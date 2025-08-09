@@ -2,9 +2,9 @@ import '@testing-library/jest-dom';
 import { vi, afterEach } from 'vitest';
 
 // Mock environment variables for tests
-process.env.NODE_ENV = 'test';
-process.env.REDIS_URL = 'redis://localhost:6379';
-process.env.REDIS_TOKEN = 'test-token';
+vi.stubEnv('NODE_ENV', 'test');
+vi.stubEnv('REDIS_URL', 'redis://localhost:6379');
+vi.stubEnv('REDIS_TOKEN', 'test-token');
 
 // Mock fetch for API tests
 global.fetch = vi.fn();
