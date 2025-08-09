@@ -1,0 +1,62 @@
+{
+  "name": "quantiv",
+  "version": "1.0.0",
+  "description": "Quantiv is a modern web platform for options traders to instantly see market-implied moves before earnings. It computes expected moves, greeks, and IV rank from live options chains, with a clean dashboard, historical comparisons, and shareable insights—helping traders act with precision and speed.",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:e2e": "playwright test",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "next": "^14.0.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "@tanstack/react-query": "^5.0.0",
+    "@headlessui/react": "^1.7.17",
+    "@heroicons/react": "^2.0.18",
+    "tailwindcss": "^3.3.0",
+    "autoprefixer": "^10.4.16",
+    "postcss": "^8.4.31",
+    "zod": "^3.22.4",
+    "clsx": "^2.0.0",
+    "tailwind-merge": "^2.0.0",
+    "@upstash/redis": "^1.25.0",
+    "lru-cache": "^10.0.0",
+    "date-fns": "^2.30.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.8.0",
+    "@types/react": "^18.2.25",
+    "@types/react-dom": "^18.2.11",
+    "typescript": "^5.2.2",
+    "eslint": "^8.51.0",
+    "eslint-config-next": "^14.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.7.4",
+    "@typescript-eslint/parser": "^6.7.4",
+    "vitest": "^0.34.6",
+    "@vitest/ui": "^0.34.6",
+    "jsdom": "^22.1.0",
+    "@testing-library/react": "^13.4.0",
+    "@testing-library/jest-dom": "^6.1.4",
+    "@playwright/test": "^1.39.0",
+    "prettier": "^3.0.3",
+    "prettier-plugin-tailwindcss": "^0.5.6"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kenchengkc/quantiv.git"
+  },
+  "keywords": ["options", "trading", "finance", "earnings", "implied-volatility", "greeks"],
+  "author": "",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/kenchengkc/quantiv/issues"
+  },
+  "homepage": "https://github.com/kenchengkc/quantiv#readme"
+}
