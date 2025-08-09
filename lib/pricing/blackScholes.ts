@@ -93,7 +93,7 @@ export function blackScholes(params: BSParams): BSResult {
   // Greeks
   const delta = {
     call: dividendFactor * Nd1,
-    put: dividendFactor * (Nd1 - 1)
+    put: -dividendFactor * NegD1
   };
 
   const gamma = (dividendFactor * nd1) / (S * params.iv * Math.sqrt(T));

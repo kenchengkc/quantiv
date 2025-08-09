@@ -1,4 +1,5 @@
 import '@testing-library/jest-dom';
+import { vi, afterEach } from 'vitest';
 
 // Mock environment variables for tests
 process.env.NODE_ENV = 'test';
