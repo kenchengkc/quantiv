@@ -107,8 +107,9 @@ describe('Black-Scholes Pricing', () => {
       expect(result.delta.put).toBeGreaterThan(-0.6);
       expect(result.delta.put).toBeLessThan(-0.4);
       
-      // Call delta + Put delta should equal -1 (put-call parity)
-      expect(Math.abs(result.delta.call + result.delta.put + 1)).toBeLessThan(0.01);
+      // Call delta - Put delta should equal e^(-q*T) (put-call parity)
+      const expectedDiff = Math.exp(-testCase1.q * testCase1.T);
+      expect(Math.abs(result.delta.call - result.delta.put - expectedDiff)).toBeLessThan(0.001);
     });
 
     it('should calculate gamma correctly', () => {
