@@ -7,8 +7,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ExpectedMoveRequestSchema, ExpectedMoveResponseSchema, createApiResponse, validateRequest } from '@/lib/schemas';
 import { CacheInstances, CacheKeys } from '@/lib/cache/lru';
 import { RedisCache, Keys, QuantivCache } from '@/lib/cache/redis';
-import { calculateExpectedMove, assessConfidence, formatExpectedMove } from '@/lib/services/expectedMove';
-import { calculateIVStats, generateMockIVData } from '@/lib/services/ivStats';
+import { computeExpectedMove, assessConfidence, formatExpectedMove } from '@/lib/services/expectedMove';
+import { calculateIVStats, createMockIVHistory } from '@/lib/services/ivStats';
 import type { ChainData } from '@/lib/services/expectedMove';
 
 /**

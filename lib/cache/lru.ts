@@ -168,7 +168,13 @@ export class QuantivLRUCache<T> {
       timestamp: number;
       age: number;
     }>;
-    stats: ReturnType<typeof this.getStats>;
+    stats: {
+      hits: number;
+      misses: number;
+      hitRate: number;
+      size: number;
+      maxSize: number;
+    };
   } {
     const entries: Array<{ key: string; timestamp: number; age: number }> = [];
     const now = Date.now();
