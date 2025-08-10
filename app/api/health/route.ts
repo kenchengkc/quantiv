@@ -35,6 +35,9 @@ export async function GET(request: NextRequest) {
     
     if (redisHealth.connected) {
       status = 'healthy';
+    } else if (redisHealth.error && redisHealth.error.includes('CRITICAL')) {
+      // If Redis has critical errors, mark as unhealthy
+      status = 'unhealthy';
     } else {
       // System can still function without Redis (L1 cache only)
       status = 'degraded';
