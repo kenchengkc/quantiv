@@ -80,7 +80,7 @@ export async function GET(request: NextRequest) {
       );
     }
     
-    const { symbol } = validation.data;
+    const { symbol } = validation.data!;
     
     // Generate cache key
     const cacheKey = CacheKeys.earnings(symbol);
@@ -119,7 +119,7 @@ export async function GET(request: NextRequest) {
       'X-Cache-Hit': cacheHit,
       'X-Processing-Time': `${processingTime}ms`,
       'X-Symbol': symbol,
-      'X-Has-Next-Earnings': earningsData.next ? 'true' : 'false'
+      'X-Has-Next-Earnings': (earningsData as any)?.next ? 'true' : 'false'
     });
     
     return NextResponse.json(response, { headers });
