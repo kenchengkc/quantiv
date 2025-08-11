@@ -31,13 +31,20 @@ export function useEarnings({ symbol }: UseEarningsParams) {
         throw new Error('Symbol is required');
       }
 
-      const response = await fetch(`/api/earnings/${symbol}`);
+      const response = await fetch(`/api/earnings?symbol=${symbol}`);
       
       if (!response.ok) {
         throw new Error(`Failed to fetch earnings data: ${response.statusText}`);
       }
 
-      return response.json();
+      const apiResponse = await response.json();
+      
+      // Extract data from API response wrapper
+      if (!apiResponse.success || !apiResponse.data) {
+        throw new Error(apiResponse.error || 'Failed to fetch earnings data');
+      }
+      
+      return apiResponse.data;
     },
     enabled: !!symbol,
     staleTime: 5 * 60 * 1000, // 5 minutes (earnings data changes less frequently)

@@ -4,10 +4,13 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { OptionsRequestSchema, OptionsResponseSchema, createApiResponse, validateRequest } from '@/lib/schemas';
+import { createApiResponse, validateRequest } from '@/lib/schemas';
+import { OptionsRequestSchema } from '@/lib/schemas';
 import { CacheInstances, CacheKeys } from '@/lib/cache/lru';
 import { RedisCache, Keys } from '@/lib/cache/redis';
 import { findATMStrike } from '@/lib/pricing/blackScholes';
+import { fetchHybridQuoteData } from '@/lib/data/sp500Service';
+import { fetchLiveOptionsChain, isLiveDataAvailable } from '@/lib/services/liveDataService';
 import type { ChainData } from '@/lib/services/expectedMove';
 
 /**
@@ -68,14 +71,13 @@ class OptionsProvider {
     });
     
     return {
-      symbol: symbol.toUpperCase(),
       spot,
       expiryDate: selectedExpiry,
       daysToExpiry,
       strikes,
       calls,
       puts,
-      timestamp: new Date().toISOString()
+
     };
   }
 }
@@ -91,7 +93,7 @@ export async function GET(request: NextRequest) {
     const url = new URL(request.url);
     const params = {
       symbol: url.searchParams.get('symbol'),
-      expiry: url.searchParams.get('expiry')
+      expiry: url.searchParams.get('expiry') || undefined
     };
     
     const validation = validateRequest(OptionsRequestSchema, params);
@@ -102,7 +104,7 @@ export async function GET(request: NextRequest) {
       );
     }
     
-    const { symbol, expiry } = validation.data;
+    const { symbol, expiry } = validation.data!;
     
     // Generate cache key
     const cacheKey = CacheKeys.optionsChain(symbol, expiry || 'default');
@@ -132,9 +134,9 @@ export async function GET(request: NextRequest) {
     }
     
     // Find ATM strike and data
-    const atmStrike = findATMStrike(chainData.spot, chainData.strikes);
-    const atmCall = chainData.calls.find(c => c.strike === atmStrike);
-    const atmPut = chainData.puts.find(p => p.strike === atmStrike);
+    const atmStrike = findATMStrike((chainData as any).strikes, (chainData as any).spot);
+    const atmCall = (chainData as any).calls.find((c: any) => c.strike === atmStrike);
+    const atmPut = (chainData as any).puts.find((p: any) => p.strike === atmStrike);
     
     if (!atmCall || !atmPut) {
       return NextResponse.json(
@@ -144,22 +146,140 @@ export async function GET(request: NextRequest) {
     }
     
     // Calculate time to expiry in years
-    const T = chainData.daysToExpiry / 365;
+    const T = (chainData as any).daysToExpiry / 365;
     
-    // Build response data
+    // Try to fetch live options data first
+    let liveOptionsData = null;
+    if (isLiveDataAvailable()) {
+      try {
+        liveOptionsData = await fetchLiveOptionsChain(symbol);
+        console.log(`[options-api] Live data ${liveOptionsData ? 'found' : 'not found'} for ${symbol}`);
+      } catch (error) {
+        console.warn(`[options-api] Live data fetch failed for ${symbol}:`, error);
+      }
+    }
+
+    // If we have live data, use it; otherwise fall back to mock data
+    if (liveOptionsData) {
+      return NextResponse.json(createApiResponse({
+        symbol,
+        chain: {
+          quote: await fetchHybridQuoteData(symbol),
+          strikes: {
+            [liveOptionsData.expirationDate]: liveOptionsData.strikes.reduce((acc, strike) => {
+              acc[`${strike.strike}C`] = {
+                strike: strike.strike,
+                type: 'call' as const,
+                bid: strike.call.bid,
+                ask: strike.call.ask,
+                last: strike.call.last,
+                volume: strike.call.volume,
+                openInterest: strike.call.openInterest,
+                impliedVolatility: strike.call.impliedVolatility,
+                delta: strike.call.delta,
+                gamma: strike.call.gamma,
+                theta: strike.call.theta,
+                vega: strike.call.vega
+              };
+              acc[`${strike.strike}P`] = {
+                strike: strike.strike,
+                type: 'put' as const,
+                bid: strike.put.bid,
+                ask: strike.put.ask,
+                last: strike.put.last,
+                volume: strike.put.volume,
+                openInterest: strike.put.openInterest,
+                impliedVolatility: strike.put.impliedVolatility,
+                delta: strike.put.delta,
+                gamma: strike.put.gamma,
+                theta: strike.put.theta,
+                vega: strike.put.vega
+              };
+              return acc;
+            }, {} as Record<string, any>)
+          }
+        }
+      }));
+    }
+
+    // Fallback to mock data
+    // Fetch enhanced quote data (real or enhanced mock)
+    const quoteData = await fetchHybridQuoteData(symbol);
+    
+    // Build response data to match MiniOptionsChain component expectations
+    const expiryDate = (chainData as any).expiryDate;
+    
+    // Create strikes object organized by expiration date
+    const strikesByExpiry: Record<string, Record<string, any>> = {};
+    strikesByExpiry[expiryDate] = {};
+    
+    // Build strikes data for the MiniOptionsChain component
+    (chainData as any).strikes.forEach((strike: any) => {
+      const call = (chainData as any).calls.find((c: any) => c.strike === strike);
+      const put = (chainData as any).puts.find((p: any) => p.strike === strike);
+      
+      // Add call option
+      if (call) {
+        strikesByExpiry[expiryDate][`${strike}C`] = {
+          strike: strike,
+          type: 'call' as const,
+          bid: call.bid,
+          ask: call.ask,
+          mark: call.mid,
+          volume: call.volume || 0,
+          openInterest: call.openInterest || 0,
+          iv: call.iv,
+          delta: call.delta,
+          inTheMoney: strike < (chainData as any).spot
+        };
+      }
+      
+      // Add put option
+      if (put) {
+        strikesByExpiry[expiryDate][`${strike}P`] = {
+          strike: strike,
+          type: 'put' as const,
+          bid: put.bid,
+          ask: put.ask,
+          mark: put.mid,
+          volume: put.volume || 0,
+          openInterest: put.openInterest || 0,
+          iv: put.iv,
+          delta: put.delta,
+          inTheMoney: strike > (chainData as any).spot
+        };
+      }
+    });
+
     const responseData = {
-      spot: chainData.spot,
-      expiryUsed: chainData.expiryDate,
+      chain: {
+        quote: {
+          last: quoteData.price,
+          change: quoteData.change,
+          changePercent: quoteData.changePercent,
+          name: quoteData.name,
+          volume: quoteData.volume,
+          marketCap: quoteData.marketCap,
+          pe: quoteData.pe,
+          high52Week: quoteData.high52Week,
+          low52Week: quoteData.low52Week
+        },
+        expirations: [{ date: expiryDate, dte: (chainData as any).daysToExpiry }],
+        strikes: strikesByExpiry
+      },
+      spot: (chainData as any).spot,
+      expiryUsed: expiryDate,
       atm: {
         strike: atmStrike,
         callMid: atmCall.mid,
         putMid: atmPut.mid,
         iv: atmCall.iv || atmPut.iv || 0.25, // Fallback IV
-        T
+        T: (chainData as any).daysToExpiry / 365
       },
-      rows: chainData.strikes.map(strike => {
-        const call = chainData.calls.find(c => c.strike === strike);
-        const put = chainData.puts.find(p => p.strike === strike);
+      // Keep rows for backward compatibility with other components
+      rows: (chainData as any).strikes.map((strike: any) => {
+        const call = (chainData as any).calls.find((c: any) => c.strike === strike);
+        const put = (chainData as any).puts.find((p: any) => p.strike === strike);
         
         return {
           strike,
@@ -195,7 +315,7 @@ export async function GET(request: NextRequest) {
       'X-Cache-Hit': cacheHit,
       'X-Processing-Time': `${processingTime}ms`,
       'X-Symbol': symbol,
-      'X-Expiry': chainData.expiryDate
+      'X-Expiry': (chainData as any).expiryDate
     });
     
     return NextResponse.json(response, { headers });
