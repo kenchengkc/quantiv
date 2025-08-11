@@ -62,6 +62,7 @@ export interface ExpectedMoveResult {
     straddle: 'high' | 'medium' | 'low';
     iv: 'high' | 'medium' | 'low';
   };
+  atm: ATMData;  // Include ATM data in the result
 }
 
 /**
@@ -245,7 +246,8 @@ export function computeExpectedMove(chain: ChainData): ExpectedMoveResult {
     straddle: straddleMove,
     iv: ivMove,
     bands,
-    confidence
+    confidence,
+    atm // Include ATM data in the result
   };
 }
 

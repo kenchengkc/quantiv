@@ -22,6 +22,15 @@ export const ExpirySchema = z.string()
     return parsed > now;
   }, 'Expiry must be in the future');
 
+export const OptionalExpirySchema = z.string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Expiry must be in YYYY-MM-DD format')
+  .refine(date => {
+    const parsed = new Date(date);
+    const now = new Date();
+    return parsed > now;
+  }, 'Expiry must be in the future')
+  .optional();
+
 export const DateSchema = z.string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format');
 
@@ -135,12 +144,12 @@ export const EarningsDataSchema = z.object({
  */
 export const OptionsRequestSchema = z.object({
   symbol: SymbolSchema,
-  expiry: ExpirySchema.optional()
+  expiry: OptionalExpirySchema
 });
 
 export const ExpectedMoveRequestSchema = z.object({
   symbol: SymbolSchema,
-  expiry: ExpirySchema.optional()
+  expiry: OptionalExpirySchema
 });
 
 export const EarningsRequestSchema = z.object({

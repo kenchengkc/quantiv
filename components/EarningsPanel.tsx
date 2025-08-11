@@ -27,7 +27,7 @@ interface EarningsPanelProps {
 }
 
 export default function EarningsPanel({ data, symbol }: EarningsPanelProps) {
-  const nextEarnings = data.events[0];
+  const nextEarnings = data?.events?.[0];
   const historicalMoves = nextEarnings?.historicalMoves?.slice(0, 8) || [];
 
   return (
@@ -77,11 +77,11 @@ export default function EarningsPanel({ data, symbol }: EarningsPanelProps) {
         <div className="mt-4 pt-4 border-t border-gray-100 grid grid-cols-2 gap-2 text-xs">
           <div>
             <span className="text-gray-500">Avg Move</span>
-            <p className="font-bold">{data.stats.avgAbsMove.toFixed(1)}%</p>
+            <p className="font-bold">{(data.stats.avgMove || data.stats.avgAbsMove || 0).toFixed(1)}%</p>
           </div>
           <div>
             <span className="text-gray-500">Beat Rate</span>
-            <p className="font-bold">{(data.stats.beatRate * 100).toFixed(0)}%</p>
+            <p className="font-bold">{((data.stats.beatRate || 0) * 100).toFixed(0)}%</p>
           </div>
         </div>
       )}

@@ -9,6 +9,7 @@ import IVRankSparkline from '@/components/IVRankSparkline';
 import EarningsPanel from '@/components/EarningsPanel';
 import MiniOptionsChain from '@/components/MiniOptionsChain';
 import SymbolSearch from '@/components/SymbolSearch';
+import { WatchlistToggle } from '@/components/WatchlistToggle';
 import { AlertCircle, Loader2 } from 'lucide-react';
 
 export default function SymbolPage() {
@@ -58,19 +59,29 @@ export default function SymbolPage() {
     <div className="container mx-auto p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">{symbol}</h1>
-          {optionsData?.chain.quote && (
-            <div className="flex items-center gap-4 mt-2 text-sm">
-              <span className="text-2xl font-semibold">
-                ${optionsData.chain.quote.last.toFixed(2)}
-              </span>
-              <span className={`font-medium ${optionsData.chain.quote.change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {optionsData.chain.quote.change >= 0 ? '+' : ''}{optionsData.chain.quote.change.toFixed(2)} 
-                ({optionsData.chain.quote.changePercent.toFixed(2)}%)
-              </span>
-            </div>
-          )}
+        <div className="flex items-center gap-4">
+          <div>
+            <h1 className="text-3xl font-bold">{symbol}</h1>
+            {optionsData?.chain.quote && (
+              <div className="flex items-center gap-4 mt-2 text-sm">
+                <span className="text-2xl font-semibold">
+                  ${optionsData.chain.quote.last.toFixed(2)}
+                </span>
+                <span className={`font-medium ${optionsData.chain.quote.change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {optionsData.chain.quote.change >= 0 ? '+' : ''}{optionsData.chain.quote.change.toFixed(2)} 
+                  ({optionsData.chain.quote.changePercent.toFixed(2)}%)
+                </span>
+              </div>
+            )}
+          </div>
+          <WatchlistToggle
+            symbol={symbol}
+            name={optionsData?.chain.quote?.name}
+            price={optionsData?.chain.quote?.last}
+            change={optionsData?.chain.quote?.change}
+            changePercent={optionsData?.chain.quote?.changePercent}
+            size="lg"
+          />
         </div>
         <SymbolSearch />
       </div>
