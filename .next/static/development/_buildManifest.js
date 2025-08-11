@@ -1,1 +1,0 @@
-self.__BUILD_MANIFEST = (function(a){return {__rewrites:{afterFiles:[{has:[{type:"query",key:"symbol",value:"(?\u003Csymbol\u003E.*)"}],source:a,destination:a}],beforeFiles:[],fallback:[]},sortedPages:["\u002F_app"]}}("\u002F:symbol"));self.__BUILD_MANIFEST_CB && self.__BUILD_MANIFEST_CB()
