@@ -19,6 +19,7 @@ interface OptionsChainData {
       last: number;
       change: number;
       changePercent: number;
+      name: string;
     };
   };
   atmStrike: number | null;
@@ -43,13 +44,20 @@ export function useOptions({ symbol }: UseOptionsParams) {
         throw new Error('Symbol is required');
       }
 
-      const response = await fetch(`/api/options/${symbol}`);
+      const response = await fetch(`/api/options?symbol=${symbol}`);
       
       if (!response.ok) {
         throw new Error(`Failed to fetch options data: ${response.statusText}`);
       }
 
-      return response.json();
+      const apiResponse = await response.json();
+      
+      // Extract data from API response wrapper
+      if (!apiResponse.success || !apiResponse.data) {
+        throw new Error(apiResponse.error || 'Failed to fetch options data');
+      }
+      
+      return apiResponse.data;
     },
     enabled: !!symbol,
     staleTime: 30 * 1000, // 30 seconds

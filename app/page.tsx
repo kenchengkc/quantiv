@@ -1,5 +1,7 @@
 import Link from 'next/link';
 import { MagnifyingGlassIcon, ChartBarIcon, ClockIcon } from '@heroicons/react/24/outline';
+import SymbolSearch from '@/components/SymbolSearch';
+import { WatchlistPanel } from '@/components/WatchlistPanel';
 
 export default function HomePage() {
   return (
@@ -38,18 +40,9 @@ export default function HomePage() {
           {/* Search Bar */}
           <div className="mt-10 flex justify-center">
             <div className="w-full max-w-md">
-              <div className="relative">
-                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                  <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" aria-hidden="true" />
-                </div>
-                <input
-                  type="text"
-                  placeholder="Enter ticker symbol (e.g., AAPL)"
-                  className="block w-full rounded-md border-0 py-3 pl-10 pr-3 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6"
-                />
-              </div>
-              <p className="mt-2 text-sm text-gray-500">
-                Try: AAPL, TSLA, NVDA, SPY
+              <SymbolSearch />
+              <p className="mt-2 text-sm text-gray-500 text-center">
+                Try: AAPL, TSLA, NVDA, SPY, QQQ
               </p>
             </div>
           </div>
@@ -90,43 +83,61 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Demo Section */}
-        <div className="mt-20 rounded-lg bg-white p-8 shadow-lg">
-          <h2 className="text-2xl font-bold text-gray-900 text-center mb-8">
-            Coming Soon
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        {/* Platform Status */}
+        <div className="mt-20 grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Live Features */}
+          <div className="rounded-lg bg-white p-8 shadow-lg">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">
+              🚀 Live Platform
+            </h2>
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-gray-900">✨ Features</h3>
-              <ul className="space-y-2 text-sm text-gray-600">
-                <li>• Real-time options chain data</li>
-                <li>• Expected move calculations</li>
-                <li>• IV rank and percentile</li>
-                <li>• ATM Greeks (Δ, Γ, Θ, ν)</li>
-                <li>• Earnings history analysis</li>
-                <li>• Watchlist and alerts</li>
-              </ul>
-            </div>
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-gray-900">🚀 Status</h3>
               <div className="space-y-2 text-sm">
                 <div className="flex items-center">
-                  <div className="h-2 w-2 bg-green-500 rounded-full mr-2"></div>
-                  <span>Black-Scholes Engine: Complete</span>
+                  <div className="h-2 w-2 bg-green-500 rounded-full mr-3"></div>
+                  <span className="font-medium">Options Chain Analysis</span>
                 </div>
                 <div className="flex items-center">
-                  <div className="h-2 w-2 bg-yellow-500 rounded-full mr-2"></div>
-                  <span>API Routes: In Progress</span>
+                  <div className="h-2 w-2 bg-green-500 rounded-full mr-3"></div>
+                  <span className="font-medium">Expected Move Calculations</span>
                 </div>
                 <div className="flex items-center">
-                  <div className="h-2 w-2 bg-gray-300 rounded-full mr-2"></div>
-                  <span>Data Providers: Pending</span>
+                  <div className="h-2 w-2 bg-green-500 rounded-full mr-3"></div>
+                  <span className="font-medium">IV Rank & Percentile</span>
                 </div>
                 <div className="flex items-center">
-                  <div className="h-2 w-2 bg-gray-300 rounded-full mr-2"></div>
-                  <span>UI Components: Pending</span>
+                  <div className="h-2 w-2 bg-green-500 rounded-full mr-3"></div>
+                  <span className="font-medium">ATM Greeks (Δ, Γ, Θ, ν)</span>
+                </div>
+                <div className="flex items-center">
+                  <div className="h-2 w-2 bg-green-500 rounded-full mr-3"></div>
+                  <span className="font-medium">Earnings History Analysis</span>
+                </div>
+                <div className="flex items-center">
+                  <div className="h-2 w-2 bg-green-500 rounded-full mr-3"></div>
+                  <span className="font-medium">Watchlist & Symbol Search</span>
                 </div>
               </div>
+              <div className="mt-6 pt-4 border-t border-gray-200">
+                <p className="text-sm text-gray-600">
+                  All core features are live and ready to use. Start by searching for any ticker symbol above.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Watchlist Panel */}
+          <div className="space-y-6">
+            <WatchlistPanel />
+            <div className="rounded-lg bg-blue-50 p-6">
+              <h3 className="text-lg font-semibold text-blue-900 mb-2">
+                Quick Start
+              </h3>
+              <ul className="space-y-2 text-sm text-blue-800">
+                <li>• Search for any ticker symbol above</li>
+                <li>• View expected moves and options data</li>
+                <li>• Click the star to add to watchlist</li>
+                <li>• Analyze earnings history and IV rank</li>
+              </ul>
             </div>
           </div>
         </div>

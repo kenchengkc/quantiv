@@ -22,13 +22,20 @@ export function useExpectedMove({ symbol }: UseExpectedMoveParams) {
         throw new Error('Symbol is required');
       }
 
-      const response = await fetch(`/api/expected-move/${symbol}`);
+      const response = await fetch(`/api/expected-move?symbol=${symbol}`);
       
       if (!response.ok) {
         throw new Error(`Failed to fetch expected move data: ${response.statusText}`);
       }
 
-      return response.json();
+      const apiResponse = await response.json();
+      
+      // Extract data from API response wrapper
+      if (!apiResponse.success || !apiResponse.data) {
+        throw new Error(apiResponse.error || 'Failed to fetch expected move data');
+      }
+      
+      return apiResponse.data;
     },
     enabled: !!symbol,
     staleTime: 30 * 1000, // 30 seconds

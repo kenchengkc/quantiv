@@ -5,11 +5,13 @@
 
 import { Redis } from '@upstash/redis';
 
-// Initialize Redis client
-const redis = new Redis({
-  url: process.env.REDIS_URL!,
-  token: process.env.REDIS_TOKEN!,
-});
+// Initialize Redis client - disabled for development
+const redis = process.env.REDIS_URL && process.env.REDIS_TOKEN 
+  ? new Redis({
+      url: process.env.REDIS_URL,
+      token: process.env.REDIS_TOKEN,
+    })
+  : null;
 
 /**
  * Redis key builders following Quantiv's naming convention
@@ -52,6 +54,7 @@ export class RedisCache {
    * Set JSON data with TTL
    */
   static async setJson<T>(key: string, data: T, ttlSeconds: number = 120): Promise<void> {
+    if (!redis) return; // Skip if Redis not configured
     try {
       await redis.setex(key, ttlSeconds, JSON.stringify(data));
     } catch (error) {
@@ -64,6 +67,7 @@ export class RedisCache {
    * Get JSON data
    */
   static async getJson<T>(key: string): Promise<T | null> {
+    if (!redis) return null; // Skip if Redis not configured
     try {
       const result = await redis.get(key);
       return result ? JSON.parse(result as string) : null;
@@ -77,6 +81,7 @@ export class RedisCache {
    * Increment counter and return new value
    */
   static async increment(key: string, ttlSeconds?: number): Promise<number> {
+    if (!redis) return 1; // Return 1 if Redis not configured
     try {
       const newValue = await redis.incr(key);
       
@@ -96,6 +101,7 @@ export class RedisCache {
    * Add to sorted set (for top movers)
    */
   static async addToSortedSet(key: string, score: number, member: string, ttlSeconds?: number): Promise<void> {
+    if (!redis) return; // Skip if Redis not configured
     try {
       await redis.zadd(key, { score, member });
       
@@ -115,6 +121,7 @@ export class RedisCache {
     member: string;
     score: number;
   }>> {
+    if (!redis) return []; // Return empty array if Redis not configured
     try {
       const result = await redis.zrange(key, 0, count - 1, { 
         rev: true, 
@@ -141,6 +148,7 @@ export class RedisCache {
    * Delete a key
    */
   static async delete(key: string): Promise<void> {
+    if (!redis) return; // Skip if Redis not configured
     try {
       await redis.del(key);
     } catch (error) {
@@ -153,6 +161,7 @@ export class RedisCache {
    * Check if key exists
    */
   static async exists(key: string): Promise<boolean> {
+    if (!redis) return false; // Return false if Redis not configured
     try {
       const result = await redis.exists(key);
       return result === 1;
@@ -166,6 +175,7 @@ export class RedisCache {
    * Get TTL for a key
    */
   static async getTTL(key: string): Promise<number> {
+    if (!redis) return -1; // Return -1 if Redis not configured
     try {
       return await redis.ttl(key);
     } catch (error) {
@@ -225,6 +235,7 @@ export class QuantivCache {
     const targetDate = date || new Date().toISOString().split('T')[0].replace(/-/g, '');
     const key = Keys.dailyVisits(targetDate);
     
+    if (!redis) return 0; // Return 0 if Redis not configured
     try {
       const count = await redis.get(key);
       return count ? parseInt(count as string, 10) : 0;
@@ -296,6 +307,12 @@ export async function checkRedisHealth(): Promise<{
   latency?: number;
   error?: string;
 }> {
+  if (!redis) {
+    return {
+      connected: false,
+      error: 'Redis not configured (missing REDIS_URL or REDIS_TOKEN)'
+    };
+  }
   try {
     const start = Date.now();
     await redis.ping();

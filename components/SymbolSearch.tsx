@@ -3,17 +3,12 @@
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Search, X } from 'lucide-react';
-
-// Popular tickers for suggestions
-const POPULAR_SYMBOLS = [
-  'SPY', 'QQQ', 'AAPL', 'MSFT', 'NVDA', 'TSLA', 'AMZN', 'META', 'GOOGL', 'AMD',
-  'NFLX', 'DIS', 'BA', 'JPM', 'V', 'PYPL', 'SQ', 'SHOP', 'COIN', 'ARKK'
-];
+import { searchStocks, getPopularStocks, type Stock } from '@/lib/data/stocks';
 
 export default function SymbolSearch() {
   const [query, setQuery] = useState('');
   const [isOpen, setIsOpen] = useState(false);
-  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [suggestions, setSuggestions] = useState<Stock[]>([]);
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -30,14 +25,14 @@ export default function SymbolSearch() {
 
   useEffect(() => {
     if (query.length > 0) {
-      const filtered = POPULAR_SYMBOLS.filter(symbol => 
-        symbol.toLowerCase().includes(query.toLowerCase())
-      );
-      setSuggestions(filtered);
-      setIsOpen(filtered.length > 0);
+      const results = searchStocks(query, 8);
+      setSuggestions(results);
+      setIsOpen(results.length > 0);
     } else {
-      setSuggestions([]);
-      setIsOpen(false);
+      // Show popular stocks when no query
+      const popular = getPopularStocks();
+      setSuggestions(popular);
+      setIsOpen(false); // Don't show dropdown for empty query
     }
   }, [query]);
 
@@ -50,7 +45,7 @@ export default function SymbolSearch() {
   };
 
   return (
-    <div ref={wrapperRef} className="relative w-full max-w-xs">
+    <div ref={wrapperRef} className="relative w-full max-w-md mx-auto">
       <form 
         onSubmit={(e) => {
           e.preventDefault();
@@ -82,14 +77,32 @@ export default function SymbolSearch() {
       </form>
 
       {isOpen && suggestions.length > 0 && (
-        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
-          {suggestions.map(symbol => (
+        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden max-h-80 overflow-y-auto">
+          {suggestions.map(item => (
             <button
-              key={symbol}
-              onClick={() => handleSubmit(symbol)}
-              className="w-full px-4 py-2 text-left hover:bg-gray-50 focus:bg-gray-50 focus:outline-none"
+              key={item.symbol}
+              onClick={() => handleSubmit(item.symbol)}
+              className="w-full px-4 py-3 text-left hover:bg-gray-50 focus:bg-gray-50 focus:outline-none border-b border-gray-100 last:border-b-0"
             >
-              <span className="font-medium">{symbol}</span>
+              <div className="flex items-center justify-between">
+                <div className="flex flex-col min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-gray-900">{item.symbol}</span>
+                    {item.exchange && (
+                      <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded">
+                        {item.exchange}
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-sm text-gray-600 truncate">{item.name}</span>
+                  {item.sector && (
+                    <span className="text-xs text-gray-500">{item.sector}</span>
+                  )}
+                </div>
+                <div className="text-xs text-gray-400 ml-2">
+                  →
+                </div>
+              </div>
             </button>
           ))}
         </div>
