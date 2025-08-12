@@ -38,9 +38,9 @@ export function useExpectedMove({ symbol }: UseExpectedMoveParams) {
       return apiResponse.data;
     },
     enabled: !!symbol,
-    staleTime: 10 * 60 * 1000, // 10 minutes - keep data fresh longer
-    gcTime: 30 * 60 * 1000, // 30 minutes - persist in cache longer (formerly cacheTime)
-    refetchInterval: false, // Don't auto-refetch to prevent data loss
+    staleTime: 60 * 60 * 1000, // 1 hour - keep expected move data stable for analysis
+    gcTime: 90 * 60 * 1000, // 1.5 hours - persist in cache longer for stability
+    refetchInterval: false, // Don't auto-refetch to prevent data loss during analysis
     refetchOnWindowFocus: false, // Don't refetch on focus to maintain stability
     refetchOnMount: false, // Don't refetch on mount if we have cached data
     retry: 3, // Retry failed requests

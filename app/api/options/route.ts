@@ -139,22 +139,31 @@ export async function GET(request: NextRequest) {
     let atmCall: any;
     let atmPut: any;
     
+    // Handle different data structures - check for wrapped 'chain' property first
+    let actualChainData = chainData;
+    
+    // If data is wrapped in a 'chain' property, unwrap it
+    if ((chainData as any).chain && typeof (chainData as any).chain === 'object') {
+      actualChainData = (chainData as any).chain;
+      console.log('[options-api] Unwrapped chain data structure');
+    }
+    
     // Check if we have the new enhanced data structure or old structure
-    if ((chainData as any).strikes && Array.isArray((chainData as any).strikes)) {
+    if ((actualChainData as any).strikes && Array.isArray((actualChainData as any).strikes)) {
       // Enhanced live data structure
-      atmStrike = findATMStrike((chainData as any).strikes, (chainData as any).spot);
-      atmCall = (chainData as any).calls?.find((c: any) => c.strike === atmStrike);
-      atmPut = (chainData as any).puts?.find((p: any) => p.strike === atmStrike);
-    } else if ((chainData as any).calls && Array.isArray((chainData as any).calls)) {
+      atmStrike = findATMStrike((actualChainData as any).strikes, (actualChainData as any).spot);
+      atmCall = (actualChainData as any).calls?.find((c: any) => c.strike === atmStrike);
+      atmPut = (actualChainData as any).puts?.find((p: any) => p.strike === atmStrike);
+    } else if ((actualChainData as any).calls && Array.isArray((actualChainData as any).calls)) {
       // Old fallback data structure - extract strikes from calls/puts
-      const callStrikes = (chainData as any).calls.map((c: any) => c.strike);
-      const putStrikes = (chainData as any).puts?.map((p: any) => p.strike) || [];
+      const callStrikes = (actualChainData as any).calls.map((c: any) => c.strike);
+      const putStrikes = (actualChainData as any).puts?.map((p: any) => p.strike) || [];
       const allStrikes = [...new Set([...callStrikes, ...putStrikes])];
       
       if (allStrikes.length > 0) {
-        atmStrike = findATMStrike(allStrikes, (chainData as any).spot);
-        atmCall = (chainData as any).calls.find((c: any) => c.strike === atmStrike);
-        atmPut = (chainData as any).puts?.find((p: any) => p.strike === atmStrike);
+        atmStrike = findATMStrike(allStrikes, (actualChainData as any).spot);
+        atmCall = (actualChainData as any).calls.find((c: any) => c.strike === atmStrike);
+        atmPut = (actualChainData as any).puts?.find((p: any) => p.strike === atmStrike);
       } else {
         console.error('[options-api] No strikes found in chain data');
         return NextResponse.json(
@@ -163,7 +172,8 @@ export async function GET(request: NextRequest) {
         );
       }
     } else {
-      console.error('[options-api] Invalid chain data structure:', Object.keys(chainData as any));
+      console.error('[options-api] Invalid chain data structure:', Object.keys(actualChainData as any));
+      console.error('[options-api] Original data keys:', Object.keys(chainData as any));
       return NextResponse.json(
         createApiResponse(undefined, 'Invalid data structure', 'Options chain data format not recognized'),
         { status: 500 }
@@ -346,16 +356,16 @@ export async function GET(request: NextRequest) {
     const quoteData = await fetchHybridQuoteData(symbol);
     
     // Build response data to match MiniOptionsChain component expectations
-    const expiryDate = (chainData as any).expiryDate;
+    const expiryDate = (actualChainData as any).expiryDate;
     
     // Create strikes object organized by expiration date
     const strikesByExpiry: Record<string, Record<string, any>> = {};
     strikesByExpiry[expiryDate] = {};
     
     // Build strikes data for the MiniOptionsChain component
-    (chainData as any).strikes.forEach((strike: any) => {
-      const call = (chainData as any).calls.find((c: any) => c.strike === strike);
-      const put = (chainData as any).puts.find((p: any) => p.strike === strike);
+    (actualChainData as any).strikes.forEach((strike: any) => {
+      const call = (actualChainData as any).calls.find((c: any) => c.strike === strike);
+      const put = (actualChainData as any).puts.find((p: any) => p.strike === strike);
       
       // Add call option
       if (call) {
@@ -403,22 +413,22 @@ export async function GET(request: NextRequest) {
           high52Week: quoteData.high52Week,
           low52Week: quoteData.low52Week
         },
-        expirations: [{ date: expiryDate, dte: (chainData as any).daysToExpiry }],
+        expirations: [{ date: expiryDate, dte: (actualChainData as any).daysToExpiry }],
         strikes: strikesByExpiry
       },
-      spot: (chainData as any).spot,
+      spot: (actualChainData as any).spot,
       expiryUsed: expiryDate,
       atm: {
         strike: atmStrike,
         callMid: atmCall.mid,
         putMid: atmPut.mid,
         iv: atmCall.iv || atmPut.iv || 0.25, // Fallback IV
-        T: (chainData as any).daysToExpiry / 365
+        T: (actualChainData as any).daysToExpiry / 365
       },
       // Keep rows for backward compatibility with other components
-      rows: (chainData as any).strikes.map((strike: any) => {
-        const call = (chainData as any).calls.find((c: any) => c.strike === strike);
-        const put = (chainData as any).puts.find((p: any) => p.strike === strike);
+      rows: (actualChainData as any).strikes.map((strike: any) => {
+        const call = (actualChainData as any).calls.find((c: any) => c.strike === strike);
+        const put = (actualChainData as any).puts.find((p: any) => p.strike === strike);
         
         return {
           strike,
