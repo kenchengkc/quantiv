@@ -38,7 +38,12 @@ export function useExpectedMove({ symbol }: UseExpectedMoveParams) {
       return apiResponse.data;
     },
     enabled: !!symbol,
-    staleTime: 30 * 1000, // 30 seconds
-    refetchInterval: 60 * 1000, // 1 minute
+    staleTime: 10 * 60 * 1000, // 10 minutes - keep data fresh longer
+    gcTime: 30 * 60 * 1000, // 30 minutes - persist in cache longer (formerly cacheTime)
+    refetchInterval: false, // Don't auto-refetch to prevent data loss
+    refetchOnWindowFocus: false, // Don't refetch on focus to maintain stability
+    refetchOnMount: false, // Don't refetch on mount if we have cached data
+    retry: 3, // Retry failed requests
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000) // Exponential backoff
   });
 }

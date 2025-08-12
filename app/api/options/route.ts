@@ -10,6 +10,7 @@ import { CacheInstances, CacheKeys } from '@/lib/cache/lru';
 import { RedisCache, Keys } from '@/lib/cache/redis';
 import { findATMStrike } from '@/lib/pricing/blackScholes';
 import { fetchHybridQuoteData } from '@/lib/data/sp500Service';
+import { fetchEnhancedQuote, fetchEnhancedOptionsChain, isEnhancedLiveDataAvailable } from '@/lib/services/enhancedLiveDataService';
 import { fetchLiveOptionsChain, isLiveDataAvailable } from '@/lib/services/liveDataService';
 import type { ChainData } from '@/lib/services/expectedMove';
 
@@ -133,10 +134,41 @@ export async function GET(request: NextRequest) {
       }
     }
     
-    // Find ATM strike and data
-    const atmStrike = findATMStrike((chainData as any).strikes, (chainData as any).spot);
-    const atmCall = (chainData as any).calls.find((c: any) => c.strike === atmStrike);
-    const atmPut = (chainData as any).puts.find((p: any) => p.strike === atmStrike);
+    // Find ATM strike and data - handle different data structures
+    let atmStrike: number;
+    let atmCall: any;
+    let atmPut: any;
+    
+    // Check if we have the new enhanced data structure or old structure
+    if ((chainData as any).strikes && Array.isArray((chainData as any).strikes)) {
+      // Enhanced live data structure
+      atmStrike = findATMStrike((chainData as any).strikes, (chainData as any).spot);
+      atmCall = (chainData as any).calls?.find((c: any) => c.strike === atmStrike);
+      atmPut = (chainData as any).puts?.find((p: any) => p.strike === atmStrike);
+    } else if ((chainData as any).calls && Array.isArray((chainData as any).calls)) {
+      // Old fallback data structure - extract strikes from calls/puts
+      const callStrikes = (chainData as any).calls.map((c: any) => c.strike);
+      const putStrikes = (chainData as any).puts?.map((p: any) => p.strike) || [];
+      const allStrikes = [...new Set([...callStrikes, ...putStrikes])];
+      
+      if (allStrikes.length > 0) {
+        atmStrike = findATMStrike(allStrikes, (chainData as any).spot);
+        atmCall = (chainData as any).calls.find((c: any) => c.strike === atmStrike);
+        atmPut = (chainData as any).puts?.find((p: any) => p.strike === atmStrike);
+      } else {
+        console.error('[options-api] No strikes found in chain data');
+        return NextResponse.json(
+          createApiResponse(undefined, 'No options data', 'No strikes available in options chain'),
+          { status: 500 }
+        );
+      }
+    } else {
+      console.error('[options-api] Invalid chain data structure:', Object.keys(chainData as any));
+      return NextResponse.json(
+        createApiResponse(undefined, 'Invalid data structure', 'Options chain data format not recognized'),
+        { status: 500 }
+      );
+    }
     
     if (!atmCall || !atmPut) {
       return NextResponse.json(
@@ -148,6 +180,113 @@ export async function GET(request: NextRequest) {
     // Calculate time to expiry in years
     const T = (chainData as any).daysToExpiry / 365;
     
+    // Try enhanced live data first if available
+    if (isEnhancedLiveDataAvailable()) {
+      try {
+        console.log(`[options-api] Fetching enhanced live data for ${symbol}`);
+        const [enhancedChain, enhancedQuote] = await Promise.all([
+          fetchEnhancedOptionsChain(symbol, expiry),
+          fetchEnhancedQuote(symbol)
+        ]);
+
+        console.log(`[options-api] Enhanced data received:`, {
+          chainExists: !!enhancedChain,
+          quoteExists: !!enhancedQuote,
+          chainStrikes: enhancedChain?.strikes?.length || 0,
+          quotePrice: enhancedQuote?.price
+        });
+
+        if (enhancedChain && enhancedQuote && enhancedChain.strikes && enhancedChain.strikes.length > 0) {
+          // Build strikes data for the MiniOptionsChain component
+          const strikesByExpiry: Record<string, Record<string, any>> = {};
+          strikesByExpiry[enhancedChain.expirationDate] = {};
+          
+          enhancedChain.strikes.forEach((strike) => {
+            // Add call option
+            strikesByExpiry[enhancedChain.expirationDate][`${strike.strike}C`] = {
+              strike: strike.strike,
+              type: 'call' as const,
+              bid: strike.call.bid,
+              ask: strike.call.ask,
+              mark: (strike.call.bid + strike.call.ask) / 2,
+              volume: strike.call.volume,
+              openInterest: strike.call.openInterest,
+              iv: strike.call.impliedVolatility,
+              delta: strike.call.delta,
+              gamma: strike.call.gamma,
+              theta: strike.call.theta,
+              vega: strike.call.vega
+            };
+            
+            // Add put option
+            strikesByExpiry[enhancedChain.expirationDate][`${strike.strike}P`] = {
+              strike: strike.strike,
+              type: 'put' as const,
+              bid: strike.put.bid,
+              ask: strike.put.ask,
+              mark: (strike.put.bid + strike.put.ask) / 2,
+              volume: strike.put.volume,
+              openInterest: strike.put.openInterest,
+              iv: strike.put.impliedVolatility,
+              delta: strike.put.delta,
+              gamma: strike.put.gamma,
+              theta: strike.put.theta,
+              vega: strike.put.vega
+            };
+          });
+
+          // Calculate days to expiry
+          const expirationDate = new Date(enhancedChain.expirationDate);
+          const today = new Date();
+          const daysToExpiry = Math.ceil((expirationDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+          const response = {
+            chain: {
+              quote: {
+                symbol: enhancedQuote.symbol,
+                name: enhancedQuote.symbol,
+                last: enhancedQuote.price,
+                change: enhancedQuote.change,
+                changePercent: enhancedQuote.changePercent,
+                volume: enhancedQuote.volume,
+                marketCap: enhancedQuote.marketCap,
+                peRatio: enhancedQuote.peRatio
+              },
+              expirations: [
+                {
+                  date: enhancedChain.expirationDate,
+                  dte: daysToExpiry
+                }
+              ],
+              strikes: strikesByExpiry
+            },
+            atmStrike: enhancedChain.strikes && enhancedChain.strikes.length > 0 
+              ? enhancedChain.strikes.reduce((closest, strike) => 
+                  Math.abs(strike.strike - enhancedQuote.price) < Math.abs(closest - enhancedQuote.price) ? strike.strike : closest, 
+                  enhancedChain.strikes[0].strike
+                )
+              : null,
+            dataSource: enhancedChain.dataSource,
+            timestamp: new Date().toISOString()
+          };
+
+          // Cache the response
+          CacheInstances.optionsChain.set(cacheKey, response, 60 * 1000); // 1 minute L1
+          const redisKey = Keys.optionsChain(symbol, expiry || 'default');
+          await RedisCache.setJson(redisKey, response, 300); // 5 minutes L2
+
+          return NextResponse.json(createApiResponse(response));
+        }
+      } catch (error) {
+        console.error(`[options-api] Enhanced live data fetch failed for ${symbol}:`, error);
+        console.error(`[options-api] Error details:`, {
+          message: error instanceof Error ? error.message : 'Unknown error',
+          stack: error instanceof Error ? error.stack : undefined
+        });
+        // Continue to fallback
+      }
+    }
+
     // Try to fetch live options data first
     let liveOptionsData = null;
     if (isLiveDataAvailable()) {

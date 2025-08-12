@@ -7,7 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { EarningsRequestSchema, EarningsResponseSchema, createApiResponse, validateRequest } from '@/lib/schemas';
 import { CacheInstances, CacheKeys } from '@/lib/cache/lru';
 import { RedisCache, Keys } from '@/lib/cache/redis';
-import { fetchLiveEarnings, isLiveDataAvailable } from '@/lib/services/liveDataService';
+import { fetchEnhancedEarnings, isEnhancedLiveDataAvailable } from '@/lib/services/enhancedLiveDataService';
 
 /**
  * Mock earnings data provider
@@ -97,42 +97,42 @@ export async function GET(request: NextRequest) {
       cacheHit = earningsData ? 'l2' : 'miss';
       
       if (!earningsData) {
-        // Try to fetch live earnings data first
-        let liveEarningsData = null;
-        if (isLiveDataAvailable()) {
+        // Try enhanced live data first if available
+        if (isEnhancedLiveDataAvailable()) {
           try {
-            liveEarningsData = await fetchLiveEarnings(symbol);
-            console.log(`[earnings-api] Live data ${liveEarningsData ? 'found' : 'not found'} for ${symbol}`);
+            const enhancedEarnings = await fetchEnhancedEarnings(symbol);
+            if (enhancedEarnings) {
+              // Transform enhanced data to match our response format
+              const transformedEarnings = {
+                symbol: enhancedEarnings.symbol,
+                nextEarningsDate: enhancedEarnings.nextEarningsDate,
+                nextEarningsTime: enhancedEarnings.nextEarningsTime,
+                estimatedEPS: enhancedEarnings.estimatedEPS,
+                events: enhancedEarnings.historicalEarnings.map((earning) => ({
+                  date: earning.date,
+                  actualEPS: earning.actualEPS,
+                  estimatedEPS: earning.estimatedEPS,
+                  surprise: earning.surprise,
+                  priceMove: earning.priceMovePercent
+                })),
+                stats: enhancedEarnings.stats,
+                dataSource: enhancedEarnings.dataSource
+              };
+
+              // Cache the response
+              CacheInstances.earnings.set(cacheKey, transformedEarnings, 120 * 1000); // 2 minutes L1
+              await RedisCache.setJson(redisKey, transformedEarnings, 600); // 10 minutes L2
+
+              return NextResponse.json(createApiResponse(transformedEarnings));
+            }
           } catch (error) {
-            console.warn(`[earnings-api] Live data fetch failed for ${symbol}:`, error);
+            console.error('Enhanced earnings data fetch failed:', error);
+            // Continue to fallback
           }
         }
 
-        // If we have live data, use it; otherwise fall back to mock provider
-        if (liveEarningsData) {
-          earningsData = {
-            next: liveEarningsData.nextEarningsDate ? {
-              date: liveEarningsData.nextEarningsDate,
-              timing: liveEarningsData.nextEarningsTime?.toLowerCase() || 'unknown',
-              actualEPS: liveEarningsData.actualEPS,
-              estimatedEPS: liveEarningsData.estimatedEPS
-            } : null,
-            last: liveEarningsData.historicalEarnings.map(earning => ({
-              date: earning.date,
-              actualEPS: earning.actualEPS,
-              estimatedEPS: earning.estimatedEPS,
-              surprise: earning.surprise,
-              realizedMovePct: earning.priceMovePercent
-            })),
-            avgMove: liveEarningsData.stats.avgMove,
-            avgAbsMove: liveEarningsData.stats.avgAbsMove,
-            beatRate: liveEarningsData.stats.beatRate,
-            avgBeat: liveEarningsData.stats.avgBeat
-          };
-        } else {
-          // Cache miss - fetch from mock provider
-          earningsData = await EarningsProvider.getEarningsData(symbol);
-        }
+        // Cache miss - fetch from mock provider
+        earningsData = await EarningsProvider.getEarningsData(symbol);
         
         // Cache in both L1 and L2
         CacheInstances.earnings.set(cacheKey, earningsData, 300 * 1000); // 5 minutes L1

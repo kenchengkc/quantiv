@@ -23,34 +23,38 @@ export default function ExpectedMoveCard({ data }: ExpectedMoveCardProps) {
   ) => {
     if (!range) return null;
 
+    // Defensive programming: handle missing or invalid percentage
+    const percentage = range.percentage ?? 0;
+    const move = range.move ?? 0;
+    const lower = range.lower ?? 0;
+    const upper = range.upper ?? 0;
+
+    // Debug logging to see what data we're getting
+    if (typeof percentage !== 'number') {
+      console.warn(`ExpectedMoveCard: Invalid percentage for ${label}:`, range);
+    }
+
     return (
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <span className="text-sm font-medium text-gray-600">{label}</span>
-          <span className="text-sm font-bold">±{range.percentage.toFixed(2)}%</span>
+          <span className="text-sm font-bold">±{percentage.toFixed(2)}%</span>
         </div>
         <div className="relative">
           <div className="flex items-center justify-between text-xs">
             <span className="flex items-center gap-1 text-red-600">
               <TrendingDown className="h-3 w-3" />
-              ${range.lower.toFixed(2)}
+              ${lower.toFixed(2)}
             </span>
             <span className="flex items-center gap-1 text-green-600">
-              ${range.upper.toFixed(2)}
+              ${upper.toFixed(2)}
               <TrendingUp className="h-3 w-3" />
             </span>
           </div>
-          <div className="mt-2 h-2 bg-gray-200 rounded-full relative overflow-hidden">
+          <div className="mt-2 h-2 bg-gray-100 rounded-full overflow-hidden">
             <div 
-              className="absolute h-full bg-gradient-to-r from-red-500 via-yellow-500 to-green-500"
-              style={{
-                left: `${Math.max(0, ((range.lower - spotPrice * 0.8) / (spotPrice * 0.4)) * 100)}%`,
-                right: `${Math.max(0, ((spotPrice * 1.2 - range.upper) / (spotPrice * 0.4)) * 100)}%`
-              }}
-            />
-            <div 
-              className="absolute w-0.5 h-full bg-gray-900"
-              style={{ left: '50%' }}
+              className="h-full bg-gradient-to-r from-red-400 via-yellow-400 to-green-400"
+              style={{ width: '100%' }}
             />
           </div>
         </div>
