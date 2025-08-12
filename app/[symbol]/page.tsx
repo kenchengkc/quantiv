@@ -4,6 +4,7 @@ import { useParams } from 'next/navigation';
 import { useOptions } from '@/hooks/useOptions';
 import { useExpectedMove } from '@/hooks/useExpectedMove';
 import { useEarnings } from '@/hooks/useEarnings';
+import { usePageTimeout } from '@/hooks/usePageTimeout';
 import ExpectedMoveCard from '@/components/ExpectedMoveCard';
 import IVRankSparkline from '@/components/IVRankSparkline';
 import EarningsPanel from '@/components/EarningsPanel';
@@ -15,6 +16,15 @@ import { AlertCircle, Loader2 } from 'lucide-react';
 export default function SymbolPage() {
   const params = useParams();
   const symbol = (params.symbol as string)?.toUpperCase();
+
+  // Auto-redirect to homepage after 1 hour to prevent stale data analysis
+  usePageTimeout({
+    timeoutMinutes: 60,
+    redirectPath: '/',
+    onTimeout: () => {
+      console.log(`[${symbol}] Session expired after 1 hour, redirecting to homepage`);
+    }
+  });
 
   const { data: optionsData, isLoading: optionsLoading, error: optionsError } = useOptions({ symbol });
   const { data: emData, isLoading: emLoading, error: emError } = useExpectedMove({ symbol });
