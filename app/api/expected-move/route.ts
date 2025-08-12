@@ -236,9 +236,9 @@ export async function GET(request: NextRequest) {
           const realisticExpectedMove = await RealisticExpectedMoveCalculator.calculateRealisticExpectedMove(symbol);
           expectedMoveData = formatRealisticExpectedMove(realisticExpectedMove);
 
-          // Cache the enhanced data for longer persistence
-          CacheInstances.expectedMove.set(emCacheKey, expectedMoveData, 30 * 60 * 1000); // 30 minutes L1
-          await RedisCache.setJson(Keys.expectedMoveSnapshot(symbol, expiry || 'default'), expectedMoveData, 1800); // 30 min TTL for persistence
+          // Cache the enhanced data for 1 hour stability
+          CacheInstances.expectedMove.set(emCacheKey, expectedMoveData, 60 * 60 * 1000); // 1 hour L1
+          await RedisCache.setJson(Keys.expectedMoveSnapshot(symbol, expiry || 'default'), expectedMoveData, 3600); // 1 hour TTL for analysis stability
 
           const response = createApiResponse(expectedMoveData);
           return NextResponse.json(response);
@@ -250,9 +250,9 @@ export async function GET(request: NextRequest) {
         const realisticExpectedMove = await RealisticExpectedMoveCalculator.calculateRealisticExpectedMove(symbol);
         expectedMoveData = formatRealisticExpectedMove(realisticExpectedMove);
         
-        // Cache expected move in both layers for longer persistence
-        CacheInstances.expectedMove.set(emCacheKey, expectedMoveData, 30 * 60 * 1000); // 30 minutes L1
-        await QuantivCache.cacheExpectedMove(symbol, expiry || 'default', expectedMoveData, 1800); // 30 minutes L2
+        // Cache expected move in both layers for 1 hour stability
+        CacheInstances.expectedMove.set(emCacheKey, expectedMoveData, 60 * 60 * 1000); // 1 hour L1
+        await QuantivCache.cacheExpectedMove(symbol, expiry || 'default', expectedMoveData, 3600); // 1 hour L2
         
         // Add to top movers if significant move
         if ((expectedMoveData as any)?.straddle?.pct > 5.0) {
@@ -261,8 +261,8 @@ export async function GET(request: NextRequest) {
         
         cacheHit = 'miss';
       } else {
-        // Cache in L1 for next time with longer persistence
-        CacheInstances.expectedMove.set(emCacheKey, expectedMoveData, 30 * 60 * 1000); // 30 minutes L1
+        // Cache in L1 for next time with 1 hour stability
+        CacheInstances.expectedMove.set(emCacheKey, expectedMoveData, 60 * 60 * 1000); // 1 hour L1
       }
     }
     

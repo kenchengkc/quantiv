@@ -60,7 +60,10 @@ export function useOptions({ symbol }: UseOptionsParams) {
       return apiResponse.data;
     },
     enabled: !!symbol,
-    staleTime: 30 * 1000, // 30 seconds
-    refetchInterval: 60 * 1000, // 1 minute
+    staleTime: 10 * 1000, // 10 seconds - rapid updates for live prices
+    gcTime: 5 * 60 * 1000, // 5 minutes - shorter cache for live data
+    refetchInterval: 30 * 1000, // 30 seconds - frequent updates for live prices
+    refetchOnWindowFocus: true, // Refetch when user returns to tab
+    refetchOnMount: true // Always get fresh data on mount
   });
 }
