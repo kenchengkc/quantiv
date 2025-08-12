@@ -8,8 +8,11 @@ import { ExpectedMoveRequestSchema, ExpectedMoveResponseSchema, createApiRespons
 import { CacheInstances, CacheKeys } from '@/lib/cache/lru';
 import { RedisCache, Keys, QuantivCache } from '@/lib/cache/redis';
 import { fetchLiveExpectedMove, isLiveDataAvailable } from '@/lib/services/liveDataService';
+import { fetchEnhancedQuote, fetchEnhancedOptionsChain, isEnhancedLiveDataAvailable } from '@/lib/services/enhancedLiveDataService';
 import { computeExpectedMove, assessConfidence, formatExpectedMove } from '@/lib/services/expectedMove';
 import { calculateIVStats, createMockIVHistory } from '@/lib/services/ivStats';
+import { sp500DataService, fetchHybridQuoteData } from '@/lib/data/sp500Service';
+import { RealisticExpectedMoveCalculator, formatRealisticExpectedMove } from '@/lib/services/realisticExpectedMove';
 import type { ChainData } from '@/lib/services/expectedMove';
 
 /**
@@ -21,50 +24,83 @@ class OptionsProvider {
     // Simulate API delay
     await new Promise(resolve => setTimeout(resolve, 80));
     
-    const spot = 150.00 + Math.random() * 50;
+    // Get stock-specific data from S&P 500 service
+    const company = sp500DataService.getCompany(symbol);
+    const quoteData = await fetchHybridQuoteData(symbol);
+    
+    // Use real stock price if available, otherwise sector-appropriate price
+    const sectorPriceRange = this.getSectorPriceRange(company?.sector || 'Technology');
+    const spot = quoteData?.price || sectorPriceRange.min + 
+                 Math.random() * (sectorPriceRange.max - sectorPriceRange.min);
+    
     const selectedExpiry = expiry || '2024-02-16';
     const expiryDate = new Date(selectedExpiry);
     const daysToExpiry = Math.max(1, Math.ceil((expiryDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
     
-    // Generate strikes around spot price
+    // Generate strikes around spot price with appropriate spacing
     const strikes: number[] = [];
-    const baseStrike = Math.round(spot / 5) * 5;
+    const strikeSpacing = spot > 200 ? 10 : spot > 100 ? 5 : spot > 50 ? 2.5 : 1;
+    const baseStrike = Math.round(spot / strikeSpacing) * strikeSpacing;
     for (let i = -10; i <= 10; i++) {
-      strikes.push(baseStrike + (i * 5));
+      strikes.push(baseStrike + (i * strikeSpacing));
     }
     
-    // Generate mock options data with realistic pricing
+    // Get sector-specific implied volatility ranges
+    const sectorIVRange = this.getSectorIVRange(company?.sector || 'Technology');
+    const baseIV = sectorIVRange.min + Math.random() * (sectorIVRange.max - sectorIVRange.min);
+    
+    // Generate stock-specific options data with realistic pricing
     const calls = strikes.map(strike => {
       const intrinsic = Math.max(0, spot - strike);
-      const timeValue = Math.random() * 3 + 0.5;
+      const moneyness = strike / spot;
+      
+      // Adjust IV based on moneyness (volatility smile)
+      let iv = baseIV;
+      if (moneyness < 0.95 || moneyness > 1.05) {
+        iv *= 1.2; // Higher IV for OTM options
+      }
+      
+      // Calculate time value based on IV and time to expiry
+      const timeValue = spot * iv * Math.sqrt(daysToExpiry / 365) * 0.4;
       const mid = intrinsic + timeValue;
-      const spread = Math.max(0.01, mid * 0.04); // 4% spread
+      const spread = Math.max(0.01, mid * 0.03); // Tighter spreads for liquid stocks
       
       return {
         strike,
         mid,
         bid: Math.max(0.01, mid - spread / 2),
         ask: mid + spread / 2,
-        iv: 0.20 + Math.random() * 0.30,
-        volume: Math.floor(Math.random() * 1000),
-        openInterest: Math.floor(Math.random() * 5000)
+        iv: iv,
+        volume: Math.floor(Math.random() * this.getSectorVolumeRange(company?.sector || 'Technology').max),
+        openInterest: Math.floor(Math.random() * 10000)
       };
     });
     
     const puts = strikes.map(strike => {
       const intrinsic = Math.max(0, strike - spot);
-      const timeValue = Math.random() * 3 + 0.5;
+      const moneyness = strike / spot;
+      
+      // Adjust IV based on moneyness (volatility smile)
+      let iv = baseIV;
+      if (moneyness < 0.95 || moneyness > 1.05) {
+        iv *= 1.2; // Higher IV for OTM options
+      }
+      
+      // Put-call skew: puts typically have higher IV
+      iv *= 1.05;
+      
+      const timeValue = spot * iv * Math.sqrt(daysToExpiry / 365) * 0.4;
       const mid = intrinsic + timeValue;
-      const spread = Math.max(0.01, mid * 0.04);
+      const spread = Math.max(0.01, mid * 0.03);
       
       return {
         strike,
         mid,
         bid: Math.max(0.01, mid - spread / 2),
         ask: mid + spread / 2,
-        iv: 0.20 + Math.random() * 0.30,
-        volume: Math.floor(Math.random() * 1000),
-        openInterest: Math.floor(Math.random() * 5000)
+        iv: iv,
+        volume: Math.floor(Math.random() * this.getSectorVolumeRange(company?.sector || 'Technology').max),
+        openInterest: Math.floor(Math.random() * 10000)
       };
     });
     
@@ -76,6 +112,60 @@ class OptionsProvider {
       calls,
       puts
     };
+  }
+
+  // Get sector-specific implied volatility ranges
+  static getSectorIVRange(sector: string): { min: number; max: number } {
+    const ivRanges: Record<string, { min: number; max: number }> = {
+      'Technology': { min: 0.25, max: 0.45 }, // Higher volatility
+      'Healthcare': { min: 0.20, max: 0.35 },
+      'Financial Services': { min: 0.18, max: 0.30 },
+      'Consumer Cyclical': { min: 0.22, max: 0.38 },
+      'Communication Services': { min: 0.20, max: 0.35 },
+      'Industrials': { min: 0.18, max: 0.28 },
+      'Consumer Defensive': { min: 0.15, max: 0.25 }, // Lower volatility
+      'Energy': { min: 0.25, max: 0.40 },
+      'Utilities': { min: 0.12, max: 0.22 }, // Lowest volatility
+      'Real Estate': { min: 0.18, max: 0.30 },
+      'Materials': { min: 0.20, max: 0.32 }
+    };
+    return ivRanges[sector] || ivRanges['Technology'];
+  }
+
+  // Get sector-specific volume ranges
+  static getSectorVolumeRange(sector: string): { min: number; max: number } {
+    const volumeRanges: Record<string, { min: number; max: number }> = {
+      'Technology': { min: 500, max: 5000 }, // High volume
+      'Healthcare': { min: 200, max: 2000 },
+      'Financial Services': { min: 300, max: 3000 },
+      'Consumer Cyclical': { min: 100, max: 1500 },
+      'Communication Services': { min: 200, max: 2500 },
+      'Industrials': { min: 100, max: 1000 },
+      'Consumer Defensive': { min: 50, max: 800 },
+      'Energy': { min: 200, max: 2000 },
+      'Utilities': { min: 50, max: 500 }, // Lowest volume
+      'Real Estate': { min: 100, max: 1000 },
+      'Materials': { min: 150, max: 1200 }
+    };
+    return volumeRanges[sector] || volumeRanges['Technology'];
+  }
+
+  // Get sector-specific price ranges
+  static getSectorPriceRange(sector: string): { min: number; max: number } {
+    const priceRanges: Record<string, { min: number; max: number }> = {
+      'Technology': { min: 50, max: 500 }, // Wide range for tech stocks
+      'Healthcare': { min: 30, max: 300 },
+      'Financial Services': { min: 20, max: 200 },
+      'Consumer Cyclical': { min: 25, max: 250 },
+      'Communication Services': { min: 40, max: 400 },
+      'Industrials': { min: 30, max: 180 },
+      'Consumer Defensive': { min: 40, max: 150 },
+      'Energy': { min: 20, max: 120 },
+      'Utilities': { min: 60, max: 100 }, // Narrow range for utilities
+      'Real Estate': { min: 15, max: 80 },
+      'Materials': { min: 25, max: 150 }
+    };
+    return priceRanges[sector] || priceRanges['Technology'];
   }
 }
 
@@ -117,91 +207,52 @@ export async function GET(request: NextRequest) {
       cacheHit = expectedMoveData ? 'l2' : 'miss';
       
       if (!expectedMoveData) {
-        // Try to fetch live expected move data first
-        let liveExpectedMoveData = null;
-        if (isLiveDataAvailable()) {
+        // Try to fetch enhanced live data first
+        let enhancedQuote = null;
+        let enhancedChain = null;
+        if (isEnhancedLiveDataAvailable()) {
           try {
-            liveExpectedMoveData = await fetchLiveExpectedMove(symbol);
-            console.log(`[expected-move-api] Live data ${liveExpectedMoveData ? 'found' : 'not found'} for ${symbol}`);
+            console.log(`[expected-move-api] Fetching enhanced live data for ${symbol}`);
+            [enhancedQuote, enhancedChain] = await Promise.all([
+              fetchEnhancedQuote(symbol),
+              fetchEnhancedOptionsChain(symbol, expiry)
+            ]);
+            console.log(`[expected-move-api] Enhanced data received:`, {
+              quoteExists: !!enhancedQuote,
+              chainExists: !!enhancedChain,
+              quotePrice: enhancedQuote?.price,
+              chainStrikes: enhancedChain?.strikes?.length || 0
+            });
           } catch (error) {
-            console.warn(`[expected-move-api] Live data fetch failed for ${symbol}:`, error);
+            console.warn(`[expected-move-api] Enhanced live data fetch failed for ${symbol}:`, error);
           }
         }
 
-        // If we have live data, use it
-        if (liveExpectedMoveData) {
-          expectedMoveData = {
-            symbol,
-            summary: {
-              daily: liveExpectedMoveData.summary.daily,
-              weekly: liveExpectedMoveData.summary.weekly,
-              monthly: liveExpectedMoveData.summary.monthly
-            },
-            straddle: {
-              price: liveExpectedMoveData.straddle.price,
-              move: liveExpectedMoveData.straddle.move,
-              movePercent: liveExpectedMoveData.straddle.movePercent
-            },
-            iv: {
-              rank: liveExpectedMoveData.iv.rank,
-              percentile: liveExpectedMoveData.iv.percentile,
-              current: liveExpectedMoveData.iv.current,
-              high52Week: liveExpectedMoveData.iv.high52Week,
-              low52Week: liveExpectedMoveData.iv.low52Week
-            },
-            confidence: 'high' as const,
-            method: 'straddle' as const,
-            timeToExpiry: liveExpectedMoveData.timeToExpiry,
-            underlyingPrice: liveExpectedMoveData.underlyingPrice,
-            impliedVolatility: liveExpectedMoveData.impliedVolatility
-          };
+        // If we have enhanced live data, use it to calculate realistic expected move
+        if (enhancedQuote && enhancedChain && enhancedChain.strikes && enhancedChain.strikes.length > 0) {
+          console.log(`[expected-move-api] Using enhanced live data for realistic expected move calculation`);
+          
+          // Use realistic expected move calculator with live data
+          const realisticExpectedMove = await RealisticExpectedMoveCalculator.calculateRealisticExpectedMove(symbol);
+          expectedMoveData = formatRealisticExpectedMove(realisticExpectedMove);
 
-          // Cache the live data
-          CacheInstances.expectedMove.set(emCacheKey, expectedMoveData);
-          await RedisCache.setJson(Keys.expectedMoveSnapshot(symbol, expiry || 'default'), expectedMoveData, 300); // 5 min TTL for live data
+          // Cache the enhanced data for longer persistence
+          CacheInstances.expectedMove.set(emCacheKey, expectedMoveData, 30 * 60 * 1000); // 30 minutes L1
+          await RedisCache.setJson(Keys.expectedMoveSnapshot(symbol, expiry || 'default'), expectedMoveData, 1800); // 30 min TTL for persistence
 
           const response = createApiResponse(expectedMoveData);
           return NextResponse.json(response);
         }
 
-        // Cache miss - calculate expected move using mock data
+        // Cache miss - calculate realistic expected move
         
-        // First, get options chain data
-        const chainCacheKey = CacheKeys.optionsChain(symbol, expiry || 'default');
-        let chainData = CacheInstances.optionsChain.get(chainCacheKey);
+        // Use realistic expected move calculator based on historical data
+        const realisticExpectedMove = await RealisticExpectedMoveCalculator.calculateRealisticExpectedMove(symbol);
+        expectedMoveData = formatRealisticExpectedMove(realisticExpectedMove);
         
-        if (!chainData) {
-          // Try Redis for chain data
-          const chainRedisKey = Keys.optionsChain(symbol, expiry || 'default');
-          chainData = await RedisCache.getJson<ChainData>(chainRedisKey);
-          
-          if (!chainData) {
-            // Fetch fresh chain data
-            chainData = await OptionsProvider.getChain(symbol, expiry);
-            
-            // Cache chain data
-            CacheInstances.optionsChain.set(chainCacheKey, chainData, 60 * 1000);
-            await RedisCache.setJson(chainRedisKey, chainData, 300);
-          } else {
-            // Cache in L1
-            CacheInstances.optionsChain.set(chainCacheKey, chainData, 60 * 1000);
-          }
-        }
-        
-        // Calculate expected move
-        const expectedMove = computeExpectedMove(chainData as ChainData);
-        const confidence = assessConfidence(chainData as ChainData, (expectedMove as any).atm);
-        
-        expectedMoveData = {
-          ...expectedMove,
-          confidence,
-          timestamp: new Date().toISOString(),
-          symbol: symbol
-        };
-        
-        // Cache expected move in both layers
-        CacheInstances.expectedMove.set(emCacheKey, expectedMoveData, 90 * 1000); // 1.5 minutes L1
-        await QuantivCache.cacheExpectedMove(symbol, expiry || 'default', expectedMoveData, 180); // 3 minutes L2
+        // Cache expected move in both layers for longer persistence
+        CacheInstances.expectedMove.set(emCacheKey, expectedMoveData, 30 * 60 * 1000); // 30 minutes L1
+        await QuantivCache.cacheExpectedMove(symbol, expiry || 'default', expectedMoveData, 1800); // 30 minutes L2
         
         // Add to top movers if significant move
         if ((expectedMoveData as any)?.straddle?.pct > 5.0) {
@@ -210,8 +261,8 @@ export async function GET(request: NextRequest) {
         
         cacheHit = 'miss';
       } else {
-        // Cache in L1 for next time
-        CacheInstances.expectedMove.set(emCacheKey, expectedMoveData, 90 * 1000);
+        // Cache in L1 for next time with longer persistence
+        CacheInstances.expectedMove.set(emCacheKey, expectedMoveData, 30 * 60 * 1000); // 30 minutes L1
       }
     }
     
