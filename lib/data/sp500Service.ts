@@ -458,11 +458,35 @@ export function getPopularSP500Stocks(): SP500Company[] {
 }
 
 export async function fetchLiveQuoteData(symbol: string): Promise<LiveQuoteData | null> {
-  // Try to fetch live data first
-  const liveData = await sp500DataService.fetchLiveQuote(symbol);
-  
-  if (liveData) {
-    return liveData;
+  try {
+    // Import enhanced live data service dynamically to avoid circular imports
+    const { fetchEnhancedQuote } = await import('@/lib/services/enhancedLiveDataService');
+    
+    // Try to fetch live data first
+    const enhancedQuote = await fetchEnhancedQuote(symbol);
+    
+    if (enhancedQuote && enhancedQuote.price > 0) {
+      // Convert enhanced quote to LiveQuoteData format
+      const company = sp500DataService.getCompany(symbol);
+      return {
+        symbol: enhancedQuote.symbol,
+        name: company?.name || symbol,
+        price: enhancedQuote.price,
+        change: enhancedQuote.change,
+        changePercent: enhancedQuote.changePercent,
+        volume: enhancedQuote.volume,
+        marketCap: enhancedQuote.marketCap,
+        pe: enhancedQuote.peRatio,
+        timestamp: new Date().toISOString()
+      };
+    }
+  } catch (error) {
+    // Handle rate limiting gracefully
+    if (error instanceof Error && error.message.includes('429')) {
+      console.warn(`[fetchLiveQuoteData] API rate limited for ${symbol}, using enhanced mock data`);
+    } else {
+      console.warn(`[fetchLiveQuoteData] Enhanced live data failed for ${symbol}:`, error);
+    }
   }
 
   // Fall back to enhanced mock data based on real S&P 500 company info
