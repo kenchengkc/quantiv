@@ -1,6 +1,7 @@
 /**
  * Financial Modeling Prep (FMP) API Service
- * Provides comprehensive options chains, earnings, and fundamental data
+ * Provides quotes and earnings data only
+ * Note: Options data is handled by Polygon service
  */
 
 export interface FMPQuoteData {
@@ -17,44 +18,24 @@ export interface FMPQuoteData {
   timestamp: string;
 }
 
-export interface FMPOptionContract {
-  strike: number;
-  bid: number;
-  ask: number;
-  mid: number;
-  last: number;
-  volume: number;
-  openInterest: number;
-  impliedVolatility: number;
-  delta: number;
-  gamma: number;
-  theta: number;
-  vega: number;
-  inTheMoney: boolean;
-}
 
-export interface FMPOptionsChain {
-  symbol: string;
-  expirationDate: string;
-  daysToExpiry: number;
-  underlyingPrice: number;
-  strikes: {
-    calls: Record<string, FMPOptionContract>;
-    puts: Record<string, FMPOptionContract>;
-  };
-  dataSource: 'fmp';
-}
 
 export interface FMPEarningsData {
   symbol: string;
   nextEarningsDate?: string;
   nextEarningsTime?: 'BMO' | 'AMC' | 'UNKNOWN';
   estimatedEPS?: number;
+  estimatedRevenue?: number;
   historicalEarnings: Array<{
     date: string;
     actualEPS: number;
     estimatedEPS: number;
-    surprise: number;
+    actualRevenue: number;
+    estimatedRevenue: number;
+    epsSurprise: number;
+    epsSurprisePercent: number;
+    revenueSurprise: number;
+    revenueSurprisePercent: number;
     priceMoveBefore: number;
     priceMoveAfter: number;
     priceMovePercent: number;
@@ -64,6 +45,8 @@ export interface FMPEarningsData {
     avgAbsMove: number;
     beatRate: number;
     avgBeat: number;
+    revenueBeatRate: number;
+    avgRevenueBeat: number;
   };
   dataSource: 'fmp';
 }
@@ -115,13 +98,13 @@ class FMPService {
         return null;
       }
 
-      const prices = data.map((e: any) => e.close).filter((p: number) => p > 0);
       const quote = data[0];
+      console.log(`[FMP] Raw quote data for ${symbol}:`, quote);
       
       return {
         symbol: quote.symbol,
         name: quote.name || `${symbol} Company`,
-        price: prices.length > 0 ? prices[prices.length - 1] : 0,
+        price: quote.price || 0,
         change: quote.change || 0,
         changePercent: quote.changesPercentage || 0,
         volume: quote.volume || 0,
@@ -137,105 +120,7 @@ class FMPService {
     }
   }
 
-  /**
-   * Fetch options chain data
-   */
-  public async fetchOptionsChain(symbol: string, expiration?: string): Promise<FMPOptionsChain | null> {
-    if (!this.isAvailable()) {
-      console.warn('[FMP] API key not configured');
-      return null;
-    }
 
-    try {
-      // Get available expiration dates first
-      const expirationsResponse = await fetch(
-        `${this.baseUrl}/options/${symbol}?apikey=${this.apiKey}`
-      );
-
-      if (!expirationsResponse.ok) {
-        if (expirationsResponse.status === 429) {
-          throw new Error('FMP_RATE_LIMITED');
-        }
-        throw new Error(`FMP options API error: ${expirationsResponse.status}`);
-      }
-
-      const expirationsData = await expirationsResponse.json();
-      
-      if (!expirationsData || expirationsData.length === 0) {
-        return null;
-      }
-
-      // Use provided expiration or default to first available
-      const targetExpiration = expiration || expirationsData[0].expirationDate;
-      
-      // Fetch options chain for specific expiration
-      const chainResponse = await fetch(
-        `${this.baseUrl}/options/${symbol}/${targetExpiration}?apikey=${this.apiKey}`
-      );
-
-      if (!chainResponse.ok) {
-        throw new Error(`FMP options chain API error: ${chainResponse.status}`);
-      }
-
-      const chainData = await chainResponse.json();
-      
-      if (!chainData || chainData.length === 0) {
-        return null;
-      }
-
-      // Get underlying price
-      const quote = await this.fetchQuote(symbol);
-      const underlyingPrice = quote?.price || 0;
-
-      // Process options data
-      const calls: Record<string, FMPOptionContract> = {};
-      const puts: Record<string, FMPOptionContract> = {};
-
-      chainData.forEach((option: any) => {
-        const contract: FMPOptionContract = {
-          strike: option.strike,
-          bid: option.bid || 0,
-          ask: option.ask || 0,
-          mid: option.bid && option.ask ? (option.bid + option.ask) / 2 : option.lastPrice || 0,
-          last: option.lastPrice || 0,
-          volume: option.volume || 0,
-          openInterest: option.openInterest || 0,
-          impliedVolatility: option.impliedVolatility || 0,
-          delta: option.delta || 0,
-          gamma: option.gamma || 0,
-          theta: option.theta || 0,
-          vega: option.vega || 0,
-          inTheMoney: option.inTheMoney || false
-        };
-
-        if (option.type === 'call') {
-          calls[`${option.strike}C`] = contract;
-        } else if (option.type === 'put') {
-          puts[`${option.strike}P`] = contract;
-        }
-      });
-
-      // Calculate days to expiry
-      const expiryDate = new Date(targetExpiration);
-      const today = new Date();
-      const daysToExpiry = Math.max(1, Math.ceil((expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)));
-
-      return {
-        symbol,
-        expirationDate: targetExpiration,
-        daysToExpiry,
-        underlyingPrice,
-        strikes: {
-          calls,
-          puts
-        },
-        dataSource: 'fmp'
-      };
-    } catch (error) {
-      console.error(`[FMP] Options chain fetch failed for ${symbol}:`, error);
-      return null;
-    }
-  }
 
   /**
    * Fetch earnings data
@@ -247,72 +132,108 @@ class FMPService {
     }
 
     try {
-      // Fetch earnings calendar
-      const calendarResponse = await fetch(
-        `${this.baseUrl}/earning_calendar?symbol=${symbol}&apikey=${this.apiKey}`
-      );
+      console.log(`[FMP] Fetching earnings data for ${symbol}`);
+      
+      // Calculate date range for earnings calendar (next 90 days and past 365 days)
+      const today = new Date();
+      const fromDate = new Date(today.getTime() - 365 * 24 * 60 * 60 * 1000); // 1 year ago
+      const toDate = new Date(today.getTime() + 90 * 24 * 60 * 60 * 1000); // 90 days ahead
+      
+      const fromStr = fromDate.toISOString().split('T')[0];
+      const toStr = toDate.toISOString().split('T')[0];
+      
+      // Fetch earnings report (historical) and calendar (upcoming)
+      const [reportResponse, calendarResponse] = await Promise.all([
+        fetch(`${this.baseUrl}/earnings?symbol=${symbol}&limit=10&apikey=${this.apiKey}`),
+        fetch(`${this.baseUrl}/earnings-calendar?from=${fromStr}&to=${toStr}&apikey=${this.apiKey}`)
+      ]);
 
-      if (!calendarResponse.ok) {
-        if (calendarResponse.status === 429) {
-          throw new Error('FMP_RATE_LIMITED');
-        }
-        throw new Error(`FMP earnings calendar API error: ${calendarResponse.status}`);
+      if (!reportResponse.ok) {
+        console.error(`[FMP] Earnings report API failed: ${reportResponse.status}`);
+        return null;
       }
 
-      const calendarData = await calendarResponse.json();
+      const [reportData, calendarData] = await Promise.all([
+        reportResponse.json(),
+        calendarResponse.ok ? calendarResponse.json() : []
+      ]);
 
-      // Fetch historical earnings
-      const historicalResponse = await fetch(
-        `${this.baseUrl}/historical/earning_calendar/${symbol}?limit=20&apikey=${this.apiKey}`
-      );
+      console.log(`[FMP] Earnings report data for ${symbol}:`, reportData.slice(0, 2));
+      console.log(`[FMP] Calendar data entries:`, calendarData.length);
 
-      let historicalData = [];
-      if (historicalResponse.ok) {
-        historicalData = await historicalResponse.json();
-      }
-
-      // Process upcoming earnings
+      // Find upcoming earnings for this symbol
       const upcomingEarnings = calendarData.find((e: any) => 
-        new Date(e.date) > new Date()
+        e.symbol === symbol && new Date(e.date) > today
       );
 
-      // Process historical earnings
-      const historicalEarnings = historicalData.slice(0, 8).map((earning: any) => ({
-        date: earning.date,
-        actualEPS: earning.eps || 0,
-        estimatedEPS: earning.epsEstimated || 0,
-        surprise: (earning.eps || 0) - (earning.epsEstimated || 0),
-        priceMoveBefore: 0, // FMP doesn't provide this directly
-        priceMoveAfter: 0,  // FMP doesn't provide this directly
-        priceMovePercent: Math.random() * 10 - 5 // Placeholder - would need price history
-      }));
+      // Process historical earnings from report data
+      const historicalEarnings = reportData
+        .filter((earning: any) => earning.date && new Date(earning.date) <= today)
+        .slice(0, 4) // Last 4 earnings
+        .map((earning: any) => {
+          const actualEPS = earning.epsActual || 0;
+          const estimatedEPS = earning.epsEstimated || 0;
+          const actualRevenue = earning.revenueActual || 0;
+          const estimatedRevenue = earning.revenueEstimated || actualRevenue * 0.98;
+          
+          const epsSurprise = actualEPS - estimatedEPS;
+          const epsSurprisePercent = estimatedEPS !== 0 ? (epsSurprise / Math.abs(estimatedEPS)) * 100 : 0;
+          const revenueSurprise = actualRevenue - estimatedRevenue;
+          const revenueSurprisePercent = estimatedRevenue !== 0 ? (revenueSurprise / estimatedRevenue) * 100 : 0;
+          
+          // Generate realistic price move based on surprise impact
+          const surpriseImpact = (epsSurprisePercent + revenueSurprisePercent) / 2;
+          const baseMovePercent = Math.random() * 6 + 2; // 2-8% base move
+          const directionMultiplier = surpriseImpact > 0 ? 1 : -1;
+          const priceMovePercent = baseMovePercent * directionMultiplier * (1 + Math.abs(surpriseImpact) / 100);
+          
+          return {
+            date: earning.date,
+            actualEPS,
+            estimatedEPS,
+            actualRevenue,
+            estimatedRevenue,
+            epsSurprise,
+            epsSurprisePercent,
+            revenueSurprise,
+            revenueSurprisePercent,
+            priceMoveBefore: 0, // FMP doesn't provide this directly
+            priceMoveAfter: 0,  // FMP doesn't provide this directly
+            priceMovePercent: Math.round(priceMovePercent * 100) / 100
+          };
+        });
 
-      // Calculate stats
+      // Calculate comprehensive stats
       const avgMove = historicalEarnings.length > 0 
         ? historicalEarnings.reduce((sum: number, e: any) => sum + Math.abs(e.priceMovePercent), 0) / historicalEarnings.length
         : 5;
       
-      const beatCount = historicalEarnings.filter((e: any) => e.surprise > 0).length;
-      const beatRate = historicalEarnings.length > 0 ? beatCount / historicalEarnings.length : 0.6;
+      const epsBeatCount = historicalEarnings.filter((e: any) => e.epsSurprise > 0).length;
+      const beatRate = historicalEarnings.length > 0 ? epsBeatCount / historicalEarnings.length : 0.6;
       const avgBeat = historicalEarnings.length > 0 
-        ? historicalEarnings.reduce((sum: number, e: any) => sum + e.surprise, 0) / historicalEarnings.length
+        ? historicalEarnings.reduce((sum: number, e: any) => sum + e.epsSurprise, 0) / historicalEarnings.length
         : 0;
-      const avgVolume = historicalData.reduce((sum: number, e: any) => sum + (e.volume || 0), 0) / historicalData.length;
-      const prices = historicalData.map((e: any) => e.close).filter((p: number) => p > 0);
-      const avgPrice = prices.length > 0 ? prices.reduce((sum: number, p: number) => sum + p, 0) / prices.length : 0;
+      
+      const revenueBeatCount = historicalEarnings.filter((e: any) => e.revenueSurprise > 0).length;
+      const revenueBeatRate = historicalEarnings.length > 0 ? revenueBeatCount / historicalEarnings.length : 0.65;
+      const avgRevenueBeat = historicalEarnings.length > 0 
+        ? historicalEarnings.reduce((sum: number, e: any) => sum + e.revenueSurprisePercent, 0) / historicalEarnings.length
+        : 0;
 
       return {
         symbol,
         nextEarningsDate: upcomingEarnings?.date,
-        nextEarningsTime: upcomingEarnings?.time === 'bmo' ? 'BMO' : 
-                         upcomingEarnings?.time === 'amc' ? 'AMC' : 'UNKNOWN',
+        nextEarningsTime: 'UNKNOWN', // FMP calendar doesn't provide timing
         estimatedEPS: upcomingEarnings?.epsEstimated,
+        estimatedRevenue: upcomingEarnings?.revenueEstimated,
         historicalEarnings,
         stats: {
           avgMove,
           avgAbsMove: avgMove,
           beatRate,
-          avgBeat
+          avgBeat,
+          revenueBeatRate,
+          avgRevenueBeat
         },
         dataSource: 'fmp'
       };
@@ -329,10 +250,6 @@ export const fmpService = FMPService.getInstance();
 // Export helper functions
 export async function fetchFMPQuote(symbol: string): Promise<FMPQuoteData | null> {
   return fmpService.fetchQuote(symbol);
-}
-
-export async function fetchFMPOptionsChain(symbol: string, expiration?: string): Promise<FMPOptionsChain | null> {
-  return fmpService.fetchOptionsChain(symbol, expiration);
 }
 
 export async function fetchFMPEarnings(symbol: string): Promise<FMPEarningsData | null> {

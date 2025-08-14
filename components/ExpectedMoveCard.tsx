@@ -17,6 +17,19 @@ interface ExpectedMoveCardProps {
 export default function ExpectedMoveCard({ data }: ExpectedMoveCardProps) {
   const { spotPrice, summary } = data;
 
+  // Define reasonable maximum percentages for scaling bars
+  // These represent what should be considered "large" moves for each timeframe
+  const MAX_DAILY_PERCENTAGE = 5;   // 5% daily move is quite large
+  const MAX_WEEKLY_PERCENTAGE = 15;  // 15% weekly move is significant
+  const MAX_MONTHLY_PERCENTAGE = 25; // 2% monthly move is substantial
+
+  const getMaxPercentage = (label: string): number => {
+    if (label.includes('Daily')) return MAX_DAILY_PERCENTAGE;
+    if (label.includes('Weekly')) return MAX_WEEKLY_PERCENTAGE;
+    if (label.includes('Monthly')) return MAX_MONTHLY_PERCENTAGE;
+    return MAX_MONTHLY_PERCENTAGE; // fallback
+  };
+
   const renderRange = (
     label: string,
     range: { move: number; percentage: number; lower: number; upper: number } | null | undefined
@@ -33,6 +46,10 @@ export default function ExpectedMoveCard({ data }: ExpectedMoveCardProps) {
     if (typeof percentage !== 'number') {
       console.warn(`ExpectedMoveCard: Invalid percentage for ${label}:`, range);
     }
+
+    // Calculate bar width as percentage of maximum, capped at 100%
+    const maxPercentage = getMaxPercentage(label);
+    const barWidth = Math.min((Math.abs(percentage) / maxPercentage) * 100, 100);
 
     return (
       <div className="space-y-2">
@@ -53,9 +70,13 @@ export default function ExpectedMoveCard({ data }: ExpectedMoveCardProps) {
           </div>
           <div className="mt-2 h-2 bg-gray-100 rounded-full overflow-hidden">
             <div 
-              className="h-full bg-gradient-to-r from-red-400 via-yellow-400 to-green-400"
-              style={{ width: '100%' }}
+              className="h-full bg-gradient-to-r from-red-400 via-yellow-400 to-green-400 transition-all duration-300"
+              style={{ width: `${barWidth}%` }}
             />
+          </div>
+          {/* Show scale indicator for context */}
+          <div className="mt-1 text-xs text-gray-400 text-right">
+            Scale: {maxPercentage}% max
           </div>
         </div>
       </div>

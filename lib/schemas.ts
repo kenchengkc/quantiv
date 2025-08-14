@@ -29,7 +29,8 @@ export const OptionalExpirySchema = z.string()
     const now = new Date();
     return parsed > now;
   }, 'Expiry must be in the future')
-  .optional();
+  .optional()
+  .nullable();
 
 export const DateSchema = z.string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format');

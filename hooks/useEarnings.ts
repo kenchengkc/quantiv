@@ -1,22 +1,34 @@
 import { useQuery } from '@tanstack/react-query';
 
+interface EarningsEvent {
+  date: string;
+  actualEPS?: number;
+  estimatedEPS?: number;
+  actualRevenue?: number;
+  estimatedRevenue?: number;
+  epsSurprise?: number;
+  epsSurprisePercent?: number;
+  revenueSurprise?: number;
+  revenueSurprisePercent?: number;
+  priceMovePercent?: number;
+  isUpcoming?: boolean;
+  timing?: 'BMO' | 'AMC' | 'UNKNOWN';
+}
+
 interface EarningsData {
-  events: Array<{
-    date: string;
-    time: 'BMO' | 'AMC' | 'UNKNOWN';
-    fiscalQuarter: string;
-    historicalMoves?: Array<{
-      date: string;
-      priceMovePercent: number;
-      epsSurprise: number | null;
-    }>;
-  }>;
+  nextEarningsDate?: string;
+  nextEarningsTime?: 'BMO' | 'AMC' | 'UNKNOWN';
+  estimatedEPS?: number;
+  estimatedRevenue?: number;
+  historicalEarnings: EarningsEvent[];
   stats: {
     avgMove: number;
     avgAbsMove: number;
     beatRate: number;
-    positiveReactionRate: number;
-  } | null;
+    avgBeat: number;
+    revenueBeatRate?: number;
+    avgRevenueBeat?: number;
+  };
 }
 
 interface UseEarningsParams {
