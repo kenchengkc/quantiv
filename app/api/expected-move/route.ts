@@ -7,12 +7,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ExpectedMoveRequestSchema, ExpectedMoveResponseSchema, createApiResponse, validateRequest } from '@/lib/schemas';
 import { CacheInstances, CacheKeys } from '@/lib/cache/lru';
 import { RedisCache, Keys, QuantivCache } from '@/lib/cache/redis';
-import { fetchLiveExpectedMove, isLiveDataAvailable } from '@/lib/services/liveDataService';
-import { fetchEnhancedQuote, fetchEnhancedOptionsChain, isEnhancedLiveDataAvailable } from '@/lib/services/enhancedLiveDataService';
+import { fmpService } from '@/lib/services/fmpService';
 import { computeExpectedMove, assessConfidence, formatExpectedMove } from '@/lib/services/expectedMove';
 import { calculateIVStats, createMockIVHistory } from '@/lib/services/ivStats';
 import { sp500DataService, fetchHybridQuoteData } from '@/lib/data/sp500Service';
-import { RealisticExpectedMoveCalculator, formatRealisticExpectedMove } from '@/lib/services/realisticExpectedMove';
+import { RealisticExpectedMoveCalculator } from '@/lib/services/realisticExpectedMove';
+import { findATMStrike } from '@/lib/pricing/blackScholes';
 import type { ChainData } from '@/lib/services/expectedMove';
 
 /**
@@ -26,42 +26,59 @@ class OptionsProvider {
     
     // Get stock-specific data from S&P 500 service
     const company = sp500DataService.getCompany(symbol);
-    const quoteData = await fetchHybridQuoteData(symbol);
     
-    // Use real stock price if available, otherwise sector-appropriate price
-    const sectorPriceRange = this.getSectorPriceRange(company?.sector || 'Technology');
-    const spot = quoteData?.price || sectorPriceRange.min + 
-                 Math.random() * (sectorPriceRange.max - sectorPriceRange.min);
-    
-    const selectedExpiry = expiry || '2024-02-16';
-    const expiryDate = new Date(selectedExpiry);
-    const daysToExpiry = Math.max(1, Math.ceil((expiryDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
-    
-    // Generate strikes around spot price with appropriate spacing
-    const strikes: number[] = [];
-    const strikeSpacing = spot > 200 ? 10 : spot > 100 ? 5 : spot > 50 ? 2.5 : 1;
-    const baseStrike = Math.round(spot / strikeSpacing) * strikeSpacing;
-    for (let i = -10; i <= 10; i++) {
-      strikes.push(baseStrike + (i * strikeSpacing));
+    // Fetch live data using FMP service only
+    const [quoteData, chainData] = await Promise.all([
+      fmpService.fetchQuote(symbol),
+      fmpService.fetchOptionsChain(symbol, expiry)
+    ]);
+
+    if (!quoteData || !chainData) {
+      throw new Error('Failed to fetch live data from FMP');
     }
+
+    // Extract strikes from FMP structure and find ATM
+    const callStrikes = Object.keys(chainData.strikes.calls).map(key => {
+      const strike = parseFloat(key.replace('C', ''));
+      return isNaN(strike) ? 0 : strike;
+    }).filter(s => s > 0);
     
-    // Get sector-specific implied volatility ranges
-    const sectorIVRange = this.getSectorIVRange(company?.sector || 'Technology');
-    const baseIV = sectorIVRange.min + Math.random() * (sectorIVRange.max - sectorIVRange.min);
+    const putStrikes = Object.keys(chainData.strikes.puts).map(key => {
+      const strike = parseFloat(key.replace('P', ''));
+      return isNaN(strike) ? 0 : strike;
+    }).filter(s => s > 0);
     
+    const strikes = [...new Set([...callStrikes, ...putStrikes])].sort((a, b) => a - b);
+    
+    if (strikes.length === 0) {
+      throw new Error('No strikes available in FMP options chain');
+    }
+
+    const atmStrike = findATMStrike(strikes, quoteData.price);
+    const selectedExpiry = expiry || chainData.expirationDate;
+    const daysToExpiry = chainData.daysToExpiry;
+
+    // Find ATM call and put from FMP structure
+    const atmCall = chainData.strikes.calls[`${atmStrike}C`];
+    const atmPut = chainData.strikes.puts[`${atmStrike}P`];
+
+    const callMid = atmCall?.mid || 0;
+    const putMid = atmPut?.mid || 0;
+    const iv = atmCall?.impliedVolatility || atmPut?.impliedVolatility || 0.25;
+
     // Generate stock-specific options data with realistic pricing
     const calls = strikes.map(strike => {
-      const intrinsic = Math.max(0, spot - strike);
-      const moneyness = strike / spot;
+      const intrinsic = Math.max(0, quoteData.price - strike);
+      const moneyness = strike / quoteData.price;
       
       // Adjust IV based on moneyness (volatility smile)
-      let iv = baseIV;
+      let iv = atmCall?.impliedVolatility || atmPut?.impliedVolatility || 0.25;
       if (moneyness < 0.95 || moneyness > 1.05) {
         iv *= 1.2; // Higher IV for OTM options
       }
       
       // Calculate time value based on IV and time to expiry
-      const timeValue = spot * iv * Math.sqrt(daysToExpiry / 365) * 0.4;
+      const timeValue = quoteData.price * iv * Math.sqrt(daysToExpiry / 365) * 0.4;
       const mid = intrinsic + timeValue;
       const spread = Math.max(0.01, mid * 0.03); // Tighter spreads for liquid stocks
       
@@ -77,19 +94,19 @@ class OptionsProvider {
     });
     
     const puts = strikes.map(strike => {
-      const intrinsic = Math.max(0, strike - spot);
-      const moneyness = strike / spot;
+      const intrinsic = Math.max(0, strike - quoteData.price);
+      const moneyness = strike / quoteData.price;
       
       // Adjust IV based on moneyness (volatility smile)
-      let iv = baseIV;
+      let putIV = atmCall?.impliedVolatility || atmPut?.impliedVolatility || 0.25;
       if (moneyness < 0.95 || moneyness > 1.05) {
-        iv *= 1.2; // Higher IV for OTM options
+        putIV *= 1.2; // Higher IV for OTM options
       }
       
       // Put-call skew: puts typically have higher IV
-      iv *= 1.05;
+      putIV *= 1.05;
       
-      const timeValue = spot * iv * Math.sqrt(daysToExpiry / 365) * 0.4;
+      const timeValue = quoteData.price * putIV * Math.sqrt(daysToExpiry / 365) * 0.4;
       const mid = intrinsic + timeValue;
       const spread = Math.max(0.01, mid * 0.03);
       
@@ -105,7 +122,7 @@ class OptionsProvider {
     });
     
     return {
-      spot,
+      spot: quoteData.price,
       expiryDate: selectedExpiry,
       daysToExpiry,
       strikes,
@@ -210,18 +227,18 @@ export async function GET(request: NextRequest) {
         // Try to fetch enhanced live data first
         let enhancedQuote = null;
         let enhancedChain = null;
-        if (isEnhancedLiveDataAvailable()) {
+        if (fmpService.isAvailable()) {
           try {
             console.log(`[expected-move-api] Fetching enhanced live data for ${symbol}`);
             [enhancedQuote, enhancedChain] = await Promise.all([
-              fetchEnhancedQuote(symbol),
-              fetchEnhancedOptionsChain(symbol, expiry)
+              fmpService.fetchQuote(symbol),
+              fmpService.fetchOptionsChain(symbol, expiry)
             ]);
             console.log(`[expected-move-api] Enhanced data received:`, {
               quoteExists: !!enhancedQuote,
               chainExists: !!enhancedChain,
               quotePrice: enhancedQuote?.price,
-              chainStrikes: enhancedChain?.strikes?.length || 0
+              chainStrikes: enhancedChain?.strikes ? Object.keys(enhancedChain.strikes.calls).length + Object.keys(enhancedChain.strikes.puts).length : 0
             });
           } catch (error) {
             console.warn(`[expected-move-api] Enhanced live data fetch failed for ${symbol}:`, error);
@@ -229,12 +246,37 @@ export async function GET(request: NextRequest) {
         }
 
         // If we have enhanced live data, use it to calculate realistic expected move
-        if (enhancedQuote && enhancedChain && enhancedChain.strikes && enhancedChain.strikes.length > 0) {
+        if (enhancedQuote && enhancedChain && enhancedChain.strikes && (Object.keys(enhancedChain.strikes.calls).length > 0 || Object.keys(enhancedChain.strikes.puts).length > 0)) {
           console.log(`[expected-move-api] Using enhanced live data for realistic expected move calculation`);
           
           // Use realistic expected move calculator with live data
           const realisticExpectedMove = await RealisticExpectedMoveCalculator.calculateRealisticExpectedMove(symbol);
-          expectedMoveData = formatRealisticExpectedMove(realisticExpectedMove);
+          expectedMoveData = {
+            symbol,
+            summary: {
+              daily: {
+                move: realisticExpectedMove.straddle.move,
+                percentage: realisticExpectedMove.straddle.movePercent,
+                lower: realisticExpectedMove.currentPrice - realisticExpectedMove.straddle.move,
+                upper: realisticExpectedMove.currentPrice + realisticExpectedMove.straddle.move
+              },
+              weekly: {
+                move: realisticExpectedMove.straddle.move * 2.65,
+                percentage: realisticExpectedMove.straddle.movePercent * 2.65,
+                lower: realisticExpectedMove.currentPrice - (realisticExpectedMove.straddle.move * 2.65),
+                upper: realisticExpectedMove.currentPrice + (realisticExpectedMove.straddle.move * 2.65)
+              },
+              monthly: {
+                move: realisticExpectedMove.straddle.move * 5.48,
+                percentage: realisticExpectedMove.straddle.movePercent * 5.48,
+                lower: realisticExpectedMove.currentPrice - (realisticExpectedMove.straddle.move * 5.48),
+                upper: realisticExpectedMove.currentPrice + (realisticExpectedMove.straddle.move * 5.48)
+              }
+            },
+            straddle: realisticExpectedMove.straddle,
+            iv: realisticExpectedMove.iv,
+            timestamp: new Date().toISOString()
+          };
 
           // Cache the enhanced data for 1 hour stability
           CacheInstances.expectedMove.set(emCacheKey, expectedMoveData, 60 * 60 * 1000); // 1 hour L1
@@ -248,7 +290,32 @@ export async function GET(request: NextRequest) {
         
         // Use realistic expected move calculator based on historical data
         const realisticExpectedMove = await RealisticExpectedMoveCalculator.calculateRealisticExpectedMove(symbol);
-        expectedMoveData = formatRealisticExpectedMove(realisticExpectedMove);
+        expectedMoveData = {
+          symbol,
+          summary: {
+            daily: {
+              move: realisticExpectedMove.straddle.move,
+              percentage: realisticExpectedMove.straddle.movePercent,
+              lower: realisticExpectedMove.currentPrice - realisticExpectedMove.straddle.move,
+              upper: realisticExpectedMove.currentPrice + realisticExpectedMove.straddle.move
+            },
+            weekly: {
+              move: realisticExpectedMove.straddle.move * 2.65,
+              percentage: realisticExpectedMove.straddle.movePercent * 2.65,
+              lower: realisticExpectedMove.currentPrice - (realisticExpectedMove.straddle.move * 2.65),
+              upper: realisticExpectedMove.currentPrice + (realisticExpectedMove.straddle.move * 2.65)
+            },
+            monthly: {
+              move: realisticExpectedMove.straddle.move * 5.48,
+              percentage: realisticExpectedMove.straddle.movePercent * 5.48,
+              lower: realisticExpectedMove.currentPrice - (realisticExpectedMove.straddle.move * 5.48),
+              upper: realisticExpectedMove.currentPrice + (realisticExpectedMove.straddle.move * 5.48)
+            }
+          },
+          straddle: realisticExpectedMove.straddle,
+          iv: realisticExpectedMove.iv,
+          timestamp: new Date().toISOString()
+        };
         
         // Cache expected move in both layers for 1 hour stability
         CacheInstances.expectedMove.set(emCacheKey, expectedMoveData, 60 * 60 * 1000); // 1 hour L1
