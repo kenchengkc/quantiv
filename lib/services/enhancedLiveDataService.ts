@@ -45,12 +45,18 @@ export interface EnhancedEarningsData {
   nextEarningsDate?: string;
   nextEarningsTime?: 'BMO' | 'AMC' | 'UNKNOWN';
   estimatedEPS?: number;
+  estimatedRevenue?: number;
   actualEPS?: number;
   historicalEarnings: Array<{
     date: string;
-    actualEPS?: number;
-    estimatedEPS?: number;
-    surprise?: number;
+    actualEPS: number;
+    estimatedEPS: number;
+    actualRevenue: number;
+    estimatedRevenue: number;
+    epsSurprise: number;
+    epsSurprisePercent: number;
+    revenueSurprise: number;
+    revenueSurprisePercent: number;
     priceMoveBefore: number;
     priceMoveAfter: number;
     priceMovePercent: number;
@@ -60,8 +66,10 @@ export interface EnhancedEarningsData {
     avgAbsMove: number;
     beatRate: number;
     avgBeat: number;
+    revenueBeatRate: number;
+    avgRevenueBeat: number;
   };
-  dataSource: 'finnhub' | 'yahoo' | 'mock';
+  dataSource: 'polygon' | 'yahoo' | 'fmp' | 'mock';
 }
 
 export interface EnhancedQuoteData {

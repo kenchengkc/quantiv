@@ -4,7 +4,7 @@
  * NO MOCK DATA - All data comes from live APIs
  */
 
-import { fmpService, FMPQuoteData, FMPOptionsChain, FMPEarningsData } from './fmpService';
+import { fmpService, FMPQuoteData, FMPEarningsData } from './fmpService';
 import { fetchEnhancedQuote, fetchEnhancedOptionsChain, fetchEnhancedEarnings } from './enhancedLiveDataService';
 import yahooFinance from 'yahoo-finance2';
 
@@ -180,22 +180,7 @@ class UnifiedLiveDataService {
   public async fetchOptionsChain(symbol: string, expiration?: string): Promise<UnifiedOptionsChain> {
     console.log(`[unified-data] Fetching options chain for ${symbol}`);
 
-    // Try FMP first (best options data)
-    if (fmpService.isAvailable()) {
-      try {
-        const fmpChain = await fmpService.fetchOptionsChain(symbol, expiration);
-        if (fmpChain && Object.keys(fmpChain.strikes.calls).length > 0) {
-          console.log(`[unified-data] Options chain from FMP for ${symbol}`);
-          return this.convertFMPChainToUnified(fmpChain);
-        }
-      } catch (error) {
-        if (error instanceof Error && error.message.includes('FMP_RATE_LIMITED')) {
-          console.warn(`[unified-data] FMP rate limited for ${symbol}, trying fallback`);
-        } else {
-          console.warn(`[unified-data] FMP options failed for ${symbol}:`, error);
-        }
-      }
-    }
+    // FMP does not provide options data - skip to Polygon
 
     // Try enhanced live data service
     try {
@@ -276,65 +261,7 @@ class UnifiedLiveDataService {
     throw new Error(`Unable to fetch earnings data for ${symbol} from any source`);
   }
 
-  /**
-   * Convert FMP options chain to unified format
-   */
-  private convertFMPChainToUnified(fmpChain: FMPOptionsChain): UnifiedOptionsChain {
-    const strikes: UnifiedOptionsChain['strikes'] = [];
 
-    // Get all unique strike prices
-    const callStrikes = Object.keys(fmpChain.strikes.calls).map(k => parseFloat(k.replace('C', '')));
-    const putStrikes = Object.keys(fmpChain.strikes.puts).map(k => parseFloat(k.replace('P', '')));
-    const allStrikes = [...new Set([...callStrikes, ...putStrikes])].sort((a, b) => a - b);
-
-    allStrikes.forEach(strike => {
-      const call = fmpChain.strikes.calls[`${strike}C`];
-      const put = fmpChain.strikes.puts[`${strike}P`];
-
-      if (call && put) {
-        strikes.push({
-          strike,
-          call: {
-            bid: call.bid,
-            ask: call.ask,
-            mid: call.mid,
-            last: call.last,
-            volume: call.volume,
-            openInterest: call.openInterest,
-            iv: call.impliedVolatility,
-            delta: call.delta,
-            gamma: call.gamma,
-            theta: call.theta,
-            vega: call.vega,
-            inTheMoney: call.inTheMoney
-          },
-          put: {
-            bid: put.bid,
-            ask: put.ask,
-            mid: put.mid,
-            last: put.last,
-            volume: put.volume,
-            openInterest: put.openInterest,
-            iv: put.impliedVolatility,
-            delta: put.delta,
-            gamma: put.gamma,
-            theta: put.theta,
-            vega: put.vega,
-            inTheMoney: put.inTheMoney
-          }
-        });
-      }
-    });
-
-    return {
-      symbol: fmpChain.symbol,
-      expirationDate: fmpChain.expirationDate,
-      daysToExpiry: fmpChain.daysToExpiry,
-      underlyingPrice: fmpChain.underlyingPrice,
-      strikes,
-      dataSource: 'fmp'
-    };
-  }
 
   /**
    * Convert enhanced chain to unified format

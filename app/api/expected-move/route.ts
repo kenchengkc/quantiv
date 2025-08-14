@@ -8,6 +8,7 @@ import { ExpectedMoveRequestSchema, ExpectedMoveResponseSchema, createApiRespons
 import { CacheInstances, CacheKeys } from '@/lib/cache/lru';
 import { RedisCache, Keys, QuantivCache } from '@/lib/cache/redis';
 import { fmpService } from '@/lib/services/fmpService';
+import { polygonService } from '@/lib/services/polygonService';
 import { computeExpectedMove, assessConfidence, formatExpectedMove } from '@/lib/services/expectedMove';
 import { calculateIVStats, createMockIVHistory } from '@/lib/services/ivStats';
 import { sp500DataService, fetchHybridQuoteData } from '@/lib/data/sp500Service';
@@ -30,7 +31,7 @@ class OptionsProvider {
     // Fetch live data using FMP service only
     const [quoteData, chainData] = await Promise.all([
       fmpService.fetchQuote(symbol),
-      fmpService.fetchOptionsChain(symbol, expiry)
+polygonService.fetchOptionsChain(symbol, expiry || undefined)
     ]);
 
     if (!quoteData || !chainData) {
@@ -232,7 +233,7 @@ export async function GET(request: NextRequest) {
             console.log(`[expected-move-api] Fetching enhanced live data for ${symbol}`);
             [enhancedQuote, enhancedChain] = await Promise.all([
               fmpService.fetchQuote(symbol),
-              fmpService.fetchOptionsChain(symbol, expiry)
+              polygonService.fetchOptionsChain(symbol, expiry || undefined)
             ]);
             console.log(`[expected-move-api] Enhanced data received:`, {
               quoteExists: !!enhancedQuote,
@@ -251,26 +252,27 @@ export async function GET(request: NextRequest) {
           
           // Use realistic expected move calculator with live data
           const realisticExpectedMove = await RealisticExpectedMoveCalculator.calculateRealisticExpectedMove(symbol);
+          // Use the conservative expected moves from RealisticExpectedMoveCalculator
           expectedMoveData = {
             symbol,
             summary: {
               daily: {
-                move: realisticExpectedMove.straddle.move,
-                percentage: realisticExpectedMove.straddle.movePercent,
-                lower: realisticExpectedMove.currentPrice - realisticExpectedMove.straddle.move,
-                upper: realisticExpectedMove.currentPrice + realisticExpectedMove.straddle.move
+                move: realisticExpectedMove.summary.daily,
+                percentage: (realisticExpectedMove.summary.daily / realisticExpectedMove.currentPrice) * 100,
+                lower: realisticExpectedMove.currentPrice - realisticExpectedMove.summary.daily,
+                upper: realisticExpectedMove.currentPrice + realisticExpectedMove.summary.daily
               },
               weekly: {
-                move: realisticExpectedMove.straddle.move * 2.65,
-                percentage: realisticExpectedMove.straddle.movePercent * 2.65,
-                lower: realisticExpectedMove.currentPrice - (realisticExpectedMove.straddle.move * 2.65),
-                upper: realisticExpectedMove.currentPrice + (realisticExpectedMove.straddle.move * 2.65)
+                move: realisticExpectedMove.summary.weekly,
+                percentage: (realisticExpectedMove.summary.weekly / realisticExpectedMove.currentPrice) * 100,
+                lower: realisticExpectedMove.currentPrice - realisticExpectedMove.summary.weekly,
+                upper: realisticExpectedMove.currentPrice + realisticExpectedMove.summary.weekly
               },
               monthly: {
-                move: realisticExpectedMove.straddle.move * 5.48,
-                percentage: realisticExpectedMove.straddle.movePercent * 5.48,
-                lower: realisticExpectedMove.currentPrice - (realisticExpectedMove.straddle.move * 5.48),
-                upper: realisticExpectedMove.currentPrice + (realisticExpectedMove.straddle.move * 5.48)
+                move: realisticExpectedMove.summary.monthly,
+                percentage: (realisticExpectedMove.summary.monthly / realisticExpectedMove.currentPrice) * 100,
+                lower: realisticExpectedMove.currentPrice - realisticExpectedMove.summary.monthly,
+                upper: realisticExpectedMove.currentPrice + realisticExpectedMove.summary.monthly
               }
             },
             straddle: realisticExpectedMove.straddle,

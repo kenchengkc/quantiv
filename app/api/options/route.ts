@@ -20,6 +20,7 @@ import { CacheInstances, CacheKeys } from '@/lib/cache/lru';
 import { RedisCache, Keys } from '@/lib/cache/redis';
 import { createApiResponse, validateRequest, OptionsRequestSchema } from '@/lib/schemas';
 import { fmpService } from '@/lib/services/fmpService';
+import { polygonService } from '@/lib/services/polygonService';
 import { findATMStrike } from '@/lib/pricing/blackScholes';
 
 
@@ -30,7 +31,7 @@ import { findATMStrike } from '@/lib/pricing/blackScholes';
 export async function GET(request: NextRequest) {
   const startTime = Date.now();
   let cacheHit: 'l1' | 'l2' | 'miss' = 'miss';
-  const dataSource = 'fmp';
+  const dataSource = 'fmp+polygon';
 
   try {
     // Parse and validate query parameters
@@ -38,15 +39,22 @@ export async function GET(request: NextRequest) {
     const searchParams = url.searchParams;
     const symbol = searchParams.get('symbol');
     const expiry = searchParams.get('expiry');
-  
+    
     const validation = validateRequest(OptionsRequestSchema, {
       symbol,
       expiry
     });
-
+    
     if (!validation.success) {
+      console.error('[API] /api/options validation failed:', {
+        error: validation.error,
+        details: validation.details,
+        url: request.url,
+        searchParams: Object.fromEntries(searchParams),
+        receivedData: { symbol, expiry }
+      });
       return NextResponse.json(
-        createApiResponse(undefined, validation.error, validation.details?.join(', ')),
+        createApiResponse(undefined, 'Invalid request', validation.error || 'Validation failed'),
         { status: 400 }
       );
     }
@@ -68,15 +76,26 @@ export async function GET(request: NextRequest) {
       
       if (!responseData) {
         // Cache miss - fetch live data from FMP only
-        console.log(`[Options API] Fetching FMP live data for ${validSymbol}`);
+        console.log(`[options-api] Cache miss for ${validSymbol}, fetching from FMP`);
         
         const [quoteData, chainData] = await Promise.all([
           fmpService.fetchQuote(validSymbol),
-          fmpService.fetchOptionsChain(validSymbol, validExpiry)
+          polygonService.fetchOptionsChain(validSymbol, validExpiry || undefined)
         ]);
-
-        if (!quoteData || !chainData) {
-          throw new Error('Failed to fetch live data from FMP');
+        
+        console.log(`[options-api] FMP data received:`, {
+          quoteExists: !!quoteData,
+          chainExists: !!chainData,
+          quotePrice: quoteData?.price,
+          chainStrikes: chainData?.strikes ? Object.keys(chainData.strikes.calls).length + Object.keys(chainData.strikes.puts).length : 0
+        });
+        
+        if (!quoteData) {
+          throw new Error(`Unable to fetch quote data for ${validSymbol} from FMP`);
+        }
+        
+        if (!chainData) {
+          throw new Error(`Unable to fetch options chain for ${validSymbol} from Polygon`);
         }
 
         // Extract strikes from FMP options chain structure
@@ -103,46 +122,65 @@ export async function GET(request: NextRequest) {
         const atmCall = chainData.strikes.calls[`${atmStrike}C`];
         const atmPut = chainData.strikes.puts[`${atmStrike}P`];
         
-        // Build response data
-        responseData = {
-          spot: quoteData.price,
-          expiryUsed: validExpiry || chainData.expirationDate,
-          atm: {
-            strike: atmStrike,
-            callMid: atmCall?.mid || 0,
-            putMid: atmPut?.mid || 0,
-            iv: atmCall?.impliedVolatility || 0.25,
-            T: (chainData.daysToExpiry || 30) / 365
-          },
-          chain: {
-            strikes: strikes,
-            calls: Object.values(chainData.strikes.calls).map((call: any) => ({
-              strike: call.strike,
-              mid: call.mid,
+        // Build response data in the format expected by MiniOptionsChain component
+        const expiryDate = validExpiry || chainData.expirationDate;
+        const strikesForExpiry: Record<string, any> = {};
+        
+        // Organize strikes by expiration date as expected by frontend
+        strikes.forEach(strike => {
+          const callKey = `${strike}C`;
+          const putKey = `${strike}P`;
+          const call = chainData.strikes.calls[callKey];
+          const put = chainData.strikes.puts[putKey];
+          
+          if (call) {
+            strikesForExpiry[`${strike}_call`] = {
+              strike: strike,
+              type: 'call' as const,
               bid: call.bid,
               ask: call.ask,
-              iv: call.impliedVolatility,
+              mark: call.mid,
               volume: call.volume,
-              openInterest: call.openInterest
-            })),
-            puts: Object.values(chainData.strikes.puts).map((put: any) => ({
-              strike: put.strike,
-              mid: put.mid,
+              openInterest: call.openInterest,
+              iv: call.impliedVolatility,
+              delta: call.delta,
+              inTheMoney: call.inTheMoney
+            };
+          }
+          
+          if (put) {
+            strikesForExpiry[`${strike}_put`] = {
+              strike: strike,
+              type: 'put' as const,
               bid: put.bid,
               ask: put.ask,
-              iv: put.impliedVolatility,
+              mark: put.mid,
               volume: put.volume,
-              openInterest: put.openInterest
-            })),
-            expiryDate: chainData.expirationDate,
-            daysToExpiry: chainData.daysToExpiry || 30
-          },
-          quote: {
-            price: quoteData.price,
-            change: quoteData.change,
-            changePercent: quoteData.changePercent,
-            name: quoteData.name || validSymbol
+              openInterest: put.openInterest,
+              iv: put.impliedVolatility,
+              delta: put.delta,
+              inTheMoney: put.inTheMoney
+            };
           }
+        });
+        
+        responseData = {
+          chain: {
+            expirations: [{
+              date: expiryDate,
+              dte: chainData.daysToExpiry || 30
+            }],
+            strikes: {
+              [expiryDate]: strikesForExpiry
+            },
+            quote: {
+              last: quoteData.price,
+              change: quoteData.change,
+              changePercent: quoteData.changePercent,
+              name: quoteData.name || validSymbol
+            }
+          },
+          atmStrike: atmStrike
         };
         
         // Cache the response
