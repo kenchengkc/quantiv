@@ -21,6 +21,7 @@ import { RedisCache, Keys } from '@/lib/cache/redis';
 import { createApiResponse, validateRequest, OptionsRequestSchema } from '@/lib/schemas';
 import { fmpService } from '@/lib/services/fmpService';
 import { polygonService } from '@/lib/services/polygonService';
+import PolygonOptionsService from '@/lib/services/polygonOptionsService';
 import { findATMStrike } from '@/lib/pricing/blackScholes';
 
 
@@ -75,63 +76,44 @@ export async function GET(request: NextRequest) {
       cacheHit = responseData ? 'l2' : 'miss';
       
       if (!responseData) {
-        // Cache miss - fetch live data from FMP only
-        console.log(`[options-api] Cache miss for ${validSymbol}, fetching from FMP`);
+        // Cache miss - fetch live data using enhanced Polygon Options Chain Snapshot
+        console.log(`[options-api] Cache miss for ${validSymbol}, fetching from Polygon Options Chain Snapshot`);
         
-        const [quoteData, chainData] = await Promise.all([
-          fmpService.fetchQuote(validSymbol),
-          polygonService.fetchOptionsChain(validSymbol, validExpiry || undefined)
-        ]);
+        const polygonOptionsService = PolygonOptionsService.getInstance();
+        const enhancedChain = await polygonOptionsService.getOptionsChain(validSymbol, validExpiry || undefined);
         
-        console.log(`[options-api] FMP data received:`, {
-          quoteExists: !!quoteData,
-          chainExists: !!chainData,
-          quotePrice: quoteData?.price,
-          chainStrikes: chainData?.strikes ? Object.keys(chainData.strikes.calls).length + Object.keys(chainData.strikes.puts).length : 0
+        if (!enhancedChain) {
+          throw new Error(`Unable to fetch options chain for ${validSymbol} from Polygon Options Chain Snapshot API`);
+        }
+        
+        console.log(`[options-api] Enhanced Polygon chain received:`, {
+          symbol: enhancedChain.symbol,
+          underlyingPrice: enhancedChain.underlyingPrice,
+          expirations: enhancedChain.expirations.length,
+          totalStrikes: enhancedChain.expirations.reduce((sum, exp) => sum + exp.strikes.length, 0)
         });
-        
-        if (!quoteData) {
-          throw new Error(`Unable to fetch quote data for ${validSymbol} from FMP`);
-        }
-        
-        if (!chainData) {
-          throw new Error(`Unable to fetch options chain for ${validSymbol} from Polygon`);
-        }
 
-        // Extract strikes from FMP options chain structure
-        const callStrikes = Object.keys(chainData.strikes.calls).map(key => {
-          const strike = parseFloat(key.replace('C', ''));
-          return isNaN(strike) ? 0 : strike;
-        }).filter(s => s > 0);
-        
-        const putStrikes = Object.keys(chainData.strikes.puts).map(key => {
-          const strike = parseFloat(key.replace('P', ''));
-          return isNaN(strike) ? 0 : strike;
-        }).filter(s => s > 0);
-        
-        const strikes = [...new Set([...callStrikes, ...putStrikes])].sort((a, b) => a - b);
-        
-        if (strikes.length === 0) {
-          throw new Error('No options strikes available from FMP');
+        // Process enhanced Polygon options chain data
+        const firstExpiration = enhancedChain.expirations[0];
+        if (!firstExpiration) {
+          throw new Error('No options expirations available from Polygon');
         }
-
-        // Find ATM strike
-        const atmStrike = findATMStrike(strikes, quoteData.price);
         
-        // Find ATM call and put options
-        const atmCall = chainData.strikes.calls[`${atmStrike}C`];
-        const atmPut = chainData.strikes.puts[`${atmStrike}P`];
+        const strikes = firstExpiration.strikes.map(s => s.strike).sort((a, b) => a - b);
+        const atmStrike = findATMStrike(strikes, enhancedChain.underlyingPrice);
         
-        // Build response data in the format expected by MiniOptionsChain component
-        const expiryDate = validExpiry || chainData.expirationDate;
+        // Find ATM contracts for expected move calculations
+        const atmStrikeData = firstExpiration.strikes.find(s => s.strike === atmStrike);
+        const atmCall = atmStrikeData?.call;
+        const atmPut = atmStrikeData?.put;
+        
+        // Build response data in enhanced format with Greeks and real-time data
+        const expiryDate = validExpiry || firstExpiration.date;
         const strikesForExpiry: Record<string, any> = {};
         
-        // Organize strikes by expiration date as expected by frontend
-        strikes.forEach(strike => {
-          const callKey = `${strike}C`;
-          const putKey = `${strike}P`;
-          const call = chainData.strikes.calls[callKey];
-          const put = chainData.strikes.puts[putKey];
+        // Organize strikes with enhanced Polygon data
+        firstExpiration.strikes.forEach(strikeData => {
+          const { strike, call, put } = strikeData;
           
           if (call) {
             strikesForExpiry[`${strike}_call`] = {
@@ -139,12 +121,20 @@ export async function GET(request: NextRequest) {
               type: 'call' as const,
               bid: call.bid,
               ask: call.ask,
-              mark: call.mid,
+              mark: (call.bid + call.ask) / 2,
+              last: call.last,
               volume: call.volume,
               openInterest: call.openInterest,
               iv: call.impliedVolatility,
               delta: call.delta,
-              inTheMoney: call.inTheMoney
+              gamma: call.gamma,
+              theta: call.theta,
+              vega: call.vega,
+              breakEven: call.breakEven,
+              fmv: call.fmv,
+              intrinsicValue: call.intrinsicValue,
+              timeValue: call.timeValue,
+              inTheMoney: enhancedChain.underlyingPrice > strike
             };
           }
           
@@ -154,36 +144,74 @@ export async function GET(request: NextRequest) {
               type: 'put' as const,
               bid: put.bid,
               ask: put.ask,
-              mark: put.mid,
+              mark: (put.bid + put.ask) / 2,
+              last: put.last,
               volume: put.volume,
               openInterest: put.openInterest,
               iv: put.impliedVolatility,
               delta: put.delta,
-              inTheMoney: put.inTheMoney
+              gamma: put.gamma,
+              theta: put.theta,
+              vega: put.vega,
+              breakEven: put.breakEven,
+              fmv: put.fmv,
+              intrinsicValue: put.intrinsicValue,
+              timeValue: put.timeValue,
+              inTheMoney: enhancedChain.underlyingPrice < strike
             };
           }
         });
         
         responseData = {
           chain: {
-            expirations: [{
-              date: expiryDate,
-              dte: chainData.daysToExpiry || 30
-            }],
-            strikes: {
+            quote: {
+              symbol: validSymbol,
+              name: validSymbol,
+              last: enhancedChain.underlyingPrice,
+              change: 0, // TODO: Calculate from underlying asset data
+              changePercent: 0 // TODO: Calculate from underlying asset data
+            },
+            expirations: {
               [expiryDate]: strikesForExpiry
             },
-            quote: {
-              last: quoteData.price,
-              change: quoteData.change,
-              changePercent: quoteData.changePercent,
-              name: quoteData.name || validSymbol
-            }
+            atmStrike: atmStrike,
+            atmCall: atmCall ? {
+              bid: atmCall.bid,
+              ask: atmCall.ask,
+              mid: (atmCall.bid + atmCall.ask) / 2,
+              last: atmCall.last,
+              volume: atmCall.volume,
+              openInterest: atmCall.openInterest,
+              impliedVolatility: atmCall.impliedVolatility,
+              delta: atmCall.delta,
+              gamma: atmCall.gamma,
+              theta: atmCall.theta,
+              vega: atmCall.vega,
+              breakEven: atmCall.breakEven,
+              fmv: atmCall.fmv
+            } : null,
+            atmPut: atmPut ? {
+              bid: atmPut.bid,
+              ask: atmPut.ask,
+              mid: (atmPut.bid + atmPut.ask) / 2,
+              last: atmPut.last,
+              volume: atmPut.volume,
+              openInterest: atmPut.openInterest,
+              impliedVolatility: atmPut.impliedVolatility,
+              delta: atmPut.delta,
+              gamma: atmPut.gamma,
+              theta: atmPut.theta,
+              vega: atmPut.vega,
+              breakEven: atmPut.breakEven,
+              fmv: atmPut.fmv
+            } : null
           },
-          atmStrike: atmStrike
+          dataSource: 'polygon-enhanced',
+          cacheHit,
+          responseTime: Date.now() - startTime
         };
         
-        // Cache the response
+        // Cache the enhanced response
         CacheInstances.optionsChain.set(cacheKey, responseData, 60 * 1000); // 1 minute L1
         await RedisCache.setJson(redisKey, responseData, 300); // 5 minutes L2
       } else {
@@ -193,8 +221,8 @@ export async function GET(request: NextRequest) {
     }
     
     // Final validation
-    if (!responseData || !responseData.chain || !responseData.chain.strikes || responseData.chain.strikes.length === 0) {
-      throw new Error('Unable to fetch valid options chain data from FMP');
+    if (!responseData || !responseData.chain) {
+      throw new Error('Unable to fetch valid options chain data');
     }
       
     const response = createApiResponse(responseData);
@@ -208,12 +236,12 @@ export async function GET(request: NextRequest) {
         'X-Cache-Hit': cacheHit,
         'X-Processing-Time': `${processingTime}ms`,
         'X-Symbol': validSymbol,
-        'X-Data-Source': dataSource
+        'X-Data-Source': responseData.dataSource || 'polygon-enhanced'
       }
     });
 
     // This code should not be reached since we handle live data above
-    throw new Error('Fallback code reached - this should not happen with unified live data service');
+    throw new Error('Fallback code reached - this should not happen with enhanced Polygon options service');
     
   } catch (error) {
     console.error('[API] /api/options error:', error);
