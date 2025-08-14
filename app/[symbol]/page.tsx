@@ -7,7 +7,7 @@ import { useEarnings } from '@/hooks/useEarnings';
 import { usePageTimeout } from '@/hooks/usePageTimeout';
 import ExpectedMoveCard from '@/components/ExpectedMoveCard';
 import IVRankSparkline from '@/components/IVRankSparkline';
-import EarningsPanel from '@/components/EarningsPanel';
+import EarningsCalendar from '@/components/EarningsCalendar';
 import MiniOptionsChain from '@/components/MiniOptionsChain';
 import SymbolSearch from '@/components/SymbolSearch';
 import { WatchlistToggle } from '@/components/WatchlistToggle';
@@ -107,7 +107,7 @@ export default function SymbolPage() {
         {/* Right Column */}
         <div className="space-y-6">
           {optionsData?.ivStats && <IVRankSparkline data={optionsData.ivStats} />}
-          {earningsData && <EarningsPanel data={earningsData} symbol={symbol} />}
+          {earningsData && <EarningsCalendar data={earningsData} symbol={symbol} />}
         </div>
       </div>
     </div>
