@@ -38,13 +38,14 @@ interface UseOptionsParams {
 
 export function useOptions({ symbol }: UseOptionsParams) {
   return useQuery({
-    queryKey: ['options', symbol],
+    queryKey: ['options-live', symbol],
     queryFn: async (): Promise<OptionsChainData> => {
       if (!symbol) {
         throw new Error('Symbol is required');
       }
 
-      const response = await fetch(`/api/options?symbol=${symbol}`);
+      // Use the new live API endpoint that integrates FMP + Polygon.io + Dolt
+      const response = await fetch(`/api/options-live?symbol=${symbol}`);
       
       if (!response.ok) {
         throw new Error(`Failed to fetch options data: ${response.statusText}`);
