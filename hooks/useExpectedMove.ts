@@ -16,13 +16,14 @@ interface UseExpectedMoveParams {
 
 export function useExpectedMove({ symbol }: UseExpectedMoveParams) {
   return useQuery({
-    queryKey: ['expectedMove', symbol],
+    queryKey: ['expectedMove-live', symbol],
     queryFn: async (): Promise<ExpectedMoveData> => {
       if (!symbol) {
         throw new Error('Symbol is required');
       }
 
-      const response = await fetch(`/api/expected-move?symbol=${symbol}`);
+      // Use the new live API endpoint that integrates FMP + Polygon.io + Dolt
+      const response = await fetch(`/api/expected-move-live?symbol=${symbol}`);
       
       if (!response.ok) {
         throw new Error(`Failed to fetch expected move data: ${response.statusText}`);

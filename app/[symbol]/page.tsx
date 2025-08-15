@@ -106,7 +106,7 @@ export default function SymbolPage() {
 
         {/* Right Column */}
         <div className="space-y-6">
-          {optionsData?.ivStats && <IVRankSparkline data={optionsData.ivStats} />}
+          {optionsData?.ivStats && <IVRankSparkline data={optionsData.ivStats} symbol={symbol} />}
           {earningsData && <EarningsCalendar data={earningsData} symbol={symbol} />}
         </div>
       </div>
