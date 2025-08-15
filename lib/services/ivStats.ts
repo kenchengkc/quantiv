@@ -288,29 +288,4 @@ export function formatIVStats(stats: IVStatsResult): {
   };
 }
 
-/**
- * Utility function to create mock IV history for testing
- */
-export function createMockIVHistory(days: number, baseIV: number = 0.25, volatility: number = 0.05): IVDataPoint[] {
-  const history: IVDataPoint[] = [];
-  const startDate = new Date();
-  startDate.setDate(startDate.getDate() - days);
-  
-  for (let i = 0; i < days; i++) {
-    const date = new Date(startDate);
-    date.setDate(date.getDate() + i);
-    
-    // Generate IV with some randomness and mean reversion
-    const randomFactor = (Math.random() - 0.5) * volatility;
-    const meanReversion = (baseIV - (history[i - 1]?.iv || baseIV)) * 0.1;
-    const iv = Math.max(0.05, Math.min(2.0, (history[i - 1]?.iv || baseIV) + randomFactor + meanReversion));
-    
-    history.push({
-      date: date.toISOString().split('T')[0],
-      iv: iv,
-      close: 100 + Math.random() * 20 - 10 // Mock stock price
-    });
-  }
-  
-  return history;
-}
+// Mock IV history function removed - using only live API data

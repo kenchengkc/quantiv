@@ -6,7 +6,7 @@ import {
   calculateIVBands,
   detectIVTrend,
   formatIVStats,
-  createMockIVHistory,
+
   type IVDataPoint
 } from '../lib/services/ivStats';
 
@@ -296,46 +296,16 @@ describe('IV Statistics Service', () => {
     });
   });
 
-  describe('createMockIVHistory', () => {
-    it('should create mock IV history with correct length', () => {
-      const history = createMockIVHistory(30, 0.25, 0.05);
-      
-      expect(history).toHaveLength(30);
-      
-      history.forEach(point => {
-        expect(point.date).toBeDefined();
-        expect(point.iv).toBeGreaterThan(0.05);
-        expect(point.iv).toBeLessThan(2.0);
-        expect(point.close).toBeDefined();
-      });
-    });
-
-    it('should create history with mean reversion around base IV', () => {
-      const baseIV = 0.30;
-      const history = createMockIVHistory(100, baseIV, 0.02);
-      
-      const avgIV = history.reduce((sum, point) => sum + point.iv, 0) / history.length;
-      
-      // Average should be close to base IV due to mean reversion
-      expect(avgIV).toBeCloseTo(baseIV, 1);
-    });
-
-    it('should handle different parameters', () => {
-      const history = createMockIVHistory(10, 0.40, 0.10);
-      
-      expect(history).toHaveLength(10);
-      
-      // With higher volatility, should see more variation
-      const ivValues = history.map(p => p.iv);
-      const range = Math.max(...ivValues) - Math.min(...ivValues);
-      expect(range).toBeGreaterThan(0.05); // Should have some variation
-    });
-  });
-
   describe('Integration Tests', () => {
     it('should work with realistic IV data', () => {
-      // Create realistic 252-day IV history
-      const history = createMockIVHistory(252, 0.25, 0.03);
+      // Use static test data instead of mock generator
+      const history: IVDataPoint[] = [
+        { date: '2024-01-01', iv: 0.25, close: 100 },
+        { date: '2024-01-02', iv: 0.26, close: 101 },
+        { date: '2024-01-03', iv: 0.24, close: 99 },
+        { date: '2024-01-04', iv: 0.27, close: 102 },
+        { date: '2024-01-05', iv: 0.23, close: 98 }
+      ];
       const currentIV = 0.35;
       
       const stats = calculateIVStats(history, currentIV);

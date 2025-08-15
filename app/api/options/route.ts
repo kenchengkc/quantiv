@@ -15,11 +15,12 @@
  * - timestamp: ISO timestamp
  */
 
-import { NextRequest, NextResponse } from 'next/server';
-import { CacheInstances, CacheKeys } from '@/lib/cache/lru';
-import { RedisCache, Keys } from '@/lib/cache/redis';
-import { createApiResponse, validateRequest, OptionsRequestSchema } from '@/lib/schemas';
-import { fmpService } from '@/lib/services/fmpService';
+import { NextRequest } from 'next/server';
+import { validateRequest } from '@/lib/validation';
+import { OptionsRequestSchema, OptionsResponseSchema } from '@/lib/schemas';
+import { createApiResponse } from '@/lib/api-utils';
+import { getCachedData, setCachedData } from '@/lib/cache';
+import ComprehensiveLiveDataService from '@/lib/services/comprehensiveLiveDataService';
 import { polygonService } from '@/lib/services/polygonService';
 import PolygonOptionsService from '@/lib/services/polygonOptionsService';
 import { findATMStrike } from '@/lib/pricing/blackScholes';

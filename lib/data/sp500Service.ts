@@ -315,130 +315,7 @@ class SP500DataService {
     return quotes;
   }
 
-  // Generate enhanced mock data based on real company info
-  public generateEnhancedMockQuote(symbol: string): LiveQuoteData {
-    const company = this.getCompany(symbol);
-    
-    if (!company) {
-      // If not in S&P 500, generate basic mock data
-      return this.generateBasicMockQuote(symbol);
-    }
-
-    // Sector-based price ranges for more realistic mock data
-    const sectorPriceRanges: Record<string, { min: number; max: number }> = {
-      'Technology': { min: 50, max: 500 },
-      'Healthcare': { min: 80, max: 400 },
-      'Financial Services': { min: 30, max: 200 },
-      'Consumer Discretionary': { min: 40, max: 300 },
-      'Consumer Staples': { min: 60, max: 150 },
-      'Energy': { min: 40, max: 120 },
-      'Industrials': { min: 50, max: 250 },
-      'Utilities': { min: 60, max: 100 },
-      'Real Estate': { min: 80, max: 200 },
-      'Materials': { min: 70, max: 180 },
-      'ETF': { min: 200, max: 500 },
-      'Communication Services': { min: 30, max: 200 }
-    };
-
-    const priceRange = sectorPriceRanges[company.sector] || { min: 50, max: 200 };
-    const basePrice = Math.random() * (priceRange.max - priceRange.min) + priceRange.min;
-    const dailyChange = (Math.random() - 0.5) * 0.06; // ±3% daily change
-    const changeAmount = basePrice * dailyChange;
-
-    return {
-      symbol: company.symbol,
-      name: company.name,
-      price: Math.round(basePrice * 100) / 100,
-      change: Math.round(changeAmount * 100) / 100,
-      changePercent: Math.round(dailyChange * 10000) / 100,
-      volume: this.generateRealisticVolume(company.sector),
-      marketCap: this.generateRealisticMarketCap(company.sector),
-      pe: this.generateRealisticPE(company.sector),
-      high52Week: Math.round(basePrice * (1 + Math.random() * 0.5) * 100) / 100,
-      low52Week: Math.round(basePrice * (1 - Math.random() * 0.3) * 100) / 100,
-      previousClose: Math.round((basePrice - changeAmount) * 100) / 100,
-      dayHigh: Math.round(basePrice * (1 + Math.random() * 0.02) * 100) / 100,
-      dayLow: Math.round(basePrice * (1 - Math.random() * 0.02) * 100) / 100,
-      avgVolume: this.generateRealisticVolume(company.sector) * 0.8,
-      timestamp: new Date().toISOString()
-    };
-  }
-
-  private generateBasicMockQuote(symbol: string): LiveQuoteData {
-    const basePrice = Math.random() * 150 + 50; // $50-$200
-    const dailyChange = (Math.random() - 0.5) * 0.06;
-    const changeAmount = basePrice * dailyChange;
-
-    return {
-      symbol,
-      name: `${symbol} Company`,
-      price: Math.round(basePrice * 100) / 100,
-      change: Math.round(changeAmount * 100) / 100,
-      changePercent: Math.round(dailyChange * 10000) / 100,
-      volume: Math.floor(Math.random() * 10000000 + 1000000),
-      timestamp: new Date().toISOString()
-    };
-  }
-
-  private generateRealisticVolume(sector: string): number {
-    const sectorVolumeRanges: Record<string, { min: number; max: number }> = {
-      'Technology': { min: 10000000, max: 100000000 },
-      'ETF': { min: 50000000, max: 200000000 },
-      'Financial Services': { min: 5000000, max: 50000000 },
-      'Healthcare': { min: 3000000, max: 30000000 },
-      'Consumer Discretionary': { min: 5000000, max: 40000000 },
-      'Consumer Staples': { min: 2000000, max: 20000000 },
-      'Energy': { min: 8000000, max: 60000000 },
-      'Industrials': { min: 2000000, max: 25000000 },
-      'Utilities': { min: 1000000, max: 10000000 },
-      'Real Estate': { min: 1000000, max: 15000000 },
-      'Materials': { min: 2000000, max: 20000000 },
-      'Communication Services': { min: 5000000, max: 40000000 }
-    };
-
-    const range = sectorVolumeRanges[sector] || { min: 1000000, max: 20000000 };
-    return Math.floor(Math.random() * (range.max - range.min) + range.min);
-  }
-
-  private generateRealisticMarketCap(sector: string): number {
-    const sectorMarketCapRanges: Record<string, { min: number; max: number }> = {
-      'Technology': { min: 100000000000, max: 3000000000000 }, // $100B-$3T
-      'ETF': { min: 50000000000, max: 500000000000 }, // $50B-$500B
-      'Financial Services': { min: 50000000000, max: 500000000000 },
-      'Healthcare': { min: 30000000000, max: 400000000000 },
-      'Consumer Discretionary': { min: 20000000000, max: 300000000000 },
-      'Consumer Staples': { min: 40000000000, max: 250000000000 },
-      'Energy': { min: 30000000000, max: 400000000000 },
-      'Industrials': { min: 20000000000, max: 200000000000 },
-      'Utilities': { min: 15000000000, max: 100000000000 },
-      'Real Estate': { min: 10000000000, max: 80000000000 },
-      'Materials': { min: 15000000000, max: 150000000000 },
-      'Communication Services': { min: 20000000000, max: 300000000000 }
-    };
-
-    const range = sectorMarketCapRanges[sector] || { min: 10000000000, max: 100000000000 };
-    return Math.floor(Math.random() * (range.max - range.min) + range.min);
-  }
-
-  private generateRealisticPE(sector: string): number {
-    const sectorPERanges: Record<string, { min: number; max: number }> = {
-      'Technology': { min: 15, max: 40 },
-      'ETF': { min: 18, max: 25 },
-      'Financial Services': { min: 8, max: 15 },
-      'Healthcare': { min: 12, max: 30 },
-      'Consumer Discretionary': { min: 10, max: 25 },
-      'Consumer Staples': { min: 15, max: 25 },
-      'Energy': { min: 8, max: 20 },
-      'Industrials': { min: 12, max: 22 },
-      'Utilities': { min: 18, max: 25 },
-      'Real Estate': { min: 15, max: 30 },
-      'Materials': { min: 10, max: 18 },
-      'Communication Services': { min: 12, max: 25 }
-    };
-
-    const range = sectorPERanges[sector] || { min: 10, max: 25 };
-    return Math.round((Math.random() * (range.max - range.min) + range.min) * 100) / 100;
-  }
+  // All mock data generation methods removed - using only live API data
 }
 
 // Export singleton instance
@@ -483,23 +360,24 @@ export async function fetchLiveQuoteData(symbol: string): Promise<LiveQuoteData 
   } catch (error) {
     // Handle rate limiting gracefully
     if (error instanceof Error && error.message.includes('429')) {
-      console.warn(`[fetchLiveQuoteData] API rate limited for ${symbol}, using enhanced mock data`);
+      console.warn(`[fetchLiveQuoteData] API rate limited for ${symbol}, no data available`);
     } else {
       console.warn(`[fetchLiveQuoteData] Enhanced live data failed for ${symbol}:`, error);
     }
   }
 
-  // Fall back to enhanced mock data based on real S&P 500 company info
-  return sp500DataService.generateEnhancedMockQuote(symbol);
+  // No mock data - return null if live data unavailable
+  console.warn(`[fetchLiveQuoteData] No live data available for ${symbol}`);
+  return null;
 }
 
-export async function fetchHybridQuoteData(symbol: string): Promise<LiveQuoteData> {
+export async function fetchLiveOnlyQuoteData(symbol: string): Promise<LiveQuoteData | null> {
   const liveData = await fetchLiveQuoteData(symbol);
   
   if (liveData) {
     return liveData;
   }
 
-  // This should not happen as generateEnhancedMockQuote always returns data
-  return sp500DataService.generateEnhancedMockQuote(symbol);
+  // No mock data - return null if live data unavailable
+  return null;
 }
