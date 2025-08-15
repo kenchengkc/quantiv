@@ -8,6 +8,10 @@ export interface DoltDatabaseConfig {
   database: string;
   branch?: string;
   apiKey?: string;
+  endpoints: {
+    chainEndpoint: string;
+    ivEndpoint: string;
+  };
   tables: {
     optionsChain: string;
     ivHistory: string;
@@ -29,11 +33,17 @@ export const doltConfig: DoltDatabaseConfig = {
   // No API key required for public DoltHub repositories
   apiKey: process.env.DOLT_API_KEY,
   
-  // Table names discovered in the database
+  // Separate endpoints for different table types
+  endpoints: {
+    chainEndpoint: process.env.DOLT_CHAIN_ENDPOINT || 'https://www.dolthub.com/api/v1alpha1/post-no-preference/options/master',
+    ivEndpoint: process.env.DOLT_IV_ENDPOINT || 'https://www.dolthub.com/api/v1alpha1/post-no-preference/options/master',
+  },
+  
+  // Table names for different data types
   tables: {
-    optionsChain: process.env.DOLT_OPTIONS_TABLE || 'option_chain',
-    ivHistory: process.env.DOLT_IV_TABLE || 'option_chain', // Use same table for IV history
-    symbols: process.env.DOLT_SYMBOLS_TABLE || 'option_chain', // Extract symbols from option_chain
+    optionsChain: process.env.DOLT_OPTIONS_TABLE || 'option_chain', // Raw options data
+    ivHistory: process.env.DOLT_IV_TABLE || 'volatility_history', // Dedicated IV/HV analytics
+    symbols: process.env.DOLT_SYMBOLS_TABLE || 'volatility_history', // Extract symbols from volatility_history
   },
 };
 
