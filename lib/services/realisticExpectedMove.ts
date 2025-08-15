@@ -3,7 +3,7 @@
  * Uses actual stock data and historical patterns to calculate expected moves
  */
 
-import { sp500DataService, fetchHybridQuoteData } from '@/lib/data/sp500Service';
+import { sp500DataService, fetchLiveQuoteData } from '@/lib/data/sp500Service';
 
 export interface RealisticExpectedMoveData {
   symbol: string;
@@ -103,7 +103,11 @@ export class RealisticExpectedMoveCalculator {
   static async calculateRealisticExpectedMove(symbol: string): Promise<RealisticExpectedMoveData> {
     // Get company and quote data
     const company = sp500DataService.getCompany(symbol);
-    const quoteData = await fetchHybridQuoteData(symbol);
+    const quoteData = await fetchLiveQuoteData(symbol);
+    
+    if (!quoteData) {
+      throw new Error(`No live quote data available for ${symbol}`);
+    }
     
     const currentPrice = quoteData.price;
     const sector = company?.sector || 'Technology';

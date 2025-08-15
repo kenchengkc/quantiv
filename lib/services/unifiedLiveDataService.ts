@@ -71,7 +71,12 @@ export interface UnifiedEarningsData {
     date: string;
     actualEPS: number;
     estimatedEPS: number;
-    surprise: number;
+    actualRevenue: number;
+    estimatedRevenue: number;
+    epsSurprise: number;
+    epsSurprisePercent: number;
+    revenueSurprise: number;
+    revenueSurprisePercent: number;
     priceMoveBefore: number;
     priceMoveAfter: number;
     priceMovePercent: number;
@@ -81,6 +86,8 @@ export interface UnifiedEarningsData {
     avgAbsMove: number;
     beatRate: number;
     avgBeat: number;
+    revenueBeatRate: number;
+    avgRevenueBeat: number;
   };
   dataSource: 'fmp' | 'finnhub' | 'alpha_vantage';
 }
@@ -245,12 +252,24 @@ class UnifiedLiveDataService {
             date: earning.date,
             actualEPS: earning.actualEPS || 0,
             estimatedEPS: earning.estimatedEPS || 0,
-            surprise: earning.surprise || 0,
+            actualRevenue: earning.actualRevenue || 0,
+            estimatedRevenue: earning.estimatedRevenue || 0,
+            epsSurprise: earning.epsSurprise || earning.surprise || 0,
+            epsSurprisePercent: earning.epsSurprisePercent || 0,
+            revenueSurprise: earning.revenueSurprise || 0,
+            revenueSurprisePercent: earning.revenueSurprisePercent || 0,
             priceMoveBefore: earning.priceMoveBefore,
             priceMoveAfter: earning.priceMoveAfter,
             priceMovePercent: earning.priceMovePercent
           })),
-          stats: enhancedEarnings.stats,
+          stats: {
+            avgMove: enhancedEarnings.stats.avgMove,
+            avgAbsMove: enhancedEarnings.stats.avgAbsMove,
+            beatRate: enhancedEarnings.stats.beatRate,
+            avgBeat: enhancedEarnings.stats.avgBeat,
+            revenueBeatRate: enhancedEarnings.stats.revenueBeatRate || 0,
+            avgRevenueBeat: enhancedEarnings.stats.avgRevenueBeat || 0
+          },
           dataSource: enhancedEarnings.dataSource as any
         };
       }

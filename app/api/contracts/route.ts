@@ -55,8 +55,8 @@ export async function GET(request: NextRequest) {
     }
 
     // Generate cache keys
-    const cacheKey = CacheKeys.optionsChain(`${symbol}_contracts_${contractType || 'all'}_${expiration || 'all'}_${limit}`);
-    const redisKey = Keys.optionsChain(`${symbol}_contracts_${contractType || 'all'}_${expiration || 'all'}_${limit}`);
+    const cacheKey = CacheKeys.optionsChain(symbol, `contracts_${contractType || 'all'}_${expiration || 'all'}_${limit}`);
+    const redisKey = Keys.optionsChain(symbol, `contracts_${contractType || 'all'}_${expiration || 'all'}_${limit}`);
     
     // Try L1 cache first
     let responseData: any = CacheInstances.optionsChain.get(cacheKey);

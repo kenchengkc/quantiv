@@ -22,20 +22,34 @@ export interface FMPQuoteData {
 
 export interface FMPEarningsData {
   symbol: string;
-  nextEarningsDate?: string;
+  nextEarningsDate?: string | null;
   nextEarningsTime?: 'BMO' | 'AMC' | 'UNKNOWN';
-  estimatedEPS?: number;
-  estimatedRevenue?: number;
+  estimatedEPS?: number | null;
+  estimatedRevenue?: number | null;
   historicalEarnings: Array<{
     date: string;
-    actualEPS: number;
-    estimatedEPS: number;
-    actualRevenue: number;
-    estimatedRevenue: number;
-    epsSurprise: number;
-    epsSurprisePercent: number;
-    revenueSurprise: number;
-    revenueSurprisePercent: number;
+    actualEPS: number | null;
+    estimatedEPS: number | null;
+    actualRevenue: number | null;
+    estimatedRevenue: number | null;
+    epsSurprise: number | null;
+    epsSurprisePercent: number | null;
+    revenueSurprise: number | null;
+    revenueSurprisePercent: number | null;
+    priceMoveBefore: number;
+    priceMoveAfter: number;
+    priceMovePercent: number;
+  }>;
+  upcomingEarnings?: Array<{
+    date: string;
+    actualEPS: null;
+    estimatedEPS: number | null;
+    actualRevenue: null;
+    estimatedRevenue: number | null;
+    epsSurprise: null;
+    epsSurprisePercent: null;
+    revenueSurprise: null;
+    revenueSurprisePercent: null;
     priceMoveBefore: number;
     priceMoveAfter: number;
     priceMovePercent: number;
@@ -120,88 +134,116 @@ class FMPService {
     }
   }
 
-
-
   /**
    * Fetch earnings data
    */
-  public async fetchEarnings(symbol: string): Promise<FMPEarningsData | null> {
-    if (!this.isAvailable()) {
+  public async fetchEarningsData(symbol: string): Promise<FMPEarningsData | null> {
+    if (!this.apiKey) {
       console.warn('[FMP] API key not configured');
       return null;
     }
 
     try {
-      console.log(`[FMP] Fetching earnings data for ${symbol}`);
+      console.log(`[FMP] Fetching earnings data for ${symbol} with limit 15`);
       
-      // Calculate date range for earnings calendar (next 90 days and past 365 days)
-      const today = new Date();
-      const fromDate = new Date(today.getTime() - 365 * 24 * 60 * 60 * 1000); // 1 year ago
-      const toDate = new Date(today.getTime() + 90 * 24 * 60 * 60 * 1000); // 90 days ahead
-      
-      const fromStr = fromDate.toISOString().split('T')[0];
-      const toStr = toDate.toISOString().split('T')[0];
-      
-      // Fetch earnings report (historical) and calendar (upcoming)
-      const [reportResponse, calendarResponse] = await Promise.all([
-        fetch(`${this.baseUrl}/earnings?symbol=${symbol}&limit=10&apikey=${this.apiKey}`),
-        fetch(`${this.baseUrl}/earnings-calendar?from=${fromStr}&to=${toStr}&apikey=${this.apiKey}`)
-      ]);
+      // Fetch historical earnings data (this endpoint actually returns data)
+      const response = await fetch(`${this.baseUrl}/historical/earning_calendar/${symbol}?apikey=${this.apiKey}`);
 
-      if (!reportResponse.ok) {
-        console.error(`[FMP] Earnings report API failed: ${reportResponse.status}`);
+      if (!response.ok) {
+        console.error(`[FMP] Earnings API failed: ${response.status}`);
         return null;
       }
 
-      const [reportData, calendarData] = await Promise.all([
-        reportResponse.json(),
-        calendarResponse.ok ? calendarResponse.json() : []
-      ]);
+      const earningsData = await response.json();
+      console.log(`[FMP] Raw earnings data for ${symbol}:`, earningsData.slice(0, 3));
 
-      console.log(`[FMP] Earnings report data for ${symbol}:`, reportData.slice(0, 2));
-      console.log(`[FMP] Calendar data entries:`, calendarData.length);
+      if (!Array.isArray(earningsData) || earningsData.length === 0) {
+        console.warn(`[FMP] No earnings data found for ${symbol}`);
+        return null;
+      }
 
-      // Find upcoming earnings for this symbol
-      const upcomingEarnings = calendarData.find((e: any) => 
-        e.symbol === symbol && new Date(e.date) > today
-      );
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // Set to start of day for accurate comparison
 
-      // Process historical earnings from report data
-      const historicalEarnings = reportData
-        .filter((earning: any) => earning.date && new Date(earning.date) <= today)
-        .slice(0, 4) // Last 4 earnings
-        .map((earning: any) => {
-          const actualEPS = earning.epsActual || 0;
-          const estimatedEPS = earning.epsEstimated || 0;
-          const actualRevenue = earning.revenueActual || 0;
-          const estimatedRevenue = earning.revenueEstimated || actualRevenue * 0.98;
-          
-          const epsSurprise = actualEPS - estimatedEPS;
-          const epsSurprisePercent = estimatedEPS !== 0 ? (epsSurprise / Math.abs(estimatedEPS)) * 100 : 0;
-          const revenueSurprise = actualRevenue - estimatedRevenue;
-          const revenueSurprisePercent = estimatedRevenue !== 0 ? (revenueSurprise / estimatedRevenue) * 100 : 0;
-          
-          // Generate realistic price move based on surprise impact
-          const surpriseImpact = (epsSurprisePercent + revenueSurprisePercent) / 2;
-          const baseMovePercent = Math.random() * 6 + 2; // 2-8% base move
-          const directionMultiplier = surpriseImpact > 0 ? 1 : -1;
-          const priceMovePercent = baseMovePercent * directionMultiplier * (1 + Math.abs(surpriseImpact) / 100);
-          
-          return {
-            date: earning.date,
-            actualEPS,
-            estimatedEPS,
-            actualRevenue,
-            estimatedRevenue,
-            epsSurprise,
-            epsSurprisePercent,
-            revenueSurprise,
-            revenueSurprisePercent,
-            priceMoveBefore: 0, // FMP doesn't provide this directly
-            priceMoveAfter: 0,  // FMP doesn't provide this directly
-            priceMovePercent: Math.round(priceMovePercent * 100) / 100
-          };
-        });
+      // Sort by date (most recent first) and take first 15
+      const sortedEarnings = earningsData
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+        .slice(0, 15);
+
+      // Separate past and future earnings
+      const pastEarnings = sortedEarnings
+        .filter(e => new Date(e.date) < today && (e.eps !== null || e.epsEstimated !== null))
+        .slice(0, 7); // Last 7 releases with data
+
+      // Get future earnings and prioritize those with estimates
+      const allFutureEarnings = sortedEarnings
+        .filter(e => new Date(e.date) >= today);
+      
+      // Sort future earnings chronologically (earliest first) for proper ordering
+      const chronologicalFuture = allFutureEarnings
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      
+      // Get the first future earnings with estimates (priority)
+      const firstWithEstimates = chronologicalFuture
+        .find(e => e.epsEstimated !== null || e.revenueEstimated !== null);
+      
+      // Get the chronologically next future earnings after the first
+      const remainingFuture = chronologicalFuture
+        .filter(e => e.date !== firstWithEstimates?.date);
+      
+      // Take up to 2 future earnings: first with estimates, then chronologically next
+      const futureEarnings = [
+        firstWithEstimates,
+        ...remainingFuture.slice(0, 1)
+      ].filter(Boolean).slice(0, 2);
+
+      console.log(`[FMP] Found ${pastEarnings.length} past earnings, ${futureEarnings.length} future earnings for ${symbol}`);
+
+      // Process historical earnings (past 7 releases with actual data)
+      const historicalEarnings = pastEarnings.map((earning: any) => {
+        // Historical endpoint uses different field names
+        const actualEPS = earning.eps;
+        const estimatedEPS = earning.epsEstimated;
+        const actualRevenue = earning.revenue;
+        const estimatedRevenue = earning.revenueEstimated;
+        
+        // Calculate surprises only if we have both actual and estimated values
+        const epsSurprise = (actualEPS !== null && estimatedEPS !== null) ? actualEPS - estimatedEPS : null;
+        const epsSurprisePercent = (epsSurprise !== null && estimatedEPS !== 0) ? (epsSurprise / Math.abs(estimatedEPS)) * 100 : null;
+        const revenueSurprise = (actualRevenue !== null && estimatedRevenue !== null) ? actualRevenue - estimatedRevenue : null;
+        const revenueSurprisePercent = (revenueSurprise !== null && estimatedRevenue !== 0) ? (revenueSurprise / estimatedRevenue) * 100 : null;
+        
+        return {
+          date: earning.date,
+          actualEPS,
+          estimatedEPS,
+          actualRevenue,
+          estimatedRevenue,
+          epsSurprise,
+          epsSurprisePercent: epsSurprisePercent ? Math.round(epsSurprisePercent * 100) / 100 : null,
+          revenueSurprise,
+          revenueSurprisePercent: revenueSurprisePercent ? Math.round(revenueSurprisePercent * 100) / 100 : null,
+          priceMoveBefore: 0, // Would need historical price data
+          priceMoveAfter: 0,  // Would need historical price data
+          priceMovePercent: 0 // Would need historical price data
+        };
+      });
+
+      // Process future earnings (2 upcoming releases)
+      const upcomingEarnings = futureEarnings.map((earning: any) => ({
+        date: earning.date,
+        actualEPS: null, // Future earnings don't have actuals yet
+        estimatedEPS: earning.epsEstimated,
+        actualRevenue: null, // Future earnings don't have actuals yet
+        estimatedRevenue: earning.revenueEstimated,
+        epsSurprise: null,
+        epsSurprisePercent: null,
+        revenueSurprise: null,
+        revenueSurprisePercent: null,
+        priceMoveBefore: 0,
+        priceMoveAfter: 0,
+        priceMovePercent: 0
+      }));
 
       // Calculate comprehensive stats
       const avgMove = historicalEarnings.length > 0 
@@ -222,11 +264,12 @@ class FMPService {
 
       return {
         symbol,
-        nextEarningsDate: upcomingEarnings?.date,
+        nextEarningsDate: upcomingEarnings.length > 0 ? upcomingEarnings[0].date : null,
         nextEarningsTime: 'UNKNOWN', // FMP calendar doesn't provide timing
-        estimatedEPS: upcomingEarnings?.epsEstimated,
-        estimatedRevenue: upcomingEarnings?.revenueEstimated,
+        estimatedEPS: upcomingEarnings.length > 0 ? upcomingEarnings[0].estimatedEPS : null,
+        estimatedRevenue: upcomingEarnings.length > 0 ? upcomingEarnings[0].estimatedRevenue : null,
         historicalEarnings,
+        upcomingEarnings, // Include upcoming earnings data
         stats: {
           avgMove,
           avgAbsMove: avgMove,
