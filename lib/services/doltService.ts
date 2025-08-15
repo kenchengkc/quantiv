@@ -69,50 +69,53 @@ class DoltService {
   }
 
   /**
-   * Execute SQL query against DoltHub API
+   * Execute a SQL query against the Dolt database with timeout protection
    */
-  private async executeQuery(sql: string, endpointType: 'chain' | 'iv' = 'chain'): Promise<any[]> {
+  private async executeQuery(
+    sql: string, 
+    endpointType: 'chain' | 'iv' = 'chain',
+    timeoutMs: number = 30000
+  ): Promise<any[]> {
     try {
-      // Use specific endpoint if configured, otherwise fall back to general endpoint
       let url: string;
       if (this.config.endpoints) {
         const specificEndpoint = endpointType === 'iv' ? this.config.endpoints.ivEndpoint : this.config.endpoints.chainEndpoint;
         const encodedQuery = encodeURIComponent(sql);
         url = `${specificEndpoint}?q=${encodedQuery}`;
       } else {
-        // Fallback to general endpoint construction
         const encodedQuery = encodeURIComponent(sql);
         url = `${this.config.endpoint}/${this.config.database}/${this.config.branch}?q=${encodedQuery}`;
       }
-      
-      console.log(`[Dolt] Executing ${endpointType} query: ${sql}`);
-      console.log(`[Dolt] URL: ${url}`);
 
       const headers: Record<string, string> = {
-        'Accept': 'application/json',
+        'Content-Type': 'application/json',
       };
 
       if (this.config.apiKey) {
         headers['Authorization'] = `Bearer ${this.config.apiKey}`;
       }
 
+      // Add timeout protection for large queries
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
       const response = await fetch(url, {
         method: 'GET',
         headers,
+        signal: controller.signal,
       });
 
+      clearTimeout(timeoutId);
+
       if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Dolt API error: ${response.status} ${response.statusText} - ${errorText}`);
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
       const result = await response.json();
-      
       if (result.query_execution_status !== 'Success') {
         throw new Error(`Dolt query failed: ${result.query_execution_message}`);
       }
 
-      console.log(`[Dolt] Query successful, returned ${result.rows?.length || 0} rows`);
       return result.rows || [];
     } catch (error) {
       console.error('[Dolt] Query execution failed:', error);
@@ -343,6 +346,311 @@ class DoltService {
     } catch (error) {
       console.error(`[Dolt] Failed to fetch historical expected moves for ${symbol}:`, error);
       return [];
+    }
+  }
+
+  // =============================================================================
+  // ULTRA-OPTIMIZED METHODS - Single-day focused queries for DoltHub API limits
+  // Based on testing: Only single-day queries with specific symbols work reliably
+  // These methods work within DoltHub's strict public API constraints
+  // =============================================================================
+
+  /**
+   * ULTRA-OPTIMIZED 1: Single-Day Options Chain
+   * Gets options chain for a specific symbol on a specific date (DoltHub API safe)
+   */
+  async getSingleDayOptionsChain(
+    symbol: string,
+    date: string,
+    expiration?: string
+  ): Promise<{
+    options: Array<{
+      date: string;
+      expiration: string;
+      strike: number;
+      call_put: string;
+      bid: number;
+      ask: number;
+      vol: number;
+      delta?: number;
+      gamma?: number;
+      theta?: number;
+      vega?: number;
+    }>;
+    metadata: {
+      symbol: string;
+      date: string;
+      totalOptions: number;
+      avgIV: number;
+    };
+  }> {
+    let sql = `
+      SELECT 
+        date, expiration, strike, call_put, bid, ask, vol, delta, gamma, theta, vega
+      FROM option_chain 
+      WHERE act_symbol = '${symbol.toUpperCase()}'
+        AND date = '${date}'
+    `;
+
+    if (expiration) {
+      sql += ` AND expiration = '${expiration}'`;
+    }
+
+    sql += ` ORDER BY strike ASC, call_put ASC LIMIT 500`;
+
+    try {
+      const rows = await this.executeQuery(sql, 'chain', 8000);
+      
+      const options = rows.map(row => ({
+        date: row.date,
+        expiration: row.expiration,
+        strike: parseFloat(row.strike) || 0,
+        call_put: row.call_put,
+        bid: parseFloat(row.bid) || 0,
+        ask: parseFloat(row.ask) || 0,
+        vol: parseFloat(row.vol) || 0,
+        delta: row.delta ? parseFloat(row.delta) : undefined,
+        gamma: row.gamma ? parseFloat(row.gamma) : undefined,
+        theta: row.theta ? parseFloat(row.theta) : undefined,
+        vega: row.vega ? parseFloat(row.vega) : undefined,
+      }));
+
+      const avgIV = options.length > 0 
+        ? options.reduce((sum, opt) => sum + opt.vol, 0) / options.length 
+        : 0;
+
+      return {
+        options,
+        metadata: {
+          symbol: symbol.toUpperCase(),
+          date,
+          totalOptions: options.length,
+          avgIV
+        }
+      };
+    } catch (error) {
+      console.error(`[Dolt] Failed to get single-day options chain for ${symbol} on ${date}:`, error);
+      return {
+        options: [],
+        metadata: {
+          symbol: symbol.toUpperCase(),
+          date,
+          totalOptions: 0,
+          avgIV: 0
+        }
+      };
+    }
+  }
+
+  /**
+   * ULTRA-OPTIMIZED 2: Get Available Dates for Symbol
+   * Gets recent trading dates where options data exists for a symbol (DoltHub API safe)
+   */
+  async getAvailableDatesForSymbol(
+    symbol: string,
+    limit: number = 10
+  ): Promise<{
+    dates: string[];
+    metadata: {
+      symbol: string;
+      totalDates: number;
+      latestDate: string;
+    };
+  }> {
+    const sql = `
+      SELECT DISTINCT date
+      FROM option_chain 
+      WHERE act_symbol = '${symbol.toUpperCase()}'
+      ORDER BY date DESC
+      LIMIT ${Math.min(limit, 20)}
+    `;
+
+    try {
+      const rows = await this.executeQuery(sql, 'chain', 5000);
+      const dates = rows.map(row => row.date);
+
+      return {
+        dates,
+        metadata: {
+          symbol: symbol.toUpperCase(),
+          totalDates: dates.length,
+          latestDate: dates.length > 0 ? dates[0] : ''
+        }
+      };
+    } catch (error) {
+      console.error(`[Dolt] Failed to get available dates for ${symbol}:`, error);
+      return {
+        dates: [],
+        metadata: {
+          symbol: symbol.toUpperCase(),
+          totalDates: 0,
+          latestDate: ''
+        }
+      };
+    }
+  }
+
+  /**
+   * ULTRA-OPTIMIZED 3: Get Single-Day Expirations
+   * Gets available expirations for a symbol on a specific date (DoltHub API safe)
+   */
+  async getSingleDayExpirations(
+    symbol: string,
+    date: string
+  ): Promise<{
+    expirations: Array<{
+      expiration: string;
+      optionCount: number;
+      avgIV: number;
+      isMonthly: boolean;
+    }>;
+    metadata: {
+      symbol: string;
+      date: string;
+      totalExpirations: number;
+    };
+  }> {
+    const sql = `
+      SELECT 
+        expiration,
+        COUNT(*) as option_count,
+        AVG(vol) as avg_iv
+      FROM option_chain 
+      WHERE act_symbol = '${symbol.toUpperCase()}'
+        AND date = '${date}'
+        AND vol IS NOT NULL
+      GROUP BY expiration
+      ORDER BY expiration ASC
+      LIMIT 50
+    `;
+
+    try {
+      const rows = await this.executeQuery(sql, 'chain', 8000);
+      
+      const expirations = rows.map(row => {
+        const expDate = new Date(row.expiration);
+        const dayOfMonth = expDate.getDate();
+        const isMonthly = dayOfMonth >= 15 && dayOfMonth <= 21; // 3rd Friday pattern
+        
+        return {
+          expiration: row.expiration,
+          optionCount: parseInt(row.option_count) || 0,
+          avgIV: parseFloat(row.avg_iv) || 0,
+          isMonthly
+        };
+      });
+
+      return {
+        expirations,
+        metadata: {
+          symbol: symbol.toUpperCase(),
+          date,
+          totalExpirations: expirations.length
+        }
+      };
+    } catch (error) {
+      console.error(`[Dolt] Failed to get expirations for ${symbol} on ${date}:`, error);
+      return {
+        expirations: [],
+        metadata: {
+          symbol: symbol.toUpperCase(),
+          date,
+          totalExpirations: 0
+        }
+      };
+    }
+  }
+
+  /**
+   * ULTRA-OPTIMIZED 4: Get Single-Day Summary Stats
+   * Gets summary statistics for a symbol on a specific date (DoltHub API safe)
+   */
+  async getSingleDaySummaryStats(
+    symbol: string,
+    date: string
+  ): Promise<{
+    summary: {
+      totalOptions: number;
+      avgIV: number;
+      avgDelta: number;
+      avgGamma: number;
+      liquidOptions: number;
+      avgSpread: number;
+    };
+    metadata: {
+      symbol: string;
+      date: string;
+      hasData: boolean;
+    };
+  }> {
+    const sql = `
+      SELECT 
+        COUNT(*) as total_options,
+        AVG(vol) as avg_iv,
+        AVG(delta) as avg_delta,
+        AVG(gamma) as avg_gamma,
+        COUNT(CASE WHEN bid > 0 AND ask > 0 THEN 1 END) as liquid_options,
+        AVG(ask - bid) as avg_spread
+      FROM option_chain 
+      WHERE act_symbol = '${symbol.toUpperCase()}'
+        AND date = '${date}'
+        AND vol IS NOT NULL
+    `;
+
+    try {
+      const rows = await this.executeQuery(sql, 'chain', 5000);
+      
+      if (rows.length === 0) {
+        return {
+          summary: {
+            totalOptions: 0,
+            avgIV: 0,
+            avgDelta: 0,
+            avgGamma: 0,
+            liquidOptions: 0,
+            avgSpread: 0
+          },
+          metadata: {
+            symbol: symbol.toUpperCase(),
+            date,
+            hasData: false
+          }
+        };
+      }
+
+      const row = rows[0];
+      return {
+        summary: {
+          totalOptions: parseInt(row.total_options) || 0,
+          avgIV: parseFloat(row.avg_iv) || 0,
+          avgDelta: parseFloat(row.avg_delta) || 0,
+          avgGamma: parseFloat(row.avg_gamma) || 0,
+          liquidOptions: parseInt(row.liquid_options) || 0,
+          avgSpread: parseFloat(row.avg_spread) || 0
+        },
+        metadata: {
+          symbol: symbol.toUpperCase(),
+          date,
+          hasData: true
+        }
+      };
+    } catch (error) {
+      console.error(`[Dolt] Failed to get summary stats for ${symbol} on ${date}:`, error);
+      return {
+        summary: {
+          totalOptions: 0,
+          avgIV: 0,
+          avgDelta: 0,
+          avgGamma: 0,
+          liquidOptions: 0,
+          avgSpread: 0
+        },
+        metadata: {
+          symbol: symbol.toUpperCase(),
+          date,
+          hasData: false
+        }
+      };
     }
   }
 }
