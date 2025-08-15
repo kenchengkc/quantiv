@@ -41,6 +41,10 @@ export interface DoltConfig {
   database: string;
   branch?: string;
   apiKey?: string;
+  endpoints?: {
+    chainEndpoint: string;
+    ivEndpoint: string;
+  };
 }
 
 class DoltService {
@@ -49,7 +53,7 @@ class DoltService {
 
   constructor(config: DoltConfig) {
     this.config = {
-      branch: 'main',
+      branch: 'master',
       ...config,
     };
   }
@@ -67,13 +71,21 @@ class DoltService {
   /**
    * Execute SQL query against DoltHub API
    */
-  private async executeQuery(sql: string): Promise<any[]> {
+  private async executeQuery(sql: string, endpointType: 'chain' | 'iv' = 'chain'): Promise<any[]> {
     try {
-      // DoltHub API format: https://www.dolthub.com/api/v1alpha1/{owner}/{repo}/{branch}?q={sql}
-      const encodedQuery = encodeURIComponent(sql);
-      const url = `${this.config.endpoint}/${this.config.database}/${this.config.branch}?q=${encodedQuery}`;
+      // Use specific endpoint if configured, otherwise fall back to general endpoint
+      let url: string;
+      if (this.config.endpoints) {
+        const specificEndpoint = endpointType === 'iv' ? this.config.endpoints.ivEndpoint : this.config.endpoints.chainEndpoint;
+        const encodedQuery = encodeURIComponent(sql);
+        url = `${specificEndpoint}?q=${encodedQuery}`;
+      } else {
+        // Fallback to general endpoint construction
+        const encodedQuery = encodeURIComponent(sql);
+        url = `${this.config.endpoint}/${this.config.database}/${this.config.branch}?q=${encodedQuery}`;
+      }
       
-      console.log(`[Dolt] Executing query: ${sql}`);
+      console.log(`[Dolt] Executing ${endpointType} query: ${sql}`);
       console.log(`[Dolt] URL: ${url}`);
 
       const headers: Record<string, string> = {
@@ -90,7 +102,8 @@ class DoltService {
       });
 
       if (!response.ok) {
-        throw new Error(`Dolt API error: ${response.status} ${response.statusText}`);
+        const errorText = await response.text();
+        throw new Error(`Dolt API error: ${response.status} ${response.statusText} - ${errorText}`);
       }
 
       const result = await response.json();
@@ -108,7 +121,7 @@ class DoltService {
   }
 
   /**
-   * Get historical IV data for sparkline visualization from option_chain table
+   * Get historical IV data for sparkline visualization from volatility_history table
    */
   async getIVHistory(symbol: string, days: number = 252): Promise<Array<{
     date: string;
@@ -117,20 +130,19 @@ class DoltService {
     const sql = `
       SELECT 
         date,
-        AVG(vol) as avg_iv
-      FROM option_chain 
+        iv_current as iv
+      FROM volatility_history 
       WHERE act_symbol = '${symbol.toUpperCase()}'
         AND date >= DATE_SUB(CURDATE(), INTERVAL ${days} DAY)
-        AND vol IS NOT NULL
-      GROUP BY date
+        AND iv_current IS NOT NULL
       ORDER BY date ASC
     `;
 
     try {
-      const rows = await this.executeQuery(sql);
+      const rows = await this.executeQuery(sql, 'iv');
       return rows.map(row => ({
         date: row.date,
-        iv: parseFloat(row.avg_iv) * 100, // Convert to percentage
+        iv: parseFloat(row.iv) || 0,
       }));
     } catch (error) {
       console.error(`[Dolt] Failed to fetch IV history for ${symbol}:`, error);
@@ -139,7 +151,7 @@ class DoltService {
   }
 
   /**
-   * Get current IV statistics for a symbol
+   * Get current IV statistics for a symbol from volatility_history table
    */
   async getCurrentIVStats(symbol: string): Promise<{
     rank: number;
@@ -148,30 +160,42 @@ class DoltService {
     high52Week: number;
     low52Week: number;
   } | null> {
+    // Get latest IV stats from volatility_history table
     const sql = `
       SELECT 
-        iv_rank,
-        iv_percentile,
-        current_iv,
-        high_52w,
-        low_52w
-      FROM iv_history 
-      WHERE symbol = '${symbol.toUpperCase()}'
+        iv_current,
+        iv_year_high,
+        iv_year_low,
+        hv_current
+      FROM volatility_history 
+      WHERE act_symbol = '${symbol.toUpperCase()}'
       ORDER BY date DESC 
       LIMIT 1
     `;
 
     try {
-      const rows = await this.executeQuery(sql);
-      if (rows.length === 0) return null;
+      const rows = await this.executeQuery(sql, 'iv');
+      if (rows.length === 0 || !rows[0].iv_current) {
+        console.log(`[Dolt] No IV stats found for ${symbol}`);
+        return null;
+      }
 
       const row = rows[0];
+      const current = parseFloat(row.iv_current) || 0;
+      const high = parseFloat(row.iv_year_high) || 0;
+      const low = parseFloat(row.iv_year_low) || 0;
+      
+      // Calculate rank and percentile from the pre-calculated year high/low
+      const range = high - low;
+      const rank = range > 0 ? ((current - low) / range) * 100 : 50;
+      const percentile = rank;
+
       return {
-        rank: row.iv_rank || 50,
-        percentile: row.iv_percentile || 50,
-        current: row.current_iv || 25,
-        high52Week: row.high_52w || 40,
-        low52Week: row.low_52w || 15,
+        rank: Math.round(rank),
+        percentile: Math.round(percentile),
+        current,
+        high52Week: high,
+        low52Week: low,
       };
     } catch (error) {
       console.error(`[Dolt] Failed to fetch current IV stats for ${symbol}:`, error);
@@ -180,66 +204,93 @@ class DoltService {
   }
 
   /**
-   * Get historical options chain data for expected move calculations
+   * Get available symbols in the database from volatility_history table
    */
-  async getHistoricalOptionsChain(
-    symbol: string, 
-    date: string,
-    expiration?: string
-  ): Promise<DoltOptionsChain[]> {
+  async getAvailableSymbols(): Promise<string[]> {
+    const sql = `
+      SELECT DISTINCT act_symbol
+      FROM volatility_history 
+      ORDER BY act_symbol ASC
+    `;
+
+    try {
+      const rows = await this.executeQuery(sql, 'iv');
+      return rows.map(row => row.act_symbol);
+    } catch (error) {
+      console.error('[Dolt] Failed to fetch available symbols:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get the most recent data date for a symbol from volatility_history table
+   */
+  async getLatestDataDate(symbol: string): Promise<string | null> {
+    const sql = `
+      SELECT MAX(date) as latest_date
+      FROM volatility_history 
+      WHERE act_symbol = '${symbol.toUpperCase()}'
+    `;
+
+    try {
+      const rows = await this.executeQuery(sql, 'iv');
+      return rows[0]?.latest_date || null;
+    } catch (error) {
+      console.error(`[Dolt] Failed to fetch latest date for ${symbol}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Get historical options chain data for a symbol (limited to past year for performance)
+   */
+  async getHistoricalOptionsChain(symbol: string, expiration?: string): Promise<any[]> {
     let sql = `
       SELECT 
-        symbol,
         date,
         expiration,
         strike,
-        option_type,
+        call_put,
         bid,
         ask,
-        last,
-        volume,
-        open_interest,
-        implied_volatility,
+        vol,
         delta,
         gamma,
         theta,
-        vega,
-        underlying_price
-      FROM options_chain 
-      WHERE symbol = '${symbol.toUpperCase()}'
-        AND date = '${date}'
+        vega
+      FROM option_chain 
+      WHERE act_symbol = '${symbol.toUpperCase()}'
+        AND date >= DATE_SUB(CURDATE(), INTERVAL 365 DAY)
     `;
 
     if (expiration) {
       sql += ` AND expiration = '${expiration}'`;
     }
 
-    sql += ` ORDER BY strike ASC, option_type ASC`;
+    sql += ` ORDER BY date DESC, strike ASC LIMIT 1000`;
 
     try {
       const rows = await this.executeQuery(sql);
-      return rows.map(row => DoltOptionsChainSchema.parse(row));
+      return rows;
     } catch (error) {
-      console.error(`[Dolt] Failed to fetch options chain for ${symbol} on ${date}:`, error);
+      console.error(`[Dolt] Failed to fetch historical options chain for ${symbol}:`, error);
       return [];
     }
   }
 
   /**
-   * Get available expiration dates for a symbol
+   * Get available expiration dates for a symbol (limited to past year for performance)
    */
-  async getAvailableExpirations(symbol: string, fromDate?: string): Promise<string[]> {
-    let sql = `
+  async getExpirations(symbol: string): Promise<string[]> {
+    const sql = `
       SELECT DISTINCT expiration
-      FROM options_chain 
-      WHERE symbol = '${symbol.toUpperCase()}'
+      FROM option_chain 
+      WHERE act_symbol = '${symbol.toUpperCase()}'
+        AND date >= DATE_SUB(CURDATE(), INTERVAL 365 DAY)
+        AND expiration >= CURDATE()
+      ORDER BY expiration ASC
+      LIMIT 50
     `;
-
-    if (fromDate) {
-      sql += ` AND date >= '${fromDate}'`;
-    }
-
-    sql += ` ORDER BY expiration ASC`;
 
     try {
       const rows = await this.executeQuery(sql);
@@ -251,104 +302,46 @@ class DoltService {
   }
 
   /**
-   * Get symbols available in the database
+   * Get historical expected moves for a symbol (limited to past year for performance)
    */
-  async getAvailableSymbols(): Promise<string[]> {
-    const sql = `
-      SELECT DISTINCT symbol
-      FROM options_chain 
-      ORDER BY symbol ASC
-    `;
-
-    try {
-      const rows = await this.executeQuery(sql);
-      return rows.map(row => row.symbol);
-    } catch (error) {
-      console.error('[Dolt] Failed to fetch available symbols:', error);
-      return [];
-    }
-  }
-
-  /**
-   * Get the most recent data date for a symbol
-   */
-  async getLatestDataDate(symbol: string): Promise<string | null> {
-    const sql = `
-      SELECT MAX(date) as latest_date
-      FROM options_chain 
-      WHERE symbol = '${symbol.toUpperCase()}'
-    `;
-
-    try {
-      const rows = await this.executeQuery(sql);
-      return rows[0]?.latest_date || null;
-    } catch (error) {
-      console.error(`[Dolt] Failed to fetch latest date for ${symbol}:`, error);
-      return null;
-    }
-  }
-
-  /**
-   * Calculate historical expected moves from options data
-   */
-  async getHistoricalExpectedMoves(
-    symbol: string, 
-    days: number = 30
-  ): Promise<Array<{
+  async getHistoricalExpectedMoves(symbol: string, days: number = 30): Promise<Array<{
     date: string;
     expectedMove: number;
-    actualMove?: number;
-    accuracy?: number;
+    impliedVolatility: number;
   }>> {
+    // Calculate expected moves from historical options data (past year only)
     const sql = `
       SELECT 
         date,
-        expiration,
-        strike,
-        option_type,
-        last,
-        underlying_price,
-        implied_volatility
-      FROM options_chain 
-      WHERE symbol = '${symbol.toUpperCase()}'
+        AVG(vol) as avg_iv,
+        COUNT(*) as option_count
+      FROM option_chain 
+      WHERE act_symbol = '${symbol.toUpperCase()}'
+        AND date >= DATE_SUB(CURDATE(), INTERVAL 365 DAY)
         AND date >= DATE_SUB(CURDATE(), INTERVAL ${days} DAY)
-        AND ABS(strike - underlying_price) <= underlying_price * 0.05
-      ORDER BY date ASC, ABS(strike - underlying_price) ASC
+        AND vol IS NOT NULL
+        AND vol > 0
+      GROUP BY date
+      ORDER BY date DESC
+      LIMIT 100
     `;
 
     try {
       const rows = await this.executeQuery(sql);
-      
-      // Group by date and calculate straddle prices
-      const movesByDate = new Map<string, {
-        date: string;
-        expectedMove: number;
-        underlyingPrice: number;
-      }>();
-
-      for (const row of rows) {
-        const date = row.date;
-        if (!movesByDate.has(date)) {
-          // Find ATM straddle for this date
-          const atmStrike = row.strike;
-          const callPrice = row.option_type === 'call' ? (row.last || 0) : 0;
-          const putPrice = row.option_type === 'put' ? (row.last || 0) : 0;
-          
-          // This is simplified - in practice you'd want to match call/put pairs
-          const straddlePrice = callPrice + putPrice;
-          const expectedMove = straddlePrice * 0.85; // Approximate expected move
-          
-          movesByDate.set(date, {
-            date,
-            expectedMove,
-            underlyingPrice: row.underlying_price || 0,
-          });
-        }
-      }
-
-      return Array.from(movesByDate.values());
+      return rows.map(row => {
+        const iv = parseFloat(row.avg_iv) || 0;
+        // Simple expected move calculation: IV * sqrt(days/365) * price
+        // We'll use a normalized expected move since we don't have price here
+        const expectedMove = iv * Math.sqrt(1/365) * 100; // Daily expected move as percentage
+        
+        return {
+          date: row.date,
+          expectedMove,
+          impliedVolatility: iv,
+        };
+      });
     } catch (error) {
-      console.error(`[Dolt] Failed to calculate historical expected moves for ${symbol}:`, error);
+      console.error(`[Dolt] Failed to fetch historical expected moves for ${symbol}:`, error);
       return [];
     }
   }
