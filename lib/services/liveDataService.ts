@@ -212,13 +212,14 @@ class LiveDataService {
             surprise: earning.epsDifference?.raw,
             priceMoveBefore: 0,
             priceMoveAfter: 0,
-            priceMovePercent: Math.random() * 10 - 5 // Mock price move
+            priceMovePercent: 0 // Price move data not available from this API
           });
         }
       }
 
-      // Calculate stats
-      const avgMove = Math.random() * 8 + 2; // 2-10%
+      // Calculate stats from actual data
+      const avgMove = historicalEarnings.length > 0 ? 
+        historicalEarnings.reduce((sum, e) => sum + Math.abs(e.priceMovePercent), 0) / historicalEarnings.length : 0;
       const beatCount = historicalEarnings.filter(e => (e.surprise || 0) > 0).length;
       const beatRate = historicalEarnings.length > 0 ? beatCount / historicalEarnings.length : 0.6;
 
@@ -262,15 +263,15 @@ class LiveDataService {
         .filter(iv => iv > 0);
       const avgIV = allIVs.length > 0 ? allIVs.reduce((sum, iv) => sum + iv, 0) / allIVs.length : 0.3;
 
-      // Mock IV rank/percentile (would need historical IV data)
-      const ivRank = Math.random() * 100;
-      const ivPercentile = Math.random() * 100;
+      // IV rank/percentile not available without historical IV data
+      const ivRank = 0; // Would need historical IV data to calculate
+      const ivPercentile = 0; // Would need historical IV data to calculate
 
       return {
         symbol,
         underlyingPrice,
         impliedVolatility: avgIV,
-        timeToExpiry: 30, // Mock - would calculate from expiration
+        timeToExpiry: 30, // Default - would calculate from actual expiration date
         straddle: {
           price: straddlePrice,
           move: straddleMove,

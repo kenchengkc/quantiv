@@ -88,7 +88,7 @@ class RealDataService {
   // Fetch real stock quote data
   public async fetchRealQuote(symbol: string): Promise<RealQuoteData | null> {
     if (!this.isRealDataAvailable()) {
-      return null; // Fall back to mock data
+      return null; // No mock data - return null if API unavailable
     }
 
     try {
@@ -118,14 +118,14 @@ class RealDataService {
       };
     } catch (error) {
       console.error(`Failed to fetch real quote for ${symbol}:`, error);
-      return null; // Fall back to mock data
+      return null; // No mock data - return null if API unavailable
     }
   }
 
   // Fetch real options chain data
   public async fetchRealOptionsChain(symbol: string, expiration?: string): Promise<RealOptionsData | null> {
     if (!this.isRealDataAvailable()) {
-      return null; // Fall back to mock data
+      return null; // No mock data - return null if API unavailable
     }
 
     try {
@@ -138,7 +138,7 @@ class RealDataService {
       // - Alpha Vantage
       
       console.log(`Real options data not yet implemented for ${symbol}`);
-      return null; // Fall back to mock data for now
+      return null; // No mock data - return null if API unavailable for now
     } catch (error) {
       console.error(`Failed to fetch real options for ${symbol}:`, error);
       return null;
@@ -148,7 +148,7 @@ class RealDataService {
   // Fetch real earnings data
   public async fetchRealEarnings(symbol: string): Promise<RealEarningsData | null> {
     if (!this.isRealDataAvailable()) {
-      return null; // Fall back to mock data
+      return null; // No mock data - return null if API unavailable
     }
 
     try {
@@ -160,7 +160,7 @@ class RealDataService {
       // - Quandl
       
       console.log(`Real earnings data not yet implemented for ${symbol}`);
-      return null; // Fall back to mock data for now
+      return null; // No mock data - return null if API unavailable for now
     } catch (error) {
       console.error(`Failed to fetch real earnings for ${symbol}:`, error);
       return null;
@@ -191,51 +191,15 @@ export function shouldUseRealData(): boolean {
   return realDataService.isRealDataAvailable();
 }
 
-// Hybrid data fetcher that tries real data first, falls back to mock
-export async function fetchHybridQuote(symbol: string): Promise<RealQuoteData> {
+// Live data only - no mock data fallbacks
+export async function fetchLiveQuote(symbol: string): Promise<RealQuoteData | null> {
   const realData = await realDataService.fetchRealQuote(symbol);
   
   if (realData) {
     return realData;
   }
 
-  // Fall back to enhanced mock data
-  return generateEnhancedMockQuote(symbol);
-}
-
-// Enhanced mock data generator (more realistic than current mock)
-function generateEnhancedMockQuote(symbol: string): RealQuoteData {
-  // Base prices for different symbols to make them more realistic
-  const basePrices: Record<string, number> = {
-    'AAPL': 175,
-    'MSFT': 340,
-    'GOOGL': 125,
-    'TSLA': 240,
-    'NVDA': 450,
-    'AMZN': 145,
-    'META': 320,
-    'SPY': 430,
-    'QQQ': 380,
-  };
-
-  const basePrice = basePrices[symbol] || 150;
-  const randomVariation = (Math.random() - 0.5) * 0.1; // ±5% variation
-  const currentPrice = basePrice * (1 + randomVariation);
-  
-  const dailyChange = (Math.random() - 0.5) * 0.06; // ±3% daily change
-  const changeAmount = currentPrice * dailyChange;
-  
-  return {
-    symbol,
-    name: `${symbol} Mock Company`, // You could enhance this with a real company name lookup
-    price: Math.round(currentPrice * 100) / 100,
-    change: Math.round(changeAmount * 100) / 100,
-    changePercent: Math.round(dailyChange * 10000) / 100,
-    volume: Math.floor(Math.random() * 50000000 + 1000000), // 1M-51M volume
-    marketCap: Math.floor(Math.random() * 2000000000000 + 100000000000), // 100B-2.1T market cap
-    pe: Math.round((Math.random() * 40 + 10) * 100) / 100, // 10-50 P/E ratio
-    high52Week: Math.round(currentPrice * (1 + Math.random() * 0.5) * 100) / 100,
-    low52Week: Math.round(currentPrice * (1 - Math.random() * 0.3) * 100) / 100,
-    timestamp: new Date().toISOString()
-  };
+  // No mock data - return null if real data unavailable
+  console.warn(`[real-data] No live data available for ${symbol}`);
+  return null;
 }

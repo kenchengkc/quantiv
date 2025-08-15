@@ -58,8 +58,8 @@ export async function GET(request: NextRequest) {
     }
 
     // Generate cache keys
-    const cacheKey = CacheKeys.optionsChain(`${symbol}_contract_${contract}`);
-    const redisKey = Keys.optionsChain(`${symbol}_contract_${contract}`);
+    const cacheKey = CacheKeys.optionsChain(symbol, `contract_${contract}`);
+    const redisKey = Keys.optionsChain(symbol, `contract_${contract}`);
     
     // Try L1 cache first
     let responseData: any = CacheInstances.optionsChain.get(cacheKey);
