@@ -11,6 +11,76 @@
 import DoltService from './doltService';
 import PolygonOptionsService from './polygonOptionsService';
 import { fmpService } from './fmpService';
+import type { EnhancedOptionsChain } from './enhancedLiveDataService';
+
+// Define types locally since they're used across multiple services
+interface OptionsChainData {
+  symbol: string;
+  quote: {
+    price: number;
+    change: number;
+    changePercent: number;
+    name: string;
+  };
+  chain: {
+    expirations: string[];
+    strikes: Record<string, {
+      strike: number;
+      call?: {
+        bid: number;
+        ask: number;
+        last: number;
+        volume: number;
+        openInterest: number;
+        impliedVolatility: number;
+        delta: number;
+        gamma: number;
+        theta: number;
+        vega: number;
+      };
+      put?: {
+        bid: number;
+        ask: number;
+        last: number;
+        volume: number;
+        openInterest: number;
+        impliedVolatility: number;
+        delta: number;
+        gamma: number;
+        theta: number;
+        vega: number;
+      };
+    }>;
+  };
+  ivStats?: {
+    rank: number;
+    percentile: number;
+    current: number;
+    high52Week: number;
+    low52Week: number;
+  };
+}
+
+interface ExpectedMoveData {
+  symbol: string;
+  summary: {
+    daily: number;
+    weekly: number;
+    monthly: number;
+  };
+  calculations: {
+    straddle: {
+      daily: number;
+      weekly: number;
+      monthly: number;
+    };
+    iv: {
+      daily: number;
+      weekly: number;
+      monthly: number;
+    };
+  };
+}
 
 export interface ComprehensiveLiveDataConfig {
   dolt: {
@@ -18,6 +88,10 @@ export interface ComprehensiveLiveDataConfig {
     database: string;
     branch?: string;
     apiKey?: string;
+    endpoints?: {
+      chainEndpoint: string;
+      ivEndpoint: string;
+    };
   };
   apis: {
     polygonApiKey?: string;
@@ -45,6 +119,23 @@ class ComprehensiveLiveDataService {
       ComprehensiveLiveDataService.instance = new ComprehensiveLiveDataService(config);
     }
     return ComprehensiveLiveDataService.instance;
+  }
+
+  /**
+   * Convert EnhancedOptionsChain strikes array to OptionsChainData strikes record
+   */
+  private convertStrikesToRecord(strikes: EnhancedOptionsChain['strikes']): Record<string, any> {
+    const record: Record<string, any> = {};
+    
+    strikes.forEach(strike => {
+      record[strike.strike.toString()] = {
+        strike: strike.strike,
+        call: strike.call,
+        put: strike.put,
+      };
+    });
+    
+    return record;
   }
 
   /**
@@ -90,16 +181,28 @@ class ComprehensiveLiveDataService {
         console.log(`[ComprehensiveLive] Dolt IV stats failed for ${symbol}:`, error);
       }
 
+      // Get historical IV data from Dolt for sparkline
+      let ivHistory: Array<{ date: string; iv: number }> = [];
+      try {
+        ivHistory = await this.doltService.getIVHistory(symbol, 30);
+        console.log(`[ComprehensiveLive] Got ${ivHistory.length} IV history points from Dolt for ${symbol}`);
+      } catch (error) {
+        console.log(`[ComprehensiveLive] Dolt IV history failed for ${symbol}:`, error);
+      }
+
       // If we have live chain data, enhance it with Dolt IV stats
       if (liveChain && quote) {
         return {
-          ...liveChain,
+          symbol: symbol.toUpperCase(),
           quote: {
-            ...liveChain.quote,
-            name: quote.name || `${symbol} Inc.`,
-            last: quote.price,
+            price: quote.price,
             change: quote.change,
             changePercent: quote.changePercent,
+            name: quote.name || `${symbol} Inc.`,
+          },
+          chain: {
+            expirations: [liveChain.expirationDate],
+            strikes: this.convertStrikesToRecord(liveChain.strikes),
           },
           ivStats: ivStats || {
             rank: 50,
