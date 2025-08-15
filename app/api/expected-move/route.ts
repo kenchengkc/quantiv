@@ -10,8 +10,8 @@ import { RedisCache, Keys, QuantivCache } from '@/lib/cache/redis';
 import { fmpService } from '@/lib/services/fmpService';
 import { polygonService } from '@/lib/services/polygonService';
 import { computeExpectedMove, assessConfidence, formatExpectedMove } from '@/lib/services/expectedMove';
-import { calculateIVStats, createMockIVHistory } from '@/lib/services/ivStats';
-import { sp500DataService, fetchHybridQuoteData } from '@/lib/data/sp500Service';
+import { calculateIVStats } from '@/lib/services/ivStats';
+import { sp500DataService, fetchLiveQuoteData } from '@/lib/data/sp500Service';
 import { RealisticExpectedMoveCalculator } from '@/lib/services/realisticExpectedMove';
 import { findATMStrike } from '@/lib/pricing/blackScholes';
 import type { ChainData } from '@/lib/services/expectedMove';
@@ -340,11 +340,17 @@ export async function GET(request: NextRequest) {
     let ivStats = CacheInstances.ivSeries.get(ivCacheKey);
     
     if (!ivStats) {
-      // Generate mock IV data and calculate stats
-      const ivHistory = createMockIVHistory(252, 0.25); // 1 year
+      // No mock data - IV stats require historical IV data from live APIs
+      // Set default IV stats when historical data is not available
       const currentIV = (expectedMoveData as any)?.atm?.iv || 0.25;
       
-      ivStats = calculateIVStats(ivHistory, currentIV);
+      ivStats = {
+        rank: 0, // Would need historical IV data to calculate
+        percentile: 0, // Would need historical IV data to calculate
+        current: currentIV * 100,
+        high52Week: currentIV * 150,
+        low52Week: currentIV * 50
+      };
       
       // Cache IV stats
       CacheInstances.ivSeries.set(ivCacheKey, ivStats, 1800 * 1000); // 30 minutes
