@@ -1,13 +1,12 @@
 /**
  * IV History API Route
- * Fetches historical implied volatility data from Dolt database for sparkline visualization
- * Uses DoltService to get historical IV data from post-no-preference/options repository
+ * Fetches historical implied volatility data from local SQLite database for sparkline visualization
+ * Uses LocalDoltService for fast, unlimited queries without API constraints
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import DoltService from '@/lib/services/doltService';
-import { doltConfig } from '@/lib/config/doltConfig';
+import { localDoltService } from '@/lib/services/localDoltService';
 
 // Request validation schema
 const IVHistoryRequestSchema = z.object({
@@ -37,12 +36,9 @@ export async function GET(request: NextRequest) {
 
     const { symbol: validSymbol, days: validDays } = validation.data;
 
-    // Initialize Dolt service
-    const doltService = DoltService.getInstance(doltConfig);
-    
-    // Fetch historical IV data from Dolt database
+    // Fetch historical IV data from local SQLite database
     console.log(`[API] Fetching IV history for ${validSymbol} (${validDays} days)`);
-    const ivHistory = await doltService.getIVHistory(validSymbol, validDays);
+    const ivHistory = await localDoltService.getIVHistory(validSymbol, validDays);
     
     const processingTime = Date.now() - startTime;
     
