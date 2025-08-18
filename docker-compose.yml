@@ -1,0 +1,90 @@
+version: '3.8'
+
+services:
+  # FastAPI Backend
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=quantiv_user
+      - POSTGRES_PASSWORD=quantiv_secure_2024
+      - POSTGRES_DB=quantiv_options
+      - REDIS_URL=redis://redis:6379
+      - POLYGON_API_KEY=${POLYGON_API_KEY}
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models
+    restart: unless-stopped
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_USER=quantiv_user
+      - POSTGRES_PASSWORD=quantiv_secure_2024
+      - POSTGRES_DB=quantiv_options
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/create-postgres-schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ./scripts/create-em-schema.sql:/docker-entrypoint-initdb.d/02-em-schema.sql
+    restart: unless-stopped
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+  # ML Pipeline Batch Job
+  ml-pipeline:
+    build:
+      context: ./ml
+      dockerfile: Dockerfile
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=quantiv_user
+      - POSTGRES_PASSWORD=quantiv_secure_2024
+      - POSTGRES_DB=quantiv_options
+    depends_on:
+      - postgres
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models
+    profiles:
+      - batch  # Only run when explicitly requested
+    restart: "no"
+
+  # Next.js Frontend (development)
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+    profiles:
+      - dev
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:

@@ -6,6 +6,20 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Quantiv Local Database Files
+data/
+*.csv
+*.db
+*.sqlite
+*.sqlite3
+
+# Large data files (uncomment if you want to commit the database)
+# !data/quantiv_options.db
+
+# CSV downloads (always ignore - too large for git)
+data/*.csv
+scripts/data/
+
 # Next.js build output and cache
 .next/
 out/
