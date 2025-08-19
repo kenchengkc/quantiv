@@ -49,9 +49,13 @@ def parse_env_file(path: Path) -> dict[str, str]:
         key, val = line.split("=", 1)
         key = key.strip()
         val = val.strip()
-        # Remove surrounding quotes if present
+        # Remove surrounding quotes if present; otherwise strip inline trailing comments
         if (val.startswith("\"") and val.endswith("\"")) or (val.startswith("'") and val.endswith("'")):
             val = val[1:-1]
+        else:
+            # Drop inline comments that begin with # after some whitespace
+            import re as _re
+            val = _re.split(r"\s+#", val, maxsplit=1)[0].strip()
         env[key] = val
     return env
 
