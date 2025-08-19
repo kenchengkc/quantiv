@@ -1,0 +1,12 @@
+# Frontend Dockerfile for Quantiv Next.js (dev profile)
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Install OS deps (if any)
+RUN apk add --no-cache bash
+
+# Default command installs deps into the mounted /app/node_modules volume, then runs dev server
+ENV NODE_ENV=development
+EXPOSE 3000
+CMD ["sh", "-c", "npm install && npm run dev"]

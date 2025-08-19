@@ -57,7 +57,7 @@ def get_conn():
 
 
 def ensure_table_exists(conn):
-    # Align with scripts/create-em-schema.sql
+    # Minimal serving-compatible DDL (avoids schema mismatch across variants)
     ddl = """
     CREATE TABLE IF NOT EXISTS em_forecasts (
         underlying TEXT NOT NULL,
@@ -65,13 +65,10 @@ def ensure_table_exists(conn):
         exp_date DATE NOT NULL,
         horizon TEXT NOT NULL,
         em_baseline DOUBLE PRECISION,
-        em_calibrated DOUBLE PRECISION,
-        em_quantile DOUBLE PRECISION,
         band68_low DOUBLE PRECISION,
         band68_high DOUBLE PRECISION,
         band95_low DOUBLE PRECISION,
         band95_high DOUBLE PRECISION,
-        model_version TEXT,
         created_at TIMESTAMPTZ DEFAULT NOW(),
         PRIMARY KEY (underlying, quote_ts, exp_date, horizon)
     );
@@ -83,14 +80,12 @@ def ensure_table_exists(conn):
 
 
 def insert_placeholder_forecasts(conn, symbols):
-    now = datetime.utcnow()
+    now = datetime.now(datetime.UTC)
     exp = date.today() + timedelta(days=7)
     rows = []
     for sym in symbols:
         for horizon in ["to_exp", "1d", "5d"]:
             em_baseline = 0.02
-            em_calibrated = 0.02
-            em_quantile = 0.02
             rows.append(
                 (
                     sym,
@@ -98,31 +93,23 @@ def insert_placeholder_forecasts(conn, symbols):
                     exp,
                     horizon,
                     em_baseline,
-                    em_calibrated,
-                    em_quantile,
                     0.015,
                     0.025,
                     0.010,
                     0.030,
-                    "demo-0.1",
                 )
             )
     sql = """
     INSERT INTO em_forecasts (
         underlying, quote_ts, exp_date, horizon,
-        em_baseline, em_calibrated, em_quantile,
-        band68_low, band68_high, band95_low, band95_high,
-        model_version
-    ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+        em_baseline, band68_low, band68_high, band95_low, band95_high
+    ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
     ON CONFLICT (underlying, quote_ts, exp_date, horizon) DO UPDATE
     SET em_baseline = EXCLUDED.em_baseline,
-        em_calibrated = EXCLUDED.em_calibrated,
-        em_quantile = EXCLUDED.em_quantile,
         band68_low = EXCLUDED.band68_low,
         band68_high = EXCLUDED.band68_high,
         band95_low = EXCLUDED.band95_low,
-        band95_high = EXCLUDED.band95_high,
-        model_version = EXCLUDED.model_version
+        band95_high = EXCLUDED.band95_high
     """
     with conn, conn.cursor() as cur:
         extras.execute_batch(cur, sql, rows, page_size=100)

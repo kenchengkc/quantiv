@@ -27,6 +27,8 @@ CREATE TABLE options_chain (
 ) PARTITION BY RANGE (date);
 
 -- Create partitions for different years (improves query performance)
+CREATE TABLE options_chain_2019 PARTITION OF options_chain
+    FOR VALUES FROM ('2019-01-01') TO ('2020-01-01');
 CREATE TABLE options_chain_2020 PARTITION OF options_chain
     FOR VALUES FROM ('2020-01-01') TO ('2021-01-01');
 CREATE TABLE options_chain_2021 PARTITION OF options_chain

@@ -9,16 +9,21 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 import asyncpg
-import aioredis
+import redis.asyncio as redis
 import httpx
 import structlog
 from datetime import datetime, date, timedelta
 import os
 from contextlib import asynccontextmanager
 import json
+from pathlib import Path
+from dotenv import load_dotenv
 
 # Configure structured logging
 logger = structlog.get_logger()
+
+# Load environment variables from repo-level .env.local if present
+load_dotenv(dotenv_path=Path(__file__).resolve().parents[1] / ".env.local")
 
 # Pydantic models
 class ExpectedMoveRequest(BaseModel):
@@ -38,9 +43,41 @@ class HealthResponse(BaseModel):
     timestamp: datetime
     services: Dict[str, str]
 
+class EmForecastLatestResponse(BaseModel):
+    symbol: str
+    exp: date
+    quote_ts: datetime
+    horizon: str
+    em_baseline: Optional[float] = None
+    band68_low: Optional[float] = None
+    band68_high: Optional[float] = None
+    band95_low: Optional[float] = None
+    band95_high: Optional[float] = None
+    metadata: Dict[str, Any]
+
+class EmHistoryItem(BaseModel):
+    quote_ts: datetime
+    em_baseline: Optional[float] = None
+    band68_low: Optional[float] = None
+    band68_high: Optional[float] = None
+    band95_low: Optional[float] = None
+    band95_high: Optional[float] = None
+
+class EmHistoryResponse(BaseModel):
+    symbol: str
+    exp: date
+    window: str
+    items: List[EmHistoryItem]
+    metadata: Dict[str, Any]
+
+class EmExpiriesResponse(BaseModel):
+    symbol: str
+    expiries: List[date]
+    metadata: Dict[str, Any]
+
 # Global connections
 db_pool: asyncpg.Pool = None
-redis_client: aioredis.Redis = None
+redis_client: redis.Redis = None
 http_client: httpx.AsyncClient = None
 
 @asynccontextmanager
@@ -63,7 +100,7 @@ async def lifespan(app: FastAPI):
     
     # Initialize Redis
     redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
-    redis_client = aioredis.from_url(redis_url, decode_responses=True)
+    redis_client = redis.from_url(redis_url, decode_responses=True)
     
     # Initialize HTTP client for Polygon
     http_client = httpx.AsyncClient(
@@ -78,7 +115,7 @@ async def lifespan(app: FastAPI):
     # Cleanup
     logger.info("🔄 Shutting down services...")
     await db_pool.close()
-    await redis_client.close()
+    await redis_client.aclose()
     await http_client.aclose()
 
 # Create FastAPI app
@@ -143,13 +180,10 @@ class ExpectedMoveService:
             exp_date,
             horizon,
             em_baseline,
-            em_calibrated,
-            em_quantile,
             band68_low,
             band68_high,
             band95_low,
-            band95_high,
-            model_version
+            band95_high
         FROM em_forecasts
         WHERE underlying = $1 
           AND horizon = ANY($2)
@@ -162,6 +196,35 @@ class ExpectedMoveService:
             rows = await conn.fetch(query, symbol, horizons)
             
         return [dict(row) for row in rows]
+
+    @staticmethod
+    async def get_latest_for_symbol_exp(symbol: str, exp_date: date) -> Optional[Dict[str, Any]]:
+        """Get the latest forecast for a symbol and exp_date (MVP horizon 'to_exp')."""
+        query = """
+        SELECT underlying, quote_ts, exp_date, horizon,
+               em_baseline, band68_low, band68_high, band95_low, band95_high
+        FROM em_forecasts
+        WHERE underlying = $1 AND exp_date = $2 AND horizon = 'to_exp'
+        ORDER BY quote_ts DESC
+        LIMIT 1
+        """
+        async with db_pool.acquire() as conn:
+            row = await conn.fetchrow(query, symbol, exp_date)
+        return dict(row) if row else None
+
+    @staticmethod
+    async def get_history_for_symbol_exp(symbol: str, exp_date: date, window_days: int) -> List[Dict[str, Any]]:
+        """Get timeseries for a symbol/exp_date over a window (days)."""
+        query = """
+        SELECT quote_ts, em_baseline, band68_low, band68_high, band95_low, band95_high
+        FROM em_forecasts
+        WHERE underlying = $1 AND exp_date = $2 AND horizon = 'to_exp'
+          AND quote_ts >= NOW() - ($3::text || ' days')::interval
+        ORDER BY quote_ts ASC
+        """
+        async with db_pool.acquire() as conn:
+            rows = await conn.fetch(query, symbol, exp_date, str(window_days))
+        return [dict(r) for r in rows]
     
     @staticmethod
     async def get_live_market_data(symbol: str) -> Optional[Dict]:
@@ -275,6 +338,147 @@ async def get_expected_move(
     
     return ExpectedMoveResponse(**response_data)
 
+def _parse_window_to_days(window: str) -> int:
+    """Parse window strings like '90d' into integer days; default to 90 if invalid."""
+    try:
+        w = window.strip().lower()
+        if w.endswith('d'):
+            return max(1, int(w[:-1]))
+        return max(1, int(w))
+    except Exception:
+        return 90
+
+@app.get("/em/forecast", response_model=EmForecastLatestResponse)
+async def em_forecast(symbol: str, exp: str):
+    """Latest baseline EM record for (symbol, exp). Horizon fixed to 'to_exp' for MVP."""
+    sym = symbol.upper()
+    try:
+        exp_date = date.fromisoformat(exp)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid exp date; use YYYY-MM-DD")
+
+    # Cache key
+    cache_key = f"em:forecast:{sym}:{exp_date.isoformat()}"
+    try:
+        cached = await redis_client.get(cache_key)
+        if cached:
+            data = json.loads(cached)
+            return EmForecastLatestResponse(**data)
+    except Exception as e:
+        logger.warning("EM forecast cache read failed", error=str(e))
+
+    rec = await ExpectedMoveService.get_latest_for_symbol_exp(sym, exp_date)
+    if not rec:
+        raise HTTPException(status_code=404, detail="No forecast found")
+
+    payload = {
+        "symbol": sym,
+        "exp": exp_date,
+        "quote_ts": rec["quote_ts"],
+        "horizon": rec["horizon"],
+        "em_baseline": rec.get("em_baseline"),
+        "band68_low": rec.get("band68_low"),
+        "band68_high": rec.get("band68_high"),
+        "band95_low": rec.get("band95_low"),
+        "band95_high": rec.get("band95_high"),
+        "metadata": {"source": "em_forecasts", "cache": False},
+    }
+
+    try:
+        await redis_client.setex(cache_key, 600, json.dumps(payload, default=str))  # 10 min
+    except Exception as e:
+        logger.warning("EM forecast cache write failed", error=str(e))
+
+    return EmForecastLatestResponse(**payload)
+
+@app.get("/em/history", response_model=EmHistoryResponse)
+async def em_history(symbol: str, exp: str, window: str = "90d"):
+    """Timeseries for baseline EM for charting. Window like '90d'."""
+    sym = symbol.upper()
+    try:
+        exp_date = date.fromisoformat(exp)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid exp date; use YYYY-MM-DD")
+    days = _parse_window_to_days(window)
+
+    cache_key = f"em:history:{sym}:{exp_date.isoformat()}:{days}d"
+    try:
+        cached = await redis_client.get(cache_key)
+        if cached:
+            data = json.loads(cached)
+            return EmHistoryResponse(**data)
+    except Exception as e:
+        logger.warning("EM history cache read failed", error=str(e))
+
+    rows = await ExpectedMoveService.get_history_for_symbol_exp(sym, exp_date, days)
+    items = [
+        {
+            "quote_ts": r["quote_ts"],
+            "em_baseline": r.get("em_baseline"),
+            "band68_low": r.get("band68_low"),
+            "band68_high": r.get("band68_high"),
+            "band95_low": r.get("band95_low"),
+            "band95_high": r.get("band95_high"),
+        }
+        for r in rows
+    ]
+
+    payload = {
+        "symbol": sym,
+        "exp": exp_date,
+        "window": f"{days}d",
+        "items": items,
+        "metadata": {"count": len(items), "source": "em_forecasts", "cache": False},
+    }
+
+    try:
+        await redis_client.setex(cache_key, 600, json.dumps(payload, default=str))
+    except Exception as e:
+        logger.warning("EM history cache write failed", error=str(e))
+
+    return EmHistoryResponse(**payload)
+
+@app.get("/em/expiries", response_model=EmExpiriesResponse)
+async def em_expiries(symbol: str, window: str = "120d"):
+    """List upcoming expiries with forecasts for a symbol within a window (default 120d)."""
+    sym = symbol.upper()
+    days = _parse_window_to_days(window)
+
+    cache_key = f"em:expiries:{sym}:{days}d"
+    try:
+        cached = await redis_client.get(cache_key)
+        if cached:
+            data = json.loads(cached)
+            return EmExpiriesResponse(**data)
+    except Exception as e:
+        logger.warning("EM expiries cache read failed", error=str(e))
+
+    query = """
+    SELECT DISTINCT exp_date
+    FROM em_forecasts
+    WHERE underlying = $1
+      AND exp_date >= CURRENT_DATE
+      AND exp_date <= (CURRENT_DATE + ($2::text || ' days')::interval)
+    ORDER BY exp_date ASC
+    LIMIT 50
+    """
+    async with db_pool.acquire() as conn:
+        rows = await conn.fetch(query, sym, str(days))
+    expiries = [r["exp_date"] for r in rows]
+
+    payload = {
+        "symbol": sym,
+        "expiries": expiries,
+        "metadata": {"count": len(expiries), "source": "em_forecasts", "cache": False},
+    }
+
+    try:
+        await redis_client.setex(cache_key, 600, json.dumps(payload, default=str))
+    except Exception as e:
+        logger.warning("EM expiries cache write failed", error=str(e))
+
+    return EmExpiriesResponse(**payload)
+
 @app.get("/api/symbols")
 async def get_available_symbols():
     """Get list of symbols with available forecasts"""
@@ -301,7 +505,7 @@ async def get_symbol_history(symbol: str, days: int = 30):
     SELECT 
         quote_ts,
         horizon,
-        em_calibrated,
+        em_baseline,
         band68_low,
         band68_high
     FROM em_forecasts
