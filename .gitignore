@@ -1,4 +1,5 @@
-# Dependencies
+# Node.js / Next.js
+
 node_modules/
 npm-debug.log*
 yarn-debug.log*
@@ -6,54 +7,87 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-# Quantiv Local Database Files
-data/
-*.csv
-*.db
-*.sqlite
-*.sqlite3
-
-# Large data files (uncomment if you want to commit the database)
-# !data/quantiv_options.db
-
-# CSV downloads (always ignore - too large for git)
-data/*.csv
-scripts/data/
-
 # Next.js build output and cache
 .next/
 out/
 build/
 dist/
 
-# Next.js cache files (these are the .pack and .gz files you saw)
+# Next.js cache files
 .next/cache/
 .next/static/chunks/
 .next/server/
 .next/types/
 
-# Environment variables
+# Storybook
+.out
+.storybook-out
+
+
+# Quantiv Data Files
+
+# Local DB + large data dumps
+data/
+*.csv
+*.db
+*.sqlite
+*.sqlite3
+*.parquet
+
+# Always ignore raw downloads
+scripts/data/
+
+# If you want to commit a small demo DB, uncomment:
+# !data/quantiv_options.db
+
+
+# Python
+
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*.pyd
+*.so
+*.egg-info/
+*.egg
+.pytest_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+
+# Virtual environments
+.venv/
+venv/
+env/
+.venv-*/
+.venv-quantiv/
+
+# Build
+build/
+dist/
+
+
+# Env / Secrets
+
 .env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+# but keep an example file tracked
+!.env.example
 
-# Vercel deployment
-.vercel
 
-# TypeScript
-*.tsbuildinfo
-next-env.d.ts
+# IDE & Editor
 
-# IDE and editor files
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 
-# OS generated files
+
+# OS / System
+
 .DS_Store
 .DS_Store?
 ._*
@@ -62,46 +96,31 @@ next-env.d.ts
 ehthumbs.db
 Thumbs.db
 
-# Logs
-logs
-*.log
 
-# Runtime data
+# Logs / Runtime
+
+logs/
+*.log
 pids
 *.pid
 *.seed
 *.pid.lock
 
-# Coverage directory used by tools like istanbul
+
+# Test Coverage
+
 coverage/
 *.lcov
-
-# nyc test coverage
 .nyc_output
 
-# ESLint cache
+
+# Misc Caches
+
 .eslintcache
-
-# Optional npm cache directory
 .npm
-
-# Optional REPL history
 .node_repl_history
-
-# Output of 'npm pack'
-*.tgz
-
-# Yarn Integrity file
+*.tsbuildinfo
+next-env.d.ts
 .yarn-integrity
-
-# parcel-bundler cache (https://parceljs.org/)
 .cache
 .parcel-cache
-
-# Storybook build outputs
-.out
-.storybook-out
-
-# Temporary folders
-tmp/
-temp/
