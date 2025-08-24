@@ -1,0 +1,21 @@
+# Quantiv DB Indexer Dockerfile
+FROM python:3.11-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+# System deps for psycopg2
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq-dev \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+# Python deps
+RUN pip install --no-cache-dir psycopg2-binary python-dotenv
+
+# Copy script
+COPY ensure_serving_indexes.py /app/ensure_serving_indexes.py
+
+CMD ["python", "/app/ensure_serving_indexes.py"]

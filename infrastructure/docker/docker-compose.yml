@@ -1,13 +1,15 @@
-version: '3.8'
+# Compose V2: removed version key (was '3.8')
 
 services:
   # FastAPI Backend
   api:
     build:
-      context: ./backend
+      context: ../../apps/backend
       dockerfile: Dockerfile
     ports:
       - "8000:8000"
+    env_file:
+      - ../../config/.env.local
     environment:
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
@@ -15,13 +17,14 @@ services:
       - POSTGRES_PASSWORD=quantiv_secure_2024
       - POSTGRES_DB=quantiv_options
       - REDIS_URL=redis://redis:6379
-      - POLYGON_API_KEY=${POLYGON_API_KEY}
+      - NODE_ENV=development
+      - ENVIRONMENT=development
     depends_on:
       - postgres
       - redis
     volumes:
-      - ./data:/app/data
-      - ./models:/app/models
+      - ../../data:/app/data
+      - ../../models:/app/models
     restart: unless-stopped
 
   # PostgreSQL Database
@@ -35,8 +38,9 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./scripts/create-postgres-schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
-      - ./scripts/create-em-schema.sql:/docker-entrypoint-initdb.d/02-em-schema.sql
+      - ../database/create-postgres-schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ../database/create-serving-schema.sql:/docker-entrypoint-initdb.d/02-serving-schema.sql
+      - ../database/create-em-schema.sql:/docker-entrypoint-initdb.d/03-em-schema.sql
     restart: unless-stopped
 
   # Redis Cache
@@ -51,9 +55,12 @@ services:
   # ML Pipeline Batch Job
   ml-pipeline:
     build:
-      context: ./ml
+      context: ../../apps/ml
       dockerfile: Dockerfile
+    env_file:
+      - ../../config/.env.local
     environment:
+      - DATABASE_URL=
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
       - POSTGRES_USER=quantiv_user
@@ -62,8 +69,8 @@ services:
     depends_on:
       - postgres
     volumes:
-      - ./data:/app/data
-      - ./models:/app/models
+      - ../../data:/app/data
+      - ../../models:/app/models
     profiles:
       - batch  # Only run when explicitly requested
     restart: "no"
@@ -75,15 +82,37 @@ services:
       dockerfile: Dockerfile.frontend
     ports:
       - "3000:3000"
+    env_file:
+      - ../../config/.env.local
     environment:
+      - NODE_ENV=development
       - NEXT_PUBLIC_API_URL=http://localhost:8000
     volumes:
-      - .:/app
+      - ../../apps/frontend:/app
       - /app/node_modules
       - /app/.next
     profiles:
       - dev
     restart: unless-stopped
+
+  # Serving Indexes Runner (one-shot)
+  db-indexes:
+    build:
+      context: ../database
+      dockerfile: Dockerfile.indexer
+    env_file:
+      - ../../config/.env.local
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=quantiv_user
+      - POSTGRES_PASSWORD=quantiv_secure_2024
+      - POSTGRES_DB=quantiv_options
+    depends_on:
+      - postgres
+    profiles:
+      - ops
+    restart: "no"
 
 volumes:
   postgres_data:

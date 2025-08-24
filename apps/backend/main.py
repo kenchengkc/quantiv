@@ -22,8 +22,17 @@ from dotenv import load_dotenv
 # Configure structured logging
 logger = structlog.get_logger()
 
-# Load environment variables from repo-level .env.local if present
-load_dotenv(dotenv_path=Path(__file__).resolve().parents[1] / ".env.local")
+# Load environment variables from repo-level config/.env.* when available.
+# In containers, envs are injected by docker-compose via env_file/environment, so this is best-effort only.
+try:
+    repo_root = Path(__file__).resolve().parents[2]
+except IndexError:
+    # Shallow directory (e.g., container at /app); fall back to file's parent
+    repo_root = Path(__file__).resolve().parent
+env_file = ".env.production" if os.getenv("NODE_ENV") == "production" or os.getenv("ENVIRONMENT") == "production" else ".env.local"
+env_path = repo_root / "config" / env_file
+if env_path.exists():
+    load_dotenv(dotenv_path=env_path)
 
 # Pydantic models
 class ExpectedMoveRequest(BaseModel):
@@ -87,16 +96,26 @@ async def lifespan(app: FastAPI):
     
     logger.info("🚀 Starting Quantiv API...")
     
-    # Initialize database pool
-    db_pool = await asyncpg.create_pool(
-        host=os.getenv("POSTGRES_HOST", "localhost"),
-        port=int(os.getenv("POSTGRES_PORT", "5432")),
-        user=os.getenv("POSTGRES_USER", "quantiv_user"),
-        password=os.getenv("POSTGRES_PASSWORD", "quantiv_secure_2024"),
-        database=os.getenv("POSTGRES_DB", "quantiv_options"),
-        min_size=5,
-        max_size=20
-    )
+    # Initialize database pool (supports DATABASE_URL or discrete params)
+    db_url = os.getenv("DATABASE_URL")
+    if db_url:
+        logger.info("Connecting to Postgres via DATABASE_URL")
+        db_pool = await asyncpg.create_pool(
+            dsn=db_url,
+            min_size=5,
+            max_size=20,
+        )
+    else:
+        logger.info("Connecting to Postgres via discrete env vars")
+        db_pool = await asyncpg.create_pool(
+            host=os.getenv("POSTGRES_HOST", "localhost"),
+            port=int(os.getenv("POSTGRES_PORT", "5432")),
+            user=os.getenv("POSTGRES_USER", "quantiv_user"),
+            password=os.getenv("POSTGRES_PASSWORD", "quantiv_secure_2024"),
+            database=os.getenv("POSTGRES_DB", "quantiv_options"),
+            min_size=5,
+            max_size=20,
+        )
     
     # Initialize Redis
     redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")

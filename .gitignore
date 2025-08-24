@@ -67,18 +67,17 @@ dist/
 
 
 # Env / Secrets
-
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+config/.env.local
+config/.env.development
+config/.env.production
+config/.env.test
+config/docker/.env.docker
+config/docker/.env.compose
 # but keep an example file tracked
-!.env.example
+!config/.env.example
 
 
 # IDE & Editor
-
 .vscode/
 .idea/
 *.swp
@@ -87,7 +86,6 @@ dist/
 
 
 # OS / System
-
 .DS_Store
 .DS_Store?
 ._*
@@ -98,7 +96,6 @@ Thumbs.db
 
 
 # Logs / Runtime
-
 logs/
 *.log
 pids
@@ -108,14 +105,12 @@ pids
 
 
 # Test Coverage
-
 coverage/
 *.lcov
 .nyc_output
 
 
 # Misc Caches
-
 .eslintcache
 .npm
 .node_repl_history
