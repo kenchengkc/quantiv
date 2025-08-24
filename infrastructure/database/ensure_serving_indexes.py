@@ -11,10 +11,17 @@ import psycopg2
 from psycopg2.extras import DictCursor
 from dotenv import load_dotenv
 
-# Load repo-level .env.local
-repo_root = Path(__file__).resolve().parents[1]
-load_dotenv(dotenv_path=repo_root / ".env.local")
+# Load repo-level config/.env.* (production vs local) if present.
+try:
+    repo_root = Path(__file__).resolve().parents[2]
+except IndexError:
+    repo_root = Path(__file__).resolve().parent
+env_file = ".env.production" if os.getenv("NODE_ENV") == "production" or os.getenv("ENVIRONMENT") == "production" else ".env.local"
+env_path = repo_root / "config" / env_file
+if env_path.exists():
+    load_dotenv(dotenv_path=env_path)
 
+DB_URL = os.getenv("DATABASE_URL")
 PG_HOST = os.getenv("POSTGRES_HOST", "localhost")
 PG_PORT = int(os.getenv("POSTGRES_PORT", "5432"))
 PG_DB = os.getenv("POSTGRES_DB", "quantiv_options")
@@ -52,6 +59,8 @@ ORDER BY indexname;
 """
 
 def get_conn():
+    if DB_URL:
+        return psycopg2.connect(DB_URL)
     return psycopg2.connect(
         host=PG_HOST,
         port=PG_PORT,

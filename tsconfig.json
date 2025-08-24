@@ -1,4 +1,12 @@
 {
+  "files": [],
+  "include": [],
+  "references": [
+    { "path": "./apps/frontend" },
+    { "path": "./packages/schemas" },
+    { "path": "./packages/shared-types" },
+    { "path": "./packages/database" }
+  ],
   "compilerOptions": {
     "target": "es2015",
     "lib": ["dom", "dom.iterable", "es2015"],
@@ -13,21 +21,6 @@
     "isolatedModules": true,
     "jsx": "preserve",
     "incremental": true,
-    "plugins": [
-      {
-        "name": "next"
-      }
-    ],
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["./*"],
-      "@/lib/*": ["./lib/*"],
-      "@/app/*": ["./app/*"],
-      "@/hooks/*": ["./hooks/*"],
-      "@/components/*": ["./components/*"],
-      "@/providers/*": ["./providers/*"]
-    }
-  },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules"]
+    "composite": true
+  }
 }

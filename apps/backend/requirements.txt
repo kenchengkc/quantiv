@@ -1,0 +1,28 @@
+# Quantiv Backend Requirements
+# FastAPI and async web framework
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+httpx>=0.25.0
+pydantic>=2.5.0
+python-dotenv>=1.0.0
+python-multipart>=0.0.6
+
+# Database and caching
+asyncpg>=0.29.0
+psycopg2-binary>=2.9.0
+redis>=5.0.0
+sqlalchemy>=2.0.0
+
+# Data processing
+pandas>=2.1.0
+numpy>=1.24.0
+
+# Monitoring and logging
+structlog>=23.2.0
+prometheus-client>=0.19.0
+
+# Development and testing
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+black>=23.11.0
+ruff>=0.1.6

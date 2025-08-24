@@ -18,6 +18,6 @@ COPY requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r /app/requirements.txt
 
 # Copy pipeline code
-COPY ml/pipeline.py /app/ml/pipeline.py
+COPY pipeline.py /app/pipeline.py
 
-CMD ["python", "/app/ml/pipeline.py"]
+CMD ["python", "/app/pipeline.py"]
