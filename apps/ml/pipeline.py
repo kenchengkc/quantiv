@@ -12,7 +12,43 @@ from datetime import datetime, timedelta, date
 import glob
 import psycopg2
 import psycopg2.extras as extras
+from dotenv import load_dotenv
 
+# Robust dotenv loading: try common repo and container locations; otherwise rely on injected env vars
+def _load_env() -> None:
+    env_name = (os.getenv("NODE_ENV") or os.getenv("ENVIRONMENT") or "development").lower()
+    env_file = ".env.production" if env_name == "production" else ".env.local"
+
+    candidates = []
+    try:
+        here = Path(__file__).resolve()
+        # If running from monorepo layout (apps/ml/pipeline.py), parents[2] is repo root
+        if len(here.parents) >= 3:
+            candidates.append(here.parents[2] / "config" / env_file)
+        if len(here.parents) >= 2:
+            candidates.append(here.parents[1] / "config" / env_file)
+    except Exception:
+        pass
+
+    # CWD and container-friendly fallbacks
+    candidates.extend([
+        Path.cwd() / "config" / env_file,
+        Path("/app") / "config" / env_file,
+    ])
+
+    for p in candidates:
+        try:
+            if p.exists():
+                load_dotenv(dotenv_path=p)
+                print(f"[ML] Loaded env from {p}")
+                return
+        except Exception:
+            continue
+    print("[ML] No .env file found; relying on environment variables")
+
+_load_env()
+
+DB_URL = os.getenv("DATABASE_URL")
 POSTGRES_HOST = os.getenv("POSTGRES_HOST", "localhost")
 POSTGRES_PORT = int(os.getenv("POSTGRES_PORT", "5432"))
 POSTGRES_DB = os.getenv("POSTGRES_DB", "quantiv_options")
@@ -47,6 +83,8 @@ def discover_symbols(parquet_root: Path, limit: int = 5):
 
 
 def get_conn():
+    if DB_URL:
+        return psycopg2.connect(DB_URL)
     return psycopg2.connect(
         host=POSTGRES_HOST,
         port=POSTGRES_PORT,

@@ -3,12 +3,23 @@
   "version": "1.0.0",
   "description": "Quantiv is a modern web platform for options traders to instantly see market-implied moves before earnings. It computes expected moves, greeks, and IV rank from live options chains, with a clean dashboard, historical comparisons, and shareable insights—helping traders act with precision and speed.",
   "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint",
-    "type-check": "tsc --noEmit"
+    "dev": "npm run dev --workspace=apps/frontend",
+    "dev:frontend": "npm run dev --workspace=apps/frontend",
+    "dev:backend": "cd apps/backend && python main.py",
+    "build": "npm run build --workspace=apps/frontend",
+    "build:frontend": "npm run build --workspace=apps/frontend",
+    "start": "npm run start --workspace=apps/frontend",
+    "lint": "npm run lint --workspace=apps/frontend",
+    "type-check": "npm run type-check --workspace=apps/frontend",
+    "test": "npm run test --workspace=apps/frontend",
+    "docker:up": "docker-compose -f infrastructure/docker/docker-compose.yml up",
+    "docker:down": "docker-compose -f infrastructure/docker/docker-compose.yml down",
+    "ml:pipeline": "cd apps/ml && python pipeline.py"
   },
   "dependencies": {
     "@headlessui/react": "^1.7.17",
@@ -77,7 +88,7 @@
     "greeks"
   ],
   "author": "",
-  "license": "MIT",
+  "license": "GPL-3.0",
   "bugs": {
     "url": "https://github.com/kenchengkc/quantiv/issues"
   },
