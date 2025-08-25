@@ -19,14 +19,14 @@ export default function IVRankSparkline({ data, symbol }: IVRankSparklineProps) 
   const [sparklineData, setSparklineData] = useState<number[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Fetch historical IV data from Dolt database
+  // Fetch historical IV data via frontend API (proxies backend EM history)
   useEffect(() => {
     async function fetchHistoricalIV() {
       if (!symbol) return;
       
       setIsLoading(true);
       try {
-        // Fetch historical IV data from Dolt database (52 weeks = ~365 days)
+        // Fetch historical IV data (52 weeks = ~365 days)
         const response = await fetch(`/api/iv-history?symbol=${symbol}&days=365`);
         
         if (response.ok) {
