@@ -224,10 +224,39 @@ class UnifiedLiveDataService {
     // Try FMP first (comprehensive earnings data)
     if (fmpService.isAvailable()) {
       try {
-        const fmpEarnings = await fmpService.fetchEarnings(symbol);
+        const fmpEarnings = await fmpService.fetchEarningsData(symbol);
         if (fmpEarnings) {
           console.log(`[unified-data] Earnings from FMP for ${symbol}`);
-          return fmpEarnings;
+          // Map FMPEarningsData (nullable fields) to UnifiedEarningsData (non-nullable primitives)
+          return {
+            symbol: fmpEarnings.symbol,
+            nextEarningsDate: fmpEarnings.nextEarningsDate || undefined,
+            nextEarningsTime: fmpEarnings.nextEarningsTime,
+            estimatedEPS: fmpEarnings.estimatedEPS ?? undefined,
+            historicalEarnings: fmpEarnings.historicalEarnings.map((e: any) => ({
+              date: e.date,
+              actualEPS: e.actualEPS ?? 0,
+              estimatedEPS: e.estimatedEPS ?? 0,
+              actualRevenue: e.actualRevenue ?? 0,
+              estimatedRevenue: e.estimatedRevenue ?? 0,
+              epsSurprise: e.epsSurprise ?? 0,
+              epsSurprisePercent: e.epsSurprisePercent ?? 0,
+              revenueSurprise: e.revenueSurprise ?? 0,
+              revenueSurprisePercent: e.revenueSurprisePercent ?? 0,
+              priceMoveBefore: e.priceMoveBefore,
+              priceMoveAfter: e.priceMoveAfter,
+              priceMovePercent: e.priceMovePercent
+            })),
+            stats: {
+              avgMove: fmpEarnings.stats.avgMove,
+              avgAbsMove: fmpEarnings.stats.avgAbsMove,
+              beatRate: fmpEarnings.stats.beatRate,
+              avgBeat: fmpEarnings.stats.avgBeat,
+              revenueBeatRate: fmpEarnings.stats.revenueBeatRate,
+              avgRevenueBeat: fmpEarnings.stats.avgRevenueBeat
+            },
+            dataSource: 'fmp'
+          };
         }
       } catch (error) {
         if (error instanceof Error && error.message.includes('FMP_RATE_LIMITED')) {
