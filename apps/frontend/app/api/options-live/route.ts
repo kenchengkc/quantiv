@@ -3,15 +3,15 @@
  * Uses ComprehensiveLiveDataService to combine:
  * - FMP: Live quotes and earnings
  * - Polygon.io: Live options chains and real-time Greeks
- * - Dolt: Historical IV data and recent options data for analysis
+ * - Local DB (SQLite): Historical IV data via LocalDoltService
  * 
- * NO MOCK DATA - All data from live APIs and Dolt database
+ * NO MOCK DATA - All data from live APIs and local database
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import ComprehensiveLiveDataService from '@/lib/services/comprehensiveLiveDataService';
-import { comprehensiveConfig } from '@/lib/config/doltConfig';
+ 
 
 // Request validation schema
 const OptionsRequestSchema = z.object({
@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
     const { symbol: validSymbol, expiry: validExpiry } = validation.data;
 
     // Initialize comprehensive live data service
-    const liveDataService = ComprehensiveLiveDataService.getInstance(comprehensiveConfig);
+    const liveDataService = ComprehensiveLiveDataService.getInstance();
     
     // Fetch comprehensive options chain data
     console.log(`[API] Fetching live options chain for ${validSymbol}`);

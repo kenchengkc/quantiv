@@ -21,13 +21,25 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./*"],
-      "@/lib/*": ["./lib/*"],
+      "@/lib/*": ["../../lib/*", "./lib/*"],
       "@/app/*": ["./app/*"],
       "@/hooks/*": ["./hooks/*"],
       "@/components/*": ["./components/*"],
       "@/providers/*": ["./providers/*"]
     }
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules"]
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    "../../lib/**/*.ts",
+    "../../lib/**/*.tsx"
+  ],
+  "exclude": [
+    "node_modules",
+    "../../lib/services/doltService.ts",
+    "../../lib/services/doltOptimizedService.ts",
+    "../../lib/config/doltConfig.ts"
+  ]
 }
