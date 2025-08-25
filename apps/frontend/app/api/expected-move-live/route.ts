@@ -3,15 +3,14 @@
  * Uses ComprehensiveLiveDataService to combine:
  * - FMP: Live quotes for current price
  * - Polygon.io: Live options chains for straddle calculations
- * - Dolt: Historical expected moves for accuracy validation
+ * - Local DB (SQLite): Historical IV data via LocalDoltService
  * 
- * NO MOCK DATA - All data from live APIs and Dolt database
+ * NO MOCK DATA - All data from live APIs and local database
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import ComprehensiveLiveDataService from '@/lib/services/comprehensiveLiveDataService';
-import { comprehensiveConfig } from '@/lib/config/doltConfig';
 
 // Request validation schema
 const ExpectedMoveRequestSchema = z.object({
@@ -41,7 +40,7 @@ export async function GET(request: NextRequest) {
     const { symbol: validSymbol } = validation.data;
 
     // Initialize comprehensive live data service
-    const liveDataService = ComprehensiveLiveDataService.getInstance(comprehensiveConfig);
+    const liveDataService = ComprehensiveLiveDataService.getInstance();
     
     // Fetch comprehensive expected move data
     console.log(`[API] Calculating live expected move for ${validSymbol}`);

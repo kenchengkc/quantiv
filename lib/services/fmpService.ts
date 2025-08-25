@@ -296,5 +296,5 @@ export async function fetchFMPQuote(symbol: string): Promise<FMPQuoteData | null
 }
 
 export async function fetchFMPEarnings(symbol: string): Promise<FMPEarningsData | null> {
-  return fmpService.fetchEarnings(symbol);
+  return fmpService.fetchEarningsData(symbol);
 }

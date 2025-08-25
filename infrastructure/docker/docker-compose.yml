@@ -3,6 +3,8 @@
 services:
   # FastAPI Backend
   api:
+    networks:
+      - quantiv-net
     build:
       context: ../../apps/backend
       dockerfile: Dockerfile
@@ -11,6 +13,7 @@ services:
     env_file:
       - ../../config/.env.local
     environment:
+      - DATABASE_URL=
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
       - POSTGRES_USER=quantiv_user
@@ -29,6 +32,8 @@ services:
 
   # PostgreSQL Database
   postgres:
+    networks:
+      - quantiv-net
     image: postgres:15-alpine
     environment:
       - POSTGRES_USER=quantiv_user
@@ -45,6 +50,8 @@ services:
 
   # Redis Cache
   redis:
+    networks:
+      - quantiv-net
     image: redis:7-alpine
     ports:
       - "6379:6379"
@@ -54,6 +61,8 @@ services:
 
   # ML Pipeline Batch Job
   ml-pipeline:
+    networks:
+      - quantiv-net
     build:
       context: ../../apps/ml
       dockerfile: Dockerfile
@@ -77,6 +86,8 @@ services:
 
   # Next.js Frontend (development)
   frontend:
+    networks:
+      - quantiv-net
     build:
       context: .
       dockerfile: Dockerfile.frontend
@@ -89,6 +100,7 @@ services:
       - NEXT_PUBLIC_API_URL=http://localhost:8000
     volumes:
       - ../../apps/frontend:/app
+      - ../../lib:/app/lib
       - /app/node_modules
       - /app/.next
     profiles:
@@ -97,6 +109,8 @@ services:
 
   # Serving Indexes Runner (one-shot)
   db-indexes:
+    networks:
+      - quantiv-net
     build:
       context: ../database
       dockerfile: Dockerfile.indexer
@@ -117,3 +131,7 @@ services:
 volumes:
   postgres_data:
   redis_data:
+
+networks:
+  quantiv-net:
+    driver: bridge
