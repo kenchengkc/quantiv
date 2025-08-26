@@ -3,6 +3,7 @@
  * Returns system status, cache stats, and Redis connectivity
  */
 
+export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { HealthResponseSchema, createApiResponse } from '@/lib/schemas';
 import { getAllCacheStats } from '@/lib/cache/lru';

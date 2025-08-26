@@ -3,6 +3,7 @@
  * Returns upcoming and historical earnings with realized moves
  */
 
+export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { EarningsRequestSchema, EarningsResponseSchema, createApiResponse, validateRequest } from '@/lib/schemas';
 import { CacheInstances, CacheKeys } from '@/lib/cache/lru';
