@@ -3,6 +3,7 @@
  * Returns expected move data using straddle and IV methods with confidence assessment
  */
 
+export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { ExpectedMoveRequestSchema, ExpectedMoveResponseSchema, createApiResponse, validateRequest } from '@/lib/schemas';
 import { CacheInstances, CacheKeys } from '@/lib/cache/lru';
