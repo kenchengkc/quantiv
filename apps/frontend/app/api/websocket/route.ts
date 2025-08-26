@@ -15,6 +15,7 @@
  * - timestamp: ISO timestamp
  */
 
+export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { createApiResponse } from '@/lib/schemas';
 import PolygonWebSocketService from '@/lib/services/polygonWebSocketService';

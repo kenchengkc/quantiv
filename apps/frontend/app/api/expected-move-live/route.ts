@@ -8,6 +8,7 @@
  * NO MOCK DATA - All data from live APIs and local database
  */
 
+export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import ComprehensiveLiveDataService from '@/lib/services/comprehensiveLiveDataService';

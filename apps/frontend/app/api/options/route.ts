@@ -14,6 +14,7 @@
  * - error: Error message if any
  * - timestamp: ISO timestamp
  */
+export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { validateRequest } from '@/lib/schemas';

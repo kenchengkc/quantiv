@@ -3,7 +3,14 @@
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Search, X } from 'lucide-react';
-import { searchStocks, getPopularStocks, type Stock } from '@/lib/data/stocks';
+
+// Local type to avoid importing server-side data services in the client bundle
+type Stock = {
+  symbol: string;
+  name: string;
+  sector?: string;
+  exchange?: 'NYSE' | 'NASDAQ';
+};
 
 export default function SymbolSearch() {
   const [query, setQuery] = useState('');
@@ -24,16 +31,56 @@ export default function SymbolSearch() {
   }, []);
 
   useEffect(() => {
-    if (query.length > 0) {
-      const results = searchStocks(query, 8);
-      setSuggestions(results);
-      setIsOpen(results.length > 0);
-    } else {
-      // Show popular stocks when no query
-      const popular = getPopularStocks();
-      setSuggestions(popular);
-      setIsOpen(false); // Don't show dropdown for empty query
+    let active = true;
+    const controller = new AbortController();
+
+    const fetchPopular = async () => {
+      try {
+        const res = await fetch('/api/stocks/popular', { signal: controller.signal });
+        if (!res.ok) return;
+        const json = await res.json();
+        if (active) {
+          setSuggestions(json.data ?? []);
+          setIsOpen(false); // Don't show dropdown for empty query
+        }
+      } catch (_) {
+        // ignore abort/network errors for UI
+      }
+    };
+
+    const fetchSearch = async (q: string) => {
+      try {
+        const res = await fetch(`/api/stocks/search?q=${encodeURIComponent(q)}&limit=8`, { signal: controller.signal });
+        if (!res.ok) return;
+        const json = await res.json();
+        if (active) {
+          const results: Stock[] = json.data ?? [];
+          setSuggestions(results);
+          setIsOpen(results.length > 0);
+        }
+      } catch (_) {
+        // ignore abort/network errors
+      }
+    };
+
+    if (!query) {
+      fetchPopular();
+      return () => {
+        active = false;
+        controller.abort();
+      };
     }
+
+    // Debounce search
+    const t = setTimeout(() => {
+      fetchSearch(query);
+    }, 250);
+
+    return () => {
+      active = false;
+      controller.abort();
+      clearTimeout(t);
+    };
   }, [query]);
 
   const handleSubmit = (symbol: string) => {
