@@ -25,7 +25,34 @@ import { RedisCache, Keys } from '@/lib/cache/redis';
 import PolygonOptionsService from '@/lib/services/polygonOptionsService';
 import { findATMStrike } from '@/lib/pricing/blackScholes';
 
+// Minimal types to avoid explicit any and match fields we use below
+interface OptionContractEntry {
+  strike: number;
+  type: 'call' | 'put';
+  bid: number;
+  ask: number;
+  mark: number;
+  last: number;
+  volume: number;
+  openInterest: number;
+  iv: number;
+  delta: number;
+  gamma: number;
+  theta: number;
+  vega: number;
+  breakEven?: number;
+  fmv?: number;
+  intrinsicValue?: number;
+  timeValue?: number;
+  inTheMoney: boolean;
+}
 
+interface OptionsResponseData {
+  chain: unknown;
+  dataSource?: string;
+  cacheHit?: 'l1' | 'l2' | 'miss';
+  responseTime?: number;
+}
 
 /**
  * GET /api/options?symbol=AAPL&expiry=2024-01-19
@@ -33,7 +60,6 @@ import { findATMStrike } from '@/lib/pricing/blackScholes';
 export async function GET(request: NextRequest) {
   const startTime = Date.now();
   let cacheHit: 'l1' | 'l2' | 'miss' = 'miss';
-  const dataSource = 'fmp+polygon';
 
   try {
     // Parse and validate query parameters
@@ -68,12 +94,13 @@ export async function GET(request: NextRequest) {
     const redisKey = Keys.optionsChain(validSymbol, validExpiry || 'default');
     
     // Try L1 cache first
-    let responseData: any = CacheInstances.optionsChain.get(cacheKey);
+    let responseData = CacheInstances.optionsChain.get(cacheKey) as OptionsResponseData | undefined;
     cacheHit = responseData ? 'l1' : 'miss';
     
     if (!responseData) {
       // Try L2 cache
-      responseData = await RedisCache.getJson(redisKey);
+      const redisData = (await RedisCache.getJson(redisKey)) as OptionsResponseData | null;
+      responseData = redisData ?? undefined;
       cacheHit = responseData ? 'l2' : 'miss';
       
       if (!responseData) {
@@ -110,7 +137,7 @@ export async function GET(request: NextRequest) {
         
         // Build response data in enhanced format with Greeks and real-time data
         const expiryDate = validExpiry || firstExpiration.date;
-        const strikesForExpiry: Record<string, any> = {};
+        const strikesForExpiry: Record<string, OptionContractEntry> = {};
         
         // Organize strikes with enhanced Polygon data
         firstExpiration.strikes.forEach(strikeData => {
@@ -210,7 +237,7 @@ export async function GET(request: NextRequest) {
           dataSource: 'polygon-enhanced',
           cacheHit,
           responseTime: Date.now() - startTime
-        };
+        } as OptionsResponseData;
         
         // Cache the enhanced response
         CacheInstances.optionsChain.set(cacheKey, responseData, 60 * 1000); // 1 minute L1
@@ -222,7 +249,7 @@ export async function GET(request: NextRequest) {
     }
     
     // Final validation
-    if (!responseData || !responseData.chain) {
+    if (!responseData || !(responseData as OptionsResponseData).chain) {
       throw new Error('Unable to fetch valid options chain data');
     }
       

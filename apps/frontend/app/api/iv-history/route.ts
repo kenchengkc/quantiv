@@ -8,6 +8,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 export const dynamic = 'force-dynamic';
 
+// Minimal shape of backend /em/history items we consume here
+interface HistoryItem {
+  quote_ts: string | number;
+  em_baseline?: number | null;
+}
+
 // Request validation schema
 const IVHistoryRequestSchema = z.object({
   symbol: z.string().min(1).max(10).toUpperCase(),
@@ -127,9 +133,9 @@ export async function GET(request: NextRequest) {
     }
 
     const histData = await histResp.json();
-    const items = Array.isArray(histData?.items) ? histData.items : [];
+    const items = Array.isArray(histData?.items) ? (histData.items as HistoryItem[]) : [];
     // Map to existing shape: { date, iv } for sparkline compatibility
-    const ivHistory = items.map((it: any) => ({
+    const ivHistory = items.map((it) => ({
       date: it.quote_ts,
       iv: it.em_baseline ?? 0,
     }));

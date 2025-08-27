@@ -26,7 +26,7 @@ interface EarningsPanelProps {
   symbol: string;
 }
 
-export default function EarningsPanel({ data, symbol }: EarningsPanelProps) {
+export default function EarningsPanel({ data }: EarningsPanelProps) {
   const nextEarnings = data?.events?.[0];
   const historicalMoves = nextEarnings?.historicalMoves?.slice(0, 8) || [];
 

@@ -5,10 +5,76 @@
 
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
-import { EarningsRequestSchema, EarningsResponseSchema, createApiResponse, validateRequest } from '@/lib/schemas';
+import { EarningsRequestSchema, createApiResponse, validateRequest } from '@/lib/schemas';
 import { CacheInstances, CacheKeys } from '@/lib/cache/lru';
 import { RedisCache, Keys } from '@/lib/cache/redis';
 import { fetchEnhancedEarnings, isEnhancedLiveDataAvailable } from '@/lib/services/enhancedLiveDataService';
+
+interface EnhancedHistoricalEarning {
+  date: string;
+  actualEPS: number;
+  estimatedEPS: number;
+  actualRevenue: number;
+  estimatedRevenue: number;
+  epsSurprise: number;
+  epsSurprisePercent: number;
+  revenueSurprise: number;
+  revenueSurprisePercent: number;
+  priceMovePercent: number;
+}
+
+interface EnhancedEarningsStats {
+  avgMove: number;
+  avgAbsMove: number;
+  beatRate: number;
+  avgBeat: number;
+  revenueBeatRate: number;
+  avgRevenueBeat: number;
+}
+
+interface EnhancedEarningsCache {
+  symbol?: string;
+  nextEarningsDate?: string;
+  nextEarningsTime?: string;
+  estimatedEPS?: number;
+  estimatedRevenue?: number;
+  historicalEarnings: EnhancedHistoricalEarning[];
+  stats: EnhancedEarningsStats;
+  dataSource?: string;
+}
+
+interface MockEarningsNext {
+  date: string;
+  confidence: 'confirmed' | 'estimated';
+  timing: 'bmo' | 'amc';
+  estimate: { eps: number; revenue: number };
+}
+
+interface MockEarningsLastItem {
+  date: string;
+  realizedMovePct: number;
+  priceChange: number;
+  priceBefore: number;
+  priceAfter: number;
+  volume: number;
+}
+
+interface MockEarningsCache {
+  symbol: string;
+  next?: MockEarningsNext;
+  last: MockEarningsLastItem[];
+  timestamp: string;
+  avgMove?: number;
+  avgAbsMove?: number;
+  avgBeat?: number;
+  beatRate?: number;
+  revenueBeatRate?: number;
+  avgRevenueBeat?: number;
+}
+
+function isEnhancedEarningsCache(data: unknown): data is EnhancedEarningsCache {
+  return !!data && typeof data === 'object' && 'historicalEarnings' in data;
+}
 
 /**
  * Mock earnings data provider
@@ -25,8 +91,8 @@ class EarningsProvider {
     // Mock upcoming earnings
     const next = Math.random() > 0.3 ? {
       date: nextWeek.toISOString().split('T')[0],
-      confidence: Math.random() > 0.5 ? 'confirmed' : 'estimated' as const,
-      timing: Math.random() > 0.5 ? 'bmo' : 'amc' as const,
+      confidence: (Math.random() > 0.5 ? 'confirmed' : 'estimated') as 'confirmed' | 'estimated',
+      timing: (Math.random() > 0.5 ? 'bmo' : 'amc') as 'bmo' | 'amc',
       estimate: {
         eps: Math.random() * 2 + 0.5, // $0.50 - $2.50
         revenue: Math.random() * 50 + 10 // $10B - $60B
@@ -88,13 +154,17 @@ export async function GET(request: NextRequest) {
     const cacheKey = CacheKeys.earnings(symbol);
     
     // Try L1 cache first
-    let earningsData = CacheInstances.earnings.get(cacheKey);
+    let earningsData: EnhancedEarningsCache | MockEarningsCache | undefined = CacheInstances.earnings.get(cacheKey) as
+      | EnhancedEarningsCache
+      | MockEarningsCache
+      | undefined;
     let cacheHit = 'l1';
     
     if (!earningsData) {
       // Try L2 (Redis) cache
       const redisKey = Keys.earnings(symbol);
-      earningsData = await RedisCache.getJson(redisKey);
+      const redisData = (await RedisCache.getJson(redisKey)) as EnhancedEarningsCache | MockEarningsCache | null;
+      earningsData = redisData ?? undefined;
       cacheHit = earningsData ? 'l2' : 'miss';
       
       if (!earningsData) {
@@ -159,26 +229,24 @@ export async function GET(request: NextRequest) {
     }
     
     // Transform earnings data to match EarningsCalendar component expectations
-    const earnings = earningsData as any; // Type assertion for mock data
-    
-    // Check if we have enhanced live data (FMP/Polygon) or mock data
-    if (earnings.historicalEarnings && Array.isArray(earnings.historicalEarnings)) {
+    if (isEnhancedEarningsCache(earningsData)) {
+      const earnings = earningsData;
       // Enhanced live data from FMP - use directly
       const transformedData = {
         nextEarningsDate: earnings.nextEarningsDate,
         nextEarningsTime: earnings.nextEarningsTime,
         estimatedEPS: earnings.estimatedEPS,
         estimatedRevenue: earnings.estimatedRevenue,
-        historicalEarnings: earnings.historicalEarnings.map((earning: any) => ({
+        historicalEarnings: earnings.historicalEarnings.map((earning: EnhancedHistoricalEarning) => ({
           date: earning.date,
           actualEPS: earning.actualEPS,
           estimatedEPS: earning.estimatedEPS,
           actualRevenue: earning.actualRevenue || Math.random() * 50 + 10, // Mock revenue if not available
           estimatedRevenue: earning.estimatedRevenue || Math.random() * 48 + 9.5,
-          epsSurprise: earning.actualEPS - earning.estimatedEPS,
-          epsSurprisePercent: earning.estimatedEPS !== 0 ? ((earning.actualEPS - earning.estimatedEPS) / Math.abs(earning.estimatedEPS)) * 100 : 0,
-          revenueSurprise: (Math.random() - 0.5) * 2, // Mock revenue surprise
-          revenueSurprisePercent: (Math.random() - 0.5) * 10, // Mock revenue surprise %
+          epsSurprise: earning.epsSurprise,
+          epsSurprisePercent: earning.epsSurprisePercent,
+          revenueSurprise: earning.revenueSurprise,
+          revenueSurprisePercent: earning.revenueSurprisePercent,
           priceMovePercent: earning.priceMovePercent
         })),
         stats: earnings.stats || {
@@ -192,15 +260,16 @@ export async function GET(request: NextRequest) {
       };
       return NextResponse.json(createApiResponse(transformedData));
     }
-    
+
     // Mock data structure - transform to match EarningsCalendar
+    const earnings = earningsData as MockEarningsCache;
     const transformedData = {
       nextEarningsDate: earnings.next?.date,
       nextEarningsTime: earnings.next?.timing === 'bmo' ? 'BMO' as const : 
                        earnings.next?.timing === 'amc' ? 'AMC' as const : 'UNKNOWN' as const,
       estimatedEPS: earnings.next?.estimate?.eps,
       estimatedRevenue: earnings.next?.estimate?.revenue,
-      historicalEarnings: earnings.last?.map((earning: any) => ({
+      historicalEarnings: earnings.last?.map((earning: MockEarningsLastItem) => ({
         date: earning.date,
         actualEPS: Math.random() * 2 + 0.5, // Mock actual EPS
         estimatedEPS: Math.random() * 2 + 0.4, // Mock estimated EPS
@@ -232,7 +301,7 @@ export async function GET(request: NextRequest) {
       'X-Cache-Hit': cacheHit,
       'X-Processing-Time': `${processingTime}ms`,
       'X-Symbol': symbol,
-      'X-Has-Next-Earnings': (earningsData as any)?.next ? 'true' : 'false'
+      'X-Has-Next-Earnings': earnings?.next ? 'true' : 'false'
     });
     
     return NextResponse.json(response, { headers });

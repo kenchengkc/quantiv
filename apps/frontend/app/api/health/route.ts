@@ -4,15 +4,14 @@
  */
 
 export const dynamic = 'force-dynamic';
-import { NextRequest, NextResponse } from 'next/server';
-import { HealthResponseSchema, createApiResponse } from '@/lib/schemas';
+import { NextResponse } from 'next/server';
 import { getAllCacheStats } from '@/lib/cache/lru';
 import { checkRedisHealth } from '@/lib/cache/redis';
 
 /**
  * GET /api/health
  */
-export async function GET(request: NextRequest) {
+export async function GET() {
   const startTime = Date.now();
   
   try {

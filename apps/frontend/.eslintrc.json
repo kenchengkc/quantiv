@@ -1,0 +1,22 @@
+{
+  "extends": [
+    "next/core-web-vitals",
+    "next/typescript"
+  ],
+  "rules": {
+    "no-restricted-imports": [
+      "error",
+      {
+        "paths": [
+          {
+            "name": "yahoo-finance2",
+            "message": "Do not statically import 'yahoo-finance2'. Use dynamic import inside server-only code paths (e.g., API routes or services)."
+          }
+        ],
+        "patterns": [
+          "yahoo-finance2/*"
+        ]
+      }
+    ]
+  }
+}
