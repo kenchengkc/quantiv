@@ -36,7 +36,7 @@ interface EarningsCalendarProps {
   };
 }
 
-export default function EarningsCalendar({ symbol, data }: EarningsCalendarProps) {
+export default function EarningsCalendar({ data }: EarningsCalendarProps) {
   // Prepare earnings events (upcoming + historical)
   const upcomingEarning: EarningsEvent | null = data.nextEarningsDate ? {
     date: data.nextEarningsDate,

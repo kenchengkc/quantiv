@@ -49,7 +49,7 @@ export default function AboutPage() {
           <h3>Methodology</h3>
           <p>
             Our calculations are based on the Black-Scholes model with proper dividend adjustments. 
-            We use Brent's method for implied volatility calculations with high precision (1e-6 tolerance).
+            We use Brent&apos;s method for implied volatility calculations with high precision (1e-6 tolerance).
           </p>
 
           <h4>Expected Move Formulas</h4>

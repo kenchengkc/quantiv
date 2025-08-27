@@ -6,7 +6,8 @@
 
 import { fmpService, FMPQuoteData, FMPEarningsData } from './fmpService';
 import { fetchEnhancedQuote, fetchEnhancedOptionsChain, fetchEnhancedEarnings } from './enhancedLiveDataService';
-import yahooFinance from 'yahoo-finance2';
+// Avoid top-level import of 'yahoo-finance2' to prevent client bundling.
+// Use dynamic import within server-only code paths when needed.
 
 export interface UnifiedQuoteData {
   symbol: string;
@@ -155,8 +156,9 @@ class UnifiedLiveDataService {
       console.warn(`[unified-data] Enhanced quote failed for ${symbol}:`, error);
     }
 
-    // Final fallback to Yahoo Finance
+    // Final fallback to Yahoo Finance (server-only dynamic import)
     try {
+      const yahooFinance = (await import('yahoo-finance2')).default;
       const yahooQuote = await yahooFinance.quote(symbol);
       console.log(`[unified-data] Quote from Yahoo Finance for ${symbol}`);
       
@@ -200,8 +202,9 @@ class UnifiedLiveDataService {
       console.warn(`[unified-data] Enhanced options failed for ${symbol}:`, error);
     }
 
-    // Final fallback to Yahoo Finance (limited options data)
+    // Final fallback to Yahoo Finance (limited options data; server-only dynamic import)
     try {
+      const yahooFinance = (await import('yahoo-finance2')).default;
       const yahooOptions = await yahooFinance.options(symbol, {});
       if (yahooOptions && yahooOptions.options && yahooOptions.options.length > 0) {
         console.log(`[unified-data] Options chain from Yahoo Finance for ${symbol}`);

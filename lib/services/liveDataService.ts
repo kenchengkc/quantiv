@@ -3,7 +3,6 @@
  * Integrates with multiple financial data providers for real-time market data
  */
 
-import yahooFinance from 'yahoo-finance2';
 // Note: Advanced APIs like Polygon.io require API keys and complex setup
 // For now, we'll focus on Yahoo Finance which works reliably
 
@@ -139,7 +138,10 @@ class LiveDataService {
     try {
       // Get current stock price and IV data
       const [quote, optionsData] = await Promise.all([
-        yahooFinance.quote(symbol),
+        (async () => {
+          const yahooFinance = (await import('yahoo-finance2')).default;
+          return yahooFinance.quote(symbol);
+        })(),
         this.fetchLiveOptionsChain(symbol)
       ]);
 
