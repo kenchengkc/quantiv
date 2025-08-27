@@ -1,7 +1,7 @@
 'use client';
 
 import { TrendingUp, BarChart3 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 interface IVRankSparklineProps {
   data: {
@@ -17,47 +17,14 @@ interface IVRankSparklineProps {
 export default function IVRankSparkline({ data, symbol }: IVRankSparklineProps) {
   const { current, rank, percentile, high52Week, low52Week } = data;
   const [sparklineData, setSparklineData] = useState<number[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  // Fetch historical IV data via frontend API (proxies backend EM history)
-  useEffect(() => {
-    async function fetchHistoricalIV() {
-      if (!symbol) return;
-      
-      setIsLoading(true);
-      try {
-        // Fetch historical IV data (52 weeks = ~365 days)
-        const response = await fetch(`/api/iv-history?symbol=${symbol}&days=365`);
-        
-        if (response.ok) {
-          const result = await response.json();
-          if (result.success && result.data && result.data.length > 0) {
-            // Use real historical IV data
-            const historicalIVs = result.data.map((item: any) => item.iv);
-            setSparklineData([...historicalIVs, current]);
-            console.log(`[IVSparkline] Loaded ${historicalIVs.length} historical IV points for ${symbol}`);
-          } else {
-            // Fallback to interpolated data based on current stats if no historical data
-            console.log(`[IVSparkline] No historical data for ${symbol}, using interpolated data`);
-            setSparklineData(generateInterpolatedData());
-          }
-        } else {
-          console.log(`[IVSparkline] API failed for ${symbol}, using interpolated data`);
-          setSparklineData(generateInterpolatedData());
-        }
-      } catch (error) {
-        console.error(`[IVSparkline] Error fetching historical IV for ${symbol}:`, error);
-        setSparklineData(generateInterpolatedData());
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    fetchHistoricalIV();
-  }, [symbol, current, high52Week, low52Week]);
+  
+  interface IvHistoryPoint {
+    date: string | number;
+    iv: number;
+  }
 
   // Generate interpolated data based on current IV stats (better than random mock data)
-  function generateInterpolatedData(): number[] {
+  const generateInterpolatedData = useCallback((): number[] => {
     const weeks = 52;
     const data: number[] = [];
     
@@ -77,7 +44,43 @@ export default function IVRankSparkline({ data, symbol }: IVRankSparklineProps) 
     
     data.push(current);
     return data;
-  }
+  }, [current, high52Week, low52Week]);
+
+  // Fetch historical IV data via frontend API (proxies backend EM history)
+  useEffect(() => {
+    async function fetchHistoricalIV() {
+      if (!symbol) return;
+      
+      try {
+        // Fetch historical IV data (52 weeks = ~365 days)
+        const response = await fetch(`/api/iv-history?symbol=${symbol}&days=365`);
+        
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success && result.data && result.data.length > 0) {
+            // Use real historical IV data
+            const historicalIVs = (result.data as IvHistoryPoint[]).map((item) => item.iv);
+            setSparklineData([...historicalIVs, current]);
+            console.log(`[IVSparkline] Loaded ${historicalIVs.length} historical IV points for ${symbol}`);
+          } else {
+            // Fallback to interpolated data based on current stats if no historical data
+            console.log(`[IVSparkline] No historical data for ${symbol}, using interpolated data`);
+            setSparklineData(generateInterpolatedData());
+          }
+        } else {
+          console.log(`[IVSparkline] API failed for ${symbol}, using interpolated data`);
+          setSparklineData(generateInterpolatedData());
+        }
+      } catch (error) {
+        console.error(`[IVSparkline] Error fetching historical IV for ${symbol}:`, error);
+        setSparklineData(generateInterpolatedData());
+      }
+    }
+
+    fetchHistoricalIV();
+  }, [symbol, current, high52Week, low52Week, generateInterpolatedData]);
+
+  
 
   const max = Math.max(...sparklineData);
   const min = Math.min(...sparklineData);
