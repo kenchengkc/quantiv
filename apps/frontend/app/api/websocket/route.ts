@@ -20,6 +20,56 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createApiResponse } from '@/lib/schemas';
 import PolygonWebSocketService from '@/lib/services/polygonWebSocketService';
 
+// Response typing to avoid explicit any
+type ConnectionStatus = {
+  connected: boolean;
+  subscriptions: number;
+  reconnectAttempts: number;
+};
+
+type SubscribeResponse = {
+  action: 'subscribe';
+  contract: string | null;
+  subscribed: boolean;
+  message: string;
+  connectionStatus: ConnectionStatus;
+  responseTime: number;
+};
+
+type UnsubscribeResponse = {
+  action: 'unsubscribe';
+  contract: string | null;
+  unsubscribed: boolean;
+  message: string;
+  connectionStatus: ConnectionStatus;
+  responseTime: number;
+};
+
+type StatusResponse = {
+  action: 'status';
+  connectionStatus: ConnectionStatus;
+  subscriptions: Array<{
+    contractTicker: string;
+    subscribed: boolean;
+    lastUpdate: string | number | Date | null;
+    messageCount: number;
+  }>;
+  totalSubscriptions: number;
+  responseTime: number;
+};
+
+type WebSocketApiResponse = SubscribeResponse | UnsubscribeResponse | StatusResponse;
+
+type SubscriptionInfo = {
+  subscribed: boolean;
+  lastUpdate: string | number | Date | null;
+  messageCount: number;
+};
+
+function isAction(value: string | null): value is 'subscribe' | 'unsubscribe' | 'status' {
+  return value === 'subscribe' || value === 'unsubscribe' || value === 'status';
+}
+
 /**
  * GET /api/websocket?action=subscribe&contract=O:SPY251219C00650000
  * GET /api/websocket?action=status
@@ -34,7 +84,7 @@ export async function GET(request: NextRequest) {
     const action = searchParams.get('action');
     const contract = searchParams.get('contract');
     
-    if (!action || !['subscribe', 'unsubscribe', 'status'].includes(action)) {
+    if (!isAction(action)) {
       return NextResponse.json(
         createApiResponse(undefined, 'Invalid action', 'Action must be subscribe, unsubscribe, or status'),
         { status: 400 }
@@ -56,16 +106,17 @@ export async function GET(request: NextRequest) {
     }
 
     const wsService = PolygonWebSocketService.getInstance();
-    let responseData: any;
+    let responseData: WebSocketApiResponse;
 
     switch (action) {
       case 'subscribe':
         console.log(`[websocket-api] Subscribing to ${contract}`);
         const subscribed = await wsService.subscribeToContract(contract!);
+        const subscribeContract = contract as string;
         
         responseData = {
           action: 'subscribe',
-          contract: contract,
+          contract: subscribeContract,
           subscribed,
           message: subscribed ? 'Successfully subscribed' : 'Subscription failed',
           connectionStatus: wsService.getConnectionStatus(),
@@ -76,10 +127,11 @@ export async function GET(request: NextRequest) {
       case 'unsubscribe':
         console.log(`[websocket-api] Unsubscribing from ${contract}`);
         const unsubscribed = await wsService.unsubscribeFromContract(contract!);
+        const unsubscribeContract = contract as string;
         
         responseData = {
           action: 'unsubscribe',
-          contract: contract,
+          contract: unsubscribeContract,
           unsubscribed,
           message: unsubscribed ? 'Successfully unsubscribed' : 'Unsubscription failed',
           connectionStatus: wsService.getConnectionStatus(),
@@ -88,7 +140,7 @@ export async function GET(request: NextRequest) {
         break;
 
       case 'status':
-        const subscriptions = wsService.getSubscriptions();
+        const subscriptions = wsService.getSubscriptions() as Map<string, SubscriptionInfo>;
         const connectionStatus = wsService.getConnectionStatus();
         
         responseData = {
