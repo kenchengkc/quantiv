@@ -3,7 +3,8 @@
  * Integrates with Polygon.io, Finnhub, and Yahoo Finance for comprehensive market data
  */
 
-import yahooFinance from 'yahoo-finance2';
+// Note: avoid top-level import of 'yahoo-finance2' to prevent client bundling.
+// Use dynamic import within server-only methods when needed.
 
 // Types for enhanced live data
 export interface EnhancedOptionsChain {
@@ -379,6 +380,7 @@ class EnhancedLiveDataService {
    */
   private async fetchYahooQuote(symbol: string): Promise<EnhancedQuoteData | null> {
     try {
+      const yahooFinance = (await import('yahoo-finance2')).default;
       const quote = await yahooFinance.quote(symbol);
       
       return {
@@ -401,6 +403,7 @@ class EnhancedLiveDataService {
 
   private async fetchYahooOptionsChain(symbol: string, expiration?: string): Promise<EnhancedOptionsChain | null> {
     try {
+      const yahooFinance = (await import('yahoo-finance2')).default;
       const options = await yahooFinance.options(symbol, {});
       const quote = await yahooFinance.quote(symbol);
       
@@ -464,6 +467,7 @@ class EnhancedLiveDataService {
   private async fetchYahooEarnings(symbol: string): Promise<EnhancedEarningsData | null> {
     try {
       // Use quote API to get basic earnings info since fundamentalsTimeSeries is complex
+      const yahooFinance = (await import('yahoo-finance2')).default;
       const quote = await yahooFinance.quote(symbol);
       
       // Yahoo Finance doesn't provide comprehensive earnings data

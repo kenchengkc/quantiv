@@ -22,6 +22,13 @@ import { RedisCache, Keys } from '@/lib/cache/redis';
 import { createApiResponse } from '@/lib/schemas';
 import PolygonOptionsService from '@/lib/services/polygonOptionsService';
 
+interface ContractResponseData {
+  analysis: unknown;
+  dataSource?: string;
+  cacheHit: 'l1' | 'l2' | 'miss';
+  responseTime: number;
+}
+
 /**
  * GET /api/contract?symbol=AAPL&contract=O:AAPL250815C00150000
  */
@@ -63,12 +70,12 @@ export async function GET(request: NextRequest) {
     const redisKey = Keys.optionsChain(symbol, `contract_${contract}`);
     
     // Try L1 cache first
-    let responseData: any = CacheInstances.optionsChain.get(cacheKey);
+    let responseData: ContractResponseData | undefined = CacheInstances.optionsChain.get(cacheKey) as ContractResponseData | undefined;
     cacheHit = responseData ? 'l1' : 'miss';
     
     if (!responseData) {
       // Try L2 cache
-      responseData = await RedisCache.getJson(redisKey);
+      responseData = (await RedisCache.getJson(redisKey)) as ContractResponseData | undefined;
       cacheHit = responseData ? 'l2' : 'miss';
       
       if (!responseData) {
@@ -96,7 +103,7 @@ export async function GET(request: NextRequest) {
           dataSource: 'polygon-contract',
           cacheHit,
           responseTime: Date.now() - startTime
-        };
+        } as ContractResponseData;
         
         // Cache the response (shorter TTL for individual contracts due to frequent price changes)
         CacheInstances.optionsChain.set(cacheKey, responseData, 2 * 60 * 1000); // 2 minutes L1

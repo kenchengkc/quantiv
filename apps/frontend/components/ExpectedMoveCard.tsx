@@ -15,7 +15,7 @@ interface ExpectedMoveCardProps {
 }
 
 export default function ExpectedMoveCard({ data }: ExpectedMoveCardProps) {
-  const { spotPrice, summary } = data;
+  const { summary } = data;
 
   // Define reasonable maximum percentages for scaling bars
   // These represent what should be considered "large" moves for each timeframe
@@ -38,7 +38,6 @@ export default function ExpectedMoveCard({ data }: ExpectedMoveCardProps) {
 
     // Defensive programming: handle missing or invalid percentage
     const percentage = range.percentage ?? 0;
-    const move = range.move ?? 0;
     const lower = range.lower ?? 0;
     const upper = range.upper ?? 0;
 

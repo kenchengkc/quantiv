@@ -20,31 +20,7 @@ const OptionsRequestSchema = z.object({
   expiry: z.string().optional(),
 });
 
-// Response schema
-const OptionsResponseSchema = z.object({
-  success: z.boolean(),
-  data: z.object({
-    symbol: z.string(),
-    quote: z.object({
-      name: z.string(),
-      last: z.number(),
-      change: z.number(),
-      changePercent: z.number(),
-    }),
-    expirations: z.array(z.string()),
-    strikes: z.record(z.record(z.any())),
-    ivStats: z.object({
-      rank: z.number(),
-      percentile: z.number(),
-      current: z.number(),
-      high52Week: z.number(),
-      low52Week: z.number(),
-    }),
-  }).optional(),
-  error: z.string().optional(),
-  timestamp: z.string(),
-  dataSource: z.string(),
-});
+// Response schema (removed unused OptionsResponseSchema to satisfy ESLint no-unused-vars)
 
 export async function GET(request: NextRequest) {
   const startTime = Date.now();
