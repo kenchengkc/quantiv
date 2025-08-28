@@ -50,7 +50,7 @@ Quantiv is a modern options trading analytics platform that provides ML-powered 
 **Backend** 
 - FastAPI with async/await patterns
 - Pydantic models for data validation
-- PostgreSQL with table partitioning (87M+ records)
+- PostgreSQL with table partitioning (1B+ records)
 - Redis for high-performance caching
 - Structured logging with contextual data
 
