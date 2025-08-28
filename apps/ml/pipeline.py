@@ -70,8 +70,18 @@ DATA_DIR = Path(os.getenv("DATA_DIR", "/app/data"))
 EM_ALPHA = float(os.getenv("EM_ALPHA", "1.0"))
 EXPIRY_WINDOW_DAYS = int(os.getenv("EXPIRY_WINDOW_DAYS", "120"))
 MAX_EXPS_PER_SYMBOL = int(os.getenv("MAX_EXPS_PER_SYMBOL", "5"))
-MODEL_DIR = Path(os.getenv("MODEL_DIR", str((DATA_DIR if 'DATA_DIR' in os.environ else Path('.')) / "models")))
-METADATA_DIR = Path(os.getenv("METADATA_DIR", str((DATA_DIR if 'DATA_DIR' in os.environ else Path('.')) / "metadata")))
+MODEL_DIR = Path(
+    os.getenv(
+        "MODEL_DIR",
+        str((DATA_DIR if "DATA_DIR" in os.environ else Path(".")) / "models"),
+    )
+)
+METADATA_DIR = Path(
+    os.getenv(
+        "METADATA_DIR",
+        str((DATA_DIR if "DATA_DIR" in os.environ else Path(".")) / "metadata"),
+    )
+)
 TRAIN_MODELS = os.getenv("TRAIN_MODELS", "auto").lower()  # 'auto' | 'true' | 'false'
 MODEL_VERSION = os.getenv("MODEL_VERSION", "v0")
 
@@ -119,7 +129,9 @@ def expiries_from_parquet(
             "AND expiration BETWEEN ? AND ? "
             "ORDER BY exp_date ASC LIMIT ?"
         )
-        rows = con.execute(sql, [options_glob, symbol, begin, end, MAX_EXPS_PER_SYMBOL]).fetchall()
+        rows = con.execute(
+            sql, [options_glob, symbol, begin, end, MAX_EXPS_PER_SYMBOL]
+        ).fetchall()
         exps = [r[0] for r in rows if r and r[0] is not None]
         return exps
     except Exception as e:
@@ -147,7 +159,19 @@ def compute_baseline_forecasts(symbols):
             band68_high = 1.25 * em
             band95_low = 0.50 * em
             band95_high = 1.50 * em
-            rows.append((sym, now_ts, exp, "to_exp", em, band68_low, band68_high, band95_low, band95_high))
+            rows.append(
+                (
+                    sym,
+                    now_ts,
+                    exp,
+                    "to_exp",
+                    em,
+                    band68_low,
+                    band68_high,
+                    band95_low,
+                    band95_high,
+                )
+            )
 
         # Also provide short-horizon baselines keyed to nearest expiry (for charts)
         nearest_exp = expiries[0]
@@ -157,7 +181,19 @@ def compute_baseline_forecasts(symbols):
             band68_high = 1.25 * em
             band95_low = 0.50 * em
             band95_high = 1.50 * em
-            rows.append((sym, now_ts, nearest_exp, horizon, em, band68_low, band68_high, band95_low, band95_high))
+            rows.append(
+                (
+                    sym,
+                    now_ts,
+                    nearest_exp,
+                    horizon,
+                    em,
+                    band68_low,
+                    band68_high,
+                    band95_low,
+                    band95_high,
+                )
+            )
 
     if con is not None:
         con.close()
@@ -170,9 +206,13 @@ def _features_labels_paths():
     return feats, labels
 
 
-def _detect_target_column(con: "duckdb.DuckDBPyConnection", labels_path: Path) -> str | None:
+def _detect_target_column(
+    con: "duckdb.DuckDBPyConnection", labels_path: Path
+) -> str | None:
     try:
-        df = con.execute("SELECT * FROM read_parquet(?) LIMIT 1", [str(labels_path)]).fetchdf()
+        df = con.execute(
+            "SELECT * FROM read_parquet(?) LIMIT 1", [str(labels_path)]
+        ).fetchdf()
         candidates = [
             "realized_abs_log_return",
             "realized_move",
@@ -189,7 +229,12 @@ def _detect_target_column(con: "duckdb.DuckDBPyConnection", labels_path: Path) -
     return None
 
 
-def _prepare_training_frame(con: "duckdb.DuckDBPyConnection", feats_path: Path, labels_path: Path, target_col: str) -> pd.DataFrame:
+def _prepare_training_frame(
+    con: "duckdb.DuckDBPyConnection",
+    feats_path: Path,
+    labels_path: Path,
+    target_col: str,
+) -> pd.DataFrame:
     sql = f"""
         SELECT f.*, l.{target_col} AS target
         FROM read_parquet(?) AS f
@@ -201,7 +246,11 @@ def _prepare_training_frame(con: "duckdb.DuckDBPyConnection", feats_path: Path, 
     # Drop obvious non-feature columns
     drop_cols = {"underlying", "quote_ts", "exp_date", "horizon", "created_at"}
     # Keep numeric features
-    feature_cols = [c for c in df.columns if c not in drop_cols and c != "target" and pd.api.types.is_numeric_dtype(df[c])]
+    feature_cols = [
+        c
+        for c in df.columns
+        if c not in drop_cols and c != "target" and pd.api.types.is_numeric_dtype(df[c])
+    ]
     cols = feature_cols + ["underlying", "quote_ts", "exp_date", "horizon", "target"]
     return df[cols].copy()
 
@@ -233,7 +282,11 @@ def train_lightgbm_if_possible() -> bool:
         df_train = df.iloc[:split_idx]
         df_valid = df.iloc[split_idx:]
 
-        feature_cols = [c for c in df.columns if c not in ("underlying", "quote_ts", "exp_date", "horizon", "target")]
+        feature_cols = [
+            c
+            for c in df.columns
+            if c not in ("underlying", "quote_ts", "exp_date", "horizon", "target")
+        ]
         X_train, y_train = df_train[feature_cols], df_train["target"].astype(float)
         X_valid, y_valid = df_valid[feature_cols], df_valid["target"].astype(float)
 
@@ -312,7 +365,9 @@ def _load_models_if_available():
     return loaded
 
 
-def _prepare_latest_features(con: "duckdb.DuckDBPyConnection", feats_path: Path, symbols: list[str]) -> pd.DataFrame:
+def _prepare_latest_features(
+    con: "duckdb.DuckDBPyConnection", feats_path: Path, symbols: list[str]
+) -> pd.DataFrame:
     # Restrict to recent timestamps per symbol to reduce load
     try:
         df_max = con.execute(
@@ -331,7 +386,11 @@ def _prepare_latest_features(con: "duckdb.DuckDBPyConnection", feats_path: Path,
             df = df[df["underlying"].isin(symbols)]
         # Keep numeric feature columns
         drop_cols = {"underlying", "quote_ts", "exp_date", "horizon", "created_at"}
-        feature_cols = [c for c in df.columns if c not in drop_cols and pd.api.types.is_numeric_dtype(df[c])]
+        feature_cols = [
+            c
+            for c in df.columns
+            if c not in drop_cols and pd.api.types.is_numeric_dtype(df[c])
+        ]
         cols = feature_cols + ["underlying", "quote_ts", "exp_date", "horizon"]
         return df[cols].copy()
     except Exception as e:
@@ -358,6 +417,7 @@ def predict_lightgbm_if_possible(symbols: list[str]):
         X = df_feats[feature_cols]
 
         preds = {}
+
         # Compute quantiles
         def key(i: int):
             return (
@@ -405,11 +465,21 @@ def merge_predictions_into_rows(rows: list[tuple], preds: dict) -> list[tuple]:
         k = (underlying, quote_ts, exp_date, horizon)
         p = preds.get(k)
         if p:
-            b68l = p.get("band68_low", b68l) if p.get("band68_low") is not None else b68l
-            b68h = p.get("band68_high", b68h) if p.get("band68_high") is not None else b68h
-            b95l = p.get("band95_low", b95l) if p.get("band95_low") is not None else b95l
-            b95h = p.get("band95_high", b95h) if p.get("band95_high") is not None else b95h
-        merged.append((underlying, quote_ts, exp_date, horizon, em, b68l, b68h, b95l, b95h))
+            b68l = (
+                p.get("band68_low", b68l) if p.get("band68_low") is not None else b68l
+            )
+            b68h = (
+                p.get("band68_high", b68h) if p.get("band68_high") is not None else b68h
+            )
+            b95l = (
+                p.get("band95_low", b95l) if p.get("band95_low") is not None else b95l
+            )
+            b95h = (
+                p.get("band95_high", b95h) if p.get("band95_high") is not None else b95h
+            )
+        merged.append(
+            (underlying, quote_ts, exp_date, horizon, em, b68l, b68h, b95l, b95h)
+        )
     return merged
 
 
