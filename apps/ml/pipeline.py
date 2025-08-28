@@ -3,20 +3,23 @@
 Quantiv ML Pipeline (skeleton)
 - Reads available underlyings from Parquet root
 - Inserts placeholder forecasts into Postgres em_forecasts for API smoke tests
+- Writes/upsers same forecasts to Parquet at DATA_DIR/forecasts/em_forecasts.parquet for DuckDB backend
 """
 import os
 import sys
-import json
 from pathlib import Path
-from datetime import datetime, timedelta, date
-import glob
+from datetime import datetime, timedelta, date, timezone
 import psycopg2
 import psycopg2.extras as extras
 from dotenv import load_dotenv
+import pandas as pd
+
 
 # Robust dotenv loading: try common repo and container locations; otherwise rely on injected env vars
 def _load_env() -> None:
-    env_name = (os.getenv("NODE_ENV") or os.getenv("ENVIRONMENT") or "development").lower()
+    env_name = (
+        os.getenv("NODE_ENV") or os.getenv("ENVIRONMENT") or "development"
+    ).lower()
     env_file = ".env.production" if env_name == "production" else ".env.local"
 
     candidates = []
@@ -31,10 +34,12 @@ def _load_env() -> None:
         pass
 
     # CWD and container-friendly fallbacks
-    candidates.extend([
-        Path.cwd() / "config" / env_file,
-        Path("/app") / "config" / env_file,
-    ])
+    candidates.extend(
+        [
+            Path.cwd() / "config" / env_file,
+            Path("/app") / "config" / env_file,
+        ]
+    )
 
     for p in candidates:
         try:
@@ -46,6 +51,7 @@ def _load_env() -> None:
             continue
     print("[ML] No .env file found; relying on environment variables")
 
+
 _load_env()
 
 DB_URL = os.getenv("DATABASE_URL")
@@ -55,28 +61,24 @@ POSTGRES_DB = os.getenv("POSTGRES_DB", "quantiv_options")
 POSTGRES_USER = os.getenv("POSTGRES_USER", "quantiv_user")
 POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD", "quantiv_secure_2024")
 PARQUET_ROOT = Path(os.getenv("PARQUET_ROOT", "/app/data/parquet"))
+# Base data directory for forecasts parquet (matches backend DATA_DIR)
+DATA_DIR = Path(os.getenv("DATA_DIR", "/app/data"))
 
 
 def discover_symbols(parquet_root: Path, limit: int = 5):
-    base = parquet_root / "options_chains"
-    if not base.exists():
+    """Discover symbols from hive partitions like underlying=SYM/quote_year=YYYY/quote_month=MM"""
+    base_candidates = [parquet_root / "options_chains", parquet_root]
+    base = next((b for b in base_candidates if b.exists()), None)
+    if base is None:
         return []
-    syms = []
+    syms: list[str] = []
     for p in base.glob("underlying=*/*/*"):
-        try:
-            underlying = p.parts[p.parts.index("underlying=") if "underlying=" in p.parts else -1]
-        except ValueError:
-            # Fallback: parse from path string
-            s = str(p)
-            idx = s.find("underlying=")
-            if idx >= 0:
-                underlying = s[idx:].split("/")[0]
-            else:
-                continue
-        if underlying.startswith("underlying="):
-            sym = underlying.split("=", 1)[1]
-            if sym not in syms:
-                syms.append(sym)
+        part = next((seg for seg in p.parts if seg.startswith("underlying=")), None)
+        if not part:
+            continue
+        sym = part.split("=", 1)[1]
+        if sym and sym not in syms:
+            syms.append(sym)
         if len(syms) >= limit:
             break
     return syms
@@ -118,7 +120,7 @@ def ensure_table_exists(conn):
 
 
 def insert_placeholder_forecasts(conn, symbols):
-    now = datetime.now(datetime.UTC)
+    now = datetime.now(timezone.utc)
     exp = date.today() + timedelta(days=7)
     rows = []
     for sym in symbols:
@@ -151,6 +153,55 @@ def insert_placeholder_forecasts(conn, symbols):
     """
     with conn, conn.cursor() as cur:
         extras.execute_batch(cur, sql, rows, page_size=100)
+    return rows
+
+
+def upsert_parquet_forecasts(rows, data_dir: Path):
+    """Upsert rows into DATA_DIR/forecasts/em_forecasts.parquet for DuckDB consumption.
+    Rows schema matches Postgres insert order.
+    Key: (underlying, quote_ts, exp_date, horizon)
+    """
+    forecasts_dir = data_dir / "forecasts"
+    forecasts_dir.mkdir(parents=True, exist_ok=True)
+    parquet_path = forecasts_dir / "em_forecasts.parquet"
+
+    # Build DataFrame from rows
+    cols = [
+        "underlying",
+        "quote_ts",
+        "exp_date",
+        "horizon",
+        "em_baseline",
+        "band68_low",
+        "band68_high",
+        "band95_low",
+        "band95_high",
+    ]
+    df_new = pd.DataFrame(rows, columns=cols)
+    df_new["created_at"] = datetime.now(timezone.utc)
+
+    if parquet_path.exists():
+        try:
+            df_old = pd.read_parquet(parquet_path)
+        except Exception:
+            df_old = pd.DataFrame(columns=cols + ["created_at"])
+        df_all = pd.concat([df_old, df_new], ignore_index=True)
+        df_all.drop_duplicates(
+            subset=["underlying", "quote_ts", "exp_date", "horizon"],
+            keep="last",
+            inplace=True,
+        )
+    else:
+        df_all = df_new
+
+    # Sort for stability
+    df_all.sort_values(
+        by=["underlying", "quote_ts", "exp_date", "horizon"], inplace=True
+    )
+
+    # Write Parquet with snappy (as per docs)
+    df_all.to_parquet(parquet_path, engine="pyarrow", compression="snappy", index=False)
+    print(f"[ML] Upserted {len(df_new)} rows to {parquet_path}")
 
 
 def main():
@@ -166,8 +217,10 @@ def main():
         sys.exit(1)
     try:
         ensure_table_exists(conn)
-        insert_placeholder_forecasts(conn, symbols)
-        print("[ML] Inserted placeholder forecasts.")
+        rows = insert_placeholder_forecasts(conn, symbols)
+        print("[ML] Inserted placeholder forecasts into Postgres.")
+        # Also upsert to Parquet for DuckDB backend
+        upsert_parquet_forecasts(rows, DATA_DIR)
     finally:
         conn.close()
 

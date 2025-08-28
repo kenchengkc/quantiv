@@ -1,0 +1,117 @@
+DuckDB Schema Information
+==================================================
+
+VIEW: atm_options
+------------------------------
+  id: BIGINT
+  date: DATE
+  act_symbol: VARCHAR
+  expiration: DATE
+  strike: DOUBLE
+  call_put: VARCHAR
+  bid: DOUBLE
+  ask: DOUBLE
+  vol: DOUBLE
+  delta: DOUBLE
+  gamma: DOUBLE
+  theta: DOUBLE
+  vega: DOUBLE
+  open_interest: BIGINT
+  volume: BIGINT
+  created_at: TIMESTAMP
+  partition_year: INTEGER
+  partition_month: INTEGER
+
+VIEW: daily_iv_summary
+------------------------------
+  date: DATE
+  act_symbol: VARCHAR
+  avg_iv: DOUBLE
+  median_iv: DOUBLE
+  option_count: BIGINT
+
+VIEW: em_forecasts
+------------------------------
+  0: VARCHAR
+  1: TIMESTAMP WITH TIME ZONE
+  2: DATE
+  3: VARCHAR
+  4: DOUBLE
+  5: DOUBLE
+  6: DOUBLE
+  7: DOUBLE
+  8: DOUBLE
+  9: TIMESTAMP WITH TIME ZONE
+
+VIEW: options_chain
+------------------------------
+  id: BIGINT
+  date: DATE
+  act_symbol: VARCHAR
+  expiration: DATE
+  strike: DOUBLE
+  call_put: VARCHAR
+  bid: DOUBLE
+  ask: DOUBLE
+  vol: DOUBLE
+  delta: DOUBLE
+  gamma: DOUBLE
+  theta: DOUBLE
+  vega: DOUBLE
+  open_interest: BIGINT
+  volume: BIGINT
+  created_at: TIMESTAMP
+  partition_year: INTEGER
+  partition_month: INTEGER
+
+BASE TABLE: recent_options
+------------------------------
+  id: BIGINT
+  date: DATE
+  act_symbol: VARCHAR
+  expiration: DATE
+  strike: DOUBLE
+  call_put: VARCHAR
+  bid: DOUBLE
+  ask: DOUBLE
+  vol: DOUBLE
+  delta: DOUBLE
+  gamma: DOUBLE
+  theta: DOUBLE
+  vega: DOUBLE
+  open_interest: BIGINT
+  volume: BIGINT
+  created_at: TIMESTAMP
+  partition_year: INTEGER
+  partition_month: INTEGER
+
+VIEW: symbol_summary
+------------------------------
+  act_symbol: VARCHAR
+  first_date: DATE
+  last_date: DATE
+  total_options: BIGINT
+  avg_iv: DOUBLE
+  trading_days: BIGINT
+
+BASE TABLE: symbols_metadata_computed
+------------------------------
+  symbol: VARCHAR
+  first_date: DATE
+  last_date: DATE
+  total_options: BIGINT
+  avg_iv: DOUBLE
+  updated_at: TIMESTAMP WITH TIME ZONE
+
+VIEW: volatility_history
+------------------------------
+  id: BIGINT
+  date: DATE
+  symbol: VARCHAR
+  iv: DOUBLE
+  hv: DOUBLE
+  iv_rank: DOUBLE
+  iv_percentile: DOUBLE
+  created_at: TIMESTAMP
+  partition_year: INTEGER
+
