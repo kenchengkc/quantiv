@@ -196,16 +196,9 @@ psql -h localhost -U quantiv_user -d quantiv_options -f infrastructure/database/
 docker-compose exec postgres pg_dump -U quantiv_user quantiv_options > backup.sql
 ```
 
-### Adding New Features
-
-1. **Frontend Components**: Add to `apps/frontend/components/`
-2. **API Endpoints**: Add to `apps/backend/main.py` or create new routers
-3. **Shared Types**: Add to `packages/shared-types/src/`
-4. **Database Changes**: Add migration scripts to `infrastructure/database/migrations/`
-
 ## 📊 Performance
 
-- **Database**: Handles 87M+ options records with partitioned tables
+- **Database**: Handles 1B+ options records with partitioned tables
 - **API Response**: Sub-100ms average with Redis caching
 - **Real-time Updates**: WebSocket latency under 50ms
 - **ML Inference**: Expected move calculations in under 200ms
@@ -272,13 +265,6 @@ This project is licensed under the GNU General Public License v3.0 - see the [LI
 - **UI Components**: Radix UI and TailwindCSS
 - **Database**: PostgreSQL for robust data storage
 - **Caching**: Redis for high-performance caching
-
-## 📞 Support
-
-For questions, issues, or contributions:
-
-- **Issues**: [GitHub Issues](https://github.com/kenchengkc/quantiv/issues)
-- **Documentation**: See [WARP.md](WARP.md) for detailed development guide
 
 ---
 
