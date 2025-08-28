@@ -12,6 +12,7 @@ import asyncpg
 import redis.asyncio as redis
 import httpx
 import structlog
+import duckdb
 from datetime import datetime, date, timedelta
 import os
 from contextlib import asynccontextmanager
@@ -88,34 +89,366 @@ class EmExpiriesResponse(BaseModel):
 db_pool: asyncpg.Pool = None
 redis_client: redis.Redis = None
 http_client: httpx.AsyncClient = None
+data_backend: "DataBackend" = None
+duckdb_conn: Optional[duckdb.DuckDBPyConnection] = None
+DATA_BACKEND_MODE: str = "postgres"  # postgres | duckdb | hybrid
+
+class DataBackend:
+    async def get_latest_forecasts(self, symbol: str, horizons: List[str]) -> List[Dict[str, Any]]:
+        raise NotImplementedError
+    async def get_latest_for_symbol_exp(self, symbol: str, exp_date: date) -> Optional[Dict[str, Any]]:
+        raise NotImplementedError
+    async def get_history_for_symbol_exp(self, symbol: str, exp_date: date, window_days: int) -> List[Dict[str, Any]]:
+        raise NotImplementedError
+    async def get_expiries(self, symbol: str, days: int) -> List[date]:
+        raise NotImplementedError
+    async def get_symbols(self, days: int) -> List[Dict[str, Any]]:
+        raise NotImplementedError
+    async def get_symbol_history_all_horizons(self, symbol: str, days: int) -> List[Dict[str, Any]]:
+        raise NotImplementedError
+    async def health(self) -> Dict[str, str]:
+        return {"database": "unknown"}
+
+class PostgresBackend(DataBackend):
+    def __init__(self, pool: asyncpg.Pool):
+        self.pool = pool
+
+    async def get_latest_forecasts(self, symbol: str, horizons: List[str]) -> List[Dict[str, Any]]:
+        query = """
+        SELECT 
+            underlying,
+            quote_ts,
+            exp_date,
+            horizon,
+            em_baseline,
+            band68_low,
+            band68_high,
+            band95_low,
+            band95_high
+        FROM em_forecasts
+        WHERE underlying = $1 
+          AND horizon = ANY($2)
+          AND quote_ts >= NOW() - INTERVAL '1 day'
+        ORDER BY quote_ts DESC, exp_date ASC
+        LIMIT 50
+        """
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch(query, symbol, horizons)
+        return [dict(row) for row in rows]
+
+    async def get_latest_for_symbol_exp(self, symbol: str, exp_date: date) -> Optional[Dict[str, Any]]:
+        query = """
+        SELECT underlying, quote_ts, exp_date, horizon,
+               em_baseline, band68_low, band68_high, band95_low, band95_high
+        FROM em_forecasts
+        WHERE underlying = $1 AND exp_date = $2 AND horizon = 'to_exp'
+        ORDER BY quote_ts DESC
+        LIMIT 1
+        """
+        async with self.pool.acquire() as conn:
+            row = await conn.fetchrow(query, symbol, exp_date)
+        return dict(row) if row else None
+
+    async def get_history_for_symbol_exp(self, symbol: str, exp_date: date, window_days: int) -> List[Dict[str, Any]]:
+        query = """
+        SELECT quote_ts, em_baseline, band68_low, band68_high, band95_low, band95_high
+        FROM em_forecasts
+        WHERE underlying = $1 AND exp_date = $2 AND horizon = 'to_exp'
+          AND quote_ts >= NOW() - ($3::text || ' days')::interval
+        ORDER BY quote_ts ASC
+        """
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch(query, symbol, exp_date, str(window_days))
+        return [dict(r) for r in rows]
+
+    async def get_expiries(self, symbol: str, days: int) -> List[date]:
+        query = """
+        SELECT DISTINCT exp_date
+        FROM em_forecasts
+        WHERE underlying = $1
+          AND exp_date >= CURRENT_DATE
+          AND exp_date <= (CURRENT_DATE + ($2::text || ' days')::interval)
+        ORDER BY exp_date ASC
+        LIMIT 50
+        """
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch(query, symbol, str(days))
+        return [r["exp_date"] for r in rows]
+
+    async def get_symbols(self, days: int) -> List[Dict[str, Any]]:
+        query = """
+        SELECT DISTINCT underlying as symbol, COUNT(*) as forecast_count
+        FROM em_forecasts
+        WHERE quote_ts >= NOW() - INTERVAL '$1 days'
+        GROUP BY underlying
+        ORDER BY forecast_count DESC, underlying
+        LIMIT 100
+        """
+        # Use param injection for days via format to keep same style as existing code
+        q = query.replace("$1", str(days))
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch(q)
+        return [{"symbol": row["symbol"], "forecast_count": row["forecast_count"]} for row in rows]
+
+    async def get_symbol_history_all_horizons(self, symbol: str, days: int) -> List[Dict[str, Any]]:
+        query = """
+        SELECT 
+            quote_ts,
+            horizon,
+            em_baseline,
+            band68_low,
+            band68_high
+        FROM em_forecasts
+        WHERE underlying = $1 
+          AND quote_ts >= NOW() - INTERVAL '%s days'
+        ORDER BY quote_ts DESC, horizon
+        LIMIT 1000
+        """ % days
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch(query, symbol)
+        return [dict(row) for row in rows]
+
+    async def health(self) -> Dict[str, str]:
+        try:
+            async with self.pool.acquire() as conn:
+                await conn.fetchval("SELECT 1")
+            return {"postgres": "healthy"}
+        except Exception:
+            return {"postgres": "unhealthy"}
+
+class DuckDBBackend(DataBackend):
+    def __init__(self, conn: duckdb.DuckDBPyConnection):
+        self.conn = conn
+
+    def _fetch_df(self, sql: str, params: Optional[List[Any]] = None):
+        if params is None:
+            return self.conn.execute(sql).fetchdf()
+        return self.conn.execute(sql, params).fetchdf()
+
+    async def get_latest_forecasts(self, symbol: str, horizons: List[str]) -> List[Dict[str, Any]]:
+        sql = (
+            "SELECT underlying, quote_ts, exp_date, horizon, em_baseline, band68_low, band68_high, band95_low, band95_high "
+            "FROM em_forecasts "
+            "WHERE underlying = ? AND quote_ts >= now() - INTERVAL 1 DAY "
+            "ORDER BY quote_ts DESC, exp_date ASC LIMIT 200"
+        )
+        df = self._fetch_df(sql, [symbol])
+        if df.empty:
+            return []
+        if horizons:
+            df = df[df["horizon"].isin(horizons)]
+        return df.head(50).to_dict(orient="records")
+
+    async def get_latest_for_symbol_exp(self, symbol: str, exp_date: date) -> Optional[Dict[str, Any]]:
+        sql = (
+            "SELECT underlying, quote_ts, exp_date, horizon, em_baseline, band68_low, band68_high, band95_low, band95_high "
+            "FROM em_forecasts WHERE underlying = ? AND exp_date = ? AND horizon = 'to_exp' "
+            "ORDER BY quote_ts DESC LIMIT 1"
+        )
+        df = self._fetch_df(sql, [symbol, exp_date])
+        return df.to_dict(orient="records")[0] if not df.empty else None
+
+    async def get_history_for_symbol_exp(self, symbol: str, exp_date: date, window_days: int) -> List[Dict[str, Any]]:
+        sql = (
+            "SELECT quote_ts, em_baseline, band68_low, band68_high, band95_low, band95_high "
+            "FROM em_forecasts WHERE underlying = ? AND exp_date = ? AND horizon = 'to_exp' "
+            f"AND quote_ts >= now() - INTERVAL {max(1, int(window_days))} DAY "
+            "ORDER BY quote_ts ASC"
+        )
+        df = self._fetch_df(sql, [symbol, exp_date])
+        return df.to_dict(orient="records") if not df.empty else []
+
+    async def get_expiries(self, symbol: str, days: int) -> List[date]:
+        sql = (
+            "SELECT DISTINCT exp_date FROM em_forecasts WHERE underlying = ? "
+            f"AND exp_date BETWEEN current_date AND current_date + INTERVAL {max(1, int(days))} DAY "
+            "ORDER BY exp_date ASC LIMIT 50"
+        )
+        df = self._fetch_df(sql, [symbol])
+        if df.empty:
+            return []
+        vals = df["exp_date"].tolist()
+        out: List[date] = []
+        for v in vals:
+            if isinstance(v, date):
+                out.append(v)
+            else:
+                try:
+                    out.append(date.fromisoformat(str(v)))
+                except Exception:
+                    continue
+        return out
+
+    async def get_symbols(self, days: int) -> List[Dict[str, Any]]:
+        sql = (
+            "SELECT underlying as symbol, COUNT(*) as forecast_count FROM em_forecasts "
+            f"WHERE quote_ts >= now() - INTERVAL {max(1, int(days))} DAY "
+            "GROUP BY underlying ORDER BY forecast_count DESC, underlying LIMIT 100"
+        )
+        df = self._fetch_df(sql)
+        return [] if df.empty else df.to_dict(orient="records")
+
+    async def get_symbol_history_all_horizons(self, symbol: str, days: int) -> List[Dict[str, Any]]:
+        sql = (
+            "SELECT quote_ts, horizon, em_baseline, band68_low, band68_high FROM em_forecasts "
+            "WHERE underlying = ? "
+            f"AND quote_ts >= now() - INTERVAL {max(1, int(days))} DAY "
+            "ORDER BY quote_ts DESC, horizon LIMIT 1000"
+        )
+        df = self._fetch_df(sql, [symbol])
+        return [] if df.empty else df.to_dict(orient="records")
+
+    async def health(self) -> Dict[str, str]:
+        try:
+            _ = self.conn.execute("SELECT 1").fetchone()
+            return {"duckdb": "healthy"}
+        except Exception:
+            return {"duckdb": "unhealthy"}
+
+class HybridBackend(DataBackend):
+    def __init__(self, duck: DuckDBBackend, pg: PostgresBackend, last_days: int = 1):
+        self.duck = duck
+        self.pg = pg
+        self.last_days = max(1, int(last_days))
+
+    async def get_latest_forecasts(self, symbol: str, horizons: List[str]) -> List[Dict[str, Any]]:
+        d = await self.duck.get_latest_forecasts(symbol, horizons)
+        p = await self.pg.get_latest_forecasts(symbol, horizons)
+        # Deduplicate by key
+        seen = set()
+        out = []
+        for rec in d + p:
+            key = (rec.get("quote_ts"), rec.get("exp_date"), rec.get("horizon"))
+            if key not in seen:
+                seen.add(key)
+                out.append(rec)
+        out.sort(key=lambda r: (r.get("quote_ts"), r.get("exp_date")), reverse=True)
+        return out[:50]
+
+    async def get_latest_for_symbol_exp(self, symbol: str, exp_date: date) -> Optional[Dict[str, Any]]:
+        d = await self.duck.get_latest_for_symbol_exp(symbol, exp_date)
+        p = await self.pg.get_latest_for_symbol_exp(symbol, exp_date)
+        if d and p:
+            return d if d["quote_ts"] >= p["quote_ts"] else p
+        return d or p
+
+    async def get_history_for_symbol_exp(self, symbol: str, exp_date: date, window_days: int) -> List[Dict[str, Any]]:
+        d = await self.duck.get_history_for_symbol_exp(symbol, exp_date, window_days)
+        p = await self.pg.get_history_for_symbol_exp(symbol, exp_date, min(self.last_days, window_days))
+        seen = set()
+        out = []
+        for rec in d + p:
+            key = rec.get("quote_ts")
+            if key not in seen:
+                seen.add(key)
+                out.append(rec)
+        out.sort(key=lambda r: r.get("quote_ts"))
+        return out
+
+    async def get_expiries(self, symbol: str, days: int) -> List[date]:
+        ds = set(await self.duck.get_expiries(symbol, days))
+        ps = set(await self.pg.get_expiries(symbol, days))
+        return sorted(list(ds | ps))[:50]
+
+    async def get_symbols(self, days: int) -> List[Dict[str, Any]]:
+        ds = await self.duck.get_symbols(days)
+        ps = await self.pg.get_symbols(days)
+        agg: Dict[str, int] = {}
+        for rec in ds + ps:
+            agg[rec["symbol"]] = agg.get(rec["symbol"], 0) + int(rec.get("forecast_count", 0))
+        out = [{"symbol": k, "forecast_count": v} for k, v in agg.items()]
+        out.sort(key=lambda r: (r["forecast_count"], r["symbol"]), reverse=True)
+        return out[:100]
+
+    async def get_symbol_history_all_horizons(self, symbol: str, days: int) -> List[Dict[str, Any]]:
+        d = await self.duck.get_symbol_history_all_horizons(symbol, days)
+        p = await self.pg.get_symbol_history_all_horizons(symbol, min(self.last_days, days))
+        seen = set()
+        out = []
+        for rec in d + p:
+            key = (rec.get("quote_ts"), rec.get("horizon"))
+            if key not in seen:
+                seen.add(key)
+                out.append(rec)
+        out.sort(key=lambda r: (r.get("quote_ts"), r.get("horizon")), reverse=True)
+        return out[:1000]
+
+    async def health(self) -> Dict[str, str]:
+        h = {}
+        h.update(await self.duck.health())
+        h.update(await self.pg.health())
+        return h
+
+def _ensure_duckdb_em_view(conn: duckdb.DuckDBPyConnection, data_dir: str):
+    """Create or replace the em_forecasts view to point at Parquet under data_dir.
+    This prevents absolute host paths inside the .duckdb file from breaking inside containers.
+    """
+    try:
+        parquet_path = str((Path(data_dir) / "forecasts" / "em_forecasts.parquet").resolve())
+        # Use CREATE OR REPLACE to override any stale definitions
+        conn.execute(
+            f"""
+            CREATE OR REPLACE VIEW em_forecasts AS
+            SELECT * FROM read_parquet('{parquet_path}')
+            """
+        )
+        logger.info("Ensured DuckDB em_forecasts view", path=parquet_path)
+    except Exception as e:
+        logger.warning("Failed to ensure em_forecasts view", error=str(e))
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage application lifecycle"""
-    global db_pool, redis_client, http_client
+    global db_pool, redis_client, http_client, data_backend, duckdb_conn, DATA_BACKEND_MODE
     
     logger.info("🚀 Starting Quantiv API...")
     
-    # Initialize database pool (supports DATABASE_URL or discrete params)
-    db_url = os.getenv("DATABASE_URL")
-    if db_url:
-        logger.info("Connecting to Postgres via DATABASE_URL")
-        db_pool = await asyncpg.create_pool(
-            dsn=db_url,
-            min_size=5,
-            max_size=20,
-        )
+    DATA_BACKEND_MODE = os.getenv("DATA_BACKEND", "postgres").lower()
+    use_pg = DATA_BACKEND_MODE in ("postgres", "hybrid")
+    use_duck = DATA_BACKEND_MODE in ("duckdb", "hybrid")
+
+    # Initialize databases as configured
+    pg_ready = False
+    if use_pg:
+        db_url = os.getenv("DATABASE_URL")
+        if db_url:
+            logger.info("Connecting to Postgres via DATABASE_URL")
+            db_pool = await asyncpg.create_pool(dsn=db_url, min_size=2, max_size=10)
+        else:
+            logger.info("Connecting to Postgres via discrete env vars")
+            db_pool = await asyncpg.create_pool(
+                host=os.getenv("POSTGRES_HOST", "localhost"),
+                port=int(os.getenv("POSTGRES_PORT", "5432")),
+                user=os.getenv("POSTGRES_USER", "quantiv_user"),
+                password=os.getenv("POSTGRES_PASSWORD", "quantiv_secure_2024"),
+                database=os.getenv("POSTGRES_DB", "quantiv_options"),
+                min_size=2,
+                max_size=10,
+            )
+        pg_ready = True
+
+    duck_ready = False
+    if use_duck:
+        duck_path = os.getenv("DUCKDB_PATH", "./quantiv.duckdb")
+        logger.info("Connecting to DuckDB", path=duck_path)
+        duckdb_conn = duckdb.connect(duck_path, read_only=False)
+        try:
+            duckdb_conn.execute("INSTALL parquet")
+            duckdb_conn.execute("LOAD parquet")
+        except Exception:
+            # parquet is often built-in; ignore errors here
+            pass
+        # Ensure em_forecasts view points at container-mounted parquet
+        _ensure_duckdb_em_view(duckdb_conn, os.getenv("DATA_DIR", "./data"))
+        duck_ready = True
+
+    # Select backend
+    if DATA_BACKEND_MODE == "postgres":
+        data_backend = PostgresBackend(db_pool)
+    elif DATA_BACKEND_MODE == "duckdb":
+        data_backend = DuckDBBackend(duckdb_conn)
     else:
-        logger.info("Connecting to Postgres via discrete env vars")
-        db_pool = await asyncpg.create_pool(
-            host=os.getenv("POSTGRES_HOST", "localhost"),
-            port=int(os.getenv("POSTGRES_PORT", "5432")),
-            user=os.getenv("POSTGRES_USER", "quantiv_user"),
-            password=os.getenv("POSTGRES_PASSWORD", "quantiv_secure_2024"),
-            database=os.getenv("POSTGRES_DB", "quantiv_options"),
-            min_size=5,
-            max_size=20,
-        )
+        data_backend = HybridBackend(DuckDBBackend(duckdb_conn), PostgresBackend(db_pool), int(os.getenv("HYBRID_LAST_DAYS", "1")))
     
     # Initialize Redis
     redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
@@ -127,15 +460,30 @@ async def lifespan(app: FastAPI):
         headers={"Authorization": f"Bearer {os.getenv('POLYGON_API_KEY', '')}"}
     )
     
-    logger.info("✅ Services initialized")
+    logger.info("✅ Services initialized", backend=DATA_BACKEND_MODE, postgres=pg_ready, duckdb=duck_ready)
     
     yield
     
     # Cleanup
     logger.info("🔄 Shutting down services...")
-    await db_pool.close()
-    await redis_client.aclose()
-    await http_client.aclose()
+    try:
+        if use_pg and db_pool:
+            await db_pool.close()
+    finally:
+        pass
+    try:
+        await redis_client.aclose()
+    finally:
+        pass
+    try:
+        await http_client.aclose()
+    finally:
+        pass
+    try:
+        if use_duck and duckdb_conn:
+            duckdb_conn.close()
+    finally:
+        pass
 
 # Create FastAPI app
 app = FastAPI(
@@ -191,59 +539,18 @@ class ExpectedMoveService:
     
     @staticmethod
     async def get_latest_forecasts(symbol: str, horizons: List[str]) -> List[Dict]:
-        """Get latest ML forecasts from PostgreSQL"""
-        query = """
-        SELECT 
-            underlying,
-            quote_ts,
-            exp_date,
-            horizon,
-            em_baseline,
-            band68_low,
-            band68_high,
-            band95_low,
-            band95_high
-        FROM em_forecasts
-        WHERE underlying = $1 
-          AND horizon = ANY($2)
-          AND quote_ts >= NOW() - INTERVAL '1 day'
-        ORDER BY quote_ts DESC, exp_date ASC
-        LIMIT 50
-        """
-        
-        async with db_pool.acquire() as conn:
-            rows = await conn.fetch(query, symbol, horizons)
-            
-        return [dict(row) for row in rows]
+        """Get latest ML forecasts from active backend"""
+        return await data_backend.get_latest_forecasts(symbol, horizons)
 
     @staticmethod
     async def get_latest_for_symbol_exp(symbol: str, exp_date: date) -> Optional[Dict[str, Any]]:
         """Get the latest forecast for a symbol and exp_date (MVP horizon 'to_exp')."""
-        query = """
-        SELECT underlying, quote_ts, exp_date, horizon,
-               em_baseline, band68_low, band68_high, band95_low, band95_high
-        FROM em_forecasts
-        WHERE underlying = $1 AND exp_date = $2 AND horizon = 'to_exp'
-        ORDER BY quote_ts DESC
-        LIMIT 1
-        """
-        async with db_pool.acquire() as conn:
-            row = await conn.fetchrow(query, symbol, exp_date)
-        return dict(row) if row else None
+        return await data_backend.get_latest_for_symbol_exp(symbol, exp_date)
 
     @staticmethod
     async def get_history_for_symbol_exp(symbol: str, exp_date: date, window_days: int) -> List[Dict[str, Any]]:
         """Get timeseries for a symbol/exp_date over a window (days)."""
-        query = """
-        SELECT quote_ts, em_baseline, band68_low, band68_high, band95_low, band95_high
-        FROM em_forecasts
-        WHERE underlying = $1 AND exp_date = $2 AND horizon = 'to_exp'
-          AND quote_ts >= NOW() - ($3::text || ' days')::interval
-        ORDER BY quote_ts ASC
-        """
-        async with db_pool.acquire() as conn:
-            rows = await conn.fetch(query, symbol, exp_date, str(window_days))
-        return [dict(r) for r in rows]
+        return await data_backend.get_history_for_symbol_exp(symbol, exp_date, window_days)
     
     @staticmethod
     async def get_live_market_data(symbol: str) -> Optional[Dict]:
@@ -282,14 +589,21 @@ async def get_em_service() -> ExpectedMoveService:
 async def health_check():
     """Health check endpoint"""
     services = {}
-    
-    # Check database
-    try:
-        async with db_pool.acquire() as conn:
-            await conn.fetchval("SELECT 1")
-        services["database"] = "healthy"
-    except Exception:
-        services["database"] = "unhealthy"
+    # Check active data backend(s)
+    backend = DATA_BACKEND_MODE
+    if backend in ("postgres", "hybrid"):
+        try:
+            async with db_pool.acquire() as conn:
+                await conn.fetchval("SELECT 1")
+            services["postgres"] = "healthy"
+        except Exception:
+            services["postgres"] = "unhealthy"
+    if backend in ("duckdb", "hybrid"):
+        try:
+            _ = duckdb_conn.execute("SELECT 1").fetchone()
+            services["duckdb"] = "healthy"
+        except Exception:
+            services["duckdb"] = "unhealthy"
     
     # Check Redis
     try:
@@ -472,18 +786,8 @@ async def em_expiries(symbol: str, window: str = "120d"):
     except Exception as e:
         logger.warning("EM expiries cache read failed", error=str(e))
 
-    query = """
-    SELECT DISTINCT exp_date
-    FROM em_forecasts
-    WHERE underlying = $1
-      AND exp_date >= CURRENT_DATE
-      AND exp_date <= (CURRENT_DATE + ($2::text || ' days')::interval)
-    ORDER BY exp_date ASC
-    LIMIT 50
-    """
-    async with db_pool.acquire() as conn:
-        rows = await conn.fetch(query, sym, str(days))
-    expiries = [r["exp_date"] for r in rows]
+    # Use pluggable backend (DuckDB/Postgres/Hybrid)
+    expiries = await data_backend.get_expiries(sym, days)
 
     payload = {
         "symbol": sym,
@@ -501,43 +805,15 @@ async def em_expiries(symbol: str, window: str = "120d"):
 @app.get("/api/symbols")
 async def get_available_symbols():
     """Get list of symbols with available forecasts"""
-    query = """
-    SELECT DISTINCT underlying as symbol, COUNT(*) as forecast_count
-    FROM em_forecasts
-    WHERE quote_ts >= NOW() - INTERVAL '7 days'
-    GROUP BY underlying
-    ORDER BY forecast_count DESC, underlying
-    LIMIT 100
-    """
-    
-    async with db_pool.acquire() as conn:
-        rows = await conn.fetch(query)
-    
-    return [{"symbol": row["symbol"], "forecast_count": row["forecast_count"]} for row in rows]
+    rows = await data_backend.get_symbols(7)
+    return rows
 
 @app.get("/api/symbols/{symbol}/history")
 async def get_symbol_history(symbol: str, days: int = 30):
     """Get historical forecasts for a symbol"""
     symbol = symbol.upper()
-    
-    query = """
-    SELECT 
-        quote_ts,
-        horizon,
-        em_baseline,
-        band68_low,
-        band68_high
-    FROM em_forecasts
-    WHERE underlying = $1 
-      AND quote_ts >= NOW() - INTERVAL '%s days'
-    ORDER BY quote_ts DESC, horizon
-    LIMIT 1000
-    """ % days
-    
-    async with db_pool.acquire() as conn:
-        rows = await conn.fetch(query, symbol)
-    
-    return [dict(row) for row in rows]
+    rows = await data_backend.get_symbol_history_all_horizons(symbol, days)
+    return rows
 
 # Background task for model updates
 @app.post("/api/admin/refresh-forecasts")

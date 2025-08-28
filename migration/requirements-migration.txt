@@ -1,0 +1,26 @@
+# Migration Requirements for Quantiv PostgreSQL → DuckDB + Parquet
+# Data export and processing
+asyncpg>=0.29.0
+pandas>=2.1.0
+pyarrow>=15.0.0
+duckdb>=0.10.0
+
+# Progress tracking and utilities
+tqdm>=4.66.0
+python-dotenv>=1.0.0
+
+# Backend integration (for updated API)
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+pydantic>=2.5.0
+
+# Data validation and testing
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+
+# Caching (Redis remains for real-time data)
+redis>=5.0.0
+
+# Development tools
+black>=23.11.0
+ruff>=0.1.6
