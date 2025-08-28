@@ -19,8 +19,6 @@ services:
       - POSTGRES_USER=quantiv_user
       - POSTGRES_PASSWORD=quantiv_secure_2024
       - POSTGRES_DB=quantiv_options
-      - DATA_DIR=/app/data
-      - PARQUET_ROOT=/app/data/parquet
       - REDIS_URL=redis://redis:6379
       - NODE_ENV=development
       - ENVIRONMENT=development
@@ -81,6 +79,8 @@ services:
       - POSTGRES_USER=quantiv_user
       - POSTGRES_PASSWORD=quantiv_secure_2024
       - POSTGRES_DB=quantiv_options
+      - DATA_DIR=/app/data
+      - PARQUET_ROOT=/app/data/parquet
     depends_on:
       - postgres
     volumes:
