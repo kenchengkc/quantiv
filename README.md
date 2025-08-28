@@ -73,7 +73,7 @@ graph TD
     A[Market Data APIs] --> B[Real-time Pipeline]
     B --> C[Parquet + DuckDB]
     B --> D[Redis Cache]
-    C --> E[ML Pipeline (LightGBM)]
+    C --> E[ML Pipeline with LightGBM]
     E --> F[Expected Move Models]
     F --> G[API Endpoints]
     G --> H[Next.js Frontend]
