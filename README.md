@@ -71,9 +71,9 @@ Quantiv is a modern options trading analytics platform that provides ML-powered 
 ```mermaid
 graph TD
     A[Market Data APIs] --> B[Real-time Pipeline]
-    B --> C[PostgreSQL]
+    B --> C[Parquet + DuckDB]
     B --> D[Redis Cache]
-    C --> E[ML Pipeline]
+    C --> E[ML Pipeline (LightGBM)]
     E --> F[Expected Move Models]
     F --> G[API Endpoints]
     G --> H[Next.js Frontend]
