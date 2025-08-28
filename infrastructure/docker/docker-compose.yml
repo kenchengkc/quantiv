@@ -22,12 +22,16 @@ services:
       - REDIS_URL=redis://redis:6379
       - NODE_ENV=development
       - ENVIRONMENT=development
+      - DATA_BACKEND=hybrid
+      - DATA_DIR=/app/data
+      - DUCKDB_PATH=/app/quantiv.duckdb
     depends_on:
       - postgres
       - redis
     volumes:
       - ../../data:/app/data
       - ../../models:/app/models
+      - ../../quantiv.duckdb:/app/quantiv.duckdb
     restart: unless-stopped
 
   # PostgreSQL Database
