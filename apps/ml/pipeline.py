@@ -13,6 +13,8 @@ import psycopg2
 import psycopg2.extras as extras
 from dotenv import load_dotenv
 import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
 import duckdb
 import joblib
 from lightgbm import LGBMRegressor
@@ -598,8 +600,57 @@ def upsert_parquet_forecasts(rows, data_dir: Path):
         by=["underlying", "quote_ts", "exp_date", "horizon"], inplace=True
     )
 
-    # Write Parquet with snappy (as per docs)
-    df_all.to_parquet(parquet_path, engine="pyarrow", compression="snappy", index=False)
+    # Standardize dtypes for Parquet schema compatibility (DuckDB/Postgres)
+    df_all["underlying"] = df_all["underlying"].astype("string")
+    df_all["horizon"] = df_all["horizon"].astype("string")
+    df_all["quote_ts"] = (
+        pd.to_datetime(df_all["quote_ts"], utc=True, errors="coerce").dt.tz_localize(None)
+    )
+    df_all["exp_date"] = pd.to_datetime(df_all["exp_date"], errors="coerce").dt.date
+    df_all["created_at"] = (
+        pd.to_datetime(df_all["created_at"], utc=True, errors="coerce").dt.tz_localize(None)
+    )
+    for c in [
+        "em_baseline",
+        "band68_low",
+        "band68_high",
+        "band95_low",
+        "band95_high",
+    ]:
+        df_all[c] = pd.to_numeric(df_all[c], errors="coerce").astype("float64")
+
+    # Reorder columns for stability
+    cols_order = [
+        "underlying",
+        "quote_ts",
+        "exp_date",
+        "horizon",
+        "em_baseline",
+        "band68_low",
+        "band68_high",
+        "band95_low",
+        "band95_high",
+        "created_at",
+    ]
+    df_all = df_all[cols_order]
+
+    # Enforce Arrow schema and write Parquet with snappy
+    schema = pa.schema(
+        [
+            pa.field("underlying", pa.string()),
+            pa.field("quote_ts", pa.timestamp("ns")),
+            pa.field("exp_date", pa.date32()),
+            pa.field("horizon", pa.string()),
+            pa.field("em_baseline", pa.float64()),
+            pa.field("band68_low", pa.float64()),
+            pa.field("band68_high", pa.float64()),
+            pa.field("band95_low", pa.float64()),
+            pa.field("band95_high", pa.float64()),
+            pa.field("created_at", pa.timestamp("ns")),
+        ]
+    )
+    table = pa.Table.from_pandas(df_all, schema=schema, preserve_index=False)
+    pq.write_table(table, parquet_path, compression="snappy")
     print(f"[ML] Upserted {len(df_new)} rows to {parquet_path}")
 
 
