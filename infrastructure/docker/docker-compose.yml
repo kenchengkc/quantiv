@@ -123,6 +123,7 @@ services:
     env_file:
       - ../../config/.env.local
     environment:
+      - DATABASE_URL=
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
       - POSTGRES_USER=quantiv_user
