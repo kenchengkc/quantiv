@@ -33,9 +33,29 @@ data/
 *.sqlite
 *.sqlite3
 *.parquet
+*.duckdb
 
 # Always ignore raw downloads
 scripts/data/
+
+# ML Models & Training Artifacts
+models/
+*.pkl
+*.joblib
+*.model
+*.h5
+*.pt
+*.pth
+
+# DuckDB cache and temp files
+duckdb-cache/
+*.tmp
+*.temp
+
+# Training outputs and logs
+outputs/
+training_logs/
+checkpoints/
 
 # If you want to commit a small demo DB, uncomment:
 # !data/quantiv_options.db
@@ -75,6 +95,23 @@ config/docker/.env.docker
 config/docker/.env.compose
 # but keep an example file tracked
 !config/.env.example
+
+# SSH Keys & Certificates
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+*.pub
+authorized_keys
+known_hosts
+
+# API Keys & Tokens
+*.token
+*.secret
+.secrets/
+secrets/
 
 
 # IDE & Editor

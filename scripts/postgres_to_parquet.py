@@ -2,6 +2,7 @@
 import os
 import sys
 from pathlib import Path
+import uuid
 
 import pyarrow as pa
 import pyarrow.dataset as ds
@@ -237,14 +238,15 @@ def main():
                 write_statistics=True,
             )
 
+            
+            RUN_ID = os.environ.get("RUN_ID") or uuid.uuid4().hex[:8]
             ds.write_dataset(
                 data=tbl,
                 base_dir=str(OUTPUT_DIR),
-                format=fmt,                    # pass the format object (not "parquet")
-                file_options=file_options,     # <- use file_options instead of format_options
-                partitioning=partitioning,     # your hive ['year','month'] from make_partitioning()
-                existing_data_behavior="delete_matching",
-                max_rows_per_group=int(os.environ.get("ROW_GROUP_ROWS", "500000")),
+                format="parquet",
+                partitioning=["year", "month"],
+                existing_data_behavior="overwrite_or_ignore",
+                basename_template=f"part-{RUN_ID}-{{i}}.parquet",
             )
 
 
