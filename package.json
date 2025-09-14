@@ -19,7 +19,12 @@
     "test": "npm run test --workspace=apps/frontend",
     "docker:up": "docker-compose -f infrastructure/docker/docker-compose.yml up",
     "docker:down": "docker-compose -f infrastructure/docker/docker-compose.yml down",
-    "ml:pipeline": "cd apps/ml && python pipeline.py"
+    "ml:setup": "python scripts/setup_ml_pipeline.py --local",
+    "ml:forecast": "python scripts/populate_ml_forecasts.py --local",
+    "ml:validate": "python scripts/data_healthcheck.py --local",
+    "data:import": "python scripts/import_csv_data.py",
+    "data:sync": "python scripts/sync_postgres_to_parquet.py --local",
+    "data:sync-incremental": "python scripts/sync_postgres_to_parquet.py --local --incremental --days 7"
   },
   "dependencies": {
     "@headlessui/react": "^1.7.17",

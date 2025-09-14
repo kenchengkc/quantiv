@@ -127,7 +127,12 @@ graph TD
 
 6. **Initialize ML pipeline**
    ```bash
-   npm run ml:pipeline
+   # Set up ML data and train models
+   python scripts/setup_ml_pipeline.py --local
+   
+   # Or run individual phases
+   python scripts/build_em_comprehensive.py --local --samples 100
+   python scripts/train_baseline_models.py --local
    ```
 
 ### Access the Application
@@ -180,7 +185,9 @@ npm run docker:up         # Start all services
 npm run docker:down       # Stop all services
 
 # ML Pipeline
-npm run ml:pipeline       # Run ML forecasting
+npm run ml:setup          # Set up ML pipeline and train models
+npm run ml:forecast       # Generate new forecasts
+npm run ml:validate       # Validate model performance
 ```
 
 ### Database Management
@@ -222,8 +229,14 @@ docker-compose exec postgres pg_dump -U quantiv_user quantiv_options > backup.sq
 ### Key Endpoints
 
 ```bash
-# Get expected move forecast
-GET /api/expected-move?symbol=AAPL&expiry=2024-01-19
+# Get ML-powered expected move forecast
+GET /api/em/forecast?symbol=AAPL
+
+# Get expected move history
+GET /api/em/history?symbol=AAPL&days=30
+
+# Get available expiry dates
+GET /api/em/expiries?symbol=AAPL
 
 # Get options chain data
 GET /api/options?symbol=AAPL&expiry=2024-01-19
