@@ -19,6 +19,7 @@ from contextlib import asynccontextmanager
 import json
 from pathlib import Path
 from dotenv import load_dotenv
+from services.ml_service import MLService
 
 # Configure structured logging
 logger = structlog.get_logger()
@@ -91,6 +92,7 @@ redis_client: redis.Redis = None
 http_client: httpx.AsyncClient = None
 data_backend: "DataBackend" = None
 duckdb_conn: Optional[duckdb.DuckDBPyConnection] = None
+ml_service: Optional[MLService] = None
 DATA_BACKEND_MODE: str = "postgres"  # postgres | duckdb | hybrid
 
 class DataBackend:
@@ -399,7 +401,7 @@ def _ensure_duckdb_em_view(conn: duckdb.DuckDBPyConnection, data_dir: str):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage application lifecycle"""
-    global db_pool, redis_client, http_client, data_backend, duckdb_conn, DATA_BACKEND_MODE
+    global db_pool, redis_client, http_client, data_backend, duckdb_conn, ml_service, DATA_BACKEND_MODE
     
     logger.info("🚀 Starting Quantiv API...")
     
@@ -460,7 +462,16 @@ async def lifespan(app: FastAPI):
         headers={"Authorization": f"Bearer {os.getenv('POLYGON_API_KEY', '')}"}
     )
     
-    logger.info("✅ Services initialized", backend=DATA_BACKEND_MODE, postgres=pg_ready, duckdb=duck_ready)
+    # Initialize ML service
+    if use_duck:
+        data_dir = Path(os.getenv("DATA_DIR", "./data"))
+        try:
+            ml_service = MLService(data_dir, data_dir / "quantiv.duckdb")
+            logger.info("✅ ML service initialized", available_symbols=len(ml_service.get_available_symbols()))
+        except Exception as e:
+            logger.warning("Failed to initialize ML service", error=str(e))
+    
+    logger.info("✅ Services initialized", backend=DATA_BACKEND_MODE, postgres=pg_ready, duckdb=duck_ready, ml_ready=ml_service is not None)
     
     yield
     
@@ -482,6 +493,11 @@ async def lifespan(app: FastAPI):
     try:
         if use_duck and duckdb_conn:
             duckdb_conn.close()
+    finally:
+        pass
+    try:
+        if ml_service:
+            ml_service.close()
     finally:
         pass
 
@@ -814,6 +830,36 @@ async def get_symbol_history(symbol: str, days: int = 30):
     symbol = symbol.upper()
     rows = await data_backend.get_symbol_history_all_horizons(symbol, days)
     return rows
+
+@app.get("/api/ml/predict/{symbol}")
+async def get_ml_prediction(symbol: str):
+    """Get ML prediction for a symbol"""
+    if not ml_service:
+        raise HTTPException(status_code=503, detail="ML service not available")
+    
+    symbol = symbol.upper()
+    prediction = ml_service.predict_expected_move(symbol)
+    
+    if not prediction:
+        raise HTTPException(status_code=404, detail=f"No ML prediction available for {symbol}")
+    
+    return prediction
+
+@app.get("/api/ml/info")
+async def get_ml_info():
+    """Get ML service information"""
+    if not ml_service:
+        return {"status": "unavailable", "message": "ML service not initialized"}
+    
+    return ml_service.get_model_info()
+
+@app.get("/api/ml/symbols")
+async def get_ml_symbols():
+    """Get symbols with ML predictions available"""
+    if not ml_service:
+        return []
+    
+    return ml_service.get_available_symbols()
 
 # Background task for model updates
 @app.post("/api/admin/refresh-forecasts")

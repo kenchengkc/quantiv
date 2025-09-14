@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { MagnifyingGlassIcon, ChartBarIcon, ClockIcon } from '@heroicons/react/24/outline';
 import SymbolSearch from '@/components/SymbolSearch';
 import { WatchlistPanel } from '@/components/WatchlistPanel';
+import { MLPredictions } from '@/components/MLPredictions';
 
 export default function HomePage() {
   return (
@@ -83,6 +84,19 @@ export default function HomePage() {
           </div>
         </div>
 
+        {/* ML Predictions Section */}
+        <div className="mt-20">
+          <div className="text-center mb-8">
+            <h2 className="text-3xl font-bold text-gray-900">
+              🤖 ML-Powered Predictions
+            </h2>
+            <p className="mt-2 text-lg text-gray-600">
+              Live expected move forecasts from our trained machine learning models
+            </p>
+          </div>
+          <MLPredictions />
+        </div>
+
         {/* Platform Status */}
         <div className="mt-20 grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Live Features */}
@@ -92,6 +106,10 @@ export default function HomePage() {
             </h2>
             <div className="space-y-4">
               <div className="space-y-2 text-sm">
+                <div className="flex items-center">
+                  <div className="h-2 w-2 bg-green-500 rounded-full mr-3"></div>
+                  <span className="font-medium">ML Expected Move Predictions</span>
+                </div>
                 <div className="flex items-center">
                   <div className="h-2 w-2 bg-green-500 rounded-full mr-3"></div>
                   <span className="font-medium">Options Chain Analysis</span>
@@ -119,7 +137,7 @@ export default function HomePage() {
               </div>
               <div className="mt-6 pt-4 border-t border-gray-200">
                 <p className="text-sm text-gray-600">
-                  All core features are live and ready to use. Start by searching for any ticker symbol above.
+                  All core features including ML predictions are live and ready to use. Start by searching for any ticker symbol above.
                 </p>
               </div>
             </div>
@@ -134,7 +152,7 @@ export default function HomePage() {
               </h3>
               <ul className="space-y-2 text-sm text-blue-800">
                 <li>• Search for any ticker symbol above</li>
-                <li>• View expected moves and options data</li>
+                <li>• View ML predictions and expected moves</li>
                 <li>• Click the star to add to watchlist</li>
                 <li>• Analyze earnings history and IV rank</li>
               </ul>
