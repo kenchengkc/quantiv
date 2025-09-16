@@ -72,24 +72,24 @@ export default function SymbolPage() {
         <div className="flex items-center gap-4">
           <div>
             <h1 className="text-3xl font-bold">{symbol}</h1>
-            {optionsData?.chain.quote && (
+            {emData?.live_data && (
               <div className="flex items-center gap-4 mt-2 text-sm">
                 <span className="text-2xl font-semibold">
-                  ${optionsData.chain.quote.last.toFixed(2)}
+                  ${emData.live_data.price.toFixed(2)}
                 </span>
-                <span className={`font-medium ${optionsData.chain.quote.change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  {optionsData.chain.quote.change >= 0 ? '+' : ''}{optionsData.chain.quote.change.toFixed(2)} 
-                  ({optionsData.chain.quote.changePercent.toFixed(2)}%)
+                <span className={`font-medium ${emData.live_data.change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {emData.live_data.change >= 0 ? '+' : ''}{emData.live_data.change.toFixed(2)} 
+                  ({emData.live_data.change_percent.toFixed(2)}%)
                 </span>
               </div>
             )}
           </div>
           <WatchlistToggle
             symbol={symbol}
-            name={optionsData?.chain.quote?.name}
-            price={optionsData?.chain.quote?.last}
-            change={optionsData?.chain.quote?.change}
-            changePercent={optionsData?.chain.quote?.changePercent}
+            name={emData?.live_data?.symbol}
+            price={emData?.live_data?.price}
+            change={emData?.live_data?.change}
+            changePercent={emData?.live_data?.change_percent}
             size="lg"
           />
         </div>
