@@ -1,36 +1,44 @@
 # Data Import Workflow
 
-This document explains how to import new CSV data for options_chain and volatility_history into the Quantiv platform and update the ML pipeline.
+This document explains how to import new CSV data for options_chain and volatility_history into the Quantiv platform using a **Postgres-first workflow** and update the ML pipeline.
 
 ## Overview
 
-The data flow follows this pattern:
+The data flow follows this **Postgres-first** pattern:
 ```
 CSV Files → PostgreSQL → Parquet Files → ML Pipeline → Predictions
 ```
 
+This ensures data safety and integrity by using PostgreSQL as the source of truth before converting to Parquet for ML processing.
+
 ## Quick Start
 
-### 1. Import New CSV Data
+### 1. Import New CSV Data to PostgreSQL
 
 For **options_chain** data:
 ```bash
-npm run data:import -- --type options_chain --csv path/to/new_options_data.csv
+CSV_FILE=path/to/new_options_data.csv python scripts/csv_to_postgres.py
 ```
 
 For **volatility_history** data:
 ```bash
-npm run data:import -- --type volatility_history --csv path/to/new_volatility_data.csv
+CSV_FILE=path/to/new_volatility_data.csv python scripts/csv_to_postgres.py
 ```
 
-For **both** types at once:
+### 2. Sync PostgreSQL to Parquet Files
+
+After importing CSV data to PostgreSQL, sync to Parquet files:
 ```bash
-npm run data:import -- --type both --options-csv path/to/options.csv --volatility-csv path/to/volatility.csv
+# Full sync from PostgreSQL to Parquet
+npm run data:sync
+
+# Or incremental sync (last 7 days only)
+npm run data:sync-incremental
 ```
 
-### 2. Update ML Pipeline
+### 3. Update ML Pipeline
 
-After importing new data, update the ML pipeline:
+After syncing to Parquet, update the ML pipeline:
 ```bash
 # Rebuild features and retrain models
 npm run ml:setup
@@ -39,7 +47,7 @@ npm run ml:setup
 npm run ml:forecast
 ```
 
-### 3. Verify Import
+### 4. Verify Import
 
 Check data health and ML predictions:
 ```bash
@@ -112,11 +120,16 @@ To rebuild all Parquet files from PostgreSQL:
 npm run data:sync
 ```
 
-#### Skip Parquet Updates
+#### Environment Configuration
 
-If you only want to update PostgreSQL without rebuilding Parquet files:
-```bash
-python scripts/import_csv_data.py --type options_chain --csv data.csv --skip-parquet
+Configure PostgreSQL connection in `config/.env.local`:
+```env
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
+POSTGRES_USER=quantiv_user
+POSTGRES_PASSWORD=quantiv_secure_2024
+POSTGRES_DB=quantiv_options
+DATABASE_URL=postgresql://quantiv_user:quantiv_secure_2024@localhost:5432/quantiv_options
 ```
 
 ## Database Schema
@@ -213,24 +226,32 @@ data/parquet/
 
 ## Example Workflow
 
-Complete workflow for adding new data:
+Complete workflow for adding new data using the **Postgres-first approach**:
 
 ```bash
-# 1. Import new options and volatility data
-npm run data:import -- --type both \
-  --options-csv /path/to/new_options.csv \
-  --volatility-csv /path/to/new_volatility.csv
+# 1. Import new options data to PostgreSQL
+CSV_FILE=/path/to/new_options.csv \
+FINAL_TABLE=options_chain \
+python scripts/csv_to_postgres.py
 
-# 2. Verify data import
-npm run ml:validate
+# 2. Import new volatility data to PostgreSQL  
+CSV_FILE=/path/to/new_volatility.csv \
+FINAL_TABLE=volatility_history \
+python scripts/csv_to_postgres.py
 
-# 3. Rebuild ML pipeline with new data
+# 3. Sync PostgreSQL data to Parquet files
+npm run data:sync
+
+# 4. Rebuild ML pipeline with new data
 npm run ml:setup
 
-# 4. Generate fresh predictions
+# 5. Generate fresh predictions
 npm run ml:forecast
 
-# 5. Start services to see predictions
+# 6. Verify data and predictions
+npm run ml:validate
+
+# 7. Start services to see predictions
 npm run dev:backend &
 npm run dev:frontend
 ```

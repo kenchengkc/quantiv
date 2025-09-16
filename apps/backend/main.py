@@ -857,9 +857,23 @@ async def get_ml_info():
 async def get_ml_symbols():
     """Get symbols with ML predictions available"""
     if not ml_service:
-        return []
+        raise HTTPException(status_code=503, detail="ML service not available")
     
     return ml_service.get_available_symbols()
+
+@app.get("/api/ml/forecasts")
+async def get_all_ml_forecasts(days_ahead: int = 30):
+    """Get all upcoming ML forecasts within specified days"""
+    if not ml_service:
+        raise HTTPException(status_code=503, detail="ML service not available")
+    
+    forecasts = ml_service.get_all_upcoming_forecasts(days_ahead)
+    return {
+        "forecasts": forecasts,
+        "count": len(forecasts),
+        "days_ahead": days_ahead,
+        "generated_at": datetime.now().isoformat()
+    }
 
 # Background task for model updates
 @app.post("/api/admin/refresh-forecasts")

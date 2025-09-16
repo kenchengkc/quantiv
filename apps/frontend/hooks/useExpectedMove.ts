@@ -1,12 +1,32 @@
 import { useQuery } from '@tanstack/react-query';
 
+// Updated interface to match the backend API response
 interface ExpectedMoveData {
   symbol: string;
-  spotPrice: number;
-  summary: {
-    daily?: { move: number; percentage: number; lower: number; upper: number } | null;
-    weekly?: { move: number; percentage: number; lower: number; upper: number } | null;
-    monthly?: { move: number; percentage: number; lower: number; upper: number } | null;
+  timestamp: string;
+  forecasts: Array<{
+    underlying: string;
+    quote_ts: string;
+    exp_date: string;
+    horizon: string;
+    em_baseline: number;
+    band68_low: number;
+    band68_high: number;
+    band95_low?: number;
+    band95_high?: number;
+  }>;
+  live_data: {
+    symbol: string;
+    price: number;
+    change: number;
+    change_percent: number;
+    volume: number;
+    timestamp: string;
+  };
+  metadata: {
+    forecast_count: number;
+    horizons_requested: string[];
+    has_live_data: boolean;
   };
 }
 
@@ -22,8 +42,14 @@ export function useExpectedMove({ symbol }: UseExpectedMoveParams) {
         throw new Error('Symbol is required');
       }
 
-      // Use the new live API endpoint that integrates FMP + Polygon.io + Dolt
-      const response = await fetch(`/api/expected-move-live?symbol=${symbol}`);
+      // Use the ML forecast proxy endpoint
+      const response = await fetch(`/api/ml-forecast`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ symbol })
+      });
       
       if (!response.ok) {
         throw new Error(`Failed to fetch expected move data: ${response.statusText}`);
@@ -31,12 +57,7 @@ export function useExpectedMove({ symbol }: UseExpectedMoveParams) {
 
       const apiResponse = await response.json();
       
-      // Extract data from API response wrapper
-      if (!apiResponse.success || !apiResponse.data) {
-        throw new Error(apiResponse.error || 'Failed to fetch expected move data');
-      }
-      
-      return apiResponse.data;
+      return apiResponse;
     },
     enabled: !!symbol,
     staleTime: 60 * 60 * 1000, // 1 hour - keep expected move data stable for analysis
