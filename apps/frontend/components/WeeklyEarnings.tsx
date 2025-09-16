@@ -4,33 +4,55 @@ import { useState, useEffect } from 'react'
 import { CalendarIcon, ClockIcon, ChartBarIcon } from '@heroicons/react/24/outline'
 
 interface EarningsEvent {
-  act_symbol: string
+  ticker: string
   earnings_date: string
-  t1: string
-  expiry: string | null
-  spot_ref: number | null
-  atm_strike: number | null
-  mid_call: number | null
-  mid_put: number | null
-  em_abs: number | null
-  em_pct: number | null
-  when: string
-  call_bid: number | null
-  call_ask: number | null
-  put_bid: number | null
-  put_ask: number | null
+  timing: string
+  fiscal_q: string
+  as_of_date: string
+  lead_time_days: number
+  expiry_date: string
+  days_to_expiry: number
+  
+  // Core EM metrics
+  em_straddle_pct: number
+  em_iv_pct: number
+  em_straddle_abs: number
+  
+  // Options data
+  spot_price: number
+  atm_strike: number
+  atm_iv: number
+  call_iv: number
+  put_iv: number
+  
+  // Market microstructure
+  skew_atm: number
+  term_slope: number
+  total_vega: number
+  avg_bid_ask_spread: number
+  
+  // Metadata
+  method: string
+  confidence: string
 }
 
 interface WeeklyData {
+  metadata: {
+    version: string
+    generated_at: string
+    as_of_date: string
+    method: string
+  }
   window: {
     start: string
     end: string
-    generated_at: string
   }
   events: EarningsEvent[]
   summary: {
     total_events: number
-    avg_em_pct: number
+    avg_em_straddle_pct: number
+    avg_em_iv_pct: number
+    avg_lead_time_days: number
   }
 }
 
@@ -42,7 +64,7 @@ export function WeeklyEarnings() {
   useEffect(() => {
     async function fetchWeeklyData() {
       try {
-        const response = await fetch('/weekly.json')
+        const response = await fetch('/api/weekly')
         if (!response.ok) {
           throw new Error('Failed to fetch weekly data')
         }
@@ -93,7 +115,9 @@ export function WeeklyEarnings() {
   }, {} as Record<string, EarningsEvent[]>)
 
   const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr)
+    // Parse as local date to avoid timezone conversion issues
+    const [year, month, day] = dateStr.split('-').map(Number)
+    const date = new Date(year, month - 1, day)
     return date.toLocaleDateString('en-US', { 
       weekday: 'long', 
       month: 'short', 
@@ -119,10 +143,10 @@ export function WeeklyEarnings() {
           Week of {formatDate(data.window.start)} - {formatDate(data.window.end)}
         </h2>
         <p className="text-slate-300">
-          {data.summary.total_events} earnings events • Avg EM: {formatPercent(data.summary.avg_em_pct)}
+          {data.summary.total_events} earnings events • Avg Straddle EM: {formatPercent(data.summary.avg_em_straddle_pct)} • Avg IV EM: {formatPercent(data.summary.avg_em_iv_pct)}
         </p>
         <p className="text-sm text-slate-400 mt-1">
-          Last updated: {new Date(data.window.generated_at).toLocaleString()}
+          Last updated: {new Date(data.metadata.generated_at).toLocaleString()} • Method: {data.metadata.method}
         </p>
       </div>
 
@@ -137,30 +161,50 @@ export function WeeklyEarnings() {
             
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {events.map((event) => (
-                <div key={`${event.act_symbol}-${event.earnings_date}`} 
+                <div key={`${event.ticker}-${event.earnings_date}`} 
                      className="bg-slate-900/50 border border-slate-600 rounded-lg p-4">
                   
                   {/* Symbol and timing */}
                   <div className="flex justify-between items-start mb-3">
-                    <h4 className="text-xl font-bold text-white">{event.act_symbol}</h4>
+                    <h4 className="text-xl font-bold text-white">{event.ticker}</h4>
                     <div className="text-xs text-slate-400 flex items-center">
                       <ClockIcon className="h-3 w-3 mr-1" />
-                      {event.when || 'TBD'}
+                      {event.timing === 'after_market_close' ? 'After Close' : 
+                       event.timing === 'before_market_open' ? 'Before Open' :
+                       event.timing === 'during_market_hours' ? 'During Hours' : 'TBD'}
                     </div>
+                  </div>
+                  
+                  {/* Lead time badge */}
+                  <div className="mb-3">
+                    <span className="inline-block bg-blue-900/50 text-blue-300 text-xs px-2 py-1 rounded">
+                      T{event.lead_time_days >= 0 ? '+' : ''}{event.lead_time_days} • {event.fiscal_q}
+                    </span>
+                    {event.lead_time_days < 0 && (
+                      <span className="ml-2 inline-block bg-amber-900/50 text-amber-300 text-xs px-2 py-1 rounded">
+                        Historical
+                      </span>
+                    )}
                   </div>
 
                   {/* Expected Move */}
                   <div className="space-y-2 mb-3">
                     <div className="flex justify-between">
-                      <span className="text-slate-300">Expected Move:</span>
+                      <span className="text-slate-300">Straddle EM:</span>
                       <span className="text-green-400 font-semibold">
-                        {formatPercent(event.em_pct)}
+                        {formatPercent(event.em_straddle_pct)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-300">IV EM:</span>
+                      <span className="text-blue-400 font-semibold">
+                        {formatPercent(event.em_iv_pct)}
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-300">Dollar Move:</span>
                       <span className="text-green-400 font-semibold">
-                        {formatDollar(event.em_abs)}
+                        {formatDollar(event.em_straddle_abs)}
                       </span>
                     </div>
                   </div>
@@ -168,8 +212,8 @@ export function WeeklyEarnings() {
                   {/* Options details */}
                   <div className="text-xs text-slate-400 space-y-1">
                     <div className="flex justify-between">
-                      <span>Spot Ref:</span>
-                      <span>{formatDollar(event.spot_ref)}</span>
+                      <span>Spot Price:</span>
+                      <span>{formatDollar(event.spot_price)} <span className="text-xs text-slate-500">(est.)</span></span>
                     </div>
                     <div className="flex justify-between">
                       <span>ATM Strike:</span>
@@ -177,21 +221,29 @@ export function WeeklyEarnings() {
                     </div>
                     <div className="flex justify-between">
                       <span>Expiry:</span>
-                      <span>{event.expiry ? new Date(event.expiry).toLocaleDateString() : 'N/A'}</span>
+                      <span>{event.expiry_date ? new Date(event.expiry_date).toLocaleDateString() : 'N/A'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>ATM IV:</span>
+                      <span>{formatPercent(event.atm_iv)}</span>
                     </div>
                   </div>
 
-                  {/* Straddle components */}
-                  {(event.mid_call || event.mid_put) && (
+                  {/* Advanced metrics */}
+                  {(event.skew_atm !== undefined || event.total_vega !== undefined) && (
                     <div className="mt-3 pt-3 border-t border-slate-600">
                       <div className="text-xs text-slate-400 space-y-1">
                         <div className="flex justify-between">
-                          <span>Call Mid:</span>
-                          <span>{formatDollar(event.mid_call)}</span>
+                          <span>Skew (ATM):</span>
+                          <span>{event.skew_atm ? `${(event.skew_atm * 100).toFixed(1)}vol` : 'N/A'}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span>Put Mid:</span>
-                          <span>{formatDollar(event.mid_put)}</span>
+                          <span>Total Vega:</span>
+                          <span>{event.total_vega ? `$${(event.total_vega * 1000).toFixed(0)}` : 'N/A'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Confidence:</span>
+                          <span className="capitalize">{event.confidence}</span>
                         </div>
                       </div>
                     </div>
@@ -211,16 +263,22 @@ export function WeeklyEarnings() {
         </h3>
         <div className="text-sm text-slate-300 space-y-2">
           <p>
-            Expected Move = ATM Call Mid + ATM Put Mid (straddle price)
+            <strong>Straddle EM:</strong> ATM Call Mid + ATM Put Mid (market pricing)
           </p>
           <p>
-            • Uses options expiring after earnings date
+            <strong>IV EM:</strong> ATM IV × √(Days to Expiry / 365) (volatility-based)
           </p>
           <p>
-            • Based on implied volatility from T-1 (last trading day before earnings)
+            <strong>Spot Price:</strong> Estimated from ATM options with delta ≈ 0.5
           </p>
           <p>
-            • Represents market's expectation of stock movement magnitude
+            <strong>Skew:</strong> Put IV - Call IV difference (in volatility points)
+          </p>
+          <p>
+            <strong>Vega:</strong> Total position sensitivity to 1% IV change (×1000)
+          </p>
+          <p>
+            • T+X: Days after earnings (historical data) • T-X: Days before earnings
           </p>
         </div>
       </div>
