@@ -74,7 +74,7 @@ class MLService:
         try:
             result = self.conn.execute("""
                 SELECT DISTINCT act_symbol 
-                FROM em_features 
+                FROM em_forecasts_view 
                 ORDER BY act_symbol
             """).fetchall()
             return [row[0] for row in result]
@@ -107,79 +107,57 @@ class MLService:
             return None
     
     def predict_expected_move(self, symbol: str) -> Optional[Dict[str, Any]]:
-        """Generate ML prediction for a symbol."""
-        if not self.model:
-            logger.warning("No model available for prediction")
-            return None
-        
-        features = self.get_latest_features(symbol)
-        if not features:
-            logger.warning("No features available for symbol", symbol=symbol)
+        """Get pre-computed ML prediction for a symbol from forecasts."""
+        if not self.conn:
+            logger.warning("No DuckDB connection available")
             return None
         
         try:
-            # Prepare feature vector
-            feature_names = [
-                'iv_t1', 'hv_t1', 'iv_week_ago', 'iv_month_ago', 
-                'iv_hv_spread', 'iv_percentile_est', 'avg_iv_t1', 
-                'atm_iv_t1', 'iv_skew', 'avg_gamma_t1', 'avg_vega_t1', 
-                'call_put_ratio', 'total_contracts'
-            ]
+            # Get the latest forecast for this symbol
+            result = self.conn.execute("""
+                SELECT 
+                    act_symbol,
+                    earnings_date,
+                    em_baseline,
+                    band68_low,
+                    band68_high,
+                    band95_low,
+                    band95_high,
+                    model_type,
+                    features_used,
+                    confidence,
+                    created_at
+                FROM em_forecasts_view 
+                WHERE act_symbol = ? 
+                ORDER BY earnings_date DESC, created_at DESC
+                LIMIT 1
+            """, [symbol]).fetchone()
             
-            # Extract features, handling missing values
-            feature_vector = []
-            for name in feature_names:
-                value = features.get(name)
-                if value is None or pd.isna(value):
-                    # Use reasonable defaults
-                    if name in ['iv_t1', 'avg_iv_t1', 'atm_iv_t1']:
-                        value = 0.25  # Default IV
-                    elif name in ['hv_t1']:
-                        value = 0.20  # Default HV
-                    elif name in ['iv_percentile_est']:
-                        value = 0.5   # Median percentile
-                    elif name in ['call_put_ratio']:
-                        value = 1.0   # Neutral ratio
-                    elif name in ['total_contracts']:
-                        value = 1000  # Default volume
-                    else:
-                        value = 0.0   # Default to zero
-                
-                feature_vector.append(float(value))
+            if not result:
+                logger.warning("No pre-computed forecast available for symbol", symbol=symbol)
+                return None
             
-            # Make prediction
-            X = np.array(feature_vector).reshape(1, -1)
-            
-            if hasattr(self.model, 'predict'):
-                prediction = self.model.predict(X)[0]
-            else:
-                # Heuristic model
-                iv = feature_vector[0]  # iv_t1
-                prediction = 0.36 * iv  # Use learned alpha
-            
-            # Calculate confidence bands (68% and 95%)
-            # For now, use simple scaling factors
-            band68_low = prediction * 0.7
-            band68_high = prediction * 1.3
-            band95_low = prediction * 0.5
-            band95_high = prediction * 1.5
+            # Convert result to dict
+            (act_symbol, earnings_date, em_baseline, band68_low, band68_high, 
+             band95_low, band95_high, model_type, features_used, confidence, created_at) = result
             
             return {
-                'symbol': symbol,
+                'symbol': act_symbol,
                 'prediction_date': datetime.now(),
-                'earnings_date': features.get('earnings_date'),
-                'em_baseline': float(prediction),
+                'earnings_date': earnings_date,
+                'em_baseline': float(em_baseline),
                 'band68_low': float(band68_low),
                 'band68_high': float(band68_high),
                 'band95_low': float(band95_low),
                 'band95_high': float(band95_high),
-                'model_type': type(self.model).__name__,
-                'features_used': feature_names,
-                'confidence': 'medium'  # Could be enhanced with model uncertainty
+                'model_type': model_type,
+                'features_used': features_used.split(',') if features_used else [],
+                'confidence': confidence,
+                'forecast_created_at': created_at
             }
             
         except Exception as e:
-            logger.error("Failed to generate prediction", symbol=symbol, error=str(e))
+            logger.error("Failed to get pre-computed forecast", symbol=symbol, error=str(e))
             return None
     
     def get_predictions_for_symbols(self, symbols: List[str]) -> List[Dict[str, Any]]:
@@ -191,6 +169,56 @@ class MLService:
                 predictions.append(pred)
         return predictions
     
+    def get_all_upcoming_forecasts(self, days_ahead: int = 30) -> List[Dict[str, Any]]:
+        """Get all upcoming forecasts within the specified days."""
+        if not self.conn:
+            return []
+        
+        try:
+            cutoff_date = (datetime.now() + timedelta(days=days_ahead)).date()
+            
+            result = self.conn.execute("""
+                SELECT 
+                    act_symbol,
+                    earnings_date,
+                    em_baseline,
+                    band68_low,
+                    band68_high,
+                    band95_low,
+                    band95_high,
+                    model_type,
+                    confidence,
+                    created_at
+                FROM em_forecasts_view 
+                WHERE earnings_date >= CURRENT_DATE 
+                  AND earnings_date <= ?
+                ORDER BY earnings_date ASC, act_symbol ASC
+            """, [cutoff_date]).fetchall()
+            
+            forecasts = []
+            for row in result:
+                (act_symbol, earnings_date, em_baseline, band68_low, band68_high,
+                 band95_low, band95_high, model_type, confidence, created_at) = row
+                
+                forecasts.append({
+                    'symbol': act_symbol,
+                    'earnings_date': earnings_date,
+                    'em_baseline': float(em_baseline),
+                    'band68_low': float(band68_low),
+                    'band68_high': float(band68_high),
+                    'band95_low': float(band95_low),
+                    'band95_high': float(band95_high),
+                    'model_type': model_type,
+                    'confidence': confidence,
+                    'forecast_created_at': created_at
+                })
+            
+            return forecasts
+            
+        except Exception as e:
+            logger.error("Failed to get upcoming forecasts", error=str(e))
+            return []
+    
     def get_model_info(self) -> Dict[str, Any]:
         """Get information about the loaded model."""
         if not self.model:
@@ -200,7 +228,8 @@ class MLService:
             'status': 'loaded',
             'model_type': type(self.model).__name__,
             'available_symbols': len(self.get_available_symbols()),
-            'loaded_at': datetime.now().isoformat()
+            'loaded_at': datetime.now().isoformat(),
+            'forecast_mode': 'pre_computed'
         }
         
         if self.model_metadata:
@@ -209,6 +238,17 @@ class MLService:
                 'performance': self.model_metadata.get('performance', {}),
                 'features': self.model_metadata.get('features', [])
             })
+        
+        # Add forecast statistics
+        try:
+            if self.conn:
+                forecast_count = self.conn.execute("""
+                    SELECT COUNT(*) FROM em_forecasts_view 
+                    WHERE earnings_date >= CURRENT_DATE
+                """).fetchone()[0]
+                info['upcoming_forecasts'] = forecast_count
+        except:
+            pass
         
         return info
     
