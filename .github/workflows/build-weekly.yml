@@ -22,13 +22,13 @@ jobs:
     
     - name: Install dependencies
       run: |
-        pip install duckdb==1.1.3 pandas pyarrow
+        pip install duckdb==1.1.3 pandas pyarrow numpy
     
     - name: Create public directory
       run: mkdir -p public
     
     - name: Build weekly JSON
-      run: python tools/build_weekly_json.py
+      run: python tools/build_weekly_json_v2.py
     
     - name: Commit and push changes
       run: |
