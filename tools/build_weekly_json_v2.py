@@ -144,8 +144,11 @@ def main():
     output_path = repo_root / "public" / "weekly.json"
     env_path = repo_root / "config" / ".env.local"
     
-    # Load environment variables
+    # Load environment variables (GitHub Actions or local)
     env_vars = load_env_file(env_path)
+    # Override with GitHub Actions environment variables if available
+    if os.getenv('POLYGON_API_KEY'):
+        env_vars['POLYGON_API_KEY'] = os.getenv('POLYGON_API_KEY')
     
     # Ensure output directory exists
     output_path.parent.mkdir(exist_ok=True)
