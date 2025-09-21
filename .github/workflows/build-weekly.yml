@@ -29,6 +29,8 @@ jobs:
     
     - name: Build weekly JSON
       run: python tools/build_weekly_json_v2.py
+      env:
+        POLYGON_API_KEY: ${{ secrets.POLYGON_API_KEY }}
     
     - name: Commit and push changes
       run: |
