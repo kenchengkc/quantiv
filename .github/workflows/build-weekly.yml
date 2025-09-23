@@ -5,6 +5,9 @@ on:
     - cron: '0 9 * * *'  # Daily at 9 AM UTC
   workflow_dispatch:  # Manual trigger
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -38,7 +41,7 @@ jobs:
         git config --local user.name "GitHub Action"
         git add public/weekly.json
         git diff --staged --quiet || git commit -m "Update weekly earnings data - $(date -u +%Y-%m-%d)"
-        git push
+        git push origin main
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     
