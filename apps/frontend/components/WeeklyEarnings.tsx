@@ -34,6 +34,18 @@ interface EarningsEvent {
   // Metadata
   method: string
   confidence: string
+  
+  // ML-enhanced forecasts (optional)
+  ml_forecast?: {
+    em_ml: number
+    em_math: number
+    correction_factor: number
+    p10: number
+    p50: number
+    p90: number
+    combined_confidence: number
+    method: string
+  }
 }
 
 interface WeeklyData {
@@ -60,6 +72,37 @@ export function WeeklyEarnings() {
   const [data, setData] = useState<WeeklyData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [mlEnabled, setMlEnabled] = useState(true)
+  const [mlLoading, setMlLoading] = useState(false)
+
+  // Fetch ML forecasts for events
+  async function fetchMLForecasts(events: EarningsEvent[]) {
+    if (!mlEnabled) return events
+    
+    setMlLoading(true)
+    const eventsWithML = await Promise.all(
+      events.map(async (event) => {
+        // Only fetch for future events
+        if (event.lead_time_days < 0) return event
+        
+        try {
+          const response = await fetch(
+            `/api/backend/em/ml-forecast?symbol=${event.ticker}&earnings_date=${event.earnings_date}`
+          )
+          if (response.ok) {
+            const mlForecast = await response.json()
+            return { ...event, ml_forecast: mlForecast }
+          }
+        } catch (err) {
+          // Silently fail for individual ML forecasts
+          console.warn(`ML forecast failed for ${event.ticker}:`, err)
+        }
+        return event
+      })
+    )
+    setMlLoading(false)
+    return eventsWithML
+  }
 
   useEffect(() => {
     async function fetchWeeklyData() {
@@ -69,6 +112,12 @@ export function WeeklyEarnings() {
           throw new Error('Failed to fetch weekly data')
         }
         const weeklyData = await response.json()
+        
+        // Fetch ML forecasts if enabled
+        if (mlEnabled && weeklyData.events) {
+          weeklyData.events = await fetchMLForecasts(weeklyData.events)
+        }
+        
         setData(weeklyData)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error')
@@ -78,7 +127,7 @@ export function WeeklyEarnings() {
     }
 
     fetchWeeklyData()
-  }, [])
+  }, [mlEnabled])
 
   if (loading) {
     return (
@@ -148,6 +197,16 @@ export function WeeklyEarnings() {
         <p className="text-sm text-slate-400 mt-1">
           Last updated: {new Date(data.metadata.generated_at).toLocaleString()} • Method: {data.metadata.method}
         </p>
+        {mlLoading && (
+          <p className="text-xs text-blue-400 mt-2">
+            Loading ML forecasts...
+          </p>
+        )}
+        {mlEnabled && !mlLoading && (
+          <p className="text-xs text-blue-300 mt-2">
+            ✨ ML-enhanced forecasts enabled
+          </p>
+        )}
       </div>
 
       {/* Events by day */}
@@ -189,6 +248,47 @@ export function WeeklyEarnings() {
 
                   {/* Expected Move */}
                   <div className="space-y-2 mb-3">
+                    {/* ML Forecast (if available) */}
+                    {event.ml_forecast && (
+                      <div className="mb-3 p-3 bg-blue-900/20 border border-blue-700/50 rounded">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs text-blue-300 font-semibold">ML-Enhanced</span>
+                          <span className="text-xs px-2 py-0.5 bg-blue-700/50 text-blue-200 rounded">
+                            {Math.round(event.ml_forecast.combined_confidence * 100)}% conf
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <div className="text-xs text-slate-400">
+                            Math: {formatPercent(event.ml_forecast.em_math)}
+                          </div>
+                          <div className="text-xs text-slate-400">→</div>
+                          <div className="text-sm font-bold text-blue-300">
+                            ML: {formatPercent(event.ml_forecast.em_ml)}
+                          </div>
+                        </div>
+                        {/* Confidence band visualization */}
+                        <div className="mt-2 h-1.5 bg-slate-700 rounded-full relative overflow-hidden">
+                          <div 
+                            className="absolute h-full bg-blue-500/30 rounded-full"
+                            style={{
+                              left: `${Math.max(0, (event.ml_forecast.p10 / (event.ml_forecast.p90 * 1.2)) * 100)}%`,
+                              width: `${Math.min(100, ((event.ml_forecast.p90 - event.ml_forecast.p10) / (event.ml_forecast.p90 * 1.2)) * 100)}%`
+                            }}
+                          />
+                          <div 
+                            className="absolute h-full w-0.5 bg-blue-400"
+                            style={{
+                              left: `${(event.ml_forecast.p50 / (event.ml_forecast.p90 * 1.2)) * 100}%`
+                            }}
+                          />
+                        </div>
+                        <div className="flex justify-between text-xs text-slate-500 mt-1">
+                          <span>{formatPercent(event.ml_forecast.p10)}</span>
+                          <span>{formatPercent(event.ml_forecast.p90)}</span>
+                        </div>
+                      </div>
+                    )}
+                    
                     <div className="flex justify-between">
                       <span className="text-slate-300">Straddle EM:</span>
                       <span className="text-green-400 font-semibold">
