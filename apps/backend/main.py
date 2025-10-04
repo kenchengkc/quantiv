@@ -740,6 +740,70 @@ async def em_forecast(symbol: str, exp: str):
 
     return EmForecastLatestResponse(**payload)
 
+@app.get("/em/ml-forecast")
+async def em_ml_forecast(symbol: str, earnings_date: str, sector: Optional[str] = None):
+    """ML-enhanced expected move forecast using MVP2 serving pipeline."""
+    sym = symbol.upper()
+    
+    if not ml_service:
+        raise HTTPException(
+            status_code=503,
+            detail="ML service not available"
+        )
+    
+    # Cache key
+    cache_key = f"em:ml:{sym}:{earnings_date}:{sector or 'none'}"
+    try:
+        cached = await redis_client.get(cache_key)
+        if cached:
+            return json.loads(cached)
+    except Exception as e:
+        logger.warning("ML forecast cache read failed", error=str(e))
+    
+    # Generate ML forecast
+    try:
+        forecast = ml_service.predict_expected_move(
+            symbol=sym,
+            earnings_date=earnings_date,
+            sector=sector
+        )
+        
+        if not forecast:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No ML forecast available for {sym}"
+            )
+        
+        # Cache for 5 minutes
+        try:
+            await redis_client.setex(
+                cache_key,
+                300,
+                json.dumps(forecast, default=str)
+            )
+        except Exception as e:
+            logger.warning("ML forecast cache write failed", error=str(e))
+        
+        return forecast
+        
+    except Exception as e:
+        logger.error("ML forecast generation failed", symbol=sym, error=str(e))
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to generate ML forecast"
+        )
+
+@app.get("/em/ml-info")
+async def em_ml_info():
+    """Get information about ML pipeline status and capabilities."""
+    if not ml_service:
+        return {
+            "status": "unavailable",
+            "message": "ML service not initialized"
+        }
+    
+    return ml_service.get_model_info()
+
 @app.get("/em/history", response_model=EmHistoryResponse)
 async def em_history(symbol: str, exp: str, window: str = "90d"):
     """Timeseries for baseline EM for charting. Window like '90d'."""

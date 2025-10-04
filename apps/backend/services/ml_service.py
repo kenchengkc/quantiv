@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
 ML Service for loading and serving expected move predictions.
-Integrates trained models with the backend API.
+Integrates ML MVP2 multi-horizon models with bias curve conditioning.
 """
 
-import pickle
+import sys
 import json
 import pandas as pd
 import numpy as np
@@ -14,46 +14,57 @@ from typing import Dict, List, Optional, Any
 import duckdb
 import structlog
 
+# Add parent directory to path for ml module imports
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
+try:
+    from ml.serving_pipeline import MLServingPipeline
+    ML_PIPELINE_AVAILABLE = True
+except ImportError as e:
+    ML_PIPELINE_AVAILABLE = False
+    import warnings
+    warnings.warn(f"ML Pipeline not available: {e}")
+
 logger = structlog.get_logger()
 
 class MLService:
+    """Backend ML service wrapping ML MVP2 serving pipeline."""
+    
     def __init__(self, data_dir: Path, duckdb_path: Optional[Path] = None):
         self.data_dir = data_dir
         self.models_dir = data_dir / "models"
         self.duckdb_path = duckdb_path or (data_dir / "quantiv.duckdb")
         
-        self.model = None
-        self.model_metadata = None
+        # ML MVP2 serving pipeline
+        self.serving_pipeline = None
         self.conn = None
         
-        self._load_model()
+        self._load_ml_pipeline()
         self._connect_duckdb()
     
-    def _load_model(self):
-        """Load the latest trained model."""
+    def _load_ml_pipeline(self):
+        """Load ML MVP2 serving pipeline with multi-horizon models."""
         try:
-            latest_model_path = self.models_dir / "em_model_latest.pkl"
-            
-            if not latest_model_path.exists():
-                logger.warning("No trained model found", path=str(latest_model_path))
+            if not ML_PIPELINE_AVAILABLE:
+                logger.warning("ML Pipeline not available - using fallback mode")
                 return
             
-            with open(latest_model_path, 'rb') as f:
-                self.model = pickle.load(f)
+            # Initialize serving pipeline
+            self.serving_pipeline = MLServingPipeline(
+                data_dir=str(self.data_dir),
+                models_dir=str(self.models_dir)
+            )
             
-            # Load metadata if available
-            metadata_files = list(self.models_dir.glob("*_summary.json"))
-            if metadata_files:
-                latest_metadata = sorted(metadata_files)[-1]
-                with open(latest_metadata, 'r') as f:
-                    self.model_metadata = json.load(f)
-            
-            logger.info("ML model loaded successfully", 
-                       model_type=type(self.model).__name__,
-                       metadata_available=self.model_metadata is not None)
+            logger.info(
+                "ML serving pipeline loaded",
+                models_loaded=len(self.serving_pipeline.models),
+                bias_curves=len(self.serving_pipeline.bias_curves),
+                horizons=[1, 2, 3, 7, 14, 21]
+            )
                        
         except Exception as e:
-            logger.error("Failed to load ML model", error=str(e))
+            logger.error("Failed to load ML serving pipeline", error=str(e))
+            self.serving_pipeline = None
     
     def _connect_duckdb(self):
         """Connect to DuckDB for data access."""
@@ -106,14 +117,48 @@ class MLService:
             logger.error("Failed to get latest features", symbol=symbol, error=str(e))
             return None
     
-    def predict_expected_move(self, symbol: str) -> Optional[Dict[str, Any]]:
-        """Get pre-computed ML prediction for a symbol from forecasts."""
+    def predict_expected_move(self, symbol: str, earnings_date: str, 
+                            sector: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """Generate ML-enhanced expected move prediction using serving pipeline."""
+        
+        # Try serving pipeline first (live generation)
+        if self.serving_pipeline:
+            try:
+                forecast = self.serving_pipeline.generate_forecast(
+                    symbol=symbol,
+                    earnings_date=earnings_date,
+                    sector=sector
+                )
+                
+                return {
+                    'symbol': symbol,
+                    'earnings_date': earnings_date,
+                    'prediction_date': datetime.now(),
+                    'em_math': forecast.get('em_math', 0.0),
+                    'em_ml': forecast.get('em_ml', 0.0),
+                    'correction_factor': forecast.get('correction_factor', 1.0),
+                    'bias_multiplier': forecast.get('bias_multiplier', 1.0),
+                    'p10': forecast.get('p10', 0.0),
+                    'p50': forecast.get('p50', 0.0),
+                    'p90': forecast.get('p90', 0.0),
+                    'combined_confidence': forecast.get('combined_confidence', 0.5),
+                    'model_type': 'ml_mvp2',
+                    'horizon': forecast.get('horizon', 'unknown'),
+                    'method': 'live_generation'
+                }
+            except Exception as e:
+                logger.warning(
+                    "Failed to generate live ML forecast, falling back to pre-computed",
+                    symbol=symbol,
+                    error=str(e)
+                )
+        
+        # Fallback: try to get pre-computed forecast from DuckDB
         if not self.conn:
-            logger.warning("No DuckDB connection available")
+            logger.warning("No DuckDB connection and no serving pipeline available")
             return None
         
         try:
-            # Get the latest forecast for this symbol
             result = self.conn.execute("""
                 SELECT 
                     act_symbol,
@@ -129,35 +174,35 @@ class MLService:
                     created_at
                 FROM em_forecasts_view 
                 WHERE act_symbol = ? 
-                ORDER BY earnings_date DESC, created_at DESC
+                  AND earnings_date = ?
+                ORDER BY created_at DESC
                 LIMIT 1
-            """, [symbol]).fetchone()
+            """, [symbol, earnings_date]).fetchone()
             
             if not result:
-                logger.warning("No pre-computed forecast available for symbol", symbol=symbol)
                 return None
             
-            # Convert result to dict
             (act_symbol, earnings_date, em_baseline, band68_low, band68_high, 
              band95_low, band95_high, model_type, features_used, confidence, created_at) = result
             
             return {
                 'symbol': act_symbol,
-                'prediction_date': datetime.now(),
                 'earnings_date': earnings_date,
-                'em_baseline': float(em_baseline),
-                'band68_low': float(band68_low),
-                'band68_high': float(band68_high),
-                'band95_low': float(band95_low),
-                'band95_high': float(band95_high),
-                'model_type': model_type,
+                'prediction_date': datetime.now(),
+                'em_math': float(em_baseline) if em_baseline else 0.0,
+                'em_ml': float(em_baseline) if em_baseline else 0.0,
+                'p10': float(band68_low) if band68_low else 0.0,
+                'p50': float(em_baseline) if em_baseline else 0.0,
+                'p90': float(band68_high) if band68_high else 0.0,
+                'combined_confidence': confidence if confidence else 0.5,
+                'model_type': model_type or 'pre_computed',
                 'features_used': features_used.split(',') if features_used else [],
-                'confidence': confidence,
-                'forecast_created_at': created_at
+                'forecast_created_at': created_at,
+                'method': 'pre_computed'
             }
             
         except Exception as e:
-            logger.error("Failed to get pre-computed forecast", symbol=symbol, error=str(e))
+            logger.error("Failed to get forecast", symbol=symbol, error=str(e))
             return None
     
     def get_predictions_for_symbols(self, symbols: List[str]) -> List[Dict[str, Any]]:
@@ -220,26 +265,40 @@ class MLService:
             return []
     
     def get_model_info(self) -> Dict[str, Any]:
-        """Get information about the loaded model."""
-        if not self.model:
-            return {'status': 'no_model'}
+        """Get information about the ML MVP2 pipeline and models."""
+        if not self.serving_pipeline:
+            return {
+                'status': 'unavailable',
+                'pipeline_available': ML_PIPELINE_AVAILABLE,
+                'error': 'ML serving pipeline not loaded'
+            }
         
         info = {
-            'status': 'loaded',
-            'model_type': type(self.model).__name__,
-            'available_symbols': len(self.get_available_symbols()),
-            'loaded_at': datetime.now().isoformat(),
-            'forecast_mode': 'pre_computed'
+            'status': 'operational',
+            'pipeline_version': 'mvp2',
+            'models_loaded': len(self.serving_pipeline.models),
+            'horizons_available': sorted(self.serving_pipeline.models.keys()),
+            'bias_curves': list(self.serving_pipeline.bias_curves.keys()),
+            'forecast_mode': 'live_generation',
+            'loaded_at': datetime.now().isoformat()
         }
         
-        if self.model_metadata:
-            info.update({
-                'training_date': self.model_metadata.get('timestamp'),
-                'performance': self.model_metadata.get('performance', {}),
-                'features': self.model_metadata.get('features', [])
-            })
+        # Add model metadata from disk
+        try:
+            metadata_files = list(self.models_dir.glob("metadata_T*.json"))
+            if metadata_files:
+                latest_metadata = sorted(metadata_files)[-1]
+                with open(latest_metadata, 'r') as f:
+                    metadata = json.load(f)
+                    info['latest_model'] = {
+                        'horizon': latest_metadata.stem.split('_')[-1],
+                        'metrics': metadata.get('metrics', {}),
+                        'trained_at': metadata.get('trained_at')
+                    }
+        except:
+            pass
         
-        # Add forecast statistics
+        # Add forecast statistics from DuckDB
         try:
             if self.conn:
                 forecast_count = self.conn.execute("""
@@ -253,12 +312,12 @@ class MLService:
         return info
     
     def refresh_model(self) -> bool:
-        """Reload the model from disk."""
+        """Reload the ML serving pipeline from disk."""
         try:
-            self._load_model()
-            return self.model is not None
+            self._load_ml_pipeline()
+            return self.serving_pipeline is not None
         except Exception as e:
-            logger.error("Failed to refresh model", error=str(e))
+            logger.error("Failed to refresh ML pipeline", error=str(e))
             return False
     
     def close(self):
