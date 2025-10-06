@@ -77,24 +77,21 @@ def run_fast_ml_pipeline(data_dir: str = "../../data",
         # Step 3: Model Training (fast mode - no optimization)
         logger.info("Step 3: Training models per horizon...")
         logger.info(f"Optimization: {'enabled' if optimize_models else 'disabled (fast mode)'}")
-        trainer = ModelTrainer(data_dir)
+        # ModelTrainer needs the ml_training subdirectory
+        training_dir = os.path.join(data_dir, "ml_training")
+        trainer = ModelTrainer(training_dir)
         
-        model_results = {}
-        for horizon in sorted(feature_sets.keys()):
-            logger.info(f"\n--- Training model for T-{horizon} ---")
-            result = trainer.train_model(
-                horizon=horizon,
-                optimize=optimize_models,
-                n_trials=10 if optimize_models else 0  # Fewer trials for speed
-            )
-            model_results[horizon] = result
-            
-            if result['success']:
-                logger.info(f"✅ T-{horizon}: MAE={result['mae']:.4f}, RMSE={result['rmse']:.4f}")
-            else:
-                logger.error(f"❌ T-{horizon}: Training failed - {result.get('error', 'Unknown')}")
+        # Train all models at once
+        model_results = trainer.train_all_models(optimize=optimize_models)
         
-        logger.info(f"\n✅ Trained {len(model_results)} models")
+        # Log results
+        for horizon, result in sorted(model_results.items()):
+            metrics = result['metrics']
+            logger.info(f"✅ T-{horizon}: MAE={metrics['val_mae']:.4f}, RMSE={metrics['val_rmse']:.4f}")
+        
+        # Save models
+        saved_paths = trainer.save_models(model_results)
+        logger.info(f"\n✅ Trained and saved {len(model_results)} models")
         
         # Step 4: Test Serving Pipeline
         logger.info("\nStep 4: Testing serving pipeline...")
@@ -126,12 +123,11 @@ def run_fast_ml_pipeline(data_dir: str = "../../data",
         logger.info(f"\n{'='*80}")
         logger.info(f"✅ Pipeline completed successfully in {duration:.1f}s")
         logger.info(f"{'='*80}")
-        logger.info(f"\nModel Results:")
-        for horizon in sorted(model_results.keys()):
-            result = model_results[horizon]
-            if result['success']:
-                logger.info(f"  T-{horizon:2d}: MAE={result['mae']:.4f}, "
-                           f"n_train={result['n_train']}, n_val={result['n_val']}")
+        logger.info("\nModel Results:")
+        for horizon, result in sorted(model_results.items()):
+            metrics = result.get('metrics', {})
+            logger.info(f"  T-{horizon}: Val MAE={metrics.get('val_mae', 0):.4f}, "
+                       f"Val RMSE={metrics.get('val_rmse', 0):.4f}")
         
         logger.info(f"\nNext Steps:")
         logger.info(f"  1. Expand to full historical data (2023-2024) for better models")
