@@ -30,10 +30,11 @@ logger = structlog.get_logger()
 class MLService:
     """Backend ML service wrapping ML MVP2 serving pipeline."""
     
-    def __init__(self, data_dir: Path, duckdb_path: Optional[Path] = None):
-        self.data_dir = data_dir
-        self.models_dir = data_dir / "models"
-        self.duckdb_path = duckdb_path or (data_dir / "quantiv.duckdb")
+    def __init__(self, data_dir, duckdb_path: Optional[Path] = None):
+        # Convert to Path if string
+        self.data_dir = Path(data_dir) if isinstance(data_dir, str) else data_dir
+        self.models_dir = self.data_dir / "models"
+        self.duckdb_path = Path(duckdb_path) if isinstance(duckdb_path, str) else (duckdb_path or (self.data_dir / "quantiv.duckdb"))
         
         # ML MVP2 serving pipeline
         self.serving_pipeline = None
