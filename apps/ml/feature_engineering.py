@@ -199,61 +199,102 @@ class FeatureEngineer:
     
     def _get_realized_moves(self, options_df: pd.DataFrame, 
                            start_date: str, end_date: str) -> pd.DataFrame:
-        """Get realized moves for target variable"""
+        """Get realized moves for target variable using batch query"""
         
         # Get unique earnings events
         earnings_events = options_df[['symbol', 'earnings_date']].drop_duplicates()
         
-        realized_moves = []
+        if earnings_events.empty:
+            return pd.DataFrame()
         
-        for _, event in earnings_events.iterrows():
-            symbol = event['symbol']
-            earnings_date = event['earnings_date']
-            
-            # Reuse spot_est logic to compute S_hat pre and post earnings
-            pre_query = """
-            WITH paired AS (
-                SELECT strike, delta, date::DATE as quote_date
-                FROM options_chain
-                WHERE act_symbol = ? AND date BETWEEN ? - INTERVAL '5 days' AND ?
-            )
-            SELECT arg_min(strike, ABS(ABS(COALESCE(delta,0.0)) - 0.5))
-            FROM paired
-            """
-
-            post_query = """
-            WITH paired AS (
-                SELECT strike, delta, date::DATE as quote_date
-                FROM options_chain
-                WHERE act_symbol = ? AND date BETWEEN ? + 1 AND ? + 3
-            )
-            SELECT arg_min(strike, quote_date)
-            FROM paired
-            """
-            
-            try:
-                pre_result = self.conn.execute(pre_query, [symbol, earnings_date, earnings_date, earnings_date]).fetchone()
-                post_result = self.conn.execute(post_query, [symbol, earnings_date, earnings_date]).fetchone()
-                
-                if pre_result and post_result and pre_result[0] and post_result[0]:
-                    pre_price = float(pre_result[0])
-                    post_price = float(post_result[0])
-                    
-                    if pre_price > 0 and post_price > 0:
-                        realized_move = abs(np.log(post_price / pre_price))
-                        realized_moves.append({
-                            'symbol': symbol,
-                            'earnings_date': earnings_date,
-                            'pre_price': pre_price,
-                            'post_price': post_price,
-                            'realized_move': realized_move
-                        })
-            
-            except Exception as e:
-                logger.debug(f"Could not get realized move for {symbol} {earnings_date}: {e}")
-                continue
+        logger.info(f"Calculating realized moves for {len(earnings_events)} earnings events...")
         
-        return pd.DataFrame(realized_moves)
+        # Batch query to get pre and post earnings prices
+        batch_query = """
+        WITH earnings_list AS (
+            SELECT DISTINCT 
+                symbol,
+                earnings_date
+            FROM (VALUES {}) AS t(symbol, earnings_date)
+        ),
+        
+        -- Pre-earnings S_hat (up to 5 days before)
+        pre_spot AS (
+            SELECT 
+                e.symbol,
+                e.earnings_date,
+                arg_min(oc.strike, ABS(ABS(COALESCE(oc.delta,0.0)) - 0.5)) as pre_price
+            FROM earnings_list e
+            JOIN options_chain oc 
+              ON oc.act_symbol = e.symbol
+             AND oc.call_put = 'C'
+             AND oc.date::DATE BETWEEN e.earnings_date - INTERVAL '5 days' AND e.earnings_date
+             AND oc.delta IS NOT NULL
+            GROUP BY e.symbol, e.earnings_date
+        ),
+        
+        -- Post-earnings S_hat (1-5 days after)
+        post_spot AS (
+            SELECT 
+                e.symbol,
+                e.earnings_date,
+                arg_min(oc.strike, ABS(ABS(COALESCE(oc.delta,0.0)) - 0.5)) as post_price
+            FROM earnings_list e
+            JOIN options_chain oc 
+              ON oc.act_symbol = e.symbol
+             AND oc.call_put = 'C'
+             AND oc.date::DATE BETWEEN e.earnings_date + INTERVAL '1 day' AND e.earnings_date + INTERVAL '5 days'
+             AND oc.delta IS NOT NULL
+            GROUP BY e.symbol, e.earnings_date
+        )
+        
+        SELECT 
+            pre.symbol,
+            pre.earnings_date,
+            pre.pre_price,
+            post.post_price,
+            ABS(LN(post.post_price / NULLIF(pre.pre_price, 0))) as realized_move
+        FROM pre_spot pre
+        JOIN post_spot post 
+          ON pre.symbol = post.symbol 
+         AND pre.earnings_date = post.earnings_date
+        WHERE pre.pre_price > 0 AND post.post_price > 0
+        """
+        
+        try:
+            # Build VALUES clause for earnings events
+            values_list = []
+            for _, row in earnings_events.iterrows():
+                symbol = row['symbol']
+                earnings_date = row['earnings_date']
+                # Convert date to string for SQL
+                if hasattr(earnings_date, 'strftime'):
+                    date_str = earnings_date.strftime('%Y-%m-%d')
+                else:
+                    date_str = str(earnings_date)
+                values_list.append(f"('{symbol}', '{date_str}'::DATE)")
+            
+            if not values_list:
+                return pd.DataFrame()
+            
+            values_clause = ','.join(values_list)
+            full_query = batch_query.format(values_clause)
+            
+            result = self.conn.execute(full_query).fetchall()
+            
+            if not result:
+                logger.warning("No realized moves calculated")
+                return pd.DataFrame()
+            
+            columns = ['symbol', 'earnings_date', 'pre_price', 'post_price', 'realized_move']
+            df = pd.DataFrame(result, columns=columns)
+            
+            logger.info(f"Calculated {len(df)} realized moves")
+            return df
+            
+        except Exception as e:
+            logger.error(f"Failed to calculate realized moves: {e}")
+            return pd.DataFrame()
     
     def _build_features_for_horizon(self, options_df: pd.DataFrame, 
                                    realized_moves: pd.DataFrame, 
@@ -270,20 +311,32 @@ class FeatureEngineer:
         # Group by (symbol, earnings_date) to create features
         features_list = []
         
-        for (symbol, earnings_date), group in horizon_df.groupby(['symbol', 'earnings_date']):
+        # Ensure realized_moves has required columns
+        if realized_moves.empty or 'symbol' not in realized_moves.columns:
+            logger.warning(f"No realized moves available for T-{horizon}")
+            return None
+        
+        try:
+            grouped = horizon_df.groupby(['symbol', 'earnings_date'], dropna=False)
+        except Exception as e:
+            logger.error(f"Groupby failed for T-{horizon}: {e}")
+            return None
+        
+        for group_key, group in grouped:
+            symbol, earnings_date = group_key
             
             # Check if we have realized move
-            realized_row = realized_moves[
-                (realized_moves['symbol'] == symbol) & 
-                (realized_moves['earnings_date'] == earnings_date)
-            ]
-            
-            if realized_row.empty:
-                continue
-            
-            realized_move = realized_row.iloc[0]['realized_move']
-            
             try:
+                realized_row = realized_moves[
+                    (realized_moves['symbol'] == symbol) & 
+                    (realized_moves['earnings_date'] == earnings_date)
+                ]
+                
+                if realized_row.empty:
+                    continue
+                
+                realized_move = realized_row.iloc[0]['realized_move']
+                
                 features = self._extract_features_from_chain(group, symbol, earnings_date, horizon)
                 features['realized_move'] = realized_move
                 features_list.append(features)
@@ -321,9 +374,16 @@ class FeatureEngineer:
         )
     
     def _extract_features_from_chain(self, chain_group: pd.DataFrame, 
-                                   symbol: str, earnings_date: date, 
+                                   symbol: str, earnings_date, 
                                    horizon: int) -> Dict[str, float]:
         """Extract features from options chain snapshot"""
+        
+        # Convert earnings_date to date object if needed
+        if isinstance(earnings_date, pd.Timestamp):
+            earnings_date = earnings_date.date()
+        elif isinstance(earnings_date, str):
+            from datetime import datetime
+            earnings_date = datetime.fromisoformat(earnings_date).date()
         
         features = {
             'symbol_encoded': hash(symbol) % 10000,  # Simple encoding
@@ -333,7 +393,9 @@ class FeatureEngineer:
         }
         
         # Spot estimate S_hat from log_moneyness definition
-        s_hat = chain_group['s_hat'].iloc[0]
+        if 's_hat' not in chain_group.columns or chain_group.empty:
+            raise ValueError("Missing s_hat column or empty group")
+        s_hat = float(chain_group['s_hat'].iloc[0])
         features['underlying_price'] = s_hat
         features['log_price'] = np.log(max(s_hat, 1e-6))
         
