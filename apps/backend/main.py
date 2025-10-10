@@ -509,10 +509,20 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS middleware
+# CORS middleware - allow frontend origins
+allowed_origins = [
+    "http://localhost:3000",
+    "http://localhost:3001",
+    "https://quantiv.vercel.app",
+]
+
+# Add custom domain if set
+if custom_domain := os.getenv("FRONTEND_URL"):
+    allowed_origins.append(custom_domain)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "https://quantiv.vercel.app"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
