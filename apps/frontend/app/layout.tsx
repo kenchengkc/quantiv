@@ -2,6 +2,8 @@ import './globals.css';
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import { Providers } from './providers';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { Navbar } from '@/components/Navbar';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -36,7 +38,9 @@ export default function RootLayout({
     <html lang="en">
       <body className={inter.className}>
         <Providers>
+          <ErrorBoundary>
           <div className="min-h-screen bg-gray-50">
+            <Navbar />
             <main>{children}</main>
             <footer className="border-t bg-white py-8">
               <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -51,6 +55,7 @@ export default function RootLayout({
               </div>
             </footer>
           </div>
+          </ErrorBoundary>
         </Providers>
       </body>
     </html>
