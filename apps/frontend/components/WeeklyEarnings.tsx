@@ -72,7 +72,7 @@ export function WeeklyEarnings() {
   const [data, setData] = useState<WeeklyData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [mlEnabled, setMlEnabled] = useState(true)
+  const mlEnabled = true
   const [mlLoading, setMlLoading] = useState(false)
 
   // Fetch ML forecasts for events
@@ -127,6 +127,7 @@ export function WeeklyEarnings() {
     }
 
     fetchWeeklyData()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mlEnabled])
 
   if (loading) {

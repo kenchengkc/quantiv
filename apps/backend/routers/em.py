@@ -1,7 +1,7 @@
 """Expected-move and ML forecast endpoints."""
 
-from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
-from typing import Optional, List, Dict, Any
+from fastapi import APIRouter, HTTPException
+from typing import Optional, Dict, Any
 from datetime import datetime, date
 import json
 import structlog
@@ -61,7 +61,7 @@ def _backend_mode():
 @router.get("/health", response_model=HealthResponse)
 async def health_check():
     """Health check endpoint"""
-    import os, duckdb as _ddb
+    import os
     services: Dict[str, str] = {}
     backend = _backend_mode()
     if backend in ("postgres", "hybrid"):
