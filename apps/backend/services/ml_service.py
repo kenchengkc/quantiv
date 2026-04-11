@@ -6,10 +6,8 @@ Integrates ML MVP2 multi-horizon models with bias curve conditioning.
 
 import sys
 import json
-import pandas as pd
-import numpy as np
 from pathlib import Path
-from datetime import datetime, date, timedelta
+from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 import duckdb
 import structlog
@@ -296,7 +294,7 @@ class MLService:
                         'metrics': metadata.get('metrics', {}),
                         'trained_at': metadata.get('trained_at')
                     }
-        except:
+        except Exception:
             pass
         
         # Add forecast statistics from DuckDB
@@ -307,7 +305,7 @@ class MLService:
                     WHERE earnings_date >= CURRENT_DATE
                 """).fetchone()[0]
                 info['upcoming_forecasts'] = forecast_count
-        except:
+        except Exception:
             pass
         
         return info
