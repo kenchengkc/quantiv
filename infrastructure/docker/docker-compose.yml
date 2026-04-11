@@ -16,9 +16,9 @@ services:
       - DATABASE_URL=
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
-      - POSTGRES_USER=quantiv_user
-      - POSTGRES_PASSWORD=quantiv_secure_2024
-      - POSTGRES_DB=quantiv_options
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
       - REDIS_URL=redis://redis:6379
       - NODE_ENV=development
       - ENVIRONMENT=development
@@ -39,10 +39,12 @@ services:
     networks:
       - quantiv-net
     image: postgres:15-alpine
+    env_file:
+      - ../../config/.env.local
     environment:
-      - POSTGRES_USER=quantiv_user
-      - POSTGRES_PASSWORD=quantiv_secure_2024
-      - POSTGRES_DB=quantiv_options
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
     ports:
       - "5432:5432"
     volumes:
@@ -76,9 +78,9 @@ services:
       - DATABASE_URL=
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
-      - POSTGRES_USER=quantiv_user
-      - POSTGRES_PASSWORD=quantiv_secure_2024
-      - POSTGRES_DB=quantiv_options
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
       - DATA_DIR=/app/data
       - PARQUET_ROOT=/app/data/parquet
     depends_on:
@@ -126,9 +128,9 @@ services:
       - DATABASE_URL=
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
-      - POSTGRES_USER=quantiv_user
-      - POSTGRES_PASSWORD=quantiv_secure_2024
-      - POSTGRES_DB=quantiv_options
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
     depends_on:
       - postgres
     profiles:

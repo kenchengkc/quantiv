@@ -22,7 +22,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Proxy to backend API
-    const backendResponse = await fetch(`http://localhost:8000/api/expected-move`, {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    const backendResponse = await fetch(`${apiUrl}/api/expected-move`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
