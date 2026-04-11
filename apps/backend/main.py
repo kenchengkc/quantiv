@@ -5,30 +5,24 @@ Slim entrypoint: wires up middleware, lifespan, and routers.
 Models live in models/, backends in backends/, routes in routers/.
 """
 
-from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks, Security, Request
+from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks, Security
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import APIKeyHeader
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
-from typing import List, Optional, Dict, Any
+from typing import List, Optional
 import asyncpg
 import redis.asyncio as redis
 import httpx
 import structlog
 import duckdb
-from datetime import datetime, date, timedelta
 import os
 from contextlib import asynccontextmanager
-import json
 from pathlib import Path
 from dotenv import load_dotenv
 from services.ml_service import MLService
 from backends import PostgresBackend, DuckDBBackend, HybridBackend, DataBackend
-from models import (
-    ExpectedMoveRequest, ExpectedMoveResponse, HealthResponse,
-    EmForecastLatestResponse, EmHistoryResponse, EmExpiriesResponse,
-)
 from routers.em import router as em_router, init_router as init_em_router
 
 # Configure structured logging
@@ -149,7 +143,8 @@ async def lifespan(app: FastAPI):
         logger.info("Connecting to DuckDB", path=duck_path)
         duckdb_conn = duckdb.connect(duck_path, read_only=False)
         try:
-            duckdb_conn.execute("INSTALL parquet"); duckdb_conn.execute("LOAD parquet")
+            duckdb_conn.execute("INSTALL parquet")
+            duckdb_conn.execute("LOAD parquet")
         except Exception:
             pass
         _ensure_duckdb_em_view(duckdb_conn, os.getenv("DATA_DIR", "./data"))
