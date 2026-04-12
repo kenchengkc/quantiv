@@ -416,7 +416,7 @@ class EnhancedLiveDataService {
       const callsMap = new Map();
       const putsMap = new Map();
       
-      chain.calls?.forEach(call => {
+      chain.calls?.forEach((call: Record<string, unknown>) => {
         callsMap.set(call.strike, {
           bid: call.bid || 0,
           ask: call.ask || 0,
@@ -427,7 +427,7 @@ class EnhancedLiveDataService {
         });
       });
       
-      chain.puts?.forEach(put => {
+      chain.puts?.forEach((put: Record<string, unknown>) => {
         putsMap.set(put.strike, {
           bid: put.bid || 0,
           ask: put.ask || 0,
