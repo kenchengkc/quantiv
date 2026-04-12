@@ -29,8 +29,8 @@ dist/
 
 # Quantiv Data Files
 
-# Local DB + large data dumps
-data/
+# Local DB + large data dumps (root-level only, not lib/data/)
+/data/
 *.csv
 *.db
 *.sqlite
