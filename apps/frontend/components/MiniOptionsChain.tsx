@@ -18,7 +18,7 @@ interface OptionsData {
       delta: number | null;
       inTheMoney: boolean;
     }>>;
-    quote: { last: number };
+    quote?: { last: number };
   };
   atmStrike: number | null;
 }
@@ -30,7 +30,7 @@ interface MiniOptionsChainProps {
 export default function MiniOptionsChain({ data }: MiniOptionsChainProps) {
   const [selectedExpiration, setSelectedExpiration] = useState(data.chain.expirations[0]?.date);
   
-  const spotPrice = data.chain.quote.last;
+  const spotPrice = data.chain.quote?.last ?? 0;
   const strikes = data.chain.strikes[selectedExpiration] || {};
   
   // Get unique strikes sorted numerically

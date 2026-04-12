@@ -172,7 +172,7 @@ class ComprehensiveLiveDataService {
       try {
         const stats = await this.localDb.getIVStats(symbol);
         const history = await this.localDb.getIVHistory(symbol, 252);
-        const ivValues = history.map(h => h.iv);
+        const ivValues = history.map((h: { iv: number }) => h.iv);
         const high52Week = ivValues.length ? Math.max(...ivValues) : 0;
         const low52Week = ivValues.length ? Math.min(...ivValues) : 0;
         if (stats) {
@@ -186,7 +186,7 @@ class ComprehensiveLiveDataService {
           console.log(`[ComprehensiveLive] Got IV stats from local DB for ${symbol}`);
         } else if (ivValues.length) {
           const current = ivValues[ivValues.length - 1];
-          const percentile = Math.round((ivValues.filter(v => v <= current).length / ivValues.length) * 100);
+          const percentile = Math.round((ivValues.filter((v: number) => v <= current).length / ivValues.length) * 100);
           ivStats = {
             rank: percentile,
             percentile,
@@ -385,7 +385,7 @@ class ComprehensiveLiveDataService {
   }>> {
     try {
       const history = await this.localDb.getIVHistory(symbol, days);
-      return history.map(h => ({
+      return history.map((h: { date: string; iv: number }) => ({
         date: h.date,
         iv: h.iv || 25,
       }));
