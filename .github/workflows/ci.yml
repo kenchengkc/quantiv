@@ -10,9 +10,6 @@ jobs:
   frontend:
     name: Frontend (lint, type-check, build)
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/frontend
     steps:
       - uses: actions/checkout@v4
 
@@ -20,12 +17,11 @@ jobs:
         with:
           node-version: 18
           cache: npm
-          cache-dependency-path: apps/frontend/package-lock.json
 
       - run: npm ci
-      - run: npm run lint
-      - run: npm run type-check
-      - run: npm run build
+      - run: npm run lint --workspace=apps/frontend
+      - run: npm run type-check --workspace=apps/frontend
+      - run: npm run build --workspace=apps/frontend
 
   backend:
     name: Backend (lint, syntax)

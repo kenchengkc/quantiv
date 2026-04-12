@@ -34,12 +34,10 @@
     "**/*.tsx",
     ".next/types/**/*.ts",
     "../../lib/**/*.ts",
-    "../../lib/**/*.tsx"
+    "../../lib/**/*.tsx",
+    "../../lib/types.d.ts"
   ],
   "exclude": [
-    "node_modules",
-    "../../lib/services/doltService.ts",
-    "../../lib/services/doltOptimizedService.ts",
-    "../../lib/config/doltConfig.ts"
+    "node_modules"
   ]
 }

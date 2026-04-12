@@ -126,18 +126,18 @@ class PolygonWebSocketService {
           resolve(true);
         });
 
-        this.ws.on('message', (data) => {
+        this.ws.on('message', (data: { toString(): string }) => {
           this.handleMessage(data.toString());
         });
 
-        this.ws.on('close', (code, reason) => {
+        this.ws.on('close', (code: number, reason: Buffer) => {
           console.log(`[Polygon WebSocket] Connection closed: ${code} ${reason.toString()}`);
           this.isConnecting = false;
           this.stopHeartbeat();
           this.handleReconnect();
         });
 
-        this.ws.on('error', (error) => {
+        this.ws.on('error', (error: Error) => {
           console.error('[Polygon WebSocket] Connection error:', error);
           this.isConnecting = false;
           resolve(false);
