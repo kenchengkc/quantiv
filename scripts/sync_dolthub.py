@@ -50,6 +50,7 @@ ROW_LIMIT = 1000  # DoltHub enforced max
 # API endpoints for each repo
 OPTIONS_API = f"https://www.dolthub.com/api/v1alpha1/{DOLTHUB_OWNER}/options/{DOLTHUB_BRANCH}"
 EARNINGS_API = f"https://www.dolthub.com/api/v1alpha1/{DOLTHUB_OWNER}/earnings/{DOLTHUB_BRANCH}"
+STOCKS_API = f"https://www.dolthub.com/api/v1alpha1/{DOLTHUB_OWNER}/stocks/{DOLTHUB_BRANCH}"
 
 COLUMNS = "date, act_symbol, expiration, strike, call_put, bid, ask, vol, delta, gamma, theta, vega, rho"
 
@@ -426,6 +427,103 @@ def sync_earnings():
 
 
 # ---------------------------------------------------------------------------
+# OHLCV sync (post-no-preference/stocks)
+# ---------------------------------------------------------------------------
+OHLCV_SCHEMA = pa.schema([
+    ("date", pa.date32()),
+    ("act_symbol", pa.string()),
+    ("open", pa.float64()),
+    ("high", pa.float64()),
+    ("low", pa.float64()),
+    ("close", pa.float64()),
+    ("volume", pa.int64()),
+])
+
+
+def sync_ohlcv(start_date_str: Optional[str] = None, end_date_str: Optional[str] = None,
+               days: int = 30, full: bool = False):
+    """Sync OHLCV stock price data from DoltHub → Parquet.
+
+    The ohlcv table is keyed on (act_symbol, date) and moderate in size.
+    We paginate by date, fetching all symbols per date in batches of 1000.
+    """
+    print(f"{'='*60}\nOHLCV SYNC\n{'='*60}")
+
+    ohlcv_root = data_dir() / "parquet" / "ohlcv"
+    ohlcv_root.mkdir(parents=True, exist_ok=True)
+    meta = load_meta()
+
+    # Determine date range
+    if full:
+        rows_min = query("SELECT date FROM ohlcv ORDER BY date ASC LIMIT 1", STOCKS_API)
+        rows_max = query("SELECT date FROM ohlcv ORDER BY date DESC LIMIT 1", STOCKS_API)
+        start = date.fromisoformat(start_date_str) if start_date_str else date.fromisoformat(rows_min[0]["date"])
+        end = date.fromisoformat(end_date_str) if end_date_str else date.fromisoformat(rows_max[0]["date"])
+    else:
+        rows_max = query("SELECT date FROM ohlcv ORDER BY date DESC LIMIT 1", STOCKS_API)
+        end = date.fromisoformat(rows_max[0]["date"])
+        last_ohlcv = meta.get("last_ohlcv_date")
+        if last_ohlcv:
+            start = date.fromisoformat(last_ohlcv) + timedelta(days=1)
+        else:
+            start = end - timedelta(days=days)
+
+    if start > end:
+        print(f"Already up to date (synced through {meta.get('last_ohlcv_date')})")
+        return
+
+    dates = trading_dates(start, end)
+    print(f"Syncing {len(dates)} trading days: {start} → {end}\n")
+
+    total = 0
+    for i, d in enumerate(dates):
+        ds = d.isoformat()
+        out_dir = ohlcv_root / f"year={d.year}" / f"month={d.month:02d}"
+        out_path = out_dir / f"{ds}.parquet"
+        if out_path.exists() and not full:
+            continue
+
+        # Fetch all rows for this date (paginate if >1000 symbols)
+        all_rows: list[dict] = []
+        last_sym = ""
+        while True:
+            sql = (
+                f"SELECT date, act_symbol, `open`, high, low, `close`, volume "
+                f"FROM ohlcv WHERE date = '{ds}' AND act_symbol > '{last_sym}' "
+                f"ORDER BY act_symbol LIMIT {ROW_LIMIT}"
+            )
+            rows = query(sql, STOCKS_API)
+            if not rows:
+                break
+            all_rows.extend(rows)
+            if len(rows) < ROW_LIMIT:
+                break
+            last_sym = rows[-1]["act_symbol"]
+            time.sleep(API_DELAY)
+
+        if not all_rows:
+            continue
+
+        df = pd.DataFrame(all_rows)
+        df["date"] = pd.to_datetime(df["date"]).dt.date
+        for c in ["open", "high", "low", "close"]:
+            df[c] = pd.to_numeric(df[c], errors="coerce")
+        df["volume"] = pd.to_numeric(df["volume"], errors="coerce").fillna(0).astype("int64")
+
+        out_dir.mkdir(parents=True, exist_ok=True)
+        table = pa.Table.from_pandas(df, schema=OHLCV_SCHEMA, preserve_index=False)
+        pq.write_table(table, out_path, compression="snappy")
+        total += len(df)
+        print(f"  [{i+1}/{len(dates)}] {ds} — {len(df):,} rows", flush=True)
+        time.sleep(API_DELAY)
+
+    meta["last_ohlcv_date"] = end.isoformat()
+    meta["last_ohlcv_sync_time"] = datetime.now().isoformat()
+    save_meta(meta)
+    print(f"\n✅ OHLCV sync complete: {total:,} rows written to {ohlcv_root}")
+
+
+# ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 def main():
@@ -438,12 +536,17 @@ def main():
     parser.add_argument("--end-date", type=str, default=None)
     parser.add_argument("--date", type=str, default=None, help="Sync a single date")
     parser.add_argument("--force", action="store_true", help="Re-download even if Parquet exists")
-    parser.add_argument("--earnings", action="store_true", help="Sync earnings calendar instead of options")
+    parser.add_argument("--earnings", action="store_true", help="Sync earnings calendar")
+    parser.add_argument("--ohlcv", action="store_true", help="Sync OHLCV stock prices")
 
     args = parser.parse_args()
 
     if args.earnings:
         sync_earnings()
+        return
+
+    if args.ohlcv:
+        sync_ohlcv(args.start_date, args.end_date, args.days, args.full)
         return
 
     print(f"Parquet root: {parquet_root()}\n")
