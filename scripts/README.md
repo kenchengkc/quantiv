@@ -1,103 +1,90 @@
 # Scripts Directory
 
-This directory contains the core scripts for the Quantiv ML pipeline using a **Postgres-first workflow**.
+Core scripts for the Quantiv data and ML pipeline.
 
-## Core Workflow Scripts
+## Pipeline Overview
 
-### Data Import (CSV → PostgreSQL)
-- `csv_to_postgres.py` - Import CSV data directly to PostgreSQL tables
+```
+DoltHub (post-no-preference/options)
+    │
+    ├── sync_dolthub.py ──> Parquet (partitioned by year/month)
+    │                              │
+    │                              └── setup_duckdb_from_parquet.py ──> DuckDB views
+    │                                         │
+    │                                         ├── build_em_labels_features.py ──> ML features
+    │                                         ├── train_baseline_models.py ──> LightGBM models
+    │                                         └── daily_scoring_pipeline.py ──> Live predictions
+    │
+    └── setup_earnings_calendar.py ──> earnings_calendar.csv
+```
 
-### Data Pipeline (PostgreSQL → Parquet)
-- `postgres_to_parquet.py` - Convert PostgreSQL data to partitioned Parquet files
-- `sync_postgres_to_parquet.py` - Sync PostgreSQL to Parquet with incremental updates
+## Quick Start
+
+```bash
+# 1. Initial data load from DoltHub (one-time, takes a while)
+python scripts/sync_dolthub.py --full --start-date 2023-01-01
+
+# 2. Set up DuckDB views over the Parquet files
+python scripts/setup_duckdb_from_parquet.py
+
+# 3. Build ML features and train models
+python scripts/build_em_labels_features.py
+python scripts/train_baseline_models.py
+
+# 4. Generate predictions
+python scripts/populate_ml_forecasts.py
+```
+
+## Daily Operations
+
+```bash
+# Incremental sync (only new rows since last sync)
+python scripts/sync_dolthub.py
+
+# Refresh DuckDB views
+python scripts/setup_duckdb_from_parquet.py
+
+# Score upcoming earnings
+python scripts/daily_scoring_pipeline.py
+```
+
+## Scripts
+
+### Data Pipeline (DoltHub → Parquet → DuckDB)
+- `sync_dolthub.py` — Sync options chain data from DoltHub SQL API to Parquet
+- `setup_duckdb_from_parquet.py` — Create DuckDB views over Parquet files
 
 ### ML Pipeline
-- `setup_ml_pipeline.py` - Initialize ML pipeline and DuckDB views
-- `build_em_labels_features.py` - Build features for expected move predictions
-- `build_em_final.py` - Final feature engineering and model preparation
-- `train_baseline_models.py` - Train ML models for expected move forecasting
-- `populate_ml_forecasts.py` - Generate ML predictions and populate forecast tables
+- `setup_ml_pipeline.py` — Initialize ML pipeline
+- `build_em_labels_features.py` — Build expected move features/labels
+- `build_em_final.py` — Final feature engineering
+- `train_baseline_models.py` — Train LightGBM models
+- `populate_ml_forecasts.py` — Generate predictions
 
-### Data Management
-- `setup_data_structure.py` - Initialize database schemas and tables
-- `setup_duckdb_views.py` - Create DuckDB views for ML pipeline
-- `setup_earnings_calendar.py` - Setup earnings calendar data
-- `data_healthcheck.py` - Validate data quality and ML pipeline health
+### Supporting
+- `setup_earnings_calendar.py` — Fetch/update earnings calendar
+- `data_healthcheck.py` — Validate data quality
+- `daily_scoring_pipeline.py` — Daily production scoring
 
-### Production Pipeline
-- `daily_scoring_pipeline.py` - Daily production scoring for live predictions
-
-## Workflow Overview
-
-```
-CSV Files → PostgreSQL → Parquet Files → DuckDB Views → ML Models → Predictions
-```
-
-### 1. Data Import
-```bash
-# Import options chain CSV to PostgreSQL
-CSV_FILE=data/options_chain.csv python scripts/csv_to_postgres.py
-
-# Import volatility history CSV to PostgreSQL  
-CSV_FILE=data/volatility_history.csv python scripts/csv_to_postgres.py
-```
-
-### 2. Data Sync to Parquet
-```bash
-# Full sync from PostgreSQL to Parquet
-python scripts/sync_postgres_to_parquet.py --local
-
-# Incremental sync (last 7 days)
-python scripts/sync_postgres_to_parquet.py --local --incremental --days 7
-```
-
-### 3. ML Pipeline Setup
-```bash
-# Initialize ML pipeline
-python scripts/setup_ml_pipeline.py --local
-
-# Build features and train models
-python scripts/build_em_labels_features.py --local
-python scripts/train_baseline_models.py --local
-
-# Generate predictions
-python scripts/populate_ml_forecasts.py --local
-```
-
-### 4. Health Check
-```bash
-# Validate entire pipeline
-python scripts/data_healthcheck.py --local
-```
+### Legacy (Postgres-based, kept for reference)
+- `csv_to_postgres.py` — CSV → Postgres import
+- `postgres_to_parquet.py` — Postgres → Parquet export
+- `sync_postgres_to_parquet.py` — Incremental Postgres → Parquet sync
 
 ## NPM Scripts
 
-Convenient npm scripts are available in `package.json`:
-
 ```bash
-# ML pipeline
-npm run ml:setup
-npm run ml:forecast
-npm run ml:validate
-
-# Data sync
-npm run data:sync
-npm run data:sync-incremental
+npm run data:sync              # Incremental DoltHub sync
+npm run data:sync-full         # Full DoltHub sync
+npm run ml:setup               # Set up ML pipeline
+npm run ml:forecast            # Generate forecasts
+npm run ml:validate            # Health check
 ```
 
-## Environment Setup
+## Environment
 
 Ensure `config/.env.local` contains:
-
 ```env
-# PostgreSQL
-POSTGRES_HOST=localhost
-POSTGRES_PORT=5432
-POSTGRES_USER=quantiv_user
-POSTGRES_PASSWORD=quantiv_secure_2024
-POSTGRES_DB=quantiv_options
-
-# Data paths
-DATA_DIR=/path/to/quantiv/data
-DUCKDB_PATH=/path/to/quantiv/data/quantiv.duckdb
+DATA_DIR=./data
+DUCKDB_PATH=./data/quantiv.duckdb
 ```
