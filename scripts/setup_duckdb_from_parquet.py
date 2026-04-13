@@ -155,7 +155,7 @@ def setup_views(conn: duckdb.DuckDBPyConnection, data_dir: Path):
     else:
         print(f"[views] ⚠ No earnings data found (run: python scripts/sync_dolthub.py --earnings)")
 
-    # ── Volatility history ────────────────────────────────────────────
+    # ── Volatility history (legacy CSV) ─────────────────────────────
     if volhist_csv.exists():
         conn.execute(f"""
             CREATE OR REPLACE VIEW v_volhist_raw AS
@@ -165,6 +165,114 @@ def setup_views(conn: duckdb.DuckDBPyConnection, data_dir: Path):
         print(f"[views] v_volhist_raw: {vcount:,} rows (from {volhist_csv.name})")
     else:
         print(f"[views] ⚠ Volatility history CSV not found at {volhist_csv}")
+
+    # ── OHLCV stock prices ───────────────────────────────────────────
+    ohlcv_glob = str(data_dir / "parquet" / "ohlcv" / "year=*" / "month=*" / "*.parquet")
+    ohlcv_dir = data_dir / "parquet" / "ohlcv"
+    if ohlcv_dir.exists() and any(ohlcv_dir.rglob("*.parquet")):
+        conn.execute(f"""
+            CREATE OR REPLACE VIEW v_ohlcv AS
+            SELECT * FROM read_parquet('{ohlcv_glob}', hive_partitioning=true)
+        """)
+        ocount = conn.execute("SELECT COUNT(*) FROM v_ohlcv").fetchone()[0]
+        print(f"[views] v_ohlcv: {ocount:,} rows")
+
+        # ── Realized volatility estimators ────────────────────────────
+        # Computes rolling Parkinson, close-to-close, and Yang-Zhang estimates
+        conn.execute("""
+            CREATE OR REPLACE VIEW v_realized_vol AS
+            WITH daily AS (
+                SELECT
+                    act_symbol,
+                    date,
+                    open, high, low, close, volume,
+                    LN(high / NULLIF(low, 0)) AS hl_log,
+                    LN(close / NULLIF(
+                        LAG(close) OVER (PARTITION BY act_symbol ORDER BY date), 0
+                    )) AS cc_log_return
+                FROM v_ohlcv
+                WHERE close > 0 AND high > 0 AND low > 0 AND open > 0
+            ),
+            -- Stage 1: rolling vol estimates (no nesting)
+            stage1 AS (
+                SELECT
+                    act_symbol, date, close, volume,
+
+                    -- Parkinson RV (annualized)
+                    SQRT(252.0 / (4.0 * 5  * LN(2)) * SUM(hl_log * hl_log) OVER w5 ) AS parkinson_rv_5d,
+                    SQRT(252.0 / (4.0 * 10 * LN(2)) * SUM(hl_log * hl_log) OVER w10) AS parkinson_rv_10d,
+                    SQRT(252.0 / (4.0 * 20 * LN(2)) * SUM(hl_log * hl_log) OVER w20) AS parkinson_rv_20d,
+                    SQRT(252.0 / (4.0 * 60 * LN(2)) * SUM(hl_log * hl_log) OVER w60) AS parkinson_rv_60d,
+
+                    -- Close-to-close RV (annualized)
+                    SQRT(252.0 / 10 * SUM(cc_log_return * cc_log_return) OVER w10) AS cc_rv_10d,
+                    SQRT(252.0 / 20 * SUM(cc_log_return * cc_log_return) OVER w20) AS cc_rv_20d,
+
+                    -- Volume ratio
+                    volume * 1.0 / NULLIF(AVG(volume) OVER w20, 0) AS volume_ratio_20d,
+
+                    -- 5-day drift
+                    EXP(SUM(cc_log_return) OVER w5) - 1.0 AS drift_5d
+
+                FROM daily
+                WINDOW
+                    w5  AS (PARTITION BY act_symbol ORDER BY date ROWS BETWEEN 4 PRECEDING AND CURRENT ROW),
+                    w10 AS (PARTITION BY act_symbol ORDER BY date ROWS BETWEEN 9 PRECEDING AND CURRENT ROW),
+                    w20 AS (PARTITION BY act_symbol ORDER BY date ROWS BETWEEN 19 PRECEDING AND CURRENT ROW),
+                    w60 AS (PARTITION BY act_symbol ORDER BY date ROWS BETWEEN 59 PRECEDING AND CURRENT ROW)
+            )
+            -- Stage 2: vol-of-vol uses the 5d Parkinson from stage1
+            SELECT
+                act_symbol, date, close, volume,
+                parkinson_rv_10d, parkinson_rv_20d, parkinson_rv_60d,
+                cc_rv_10d, cc_rv_20d,
+                volume_ratio_20d, drift_5d,
+                STDDEV(parkinson_rv_5d) OVER (
+                    PARTITION BY act_symbol ORDER BY date ROWS BETWEEN 19 PRECEDING AND CURRENT ROW
+                ) AS vol_of_vol_20d
+            FROM stage1
+        """)
+        print("[views] v_realized_vol: created (parkinson, cc, vol-of-vol, volume ratio, drift)")
+
+        # ── IV vs RV feature view (join options ATM IV with realized vol) ─
+        conn.execute("""
+            CREATE OR REPLACE VIEW v_iv_rv_features AS
+            SELECT
+                s.act_symbol,
+                s.date,
+                s.expiration,
+                s.dte,
+                s.atm_strike,
+                s.atm_iv,
+                s.straddle_mid,
+                s.em_straddle,
+                s.em_iv,
+                -- Realized vol
+                rv.parkinson_rv_10d,
+                rv.parkinson_rv_20d,
+                rv.parkinson_rv_60d,
+                rv.cc_rv_10d,
+                rv.cc_rv_20d,
+                rv.vol_of_vol_20d,
+                rv.volume_ratio_20d,
+                rv.drift_5d,
+                rv.close AS spot_price,
+                -- IV / RV ratios (key predictive features)
+                s.atm_iv / NULLIF(rv.parkinson_rv_20d, 0) AS iv_rv_ratio_20d,
+                s.atm_iv / NULLIF(rv.parkinson_rv_60d, 0) AS iv_rv_ratio_60d,
+                s.atm_iv / NULLIF(rv.cc_rv_20d, 0) AS iv_cc_rv_ratio_20d,
+                -- Vol regime
+                rv.parkinson_rv_10d / NULLIF(rv.parkinson_rv_60d, 0) AS rv_term_ratio
+            FROM v_straddle_features s
+            JOIN v_realized_vol rv
+                ON s.act_symbol = rv.act_symbol
+                AND s.date = rv.date
+        """)
+        iv_rv_count = conn.execute("SELECT COUNT(*) FROM v_iv_rv_features").fetchone()[0]
+        print(f"[views] v_iv_rv_features: {iv_rv_count:,} rows (options + OHLCV joined)")
+
+    else:
+        print(f"[views] ⚠ No OHLCV data found (run: python scripts/sync_dolthub.py --ohlcv)")
 
     # ── Summary ───────────────────────────────────────────────────────
     print("\n[summary] Available views:")
