@@ -23,6 +23,9 @@ const nextConfig = {
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || '',
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL || '',
   },
+  experimental: {
+    serverComponentsExternalPackages: ['better-sqlite3', 'sqlite3', 'pg', 'ws'],
+  },
   async headers() {
     return [
       {
