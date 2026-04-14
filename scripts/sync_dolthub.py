@@ -480,7 +480,7 @@ def sync_ohlcv(start_date_str: Optional[str] = None, end_date_str: Optional[str]
         ds = d.isoformat()
         out_dir = ohlcv_root / f"year={d.year}" / f"month={d.month:02d}"
         out_path = out_dir / f"{ds}.parquet"
-        if out_path.exists() and not full:
+        if out_path.exists():
             continue
 
         # Fetch all rows for this date (paginate if >1000 symbols)
