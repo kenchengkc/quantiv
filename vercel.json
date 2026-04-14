@@ -1,0 +1,24 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "npm run build --workspace=apps/frontend",
+  "installCommand": "npm install",
+  "outputDirectory": "apps/frontend/.next",
+  "framework": "nextjs",
+  "env": {
+    "NEXT_PUBLIC_API_URL": "@quantiv_api_url",
+    "NEXT_PUBLIC_APP_URL": "@quantiv_app_url"
+  },
+  "regions": ["iad1"],
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "s-maxage=60, stale-while-revalidate=120"
+        }
+      ]
+    }
+  ],
+  "ignoreCommand": "git diff --quiet HEAD^ HEAD -- apps/frontend/ lib/ packages/"
+}
