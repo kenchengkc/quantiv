@@ -155,16 +155,25 @@ def setup_views(conn: duckdb.DuckDBPyConnection, data_dir: Path):
     else:
         print(f"[views] ⚠ No earnings data found (run: python scripts/sync_dolthub.py --earnings)")
 
-    # ── Volatility history (legacy CSV) ─────────────────────────────
-    if volhist_csv.exists():
+    # ── Volatility history (prefer Parquet, fall back to CSV) ───────
+    volhist_parquet_dir = data_dir / "parquet" / "volatility_history"
+    if volhist_parquet_dir.exists() and any(volhist_parquet_dir.rglob("*.parquet")):
+        volhist_glob = str(volhist_parquet_dir / "year=*" / "month=*" / "*.parquet")
+        conn.execute(f"""
+            CREATE OR REPLACE VIEW v_volhist_raw AS
+            SELECT * FROM read_parquet('{volhist_glob}', hive_partitioning=true)
+        """)
+        vcount = conn.execute("SELECT COUNT(*) FROM v_volhist_raw").fetchone()[0]
+        print(f"[views] v_volhist_raw: {vcount:,} rows (from Parquet)")
+    elif volhist_csv.exists():
         conn.execute(f"""
             CREATE OR REPLACE VIEW v_volhist_raw AS
             SELECT * FROM read_csv_auto('{volhist_csv}')
         """)
         vcount = conn.execute("SELECT COUNT(*) FROM v_volhist_raw").fetchone()[0]
-        print(f"[views] v_volhist_raw: {vcount:,} rows (from {volhist_csv.name})")
+        print(f"[views] v_volhist_raw: {vcount:,} rows (from {volhist_csv.name}, fallback)")
     else:
-        print(f"[views] ⚠ Volatility history CSV not found at {volhist_csv}")
+        print(f"[views] ⚠ Volatility history not found (neither Parquet nor CSV)")
 
     # ── OHLCV stock prices ───────────────────────────────────────────
     ohlcv_glob = str(data_dir / "parquet" / "ohlcv" / "year=*" / "month=*" / "*.parquet")
