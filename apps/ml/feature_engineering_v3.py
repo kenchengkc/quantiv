@@ -49,7 +49,7 @@ def get_data_dir() -> Path:
 
 def connect_duckdb() -> duckdb.DuckDBPyConnection:
     db_path = os.getenv("DUCKDB_PATH", str(get_data_dir() / "quantiv.duckdb"))
-    conn = duckdb.connect(db_path, read_only=True)
+    conn = duckdb.connect(db_path, read_only=False)
     views = [r[0] for r in conn.execute(
         "SELECT table_name FROM information_schema.tables WHERE table_type='VIEW'"
     ).fetchall()]
@@ -57,6 +57,31 @@ def connect_duckdb() -> duckdb.DuckDBPyConnection:
     for v in required:
         if v not in views:
             raise RuntimeError(f"Required view '{v}' missing. Run: python scripts/setup_duckdb_from_parquet.py")
+
+    # v_ohlcv and v_realized_vol are optional — create empty stubs if missing
+    # so LEFT JOINs work even without OHLCV data
+    if "v_ohlcv" not in views:
+        logger.warning("v_ohlcv not found — realized moves will use S_hat fallback only")
+        conn.execute("""
+            CREATE OR REPLACE VIEW v_ohlcv AS
+            SELECT NULL::VARCHAR AS act_symbol, NULL::DATE AS date,
+                   NULL::DOUBLE AS close, NULL::DOUBLE AS high,
+                   NULL::DOUBLE AS low, NULL::DOUBLE AS open
+            WHERE 1=0
+        """)
+    if "v_realized_vol" not in views:
+        logger.warning("v_realized_vol not found — RV features will be NULL")
+        conn.execute("""
+            CREATE OR REPLACE VIEW v_realized_vol AS
+            SELECT NULL::VARCHAR AS act_symbol, NULL::DATE AS date,
+                   NULL::DOUBLE AS close,
+                   NULL::DOUBLE AS parkinson_rv_10d, NULL::DOUBLE AS parkinson_rv_20d,
+                   NULL::DOUBLE AS parkinson_rv_60d,
+                   NULL::DOUBLE AS cc_rv_10d, NULL::DOUBLE AS cc_rv_20d,
+                   NULL::DOUBLE AS vol_of_vol_20d,
+                   NULL::DOUBLE AS volume_ratio_20d, NULL::DOUBLE AS drift_5d
+            WHERE 1=0
+        """)
     return conn
 
 
@@ -243,14 +268,20 @@ def extract_training_data(conn: duckdb.DuckDBPyConnection,
             -- Find back-month IV (next expiry after the front one)
             back.atm_iv AS back_iv,
             back.dte AS back_dte,
-            -- Event vol decomposition
+            -- Event vol decomposition (professional term-structure method)
+            -- Total variance = σ²_diffusive × T + σ²_event
+            -- Front expiry contains event: IV²_front × T_front = σ²_diff × T_front + σ²_event
+            -- Back expiry is pure diffusive: IV²_back × T_back = σ²_diff × T_back
+            -- Therefore: σ²_event = IV²_front × T_front - IV²_back × T_front
+            --                     ≈ (IV²_front - IV²_back) × T_front
+            -- event_move = √(σ²_event)
             CASE
                 WHEN sf.atm_iv > 0 AND back.atm_iv > 0
                      AND sf.atm_iv > back.atm_iv
                 THEN SQRT(
                     GREATEST(0,
                         sf.atm_iv * sf.atm_iv * (sf.dte / 365.0)
-                        - back.atm_iv * back.atm_iv * (sf.dte / 365.0)
+                        - back.atm_iv * back.atm_iv * (back.dte / 365.0)
                     )
                 )
                 ELSE NULL
@@ -327,7 +358,7 @@ def extract_training_data(conn: duckdb.DuckDBPyConnection,
             -- Market context (NULL pre-2023)
             rv.volume_ratio_20d,
             rv.drift_5d,
-            COALESCE(rv.close, sf.spot_est) AS spot_price,
+            COALESCE(rv.close, sf.atm_strike) AS spot_price,
 
             -- Historical earnings features
             ts.hist_move_avg_4q,
@@ -339,8 +370,8 @@ def extract_training_data(conn: duckdb.DuckDBPyConnection,
 
             -- Straddle accuracy: how well did straddle predict past moves?
             CASE WHEN ts.hist_move_avg_4q > 0
-                 AND sf.straddle_mid / NULLIF(sf.spot_est, 0) > 0
-                 THEN ts.hist_move_avg_4q / (sf.straddle_mid / NULLIF(sf.spot_est, 0))
+                 AND sf.straddle_mid / NULLIF(sf.atm_strike, 0) > 0
+                 THEN ts.hist_move_avg_4q / (sf.straddle_mid / NULLIF(sf.atm_strike, 0))
                  ELSE NULL
             END AS hist_straddle_accuracy,
 
@@ -365,7 +396,7 @@ def extract_training_data(conn: duckdb.DuckDBPyConnection,
         LEFT JOIN trailing_stats ts
             ON ts.act_symbol = e.act_symbol
             AND ts.earnings_date = e.earnings_date
-        WHERE sf.atm_iv > 0 AND sf.spot_est > 0
+        WHERE sf.atm_iv > 0 AND sf.atm_strike > 0
     )
 
     SELECT * FROM snapshots
