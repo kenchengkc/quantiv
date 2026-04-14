@@ -34,29 +34,65 @@ class MLServingPipeline:
         self._load_bias_curves()
     
     def _setup_duckdb(self):
-        """Initialize DuckDB connection"""
+        """Initialize DuckDB connection with views matching actual Parquet schema.
+
+        Parquet columns: date, act_symbol, expiration, strike, call_put,
+                         bid, ask, vol, delta, gamma, theta, vega, rho
+        """
         try:
             self.conn = duckdb.connect(":memory:")
             self.conn.execute("INSTALL parquet")
             self.conn.execute("LOAD parquet")
-            
-            # Load data views
+
             options_path = self.data_dir / "parquet" / "options_chain"
             if options_path.exists():
                 self.conn.execute(f"""
-                    CREATE VIEW options_chain AS 
-                    SELECT * FROM read_parquet('{options_path}/**/*.parquet')
+                    CREATE VIEW options_raw AS
+                    SELECT * FROM read_parquet(
+                        '{options_path}/**/*.parquet',
+                        hive_partitioning=true
+                    )
                 """)
-            
+
+                # Paired call/put view used by both math baseline and feature extraction
+                self.conn.execute("""
+                    CREATE VIEW options_paired AS
+                    SELECT
+                        c.act_symbol,
+                        c.date       AS quote_date,
+                        c.expiration,
+                        c.strike,
+                        (c.bid + c.ask) / 2.0 AS call_mid,
+                        (p.bid + p.ask) / 2.0 AS put_mid,
+                        c.vol  AS call_iv,
+                        p.vol  AS put_iv,
+                        c.delta AS call_delta,
+                        p.delta AS put_delta,
+                        c.gamma AS call_gamma,
+                        c.theta AS call_theta,
+                        c.vega  AS call_vega,
+                        COALESCE(c.vol, 0)   AS call_vol_proxy,
+                        COALESCE(p.vol, 0)   AS put_vol_proxy
+                    FROM options_raw c
+                    JOIN options_raw p
+                      ON  c.act_symbol = p.act_symbol
+                      AND c.date       = p.date
+                      AND c.expiration = p.expiration
+                      AND c.strike     = p.strike
+                    WHERE c.call_put = 'Call' AND p.call_put = 'Put'
+                      AND c.bid > 0 AND c.ask > 0
+                      AND p.bid > 0 AND p.ask > 0
+                """)
+
             earnings_path = self.data_dir / "earnings_calendar.csv"
             if earnings_path.exists():
                 self.conn.execute(f"""
-                    CREATE VIEW earnings_calendar AS 
+                    CREATE VIEW earnings_calendar AS
                     SELECT * FROM read_csv('{earnings_path}')
                 """)
-            
+
             logger.info("DuckDB serving views created")
-            
+
         except Exception as e:
             logger.error(f"Failed to setup DuckDB: {e}")
             raise
@@ -102,60 +138,67 @@ class MLServingPipeline:
             except Exception as e:
                 logger.warning(f"Failed to load bias curves: {e}")
     
-    def calculate_math_baseline(self, symbol: str, lead_time_days: int, 
+    def calculate_math_baseline(self, symbol: str, lead_time_days: int,
                               sector: Optional[str] = None) -> Dict[str, float]:
-        """Calculate math baseline EM with bias correction"""
-        
-        # Get current options data
+        """Calculate math baseline EM with bias correction.
+
+        Uses the paired call/put view.  S_hat is estimated as the strike
+        where |call_delta| is closest to 0.5 (standard ATM proxy).
+        """
+
         query = """
-        SELECT 
-            underlying_price,
-            strike,
-            call_bid, call_ask, put_bid, put_ask,
-            implied_volatility as iv,
-            ABS(LN(strike / underlying_price)) as atm_distance
-        FROM options_chain 
-        WHERE underlying_ticker = ?
-            AND quote_date = (
-                SELECT MAX(quote_date) 
-                FROM options_chain 
-                WHERE underlying_ticker = ?
-            )
-            AND call_bid > 0 AND put_bid > 0
+        WITH latest AS (
+            SELECT MAX(quote_date) AS max_date
+            FROM options_paired
+            WHERE act_symbol = ?
+        ),
+        spot AS (
+            SELECT arg_min(strike, ABS(ABS(COALESCE(call_delta,0)) - 0.5)) AS s_hat
+            FROM options_paired, latest
+            WHERE act_symbol = ?
+              AND quote_date = latest.max_date
+        )
+        SELECT
+            s.s_hat,
+            op.strike,
+            op.call_mid,
+            op.put_mid,
+            ABS(LN(op.strike / NULLIF(s.s_hat, 0))) AS atm_distance
+        FROM options_paired op, latest l, spot s
+        WHERE op.act_symbol = ?
+          AND op.quote_date = l.max_date
+          AND s.s_hat > 0
         ORDER BY atm_distance ASC
         LIMIT 10
         """
-        
+
         try:
-            result = self.conn.execute(query, [symbol, symbol]).fetchall()
-            
+            result = self.conn.execute(query, [symbol, symbol, symbol]).fetchall()
+
             if not result:
                 logger.warning(f"No options data found for {symbol}")
-                return {'em_math': 0.02, 'confidence': 0.0}  # Default 2%
-            
-            # Find ATM strike
-            atm_row = result[0]  # Closest to ATM
-            underlying_price = atm_row[0]
-            call_mid = (atm_row[2] + atm_row[3]) / 2
-            put_mid = (atm_row[4] + atm_row[5]) / 2
+                return {'em_math': 0.02, 'confidence': 0.0}
+
+            atm_row = result[0]
+            underlying_price = atm_row[0]  # s_hat
+            call_mid = atm_row[2]
+            put_mid = atm_row[3]
             straddle_price = call_mid + put_mid
-            
-            # Raw EM math
+
             em_math_raw = straddle_price / underlying_price
-            
-            # Apply bias correction
+
             bias_multiplier = self._get_bias_multiplier(symbol, sector, lead_time_days)
             em_math_corrected = em_math_raw * bias_multiplier
-            
+
             return {
                 'em_math': em_math_corrected,
                 'em_math_raw': em_math_raw,
                 'bias_multiplier': bias_multiplier,
                 'straddle_price': straddle_price,
                 'underlying_price': underlying_price,
-                'confidence': 0.7  # Math baseline confidence
+                'confidence': 0.7,
             }
-            
+
         except Exception as e:
             logger.error(f"Failed to calculate math baseline for {symbol}: {e}")
             return {'em_math': 0.02, 'confidence': 0.0}
@@ -182,110 +225,113 @@ class MLServingPipeline:
         return market_curve.get(closest_bucket, 1.0)
     
     def extract_ml_features(self, symbol: str, lead_time_days: int) -> Optional[pd.DataFrame]:
-        """Extract features for ML prediction"""
-        
-        # Get current options chain
+        """Extract features for ML prediction from the paired options view."""
+
         query = """
-        SELECT 
-            underlying_price,
-            strike,
-            option_type,
-            call_bid, call_ask, put_bid, put_ask,
-            implied_volatility as iv,
-            delta, gamma, theta, vega,
-            volume, open_interest,
-            expiration_date,
-            quote_date
-        FROM options_chain 
-        WHERE underlying_ticker = ?
-            AND quote_date = (
-                SELECT MAX(quote_date) 
-                FROM options_chain 
-                WHERE underlying_ticker = ?
-            )
-            AND call_bid > 0 AND put_bid > 0
+        WITH latest AS (
+            SELECT MAX(quote_date) AS max_date
+            FROM options_paired WHERE act_symbol = ?
+        ),
+        spot AS (
+            SELECT arg_min(strike, ABS(ABS(COALESCE(call_delta,0)) - 0.5)) AS s_hat
+            FROM options_paired, latest
+            WHERE act_symbol = ? AND quote_date = latest.max_date
+        )
+        SELECT
+            s.s_hat,
+            op.strike,
+            op.call_mid,
+            op.put_mid,
+            op.call_iv,
+            op.call_delta,
+            op.call_gamma,
+            op.call_theta,
+            op.call_vega,
+            op.expiration,
+            op.quote_date
+        FROM options_paired op, latest l, spot s
+        WHERE op.act_symbol = ?
+          AND op.quote_date = l.max_date
+          AND s.s_hat > 0
         """
-        
+
         try:
-            result = self.conn.execute(query, [symbol, symbol]).fetchall()
-            
+            result = self.conn.execute(query, [symbol, symbol, symbol]).fetchall()
+
             if not result:
                 return None
-            
-            columns = ['underlying_price', 'strike', 'option_type', 'call_bid', 'call_ask', 
-                      'put_bid', 'put_ask', 'iv', 'delta', 'gamma', 'theta', 'vega',
-                      'volume', 'open_interest', 'expiration_date', 'quote_date']
-            
+
+            columns = ['s_hat', 'strike', 'call_mid', 'put_mid', 'call_iv',
+                       'call_delta', 'call_gamma', 'call_theta', 'call_vega',
+                       'expiration', 'quote_date']
+
             df = pd.DataFrame(result, columns=columns)
-            
-            # Extract features (similar to feature_engineering.py)
             features = self._extract_features_from_chain(df, symbol, lead_time_days)
-            
+
             return pd.DataFrame([features])
-            
+
         except Exception as e:
             logger.error(f"Failed to extract ML features for {symbol}: {e}")
             return None
-    
-    def _extract_features_from_chain(self, chain_df: pd.DataFrame, 
+
+    def _extract_features_from_chain(self, chain_df: pd.DataFrame,
                                    symbol: str, lead_time_days: int) -> Dict[str, float]:
-        """Extract features from options chain (simplified version)"""
-        
-        features = {
+        """Extract features from paired options data.
+
+        Columns expected: s_hat, strike, call_mid, put_mid, call_iv,
+                          call_delta, call_gamma, call_theta, call_vega,
+                          expiration, quote_date
+        """
+
+        s_hat = float(chain_df['s_hat'].iloc[0])
+
+        features: Dict[str, float] = {
             'symbol_encoded': hash(symbol) % 10000,
             'horizon': lead_time_days,
             'earnings_month': datetime.now().month,
             'earnings_weekday': datetime.now().weekday(),
+            'underlying_price': s_hat,
+            'log_price': np.log(max(s_hat, 1e-6)),
+            'log_market_cap': np.log(1e9),
         }
-        
-        underlying_price = chain_df['underlying_price'].iloc[0]
-        features['underlying_price'] = underlying_price
-        features['log_price'] = np.log(underlying_price)
-        features['log_market_cap'] = np.log(1e9)  # Default
-        
-        # ATM features
+
         chain_df = chain_df.copy()
-        chain_df['atm_distance'] = np.abs(np.log(chain_df['strike'] / underlying_price))
-        atm_strike = chain_df.loc[chain_df['atm_distance'].idxmin(), 'strike']
-        
-        atm_calls = chain_df[(chain_df['strike'] == atm_strike) & (chain_df['option_type'] == 'call')]
-        atm_puts = chain_df[(chain_df['strike'] == atm_strike) & (chain_df['option_type'] == 'put')]
-        
-        if not atm_calls.empty and not atm_puts.empty:
-            call_price = (atm_calls['call_bid'].iloc[0] + atm_calls['call_ask'].iloc[0]) / 2
-            put_price = (atm_puts['put_bid'].iloc[0] + atm_puts['put_ask'].iloc[0]) / 2
-            
-            features.update({
-                'atm_straddle_price': call_price + put_price,
-                'atm_straddle_pct': (call_price + put_price) / underlying_price,
-                'atm_iv': atm_calls['iv'].iloc[0],
-                'atm_delta': abs(atm_calls['delta'].iloc[0] or 0),
-                'atm_gamma': atm_calls['gamma'].iloc[0] or 0,
-                'atm_theta': atm_calls['theta'].iloc[0] or 0,
-                'atm_vega': atm_calls['vega'].iloc[0] or 0,
-            })
-        else:
-            features.update({
-                'atm_straddle_price': 0,
-                'atm_straddle_pct': 0.02,
-                'atm_iv': 0.3,
-                'atm_delta': 0.5,
-                'atm_gamma': 0,
-                'atm_theta': 0,
-                'atm_vega': 0,
-            })
-        
-        # Additional features (simplified)
+        chain_df['atm_distance'] = np.abs(np.log(chain_df['strike'] / s_hat))
+        atm_idx = chain_df['atm_distance'].idxmin()
+        atm_row = chain_df.loc[atm_idx]
+
+        call_price = atm_row['call_mid']
+        put_price = atm_row['put_mid']
+        straddle = call_price + put_price
+
         features.update({
-            'skew_25d': 0,
-            'total_volume': chain_df['volume'].sum(),
-            'total_oi': chain_df['open_interest'].sum(),
-            'volume_oi_ratio': chain_df['volume'].sum() / max(chain_df['open_interest'].sum(), 1),
+            'atm_straddle_price': straddle,
+            'atm_straddle_pct': straddle / max(s_hat, 1e-6),
+            'atm_iv': abs(atm_row['call_delta']) if pd.notna(atm_row['call_iv']) and atm_row['call_iv'] == 0 else (atm_row['call_iv'] or 0.3),
+            'atm_delta': abs(atm_row['call_delta'] or 0),
+            'atm_gamma': atm_row['call_gamma'] or 0,
+            'atm_theta': atm_row['call_theta'] or 0,
+            'atm_vega': atm_row['call_vega'] or 0,
+        })
+
+        # Skew: 25-delta put premium vs 25-delta call premium
+        calls_25d = chain_df[chain_df['call_delta'].between(0.2, 0.3)]
+        if not calls_25d.empty:
+            put_25d_norm = (calls_25d['put_mid'] / max(s_hat, 1e-6)).mean()
+            call_25d_norm = (calls_25d['call_mid'] / max(s_hat, 1e-6)).mean()
+            features['skew_25d'] = put_25d_norm - call_25d_norm
+        else:
+            features['skew_25d'] = 0
+
+        # Volume/OI not available in paired view (our schema has no OI column)
+        features.update({
+            'total_volume': 0,
+            'volume_oi_ratio': 0,
             'pc_volume_ratio': 1.0,
             'iv_term_slope': 0,
-            'tte_earnings': lead_time_days / 365.25
+            'tte_earnings': lead_time_days / 365.25,
         })
-        
+
         return features
     
     def predict_ml_correction(self, symbol: str, lead_time_days: int) -> Dict[str, float]:
