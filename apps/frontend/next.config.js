@@ -26,6 +26,7 @@ const nextConfig = {
   experimental: {
     serverComponentsExternalPackages: ['better-sqlite3', 'sqlite3', 'pg', 'ws'],
   },
+  transpilePackages: [],
   async headers() {
     return [
       {
