@@ -1,5 +1,6 @@
 # Data files (CSVs, Parquet, DuckDB) — not needed for frontend build
-data/
+# Leading / anchors to repo root only (don't match apps/frontend/lib/data/)
+/data/
 *.csv
 *.parquet
 *.duckdb
@@ -12,7 +13,7 @@ data/
 venv/
 
 # ML models and training artifacts
-models/
+/models/
 *.pkl
 *.joblib
 *.model
