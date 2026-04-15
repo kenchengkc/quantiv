@@ -1,0 +1,41 @@
+# Data files (CSVs, Parquet, DuckDB) — not needed for frontend build
+data/
+*.csv
+*.parquet
+*.duckdb
+*.db
+*.sqlite
+*.sqlite3
+
+# Python virtual env
+.venv/
+venv/
+
+# ML models and training artifacts
+models/
+*.pkl
+*.joblib
+*.model
+*.h5
+*.pt
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+
+# Backend and ML apps (not deployed to Vercel)
+apps/backend/
+apps/ml/
+
+# Dolt data
+dolt/
+
+# Git
+.git/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
