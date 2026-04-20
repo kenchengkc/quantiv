@@ -77,16 +77,21 @@ def create_duckdb_views(conn: duckdb.DuckDBPyConnection, data_dir: Path):
     
     print("🦆 Creating DuckDB views...")
     
-    # Options chain view
+    # Options chain view (dedup on ticker/date/expiry/strike/call_put since parquet files can overlap)
     options_pattern = str(data_dir / "parquet" / "options_chain" / "*" / "*" / "*.parquet")
     conn.execute(f"""
         CREATE OR REPLACE VIEW v_options_chain AS
-        SELECT 
+        SELECT * FROM (
+        SELECT
             act_symbol as ticker,
             CAST(date AS DATE) as as_of_date,
             CAST(expiration AS DATE) as expiry_date,
             strike,
-            call_put,
+            CASE
+                WHEN UPPER(call_put) IN ('C', 'CALL') THEN 'C'
+                WHEN UPPER(call_put) IN ('P', 'PUT') THEN 'P'
+                ELSE NULL
+            END as call_put,
             bid,
             ask,
             (bid + ask) / 2.0 as mid_price,
@@ -104,6 +109,8 @@ def create_duckdb_views(conn: duckdb.DuckDBPyConnection, data_dir: Path):
         AND vol IS NOT NULL
         AND vol > 0
         AND vol < 5.0  -- Filter extreme IVs
+        QUALIFY ROW_NUMBER() OVER (PARTITION BY act_symbol, date, expiration, strike, call_put ORDER BY (bid+ask) DESC) = 1
+        )
     """)
     
     # Volatility history view  
