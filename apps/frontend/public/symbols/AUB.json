@@ -1,0 +1,89 @@
+{
+  "symbol": "AUB",
+  "as_of_date": "2026-04-10",
+  "spot_price": 35.0,
+  "expected_move": {
+    "earnings_date": "2026-04-21",
+    "expiration": "2026-05-15",
+    "dte": 35,
+    "lead_time_days": 11,
+    "atm_strike": 40.0,
+    "atm_iv": 1.322388,
+    "straddle_abs": 4.675,
+    "straddle_pct": 0.116875,
+    "iv_pct": 0.409493,
+    "skew_atm": 0.2971,
+    "term_slope": null,
+    "total_vega": 0.0917
+  },
+  "straddle_features": [
+    {
+      "expiration": "2026-05-15",
+      "dte": 35,
+      "atm_strike": 40.0,
+      "atm_iv": 1.32255,
+      "atm_call_iv": 1.174,
+      "atm_put_iv": 1.4711,
+      "straddle_mid": 4.675,
+      "em_straddle": 4.675,
+      "em_straddle_pct": 0.133571,
+      "em_iv": 14.334011,
+      "em_iv_pct": 0.409543,
+      "call_delta": 0.4676,
+      "call_gamma": 0.0262,
+      "call_vega": 0.0459,
+      "call_theta": -0.0472
+    }
+  ],
+  "earnings_history": [
+    {
+      "date": "2026-04-21",
+      "timing": "unknown"
+    },
+    {
+      "date": "2026-01-22",
+      "timing": "unknown"
+    },
+    {
+      "date": "2025-10-23",
+      "timing": "unknown"
+    },
+    {
+      "date": "2025-07-24",
+      "timing": "unknown"
+    },
+    {
+      "date": "2025-04-24",
+      "timing": "unknown"
+    },
+    {
+      "date": "2025-01-23",
+      "timing": "unknown"
+    },
+    {
+      "date": "2024-10-22",
+      "timing": "unknown"
+    },
+    {
+      "date": "2024-07-25",
+      "timing": "unknown"
+    },
+    {
+      "date": "2024-04-23",
+      "timing": "unknown"
+    },
+    {
+      "date": "2024-01-23",
+      "timing": "unknown"
+    },
+    {
+      "date": "2023-10-19",
+      "timing": "unknown"
+    },
+    {
+      "date": "2023-07-25",
+      "timing": "unknown"
+    }
+  ],
+  "next_earnings": "2026-04-21"
+}

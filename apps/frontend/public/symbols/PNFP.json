@@ -1,0 +1,89 @@
+{
+  "symbol": "PNFP",
+  "as_of_date": "2026-04-10",
+  "spot_price": null,
+  "expected_move": {
+    "earnings_date": "2026-04-22",
+    "expiration": "2026-05-15",
+    "dte": 35,
+    "lead_time_days": 12,
+    "atm_strike": 95.0,
+    "atm_iv": 0.342635,
+    "straddle_abs": 8.15,
+    "straddle_pct": 0.085789,
+    "iv_pct": 0.106101,
+    "skew_atm": 0.017933,
+    "term_slope": null,
+    "total_vega": 0.2241
+  },
+  "straddle_features": [
+    {
+      "expiration": "2026-05-15",
+      "dte": 35,
+      "atm_strike": 95.0,
+      "atm_iv": 0.3426,
+      "atm_call_iv": 0.3338,
+      "atm_put_iv": 0.3514,
+      "straddle_mid": 8.15,
+      "em_straddle": 8.15,
+      "em_straddle_pct": null,
+      "em_iv": null,
+      "em_iv_pct": null,
+      "call_delta": 0.4154,
+      "call_gamma": 0.0401,
+      "call_vega": 0.1116,
+      "call_theta": -0.0449
+    }
+  ],
+  "earnings_history": [
+    {
+      "date": "2026-04-22",
+      "timing": "unknown"
+    },
+    {
+      "date": "2026-01-21",
+      "timing": "unknown"
+    },
+    {
+      "date": "2025-10-15",
+      "timing": "unknown"
+    },
+    {
+      "date": "2025-07-15",
+      "timing": "unknown"
+    },
+    {
+      "date": "2025-04-14",
+      "timing": "unknown"
+    },
+    {
+      "date": "2025-01-21",
+      "timing": "unknown"
+    },
+    {
+      "date": "2024-10-15",
+      "timing": "unknown"
+    },
+    {
+      "date": "2024-07-16",
+      "timing": "unknown"
+    },
+    {
+      "date": "2024-04-22",
+      "timing": "unknown"
+    },
+    {
+      "date": "2024-01-16",
+      "timing": "unknown"
+    },
+    {
+      "date": "2023-10-17",
+      "timing": "unknown"
+    },
+    {
+      "date": "2023-07-18",
+      "timing": "unknown"
+    }
+  ],
+  "next_earnings": "2026-04-22"
+}

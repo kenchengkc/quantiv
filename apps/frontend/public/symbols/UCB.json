@@ -1,0 +1,86 @@
+{
+  "symbol": "UCB",
+  "as_of_date": "2026-04-10",
+  "spot_price": null,
+  "expected_move": {
+    "earnings_date": "2026-04-21",
+    "expiration": "2026-05-15",
+    "dte": 35,
+    "lead_time_days": 11,
+    "atm_strike": 35.0,
+    "atm_iv": 1.732,
+    "straddle_abs": 4.75,
+    "straddle_pct": 0.135714,
+    "iv_pct": 0.536334,
+    "skew_atm": 0.0,
+    "term_slope": null,
+    "total_vega": 0.0823
+  },
+  "straddle_features": [
+    {
+      "expiration": "2026-05-15",
+      "dte": 35,
+      "atm_strike": 35.0,
+      "atm_iv": 1.732,
+      "atm_call_iv": 1.732,
+      "atm_put_iv": 1.732,
+      "straddle_mid": 4.75,
+      "em_straddle": 4.75,
+      "em_straddle_pct": null,
+      "em_iv": null,
+      "em_iv_pct": null,
+      "call_delta": 0.6484,
+      "call_gamma": 0.0233,
+      "call_vega": 0.0416,
+      "call_theta": -0.1436
+    },
+    {
+      "expiration": "2026-06-18",
+      "dte": 69,
+      "atm_strike": 35.0,
+      "atm_iv": 0.3497,
+      "atm_call_iv": 0.3497,
+      "atm_put_iv": 0.3497,
+      "straddle_mid": 5.05,
+      "em_straddle": 5.05,
+      "em_straddle_pct": null,
+      "em_iv": null,
+      "em_iv_pct": null,
+      "call_delta": 0.5515,
+      "call_gamma": 0.0844,
+      "call_vega": 0.06,
+      "call_theta": -0.0312
+    }
+  ],
+  "earnings_history": [
+    {
+      "date": "2026-04-21",
+      "timing": "unknown"
+    },
+    {
+      "date": "2026-01-14",
+      "timing": "unknown"
+    },
+    {
+      "date": "2025-10-22",
+      "timing": "unknown"
+    },
+    {
+      "date": "2025-07-23",
+      "timing": "unknown"
+    },
+    {
+      "date": "2025-04-22",
+      "timing": "unknown"
+    },
+    {
+      "date": "2025-01-22",
+      "timing": "unknown"
+    },
+    {
+      "date": "2024-10-23",
+      "timing": "unknown"
+    }
+  ],
+  "next_earnings": "2026-04-21"
+}
