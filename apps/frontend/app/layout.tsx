@@ -39,20 +39,20 @@ export default function RootLayout({
       <body className={inter.className}>
         <Providers>
           <ErrorBoundary>
-            <div className="min-h-screen flex flex-col bg-white">
+            <div className="min-h-screen flex flex-col bg-[#0b0e14] text-gray-100">
               <Navbar />
               <main className="flex-1">{children}</main>
-              <footer className="border-t border-gray-200">
-                <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+              <footer className="border-t border-white/5">
+                <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6">
                   <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                     <div className="flex items-center gap-2">
-                      <div className="flex h-6 w-6 items-center justify-center rounded-md bg-blue-600 text-white font-bold text-xs">
+                      <div className="flex h-6 w-6 items-center justify-center rounded-md bg-emerald-500 text-black font-bold text-xs">
                         Q
                       </div>
-                      <span className="text-sm font-semibold text-gray-900">Quantiv</span>
+                      <span className="text-sm font-semibold text-gray-200">Quantiv</span>
                     </div>
-                    <p className="text-sm text-gray-400">
-                      &copy; {new Date().getFullYear()} Quantiv. Options intelligence for informed decisions.
+                    <p className="text-xs text-gray-500">
+                      &copy; {new Date().getFullYear()} Quantiv · Expected moves from options math + ML
                     </p>
                   </div>
                 </div>
