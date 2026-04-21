@@ -1,0 +1,85 @@
+{
+  "symbol": "JBTM",
+  "as_of_date": "2026-04-10",
+  "spot_price": 130.0,
+  "expected_move": {
+    "earnings_date": "2026-05-04",
+    "expiration": "2026-05-15",
+    "dte": 35,
+    "lead_time_days": 24,
+    "atm_strike": 130.0,
+    "atm_iv": 0.545753,
+    "straddle_abs": 17.4,
+    "straddle_pct": 0.133846,
+    "iv_pct": 0.168999,
+    "skew_atm": -0.02616,
+    "term_slope": null,
+    "total_vega": 0.3176,
+    "timing": "unknown",
+    "em_method": "options_math"
+  },
+  "straddle_features": [
+    {
+      "expiration": "2026-04-17",
+      "dte": 7,
+      "atm_strike": 130.0,
+      "atm_iv": 0.5046,
+      "atm_call_iv": 0.5019,
+      "atm_put_iv": 0.5073,
+      "straddle_mid": 7.275,
+      "em_straddle": 7.275,
+      "em_straddle_pct": 0.055962,
+      "em_iv": 9.084336,
+      "em_iv_pct": 0.06988,
+      "call_delta": 0.4611,
+      "call_gamma": 0.0443,
+      "call_vega": 0.0707,
+      "call_theta": -0.254
+    },
+    {
+      "expiration": "2026-05-15",
+      "dte": 35,
+      "atm_strike": 130.0,
+      "atm_iv": 0.54575,
+      "atm_call_iv": 0.5412,
+      "atm_put_iv": 0.5503,
+      "straddle_mid": 17.4,
+      "em_straddle": 17.4,
+      "em_straddle_pct": 0.133846,
+      "em_iv": 21.969728,
+      "em_iv_pct": 0.168998,
+      "call_delta": 0.5164,
+      "call_gamma": 0.0185,
+      "call_vega": 0.1587,
+      "call_theta": -0.131
+    }
+  ],
+  "earnings_history": [
+    {
+      "date": "2026-05-04",
+      "timing": "unknown"
+    },
+    {
+      "date": "2026-02-23",
+      "timing": "unknown"
+    },
+    {
+      "date": "2025-11-03",
+      "timing": "unknown"
+    },
+    {
+      "date": "2025-08-04",
+      "timing": "unknown"
+    },
+    {
+      "date": "2025-05-05",
+      "timing": "unknown"
+    },
+    {
+      "date": "2025-02-24",
+      "timing": "unknown"
+    }
+  ],
+  "next_earnings": "2026-05-04",
+  "next_earnings_timing": "unknown"
+}

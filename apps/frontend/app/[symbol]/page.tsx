@@ -2,7 +2,17 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { AlertCircle, ArrowLeft, Loader2, TrendingDown, TrendingUp } from 'lucide-react';
+import {
+  AlertCircle,
+  ArrowLeft,
+  BrainCircuit,
+  Calculator,
+  Loader2,
+  Moon,
+  Sun,
+  TrendingDown,
+  TrendingUp,
+} from 'lucide-react';
 
 interface Straddle {
   expiration: string;
@@ -35,6 +45,8 @@ interface ExpectedMove {
   skew_atm?: number | null;
   term_slope?: number | null;
   total_vega?: number | null;
+  timing?: string;
+  em_method?: 'options_math' | 'ml_lightgbm' | 'ensemble';
 }
 
 interface SymbolDetail {
@@ -45,6 +57,16 @@ interface SymbolDetail {
   straddle_features: Straddle[];
   earnings_history?: Array<{ date: string; timing: string }>;
   next_earnings?: string | null;
+  next_earnings_timing?: string;
+}
+
+interface LivePrice {
+  price: number | null;
+  previousClose: number | null;
+  change: number | null;
+  changePct: number | null;
+  updated: string;
+  source: 'polygon' | 'cache' | 'unavailable';
 }
 
 function logoUrl(ticker: string): string {
@@ -61,10 +83,66 @@ function formatDollar(v: number | null | undefined): string {
   return `$${v.toFixed(2)}`;
 }
 
+// Parses YYYY-MM-DD as a local date (not UTC) so `toLocaleDateString` doesn't
+// shift back a day for viewers west of UTC.
+function parseLocalDate(iso: string): Date {
+  const [y, m, d] = iso.slice(0, 10).split('-').map(Number);
+  return new Date(y, (m ?? 1) - 1, d ?? 1);
+}
+
 function formatDate(iso: string | undefined | null): string {
   if (!iso) return '—';
-  const d = new Date(iso);
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  return parseLocalDate(iso).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
+
+function timingLabel(t: string | undefined | null): {
+  label: string;
+  icon: React.ReactNode;
+  className: string;
+} | null {
+  if (!t) return null;
+  const key = t.toLowerCase();
+  if (key === 'bmo' || key === 'before_market_open' || key === 'before_open') {
+    return {
+      label: 'Before Open',
+      icon: <Sun className="w-3.5 h-3.5" />,
+      className: 'bg-amber-500/10 border-amber-400/30 text-amber-300',
+    };
+  }
+  if (key === 'amc' || key === 'after_market_close' || key === 'after_close') {
+    return {
+      label: 'After Close',
+      icon: <Moon className="w-3.5 h-3.5" />,
+      className: 'bg-indigo-500/10 border-indigo-400/30 text-indigo-300',
+    };
+  }
+  return null; // `unknown` → hide per spec ("nothing if not shown in csv")
+}
+
+function emMethodInfo(m: string | undefined): { label: string; icon: React.ReactNode; tooltip: string } {
+  if (m === 'ml_lightgbm') {
+    return {
+      label: 'ML forecast',
+      icon: <BrainCircuit className="w-3 h-3" />,
+      tooltip: 'Derived from a LightGBM model trained on historical earnings moves.',
+    };
+  }
+  if (m === 'ensemble') {
+    return {
+      label: 'Math + ML',
+      icon: <BrainCircuit className="w-3 h-3" />,
+      tooltip: 'Ensemble of options-math and LightGBM ML forecast.',
+    };
+  }
+  return {
+    label: 'Options math',
+    icon: <Calculator className="w-3 h-3" />,
+    tooltip: 'ATM straddle / IV baseline computed from the live options chain.',
+  };
 }
 
 export default function SymbolPage() {
@@ -76,6 +154,7 @@ export default function SymbolPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [logoError, setLogoError] = useState(false);
+  const [live, setLive] = useState<LivePrice | null>(null);
 
   useEffect(() => {
     if (!symbol) return;
@@ -92,6 +171,25 @@ export default function SymbolPage() {
         if (!cancelled) setError((e as Error).message);
       } finally {
         if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [symbol]);
+
+  // Fetch live price in parallel; ignore failures silently.
+  useEffect(() => {
+    if (!symbol) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/stocks/price?symbol=${symbol}`, { cache: 'no-store' });
+        if (!res.ok) return;
+        const json = (await res.json()) as LivePrice;
+        if (!cancelled) setLive(json);
+      } catch {
+        /* ignore */
       }
     })();
     return () => {
@@ -136,10 +234,17 @@ export default function SymbolPage() {
   }
 
   const em = data.expected_move;
-  const spot = data.spot_price ?? 0;
+  const livePrice = live?.price ?? null;
+  const spot = livePrice ?? data.spot_price ?? 0;
 
   const lower = em?.straddle_pct && spot ? spot * (1 - em.straddle_pct) : null;
   const upper = em?.straddle_pct && spot ? spot * (1 + em.straddle_pct) : null;
+  const lowerIV = em?.iv_pct && spot ? spot * (1 - em.iv_pct) : null;
+  const upperIV = em?.iv_pct && spot ? spot * (1 + em.iv_pct) : null;
+
+  const timing = timingLabel(em?.timing ?? data.next_earnings_timing);
+  const method = emMethodInfo(em?.em_method);
+  const changeUp = (live?.change ?? 0) >= 0;
 
   return (
     <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6 max-w-5xl">
@@ -152,7 +257,7 @@ export default function SymbolPage() {
       </button>
 
       {/* Header */}
-      <div className="flex items-center gap-4 mb-8">
+      <div className="flex items-start gap-4 mb-8">
         <div className="w-16 h-16 rounded-xl overflow-hidden bg-gray-800 ring-1 ring-white/10 flex-shrink-0">
           {!logoError ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -168,16 +273,49 @@ export default function SymbolPage() {
             </div>
           )}
         </div>
-        <div>
+        <div className="flex-1">
           <h1 className="text-3xl font-bold text-white">{symbol}</h1>
-          <div className="flex items-center gap-3 mt-1 text-sm">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-sm">
             <span className="text-2xl font-semibold text-gray-100">
               {formatDollar(spot)}
             </span>
-            <span className="text-gray-500">
-              As of {data.as_of_date}
-            </span>
+            {live?.change !== null && live?.change !== undefined && (
+              <span
+                className={`inline-flex items-center gap-1 text-sm font-medium ${
+                  changeUp ? 'text-emerald-400' : 'text-red-400'
+                }`}
+              >
+                {changeUp ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
+                {changeUp ? '+' : ''}
+                {live.change.toFixed(2)} ({changeUp ? '+' : ''}
+                {((live.changePct ?? 0) * 100).toFixed(2)}%)
+              </span>
+            )}
+            {live?.source === 'polygon' || live?.source === 'cache' ? (
+              <span className="text-[10px] uppercase tracking-wider text-emerald-400/80">
+                Live · Polygon
+              </span>
+            ) : (
+              <span className="text-[10px] uppercase tracking-wider text-gray-500">
+                As of {data.as_of_date}
+              </span>
+            )}
           </div>
+          {em?.earnings_date && (
+            <div className="flex flex-wrap items-center gap-2 mt-3">
+              <span className="text-xs text-gray-400">
+                Next earnings <span className="text-gray-200 font-medium">{formatDate(em.earnings_date)}</span>
+              </span>
+              {timing && (
+                <span
+                  className={`inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full border ${timing.className}`}
+                >
+                  {timing.icon}
+                  {timing.label}
+                </span>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -190,10 +328,15 @@ export default function SymbolPage() {
                 {em.earnings_date ? 'Next-earnings expected move' : 'Nearest-expiry expected move'}
               </div>
               <div className="text-xs text-gray-400 mt-1">
-                {em.earnings_date && (
-                  <>Earnings {formatDate(em.earnings_date)} · </>
-                )}
+                {em.earnings_date && <>Earnings {formatDate(em.earnings_date)} · </>}
                 Expiry {formatDate(em.expiration)} · {em.dte}d out
+              </div>
+              <div
+                title={method.tooltip}
+                className="inline-flex items-center gap-1.5 mt-2 text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-300 border border-emerald-400/20"
+              >
+                {method.icon}
+                {method.label}
               </div>
             </div>
             <div className="text-right">
@@ -204,24 +347,15 @@ export default function SymbolPage() {
             </div>
           </div>
 
-          {/* Price range */}
+          {/* Creative implied range bar */}
           {lower && upper && (
-            <div>
-              <div className="flex items-center justify-between text-xs mb-2">
-                <span className="inline-flex items-center gap-1 text-red-400">
-                  <TrendingDown className="w-3 h-3" />
-                  {formatDollar(lower)}
-                </span>
-                <span className="text-gray-500">Implied range · 68% band</span>
-                <span className="inline-flex items-center gap-1 text-emerald-400">
-                  {formatDollar(upper)}
-                  <TrendingUp className="w-3 h-3" />
-                </span>
-              </div>
-              <div className="h-2 bg-black/40 rounded-full overflow-hidden">
-                <div className="h-full w-full bg-gradient-to-r from-red-500/80 via-yellow-400/70 to-emerald-500/80" />
-              </div>
-            </div>
+            <ImpliedMoveBar
+              spot={spot}
+              lower={lower}
+              upper={upper}
+              lowerIV={lowerIV}
+              upperIV={upperIV}
+            />
           )}
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6">
@@ -252,8 +386,8 @@ export default function SymbolPage() {
                   <th className="text-right py-2 font-normal">DTE</th>
                   <th className="text-right py-2 font-normal">ATM IV</th>
                   <th className="text-right py-2 font-normal">Straddle</th>
-                  <th className="text-right py-2 font-normal">EM %</th>
-                  <th className="text-right py-2 font-normal">IV EM %</th>
+                  <th className="text-right py-2 font-normal">EM % (math)</th>
+                  <th className="text-right py-2 font-normal">EM % (IV)</th>
                 </tr>
               </thead>
               <tbody>
@@ -326,6 +460,119 @@ function Stat({ label, value }: { label: string; value: string }) {
     <div className="rounded-xl bg-black/30 border border-white/5 p-3">
       <div className="text-[10px] uppercase tracking-wider text-gray-500">{label}</div>
       <div className="text-base font-semibold text-gray-100 mt-0.5">{value}</div>
+    </div>
+  );
+}
+
+function ImpliedMoveBar({
+  spot,
+  lower,
+  upper,
+  lowerIV,
+  upperIV,
+}: {
+  spot: number;
+  lower: number;
+  upper: number;
+  lowerIV: number | null;
+  upperIV: number | null;
+}) {
+  // Pad the axis a bit beyond whichever range (straddle vs IV) is wider so both fit.
+  const widest = Math.max(
+    upper - spot,
+    spot - lower,
+    upperIV ? upperIV - spot : 0,
+    lowerIV ? spot - lowerIV : 0,
+  );
+  const minVal = spot - widest * 1.08;
+  const maxVal = spot + widest * 1.08;
+  const toPct = (v: number) => ((v - minVal) / (maxVal - minVal)) * 100;
+
+  const lowPct = toPct(lower);
+  const highPct = toPct(upper);
+  const spotPct = toPct(spot);
+  const lowIVPct = lowerIV ? toPct(lowerIV) : null;
+  const highIVPct = upperIV ? toPct(upperIV) : null;
+
+  return (
+    <div className="mt-2">
+      {/* Axis labels */}
+      <div className="flex items-center justify-between text-[11px] mb-2">
+        <span className="inline-flex items-center gap-1 text-red-400 font-medium">
+          <TrendingDown className="w-3 h-3" />
+          {formatDollar(lower)}
+        </span>
+        <span className="text-gray-400 text-[10px] uppercase tracking-wider">
+          Implied range · ~68% · straddle
+        </span>
+        <span className="inline-flex items-center gap-1 text-emerald-400 font-medium">
+          {formatDollar(upper)}
+          <TrendingUp className="w-3 h-3" />
+        </span>
+      </div>
+
+      {/* Track */}
+      <div className="relative h-10">
+        {/* distribution-ish gradient backdrop */}
+        <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-3 rounded-full bg-black/40 overflow-hidden ring-1 ring-white/5">
+          <div
+            className="absolute top-0 bottom-0 bg-gradient-to-r from-red-500/60 via-amber-400/60 to-emerald-500/60"
+            style={{ left: `${lowPct}%`, width: `${highPct - lowPct}%` }}
+          />
+          {/* Inner, higher-density core (~1-sigma squeeze) */}
+          <div
+            className="absolute top-0 bottom-0 bg-gradient-to-r from-red-400 via-yellow-300 to-emerald-400"
+            style={{
+              left: `${lowPct + (highPct - lowPct) * 0.33}%`,
+              width: `${(highPct - lowPct) * 0.34}%`,
+              opacity: 0.9,
+              filter: 'blur(0.5px)',
+            }}
+          />
+        </div>
+
+        {/* IV band as dashed outline under main track */}
+        {lowIVPct !== null && highIVPct !== null && (
+          <div
+            className="absolute top-1/2 -translate-y-1/2 h-6 border border-dashed border-blue-400/50 rounded-full pointer-events-none"
+            style={{ left: `${lowIVPct}%`, width: `${highIVPct - lowIVPct}%` }}
+            title={`IV-based range: ${formatDollar(lowerIV ?? 0)} – ${formatDollar(upperIV ?? 0)}`}
+          />
+        )}
+
+        {/* Spot marker */}
+        <div
+          className="absolute top-0 bottom-0 w-px bg-white"
+          style={{ left: `${spotPct}%` }}
+          aria-hidden
+        />
+        <div
+          className="absolute -top-1 -translate-x-1/2"
+          style={{ left: `${spotPct}%` }}
+        >
+          <div className="w-2.5 h-2.5 rotate-45 bg-white border border-gray-700" />
+        </div>
+        <div
+          className="absolute -bottom-5 -translate-x-1/2 text-[10px] font-medium text-gray-200 whitespace-nowrap"
+          style={{ left: `${spotPct}%` }}
+        >
+          Spot {formatDollar(spot)}
+        </div>
+      </div>
+
+      {/* Legend */}
+      <div className="flex items-center gap-4 mt-7 text-[10px] text-gray-400">
+        <span className="inline-flex items-center gap-1.5">
+          <span className="h-2 w-4 rounded-full bg-gradient-to-r from-red-500/70 via-amber-400/70 to-emerald-500/70" />
+          Straddle band
+        </span>
+        {lowIVPct !== null && (
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-2 w-4 rounded-full border border-dashed border-blue-400/70" />
+            IV band
+          </span>
+        )}
+      </div>
     </div>
   );
 }

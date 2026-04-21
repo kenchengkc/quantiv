@@ -1,0 +1,93 @@
+{
+  "symbol": "WAY",
+  "as_of_date": "2026-04-10",
+  "spot_price": null,
+  "expected_move": {
+    "earnings_date": "2026-04-29",
+    "expiration": "2026-05-15",
+    "dte": 35,
+    "lead_time_days": 19,
+    "atm_strike": 22.5,
+    "atm_iv": 0.621707,
+    "straddle_abs": 3.5,
+    "straddle_pct": 0.155556,
+    "iv_pct": 0.192519,
+    "skew_atm": -0.0097,
+    "term_slope": null,
+    "total_vega": 0.0514,
+    "timing": "unknown",
+    "em_method": "options_math"
+  },
+  "straddle_features": [
+    {
+      "expiration": "2026-05-15",
+      "dte": 35,
+      "atm_strike": 22.5,
+      "atm_iv": 0.62165,
+      "atm_call_iv": 0.6265,
+      "atm_put_iv": 0.6168,
+      "straddle_mid": 3.5,
+      "em_straddle": 3.5,
+      "em_straddle_pct": null,
+      "em_iv": null,
+      "em_iv_pct": null,
+      "call_delta": 0.4404,
+      "call_gamma": 0.0969,
+      "call_vega": 0.026,
+      "call_theta": -0.0265
+    },
+    {
+      "expiration": "2026-06-18",
+      "dte": 69,
+      "atm_strike": 22.5,
+      "atm_iv": 0.62185,
+      "atm_call_iv": 0.5778,
+      "atm_put_iv": 0.6659,
+      "straddle_mid": 4.8,
+      "em_straddle": 4.8,
+      "em_straddle_pct": null,
+      "em_iv": null,
+      "em_iv_pct": null,
+      "call_delta": 0.4782,
+      "call_gamma": 0.0756,
+      "call_vega": 0.0368,
+      "call_theta": -0.0174
+    }
+  ],
+  "earnings_history": [
+    {
+      "date": "2026-04-29",
+      "timing": "unknown"
+    },
+    {
+      "date": "2026-02-17",
+      "timing": "unknown"
+    },
+    {
+      "date": "2025-10-29",
+      "timing": "unknown"
+    },
+    {
+      "date": "2025-07-30",
+      "timing": "unknown"
+    },
+    {
+      "date": "2025-04-30",
+      "timing": "unknown"
+    },
+    {
+      "date": "2025-02-18",
+      "timing": "unknown"
+    },
+    {
+      "date": "2024-11-06",
+      "timing": "unknown"
+    },
+    {
+      "date": "2024-08-07",
+      "timing": "unknown"
+    }
+  ],
+  "next_earnings": "2026-04-29",
+  "next_earnings_timing": "unknown"
+}

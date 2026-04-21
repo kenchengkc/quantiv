@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import { Sun, Moon, Flag, Filter, ChevronLeft, ChevronRight } from 'lucide-react';
 
@@ -24,6 +24,7 @@ interface WeeklyData {
     generated_at: string;
     as_of_date: string;
     method: string;
+    offset?: number;
   };
   window: { start: string; end: string };
   events: EarningsEvent[];
@@ -32,6 +33,28 @@ interface WeeklyData {
     avg_em_straddle_pct: number;
     avg_em_iv_pct: number;
   };
+}
+
+// UI exposes last week through two weeks ahead.
+const MIN_OFFSET = -1;
+const MAX_OFFSET = 2;
+
+function parseLocalDate(iso: string): Date {
+  const [y, m, d] = iso.slice(0, 10).split('-').map(Number);
+  return new Date(y, (m ?? 1) - 1, d ?? 1);
+}
+
+function mondayOf(d: Date): Date {
+  const out = new Date(d);
+  const day = out.getDay(); // 0=Sun, 1=Mon
+  const delta = day === 0 ? -6 : 1 - day;
+  out.setDate(out.getDate() + delta);
+  out.setHours(0, 0, 0, 0);
+  return out;
+}
+
+function isoDay(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 const POPULAR_WEIGHT: Record<string, number> = {
@@ -198,8 +221,8 @@ function Section({
 }
 
 function formatWindow(start: string, end: string) {
-  const s = new Date(start + 'T00:00:00');
-  const e = new Date(end + 'T00:00:00');
+  const s = parseLocalDate(start);
+  const e = parseLocalDate(end);
   const m = (d: Date) => d.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
   return `${m(s)} ${s.getDate()} - ${e.getDate()}`;
 }
@@ -209,25 +232,39 @@ export default function EarningsGrid() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [popularOnly, setPopularOnly] = useState(true);
+  const [offset, setOffset] = useState(0); // -1=last, 0=this, 1=next, 2=+2
+
+  // Compute "this Monday" in local time so the UI anchors on the user's week.
+  const thisMonday = useMemo(() => mondayOf(new Date()), []);
+  const weekStartIso = useMemo(() => {
+    const d = new Date(thisMonday);
+    d.setDate(d.getDate() + 7 * offset);
+    return isoDay(d);
+  }, [thisMonday, offset]);
+
+  const fetchWeek = useCallback(async (iso: string) => {
+    // Primary: /weeks/{monday}.json. Fallback to /weekly.json for the current
+    // week when the multi-week artifacts haven't been generated yet.
+    const tryUrls = [`/weeks/${iso}.json`, offset === 0 ? '/weekly.json' : null].filter(
+      Boolean,
+    ) as string[];
+    for (const url of tryUrls) {
+      const res = await fetch(url, { cache: 'no-store' });
+      if (res.ok) return (await res.json()) as WeeklyData;
+    }
+    throw new Error(`no data for ${iso}`);
+  }, [offset]);
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch('/weekly.json', { cache: 'no-store' });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const json = await res.json();
-        if (!cancelled) setData(json);
-      } catch (e) {
-        if (!cancelled) setError((e as Error).message);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    setLoading(true);
+    setError(null);
+    fetchWeek(weekStartIso)
+      .then((json) => { if (!cancelled) setData(json); })
+      .catch((e) => { if (!cancelled) setError((e as Error).message); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [weekStartIso, fetchWeek]);
 
   if (loading) {
     return (
@@ -245,7 +282,7 @@ export default function EarningsGrid() {
     );
   }
 
-  const weekStart = new Date(data.window.start + 'T00:00:00');
+  const weekStart = parseLocalDate(data.window.start);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const days = Array.from({ length: 5 }, (_, i) => {
@@ -268,26 +305,40 @@ export default function EarningsGrid() {
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1.5">
             <button
-              className="w-9 h-9 rounded-full bg-gray-800 hover:bg-gray-700 flex items-center justify-center text-gray-300"
+              onClick={() => setOffset((o) => Math.max(MIN_OFFSET, o - 1))}
+              disabled={offset <= MIN_OFFSET}
+              className="w-9 h-9 rounded-full bg-gray-800 hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center text-gray-300"
               aria-label="Previous week"
-              disabled
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
-            <div className="w-9 h-9 rounded-full bg-gray-800 flex flex-col items-center justify-center text-[10px] text-gray-400 leading-none">
-              <span>{weekStart.toLocaleDateString('en-US', { weekday: 'short' })[0]}</span>
-              <span className="text-xs text-white font-semibold">{weekStart.getDate()}</span>
-            </div>
             <button
-              className="w-9 h-9 rounded-full bg-gray-800 hover:bg-gray-700 flex items-center justify-center text-gray-300"
+              onClick={() => setOffset(0)}
+              className={`w-9 h-9 rounded-full flex flex-col items-center justify-center text-[10px] leading-none transition-colors ${
+                offset === 0 ? 'bg-emerald-500 text-black' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+              }`}
+              aria-label="Jump to this week"
+              title="This week"
+            >
+              <span>{weekStart.toLocaleDateString('en-US', { weekday: 'short' })[0]}</span>
+              <span className="text-xs font-semibold">{weekStart.getDate()}</span>
+            </button>
+            <button
+              onClick={() => setOffset((o) => Math.min(MAX_OFFSET, o + 1))}
+              disabled={offset >= MAX_OFFSET}
+              className="w-9 h-9 rounded-full bg-gray-800 hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center text-gray-300"
               aria-label="Next week"
-              disabled
             >
               <ChevronRight className="w-4 h-4" />
             </button>
           </div>
           <div className="ml-2">
-            <div className="text-[10px] uppercase tracking-wider text-gray-500">Earnings this week</div>
+            <div className="text-[10px] uppercase tracking-wider text-gray-500">
+              {offset === -1 && 'Last week'}
+              {offset === 0 && 'Earnings this week'}
+              {offset === 1 && 'Next week'}
+              {offset === 2 && 'Two weeks ahead'}
+            </div>
             <div className="text-sm font-semibold text-gray-200">
               {formatWindow(data.window.start, data.window.end)}
             </div>
