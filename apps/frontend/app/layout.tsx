@@ -1,6 +1,7 @@
 import './globals.css';
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
+import { Analytics } from '@vercel/analytics/next';
 import { Providers } from './providers';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Navbar } from '@/components/Navbar';
@@ -60,6 +61,7 @@ export default function RootLayout({
             </div>
           </ErrorBoundary>
         </Providers>
+        <Analytics />
       </body>
     </html>
   );
