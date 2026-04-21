@@ -1,240 +1,501 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Sun, Moon, Flag, Filter, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Sun, Moon, Info, ChevronLeft, ChevronRight, Search, Circle } from 'lucide-react';
+import { POPULAR_WEIGHT } from '@/lib/popular';
+import { COMPANY_NAMES } from '@/lib/companyNames';
 
 interface EarningsEvent {
   ticker: string;
   earnings_date: string;
   timing: string;
-  fiscal_q?: string;
-  spot_price?: number | null;
-  atm_iv?: number | null;
   em_straddle_pct?: number | null;
   em_iv_pct?: number | null;
-  em_straddle_abs?: number | null;
-  days_to_expiry?: number;
-  lead_time_days?: number;
 }
 
 interface WeeklyData {
-  metadata: {
-    version: string;
-    generated_at: string;
-    as_of_date: string;
-    method: string;
-    offset?: number;
-  };
+  metadata: { as_of_date: string; method: string; offset?: number };
   window: { start: string; end: string };
   events: EarningsEvent[];
-  summary?: {
-    total_events: number;
-    avg_em_straddle_pct: number;
-    avg_em_iv_pct: number;
-  };
 }
 
-// UI exposes last week through two weeks ahead.
+type Filter = 'popular' | 'sp500' | 'movers' | 'all';
+
 const MIN_OFFSET = -1;
 const MAX_OFFSET = 2;
+const OFFSETS: { v: number; l: string }[] = [
+  { v: -1, l: 'Last week' },
+  { v: 0, l: 'This week' },
+  { v: 1, l: 'Next week' },
+  { v: 2, l: 'In two weeks' },
+];
 
-function parseLocalDate(iso: string): Date {
+function parseLocalDate(iso: string) {
   const [y, m, d] = iso.slice(0, 10).split('-').map(Number);
   return new Date(y, (m ?? 1) - 1, d ?? 1);
 }
-
-function mondayOf(d: Date): Date {
+function mondayOf(d: Date) {
   const out = new Date(d);
-  const day = out.getDay(); // 0=Sun, 1=Mon
+  const day = out.getDay();
   const delta = day === 0 ? -6 : 1 - day;
   out.setDate(out.getDate() + delta);
   out.setHours(0, 0, 0, 0);
   return out;
 }
-
-function isoDay(d: Date): string {
+function isoDay(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
-
-const POPULAR_WEIGHT: Record<string, number> = {
-  AAPL: 100, TSLA: 100, NVDA: 100, MSFT: 95, AMZN: 95, META: 95, GOOGL: 95,
-  JPM: 90, BAC: 85, UNH: 90, JNJ: 88, V: 85, MA: 85, PG: 85, KO: 80,
-  NFLX: 90, IBM: 85, INTC: 85, AMD: 85, BA: 85, GE: 85, T: 80, VZ: 80,
-  XOM: 85, CVX: 85, WMT: 85, HD: 80, DIS: 85, NKE: 80, MCD: 80, SBUX: 78,
-  COST: 82, CRM: 82, ORCL: 82, CSCO: 80, QCOM: 80, AVGO: 85, AMAT: 78,
-  AXP: 80, GS: 82, MS: 82, C: 82, WFC: 82, PYPL: 78, SQ: 75,
-  UNP: 78, LMT: 80, RTX: 80, CAT: 78, DE: 76, HON: 78, MMM: 75,
-  TMO: 80, ABT: 80, LLY: 85, PFE: 80, MRK: 80, NEE: 76, DUK: 74,
-  SLB: 78, HAL: 75, EOG: 74, COP: 76, KMI: 72, PSX: 72,
-  NOW: 82, ADBE: 85, SNOW: 78, PLTR: 80, COIN: 80, SHOP: 76,
-  DHR: 75, DHI: 72, EFX: 72, TSCO: 72, SYF: 72, MCO: 76, MSCI: 74,
-  NOC: 75, BSX: 74, ELV: 74, CME: 74, LRCX: 76, TXN: 78, QS: 70,
-  LUV: 72, AAL: 72, UAL: 74, DAL: 74, CCI: 72, CMCSA: 78,
-  CHTR: 75, HCA: 75, VRT: 72, GEV: 74, BX: 80, EW: 74, FIX: 70,
-  DLR: 74, FCX: 75, BKR: 72, KNSL: 68, NDAQ: 74, NEM: 72, EQT: 70,
-  ADC: 68, CB: 78, COF: 78, PM: 80, UHG: 88, IBKR: 72, ISRG: 78,
-};
-
-function timingKey(timing: string): 'bmo' | 'amc' | 'other' {
-  const t = (timing || '').toLowerCase();
-  if (t === 'bmo' || t === 'before_market_open' || t === 'before_open') return 'bmo';
-  if (t === 'amc' || t === 'after_market_close' || t === 'after_close') return 'amc';
-  return 'other';
+function timingKey(t?: string) {
+  const k = (t || '').toLowerCase();
+  if (k === 'bmo' || k === 'before_market_open' || k === 'before_open') return 'bmo' as const;
+  if (k === 'amc' || k === 'after_market_close' || k === 'after_close') return 'amc' as const;
+  return 'unknown' as const;
+}
+function logoUrl(t: string) {
+  return `https://assets.parqet.com/logos/symbol/${t}?format=png`;
+}
+function companyName(t: string) {
+  return COMPANY_NAMES[t] || t;
 }
 
-function logoUrl(ticker: string): string {
-  return `https://assets.parqet.com/logos/symbol/${ticker}?format=png`;
+function Logo({ ticker, size = 24 }: { ticker: string; size?: number }) {
+  const [err, setErr] = useState(false);
+  const s = { width: size, height: size };
+  if (err) {
+    return (
+      <div
+        className="serif"
+        style={{
+          ...s,
+          borderRadius: 6,
+          background: 'var(--bg-3)',
+          border: '1px solid var(--line)',
+          display: 'grid',
+          placeItems: 'center',
+          color: 'var(--ink-2)',
+          fontSize: Math.max(9, size * 0.34),
+          fontWeight: 600,
+          letterSpacing: '0.02em',
+        }}
+      >
+        {ticker.slice(0, 3)}
+      </div>
+    );
+  }
+  // eslint-disable-next-line @next/next/no-img-element
+  return (
+    <img
+      src={logoUrl(ticker)}
+      alt={ticker}
+      onError={() => setErr(true)}
+      style={{
+        ...s,
+        borderRadius: 6,
+        objectFit: 'cover',
+        background: 'var(--paper)',
+        border: '1px solid var(--line)',
+      }}
+    />
+  );
 }
 
-function TickerTile({ event }: { event: EarningsEvent }) {
-  const [imgError, setImgError] = useState(false);
-  const movePct = event.em_straddle_pct ?? event.em_iv_pct;
-  const moveLabel = typeof movePct === 'number' ? `±${(movePct * 100).toFixed(1)}%` : null;
-
+function TickerRow({ ev }: { ev: EarningsEvent }) {
+  const movePct = ev.em_straddle_pct ?? ev.em_iv_pct ?? null;
   return (
     <Link
-      href={`/${event.ticker}`}
-      className="group flex flex-col items-center gap-1.5"
-      title={
-        moveLabel
-          ? `${event.ticker} — expected move ${moveLabel}`
-          : event.ticker
-      }
+      href={`/${ev.ticker}`}
+      style={{
+        display: 'grid',
+        gridTemplateColumns: '24px minmax(0, 1fr) auto',
+        alignItems: 'center',
+        gap: 8,
+        padding: '7px 8px',
+        borderRadius: 6,
+        textDecoration: 'none',
+        transition: 'background 120ms ease',
+      }}
+      onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-3)')}
+      onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
     >
-      <div className="relative w-14 h-14 rounded-xl overflow-hidden bg-gray-800 ring-1 ring-white/10 group-hover:ring-emerald-400/60 group-hover:scale-105 transition-all">
-        {!imgError ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={logoUrl(event.ticker)}
-            alt={event.ticker}
-            className="w-full h-full object-cover"
-            onError={() => setImgError(true)}
-            loading="lazy"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-900 to-gray-800 text-white text-xs font-bold">
-            {event.ticker.slice(0, 4)}
-          </div>
-        )}
-      </div>
-      <div className="flex flex-col items-center leading-tight">
-        <span className="text-xs font-semibold text-gray-200 group-hover:text-white">
-          {event.ticker}
-        </span>
-        {moveLabel && (
-          <span className="text-[10px] font-medium text-emerald-400/90">
-            {moveLabel}
+      <Logo ticker={ev.ticker} size={24} />
+      <div style={{ minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, minWidth: 0 }}>
+          <span
+            style={{
+              fontWeight: 600,
+              color: 'var(--ink)',
+              fontSize: 12.5,
+              letterSpacing: '0.01em',
+              flexShrink: 0,
+            }}
+          >
+            {ev.ticker}
           </span>
+          <span
+            style={{
+              color: 'var(--ink-4)',
+              fontSize: 10.5,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              minWidth: 0,
+            }}
+          >
+            {companyName(ev.ticker)}
+          </span>
+        </div>
+      </div>
+      <div
+        className="serif tnum"
+        style={{
+          fontSize: 14,
+          fontWeight: 600,
+          color: 'var(--ink)',
+          flexShrink: 0,
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {movePct !== null ? (
+          <>
+            ±{(movePct * 100).toFixed(1)}
+            <span style={{ fontSize: 9, color: 'var(--ink-3)', marginLeft: 1 }}>%</span>
+          </>
+        ) : (
+          <span style={{ fontSize: 11, color: 'var(--ink-4)' }}>—</span>
         )}
       </div>
     </Link>
   );
 }
 
-function DayColumn({
-  dayLabel,
-  dateLabel,
-  events,
-  isToday,
-  popularOnly,
-}: {
-  dayLabel: string;
-  dateLabel: string;
-  events: EarningsEvent[];
-  isToday: boolean;
-  popularOnly: boolean;
-}) {
-  const filtered = useMemo(() => {
-    let list = events;
-    if (popularOnly) {
-      list = list.filter((e) => (POPULAR_WEIGHT[e.ticker] ?? 0) >= 68);
-    }
-    list = [...list].sort(
-      (a, b) =>
-        (POPULAR_WEIGHT[b.ticker] ?? 0) - (POPULAR_WEIGHT[a.ticker] ?? 0)
-    );
-    return list;
-  }, [events, popularOnly]);
-
-  const beforeOpen = filtered.filter((e) => timingKey(e.timing) === 'bmo');
-  const afterClose = filtered.filter((e) => timingKey(e.timing) === 'amc');
-  const other = filtered.filter((e) => timingKey(e.timing) === 'other');
-
-  return (
-    <div className="flex-1 min-w-[180px]">
-      <div className="mb-3 flex items-center justify-center">
-        <span
-          className={`text-sm font-semibold px-3 py-1 rounded-full ${
-            isToday
-              ? 'bg-emerald-500 text-black'
-              : 'text-gray-300'
-          }`}
-        >
-          {dayLabel} {dateLabel}
-        </span>
-      </div>
-
-      <div className="space-y-4">
-        {beforeOpen.length > 0 && (
-          <Section title="Before Open" icon={<Sun className="w-3.5 h-3.5" />} events={beforeOpen} />
-        )}
-        {afterClose.length > 0 && (
-          <Section title="After Close" icon={<Moon className="w-3.5 h-3.5" />} events={afterClose} />
-        )}
-        {other.length > 0 && (
-          <Section title="Other" icon={<Flag className="w-3.5 h-3.5" />} events={other} />
-        )}
-        {filtered.length === 0 && (
-          <div className="rounded-xl bg-gray-900/40 border border-white/5 p-4 text-center text-xs text-gray-500">
-            No popular earnings
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function Section({
+function Group({
   title,
   icon,
-  events,
+  list,
+  tone,
 }: {
   title: string;
   icon: React.ReactNode;
+  list: EarningsEvent[];
+  tone: string;
+}) {
+  if (list.length === 0) return null;
+  return (
+    <div style={{ marginBottom: 10 }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          padding: '6px 10px',
+          color: 'var(--ink-3)',
+          fontSize: 10,
+          letterSpacing: '0.14em',
+          textTransform: 'uppercase',
+          borderTop: '1px solid var(--line)',
+        }}
+      >
+        <span style={{ color: tone, display: 'inline-flex' }}>{icon}</span>
+        <span>{title}</span>
+        <span
+          className="mono tnum"
+          style={{ marginLeft: 'auto', color: 'var(--ink-4)', letterSpacing: 0 }}
+        >
+          {list.length}
+        </span>
+      </div>
+      <div>{list.map((e) => <TickerRow key={`${e.ticker}-${e.earnings_date}`} ev={e} />)}</div>
+    </div>
+  );
+}
+
+function DayBlock({
+  dateLabel,
+  label,
+  events,
+  isToday,
+}: {
+  dateLabel: string;
+  label: string;
   events: EarningsEvent[];
+  isToday: boolean;
+}) {
+  const bmo = events.filter((e) => timingKey(e.timing) === 'bmo');
+  const amc = events.filter((e) => timingKey(e.timing) === 'amc');
+  const unk = events.filter((e) => timingKey(e.timing) === 'unknown');
+
+  return (
+    <div style={{ minWidth: 0 }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'baseline',
+          gap: 10,
+          padding: '0 10px 14px',
+          marginBottom: 4,
+        }}
+      >
+        <div
+          className="serif"
+          style={{
+            fontSize: 32,
+            lineHeight: 1,
+            fontWeight: 800,
+            color: isToday ? 'var(--ink)' : 'var(--ink-2)',
+            letterSpacing: '-0.03em',
+          }}
+        >
+          {dateLabel}
+        </div>
+        <div style={{ flex: 1 }}>
+          <div
+            style={{
+              fontSize: 11,
+              letterSpacing: '0.14em',
+              textTransform: 'uppercase',
+              color: isToday ? 'var(--accent)' : 'var(--ink-3)',
+              fontWeight: 500,
+            }}
+          >
+            {label}
+            {isToday && ' · Today'}
+          </div>
+          <div
+            className="mono tnum"
+            style={{ fontSize: 10.5, color: 'var(--ink-4)', marginTop: 2 }}
+          >
+            {events.length} {events.length === 1 ? 'report' : 'reports'}
+          </div>
+        </div>
+      </div>
+
+      <Group title="Before open" icon={<Sun size={12} />} list={bmo} tone="var(--flag)" />
+      <Group title="After close" icon={<Moon size={12} />} list={amc} tone="var(--accent)" />
+      <Group
+        title="Timing unconfirmed"
+        icon={<Circle size={10} />}
+        list={unk}
+        tone="var(--ink-4)"
+      />
+
+      {events.length === 0 && (
+        <div
+          style={{
+            padding: '24px 10px',
+            color: 'var(--ink-4)',
+            fontSize: 12,
+            borderTop: '1px solid var(--line)',
+            textAlign: 'center',
+          }}
+        >
+          Quiet day.
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FilterInfo({ filter }: { filter: Filter }) {
+  const msg = {
+    popular: 'Ranked by a blend of options volume, market cap, and recent news flow.',
+    sp500: 'S&P 500 constituents only.',
+    movers: 'Tickers whose implied move is ≥ 6% this week.',
+    all: 'Every confirmed earnings report in our calendar.',
+  }[filter];
+  return (
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 6,
+        color: 'var(--ink-3)',
+        fontSize: 11.5,
+        fontStyle: 'italic',
+      }}
+    >
+      <Info size={13} />
+      <span>{msg}</span>
+    </span>
+  );
+}
+
+function WeekHeader({
+  offset,
+  setOffset,
+  windowLabel,
+  filter,
+  setFilter,
+  search,
+  setSearch,
+}: {
+  offset: number;
+  setOffset: (n: number) => void;
+  windowLabel: string;
+  filter: Filter;
+  setFilter: (f: Filter) => void;
+  search: string;
+  setSearch: (s: string) => void;
 }) {
   return (
-    <div className="rounded-xl bg-gray-900/60 border border-white/5 p-3">
-      <div className="flex items-center gap-1.5 mb-3 text-gray-400 text-xs font-medium">
-        {icon}
-        <span>{title}</span>
-        <span className="ml-auto text-gray-500">{events.length}</span>
+    <div style={{ padding: '24px 0 20px', borderBottom: '1px solid var(--line)' }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-end',
+          gap: 24,
+          flexWrap: 'wrap',
+        }}
+      >
+        <div style={{ maxWidth: 560, minWidth: 0 }}>
+          <div
+            style={{
+              fontSize: 10,
+              letterSpacing: '0.18em',
+              textTransform: 'uppercase',
+              color: 'var(--ink-3)',
+              marginBottom: 6,
+            }}
+          >
+            Earnings Week
+          </div>
+          <h1
+            className="serif"
+            style={{
+              margin: 0,
+              fontSize: 40,
+              fontWeight: 800,
+              letterSpacing: '-0.025em',
+              lineHeight: 1.0,
+              color: 'var(--ink)',
+              textWrap: 'balance',
+              textTransform: 'uppercase',
+            }}
+          >
+            {windowLabel}
+          </h1>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <button
+            className="chip"
+            onClick={() => setOffset(Math.max(MIN_OFFSET, offset - 1))}
+            disabled={offset <= MIN_OFFSET}
+            style={{ width: 32, padding: 0, justifyContent: 'center' }}
+            aria-label="Previous week"
+          >
+            <ChevronLeft size={14} />
+          </button>
+          <div style={{ display: 'flex', gap: 2, padding: '0 6px' }}>
+            {OFFSETS.map((o) => (
+              <button
+                key={o.v}
+                className="chip"
+                aria-pressed={offset === o.v}
+                onClick={() => setOffset(o.v)}
+                style={{ fontSize: 11 }}
+              >
+                {o.l}
+              </button>
+            ))}
+          </div>
+          <button
+            className="chip"
+            onClick={() => setOffset(Math.min(MAX_OFFSET, offset + 1))}
+            disabled={offset >= MAX_OFFSET}
+            style={{ width: 32, padding: 0, justifyContent: 'center' }}
+            aria-label="Next week"
+          >
+            <ChevronRight size={14} />
+          </button>
+        </div>
       </div>
-      <div className="grid grid-cols-3 gap-y-3 gap-x-1">
-        {events.map((e) => (
-          <TickerTile key={`${e.ticker}-${e.earnings_date}`} event={e} />
-        ))}
+
+      <div
+        style={{
+          marginTop: 28,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 16,
+          flexWrap: 'wrap',
+        }}
+      >
+        <div
+          style={{
+            color: 'var(--ink-3)',
+            fontSize: 11,
+            letterSpacing: '0.14em',
+            textTransform: 'uppercase',
+          }}
+        >
+          Show
+        </div>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {(
+            [
+              { key: 'popular', label: 'Popular', tip: 'Top ~50 by options volume & market cap.' },
+              { key: 'sp500', label: 'S&P 500', tip: 'S&P 500 constituents only.' },
+              { key: 'movers', label: 'Big movers', tip: 'Expected move ≥ 6% this week.' },
+              { key: 'all', label: 'All', tip: 'Every confirmed earnings report.' },
+            ] as { key: Filter; label: string; tip: string }[]
+          ).map((f) => (
+            <button
+              key={f.key}
+              className="chip"
+              aria-pressed={filter === f.key}
+              onClick={() => setFilter(f.key)}
+              title={f.tip}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+        <FilterInfo filter={filter} />
+        <div style={{ flex: 1 }} />
+        <div style={{ position: 'relative' }}>
+          <Search
+            size={13}
+            style={{
+              position: 'absolute',
+              left: 10,
+              top: '50%',
+              transform: 'translateY(-50%)',
+              color: 'var(--ink-4)',
+            }}
+          />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value.toUpperCase())}
+            placeholder="Jump to ticker"
+            className="outline-none"
+            style={{
+              background: 'transparent',
+              border: '1px solid var(--line)',
+              color: 'var(--ink)',
+              padding: '6px 12px 6px 30px',
+              borderRadius: 999,
+              fontSize: 12,
+              width: 180,
+              fontFamily: 'inherit',
+            }}
+            onFocus={(e) => (e.currentTarget.style.borderColor = 'var(--line-2)')}
+            onBlur={(e) => (e.currentTarget.style.borderColor = 'var(--line)')}
+          />
+        </div>
       </div>
     </div>
   );
 }
 
-function formatWindow(start: string, end: string) {
-  const s = parseLocalDate(start);
-  const e = parseLocalDate(end);
-  const m = (d: Date) => d.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
-  return `${m(s)} ${s.getDate()} - ${e.getDate()}`;
-}
-
 export default function EarningsGrid() {
+  const [offset, setOffset] = useState(0);
+  const [filter, setFilter] = useState<Filter>('popular');
+  const [search, setSearch] = useState('');
   const [data, setData] = useState<WeeklyData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [popularOnly, setPopularOnly] = useState(true);
-  const [offset, setOffset] = useState(0); // -1=last, 0=this, 1=next, 2=+2
 
-  // Compute "this Monday" in local time so the UI anchors on the user's week.
   const thisMonday = useMemo(() => mondayOf(new Date()), []);
   const weekStartIso = useMemo(() => {
     const d = new Date(thisMonday);
@@ -242,18 +503,19 @@ export default function EarningsGrid() {
     return isoDay(d);
   }, [thisMonday, offset]);
 
-  const fetchWeek = useCallback(async (iso: string) => {
-    // Primary: /weeks/{monday}.json. Fallback to /weekly.json for the current
-    // week when the multi-week artifacts haven't been generated yet.
-    const tryUrls = [`/weeks/${iso}.json`, offset === 0 ? '/weekly.json' : null].filter(
-      Boolean,
-    ) as string[];
-    for (const url of tryUrls) {
-      const res = await fetch(url, { cache: 'no-store' });
-      if (res.ok) return (await res.json()) as WeeklyData;
-    }
-    throw new Error(`no data for ${iso}`);
-  }, [offset]);
+  const fetchWeek = useCallback(
+    async (iso: string) => {
+      const urls = [`/weeks/${iso}.json`, offset === 0 ? '/weekly.json' : null].filter(
+        Boolean,
+      ) as string[];
+      for (const url of urls) {
+        const res = await fetch(url, { cache: 'no-store' });
+        if (res.ok) return (await res.json()) as WeeklyData;
+      }
+      throw new Error(`no data for ${iso}`);
+    },
+    [offset],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -266,120 +528,137 @@ export default function EarningsGrid() {
     return () => { cancelled = true; };
   }, [weekStartIso, fetchWeek]);
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center py-20 text-gray-400 text-sm">
-        Loading earnings calendar…
-      </div>
-    );
-  }
+  const weekStart = useMemo(
+    () => (data ? parseLocalDate(data.window.start) : parseLocalDate(weekStartIso)),
+    [data, weekStartIso],
+  );
+  const days = useMemo(
+    () =>
+      Array.from({ length: 5 }, (_, i) => {
+        const d = new Date(weekStart);
+        d.setDate(weekStart.getDate() + i);
+        return d;
+      }),
+    [weekStart],
+  );
 
-  if (error || !data) {
-    return (
-      <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-6 text-center text-red-300 text-sm">
-        Couldn&apos;t load weekly data. {error}
-      </div>
-    );
-  }
+  const winLabel = useMemo(() => {
+    const s = days[0];
+    const e = days[4];
+    if (!s || !e) return '';
+    const m = (d: Date) => d.toLocaleDateString('en-US', { month: 'long' });
+    const sameMonth = s.getMonth() === e.getMonth();
+    return sameMonth
+      ? `${m(s)} ${s.getDate()}–${e.getDate()}, ${s.getFullYear()}`
+      : `${m(s)} ${s.getDate()} – ${m(e)} ${e.getDate()}, ${s.getFullYear()}`;
+  }, [days]);
 
-  const weekStart = parseLocalDate(data.window.start);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const days = Array.from({ length: 5 }, (_, i) => {
-    const d = new Date(weekStart);
-    d.setDate(weekStart.getDate() + i);
-    return d;
-  });
+  const today = useMemo(() => {
+    const t = new Date();
+    t.setHours(0, 0, 0, 0);
+    return t;
+  }, []);
 
-  const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+  const filteredEvents = useMemo(() => {
+    if (!data) return [] as EarningsEvent[];
+    let list = data.events;
+    if (filter === 'popular') list = list.filter((e) => (POPULAR_WEIGHT[e.ticker] ?? 0) >= 76);
+    if (filter === 'sp500') list = list.filter((e) => (POPULAR_WEIGHT[e.ticker] ?? 0) > 0);
+    if (filter === 'movers') list = list.filter((e) => (e.em_straddle_pct ?? e.em_iv_pct ?? 0) >= 0.06);
+    if (search) list = list.filter((e) => e.ticker.startsWith(search));
+    return list;
+  }, [data, filter, search]);
 
-  const eventsByDay = days.map((day) => {
-    const iso = day.toISOString().slice(0, 10);
-    return data.events.filter((e) => e.earnings_date.slice(0, 10) === iso);
-  });
+  const eventsByDay = useMemo(() => {
+    return days.map((day) => {
+      const iso = isoDay(day);
+      return filteredEvents
+        .filter((e) => e.earnings_date.slice(0, 10) === iso)
+        .sort(
+          (a, b) => (POPULAR_WEIGHT[b.ticker] ?? 0) - (POPULAR_WEIGHT[a.ticker] ?? 0),
+        );
+    });
+  }, [days, filteredEvents]);
+
+  const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
   return (
-    <div className="w-full">
-      {/* Toolbar */}
-      <div className="flex items-center justify-between mb-6 px-1">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={() => setOffset((o) => Math.max(MIN_OFFSET, o - 1))}
-              disabled={offset <= MIN_OFFSET}
-              className="w-9 h-9 rounded-full bg-gray-800 hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center text-gray-300"
-              aria-label="Previous week"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => setOffset(0)}
-              className={`w-9 h-9 rounded-full flex flex-col items-center justify-center text-[10px] leading-none transition-colors ${
-                offset === 0 ? 'bg-emerald-500 text-black' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-              }`}
-              aria-label="Jump to this week"
-              title="This week"
-            >
-              <span>{weekStart.toLocaleDateString('en-US', { weekday: 'short' })[0]}</span>
-              <span className="text-xs font-semibold">{weekStart.getDate()}</span>
-            </button>
-            <button
-              onClick={() => setOffset((o) => Math.min(MAX_OFFSET, o + 1))}
-              disabled={offset >= MAX_OFFSET}
-              className="w-9 h-9 rounded-full bg-gray-800 hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center text-gray-300"
-              aria-label="Next week"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-          <div className="ml-2">
-            <div className="text-[10px] uppercase tracking-wider text-gray-500">
-              {offset === -1 && 'Last week'}
-              {offset === 0 && 'Earnings this week'}
-              {offset === 1 && 'Next week'}
-              {offset === 2 && 'Two weeks ahead'}
-            </div>
-            <div className="text-sm font-semibold text-gray-200">
-              {formatWindow(data.window.start, data.window.end)}
-            </div>
-          </div>
+    <>
+      <WeekHeader
+        offset={offset}
+        setOffset={setOffset}
+        windowLabel={winLabel}
+        filter={filter}
+        setFilter={setFilter}
+        search={search}
+        setSearch={setSearch}
+      />
+
+      {loading && (
+        <div style={{ padding: '60px 0', textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>
+          Loading earnings calendar…
         </div>
+      )}
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setPopularOnly((v) => !v)}
-            className={`inline-flex items-center gap-1.5 px-3 h-9 rounded-full border text-sm transition-colors ${
-              popularOnly
-                ? 'bg-gray-800 border-white/10 text-white'
-                : 'border-white/10 text-gray-400 hover:text-white'
-            }`}
-          >
-            <Filter className="w-3.5 h-3.5" />
-            {popularOnly ? 'Popular' : 'All'}
-          </button>
+      {error && !loading && (
+        <div
+          style={{
+            padding: 20,
+            marginTop: 20,
+            border: '1px solid var(--down)',
+            borderRadius: 12,
+            color: 'var(--down)',
+            fontSize: 13,
+          }}
+        >
+          Couldn&apos;t load weekly data: {error}
         </div>
-      </div>
+      )}
 
-      {/* Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-        {days.map((day, i) => (
-          <DayColumn
-            key={day.toISOString()}
-            dayLabel={dayLabels[i]}
-            dateLabel={String(day.getDate())}
-            events={eventsByDay[i]}
-            isToday={day.getTime() === today.getTime()}
-            popularOnly={popularOnly}
-          />
-        ))}
-      </div>
+      {!loading && !error && data && (
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
+            marginTop: 20,
+          }}
+        >
+          {days.map((d, i) => (
+            <div
+              key={d.toISOString()}
+              style={{
+                borderRight: i < 4 ? '1px solid var(--line)' : 'none',
+              }}
+            >
+              <DayBlock
+                dateLabel={String(d.getDate())}
+                label={dayNames[i]}
+                events={eventsByDay[i]}
+                isToday={d.getTime() === today.getTime()}
+              />
+            </div>
+          ))}
+        </div>
+      )}
 
-      {/* Footer meta */}
-      <div className="mt-8 text-center text-[11px] text-gray-500">
-        As of {data.metadata.as_of_date} · {data.events.length} events ·
-        {' '}
-        {data.metadata.method}
-      </div>
-    </div>
+      {data && (
+        <div
+          style={{
+            marginTop: 40,
+            padding: '16px 0',
+            borderTop: '1px solid var(--line)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            fontSize: 11,
+            color: 'var(--ink-4)',
+          }}
+        >
+          <span className="mono">
+            {filteredEvents.length} reports · {data.metadata.method} · as of {data.metadata.as_of_date}
+          </span>
+          <span>Earnings times from earnings_calendar.csv</span>
+        </div>
+      )}
+    </>
   );
 }
