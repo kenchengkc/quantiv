@@ -1,0 +1,10 @@
+export const POPULAR_WEIGHT: Record<string, number> = {
+  AAPL: 100, MSFT: 95, AMZN: 95, NVDA: 100, GOOGL: 95, META: 95, TSLA: 100,
+  JPM: 90, V: 85, MA: 85, WFC: 82, GS: 82, BAC: 85,
+  UNH: 90, LLY: 85, PFE: 80, ABBV: 80, BMY: 78, GILD: 78, HUM: 76,
+  XOM: 85, CVX: 85, COP: 76,
+  AMD: 85, AVGO: 85, CRM: 82, ADBE: 85, INTC: 85, QCOM: 80, CSCO: 80,
+  NFLX: 90, COIN: 80, SNOW: 78, PLTR: 80,
+  HD: 80, MCD: 80, SBUX: 78, NKE: 80, KO: 80, PEP: 78, DIS: 85, BA: 85,
+  CAT: 78, LIN: 72, T: 80, VZ: 80,
+};
