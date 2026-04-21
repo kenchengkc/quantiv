@@ -1,18 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import {
-  AlertCircle,
-  ArrowLeft,
-  BrainCircuit,
-  Calculator,
-  Loader2,
-  Moon,
-  Sun,
-  TrendingDown,
-  TrendingUp,
-} from 'lucide-react';
+import { ChevronLeft } from 'lucide-react';
+import { COMPANY_NAMES } from '@/lib/companyNames';
 
 interface Straddle {
   expiration: string;
@@ -69,82 +60,729 @@ interface LivePrice {
   source: 'polygon' | 'cache' | 'unavailable';
 }
 
-function logoUrl(ticker: string): string {
-  return `https://assets.parqet.com/logos/symbol/${ticker}?format=png`;
+function logoUrl(t: string) {
+  return `https://assets.parqet.com/logos/symbol/${t}?format=png`;
 }
-
-function formatPct(v: number | null | undefined): string {
-  if (v === null || v === undefined) return '—';
-  return `${(v * 100).toFixed(2)}%`;
+function companyName(t: string) {
+  return COMPANY_NAMES[t] || t;
 }
-
-function formatDollar(v: number | null | undefined): string {
-  if (v === null || v === undefined) return '—';
-  return `$${v.toFixed(2)}`;
-}
-
-// Parses YYYY-MM-DD as a local date (not UTC) so `toLocaleDateString` doesn't
-// shift back a day for viewers west of UTC.
 function parseLocalDate(iso: string): Date {
   const [y, m, d] = iso.slice(0, 10).split('-').map(Number);
   return new Date(y, (m ?? 1) - 1, d ?? 1);
 }
-
-function formatDate(iso: string | undefined | null): string {
+function shortDate(iso: string | undefined | null) {
   if (!iso) return '—';
   return parseLocalDate(iso).toLocaleDateString('en-US', {
+    weekday: 'short',
     month: 'short',
     day: 'numeric',
-    year: 'numeric',
   });
 }
-
-function timingLabel(t: string | undefined | null): {
-  label: string;
-  icon: React.ReactNode;
-  className: string;
-} | null {
-  if (!t) return null;
-  const key = t.toLowerCase();
-  if (key === 'bmo' || key === 'before_market_open' || key === 'before_open') {
-    return {
-      label: 'Before Open',
-      icon: <Sun className="w-3.5 h-3.5" />,
-      className: 'bg-amber-500/10 border-amber-400/30 text-amber-300',
-    };
-  }
-  if (key === 'amc' || key === 'after_market_close' || key === 'after_close') {
-    return {
-      label: 'After Close',
-      icon: <Moon className="w-3.5 h-3.5" />,
-      className: 'bg-indigo-500/10 border-indigo-400/30 text-indigo-300',
-    };
-  }
-  return null; // `unknown` → hide per spec ("nothing if not shown in csv")
+function timingText(t?: string | null) {
+  const k = (t || '').toLowerCase();
+  if (k === 'bmo' || k === 'before_market_open' || k === 'before_open') return 'Before open';
+  if (k === 'amc' || k === 'after_market_close' || k === 'after_close') return 'After close';
+  return null;
 }
 
-function emMethodInfo(m: string | undefined): { label: string; icon: React.ReactNode; tooltip: string } {
-  if (m === 'ml_lightgbm') {
-    return {
-      label: 'ML forecast',
-      icon: <BrainCircuit className="w-3 h-3" />,
-      tooltip: 'Derived from a LightGBM model trained on historical earnings moves.',
-    };
+// ---------- math helpers ----------
+function erf(x: number) {
+  const sign = x < 0 ? -1 : 1;
+  x = Math.abs(x);
+  const a1 = 0.254829592,
+    a2 = -0.284496736,
+    a3 = 1.421413741,
+    a4 = -1.453152027,
+    a5 = 1.061405429,
+    p = 0.3275911;
+  const t = 1 / (1 + p * x);
+  const y = 1 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-x * x);
+  return sign * y;
+}
+function normCDF(z: number) {
+  return 0.5 * (1 + erf(z / Math.SQRT2));
+}
+
+// ---------- Logo ----------
+function Logo({ ticker, size = 60 }: { ticker: string; size?: number }) {
+  const [err, setErr] = useState(false);
+  const s = { width: size, height: size };
+  if (err) {
+    return (
+      <div
+        className="serif"
+        style={{
+          ...s,
+          borderRadius: 10,
+          background: 'var(--bg-3)',
+          border: '1px solid var(--line)',
+          display: 'grid',
+          placeItems: 'center',
+          color: 'var(--ink-2)',
+          fontSize: Math.max(14, size * 0.32),
+          fontWeight: 700,
+        }}
+      >
+        {ticker.slice(0, 3)}
+      </div>
+    );
   }
-  if (m === 'ensemble') {
-    return {
-      label: 'Math + ML',
-      icon: <BrainCircuit className="w-3 h-3" />,
-      tooltip: 'Ensemble of options-math and LightGBM ML forecast.',
-    };
-  }
-  return {
-    label: 'Options math',
-    icon: <Calculator className="w-3 h-3" />,
-    tooltip: 'ATM straddle / IV baseline computed from the live options chain.',
+  // eslint-disable-next-line @next/next/no-img-element
+  return (
+    <img
+      src={logoUrl(ticker)}
+      alt={ticker}
+      onError={() => setErr(true)}
+      style={{
+        ...s,
+        borderRadius: 10,
+        objectFit: 'cover',
+        background: 'var(--paper)',
+        border: '1px solid var(--line)',
+      }}
+    />
+  );
+}
+
+// ---------- Watchlist + Toast ----------
+const WATCH_KEY = 'quantiv-watchlist';
+
+function WatchlistButton({
+  ticker,
+  onToast,
+}: {
+  ticker: string;
+  onToast: (msg: string) => void;
+}) {
+  const [added, setAdded] = useState(false);
+  const [animating, setAnimating] = useState(false);
+  const [hovered, setHovered] = useState(false);
+
+  useEffect(() => {
+    try {
+      const list = JSON.parse(localStorage.getItem(WATCH_KEY) || '[]') as string[];
+      setAdded(list.includes(ticker));
+    } catch {
+      /* ignore */
+    }
+  }, [ticker]);
+
+  const toggle = () => {
+    if (animating) return;
+    let list: string[] = [];
+    try {
+      list = JSON.parse(localStorage.getItem(WATCH_KEY) || '[]') as string[];
+    } catch {
+      /* ignore */
+    }
+    if (added) {
+      list = list.filter((t) => t !== ticker);
+      localStorage.setItem(WATCH_KEY, JSON.stringify(list));
+      setAdded(false);
+      onToast(`${ticker} removed from watchlist`);
+    } else {
+      list = [...list, ticker];
+      localStorage.setItem(WATCH_KEY, JSON.stringify(list));
+      setAnimating(true);
+      setAdded(true);
+      onToast(`${ticker} added to watchlist`);
+      setTimeout(() => setAnimating(false), 700);
+    }
   };
+
+  const size = 30;
+  const dots = Array.from({ length: 6 }, (_, i) => {
+    const angle = (i / 6) * Math.PI * 2;
+    return {
+      dx: `${Math.cos(angle) * 22}px`,
+      dy: `${Math.sin(angle) * 22}px`,
+      delay: i * 10,
+    };
+  });
+
+  return (
+    <button
+      onClick={toggle}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      title={added ? 'Remove from watchlist' : 'Add to watchlist'}
+      aria-pressed={added}
+      style={{
+        position: 'relative',
+        width: size,
+        height: size,
+        display: 'grid',
+        placeItems: 'center',
+        borderRadius: '50%',
+        background: 'transparent',
+        padding: 0,
+        border: 'none',
+        cursor: 'pointer',
+      }}
+    >
+      {!added && (
+        <svg
+          width={size}
+          height={size}
+          viewBox="0 0 24 24"
+          fill="none"
+          style={{
+            position: 'absolute',
+            inset: 0,
+            color: hovered ? 'var(--ink)' : 'var(--ink-3)',
+            transition: 'color 160ms ease',
+          }}
+        >
+          <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.6" />
+          <path
+            d="M12 8v8M8 12h8"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+          />
+        </svg>
+      )}
+      {animating &&
+        dots.map((d, i) => (
+          <span
+            key={i}
+            style={
+              {
+                position: 'absolute',
+                width: 5,
+                height: 5,
+                borderRadius: 999,
+                background: 'var(--up)',
+                top: '50%',
+                left: '50%',
+                marginTop: -2.5,
+                marginLeft: -2.5,
+                '--dx': d.dx,
+                '--dy': d.dy,
+                animation: `splash-dot 550ms cubic-bezier(.2,.6,.3,1) ${d.delay}ms forwards`,
+              } as React.CSSProperties
+            }
+          />
+        ))}
+      {animating && (
+        <span
+          style={{
+            position: 'absolute',
+            inset: 0,
+            borderRadius: '50%',
+            border: '2px solid var(--up)',
+            animation: 'splash-ring 550ms cubic-bezier(.2,.6,.3,1) forwards',
+          }}
+        />
+      )}
+      {added && (
+        <span
+          style={{
+            position: 'absolute',
+            inset: 0,
+            background: 'var(--up)',
+            borderRadius: '50%',
+            display: 'grid',
+            placeItems: 'center',
+            animation: animating
+              ? 'pop-in 450ms cubic-bezier(.2,.8,.3,1.2) 180ms both'
+              : 'none',
+          }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <path
+              d="M5 12l5 5 9-11"
+              stroke="#0b0e14"
+              strokeWidth="2.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              style={{
+                strokeDasharray: 22,
+                animation: animating ? 'check-draw 320ms ease-out 280ms both' : 'none',
+              }}
+            />
+          </svg>
+        </span>
+      )}
+    </button>
+  );
 }
 
+function Toast({ message, onDone }: { message: string; onDone: () => void }) {
+  const [leaving, setLeaving] = useState(false);
+  useEffect(() => {
+    const t1 = setTimeout(() => setLeaving(true), 2000);
+    const t2 = setTimeout(onDone, 2280);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+  }, [onDone]);
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        top: 72,
+        left: '50%',
+        transform: 'translateX(-50%)',
+        zIndex: 200,
+        background: 'var(--bg-3)',
+        border: '1px solid var(--line-2)',
+        borderRadius: 8,
+        padding: '10px 16px 10px 12px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        fontSize: 12.5,
+        color: 'var(--ink)',
+        boxShadow: '0 16px 48px rgba(0,0,0,.5)',
+        animation: leaving
+          ? 'toast-out 280ms ease forwards'
+          : 'toast-in 260ms cubic-bezier(.2,.8,.3,1) both',
+      }}
+    >
+      <span
+        style={{
+          width: 18,
+          height: 18,
+          borderRadius: 999,
+          background: 'var(--up)',
+          display: 'grid',
+          placeItems: 'center',
+          flexShrink: 0,
+        }}
+      >
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
+          <path
+            d="M5 12l5 5 9-11"
+            stroke="#0b0e14"
+            strokeWidth="3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </span>
+      {message}
+    </div>
+  );
+}
+
+// ---------- Interactive Bar ----------
+function InteractiveBar({
+  spot,
+  em,
+  emIV,
+  atmIV,
+  dte,
+}: {
+  spot: number;
+  em: number;
+  emIV: number;
+  atmIV: number;
+  dte: number;
+}) {
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [hover, setHover] = useState<
+    { x: number; pct: number; price: number; prob: number } | null
+  >(null);
+  const [pinned, setPinned] = useState<
+    { x: number; pct: number; price: number; prob: number } | null
+  >(null);
+
+  const widest = Math.max(em, emIV, 0.01) * 1.5;
+  const minPct = -widest;
+  const maxPct = widest;
+  const toX = (pct: number) => ((pct - minPct) / (maxPct - minPct)) * 100;
+
+  const sigma = (atmIV || 0.3) * Math.sqrt((dte || 28) / 365);
+
+  const probBeyond = useCallback(
+    (pct: number) => {
+      const z = Math.log(1 + Math.abs(pct)) / sigma;
+      return 2 * (1 - normCDF(z));
+    },
+    [sigma],
+  );
+
+  const onMove = (e: React.MouseEvent) => {
+    if (!wrapRef.current) return;
+    const rect = wrapRef.current.getBoundingClientRect();
+    const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    const pct = minPct + x * (maxPct - minPct);
+    const price = spot * (1 + pct);
+    const prob = probBeyond(pct);
+    setHover({ x: x * 100, pct, price, prob });
+  };
+  const onLeave = () => setHover(null);
+  const onClick = () => {
+    if (hover) setPinned(hover);
+  };
+
+  const density = useMemo(() => {
+    const n = 80;
+    const arr: { x: number; y: number }[] = [];
+    for (let i = 0; i <= n; i++) {
+      const x = i / n;
+      const pct = minPct + x * (maxPct - minPct);
+      const z = Math.log(1 + pct) / sigma;
+      const pdf = Math.exp(-0.5 * z * z) / Math.sqrt(2 * Math.PI) / sigma;
+      arr.push({ x: x * 100, y: pdf });
+    }
+    const maxP = Math.max(...arr.map((p) => p.y));
+    return arr.map((p) => ({ x: p.x, y: p.y / maxP }));
+  }, [sigma, minPct, maxPct]);
+
+  const emLow = toX(-em);
+  const emHigh = toX(em);
+  const ivLow = toX(-emIV);
+  const ivHigh = toX(emIV);
+  const spotX = toX(0);
+
+  const current = hover || pinned;
+
+  return (
+    <div style={{ marginTop: 32, marginBottom: 10 }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          fontSize: 10,
+          color: 'var(--ink-4)',
+          letterSpacing: '0.08em',
+          textTransform: 'uppercase',
+          marginBottom: 12,
+        }}
+      >
+        <span>{`$${(spot * (1 + minPct)).toFixed(2)} · ${(minPct * 100).toFixed(1)}%`}</span>
+        <span>Spot ${spot.toFixed(2)}</span>
+        <span>{`$${(spot * (1 + maxPct)).toFixed(2)} · +${(maxPct * 100).toFixed(1)}%`}</span>
+      </div>
+
+      <div
+        ref={wrapRef}
+        onMouseMove={onMove}
+        onMouseLeave={onLeave}
+        onClick={onClick}
+        style={{
+          position: 'relative',
+          height: 88,
+          cursor: 'crosshair',
+          userSelect: 'none',
+        }}
+      >
+        <svg
+          viewBox="0 0 100 88"
+          preserveAspectRatio="none"
+          width="100%"
+          height="88"
+          style={{ position: 'absolute', inset: 0 }}
+        >
+          <defs>
+            <linearGradient id="den" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.35" />
+              <stop offset="100%" stopColor="var(--accent)" stopOpacity="0" />
+            </linearGradient>
+          </defs>
+          <path
+            d={
+              `M 0,88 ` +
+              density.map((p) => `L ${p.x},${88 - p.y * 72}`).join(' ') +
+              ` L 100,88 Z`
+            }
+            fill="url(#den)"
+          />
+          <path
+            d={density.map((p, i) => `${i ? 'L' : 'M'}${p.x},${88 - p.y * 72}`).join(' ')}
+            stroke="var(--accent)"
+            strokeWidth="0.5"
+            fill="none"
+            vectorEffect="non-scaling-stroke"
+          />
+        </svg>
+
+        <div
+          style={{
+            position: 'absolute',
+            top: 56,
+            height: 12,
+            left: `${emLow}%`,
+            width: `${emHigh - emLow}%`,
+            background: 'var(--ink)',
+            opacity: 0.95,
+            borderRadius: 2,
+          }}
+        />
+        <div
+          style={{
+            position: 'absolute',
+            top: 54,
+            height: 16,
+            left: `${ivLow}%`,
+            width: `${ivHigh - ivLow}%`,
+            borderLeft: '1px solid var(--line-2)',
+            borderRight: '1px solid var(--line-2)',
+            pointerEvents: 'none',
+          }}
+        />
+
+        <div
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            top: 62,
+            height: 1,
+            background: 'var(--line)',
+          }}
+        />
+
+        <div
+          style={{
+            position: 'absolute',
+            left: `${spotX}%`,
+            top: 46,
+            bottom: 16,
+            width: 1,
+            background: 'var(--ink-2)',
+            transform: 'translateX(-0.5px)',
+          }}
+        />
+        <div
+          style={{
+            position: 'absolute',
+            left: `${spotX}%`,
+            bottom: 0,
+            transform: 'translateX(-50%)',
+            fontSize: 10,
+            color: 'var(--ink-2)',
+            letterSpacing: '0.04em',
+          }}
+        >
+          SPOT
+        </div>
+
+        <div
+          className="mono tnum"
+          style={{
+            position: 'absolute',
+            top: 44,
+            left: `${emLow}%`,
+            transform: 'translateX(-50%)',
+            fontSize: 10,
+            color: 'var(--down)',
+          }}
+        >
+          −{(em * 100).toFixed(1)}%
+        </div>
+        <div
+          className="mono tnum"
+          style={{
+            position: 'absolute',
+            top: 44,
+            left: `${emHigh}%`,
+            transform: 'translateX(-50%)',
+            fontSize: 10,
+            color: 'var(--up)',
+          }}
+        >
+          +{(em * 100).toFixed(1)}%
+        </div>
+
+        {hover && (
+          <div
+            style={{
+              position: 'absolute',
+              left: `${hover.x}%`,
+              top: 0,
+              bottom: 0,
+              width: 1,
+              background: 'var(--ink)',
+              transform: 'translateX(-0.5px)',
+              pointerEvents: 'none',
+            }}
+          />
+        )}
+        {pinned && !hover && (
+          <div
+            style={{
+              position: 'absolute',
+              left: `${pinned.x}%`,
+              top: 0,
+              bottom: 0,
+              width: 1,
+              background: 'var(--flag)',
+              transform: 'translateX(-0.5px)',
+              pointerEvents: 'none',
+            }}
+          />
+        )}
+
+        {current && (
+          <div
+            style={{
+              position: 'absolute',
+              left: `${Math.min(82, Math.max(10, current.x))}%`,
+              top: -10,
+              transform: 'translate(-50%, -100%)',
+              background: 'var(--bg-3)',
+              border: '1px solid var(--line-2)',
+              padding: '8px 10px',
+              borderRadius: 6,
+              fontSize: 11,
+              whiteSpace: 'nowrap',
+              boxShadow: '0 10px 30px rgba(0,0,0,.4)',
+              pointerEvents: 'none',
+            }}
+          >
+            <div
+              className="serif tnum"
+              style={{ fontSize: 16, color: 'var(--ink)', lineHeight: 1 }}
+            >
+              ${current.price.toFixed(2)}
+            </div>
+            <div
+              className="mono tnum"
+              style={{
+                fontSize: 10.5,
+                marginTop: 4,
+                color: current.pct >= 0 ? 'var(--up)' : 'var(--down)',
+              }}
+            >
+              {current.pct >= 0 ? '+' : ''}
+              {(current.pct * 100).toFixed(2)}% from spot
+            </div>
+            <div
+              className="mono tnum"
+              style={{ fontSize: 10.5, color: 'var(--ink-3)', marginTop: 2 }}
+            >
+              {(current.prob * 100).toFixed(1)}% chance to move this far or more
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginTop: 14,
+          fontSize: 11,
+          color: 'var(--ink-3)',
+        }}
+      >
+        <div style={{ display: 'flex', gap: 16 }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ width: 18, height: 4, background: 'var(--ink)' }} /> Straddle band
+          </span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <span
+              style={{
+                width: 18,
+                height: 10,
+                borderLeft: '1px solid var(--line-2)',
+                borderRight: '1px solid var(--line-2)',
+              }}
+            />{' '}
+            IV band
+          </span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <span
+              style={{
+                width: 18,
+                height: 4,
+                background: 'color-mix(in oklab, var(--accent) 60%, transparent)',
+              }}
+            />{' '}
+            Log-normal density
+          </span>
+        </div>
+        <span style={{ fontStyle: 'italic' }}>Hover for probability · click to pin</span>
+      </div>
+    </div>
+  );
+}
+
+// ---------- Small bits ----------
+function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
+  return (
+    <div style={{ padding: '18px 0' }}>
+      <div
+        style={{
+          fontSize: 10,
+          letterSpacing: '0.14em',
+          textTransform: 'uppercase',
+          color: 'var(--ink-3)',
+          marginBottom: 6,
+        }}
+      >
+        {label}
+      </div>
+      <div
+        className="serif tnum"
+        style={{ fontSize: 26, fontWeight: 700, lineHeight: 1, letterSpacing: '-0.02em' }}
+      >
+        {value}
+      </div>
+      {sub && (
+        <div
+          className="mono tnum"
+          style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 6 }}
+        >
+          {sub}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Th({ children, align = 'left' }: { children: React.ReactNode; align?: 'left' | 'right' }) {
+  return (
+    <th
+      style={{
+        textAlign: align,
+        padding: '10px 0',
+        fontSize: 10,
+        letterSpacing: '0.14em',
+        textTransform: 'uppercase',
+        color: 'var(--ink-3)',
+        fontWeight: 500,
+      }}
+    >
+      {children}
+    </th>
+  );
+}
+function Td({
+  children,
+  align = 'left',
+  mono,
+  bold,
+  tone,
+}: {
+  children: React.ReactNode;
+  align?: 'left' | 'right';
+  mono?: boolean;
+  bold?: boolean;
+  tone?: string;
+}) {
+  return (
+    <td
+      className={mono ? 'mono tnum' : ''}
+      style={{
+        textAlign: align,
+        padding: '14px 0',
+        fontSize: 13,
+        color: tone || 'var(--ink-2)',
+        fontWeight: bold ? 500 : 400,
+      }}
+    >
+      {children}
+    </td>
+  );
+}
+
+// ---------- Page ----------
 export default function SymbolPage() {
   const params = useParams();
   const router = useRouter();
@@ -153,8 +791,8 @@ export default function SymbolPage() {
   const [data, setData] = useState<SymbolDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [logoError, setLogoError] = useState(false);
   const [live, setLive] = useState<LivePrice | null>(null);
+  const [toast, setToast] = useState<{ msg: string; key: number } | null>(null);
 
   useEffect(() => {
     if (!symbol) return;
@@ -178,7 +816,6 @@ export default function SymbolPage() {
     };
   }, [symbol]);
 
-  // Fetch live price in parallel; ignore failures silently.
   useEffect(() => {
     if (!symbol) return;
     let cancelled = false;
@@ -197,37 +834,39 @@ export default function SymbolPage() {
     };
   }, [symbol]);
 
+  const showToast = useCallback((msg: string) => {
+    setToast({ msg, key: Date.now() });
+  }, []);
+
   if (loading) {
     return (
-      <div className="container mx-auto p-6 flex items-center justify-center min-h-[60vh]">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="h-8 w-8 animate-spin text-emerald-400" />
-          <p className="text-gray-400">Loading {symbol}…</p>
-        </div>
+      <div style={{ maxWidth: 960, margin: '0 auto', padding: '80px 28px', textAlign: 'center' }}>
+        <div style={{ color: 'var(--ink-3)', fontSize: 13 }}>Loading {symbol}…</div>
       </div>
     );
   }
 
   if (error || !data) {
     return (
-      <div className="container mx-auto p-6 max-w-2xl">
+      <div style={{ maxWidth: 720, margin: '0 auto', padding: '40px 28px' }}>
         <button
           onClick={() => router.push('/')}
-          className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-white mb-4"
+          className="chip"
+          style={{ border: 'none', color: 'var(--ink-3)', paddingLeft: 0, cursor: 'pointer' }}
         >
-          <ArrowLeft className="w-4 h-4" />
-          Back to earnings
+          <ChevronLeft size={14} /> Earnings calendar
         </button>
-        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-5 flex items-start gap-3">
-          <AlertCircle className="h-5 w-5 text-red-400 flex-shrink-0 mt-0.5" />
-          <div>
-            <p className="text-red-300 font-medium">No data for {symbol}</p>
-            <p className="text-sm text-red-400/80 mt-1">
-              {error ?? ''} — this ticker doesn&apos;t have pre-computed options data locally.
-              Run <code className="px-1.5 py-0.5 rounded bg-black/30 text-xs">python tools/build_frontend_data.py</code>
-              {' '}with fresh parquet data to add it.
-            </p>
-          </div>
+        <div
+          style={{
+            marginTop: 24,
+            padding: 20,
+            border: '1px solid var(--down)',
+            borderRadius: 12,
+            color: 'var(--down)',
+            fontSize: 13,
+          }}
+        >
+          No data for {symbol}. {error ?? ''}
         </div>
       </div>
     );
@@ -236,342 +875,370 @@ export default function SymbolPage() {
   const em = data.expected_move;
   const livePrice = live?.price ?? null;
   const spot = livePrice ?? data.spot_price ?? 0;
+  const change = live?.change ?? 0;
+  const changePct = live?.changePct ?? 0;
+  const up = change >= 0;
 
-  const lower = em?.straddle_pct && spot ? spot * (1 - em.straddle_pct) : null;
-  const upper = em?.straddle_pct && spot ? spot * (1 + em.straddle_pct) : null;
-  const lowerIV = em?.iv_pct && spot ? spot * (1 - em.iv_pct) : null;
-  const upperIV = em?.iv_pct && spot ? spot * (1 + em.iv_pct) : null;
+  const straddlePct = em?.straddle_pct ?? 0;
+  const ivPct = em?.iv_pct ?? straddlePct;
+  const atmIV = em?.atm_iv ?? 0.3;
+  const dte = em?.dte ?? 28;
+  const lower = spot * (1 - straddlePct);
+  const upper = spot * (1 + straddlePct);
 
-  const timing = timingLabel(em?.timing ?? data.next_earnings_timing);
-  const method = emMethodInfo(em?.em_method);
-  const changeUp = (live?.change ?? 0) >= 0;
+  const timingLabel = timingText(em?.timing ?? data.next_earnings_timing);
 
   return (
-    <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6 max-w-5xl">
-      <button
-        onClick={() => router.push('/')}
-        className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-white mb-6"
-      >
-        <ArrowLeft className="w-4 h-4" />
-        Earnings calendar
-      </button>
+    <div style={{ maxWidth: 960, margin: '0 auto', padding: '0 28px 60px' }}>
+      {toast && <Toast key={toast.key} message={toast.msg} onDone={() => setToast(null)} />}
 
-      {/* Header */}
-      <div className="flex items-start gap-4 mb-8">
-        <div className="w-16 h-16 rounded-xl overflow-hidden bg-gray-800 ring-1 ring-white/10 flex-shrink-0">
-          {!logoError ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={logoUrl(symbol)}
-              alt={symbol}
-              className="w-full h-full object-cover"
-              onError={() => setLogoError(true)}
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-900 to-gray-800 text-white font-bold">
-              {symbol.slice(0, 4)}
+      <div style={{ paddingTop: 24 }}>
+        <button
+          onClick={() => router.push('/')}
+          className="chip"
+          style={{ border: 'none', color: 'var(--ink-3)', paddingLeft: 0, cursor: 'pointer' }}
+        >
+          <ChevronLeft size={14} /> Earnings calendar
+        </button>
+
+        <div
+          style={{
+            marginTop: 18,
+            paddingBottom: 24,
+            borderBottom: '1px solid var(--line)',
+            display: 'grid',
+            gridTemplateColumns: 'auto 1fr auto',
+            gap: 24,
+            alignItems: 'flex-start',
+          }}
+        >
+          <Logo ticker={symbol} size={60} />
+          <div>
+            <div
+              style={{
+                fontSize: 11,
+                letterSpacing: '0.18em',
+                textTransform: 'uppercase',
+                color: 'var(--ink-3)',
+              }}
+            >
+              {companyName(symbol)}
             </div>
-          )}
-        </div>
-        <div className="flex-1">
-          <h1 className="text-3xl font-bold text-white">{symbol}</h1>
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-sm">
-            <span className="text-2xl font-semibold text-gray-100">
-              {formatDollar(spot)}
-            </span>
-            {live?.change !== null && live?.change !== undefined && (
-              <span
-                className={`inline-flex items-center gap-1 text-sm font-medium ${
-                  changeUp ? 'text-emerald-400' : 'text-red-400'
-                }`}
-              >
-                {changeUp ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
-                {changeUp ? '+' : ''}
-                {live.change.toFixed(2)} ({changeUp ? '+' : ''}
-                {((live.changePct ?? 0) * 100).toFixed(2)}%)
+            <h1
+              className="serif"
+              style={{
+                margin: '4px 0 0',
+                fontSize: 52,
+                fontWeight: 800,
+                letterSpacing: '-0.035em',
+                lineHeight: 0.95,
+                color: 'var(--ink)',
+                textTransform: 'uppercase',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 14,
+              }}
+            >
+              {symbol}
+              <WatchlistButton ticker={symbol} onToast={showToast} />
+            </h1>
+            <div
+              style={{
+                marginTop: 10,
+                display: 'flex',
+                alignItems: 'baseline',
+                gap: 14,
+                flexWrap: 'wrap',
+              }}
+            >
+              <span className="serif tnum" style={{ fontSize: 28, fontWeight: 700 }}>
+                ${spot.toFixed(2)}
               </span>
-            )}
-            {live?.source === 'polygon' || live?.source === 'cache' ? (
-              <span className="text-[10px] uppercase tracking-wider text-emerald-400/80">
-                Live · Polygon
-              </span>
-            ) : (
-              <span className="text-[10px] uppercase tracking-wider text-gray-500">
-                As of {data.as_of_date}
-              </span>
-            )}
-          </div>
-          {em?.earnings_date && (
-            <div className="flex flex-wrap items-center gap-2 mt-3">
-              <span className="text-xs text-gray-400">
-                Next earnings <span className="text-gray-200 font-medium">{formatDate(em.earnings_date)}</span>
-              </span>
-              {timing && (
+              {live && live.change !== null && (
                 <span
-                  className={`inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full border ${timing.className}`}
+                  className="mono tnum"
+                  style={{ fontSize: 13, color: up ? 'var(--up)' : 'var(--down)' }}
                 >
-                  {timing.icon}
-                  {timing.label}
+                  {up ? '▲' : '▼'} {Math.abs(change).toFixed(2)} (
+                  {(Math.abs(changePct) * 100).toFixed(2)}%)
                 </span>
               )}
+              <span
+                style={{
+                  fontSize: 10.5,
+                  color: 'var(--ink-4)',
+                  letterSpacing: '0.1em',
+                  textTransform: 'uppercase',
+                }}
+              >
+                {live?.source === 'polygon' || live?.source === 'cache'
+                  ? 'Live · Polygon'
+                  : `As of ${data.as_of_date}`}
+              </span>
+            </div>
+          </div>
+
+          {em?.earnings_date && (
+            <div style={{ textAlign: 'right' }}>
+              <div
+                style={{
+                  fontSize: 11,
+                  letterSpacing: '0.14em',
+                  textTransform: 'uppercase',
+                  color: 'var(--ink-3)',
+                }}
+              >
+                Reports in
+              </div>
+              <div
+                className="serif tnum"
+                style={{
+                  fontSize: 38,
+                  fontWeight: 800,
+                  lineHeight: 1,
+                  marginTop: 4,
+                  letterSpacing: '-0.03em',
+                }}
+              >
+                {em.lead_time_days ?? em.dte}
+                <span
+                  style={{
+                    fontSize: 13,
+                    color: 'var(--ink-3)',
+                    marginLeft: 4,
+                    fontWeight: 500,
+                  }}
+                >
+                  days
+                </span>
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 6 }}>
+                {shortDate(em.earnings_date)}
+                {timingLabel ? ` · ${timingLabel}` : ''}
+              </div>
             </div>
           )}
         </div>
       </div>
 
-      {/* Headline expected move */}
+      {/* EM hero */}
       {em && (
-        <div className="rounded-2xl bg-gray-900/60 border border-white/10 p-6 mb-6">
-          <div className="flex items-center justify-between mb-4">
+        <section style={{ padding: '32px 0 16px', borderBottom: '1px solid var(--line)' }}>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'flex-start',
+              gap: 24,
+            }}
+          >
             <div>
-              <div className="text-[11px] uppercase tracking-wider text-gray-500">
-                {em.earnings_date ? 'Next-earnings expected move' : 'Nearest-expiry expected move'}
+              <div
+                style={{
+                  fontSize: 10,
+                  letterSpacing: '0.18em',
+                  textTransform: 'uppercase',
+                  color: 'var(--ink-3)',
+                }}
+              >
+                Expected move · {em.earnings_date ? 'Earnings' : 'Nearest expiry'}
               </div>
-              <div className="text-xs text-gray-400 mt-1">
-                {em.earnings_date && <>Earnings {formatDate(em.earnings_date)} · </>}
-                Expiry {formatDate(em.expiration)} · {em.dte}d out
+              <h2
+                className="serif"
+                style={{
+                  margin: '4px 0 0',
+                  fontSize: 26,
+                  fontWeight: 700,
+                  letterSpacing: '-0.015em',
+                }}
+              >
+                Options are pricing a move of
+              </h2>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div
+                className="serif tnum"
+                style={{
+                  fontSize: 84,
+                  fontWeight: 800,
+                  lineHeight: 0.9,
+                  letterSpacing: '-0.04em',
+                }}
+              >
+                ±{(straddlePct * 100).toFixed(1)}
+                <span style={{ fontSize: 32, color: 'var(--ink-3)', fontWeight: 600 }}>%</span>
               </div>
               <div
-                title={method.tooltip}
-                className="inline-flex items-center gap-1.5 mt-2 text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-300 border border-emerald-400/20"
+                className="mono tnum"
+                style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 6 }}
               >
-                {method.icon}
-                {method.label}
+                ${lower.toFixed(2)} – ${upper.toFixed(2)} · via ATM straddle
               </div>
-            </div>
-            <div className="text-right">
-              <div className="text-3xl font-bold text-emerald-400">
-                ±{em.straddle_pct ? (em.straddle_pct * 100).toFixed(2) : '—'}%
-              </div>
-              <div className="text-xs text-gray-500 mt-1">ATM straddle</div>
             </div>
           </div>
 
-          {/* Creative implied range bar */}
-          {lower && upper && (
-            <ImpliedMoveBar
+          {spot > 0 && straddlePct > 0 && (
+            <InteractiveBar
               spot={spot}
-              lower={lower}
-              upper={upper}
-              lowerIV={lowerIV}
-              upperIV={upperIV}
+              em={straddlePct}
+              emIV={ivPct}
+              atmIV={atmIV}
+              dte={dte}
             />
           )}
+        </section>
+      )}
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6">
-            <Stat label="ATM IV" value={formatPct(em.atm_iv)} />
-            <Stat label="IV-based EM" value={formatPct(em.iv_pct)} />
-            <Stat label="Straddle $" value={formatDollar(em.straddle_abs)} />
-            <Stat label="ATM Strike" value={formatDollar(em.atm_strike)} />
-          </div>
-        </div>
+      {/* Stat row */}
+      {em && (
+        <section
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(4, 1fr)',
+            borderBottom: '1px solid var(--line)',
+            columnGap: 24,
+          }}
+        >
+          <Stat
+            label="ATM IV"
+            value={em.atm_iv !== null ? `${(em.atm_iv * 100).toFixed(1)}%` : '—'}
+            sub={
+              em.term_slope !== null && em.term_slope !== undefined
+                ? `Δ term slope ${(em.term_slope * 100).toFixed(1)} vol/30d`
+                : undefined
+            }
+          />
+          <Stat
+            label="IV-based EM"
+            value={em.iv_pct !== null ? `±${(em.iv_pct * 100).toFixed(1)}%` : '—'}
+            sub={
+              em.atm_iv !== null
+                ? `σ ${(em.atm_iv * 100).toFixed(0)}% · ${em.dte}d`
+                : undefined
+            }
+          />
+          <Stat
+            label="ATM straddle"
+            value={em.straddle_abs !== null ? `$${em.straddle_abs.toFixed(2)}` : '—'}
+            sub={`Strike $${em.atm_strike.toFixed(2)}`}
+          />
+          <Stat
+            label="Skew (ATM)"
+            value={
+              em.skew_atm !== null && em.skew_atm !== undefined
+                ? `${(em.skew_atm * 100).toFixed(2)}v`
+                : '—'
+            }
+            sub={
+              em.total_vega !== null && em.total_vega !== undefined
+                ? `Vega $${(em.total_vega * 1000).toFixed(0)}`
+                : undefined
+            }
+          />
+        </section>
       )}
 
       {/* Term structure */}
       {data.straddle_features.length > 0 && (
-        <div className="rounded-2xl bg-gray-900/60 border border-white/10 p-6 mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-semibold text-gray-300">
-              Expected move by expiry
-            </h2>
-            <span className="text-xs text-gray-500">
+        <section style={{ padding: '40px 0', borderBottom: '1px solid var(--line)' }}>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'baseline',
+              marginBottom: 14,
+            }}
+          >
+            <div>
+              <div
+                style={{
+                  fontSize: 10,
+                  letterSpacing: '0.18em',
+                  textTransform: 'uppercase',
+                  color: 'var(--ink-3)',
+                }}
+              >
+                Term structure
+              </div>
+              <h2
+                className="serif"
+                style={{
+                  margin: '2px 0 0',
+                  fontSize: 22,
+                  fontWeight: 700,
+                  letterSpacing: '-0.01em',
+                }}
+              >
+                Expected move by expiry
+              </h2>
+            </div>
+            <span className="mono" style={{ fontSize: 10.5, color: 'var(--ink-4)' }}>
               {data.straddle_features.length} expiries
             </span>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-[11px] uppercase tracking-wider text-gray-500 border-b border-white/5">
-                  <th className="text-left py-2 font-normal">Expiry</th>
-                  <th className="text-right py-2 font-normal">DTE</th>
-                  <th className="text-right py-2 font-normal">ATM IV</th>
-                  <th className="text-right py-2 font-normal">Straddle</th>
-                  <th className="text-right py-2 font-normal">EM % (math)</th>
-                  <th className="text-right py-2 font-normal">EM % (IV)</th>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid var(--line)' }}>
+                <Th>Expiry</Th>
+                <Th align="right">DTE</Th>
+                <Th align="right">ATM IV</Th>
+                <Th align="right">Straddle</Th>
+                <Th align="right">EM · math</Th>
+                <Th align="right">EM · IV</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.straddle_features.map((s) => (
+                <tr
+                  key={s.expiration}
+                  style={{ borderBottom: '1px solid var(--line)' }}
+                >
+                  <Td>
+                    <span className="serif" style={{ fontSize: 15 }}>
+                      {shortDate(s.expiration)}
+                    </span>
+                  </Td>
+                  <Td align="right" mono>
+                    {s.dte}d
+                  </Td>
+                  <Td align="right" mono>
+                    {s.atm_iv !== null ? `${(s.atm_iv * 100).toFixed(2)}%` : '—'}
+                  </Td>
+                  <Td align="right" mono>
+                    {s.straddle_mid !== null ? `$${s.straddle_mid.toFixed(2)}` : '—'}
+                  </Td>
+                  <Td align="right" mono bold tone="var(--ink)">
+                    {s.em_straddle_pct !== null
+                      ? `±${(s.em_straddle_pct * 100).toFixed(2)}%`
+                      : '—'}
+                  </Td>
+                  <Td align="right" mono tone="var(--accent)">
+                    {s.em_iv_pct !== null ? `±${(s.em_iv_pct * 100).toFixed(2)}%` : '—'}
+                  </Td>
                 </tr>
-              </thead>
-              <tbody>
-                {data.straddle_features.map((s) => (
-                  <tr key={s.expiration} className="border-b border-white/5 last:border-0">
-                    <td className="py-2.5 text-gray-200">{formatDate(s.expiration)}</td>
-                    <td className="py-2.5 text-right text-gray-400">{s.dte}d</td>
-                    <td className="py-2.5 text-right text-gray-300">{formatPct(s.atm_iv)}</td>
-                    <td className="py-2.5 text-right text-gray-300">{formatDollar(s.straddle_mid)}</td>
-                    <td className="py-2.5 text-right font-semibold text-emerald-400">
-                      {formatPct(s.em_straddle_pct)}
-                    </td>
-                    <td className="py-2.5 text-right text-blue-400">{formatPct(s.em_iv_pct)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+              ))}
+            </tbody>
+          </table>
+        </section>
       )}
 
-      {/* Greeks + microstructure */}
-      {em && (em.skew_atm !== undefined || em.total_vega !== undefined) && (
-        <div className="rounded-2xl bg-gray-900/60 border border-white/10 p-6 mb-6">
-          <h2 className="text-sm font-semibold text-gray-300 mb-4">Greeks &amp; microstructure</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <Stat
-              label="ATM Skew"
-              value={em.skew_atm !== null && em.skew_atm !== undefined ? `${(em.skew_atm * 100).toFixed(2)}vol` : '—'}
-            />
-            <Stat
-              label="Term slope"
-              value={
-                em.term_slope !== null && em.term_slope !== undefined
-                  ? `${(em.term_slope * 100).toFixed(2)}vol/30d`
-                  : '—'
-              }
-            />
-            <Stat
-              label="Total vega"
-              value={em.total_vega ? `$${(em.total_vega * 1000).toFixed(0)}` : '—'}
-            />
-            <Stat label="DTE" value={`${em.dte}d`} />
-          </div>
-        </div>
-      )}
-
-      {/* Earnings history */}
-      {data.earnings_history && data.earnings_history.length > 0 && (
-        <div className="rounded-2xl bg-gray-900/60 border border-white/10 p-6 mb-6">
-          <h2 className="text-sm font-semibold text-gray-300 mb-4">Recent earnings</h2>
-          <div className="flex flex-wrap gap-2">
-            {data.earnings_history.slice(0, 8).map((h) => (
-              <span
-                key={h.date}
-                className="text-xs px-2.5 py-1 rounded-md bg-white/5 border border-white/10 text-gray-300"
-              >
-                {formatDate(h.date)}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl bg-black/30 border border-white/5 p-3">
-      <div className="text-[10px] uppercase tracking-wider text-gray-500">{label}</div>
-      <div className="text-base font-semibold text-gray-100 mt-0.5">{value}</div>
-    </div>
-  );
-}
-
-function ImpliedMoveBar({
-  spot,
-  lower,
-  upper,
-  lowerIV,
-  upperIV,
-}: {
-  spot: number;
-  lower: number;
-  upper: number;
-  lowerIV: number | null;
-  upperIV: number | null;
-}) {
-  // Pad the axis a bit beyond whichever range (straddle vs IV) is wider so both fit.
-  const widest = Math.max(
-    upper - spot,
-    spot - lower,
-    upperIV ? upperIV - spot : 0,
-    lowerIV ? spot - lowerIV : 0,
-  );
-  const minVal = spot - widest * 1.08;
-  const maxVal = spot + widest * 1.08;
-  const toPct = (v: number) => ((v - minVal) / (maxVal - minVal)) * 100;
-
-  const lowPct = toPct(lower);
-  const highPct = toPct(upper);
-  const spotPct = toPct(spot);
-  const lowIVPct = lowerIV ? toPct(lowerIV) : null;
-  const highIVPct = upperIV ? toPct(upperIV) : null;
-
-  return (
-    <div className="mt-2">
-      {/* Axis labels */}
-      <div className="flex items-center justify-between text-[11px] mb-2">
-        <span className="inline-flex items-center gap-1 text-red-400 font-medium">
-          <TrendingDown className="w-3 h-3" />
-          {formatDollar(lower)}
+      <div
+        style={{
+          padding: '20px 0 0',
+          fontSize: 11,
+          color: 'var(--ink-4)',
+          display: 'flex',
+          justifyContent: 'space-between',
+        }}
+      >
+        <span>Options data · as of {data.as_of_date}</span>
+        <span>
+          Method: {em?.em_method === 'ml_lightgbm'
+            ? 'ML forecast'
+            : em?.em_method === 'ensemble'
+              ? 'Math + ML'
+              : 'options math baseline'}
         </span>
-        <span className="text-gray-400 text-[10px] uppercase tracking-wider">
-          Implied range · ~68% · straddle
-        </span>
-        <span className="inline-flex items-center gap-1 text-emerald-400 font-medium">
-          {formatDollar(upper)}
-          <TrendingUp className="w-3 h-3" />
-        </span>
-      </div>
-
-      {/* Track */}
-      <div className="relative h-10">
-        {/* distribution-ish gradient backdrop */}
-        <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-3 rounded-full bg-black/40 overflow-hidden ring-1 ring-white/5">
-          <div
-            className="absolute top-0 bottom-0 bg-gradient-to-r from-red-500/60 via-amber-400/60 to-emerald-500/60"
-            style={{ left: `${lowPct}%`, width: `${highPct - lowPct}%` }}
-          />
-          {/* Inner, higher-density core (~1-sigma squeeze) */}
-          <div
-            className="absolute top-0 bottom-0 bg-gradient-to-r from-red-400 via-yellow-300 to-emerald-400"
-            style={{
-              left: `${lowPct + (highPct - lowPct) * 0.33}%`,
-              width: `${(highPct - lowPct) * 0.34}%`,
-              opacity: 0.9,
-              filter: 'blur(0.5px)',
-            }}
-          />
-        </div>
-
-        {/* IV band as dashed outline under main track */}
-        {lowIVPct !== null && highIVPct !== null && (
-          <div
-            className="absolute top-1/2 -translate-y-1/2 h-6 border border-dashed border-blue-400/50 rounded-full pointer-events-none"
-            style={{ left: `${lowIVPct}%`, width: `${highIVPct - lowIVPct}%` }}
-            title={`IV-based range: ${formatDollar(lowerIV ?? 0)} – ${formatDollar(upperIV ?? 0)}`}
-          />
-        )}
-
-        {/* Spot marker */}
-        <div
-          className="absolute top-0 bottom-0 w-px bg-white"
-          style={{ left: `${spotPct}%` }}
-          aria-hidden
-        />
-        <div
-          className="absolute -top-1 -translate-x-1/2"
-          style={{ left: `${spotPct}%` }}
-        >
-          <div className="w-2.5 h-2.5 rotate-45 bg-white border border-gray-700" />
-        </div>
-        <div
-          className="absolute -bottom-5 -translate-x-1/2 text-[10px] font-medium text-gray-200 whitespace-nowrap"
-          style={{ left: `${spotPct}%` }}
-        >
-          Spot {formatDollar(spot)}
-        </div>
-      </div>
-
-      {/* Legend */}
-      <div className="flex items-center gap-4 mt-7 text-[10px] text-gray-400">
-        <span className="inline-flex items-center gap-1.5">
-          <span className="h-2 w-4 rounded-full bg-gradient-to-r from-red-500/70 via-amber-400/70 to-emerald-500/70" />
-          Straddle band
-        </span>
-        {lowIVPct !== null && (
-          <span className="inline-flex items-center gap-1.5">
-            <span className="h-2 w-4 rounded-full border border-dashed border-blue-400/70" />
-            IV band
-          </span>
-        )}
       </div>
     </div>
   );
