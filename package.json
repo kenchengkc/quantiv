@@ -4,8 +4,7 @@
   "description": "Quantiv is a modern web platform for options traders to instantly see market-implied moves before earnings. It computes expected moves, greeks, and IV rank from live options chains, with a clean dashboard, historical comparisons, and shareable insights—helping traders act with precision and speed.",
   "private": true,
   "workspaces": [
-    "apps/*",
-    "packages/*"
+    "apps/*"
   ],
   "scripts": {
     "dev": "npm run dev --workspace=apps/frontend",
@@ -19,14 +18,17 @@
     "test": "npm run test --workspace=apps/frontend",
     "docker:up": "docker-compose -f infrastructure/docker/docker-compose.yml up",
     "docker:down": "docker-compose -f infrastructure/docker/docker-compose.yml down",
-    "ml:setup": "python scripts/setup_ml_pipeline.py --local",
-    "ml:forecast": "python scripts/populate_ml_forecasts.py --local",
+    "ml:features": "python apps/ml/feature_engineering_v2.py",
+    "ml:train": "python apps/ml/model_trainer_v2.py",
+    "ml:score": "python scripts/daily_score.py",
     "ml:validate": "python scripts/data_healthcheck.py --local",
     "data:sync": "python scripts/sync_dolthub.py",
     "data:sync-full": "python scripts/sync_dolthub.py --full",
     "data:earnings": "python scripts/sync_dolthub.py --earnings",
     "data:ohlcv": "python scripts/sync_dolthub.py --ohlcv",
-    "data:views": "python scripts/setup_duckdb_from_parquet.py"
+    "data:csv-parquet": "python scripts/csv_to_parquet.py",
+    "data:views": "python scripts/setup_duckdb_from_parquet.py",
+    "data:frontend": "python tools/build_frontend_data.py"
   },
   "dependencies": {
     "@headlessui/react": "^1.7.17",
