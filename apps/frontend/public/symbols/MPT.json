@@ -1,0 +1,103 @@
+{
+  "symbol": "MPT",
+  "as_of_date": "2026-04-10",
+  "spot_price": 5.0,
+  "expected_move": {
+    "earnings_date": "2026-05-07",
+    "expiration": "2026-05-08",
+    "dte": 28,
+    "lead_time_days": 27,
+    "atm_strike": 5.0,
+    "atm_iv": 0.6214,
+    "straddle_abs": 0.43,
+    "straddle_pct": 0.086,
+    "iv_pct": 0.172109,
+    "skew_atm": 0.0,
+    "term_slope": -0.260786,
+    "total_vega": 0.0108,
+    "timing": "unknown",
+    "em_method": "options_math"
+  },
+  "straddle_features": [
+    {
+      "expiration": "2026-04-24",
+      "dte": 14,
+      "atm_strike": 5.0,
+      "atm_iv": 0.93575,
+      "atm_call_iv": 1.0009,
+      "atm_put_iv": 0.8706,
+      "straddle_mid": 0.29,
+      "em_straddle": 0.29,
+      "em_straddle_pct": 0.058,
+      "em_iv": 0.916321,
+      "em_iv_pct": 0.183264,
+      "call_delta": 0.4978,
+      "call_gamma": 0.4079,
+      "call_vega": 0.0038,
+      "call_theta": -0.0123
+    },
+    {
+      "expiration": "2026-05-08",
+      "dte": 28,
+      "atm_strike": 5.0,
+      "atm_iv": 0.6214,
+      "atm_call_iv": 0.6214,
+      "atm_put_iv": 0.6214,
+      "straddle_mid": 0.43,
+      "em_straddle": 0.43,
+      "em_straddle_pct": 0.086,
+      "em_iv": 0.860545,
+      "em_iv_pct": 0.172109,
+      "call_delta": 0.519,
+      "call_gamma": 0.4687,
+      "call_vega": 0.0054,
+      "call_theta": -0.0064
+    },
+    {
+      "expiration": "2026-05-22",
+      "dte": 42,
+      "atm_strike": 5.0,
+      "atm_iv": 0.413,
+      "atm_call_iv": 0.409,
+      "atm_put_iv": 0.417,
+      "straddle_mid": 0.555,
+      "em_straddle": 0.555,
+      "em_straddle_pct": 0.111,
+      "em_iv": 0.700484,
+      "em_iv_pct": 0.140097,
+      "call_delta": 0.4905,
+      "call_gamma": 0.5783,
+      "call_vega": 0.0066,
+      "call_theta": -0.0031
+    },
+    {
+      "expiration": "2026-05-29",
+      "dte": 49,
+      "atm_strike": 5.0,
+      "atm_iv": 0.35215,
+      "atm_call_iv": 0.359,
+      "atm_put_iv": 0.3453,
+      "straddle_mid": 0.525,
+      "em_straddle": 0.525,
+      "em_straddle_pct": 0.105,
+      "em_iv": 0.645133,
+      "em_iv_pct": 0.129027,
+      "call_delta": 0.5614,
+      "call_gamma": 0.6167,
+      "call_vega": 0.0072,
+      "call_theta": -0.0037
+    }
+  ],
+  "earnings_history": [
+    {
+      "date": "2026-05-07",
+      "timing": "unknown"
+    },
+    {
+      "date": "2026-02-19",
+      "timing": "unknown"
+    }
+  ],
+  "next_earnings": "2026-05-07",
+  "next_earnings_timing": "unknown"
+}

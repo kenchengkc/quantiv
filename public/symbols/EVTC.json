@@ -1,0 +1,92 @@
+{
+  "symbol": "EVTC",
+  "as_of_date": "2026-04-10",
+  "spot_price": null,
+  "expected_move": {
+    "earnings_date": "2026-05-06",
+    "expiration": "2026-05-15",
+    "dte": 35,
+    "lead_time_days": 26,
+    "atm_strike": 30.0,
+    "atm_iv": 0.7348,
+    "straddle_abs": 4.3,
+    "straddle_pct": 0.143333,
+    "iv_pct": 0.227539,
+    "skew_atm": 0.0,
+    "term_slope": null,
+    "total_vega": 0.0662,
+    "timing": "unknown",
+    "em_method": "options_math"
+  },
+  "straddle_features": [
+    {
+      "expiration": "2026-05-15",
+      "dte": 35,
+      "atm_strike": 30.0,
+      "atm_iv": 0.7348,
+      "atm_call_iv": 0.7348,
+      "atm_put_iv": 0.7348,
+      "straddle_mid": 4.3,
+      "em_straddle": 4.3,
+      "em_straddle_pct": null,
+      "em_iv": null,
+      "em_iv_pct": null,
+      "call_delta": 0.3938,
+      "call_gamma": 0.0587,
+      "call_vega": 0.033,
+      "call_theta": -0.0276
+    }
+  ],
+  "earnings_history": [
+    {
+      "date": "2026-05-06",
+      "timing": "unknown"
+    },
+    {
+      "date": "2026-02-26",
+      "timing": "unknown"
+    },
+    {
+      "date": "2025-11-06",
+      "timing": "unknown"
+    },
+    {
+      "date": "2025-07-30",
+      "timing": "unknown"
+    },
+    {
+      "date": "2025-05-07",
+      "timing": "unknown"
+    },
+    {
+      "date": "2025-02-26",
+      "timing": "unknown"
+    },
+    {
+      "date": "2024-11-06",
+      "timing": "unknown"
+    },
+    {
+      "date": "2024-07-31",
+      "timing": "unknown"
+    },
+    {
+      "date": "2024-05-01",
+      "timing": "unknown"
+    },
+    {
+      "date": "2024-02-28",
+      "timing": "unknown"
+    },
+    {
+      "date": "2023-10-26",
+      "timing": "unknown"
+    },
+    {
+      "date": "2023-07-26",
+      "timing": "unknown"
+    }
+  ],
+  "next_earnings": "2026-05-06",
+  "next_earnings_timing": "unknown"
+}

@@ -1,0 +1,109 @@
+{
+  "symbol": "GRBK",
+  "as_of_date": "2026-04-10",
+  "spot_price": 65.0,
+  "expected_move": {
+    "earnings_date": "2026-04-29",
+    "expiration": "2026-05-15",
+    "dte": 35,
+    "lead_time_days": 19,
+    "atm_strike": 70.0,
+    "atm_iv": 0.387749,
+    "straddle_abs": 6.85,
+    "straddle_pct": 0.097857,
+    "iv_pct": 0.120071,
+    "skew_atm": 0.006567,
+    "term_slope": null,
+    "total_vega": 0.1614,
+    "timing": "unknown",
+    "em_method": "options_math"
+  },
+  "straddle_features": [
+    {
+      "expiration": "2026-04-17",
+      "dte": 7,
+      "atm_strike": 65.0,
+      "atm_iv": 0.6012,
+      "atm_call_iv": 0.6012,
+      "atm_put_iv": 0.6012,
+      "straddle_mid": 3.3,
+      "em_straddle": 3.3,
+      "em_straddle_pct": 0.050769,
+      "em_iv": 5.411715,
+      "em_iv_pct": 0.083257,
+      "call_delta": 0.6743,
+      "call_gamma": 0.0621,
+      "call_vega": 0.0332,
+      "call_theta": -0.0717
+    },
+    {
+      "expiration": "2026-05-15",
+      "dte": 35,
+      "atm_strike": 70.0,
+      "atm_iv": 0.38775,
+      "atm_call_iv": 0.3869,
+      "atm_put_iv": 0.3886,
+      "straddle_mid": 6.85,
+      "em_straddle": 6.85,
+      "em_straddle_pct": 0.105385,
+      "em_iv": 7.804638,
+      "em_iv_pct": 0.120071,
+      "call_delta": 0.4018,
+      "call_gamma": 0.0469,
+      "call_vega": 0.0808,
+      "call_theta": -0.0381
+    }
+  ],
+  "earnings_history": [
+    {
+      "date": "2026-04-29",
+      "timing": "unknown"
+    },
+    {
+      "date": "2026-02-25",
+      "timing": "unknown"
+    },
+    {
+      "date": "2025-10-29",
+      "timing": "unknown"
+    },
+    {
+      "date": "2025-07-30",
+      "timing": "unknown"
+    },
+    {
+      "date": "2025-04-30",
+      "timing": "unknown"
+    },
+    {
+      "date": "2025-02-26",
+      "timing": "unknown"
+    },
+    {
+      "date": "2024-10-30",
+      "timing": "unknown"
+    },
+    {
+      "date": "2024-07-31",
+      "timing": "unknown"
+    },
+    {
+      "date": "2024-05-01",
+      "timing": "unknown"
+    },
+    {
+      "date": "2024-02-29",
+      "timing": "unknown"
+    },
+    {
+      "date": "2023-10-31",
+      "timing": "unknown"
+    },
+    {
+      "date": "2023-08-02",
+      "timing": "unknown"
+    }
+  ],
+  "next_earnings": "2026-04-29",
+  "next_earnings_timing": "unknown"
+}

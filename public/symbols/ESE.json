@@ -1,0 +1,126 @@
+{
+  "symbol": "ESE",
+  "as_of_date": "2026-04-10",
+  "spot_price": 310.0,
+  "expected_move": {
+    "earnings_date": "2026-05-06",
+    "expiration": "2026-05-15",
+    "dte": 35,
+    "lead_time_days": 26,
+    "atm_strike": 310.0,
+    "atm_iv": 0.361799,
+    "straddle_abs": 27.45,
+    "straddle_pct": 0.088548,
+    "iv_pct": 0.112035,
+    "skew_atm": 0.015943,
+    "term_slope": null,
+    "total_vega": 0.7631,
+    "timing": "unknown",
+    "em_method": "options_math"
+  },
+  "straddle_features": [
+    {
+      "expiration": "2026-04-17",
+      "dte": 7,
+      "atm_strike": 310.0,
+      "atm_iv": 0.2824,
+      "atm_call_iv": 0.2779,
+      "atm_put_iv": 0.2869,
+      "straddle_mid": 9.7,
+      "em_straddle": 9.7,
+      "em_straddle_pct": 0.03129,
+      "em_iv": 12.123527,
+      "em_iv_pct": 0.039108,
+      "call_delta": 0.5321,
+      "call_gamma": 0.0331,
+      "call_vega": 0.1709,
+      "call_theta": -0.3204
+    },
+    {
+      "expiration": "2026-05-15",
+      "dte": 35,
+      "atm_strike": 310.0,
+      "atm_iv": 0.3618,
+      "atm_call_iv": 0.3659,
+      "atm_put_iv": 0.3577,
+      "straddle_mid": 27.45,
+      "em_straddle": 27.45,
+      "em_straddle_pct": 0.088548,
+      "em_iv": 34.731045,
+      "em_iv_pct": 0.112036,
+      "call_delta": 0.5384,
+      "call_gamma": 0.0112,
+      "call_vega": 0.3815,
+      "call_theta": -0.2149
+    },
+    {
+      "expiration": "2026-06-18",
+      "dte": 69,
+      "atm_strike": 310.0,
+      "atm_iv": 0.3147,
+      "atm_call_iv": 0.3168,
+      "atm_put_iv": 0.3126,
+      "straddle_mid": 33.9,
+      "em_straddle": 33.9,
+      "em_straddle_pct": 0.109355,
+      "em_iv": 42.416668,
+      "em_iv_pct": 0.136828,
+      "call_delta": 0.5478,
+      "call_gamma": 0.0092,
+      "call_vega": 0.5338,
+      "call_theta": -0.1361
+    }
+  ],
+  "earnings_history": [
+    {
+      "date": "2026-05-06",
+      "timing": "unknown"
+    },
+    {
+      "date": "2026-02-05",
+      "timing": "unknown"
+    },
+    {
+      "date": "2025-11-20",
+      "timing": "unknown"
+    },
+    {
+      "date": "2025-08-07",
+      "timing": "unknown"
+    },
+    {
+      "date": "2025-05-07",
+      "timing": "unknown"
+    },
+    {
+      "date": "2025-02-06",
+      "timing": "unknown"
+    },
+    {
+      "date": "2024-11-14",
+      "timing": "unknown"
+    },
+    {
+      "date": "2024-08-07",
+      "timing": "unknown"
+    },
+    {
+      "date": "2024-05-09",
+      "timing": "unknown"
+    },
+    {
+      "date": "2024-02-08",
+      "timing": "unknown"
+    },
+    {
+      "date": "2023-11-16",
+      "timing": "unknown"
+    },
+    {
+      "date": "2023-08-08",
+      "timing": "unknown"
+    }
+  ],
+  "next_earnings": "2026-05-06",
+  "next_earnings_timing": "unknown"
+}

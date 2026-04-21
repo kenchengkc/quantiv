@@ -1,0 +1,92 @@
+{
+  "symbol": "SHC",
+  "as_of_date": "2026-04-10",
+  "spot_price": 15.0,
+  "expected_move": {
+    "earnings_date": "2026-05-07",
+    "expiration": "2026-05-15",
+    "dte": 35,
+    "lead_time_days": 27,
+    "atm_strike": 17.5,
+    "atm_iv": 0.7338,
+    "straddle_abs": 2.725,
+    "straddle_pct": 0.155714,
+    "iv_pct": 0.22723,
+    "skew_atm": 0.0,
+    "term_slope": null,
+    "total_vega": 0.0329,
+    "timing": "unknown",
+    "em_method": "options_math"
+  },
+  "straddle_features": [
+    {
+      "expiration": "2026-05-15",
+      "dte": 35,
+      "atm_strike": 17.5,
+      "atm_iv": 0.7338,
+      "atm_call_iv": 0.7338,
+      "atm_put_iv": 0.7338,
+      "straddle_mid": 2.725,
+      "em_straddle": 2.725,
+      "em_straddle_pct": 0.181667,
+      "em_iv": 3.408447,
+      "em_iv_pct": 0.22723,
+      "call_delta": 0.3869,
+      "call_gamma": 0.1157,
+      "call_vega": 0.0184,
+      "call_theta": -0.0275
+    }
+  ],
+  "earnings_history": [
+    {
+      "date": "2026-05-07",
+      "timing": "unknown"
+    },
+    {
+      "date": "2026-02-24",
+      "timing": "unknown"
+    },
+    {
+      "date": "2025-11-04",
+      "timing": "unknown"
+    },
+    {
+      "date": "2025-08-08",
+      "timing": "unknown"
+    },
+    {
+      "date": "2025-05-01",
+      "timing": "unknown"
+    },
+    {
+      "date": "2025-02-27",
+      "timing": "unknown"
+    },
+    {
+      "date": "2024-11-05",
+      "timing": "unknown"
+    },
+    {
+      "date": "2024-08-05",
+      "timing": "unknown"
+    },
+    {
+      "date": "2024-05-02",
+      "timing": "unknown"
+    },
+    {
+      "date": "2024-02-27",
+      "timing": "unknown"
+    },
+    {
+      "date": "2023-11-01",
+      "timing": "unknown"
+    },
+    {
+      "date": "2023-08-03",
+      "timing": "unknown"
+    }
+  ],
+  "next_earnings": "2026-05-07",
+  "next_earnings_timing": "unknown"
+}

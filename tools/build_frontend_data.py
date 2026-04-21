@@ -45,11 +45,16 @@ def monday_of_week(d: date) -> date:
 
 
 def target_week(today: date) -> tuple[date, date]:
+    """Return (Mon, Fri) of the trading week for `today`. Weekend rolls to next week."""
     if today.weekday() >= 5:
         base = today + timedelta(days=(7 - today.weekday()))
     else:
         base = monday_of_week(today)
     return base, base + timedelta(days=4)
+
+
+# Week offsets we expose in the UI: last week, this week, next week, week after next.
+WEEK_OFFSETS = [-1, 0, 1, 2]
 
 
 def jsonable(v):
@@ -221,27 +226,8 @@ def build_symbol_detail(conn, ticker: str, as_of_date: date, earnings_dt: date |
     }
 
 
-def main():
-    for base in PUBLIC_DIRS:
-        (base / "symbols").mkdir(parents=True, exist_ok=True)
-
-    conn = duckdb.connect()
-    build_earnings_events_table(conn, EARNINGS_CSV)
-    create_duckdb_views(conn, DATA_DIR)
-
-    # Pick as-of = most recent parquet date available
-    as_of_row = conn.execute("SELECT MAX(as_of_date) FROM v_options_chain").fetchone()
-    as_of_date = as_of_row[0]
-    if as_of_date is None:
-        print("❌ No options data available")
-        sys.exit(1)
-
-    today = date.today()
-    week_start, week_end = target_week(today)
-    print(f"📅 Week {week_start} → {week_end}  (as_of {as_of_date})")
-
-    # Earnings this week
-    earnings = conn.execute(
+def build_week_events(conn, as_of_date: date, week_start: date, week_end: date) -> list[dict]:
+    rows = conn.execute(
         """
         SELECT ticker, earnings_dt, timing, fiscal_q
         FROM earnings_events
@@ -252,16 +238,14 @@ def main():
     ).fetchall()
 
     events = []
-    generated_symbols: set[str] = set()
-
-    for ticker, earnings_dt, timing, fiscal_q in earnings:
+    for ticker, earnings_dt, timing, fiscal_q in rows:
         em = compute_em_math(conn, ticker, as_of_date, earnings_dt)
         if not em:
             continue
         events.append({
             "ticker": ticker,
             "earnings_date": earnings_dt.isoformat(),
-            "timing": timing,
+            "timing": timing or "unknown",
             "fiscal_q": fiscal_q,
             "as_of_date": as_of_date.isoformat(),
             "spot_price": jsonable(em["estimated_spot"]),
@@ -275,33 +259,97 @@ def main():
             "lead_time_days": em["lead_time_days"],
             "skew_atm": jsonable(em.get("skew_atm")),
             "term_slope": jsonable(em.get("term_slope")),
+            "em_method": "options_math",  # source: ATM straddle + IV baseline
             "confidence": "high",
         })
+    events.sort(key=lambda e: (e["earnings_date"], e["ticker"]))
+    return events
 
-        # Generate per-symbol detail
-        try:
-            detail = build_symbol_detail(conn, ticker, as_of_date, earnings_dt)
-            if detail:
-                write_to_public(
-                    f"symbols/{ticker}.json",
-                    json.dumps(detail, indent=2, default=str),
-                )
-                generated_symbols.add(ticker)
-        except Exception as e:
-            print(f"  ⚠️  {ticker} detail: {e}")
 
-    # Popular tickers (always generate detail pages)
+def main():
+    for base in PUBLIC_DIRS:
+        (base / "symbols").mkdir(parents=True, exist_ok=True)
+        (base / "weeks").mkdir(parents=True, exist_ok=True)
+
+    conn = duckdb.connect()
+    build_earnings_events_table(conn, EARNINGS_CSV)
+    create_duckdb_views(conn, DATA_DIR)
+
+    as_of_row = conn.execute("SELECT MAX(as_of_date) FROM v_options_chain").fetchone()
+    as_of_date = as_of_row[0]
+    if as_of_date is None:
+        print("❌ No options data available")
+        sys.exit(1)
+
+    today = date.today()
+    this_monday = monday_of_week(today) if today.weekday() < 5 else today + timedelta(days=(7 - today.weekday()))
+
+    # Build each week (last, this, next, +2) and collect unique tickers for detail pages.
+    week_payloads = {}
+    tickers_needing_detail: dict[str, date] = {}
+    for offset in WEEK_OFFSETS:
+        wk_start = this_monday + timedelta(days=7 * offset)
+        wk_end = wk_start + timedelta(days=4)
+        events = build_week_events(conn, as_of_date, wk_start, wk_end)
+        print(f"📅 week {wk_start} (offset {offset:+d}) → {len(events)} events")
+        payload = {
+            "metadata": {
+                "version": "v4_multi_week",
+                "generated_at": datetime.now().isoformat(),
+                "as_of_date": as_of_date.isoformat(),
+                "method": "ATM straddle + IV baseline",
+                "offset": offset,
+            },
+            "window": {"start": wk_start.isoformat(), "end": wk_end.isoformat()},
+            "events": events,
+            "summary": {
+                "total_events": len(events),
+                "avg_em_straddle_pct": (
+                    sum(e["em_straddle_pct"] for e in events if e["em_straddle_pct"]) / len(events)
+                    if events else 0
+                ),
+                "avg_em_iv_pct": (
+                    sum(e["em_iv_pct"] for e in events if e["em_iv_pct"]) / len(events)
+                    if events else 0
+                ),
+            },
+        }
+        week_payloads[wk_start] = payload
+        write_to_public(
+            f"weeks/{wk_start.isoformat()}.json",
+            json.dumps(payload, indent=2, default=str),
+        )
+        for ev in events:
+            tickers_needing_detail.setdefault(ev["ticker"], date.fromisoformat(ev["earnings_date"]))
+
+    # Primary weekly.json points at the current week (back-compat for any old consumers).
+    write_to_public("weekly.json", json.dumps(week_payloads[this_monday], indent=2, default=str))
+
+    # Manifest of available weeks (used by the UI to render nav state).
+    manifest = {
+        "as_of_date": as_of_date.isoformat(),
+        "current_week": this_monday.isoformat(),
+        "weeks": [
+            {
+                "start": d.isoformat(),
+                "end": (d + timedelta(days=4)).isoformat(),
+                "offset": offset,
+                "count": len(week_payloads[d]["events"]),
+            }
+            for offset, d in ((off, this_monday + timedelta(days=7 * off)) for off in WEEK_OFFSETS)
+        ],
+    }
+    write_to_public("weeks/manifest.json", json.dumps(manifest, indent=2))
+
+    # Generate per-symbol detail: all tickers seen in any week + a curated popular list.
     popular = [
         "AAPL", "TSLA", "NVDA", "AMZN", "MSFT", "META", "GOOGL", "JPM",
         "BAC", "GS", "NFLX", "JNJ", "UNH", "PG", "V", "MA", "IBM", "INTC",
         "T", "BA", "GE", "RTX", "AXP", "HON", "LMT", "TMO", "MCO",
     ]
     for ticker in popular:
-        if ticker in generated_symbols:
-            continue
-        try:
-            # look up their next earnings
-            next_earn = conn.execute(
+        if ticker not in tickers_needing_detail:
+            row = conn.execute(
                 """
                 SELECT earnings_dt FROM earnings_events
                 WHERE ticker = ? AND earnings_dt >= ?
@@ -309,44 +357,34 @@ def main():
                 """,
                 [ticker, as_of_date],
             ).fetchone()
-            earn_dt = next_earn[0] if next_earn else None
+            tickers_needing_detail[ticker] = row[0] if row else None
+
+    generated = 0
+    for ticker, earn_dt in tickers_needing_detail.items():
+        try:
             detail = build_symbol_detail(conn, ticker, as_of_date, earn_dt)
-            if detail:
-                write_to_public(
-                    f"symbols/{ticker}.json",
-                    json.dumps(detail, indent=2, default=str),
-                )
-                generated_symbols.add(ticker)
+            if not detail:
+                continue
+            # Attach timing (BMO/AMC/unknown) from the earnings row, surfaced on the detail page.
+            if earn_dt:
+                row = conn.execute(
+                    "SELECT timing FROM earnings_events WHERE ticker = ? AND earnings_dt = ? LIMIT 1",
+                    [ticker, earn_dt],
+                ).fetchone()
+                timing = (row[0] if row else None) or "unknown"
+                detail["next_earnings_timing"] = timing
+                if detail.get("expected_move"):
+                    detail["expected_move"]["timing"] = timing
+                    detail["expected_move"]["em_method"] = "options_math"
+            write_to_public(
+                f"symbols/{ticker}.json",
+                json.dumps(detail, indent=2, default=str),
+            )
+            generated += 1
         except Exception as e:
             print(f"  ⚠️  {ticker} detail: {e}")
 
-    events.sort(key=lambda e: (e["earnings_date"], e["ticker"]))
-
-    weekly = {
-        "metadata": {
-            "version": "v3_frontend_build",
-            "generated_at": datetime.now().isoformat(),
-            "as_of_date": as_of_date.isoformat(),
-            "method": "ATM straddle + IV baseline",
-        },
-        "window": {"start": week_start.isoformat(), "end": week_end.isoformat()},
-        "events": events,
-        "summary": {
-            "total_events": len(events),
-            "avg_em_straddle_pct": (
-                sum(e["em_straddle_pct"] for e in events if e["em_straddle_pct"]) / len(events)
-                if events else 0
-            ),
-            "avg_em_iv_pct": (
-                sum(e["em_iv_pct"] for e in events if e["em_iv_pct"]) / len(events)
-                if events else 0
-            ),
-        },
-    }
-
-    write_to_public("weekly.json", json.dumps(weekly, indent=2, default=str))
-    print(f"✅ weekly.json written with {len(events)} events")
-    print(f"✅ {len(generated_symbols)} symbol files written")
+    print(f"✅ {len(week_payloads)} weeks written, {generated} symbol files")
     conn.close()
 
 
