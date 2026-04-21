@@ -65,22 +65,22 @@ POST /api/admin/refresh-forecasts
 
 ```mermaid
 graph TD
-    A[DoltHub options / earnings / OHLCV] --> B[scripts/sync_dolthub.py]
-    B --> C[data/parquet + earnings CSV/Parquet]
-    C --> D[DuckDB views]
-    D --> E[tools/build_frontend_data.py]
-    E --> F[apps/frontend/public/weekly.json]
-    E --> G[apps/frontend/public/weeks/*.json]
-    E --> H[apps/frontend/public/symbols/*.json]
-    F --> I[Next.js dashboard]
+    A[DoltHub Options / Earnings / OHLCV] --> B[Sync DoltHub Data]
+    B --> C[Parquet and Earnings Data]
+    C --> D[DuckDB Views]
+    D --> E[Build Frontend Data]
+    E --> F[Weekly JSON]
+    E --> G[Weekly Archive JSON]
+    E --> H[Symbol Detail JSON]
+    F --> I[Next.js Dashboard]
     G --> I
-    H --> J[Next.js symbol pages]
-    K[Polygon API] --> L[Next.js /api/stocks/price]
+    H --> J[Next.js Symbol Pages]
+    K[Polygon API] --> L[Stock Price API Route]
     L --> J
-    D --> M[FastAPI backend]
+    D --> M[FastAPI Backend]
     N[Postgres] --> M
     O[Redis] --> M
-    P[LightGBM models] --> Q[scripts/daily_score.py]
+    P[LightGBM Models] --> Q[Daily Scoring Pipeline]
     Q --> D
 ```
 
