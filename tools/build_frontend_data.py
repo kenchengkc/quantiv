@@ -24,20 +24,15 @@ from math_baseline import compute_em_math
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = REPO_ROOT / "data"
-# Next.js serves files in apps/frontend/public as static assets on Vercel.
-# We also mirror to /public at the repo root for any legacy consumers.
-PUBLIC_DIRS = [
-    REPO_ROOT / "apps" / "frontend" / "public",
-    REPO_ROOT / "public",
-]
+# Vercel serves from apps/frontend/public only (see vercel.json outputDirectory).
+PUBLIC_DIR = REPO_ROOT / "apps" / "frontend" / "public"
 EARNINGS_CSV = DATA_DIR / "earnings_calendar.csv"
 
 
 def write_to_public(relpath: str, content: str) -> None:
-    for base in PUBLIC_DIRS:
-        path = base / relpath
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(content)
+    path = PUBLIC_DIR / relpath
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content)
 
 
 def monday_of_week(d: date) -> date:
@@ -267,9 +262,8 @@ def build_week_events(conn, as_of_date: date, week_start: date, week_end: date) 
 
 
 def main():
-    for base in PUBLIC_DIRS:
-        (base / "symbols").mkdir(parents=True, exist_ok=True)
-        (base / "weeks").mkdir(parents=True, exist_ok=True)
+    (PUBLIC_DIR / "symbols").mkdir(parents=True, exist_ok=True)
+    (PUBLIC_DIR / "weeks").mkdir(parents=True, exist_ok=True)
 
     conn = duckdb.connect()
     build_earnings_events_table(conn, EARNINGS_CSV)
