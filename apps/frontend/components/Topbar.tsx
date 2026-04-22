@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { Search, ChevronRight } from 'lucide-react';
+import { SignedIn, SignedOut, UserButton } from '@clerk/nextjs';
 
 const NAV = [
   { href: '/', label: 'Earnings' },
@@ -245,6 +246,36 @@ export function Topbar() {
         </div>
         <NavSearch />
         <span className="kbd">⌘K</span>
+
+        <SignedOut>
+          <Link
+            href="/sign-in"
+            style={{
+              fontSize: 12,
+              color: 'var(--ink-2)',
+              padding: '6px 14px',
+              border: '1px solid var(--line)',
+              borderRadius: 999,
+              transition: 'border-color 140ms ease, color 140ms ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = 'var(--line-2)';
+              e.currentTarget.style.color = 'var(--ink)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = 'var(--line)';
+              e.currentTarget.style.color = 'var(--ink-2)';
+            }}
+          >
+            Sign in
+          </Link>
+        </SignedOut>
+        <SignedIn>
+          <UserButton
+            afterSignOutUrl="/"
+            appearance={{ elements: { avatarBox: { width: 28, height: 28 } } }}
+          />
+        </SignedIn>
       </div>
     </header>
   );

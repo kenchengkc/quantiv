@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ChevronLeft } from 'lucide-react';
+import { SignedIn, SignedOut, SignInButton } from '@clerk/nextjs';
 import { COMPANY_NAMES } from '@/lib/companyNames';
 
 interface Straddle {
@@ -154,8 +155,6 @@ function Logo({ ticker, size = 60 }: { ticker: string; size?: number }) {
 }
 
 // ---------- Watchlist + Toast ----------
-const WATCH_KEY = 'quantiv-watchlist';
-
 function WatchlistButton({
   ticker,
   onToast,
@@ -168,34 +167,44 @@ function WatchlistButton({
   const [hovered, setHovered] = useState(false);
 
   useEffect(() => {
-    try {
-      const list = JSON.parse(localStorage.getItem(WATCH_KEY) || '[]') as string[];
-      setAdded(list.includes(ticker));
-    } catch {
-      /* ignore */
-    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/watchlist', { cache: 'no-store' });
+        if (!res.ok) return;
+        const json = (await res.json()) as { symbols: string[] };
+        if (!cancelled) setAdded((json.symbols ?? []).includes(ticker));
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [ticker]);
 
-  const toggle = () => {
+  const toggle = async () => {
     if (animating) return;
-    let list: string[] = [];
-    try {
-      list = JSON.parse(localStorage.getItem(WATCH_KEY) || '[]') as string[];
-    } catch {
-      /* ignore */
-    }
     if (added) {
-      list = list.filter((t) => t !== ticker);
-      localStorage.setItem(WATCH_KEY, JSON.stringify(list));
       setAdded(false);
       onToast(`${ticker} removed from watchlist`);
+      fetch(`/api/watchlist/${encodeURIComponent(ticker)}`, { method: 'DELETE' }).catch(
+        () => {
+          /* optimistic */
+        },
+      );
     } else {
-      list = [...list, ticker];
-      localStorage.setItem(WATCH_KEY, JSON.stringify(list));
       setAnimating(true);
       setAdded(true);
       onToast(`${ticker} added to watchlist`);
       setTimeout(() => setAnimating(false), 700);
+      fetch('/api/watchlist', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ symbol: ticker }),
+      }).catch(() => {
+        /* optimistic */
+      });
     }
   };
 
@@ -969,7 +978,38 @@ export default function SymbolPage() {
               }}
             >
               {symbol}
-              <WatchlistButton ticker={symbol} onToast={showToast} />
+              <SignedIn>
+                <WatchlistButton ticker={symbol} onToast={showToast} />
+              </SignedIn>
+              <SignedOut>
+                <SignInButton mode="modal">
+                  <button
+                    title="Sign in to add to watchlist"
+                    style={{
+                      display: 'grid',
+                      placeItems: 'center',
+                      width: 30,
+                      height: 30,
+                      borderRadius: '50%',
+                      background: 'transparent',
+                      border: 'none',
+                      padding: 0,
+                      cursor: 'pointer',
+                      color: 'var(--ink-3)',
+                    }}
+                  >
+                    <svg width="30" height="30" viewBox="0 0 24 24" fill="none">
+                      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.6" />
+                      <path
+                        d="M12 8v8M8 12h8"
+                        stroke="currentColor"
+                        strokeWidth="1.6"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                  </button>
+                </SignInButton>
+              </SignedOut>
             </h1>
             <div
               style={{
