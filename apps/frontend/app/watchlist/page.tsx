@@ -40,6 +40,15 @@ function shortDate(iso?: string | null) {
     day: 'numeric',
   });
 }
+function daysFromToday(iso?: string | null): number | null {
+  if (!iso) return null;
+  const [y, m, d] = iso.slice(0, 10).split('-').map(Number);
+  if (!y || !m || !d) return null;
+  const target = new Date(y, m - 1, d);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.round((target.getTime() - today.getTime()) / 86_400_000);
+}
 function timingText(t?: string | null) {
   const k = (t || '').toLowerCase();
   if (k === 'bmo' || k === 'before_market_open' || k === 'before_open') return 'Before open';
@@ -259,7 +268,7 @@ export default function WatchlistPage() {
             const earningsIso = em?.earnings_date ?? sum?.next_earnings ?? null;
             const earningsLabel = shortDate(earningsIso);
             const timing = timingText(em?.timing ?? sum?.next_earnings_timing);
-            const dte = em?.lead_time_days ?? em?.dte ?? null;
+            const dte = daysFromToday(earningsIso);
             const tick = live[t];
             const spot = sum?.spot_price ?? null;
             const up = (tick?.changePct ?? 0) >= 0;

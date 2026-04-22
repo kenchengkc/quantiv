@@ -718,7 +718,6 @@ export default function EarningsGrid() {
           <span className="mono">
             {filteredEvents.length} reports · {data.metadata.method} · as of {data.metadata.as_of_date}
           </span>
-          <span>Earnings times from earnings_calendar.csv</span>
         </div>
       )}
     </>
