@@ -144,9 +144,10 @@ export function Topbar() {
   const now = useClock();
 
   const activeHref = (() => {
-    const detailMatch = pathname && /^\/[A-Z]{1,10}$/.test(pathname.toUpperCase());
-    if (detailMatch) return '/';
-    return pathname;
+    const known = new Set(NAV.map((n) => n.href));
+    if (pathname && known.has(pathname)) return pathname;
+    // Unknown routes (e.g. ticker detail `/AAPL`) fall back to Earnings.
+    return '/';
   })();
 
   const time = now
@@ -187,7 +188,7 @@ export function Topbar() {
           <img
             src="/brand/QuantivColorBanner.png"
             alt="Quantiv"
-            style={{ height: 28, width: 'auto', display: 'block' }}
+            style={{ height: 40, width: 'auto', display: 'block' }}
           />
         </Link>
 

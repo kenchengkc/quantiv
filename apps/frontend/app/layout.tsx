@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { Providers } from './providers';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Topbar } from '@/components/Topbar';
+import { Footer } from '@/components/Footer';
 
 export const metadata: Metadata = {
   title: 'Quantiv — Options Trading Intelligence',
@@ -31,6 +32,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <div className="min-h-screen flex flex-col">
               <Topbar />
               <main className="flex-1">{children}</main>
+              <Footer />
             </div>
           </ErrorBoundary>
         </Providers>
