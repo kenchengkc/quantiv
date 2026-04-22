@@ -5,8 +5,6 @@ import Link from 'next/link';
 import { GripVertical, X, Plus } from 'lucide-react';
 import { COMPANY_NAMES } from '@/lib/companyNames';
 
-const WATCH_KEY = 'quantiv-watchlist';
-
 type SymbolSummary = {
   symbol: string;
   spot_price: number | null;
@@ -97,20 +95,6 @@ function Logo({ ticker, size = 36 }: { ticker: string; size?: number }) {
   );
 }
 
-function readWatchlist(): string[] {
-  try {
-    const raw = JSON.parse(localStorage.getItem(WATCH_KEY) || '[]');
-    if (!Array.isArray(raw)) return [];
-    return raw.filter((x): x is string => typeof x === 'string');
-  } catch {
-    return [];
-  }
-}
-
-function writeWatchlist(list: string[]) {
-  localStorage.setItem(WATCH_KEY, JSON.stringify(list));
-}
-
 export default function WatchlistPage() {
   const [tickers, setTickers] = useState<string[]>([]);
   const [hydrated, setHydrated] = useState(false);
@@ -120,13 +104,22 @@ export default function WatchlistPage() {
   const [overIdx, setOverIdx] = useState<number | null>(null);
 
   useEffect(() => {
-    setTickers(readWatchlist());
-    setHydrated(true);
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === WATCH_KEY) setTickers(readWatchlist());
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/watchlist', { cache: 'no-store' });
+        if (!res.ok) return;
+        const json = (await res.json()) as { symbols: string[] };
+        if (!cancelled) setTickers(json.symbols ?? []);
+      } catch {
+        /* ignore */
+      } finally {
+        if (!cancelled) setHydrated(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
     };
-    window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
   }, []);
 
   // Load per-symbol summary from pre-generated /symbols/*.json
@@ -183,10 +176,9 @@ export default function WatchlistPage() {
   }, [tickers, hydrated]);
 
   const remove = useCallback((t: string) => {
-    setTickers((prev) => {
-      const next = prev.filter((x) => x !== t);
-      writeWatchlist(next);
-      return next;
+    setTickers((prev) => prev.filter((x) => x !== t));
+    fetch(`/api/watchlist/${encodeURIComponent(t)}`, { method: 'DELETE' }).catch(() => {
+      /* ignore — optimistic */
     });
   }, []);
 
@@ -196,7 +188,13 @@ export default function WatchlistPage() {
       const next = [...prev];
       const [item] = next.splice(from, 1);
       next.splice(to, 0, item);
-      writeWatchlist(next);
+      fetch('/api/watchlist/reorder', {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ symbols: next }),
+      }).catch(() => {
+        /* ignore — optimistic */
+      });
       return next;
     });
   }, []);

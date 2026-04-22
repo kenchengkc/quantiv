@@ -1,5 +1,6 @@
 import './globals.css';
 import type { Metadata } from 'next';
+import { ClerkProvider } from '@clerk/nextjs';
 import { Providers } from './providers';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Topbar } from '@/components/Topbar';
@@ -26,19 +27,32 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body>
-        <Providers>
-          <ErrorBoundary>
-            <div className="min-h-screen flex flex-col">
-              <Topbar />
-              <main className="flex-1">{children}</main>
-              <Footer />
-            </div>
-            <Analytics />
-          </ErrorBoundary>
-        </Providers>
-      </body>
-    </html>
+    <ClerkProvider
+      appearance={{
+        variables: {
+          colorPrimary: '#8ab4ff',
+          colorBackground: '#12151c',
+          colorText: '#e6e8ee',
+          colorInputBackground: '#0b0e14',
+          colorInputText: '#e6e8ee',
+          borderRadius: '10px',
+        },
+      }}
+    >
+      <html lang="en">
+        <body>
+          <Providers>
+            <ErrorBoundary>
+              <div className="min-h-screen flex flex-col">
+                <Topbar />
+                <main className="flex-1">{children}</main>
+                <Footer />
+              </div>
+              <Analytics />
+            </ErrorBoundary>
+          </Providers>
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }
