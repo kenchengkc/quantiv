@@ -109,14 +109,20 @@ def get_upcoming_features(conn: duckdb.DuckDBPyConnection, days_ahead: int) -> p
             AVG(p.realized_move_pct) AS hist_move_avg_4q,
             MEDIAN(p.realized_move_pct) AS hist_move_med_4q,
             STDDEV(p.realized_move_pct) AS hist_move_std_4q,
-            (SELECT AVG(p2.realized_move_pct)
-             FROM past_realized_ohlcv p2
-             WHERE p2.act_symbol = u.act_symbol AND p2.earnings_date < u.earnings_date
-             ORDER BY p2.earnings_date DESC LIMIT 8) AS hist_move_avg_8q,
-            (SELECT MEDIAN(p2.realized_move_pct)
-             FROM past_realized_ohlcv p2
-             WHERE p2.act_symbol = u.act_symbol AND p2.earnings_date < u.earnings_date
-             ORDER BY p2.earnings_date DESC LIMIT 8) AS hist_move_med_8q,
+            (SELECT AVG(x.realized_move_pct) FROM (
+                SELECT p2.realized_move_pct
+                FROM past_realized_ohlcv p2
+                WHERE p2.act_symbol = u.act_symbol
+                  AND p2.earnings_date < u.earnings_date
+                ORDER BY p2.earnings_date DESC LIMIT 8
+             ) x) AS hist_move_avg_8q,
+            (SELECT MEDIAN(x.realized_move_pct) FROM (
+                SELECT p2.realized_move_pct
+                FROM past_realized_ohlcv p2
+                WHERE p2.act_symbol = u.act_symbol
+                  AND p2.earnings_date < u.earnings_date
+                ORDER BY p2.earnings_date DESC LIMIT 8
+             ) x) AS hist_move_med_8q,
             COUNT(p.realized_move_pct) AS hist_event_count
         FROM upcoming u
         LEFT JOIN past_realized_ohlcv p

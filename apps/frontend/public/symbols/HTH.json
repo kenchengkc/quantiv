@@ -15,8 +15,18 @@
     "skew_atm": 0.0317,
     "term_slope": null,
     "total_vega": 0.0891,
-    "timing": "unknown",
-    "em_method": "options_math"
+    "em_ml_pct": 0.037047,
+    "em_ml_abs": 1.411107,
+    "correction_factor": 0.284974,
+    "model_horizon": 14,
+    "ml_snapshot_date": "2026-04-09",
+    "p10": 0.005893,
+    "p25": 0.013743,
+    "p50": 0.022979,
+    "p75": 0.044606,
+    "p90": 0.070966,
+    "em_method": "ml_lightgbm",
+    "timing": "unknown"
   },
   "straddle_features": [
     {
@@ -44,31 +54,31 @@
     },
     {
       "date": "2026-01-29",
-      "timing": "unknown"
+      "timing": "after_market_close"
     },
     {
       "date": "2025-10-23",
-      "timing": "unknown"
+      "timing": "after_market_close"
     },
     {
       "date": "2025-07-24",
-      "timing": "unknown"
+      "timing": "after_market_close"
     },
     {
       "date": "2025-04-24",
-      "timing": "unknown"
+      "timing": "after_market_close"
     },
     {
       "date": "2025-01-30",
-      "timing": "unknown"
+      "timing": "after_market_close"
     },
     {
       "date": "2024-10-24",
-      "timing": "unknown"
+      "timing": "after_market_close"
     },
     {
       "date": "2024-07-25",
-      "timing": "unknown"
+      "timing": "after_market_close"
     },
     {
       "date": "2024-04-18",
@@ -76,11 +86,11 @@
     },
     {
       "date": "2024-01-25",
-      "timing": "unknown"
+      "timing": "after_market_close"
     },
     {
       "date": "2023-10-20",
-      "timing": "unknown"
+      "timing": "before_market_open"
     },
     {
       "date": "2023-07-20",

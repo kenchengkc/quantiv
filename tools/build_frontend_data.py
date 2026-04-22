@@ -27,6 +27,77 @@ DATA_DIR = REPO_ROOT / "data"
 # Vercel serves from apps/frontend/public only (see vercel.json outputDirectory).
 PUBLIC_DIR = REPO_ROOT / "apps" / "frontend" / "public"
 EARNINGS_CSV = DATA_DIR / "earnings_calendar.csv"
+FORECASTS_DIR = DATA_DIR / "forecasts"
+MODEL_HORIZONS = [1, 2, 3, 7, 14, 21]
+
+
+def load_ml_forecasts() -> dict[tuple[str, str], dict]:
+    """Return {(ticker, earnings_date_iso): forecast_row} from the newest
+    daily_score.py output. Picks the row whose model_horizon is closest to the
+    actual lead time, and the most recent snapshot_date within that horizon.
+    Returns {} when no forecasts exist."""
+    if not FORECASTS_DIR.exists():
+        return {}
+    files = sorted(FORECASTS_DIR.glob("forecasts_*.parquet"))
+    if not files:
+        return {}
+    latest = files[-1]
+    try:
+        import pandas as pd  # local import — only needed when forecasts exist
+        df = pd.read_parquet(latest)
+    except Exception as e:
+        print(f"⚠️  Could not read {latest.name}: {e}")
+        return {}
+    if df.empty:
+        return {}
+
+    df = df.copy()
+    df["earnings_date"] = pd.to_datetime(df["earnings_date"]).dt.date
+    df["snapshot_date"] = pd.to_datetime(df["snapshot_date"]).dt.date
+    df["lead_days"] = (df["earnings_date"] - df["snapshot_date"]).apply(lambda d: d.days)
+    df["horizon_gap"] = (df["model_horizon"] - df["lead_days"]).abs()
+
+    # Per (ticker, earnings_date): smallest horizon_gap, then most recent snapshot.
+    df = df.sort_values(["act_symbol", "earnings_date", "horizon_gap", "snapshot_date"],
+                        ascending=[True, True, True, False])
+    df = df.drop_duplicates(subset=["act_symbol", "earnings_date"], keep="first")
+
+    out: dict[tuple[str, str], dict] = {}
+    for row in df.to_dict(orient="records"):
+        key = (row["act_symbol"], row["earnings_date"].isoformat())
+        out[key] = row
+    print(f"🤖 Loaded {len(out)} ML forecasts from {latest.name}")
+    return out
+
+
+def ml_fields(fc: dict | None) -> dict:
+    """Flatten a forecast row to the public JSON field names. Prefers p10/p90
+    when present (newer daily_score.py output); falls back to band68/band95."""
+    if not fc:
+        return {}
+    out: dict = {}
+
+    def pick(*keys):
+        for k in keys:
+            v = fc.get(k)
+            if v is not None and not (isinstance(v, float) and math.isnan(v)):
+                return v
+        return None
+
+    out["em_ml_pct"] = jsonable(pick("em_ml_pct"))
+    out["em_ml_abs"] = jsonable(pick("em_ml_abs"))
+    out["correction_factor"] = jsonable(pick("correction_factor"))
+    out["model_horizon"] = pick("model_horizon")
+    out["ml_snapshot_date"] = (
+        fc["snapshot_date"].isoformat() if fc.get("snapshot_date") else None
+    )
+    # Prefer true quantiles if the trainer emitted them, else use band endpoints.
+    out["p10"] = jsonable(pick("p10", "band95_low_pct"))
+    out["p25"] = jsonable(pick("p25", "band68_low_pct"))
+    out["p50"] = jsonable(pick("p50", "em_ml_pct"))
+    out["p75"] = jsonable(pick("p75", "band68_high_pct"))
+    out["p90"] = jsonable(pick("p90", "band95_high_pct"))
+    return {k: v for k, v in out.items() if v is not None}
 
 
 def write_to_public(relpath: str, content: str) -> None:
@@ -64,7 +135,8 @@ def jsonable(v):
     return v
 
 
-def build_symbol_detail(conn, ticker: str, as_of_date: date, earnings_dt: date | None) -> dict | None:
+def build_symbol_detail(conn, ticker: str, as_of_date: date, earnings_dt: date | None,
+                        ml_lookup: dict[tuple[str, str], dict] | None = None) -> dict | None:
     """Build per-symbol detail: implied moves across expiries + term structure."""
     expiries = conn.execute(
         """
@@ -194,6 +266,13 @@ def build_symbol_detail(conn, ticker: str, as_of_date: date, earnings_dt: date |
                 "term_slope": jsonable(em_math_data.get("term_slope")),
                 "total_vega": jsonable(em_math_data.get("total_vega")),
             }
+            fc = (ml_lookup or {}).get((ticker, earnings_dt.isoformat()))
+            ml = ml_fields(fc)
+            if ml:
+                em.update(ml)
+                em["em_method"] = "ml_lightgbm"
+            else:
+                em["em_method"] = "options_math"
 
     # Fall back to nearest expiry for summary if no earnings event
     if em is None and straddles:
@@ -221,7 +300,9 @@ def build_symbol_detail(conn, ticker: str, as_of_date: date, earnings_dt: date |
     }
 
 
-def build_week_events(conn, as_of_date: date, week_start: date, week_end: date) -> list[dict]:
+def build_week_events(conn, as_of_date: date, week_start: date, week_end: date,
+                      ml_lookup: dict[tuple[str, str], dict],
+                      require_ml: bool = True) -> list[dict]:
     rows = conn.execute(
         """
         SELECT ticker, earnings_dt, timing, fiscal_q
@@ -233,11 +314,24 @@ def build_week_events(conn, as_of_date: date, week_start: date, week_end: date) 
     ).fetchall()
 
     events = []
-    for ticker, earnings_dt, timing, fiscal_q in rows:
+    skipped_no_ml = 0
+    skipped_no_options = 0
+    for i, (ticker, earnings_dt, timing, fiscal_q) in enumerate(rows, 1):
+        fc = ml_lookup.get((ticker, earnings_dt.isoformat()))
+        # Skip events without a matching ML forecast when require_ml is on.
+        # Keeps the build focused and avoids spending time on symbols whose
+        # options data will yield no useful prediction.
+        if require_ml and not fc:
+            skipped_no_ml += 1
+            continue
         em = compute_em_math(conn, ticker, as_of_date, earnings_dt)
         if not em:
+            skipped_no_options += 1
             continue
-        events.append({
+        if i % 25 == 0 or i == len(rows):
+            print(f"    event {i}/{len(rows)}: {ticker} {earnings_dt}", flush=True)
+        ml = ml_fields(fc)
+        event = {
             "ticker": ticker,
             "earnings_date": earnings_dt.isoformat(),
             "timing": timing or "unknown",
@@ -254,10 +348,18 @@ def build_week_events(conn, as_of_date: date, week_start: date, week_end: date) 
             "lead_time_days": em["lead_time_days"],
             "skew_atm": jsonable(em.get("skew_atm")),
             "term_slope": jsonable(em.get("term_slope")),
-            "em_method": "options_math",  # source: ATM straddle + IV baseline
-            "confidence": "high",
-        })
+            "em_method": "ml_lightgbm" if ml else "options_math",
+            "confidence": "high" if ml else "high",
+            **ml,
+        }
+        events.append(event)
     events.sort(key=lambda e: (e["earnings_date"], e["ticker"]))
+    if skipped_no_ml or skipped_no_options:
+        print(
+            f"    skipped: {skipped_no_ml} (no ML forecast), "
+            f"{skipped_no_options} (no options data)",
+            flush=True,
+        )
     return events
 
 
@@ -268,6 +370,7 @@ def main():
     conn = duckdb.connect()
     build_earnings_events_table(conn, EARNINGS_CSV)
     create_duckdb_views(conn, DATA_DIR)
+    ml_lookup = load_ml_forecasts()
 
     as_of_row = conn.execute("SELECT MAX(as_of_date) FROM v_options_chain").fetchone()
     as_of_date = as_of_row[0]
@@ -284,7 +387,12 @@ def main():
     for offset in WEEK_OFFSETS:
         wk_start = this_monday + timedelta(days=7 * offset)
         wk_end = wk_start + timedelta(days=4)
-        events = build_week_events(conn, as_of_date, wk_start, wk_end)
+        # daily_score.py only scores upcoming earnings within a ~21-day window,
+        # so require_ml would leave last/+2 weeks empty. Fall back to the
+        # options_math baseline for those; enforce ML on current + next week.
+        require_ml = offset in (0, 1)
+        events = build_week_events(conn, as_of_date, wk_start, wk_end, ml_lookup,
+                                   require_ml=require_ml)
         print(f"📅 week {wk_start} (offset {offset:+d}) → {len(events)} events")
         payload = {
             "metadata": {
@@ -354,9 +462,13 @@ def main():
             tickers_needing_detail[ticker] = row[0] if row else None
 
     generated = 0
-    for ticker, earn_dt in tickers_needing_detail.items():
+    total_details = len(tickers_needing_detail)
+    print(f"📝 generating {total_details} symbol detail files", flush=True)
+    for i, (ticker, earn_dt) in enumerate(tickers_needing_detail.items(), 1):
+        if i % 50 == 0 or i == total_details:
+            print(f"  detail {i}/{total_details}: {ticker}", flush=True)
         try:
-            detail = build_symbol_detail(conn, ticker, as_of_date, earn_dt)
+            detail = build_symbol_detail(conn, ticker, as_of_date, earn_dt, ml_lookup)
             if not detail:
                 continue
             # Attach timing (BMO/AMC/unknown) from the earnings row, surfaced on the detail page.
@@ -369,7 +481,8 @@ def main():
                 detail["next_earnings_timing"] = timing
                 if detail.get("expected_move"):
                     detail["expected_move"]["timing"] = timing
-                    detail["expected_move"]["em_method"] = "options_math"
+                    # em_method is already set inside build_symbol_detail based
+                    # on whether an ML forecast was attached; don't overwrite.
             write_to_public(
                 f"symbols/{ticker}.json",
                 json.dumps(detail, indent=2, default=str),

@@ -39,6 +39,15 @@ interface ExpectedMove {
   total_vega?: number | null;
   timing?: string;
   em_method?: 'options_math' | 'ml_lightgbm' | 'ensemble';
+  em_ml_pct?: number | null;
+  em_ml_abs?: number | null;
+  correction_factor?: number | null;
+  model_horizon?: number | null;
+  p10?: number | null;
+  p25?: number | null;
+  p50?: number | null;
+  p75?: number | null;
+  p90?: number | null;
 }
 
 interface SymbolDetail {
@@ -721,6 +730,102 @@ function InteractiveBar({
   );
 }
 
+// ML prediction band — shows P10/P25/P50/P75/P90 quantiles with straddle tick for comparison.
+function MLBand({
+  p10,
+  p25,
+  p50,
+  p75,
+  p90,
+  straddle,
+}: {
+  p10: number;
+  p25: number;
+  p50: number;
+  p75: number;
+  p90: number;
+  straddle: number;
+}) {
+  const max = Math.max(p90, straddle) * 1.1;
+  const pct = (v: number) => `${Math.min(100, (v / max) * 100)}%`;
+  return (
+    <div style={{ marginTop: 4 }}>
+      <div
+        style={{
+          position: 'relative',
+          height: 34,
+          background: 'var(--bg-2)',
+          borderRadius: 4,
+          overflow: 'hidden',
+        }}
+      >
+        {/* 80% band (p10–p90) */}
+        <div
+          style={{
+            position: 'absolute',
+            left: pct(p10),
+            width: `calc(${pct(p90)} - ${pct(p10)})`,
+            top: 0,
+            bottom: 0,
+            background: 'color-mix(in srgb, var(--accent) 18%, transparent)',
+          }}
+        />
+        {/* 50% band (p25–p75) */}
+        <div
+          style={{
+            position: 'absolute',
+            left: pct(p25),
+            width: `calc(${pct(p75)} - ${pct(p25)})`,
+            top: 0,
+            bottom: 0,
+            background: 'color-mix(in srgb, var(--accent) 36%, transparent)',
+          }}
+        />
+        {/* P50 tick */}
+        <div
+          style={{
+            position: 'absolute',
+            left: pct(p50),
+            top: 0,
+            bottom: 0,
+            width: 2,
+            background: 'var(--accent)',
+          }}
+        />
+        {/* Straddle reference tick */}
+        <div
+          style={{
+            position: 'absolute',
+            left: pct(straddle),
+            top: -4,
+            bottom: -4,
+            width: 1,
+            background: 'var(--ink-2)',
+            borderTop: '6px solid var(--ink-2)',
+            borderBottom: '6px solid var(--ink-2)',
+          }}
+          title={`ATM straddle ±${(straddle * 100).toFixed(2)}%`}
+        />
+      </div>
+      <div
+        className="mono tnum"
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          fontSize: 10,
+          color: 'var(--ink-4)',
+          marginTop: 4,
+        }}
+      >
+        <span>0%</span>
+        <span>P10 ±{(p10 * 100).toFixed(1)}%</span>
+        <span style={{ color: 'var(--accent)' }}>P50 ±{(p50 * 100).toFixed(1)}%</span>
+        <span>P90 ±{(p90 * 100).toFixed(1)}%</span>
+      </div>
+    </div>
+  );
+}
+
 // ---------- Small bits ----------
 function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
@@ -1158,6 +1263,96 @@ export default function SymbolPage() {
               emIV={ivPct}
               atmIV={atmIV}
               dte={dte}
+            />
+          )}
+        </section>
+      )}
+
+      {/* ML forecast card */}
+      {em?.em_ml_pct != null && (
+        <section
+          style={{
+            padding: '24px 0',
+            borderBottom: '1px solid var(--line)',
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'flex-start',
+              gap: 24,
+              marginBottom: 14,
+            }}
+          >
+            <div>
+              <div
+                style={{
+                  fontSize: 10,
+                  letterSpacing: '0.18em',
+                  textTransform: 'uppercase',
+                  color: 'var(--accent)',
+                }}
+              >
+                LightGBM forecast
+                {em.model_horizon != null ? ` · T-${em.model_horizon}` : ''}
+              </div>
+              <div
+                className="serif"
+                style={{
+                  margin: '4px 0 0',
+                  fontSize: 18,
+                  fontWeight: 600,
+                  color: 'var(--ink-2)',
+                  letterSpacing: '-0.01em',
+                }}
+              >
+                Model predicts{' '}
+                <span className="tnum" style={{ color: 'var(--ink)' }}>
+                  ±{(em.em_ml_pct * 100).toFixed(2)}%
+                </span>
+                {em.correction_factor != null && (
+                  <span
+                    className="mono tnum"
+                    style={{
+                      marginLeft: 10,
+                      fontSize: 12,
+                      color:
+                        em.correction_factor < 0.9
+                          ? 'var(--up)'
+                          : em.correction_factor > 1.1
+                            ? 'var(--down)'
+                            : 'var(--ink-3)',
+                    }}
+                  >
+                    {em.correction_factor < 1
+                      ? `straddle overstates by ${((1 - em.correction_factor) * 100).toFixed(0)}%`
+                      : `straddle understates by ${((em.correction_factor - 1) * 100).toFixed(0)}%`}
+                  </span>
+                )}
+              </div>
+            </div>
+            <div
+              className="mono tnum"
+              style={{ fontSize: 11, color: 'var(--ink-3)', textAlign: 'right' }}
+            >
+              Straddle ±{(straddlePct * 100).toFixed(2)}%
+              {em.p10 != null && em.p90 != null && (
+                <div style={{ marginTop: 2 }}>
+                  80% band: ±{(em.p10 * 100).toFixed(2)}% – ±{(em.p90 * 100).toFixed(2)}%
+                </div>
+              )}
+            </div>
+          </div>
+
+          {em.p10 != null && em.p90 != null && em.p50 != null && (
+            <MLBand
+              p10={em.p10}
+              p25={em.p25 ?? em.p10}
+              p50={em.p50}
+              p75={em.p75 ?? em.p90}
+              p90={em.p90}
+              straddle={straddlePct}
             />
           )}
         </section>
