@@ -35,9 +35,9 @@ def build_earnings_events_table(conn: duckdb.DuckDBPyConnection, earnings_csv: P
         SELECT 
             act_symbol as ticker,
             CAST(date AS DATE) as earnings_dt,
-            CASE 
-                WHEN "when" = 'BMO' THEN 'before_market_open'
-                WHEN "when" = 'AMC' THEN 'after_market_close'
+            CASE
+                WHEN UPPER(timing) = 'BMO' THEN 'before_market_open'
+                WHEN UPPER(timing) = 'AMC' THEN 'after_market_close'
                 ELSE 'unknown'
             END as timing,
             'earnings_calendar_csv' as source,
@@ -49,7 +49,7 @@ def build_earnings_events_table(conn: duckdb.DuckDBPyConnection, earnings_csv: P
                 WHEN EXTRACT(MONTH FROM CAST(date AS DATE)) IN (7,8,9) THEN 'Q3'
                 ELSE 'Q4'
             END as fiscal_q
-        FROM read_csv(?, header=true, columns={'act_symbol': 'VARCHAR', 'date': 'VARCHAR', 'when': 'VARCHAR'})
+        FROM read_csv(?, header=true, columns={'act_symbol': 'VARCHAR', 'date': 'VARCHAR', 'timing': 'VARCHAR'})
         WHERE date IS NOT NULL 
         AND act_symbol IS NOT NULL
     """, [str(earnings_csv)])

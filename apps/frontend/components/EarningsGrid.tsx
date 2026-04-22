@@ -100,8 +100,16 @@ function Logo({ ticker, size = 24 }: { ticker: string; size?: number }) {
   );
 }
 
-function TickerRow({ ev }: { ev: EarningsEvent }) {
+function TickerRow({
+  ev,
+  live,
+}: {
+  ev: EarningsEvent;
+  live?: { change: number | null; changePct: number | null };
+}) {
   const movePct = ev.em_straddle_pct ?? ev.em_iv_pct ?? null;
+  const changePct = live?.changePct ?? null;
+  const up = (changePct ?? 0) >= 0;
   return (
     <Link
       href={`/${ev.ticker}`}
@@ -145,6 +153,19 @@ function TickerRow({ ev }: { ev: EarningsEvent }) {
             {companyName(ev.ticker)}
           </span>
         </div>
+        {changePct !== null && (
+          <div
+            className="mono tnum"
+            style={{
+              fontSize: 10,
+              color: up ? 'var(--up)' : 'var(--down)',
+              marginTop: 2,
+              letterSpacing: '0.01em',
+            }}
+          >
+            {up ? '▲' : '▼'} {Math.abs(changePct * 100).toFixed(2)}%
+          </div>
+        )}
       </div>
       <div
         className="serif tnum"
@@ -169,16 +190,20 @@ function TickerRow({ ev }: { ev: EarningsEvent }) {
   );
 }
 
+type LiveMap = Record<string, { change: number | null; changePct: number | null }>;
+
 function Group({
   title,
   icon,
   list,
   tone,
+  live,
 }: {
   title: string;
   icon: React.ReactNode;
   list: EarningsEvent[];
   tone: string;
+  live: LiveMap;
 }) {
   if (list.length === 0) return null;
   return (
@@ -205,7 +230,11 @@ function Group({
           {list.length}
         </span>
       </div>
-      <div>{list.map((e) => <TickerRow key={`${e.ticker}-${e.earnings_date}`} ev={e} />)}</div>
+      <div>
+        {list.map((e) => (
+          <TickerRow key={`${e.ticker}-${e.earnings_date}`} ev={e} live={live[e.ticker]} />
+        ))}
+      </div>
     </div>
   );
 }
@@ -215,11 +244,13 @@ function DayBlock({
   label,
   events,
   isToday,
+  live,
 }: {
   dateLabel: string;
   label: string;
   events: EarningsEvent[];
   isToday: boolean;
+  live: LiveMap;
 }) {
   const bmo = events.filter((e) => timingKey(e.timing) === 'bmo');
   const amc = events.filter((e) => timingKey(e.timing) === 'amc');
@@ -270,13 +301,14 @@ function DayBlock({
         </div>
       </div>
 
-      <Group title="Before open" icon={<Sun size={12} />} list={bmo} tone="var(--flag)" />
-      <Group title="After close" icon={<Moon size={12} />} list={amc} tone="var(--accent)" />
+      <Group title="Before open" icon={<Sun size={12} />} list={bmo} tone="var(--flag)" live={live} />
+      <Group title="After close" icon={<Moon size={12} />} list={amc} tone="var(--accent)" live={live} />
       <Group
         title="Timing unconfirmed"
         icon={<Circle size={10} />}
         list={unk}
         tone="var(--ink-4)"
+        live={live}
       />
 
       {events.length === 0 && (
@@ -495,6 +527,7 @@ export default function EarningsGrid() {
   const [data, setData] = useState<WeeklyData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [live, setLive] = useState<LiveMap>({});
 
   const thisMonday = useMemo(() => mondayOf(new Date()), []);
   const weekStartIso = useMemo(() => {
@@ -527,6 +560,34 @@ export default function EarningsGrid() {
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [weekStartIso, fetchWeek]);
+
+  useEffect(() => {
+    if (!data || data.events.length === 0) return;
+    let cancelled = false;
+    const symbols = Array.from(new Set(data.events.map((e) => e.ticker))).slice(0, 200);
+    (async () => {
+      try {
+        const res = await fetch(`/api/stocks/batch-price?symbols=${symbols.join(',')}`, {
+          cache: 'no-store',
+        });
+        if (!res.ok) return;
+        const json = (await res.json()) as {
+          data: { symbol: string; change: number | null; changePct: number | null }[];
+        };
+        if (cancelled) return;
+        const next: LiveMap = {};
+        for (const t of json.data) {
+          next[t.symbol] = { change: t.change, changePct: t.changePct };
+        }
+        setLive(next);
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [data]);
 
   const weekStart = useMemo(
     () => (data ? parseLocalDate(data.window.start) : parseLocalDate(weekStartIso)),
@@ -635,6 +696,7 @@ export default function EarningsGrid() {
                 label={dayNames[i]}
                 events={eventsByDay[i]}
                 isToday={d.getTime() === today.getTime()}
+                live={live}
               />
             </div>
           ))}
