@@ -58,7 +58,7 @@ interface LivePrice {
   change: number | null;
   changePct: number | null;
   updated: string | null;
-  source: 'polygon' | 'cache' | 'unavailable';
+  source: 'finnhub' | 'unavailable';
 }
 
 function logoUrl(t: string) {
@@ -843,7 +843,7 @@ export default function SymbolPage() {
         if (!res.ok) return;
         const json = (await res.json()) as {
           updated: string | null;
-          source: 'polygon' | 'unavailable';
+          source: 'finnhub' | 'unavailable';
           data: Array<{
             symbol: string;
             price: number | null;
@@ -860,7 +860,7 @@ export default function SymbolPage() {
             change: tick.change,
             changePct: tick.changePct,
             updated: json.updated,
-            source: json.source === 'polygon' ? 'polygon' : 'unavailable',
+            source: json.source === 'finnhub' ? 'finnhub' : 'unavailable',
           });
         }
       } catch {
@@ -1040,8 +1040,8 @@ export default function SymbolPage() {
                   textTransform: 'uppercase',
                 }}
               >
-                {live?.source === 'polygon' || live?.source === 'cache'
-                  ? 'Live · Polygon'
+                {live?.source === 'finnhub'
+                  ? 'Live · Finnhub'
                   : `As of ${data.as_of_date}`}
               </span>
             </div>
