@@ -182,35 +182,13 @@ export function Topbar() {
           gap: 18,
         }}
       >
-        <Link href="/" className="flex items-center gap-[10px]">
-          <div
-            style={{
-              width: 26,
-              height: 26,
-              borderRadius: 6,
-              background: 'var(--ink)',
-              color: 'var(--bg)',
-              display: 'grid',
-              placeItems: 'center',
-              fontFamily: 'Mulish',
-              fontWeight: 800,
-              fontSize: 15,
-              letterSpacing: '-0.03em',
-            }}
-          >
-            Q
-          </div>
-          <div
-            className="serif"
-            style={{
-              fontSize: 20,
-              fontWeight: 800,
-              letterSpacing: '-0.02em',
-              textTransform: 'uppercase',
-            }}
-          >
-            Quantiv
-          </div>
+        <Link href="/" aria-label="Quantiv home" className="flex items-center">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/brand/QuantivColorBanner.png"
+            alt="Quantiv"
+            style={{ height: 28, width: 'auto', display: 'block' }}
+          />
         </Link>
 
         <nav
