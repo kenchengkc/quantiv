@@ -5,17 +5,21 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 // Polygon's grouped-daily endpoint returns o/h/l/c for every US ticker in one
-// call. We cache the whole snapshot keyed by date so the calendar (50+ tickers)
-// costs one upstream call instead of fifty.
+// call. We cache TWO consecutive trading days (latest + prior) so we can report
+// daily change as (latest.c - prior.c) / prior.c — i.e. how much the stock
+// moved since the previous market close. That costs two upstream calls per
+// refresh window, well inside free-tier budget.
 const FRESH_TTL_MS = 5 * 60_000;
 const STALE_TTL_MS = 60 * 60_000;
 const LOCK_TTL_SEC = 15;
 
 type GroupedBar = { T: string; o: number; c: number; h: number; l: number; v: number };
-type SnapshotEntry = { at: number; date: string; bars: Record<string, GroupedBar> };
+type DayBars = { date: string; bars: Record<string, GroupedBar> };
+type SnapshotEntry = { at: number; latest: DayBars; prior: DayBars };
 type Tick = {
   symbol: string;
   price: number | null;
+  previousClose: number | null;
   change: number | null;
   changePct: number | null;
 };
@@ -23,21 +27,30 @@ type Tick = {
 let memSnap: SnapshotEntry | null = null;
 let inflight: Promise<SnapshotEntry | null> | null = null;
 
-const SNAP_KEY = 'batch-price:grouped-latest';
-const SNAP_LOCK = 'batch-price:lock';
+const SNAP_KEY = 'batch-price:grouped-2d';
+const SNAP_LOCK = 'batch-price:lock-2d';
 
-function latestTradingDate(now = new Date()): string {
-  const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-  // Roll back over weekends so we never ask Polygon for a non-trading day.
+function stepBackTradingDay(d: Date): Date {
+  const out = new Date(d);
+  out.setUTCDate(out.getUTCDate() - 1);
+  while (out.getUTCDay() === 0 || out.getUTCDay() === 6) {
+    out.setUTCDate(out.getUTCDate() - 1);
+  }
+  return out;
+}
+
+function latestTradingDates(now = new Date()): { latest: string; prior: string } {
+  // Polygon free tier posts EOD data after close, so "today" isn't reliable
+  // during market hours. Walk back one trading day for `latest`, then another
+  // for `prior`.
+  let d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
   while (d.getUTCDay() === 0 || d.getUTCDay() === 6) {
     d.setUTCDate(d.getUTCDate() - 1);
   }
-  // Results for "today" aren't posted until after close, so prefer yesterday.
-  d.setUTCDate(d.getUTCDate() - 1);
-  while (d.getUTCDay() === 0 || d.getUTCDay() === 6) {
-    d.setUTCDate(d.getUTCDate() - 1);
-  }
-  return d.toISOString().slice(0, 10);
+  d = stepBackTradingDay(d);
+  const latest = d.toISOString().slice(0, 10);
+  const prior = stepBackTradingDay(d).toISOString().slice(0, 10);
+  return { latest, prior };
 }
 
 async function readCache(): Promise<SnapshotEntry | null> {
@@ -78,8 +91,7 @@ async function acquireLock(): Promise<boolean> {
   }
 }
 
-async function fetchGrouped(apiKey: string): Promise<SnapshotEntry | null> {
-  const date = latestTradingDate();
+async function fetchGroupedDay(date: string, apiKey: string): Promise<DayBars | null> {
   const url = `https://api.polygon.io/v2/aggs/grouped/locale/us/market/stocks/${date}?adjusted=true&apiKey=${apiKey}`;
   const res = await fetch(url, { cache: 'no-store' });
   if (res.status === 401 || res.status === 403) return null;
@@ -88,14 +100,24 @@ async function fetchGrouped(apiKey: string): Promise<SnapshotEntry | null> {
   const results = (json?.results ?? []) as GroupedBar[];
   const bars: Record<string, GroupedBar> = {};
   for (const b of results) bars[b.T] = b;
-  return { at: Date.now(), date, bars };
+  return { date, bars };
+}
+
+async function fetchSnapshot(apiKey: string): Promise<SnapshotEntry | null> {
+  const { latest, prior } = latestTradingDates();
+  const [latestBars, priorBars] = await Promise.all([
+    fetchGroupedDay(latest, apiKey),
+    fetchGroupedDay(prior, apiKey),
+  ]);
+  if (!latestBars || !priorBars) return null;
+  return { at: Date.now(), latest: latestBars, prior: priorBars };
 }
 
 function refreshSnapshot(apiKey: string): Promise<SnapshotEntry | null> {
   if (inflight) return inflight;
   const p = (async () => {
     try {
-      const snap = await fetchGrouped(apiKey);
+      const snap = await fetchSnapshot(apiKey);
       if (snap) await writeCache(snap);
       return snap;
     } finally {
@@ -107,13 +129,15 @@ function refreshSnapshot(apiKey: string): Promise<SnapshotEntry | null> {
 }
 
 function tickFrom(snap: SnapshotEntry | null, symbol: string): Tick {
-  const bar = snap?.bars[symbol];
-  if (!bar || typeof bar.c !== 'number' || typeof bar.o !== 'number') {
-    return { symbol, price: null, change: null, changePct: null };
+  const latest = snap?.latest.bars[symbol];
+  const prior = snap?.prior.bars[symbol];
+  const price = latest?.c ?? null;
+  const previousClose = prior?.c ?? null;
+  if (price === null || previousClose === null || previousClose === 0) {
+    return { symbol, price, previousClose, change: null, changePct: null };
   }
-  const change = bar.c - bar.o;
-  const changePct = bar.o !== 0 ? change / bar.o : null;
-  return { symbol, price: bar.c, change, changePct };
+  const change = price - previousClose;
+  return { symbol, price, previousClose, change, changePct: change / previousClose };
 }
 
 export async function GET(req: NextRequest) {
@@ -141,7 +165,7 @@ export async function GET(req: NextRequest) {
       try {
         snap = (await refreshSnapshot(apiKey)) ?? snap;
       } catch {
-        /* fall through with whatever we have */
+        /* keep whatever we have */
       }
     } else if (await acquireLock()) {
       refreshSnapshot(apiKey).catch(() => {});
@@ -150,7 +174,8 @@ export async function GET(req: NextRequest) {
 
   const data = symbols.map((s) => tickFrom(snap, s));
   return NextResponse.json({
-    date: snap?.date ?? null,
+    latestDate: snap?.latest.date ?? null,
+    priorDate: snap?.prior.date ?? null,
     updated: snap ? new Date(snap.at).toISOString() : null,
     source: snap ? 'polygon' : 'unavailable',
     data,

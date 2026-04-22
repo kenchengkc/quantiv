@@ -56,7 +56,7 @@ interface LivePrice {
   previousClose: number | null;
   change: number | null;
   changePct: number | null;
-  updated: string;
+  updated: string | null;
   source: 'polygon' | 'cache' | 'unavailable';
 }
 
@@ -77,6 +77,15 @@ function shortDate(iso: string | undefined | null) {
     month: 'short',
     day: 'numeric',
   });
+}
+function daysFromToday(iso?: string | null): number | null {
+  if (!iso) return null;
+  const [y, m, d] = iso.slice(0, 10).split('-').map(Number);
+  if (!y || !m || !d) return null;
+  const target = new Date(y, m - 1, d);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.round((target.getTime() - today.getTime()) / 86_400_000);
 }
 function timingText(t?: string | null) {
   const k = (t || '').toLowerCase();
@@ -821,10 +830,30 @@ export default function SymbolPage() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(`/api/stocks/price?symbol=${symbol}`, { cache: 'no-store' });
+        const res = await fetch(`/api/stocks/batch-price?symbols=${symbol}`, { cache: 'no-store' });
         if (!res.ok) return;
-        const json = (await res.json()) as LivePrice;
-        if (!cancelled) setLive(json);
+        const json = (await res.json()) as {
+          updated: string | null;
+          source: 'polygon' | 'unavailable';
+          data: Array<{
+            symbol: string;
+            price: number | null;
+            previousClose: number | null;
+            change: number | null;
+            changePct: number | null;
+          }>;
+        };
+        const tick = json.data?.[0];
+        if (!cancelled && tick) {
+          setLive({
+            price: tick.price,
+            previousClose: tick.previousClose,
+            change: tick.change,
+            changePct: tick.changePct,
+            updated: json.updated,
+            source: json.source === 'polygon' ? 'polygon' : 'unavailable',
+          });
+        }
       } catch {
         /* ignore */
       }
@@ -978,46 +1007,51 @@ export default function SymbolPage() {
             </div>
           </div>
 
-          {em?.earnings_date && (
-            <div style={{ textAlign: 'right' }}>
-              <div
-                style={{
-                  fontSize: 11,
-                  letterSpacing: '0.14em',
-                  textTransform: 'uppercase',
-                  color: 'var(--ink-3)',
-                }}
-              >
-                Reports in
-              </div>
-              <div
-                className="serif tnum"
-                style={{
-                  fontSize: 38,
-                  fontWeight: 800,
-                  lineHeight: 1,
-                  marginTop: 4,
-                  letterSpacing: '-0.03em',
-                }}
-              >
-                {em.lead_time_days ?? em.dte}
-                <span
+          {em?.earnings_date && (() => {
+            const daysOut = daysFromToday(em.earnings_date);
+            const past = daysOut !== null && daysOut < 0;
+            const magnitude = daysOut === null ? null : Math.abs(daysOut);
+            return (
+              <div style={{ textAlign: 'right' }}>
+                <div
                   style={{
-                    fontSize: 13,
+                    fontSize: 11,
+                    letterSpacing: '0.14em',
+                    textTransform: 'uppercase',
                     color: 'var(--ink-3)',
-                    marginLeft: 4,
-                    fontWeight: 500,
                   }}
                 >
-                  days
-                </span>
+                  {past ? 'Reported' : 'Reports in'}
+                </div>
+                <div
+                  className="serif tnum"
+                  style={{
+                    fontSize: 38,
+                    fontWeight: 800,
+                    lineHeight: 1,
+                    marginTop: 4,
+                    letterSpacing: '-0.03em',
+                  }}
+                >
+                  {magnitude ?? '—'}
+                  <span
+                    style={{
+                      fontSize: 13,
+                      color: 'var(--ink-3)',
+                      marginLeft: 4,
+                      fontWeight: 500,
+                    }}
+                  >
+                    {past ? (magnitude === 1 ? 'day ago' : 'days ago') : 'days'}
+                  </span>
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 6 }}>
+                  {shortDate(em.earnings_date)}
+                  {timingLabel ? ` · ${timingLabel}` : ''}
+                </div>
               </div>
-              <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 6 }}>
-                {shortDate(em.earnings_date)}
-                {timingLabel ? ` · ${timingLabel}` : ''}
-              </div>
-            </div>
-          )}
+            );
+          })()}
         </div>
       </div>
 
