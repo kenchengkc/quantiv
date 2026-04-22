@@ -1,13 +1,27 @@
-import { neon } from '@neondatabase/serverless';
+import { neon, type NeonQueryFunction } from '@neondatabase/serverless';
 
-const connectionString = process.env.DATABASE_URL;
-if (!connectionString) {
-  // Fail loudly in prod; in dev surfaces as a clear 500 the first time a
-  // watchlist API is hit.
-  console.warn('[db] DATABASE_URL is not set — watchlist APIs will 500.');
+// Lazy-init so `next build`'s page-data collection doesn't blow up on a
+// missing DATABASE_URL. The handlers that use this are all dynamic, so this
+// only runs at request time on a real deploy.
+let _sql: NeonQueryFunction<false, false> | null = null;
+
+function getSql(): NeonQueryFunction<false, false> {
+  if (_sql) return _sql;
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) {
+    throw new Error('DATABASE_URL is not set');
+  }
+  _sql = neon(connectionString);
+  return _sql;
 }
 
-export const sql = neon(connectionString ?? 'postgres://invalid');
+// Tagged-template proxy: call sites write `sql\`SELECT ...\`` as usual.
+export const sql: NeonQueryFunction<false, false> = ((
+  strings: TemplateStringsArray,
+  ...values: unknown[]
+) => {
+  return getSql()(strings, ...values);
+}) as NeonQueryFunction<false, false>;
 
 let schemaReady: Promise<void> | null = null;
 
@@ -28,7 +42,6 @@ export function ensureSchema(): Promise<void> {
         ON watchlist (user_id, position)
       `;
     })().catch((err) => {
-      // Reset so the next request retries instead of caching a broken state.
       schemaReady = null;
       throw err;
     });
