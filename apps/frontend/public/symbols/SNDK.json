@@ -15,8 +15,18 @@
     "skew_atm": -0.002238,
     "term_slope": -0.124316,
     "total_vega": 1.8813,
-    "timing": "after_market_close",
-    "em_method": "options_math"
+    "em_ml_pct": 0.100645,
+    "em_ml_abs": 85.706053,
+    "correction_factor": 0.631834,
+    "model_horizon": 21,
+    "ml_snapshot_date": "2026-04-09",
+    "p10": 0.012545,
+    "p25": 0.030715,
+    "p50": 0.070944,
+    "p75": 0.116559,
+    "p90": 0.168327,
+    "em_method": "ml_lightgbm",
+    "timing": "after_market_close"
   },
   "straddle_features": [
     {
@@ -91,23 +101,23 @@
   "earnings_history": [
     {
       "date": "2026-04-30",
-      "timing": "unknown"
+      "timing": "after_market_close"
     },
     {
       "date": "2026-01-29",
-      "timing": "unknown"
+      "timing": "after_market_close"
     },
     {
       "date": "2025-11-06",
-      "timing": "unknown"
+      "timing": "after_market_close"
     },
     {
       "date": "2025-08-14",
-      "timing": "unknown"
+      "timing": "after_market_close"
     },
     {
       "date": "2025-05-07",
-      "timing": "unknown"
+      "timing": "after_market_close"
     }
   ],
   "next_earnings": "2026-04-30",

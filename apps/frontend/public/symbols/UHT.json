@@ -15,8 +15,18 @@
     "skew_atm": 0.0,
     "term_slope": null,
     "total_vega": 0.1012,
-    "timing": "unknown",
-    "em_method": "options_math"
+    "em_ml_pct": 0.040193,
+    "em_ml_abs": 1.651131,
+    "correction_factor": 0.26895,
+    "model_horizon": 21,
+    "ml_snapshot_date": "2026-04-06",
+    "p10": 0.006998,
+    "p25": 0.013148,
+    "p50": 0.025088,
+    "p75": 0.040494,
+    "p90": 0.070478,
+    "em_method": "ml_lightgbm",
+    "timing": "unknown"
   },
   "straddle_features": [
     {
