@@ -15,8 +15,18 @@
     "skew_atm": -0.0151,
     "term_slope": null,
     "total_vega": 0.3496,
-    "timing": "unknown",
-    "em_method": "options_math"
+    "em_ml_pct": 0.073363,
+    "em_ml_abs": 10.592109,
+    "correction_factor": 1.222712,
+    "model_horizon": 21,
+    "ml_snapshot_date": "2026-04-08",
+    "p10": 0.009492,
+    "p25": 0.02415,
+    "p50": 0.048809,
+    "p75": 0.104592,
+    "p90": 0.166009,
+    "em_method": "ml_lightgbm",
+    "timing": "unknown"
   },
   "straddle_features": [
     {
@@ -78,15 +88,15 @@
     },
     {
       "date": "2026-02-03",
-      "timing": "unknown"
+      "timing": "before_market_open"
     },
     {
       "date": "2025-11-04",
-      "timing": "unknown"
+      "timing": "before_market_open"
     },
     {
       "date": "2025-08-21",
-      "timing": "unknown"
+      "timing": "before_market_open"
     }
   ],
   "next_earnings": "2026-04-29",
