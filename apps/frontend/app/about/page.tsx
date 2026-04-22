@@ -1,63 +1,150 @@
 export default function AboutPage() {
   return (
-    <div>
-      <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 py-12">
-        <div className="prose prose-lg mx-auto">
-          <h1>About Quantiv</h1>
-          
-          <p>
-            Quantiv is a modern web platform designed for retail options traders and market students 
-            who need fast, reliable access to options market intelligence before earnings announcements.
-          </p>
-
-          <h2>What We Do</h2>
-          <p>
-            We compute expected moves, Greeks, and IV rank from live options chains, providing traders 
-            with the insights they need to make informed decisions with precision and speed.
-          </p>
-
-          <h3>Key Features</h3>
-          <ul>
-            <li><strong>Expected Move Calculations</strong> - Both straddle and IV-based methods</li>
-            <li><strong>IV Rank & Percentile</strong> - Current volatility vs 252-day historical range</li>
-            <li><strong>Earnings Analysis</strong> - Next earnings date and last 8 realized moves</li>
-            <li><strong>Mini Chain View</strong> - ATM ±3 strikes with mid, IV, and Greeks</li>
-            <li><strong>Watchlist</strong> - Track your favorite symbols</li>
-          </ul>
-
-          <h3>Methodology</h3>
-          <p>
-            Our calculations are based on the Black-Scholes model with proper dividend adjustments. 
-            We use Brent&apos;s method for implied volatility calculations with high precision (1e-6 tolerance).
-          </p>
-
-          <h4>Expected Move Formulas</h4>
-          <ul>
-            <li><strong>Straddle Method:</strong> EM$ ≈ mid(call_ATM + put_ATM)</li>
-            <li><strong>IV Method:</strong> EM$ ≈ S₀ · IV_ATM · √T</li>
-          </ul>
-
-          <h4>IV Rank Calculation</h4>
-          <ul>
-            <li><strong>Rank:</strong> (IV_today - IV_min) / (IV_max - IV_min)</li>
-            <li><strong>Percentile:</strong> Share of days with IV ≤ today</li>
-          </ul>
-
-          <h3>Disclaimer</h3>
-          <p className="text-sm text-gray-600 bg-gray-100 p-4 rounded-lg">
-            <strong>Important:</strong> This platform is for educational and informational purposes only. 
-            Options trading involves substantial risk and is not suitable for all investors. Past performance 
-            does not guarantee future results. Please consult with a financial advisor before making any 
-            investment decisions.
-          </p>
-
-          <h3>Technical Stack</h3>
-          <p>
-            Built with Next.js, TypeScript, and Tailwind CSS. Powered by real-time options data 
-            with Redis caching for optimal performance.
-          </p>
+    <div style={{ maxWidth: 860, margin: '0 auto', padding: '0 28px 60px' }}>
+      {/* Hero */}
+      <section
+        style={{
+          padding: '48px 0 32px',
+          borderBottom: '1px solid var(--line)',
+          textAlign: 'center',
+        }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/brand/QuantivColorBanner.png"
+          alt="Quantiv"
+          style={{ height: 72, width: 'auto', display: 'inline-block' }}
+        />
+        <div
+          style={{
+            marginTop: 18,
+            fontSize: 11,
+            letterSpacing: '0.22em',
+            textTransform: 'uppercase',
+            color: 'var(--ink-3)',
+          }}
+        >
+          Options intelligence, distilled
         </div>
+        <h1
+          className="serif"
+          style={{
+            margin: '10px auto 0',
+            maxWidth: 640,
+            fontSize: 34,
+            fontWeight: 800,
+            letterSpacing: '-0.02em',
+            lineHeight: 1.15,
+          }}
+        >
+          Know what the market is pricing in — before the report drops.
+        </h1>
+      </section>
+
+      {/* Mission */}
+      <Section eyebrow="Mission">
+        <p style={paraStyle}>
+          Quantiv computes expected moves, implied-volatility context, and term structure from live
+          option chains so retail traders and students can see what the market is already pricing
+          into earnings — without stitching together four tabs and a spreadsheet.
+        </p>
+      </Section>
+
+      {/* Features */}
+      <Section eyebrow="What you get">
+        <ul style={listStyle}>
+          <li><strong>Expected move</strong> — straddle-based and IV-based, side by side.</li>
+          <li><strong>Term structure</strong> — every expiry, ATM strike, IV, straddle, and EM in one table.</li>
+          <li><strong>Earnings calendar</strong> — grouped by day and by timing (before open / after close).</li>
+          <li><strong>Watchlist</strong> — drag to reorder, click to open, one-tap add from any ticker page.</li>
+        </ul>
+      </Section>
+
+      {/* Methodology */}
+      <Section eyebrow="Methodology">
+        <p style={paraStyle}>
+          Greeks and implied vol come from Black–Scholes with dividend adjustment; IV is solved
+          with Brent&apos;s method to a <span className="mono">1e-6</span> tolerance.
+        </p>
+        <div style={formulaStyle}>
+          <div className="mono tnum" style={{ fontSize: 13 }}>
+            EM<sub>straddle</sub> ≈ mid(call<sub>ATM</sub> + put<sub>ATM</sub>)
+          </div>
+          <div className="mono tnum" style={{ fontSize: 13, marginTop: 6 }}>
+            EM<sub>iv</sub> ≈ S₀ · σ<sub>ATM</sub> · √T
+          </div>
+        </div>
+      </Section>
+
+      {/* Stack */}
+      <Section eyebrow="Stack">
+        <p style={paraStyle}>
+          Next.js App Router, TypeScript, Vercel Fluid Compute, Upstash Redis for price caching,
+          and Polygon for live quotes. Data pipeline runs on DuckDB + parquet.
+        </p>
+      </Section>
+
+      {/* Disclaimer */}
+      <div
+        style={{
+          marginTop: 28,
+          padding: 18,
+          border: '1px solid var(--line)',
+          borderRadius: 10,
+          fontSize: 12.5,
+          color: 'var(--ink-3)',
+          lineHeight: 1.5,
+        }}
+      >
+        <strong style={{ color: 'var(--ink-2)' }}>Disclaimer.</strong> Quantiv is for educational
+        and informational use only. Options trading carries substantial risk. Past performance
+        does not guarantee future results. Nothing here is investment advice.
       </div>
     </div>
   );
 }
+
+function Section({ eyebrow, children }: { eyebrow: string; children: React.ReactNode }) {
+  return (
+    <section style={{ padding: '28px 0', borderBottom: '1px solid var(--line)' }}>
+      <div
+        style={{
+          fontSize: 10,
+          letterSpacing: '0.18em',
+          textTransform: 'uppercase',
+          color: 'var(--ink-3)',
+          marginBottom: 10,
+        }}
+      >
+        {eyebrow}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+const paraStyle: React.CSSProperties = {
+  fontSize: 15,
+  color: 'var(--ink-2)',
+  lineHeight: 1.65,
+  margin: 0,
+};
+
+const listStyle: React.CSSProperties = {
+  listStyle: 'none',
+  padding: 0,
+  margin: 0,
+  display: 'grid',
+  gap: 10,
+  fontSize: 14.5,
+  color: 'var(--ink-2)',
+  lineHeight: 1.55,
+};
+
+const formulaStyle: React.CSSProperties = {
+  marginTop: 14,
+  padding: '14px 16px',
+  background: 'var(--bg-2)',
+  border: '1px solid var(--line)',
+  borderRadius: 8,
+};
