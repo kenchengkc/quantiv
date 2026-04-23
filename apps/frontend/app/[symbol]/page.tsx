@@ -993,7 +993,10 @@ export default function SymbolPage() {
     return (
       <div style={{ maxWidth: 720, margin: '0 auto', padding: '40px 28px' }}>
         <button
-          onClick={() => router.push('/')}
+          onClick={() => {
+            if (window.history.length > 1) router.back();
+            else router.push('/');
+          }}
           className="chip"
           style={{ border: 'none', color: 'var(--ink-3)', paddingLeft: 0, cursor: 'pointer' }}
         >
@@ -1037,7 +1040,10 @@ export default function SymbolPage() {
 
       <div style={{ paddingTop: 24 }}>
         <button
-          onClick={() => router.push('/')}
+          onClick={() => {
+            if (window.history.length > 1) router.back();
+            else router.push('/');
+          }}
           className="chip"
           style={{ border: 'none', color: 'var(--ink-3)', paddingLeft: 0, cursor: 'pointer' }}
         >
