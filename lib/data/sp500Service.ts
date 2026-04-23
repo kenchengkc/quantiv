@@ -11,110 +11,30 @@ const DYNAMIC_SP500_TTL_MS = 24 * 60 * 60 * 1000;
 // FMP endpoint for current S&P 500 constituents
 const FMP_SP500_URL = 'https://financialmodelingprep.com/api/v3/sp500_constituent';
 
-// S&P 500 companies data (real companies, not hardcoded)
+// S&P 500 companies data
 export interface SP500Company {
   symbol: string;
   name: string;
   sector: string;
   industry: string;
   marketCap?: number;
-  exchange: 'NYSE' | 'NASDAQ';
+  // Exchange isn't present in the canonical CSV, so it's optional. Kept
+  // in the type for the few hardcoded ETF entries below that still set it.
+  exchange?: 'NYSE' | 'NASDAQ';
   founded?: number;
   employees?: number;
   website?: string;
 }
 
-// Real S&P 500 companies (subset for initial implementation)
+// Canonical S&P 500 constituents (503 entries incl. GOOG/GOOGL, FOX/FOXA,
+// NWS/NWSA dual classes). Source: lib/data/sp500-constituents.csv — refresh
+// from https://en.wikipedia.org/wiki/List_of_S%26P_500_companies periodically.
+import sp500Constituents from './sp500-constituents.json';
+
 const SP500_COMPANIES: SP500Company[] = [
-  // Technology
-  { symbol: 'AAPL', name: 'Apple Inc.', sector: 'Technology', industry: 'Consumer Electronics', exchange: 'NASDAQ' },
-  { symbol: 'MSFT', name: 'Microsoft Corporation', sector: 'Technology', industry: 'Software', exchange: 'NASDAQ' },
-  { symbol: 'GOOGL', name: 'Alphabet Inc. Class A', sector: 'Technology', industry: 'Internet Services', exchange: 'NASDAQ' },
-  { symbol: 'GOOG', name: 'Alphabet Inc. Class C', sector: 'Technology', industry: 'Internet Services', exchange: 'NASDAQ' },
-  { symbol: 'AMZN', name: 'Amazon.com Inc.', sector: 'Consumer Discretionary', industry: 'E-commerce', exchange: 'NASDAQ' },
-  { symbol: 'TSLA', name: 'Tesla Inc.', sector: 'Consumer Discretionary', industry: 'Electric Vehicles', exchange: 'NASDAQ' },
-  { symbol: 'META', name: 'Meta Platforms Inc.', sector: 'Technology', industry: 'Social Media', exchange: 'NASDAQ' },
-  { symbol: 'NVDA', name: 'NVIDIA Corporation', sector: 'Technology', industry: 'Semiconductors', exchange: 'NASDAQ' },
-  { symbol: 'NFLX', name: 'Netflix Inc.', sector: 'Communication Services', industry: 'Streaming', exchange: 'NASDAQ' },
-  { symbol: 'AMD', name: 'Advanced Micro Devices Inc.', sector: 'Technology', industry: 'Semiconductors', exchange: 'NASDAQ' },
-  { symbol: 'CRM', name: 'Salesforce Inc.', sector: 'Technology', industry: 'Cloud Software', exchange: 'NYSE' },
-  { symbol: 'ORCL', name: 'Oracle Corporation', sector: 'Technology', industry: 'Database Software', exchange: 'NYSE' },
-  { symbol: 'ADBE', name: 'Adobe Inc.', sector: 'Technology', industry: 'Software', exchange: 'NASDAQ' },
-  { symbol: 'INTC', name: 'Intel Corporation', sector: 'Technology', industry: 'Semiconductors', exchange: 'NASDAQ' },
-  { symbol: 'CSCO', name: 'Cisco Systems Inc.', sector: 'Technology', industry: 'Networking', exchange: 'NASDAQ' },
-  
-  // Financial Services
-  { symbol: 'JPM', name: 'JPMorgan Chase & Co.', sector: 'Financial Services', industry: 'Banking', exchange: 'NYSE' },
-  { symbol: 'BAC', name: 'Bank of America Corporation', sector: 'Financial Services', industry: 'Banking', exchange: 'NYSE' },
-  { symbol: 'WFC', name: 'Wells Fargo & Company', sector: 'Financial Services', industry: 'Banking', exchange: 'NYSE' },
-  { symbol: 'GS', name: 'Goldman Sachs Group Inc.', sector: 'Financial Services', industry: 'Investment Banking', exchange: 'NYSE' },
-  { symbol: 'MS', name: 'Morgan Stanley', sector: 'Financial Services', industry: 'Investment Banking', exchange: 'NYSE' },
-  { symbol: 'V', name: 'Visa Inc.', sector: 'Financial Services', industry: 'Payment Processing', exchange: 'NYSE' },
-  { symbol: 'MA', name: 'Mastercard Incorporated', sector: 'Financial Services', industry: 'Payment Processing', exchange: 'NYSE' },
-  { symbol: 'PYPL', name: 'PayPal Holdings Inc.', sector: 'Financial Services', industry: 'Digital Payments', exchange: 'NASDAQ' },
-  { symbol: 'AXP', name: 'American Express Company', sector: 'Financial Services', industry: 'Credit Services', exchange: 'NYSE' },
-  { symbol: 'BLK', name: 'BlackRock Inc.', sector: 'Financial Services', industry: 'Asset Management', exchange: 'NYSE' },
-  
-  // Healthcare
-  { symbol: 'UNH', name: 'UnitedHealth Group Incorporated', sector: 'Healthcare', industry: 'Health Insurance', exchange: 'NYSE' },
-  { symbol: 'JNJ', name: 'Johnson & Johnson', sector: 'Healthcare', industry: 'Pharmaceuticals', exchange: 'NYSE' },
-  { symbol: 'PFE', name: 'Pfizer Inc.', sector: 'Healthcare', industry: 'Pharmaceuticals', exchange: 'NYSE' },
-  { symbol: 'ABBV', name: 'AbbVie Inc.', sector: 'Healthcare', industry: 'Pharmaceuticals', exchange: 'NYSE' },
-  { symbol: 'TMO', name: 'Thermo Fisher Scientific Inc.', sector: 'Healthcare', industry: 'Life Sciences', exchange: 'NYSE' },
-  { symbol: 'ABT', name: 'Abbott Laboratories', sector: 'Healthcare', industry: 'Medical Devices', exchange: 'NYSE' },
-  { symbol: 'CVS', name: 'CVS Health Corporation', sector: 'Healthcare', industry: 'Healthcare Services', exchange: 'NYSE' },
-  { symbol: 'LLY', name: 'Eli Lilly and Company', sector: 'Healthcare', industry: 'Pharmaceuticals', exchange: 'NYSE' },
-  { symbol: 'MRK', name: 'Merck & Co. Inc.', sector: 'Healthcare', industry: 'Pharmaceuticals', exchange: 'NYSE' },
-  { symbol: 'MDT', name: 'Medtronic plc', sector: 'Healthcare', industry: 'Medical Devices', exchange: 'NYSE' },
-  
-  // Consumer Discretionary
-  { symbol: 'HD', name: 'Home Depot Inc.', sector: 'Consumer Discretionary', industry: 'Home Improvement', exchange: 'NYSE' },
-  { symbol: 'MCD', name: 'McDonald\'s Corporation', sector: 'Consumer Discretionary', industry: 'Restaurants', exchange: 'NYSE' },
-  { symbol: 'DIS', name: 'Walt Disney Company', sector: 'Communication Services', industry: 'Entertainment', exchange: 'NYSE' },
-  { symbol: 'NKE', name: 'Nike Inc.', sector: 'Consumer Discretionary', industry: 'Footwear', exchange: 'NYSE' },
-  { symbol: 'SBUX', name: 'Starbucks Corporation', sector: 'Consumer Discretionary', industry: 'Restaurants', exchange: 'NASDAQ' },
-  { symbol: 'LOW', name: 'Lowe\'s Companies Inc.', sector: 'Consumer Discretionary', industry: 'Home Improvement', exchange: 'NYSE' },
-  { symbol: 'TGT', name: 'Target Corporation', sector: 'Consumer Discretionary', industry: 'Retail', exchange: 'NYSE' },
-  { symbol: 'BKNG', name: 'Booking Holdings Inc.', sector: 'Consumer Discretionary', industry: 'Travel', exchange: 'NASDAQ' },
-  
-  // Consumer Staples
-  { symbol: 'WMT', name: 'Walmart Inc.', sector: 'Consumer Staples', industry: 'Retail', exchange: 'NYSE' },
-  { symbol: 'PG', name: 'Procter & Gamble Company', sector: 'Consumer Staples', industry: 'Personal Care', exchange: 'NYSE' },
-  { symbol: 'KO', name: 'Coca-Cola Company', sector: 'Consumer Staples', industry: 'Beverages', exchange: 'NYSE' },
-  { symbol: 'PEP', name: 'PepsiCo Inc.', sector: 'Consumer Staples', industry: 'Beverages', exchange: 'NASDAQ' },
-  { symbol: 'COST', name: 'Costco Wholesale Corporation', sector: 'Consumer Staples', industry: 'Retail', exchange: 'NASDAQ' },
-  { symbol: 'WBA', name: 'Walgreens Boots Alliance Inc.', sector: 'Consumer Staples', industry: 'Pharmacy', exchange: 'NASDAQ' },
-  
-  // Energy
-  { symbol: 'XOM', name: 'Exxon Mobil Corporation', sector: 'Energy', industry: 'Oil & Gas', exchange: 'NYSE' },
-  { symbol: 'CVX', name: 'Chevron Corporation', sector: 'Energy', industry: 'Oil & Gas', exchange: 'NYSE' },
-  { symbol: 'COP', name: 'ConocoPhillips', sector: 'Energy', industry: 'Oil & Gas', exchange: 'NYSE' },
-  { symbol: 'EOG', name: 'EOG Resources Inc.', sector: 'Energy', industry: 'Oil & Gas', exchange: 'NYSE' },
-  
-  // Industrials
-  { symbol: 'BA', name: 'Boeing Company', sector: 'Industrials', industry: 'Aerospace', exchange: 'NYSE' },
-  { symbol: 'CAT', name: 'Caterpillar Inc.', sector: 'Industrials', industry: 'Heavy Machinery', exchange: 'NYSE' },
-  { symbol: 'GE', name: 'General Electric Company', sector: 'Industrials', industry: 'Conglomerate', exchange: 'NYSE' },
-  { symbol: 'MMM', name: '3M Company', sector: 'Industrials', industry: 'Diversified Manufacturing', exchange: 'NYSE' },
-  { symbol: 'UPS', name: 'United Parcel Service Inc.', sector: 'Industrials', industry: 'Logistics', exchange: 'NYSE' },
-  { symbol: 'HON', name: 'Honeywell International Inc.', sector: 'Industrials', industry: 'Aerospace', exchange: 'NASDAQ' },
-  
-  // Utilities
-  { symbol: 'NEE', name: 'NextEra Energy Inc.', sector: 'Utilities', industry: 'Electric Utilities', exchange: 'NYSE' },
-  { symbol: 'DUK', name: 'Duke Energy Corporation', sector: 'Utilities', industry: 'Electric Utilities', exchange: 'NYSE' },
-  { symbol: 'SO', name: 'Southern Company', sector: 'Utilities', industry: 'Electric Utilities', exchange: 'NYSE' },
-  
-  // Real Estate
-  { symbol: 'AMT', name: 'American Tower Corporation', sector: 'Real Estate', industry: 'REITs', exchange: 'NYSE' },
-  { symbol: 'PLD', name: 'Prologis Inc.', sector: 'Real Estate', industry: 'REITs', exchange: 'NYSE' },
-  { symbol: 'CCI', name: 'Crown Castle Inc.', sector: 'Real Estate', industry: 'REITs', exchange: 'NYSE' },
-  
-  // Materials
-  { symbol: 'LIN', name: 'Linde plc', sector: 'Materials', industry: 'Chemicals', exchange: 'NYSE' },
-  { symbol: 'APD', name: 'Air Products and Chemicals Inc.', sector: 'Materials', industry: 'Chemicals', exchange: 'NYSE' },
-  { symbol: 'SHW', name: 'Sherwin-Williams Company', sector: 'Materials', industry: 'Chemicals', exchange: 'NYSE' },
-  
-  // ETFs (Popular ones that track S&P 500)
+  ...(sp500Constituents as SP500Company[]),
+
+  // ETFs (popular S&P-tracking funds — not constituents but users still search them)
   { symbol: 'SPY', name: 'SPDR S&P 500 ETF Trust', sector: 'ETF', industry: 'Index Fund', exchange: 'NYSE' },
   { symbol: 'VOO', name: 'Vanguard S&P 500 ETF', sector: 'ETF', industry: 'Index Fund', exchange: 'NYSE' },
   { symbol: 'IVV', name: 'iShares Core S&P 500 ETF', sector: 'ETF', industry: 'Index Fund', exchange: 'NYSE' },
