@@ -332,7 +332,7 @@ function FilterInfo({ filter }: { filter: Filter }) {
   const msg = {
     popular: 'Ranked by a blend of options volume, market cap, and recent news flow.',
     sp500: 'S&P 500 constituents only.',
-    movers: 'Tickers whose implied move is ≥ 8% this week.',
+    movers: 'Tickers whose implied move is ≥ 10% this week.',
     all: 'Every confirmed earnings report in our calendar.',
   }[filter];
   return (
@@ -468,7 +468,7 @@ function WeekHeader({
             [
               { key: 'popular', label: 'Popular', tip: 'Top ~50 by options volume & market cap.' },
               { key: 'sp500', label: 'S&P 500', tip: 'S&P 500 constituents only.' },
-              { key: 'movers', label: 'Big movers', tip: 'Expected move ≥ 8% this week.' },
+              { key: 'movers', label: 'Big movers', tip: 'Expected move ≥ 10% this week.' },
               { key: 'all', label: 'All', tip: 'Every confirmed earnings report.' },
             ] as { key: Filter; label: string; tip: string }[]
           ).map((f) => (
@@ -625,7 +625,7 @@ export default function EarningsGrid() {
     let list = data.events;
     if (filter === 'popular') list = list.filter((e) => (POPULAR_WEIGHT[e.ticker] ?? 0) >= 76);
     if (filter === 'sp500') list = list.filter((e) => (POPULAR_WEIGHT[e.ticker] ?? 0) > 0);
-    if (filter === 'movers') list = list.filter((e) => (e.em_straddle_pct ?? e.em_iv_pct ?? 0) >= 0.08);
+    if (filter === 'movers') list = list.filter((e) => (e.em_straddle_pct ?? e.em_iv_pct ?? 0) >= 0.10);
     if (search) list = list.filter((e) => e.ticker.startsWith(search));
     return list;
   }, [data, filter, search]);
