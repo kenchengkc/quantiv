@@ -1,0 +1,40 @@
+name: Refresh stock prices
+
+# Public repo: free unlimited runner minutes. Every 5 min covers ~300 symbols
+# per run at Finnhub's 60/min free tier, cycling the ~800-symbol hot set
+# roughly every 14 minutes.
+#
+# GitHub cron is best-effort and can drift 5–15 min under high runner load.
+# Redis TTL is 1h so the UI keeps showing values through any gaps.
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: refresh-prices
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci --omit=dev --ignore-scripts
+        # The script only needs @upstash/redis and @neondatabase/serverless,
+        # both of which are root deps. Skip workspace install to save time.
+
+      - run: node scripts/refresh_prices.mjs
+        env:
+          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
+          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
