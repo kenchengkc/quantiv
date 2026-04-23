@@ -316,12 +316,14 @@ def build_week_events(conn, as_of_date: date, week_start: date, week_end: date,
     events = []
     skipped_no_ml = 0
     skipped_no_options = 0
+    today = date.today()
     for i, (ticker, earnings_dt, timing, fiscal_q) in enumerate(rows, 1):
         fc = ml_lookup.get((ticker, earnings_dt.isoformat()))
-        # Skip events without a matching ML forecast when require_ml is on.
-        # Keeps the build focused and avoids spending time on symbols whose
-        # options data will yield no useful prediction.
-        if require_ml and not fc:
+        # Require ML only for *future* earnings. Past earnings within the same
+        # week (e.g. Mon/Tue when today is Wed) fall back to options_math —
+        # daily_score.py only scores upcoming events, so forecasts are absent
+        # for past dates by design.
+        if require_ml and not fc and earnings_dt >= today:
             skipped_no_ml += 1
             continue
         em = compute_em_math(conn, ticker, as_of_date, earnings_dt)
