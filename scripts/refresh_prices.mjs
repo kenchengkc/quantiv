@@ -23,6 +23,7 @@ import { neon } from '@neondatabase/serverless';
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const PUBLIC_DIR = join(REPO_ROOT, 'apps', 'frontend', 'public');
 const WEEKS_DIR = join(PUBLIC_DIR, 'weeks');
+const SP500_JSON = join(REPO_ROOT, 'lib', 'data', 'sp500-constituents.json');
 
 const BATCH_SIZE = 300;           // symbols per run (60/min × 5 min)
 const RATE_LIMIT_PER_MIN = 55;    // leave 5/min headroom for on-demand fetches
@@ -33,43 +34,92 @@ function log(...args) {
   console.log(new Date().toISOString(), '—', ...args);
 }
 
-function loadWeekSymbols() {
-  const symbols = new Set();
-  if (!existsSync(WEEKS_DIR)) return symbols;
-  for (const file of readdirSync(WEEKS_DIR)) {
-    if (!file.endsWith('.json') || file === 'manifest.json') continue;
-    try {
-      const payload = JSON.parse(readFileSync(join(WEEKS_DIR, file), 'utf8'));
-      for (const ev of payload.events ?? []) {
-        if (ev.ticker) symbols.add(ev.ticker);
-      }
-    } catch (e) {
-      log('skip', file, e.message);
-    }
+function loadWeekFile(filename) {
+  const path = join(WEEKS_DIR, filename);
+  if (!existsSync(path)) return [];
+  try {
+    const payload = JSON.parse(readFileSync(path, 'utf8'));
+    return (payload.events ?? []).map((e) => e.ticker).filter(Boolean);
+  } catch (e) {
+    log('skip', filename, e.message);
+    return [];
   }
-  return symbols;
+}
+
+function mondayOf(d) {
+  const out = new Date(d);
+  const day = out.getDay();
+  const delta = day === 0 ? -6 : 1 - day;
+  out.setDate(out.getDate() + delta);
+  out.setHours(0, 0, 0, 0);
+  return out;
+}
+
+function isoDay(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function loadSp500Symbols() {
+  if (!existsSync(SP500_JSON)) return [];
+  try {
+    const rows = JSON.parse(readFileSync(SP500_JSON, 'utf8'));
+    return rows.map((r) => r.symbol).filter(Boolean);
+  } catch (e) {
+    log('sp500 load failed:', e.message);
+    return [];
+  }
 }
 
 async function loadWatchlistSymbols() {
   const url = process.env.DATABASE_URL;
-  if (!url) return new Set();
+  if (!url) return [];
   try {
     const sql = neon(url);
     const rows = await sql`SELECT DISTINCT symbol FROM watchlist`;
-    return new Set(rows.map((r) => r.symbol));
+    return rows.map((r) => r.symbol);
   } catch (e) {
     log('watchlist query failed (non-fatal):', e.message);
-    return new Set();
+    return [];
   }
 }
 
 async function buildSymbolList() {
-  const week = loadWeekSymbols();
-  const watchlist = await loadWatchlistSymbols();
-  const merged = new Set([...week, ...watchlist]);
-  // Deterministic ordering so the cursor is stable across runs even when the
-  // set changes slightly. Cursor is a position in the sorted array.
-  return [...merged].sort();
+  // Priority order (first = refreshed first each cycle):
+  //   1. user watchlists
+  //   2. this week's earnings tickers
+  //   3. next week's earnings tickers
+  //   4. S&P 500 constituents
+  //   5. last week's earnings tickers
+  // Cursor rotates through this priority-ordered list. De-duped via Set;
+  // each symbol keeps its FIRST (highest-priority) position.
+  const thisMon = mondayOf(new Date());
+  const lastMon = new Date(thisMon); lastMon.setDate(thisMon.getDate() - 7);
+  const nextMon = new Date(thisMon); nextMon.setDate(thisMon.getDate() + 7);
+
+  const tiers = [
+    await loadWatchlistSymbols(),
+    loadWeekFile(`${isoDay(thisMon)}.json`),
+    loadWeekFile(`${isoDay(nextMon)}.json`),
+    loadSp500Symbols(),
+    loadWeekFile(`${isoDay(lastMon)}.json`),
+  ];
+
+  const ordered = [];
+  const seen = new Set();
+  for (const tier of tiers) {
+    for (const s of tier) {
+      if (!seen.has(s)) {
+        seen.add(s);
+        ordered.push(s);
+      }
+    }
+  }
+  log(
+    `tiers: watchlist=${tiers[0].length} this=${tiers[1].length} ` +
+    `next=${tiers[2].length} sp500=${tiers[3].length} last=${tiers[4].length} ` +
+    `total=${ordered.length}`,
+  );
+  return ordered;
 }
 
 async function fetchQuote(symbol, apiKey) {
