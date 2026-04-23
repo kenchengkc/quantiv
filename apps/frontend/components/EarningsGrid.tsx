@@ -2,9 +2,17 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Sun, Moon, Info, ChevronLeft, ChevronRight, Search, Circle } from 'lucide-react';
 import { POPULAR_WEIGHT } from '@/lib/popular';
 import { COMPANY_NAMES } from '@/lib/companyNames';
+import sp500Constituents from '../../../lib/data/sp500-constituents.json';
+
+// Full S&P 500 (503 constituents incl. dual-class). Used for the "S&P 500"
+// filter instead of the tiny POPULAR_WEIGHT map.
+const SP500_SET: Set<string> = new Set(
+  (sp500Constituents as { symbol: string }[]).map((c) => c.symbol),
+);
 
 interface EarningsEvent {
   ticker: string;
@@ -521,9 +529,35 @@ function WeekHeader({
 }
 
 export default function EarningsGrid() {
-  const [offset, setOffset] = useState(0);
-  const [filter, setFilter] = useState<Filter>('popular');
+  // Persist (offset, filter) in the URL so that navigating to a ticker and
+  // hitting back returns the user to the same week + filter they were on.
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const initialOffset = (() => {
+    const v = Number(searchParams.get('offset'));
+    return Number.isFinite(v) && v >= MIN_OFFSET && v <= MAX_OFFSET ? v : 0;
+  })();
+  const initialFilter: Filter = (() => {
+    const v = searchParams.get('filter');
+    return v === 'popular' || v === 'sp500' || v === 'movers' || v === 'all'
+      ? v
+      : 'popular';
+  })();
+  const [offset, setOffset] = useState(initialOffset);
+  const [filter, setFilter] = useState<Filter>(initialFilter);
   const [search, setSearch] = useState('');
+
+  // Mirror state → URL query. Omit default values so a fresh landing stays
+  // on a clean `/` URL.
+  useEffect(() => {
+    const next = new URLSearchParams();
+    if (offset !== 0) next.set('offset', String(offset));
+    if (filter !== 'popular') next.set('filter', filter);
+    const qs = next.toString();
+    const url = qs ? `/?${qs}` : '/';
+    // replace (not push) so state updates don't pollute back-button history.
+    router.replace(url, { scroll: false });
+  }, [offset, filter, router]);
   const [data, setData] = useState<WeeklyData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -624,7 +658,7 @@ export default function EarningsGrid() {
     if (!data) return [] as EarningsEvent[];
     let list = data.events;
     if (filter === 'popular') list = list.filter((e) => (POPULAR_WEIGHT[e.ticker] ?? 0) >= 76);
-    if (filter === 'sp500') list = list.filter((e) => (POPULAR_WEIGHT[e.ticker] ?? 0) > 0);
+    if (filter === 'sp500') list = list.filter((e) => SP500_SET.has(e.ticker));
     if (filter === 'movers') list = list.filter((e) => (e.em_straddle_pct ?? e.em_iv_pct ?? 0) >= 0.10);
     if (search) list = list.filter((e) => e.ticker.startsWith(search));
     return list;
