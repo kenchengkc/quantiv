@@ -7,7 +7,7 @@ import { Search, ChevronRight } from 'lucide-react';
 import { SignedIn, SignedOut, UserButton } from '@clerk/nextjs';
 
 const NAV = [
-  { href: '/', label: 'Earnings' },
+  { href: '/', label: 'Earnings calendar' },
   { href: '/screener', label: 'Screener' },
   { href: '/watchlist', label: 'Watchlist' },
   { href: '/about', label: 'About' },

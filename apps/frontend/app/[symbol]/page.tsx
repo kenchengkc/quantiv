@@ -1193,7 +1193,7 @@ export default function SymbolPage() {
           className="chip"
           style={{ border: 'none', color: 'var(--ink-3)', paddingLeft: 0, cursor: 'pointer' }}
         >
-          <ChevronLeft size={14} /> Earnings calendar
+          <ChevronLeft size={14} /> Return
         </button>
         <div
           style={{
@@ -1240,7 +1240,7 @@ export default function SymbolPage() {
           className="chip"
           style={{ border: 'none', color: 'var(--ink-3)', paddingLeft: 0, cursor: 'pointer' }}
         >
-          <ChevronLeft size={14} /> Earnings calendar
+          <ChevronLeft size={14} /> Return
         </button>
 
         <div

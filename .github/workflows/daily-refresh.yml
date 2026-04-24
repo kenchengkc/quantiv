@@ -93,10 +93,12 @@ jobs:
         run: python -u tools/build_frontend_data.py
 
       - name: Commit + push frontend data
+        # data/forecasts is gitignored — the JSON in apps/frontend/public is
+        # the only thing that ships to Vercel. Forecast parquet stays in R2.
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name  "Quantiv bot"
-          git add apps/frontend/public data/forecasts 2>/dev/null || true
+          git add apps/frontend/public
           if git diff --staged --quiet; then
             echo "No changes to commit"
           else
