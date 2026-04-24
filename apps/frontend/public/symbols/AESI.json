@@ -1,46 +1,73 @@
 {
   "symbol": "AESI",
-  "as_of_date": "2026-04-10",
-  "spot_price": null,
+  "as_of_date": "2026-04-23",
+  "spot_price": 15.0,
   "expected_move": {
     "earnings_date": "2026-05-04",
     "expiration": "2026-05-15",
-    "dte": 35,
-    "lead_time_days": 24,
-    "atm_strike": 12.5,
-    "atm_iv": 0.707,
-    "straddle_abs": 2.225,
-    "straddle_pct": 0.178,
-    "iv_pct": 0.218931,
+    "dte": 22,
+    "lead_time_days": 11,
+    "atm_strike": 15.0,
+    "atm_iv": 0.7687,
+    "straddle_abs": 2.35,
+    "straddle_pct": 0.156667,
+    "iv_pct": 0.188722,
     "skew_atm": 0.0,
     "term_slope": null,
-    "total_vega": 0.0265,
-    "em_method": "options_math",
-    "timing": "unknown"
+    "total_vega": 0.029,
+    "em_ml_pct": 0.092494,
+    "em_ml_abs": 1.277341,
+    "correction_factor": 0.584172,
+    "model_horizon": 14,
+    "ml_snapshot_date": "2026-04-20",
+    "p10": 0.009924,
+    "p25": 0.033026,
+    "p50": 0.070625,
+    "p75": 0.148585,
+    "p90": 0.187528,
+    "em_method": "ml_lightgbm",
+    "timing": "after_market_close"
   },
   "straddle_features": [
     {
       "expiration": "2026-05-15",
-      "dte": 35,
-      "atm_strike": 12.5,
-      "atm_iv": 0.707,
-      "atm_call_iv": 0.707,
-      "atm_put_iv": 0.707,
-      "straddle_mid": 2.225,
-      "em_straddle": 2.225,
-      "em_straddle_pct": null,
-      "em_iv": null,
-      "em_iv_pct": null,
-      "call_delta": 0.3783,
-      "call_gamma": 0.1522,
-      "call_vega": 0.0133,
-      "call_theta": -0.0136
+      "dte": 22,
+      "atm_strike": 15.0,
+      "atm_iv": 0.7687,
+      "atm_call_iv": 0.7687,
+      "atm_put_iv": 0.7687,
+      "straddle_mid": 2.35,
+      "em_straddle": 2.35,
+      "em_straddle_pct": 0.156667,
+      "em_iv": 2.830825,
+      "em_iv_pct": 0.188722,
+      "call_delta": 0.6376,
+      "call_gamma": 0.1254,
+      "call_vega": 0.0145,
+      "call_theta": -0.0256
+    },
+    {
+      "expiration": "2026-06-18",
+      "dte": 56,
+      "atm_strike": 15.0,
+      "atm_iv": 0.668,
+      "atm_call_iv": 0.6606,
+      "atm_put_iv": 0.6754,
+      "straddle_mid": 3.225,
+      "em_straddle": 3.225,
+      "em_straddle_pct": 0.215,
+      "em_iv": 3.92478,
+      "em_iv_pct": 0.261652,
+      "call_delta": 0.6105,
+      "call_gamma": 0.0926,
+      "call_vega": 0.0233,
+      "call_theta": -0.0127
     }
   ],
   "earnings_history": [
     {
       "date": "2026-05-04",
-      "timing": "unknown"
+      "timing": "after_market_close"
     },
     {
       "date": "2026-02-23",
@@ -88,5 +115,5 @@
     }
   ],
   "next_earnings": "2026-05-04",
-  "next_earnings_timing": "unknown"
+  "next_earnings_timing": "after_market_close"
 }
