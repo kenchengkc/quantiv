@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { ChevronLeft } from 'lucide-react';
 import { SignedIn, SignedOut, SignInButton } from '@clerk/nextjs';
 import { COMPANY_NAMES } from '@/lib/companyNames';
+import { useWatchlist } from '@/lib/watchlist';
 
 interface Straddle {
   expiration: string;
@@ -171,49 +172,21 @@ function WatchlistButton({
   ticker: string;
   onToast: (msg: string) => void;
 }) {
-  const [added, setAdded] = useState(false);
+  const { symbols, add, remove } = useWatchlist();
+  const added = symbols.includes(ticker);
   const [animating, setAnimating] = useState(false);
   const [hovered, setHovered] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch('/api/watchlist', { cache: 'no-store' });
-        if (!res.ok) return;
-        const json = (await res.json()) as { symbols: string[] };
-        if (!cancelled) setAdded((json.symbols ?? []).includes(ticker));
-      } catch {
-        /* ignore */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [ticker]);
-
-  const toggle = async () => {
+  const toggle = () => {
     if (animating) return;
     if (added) {
-      setAdded(false);
       onToast(`${ticker} removed from watchlist`);
-      fetch(`/api/watchlist/${encodeURIComponent(ticker)}`, { method: 'DELETE' }).catch(
-        () => {
-          /* optimistic */
-        },
-      );
+      remove(ticker);
     } else {
       setAnimating(true);
-      setAdded(true);
       onToast(`${ticker} added to watchlist`);
       setTimeout(() => setAnimating(false), 700);
-      fetch('/api/watchlist', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ symbol: ticker }),
-      }).catch(() => {
-        /* optimistic */
-      });
+      add(ticker);
     }
   };
 
