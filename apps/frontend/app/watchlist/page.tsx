@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { GripVertical, X, Plus } from 'lucide-react';
 import { COMPANY_NAMES } from '@/lib/companyNames';
+import { useWatchlist } from '@/lib/watchlist';
 
 type SymbolSummary = {
   symbol: string;
@@ -96,31 +97,11 @@ function Logo({ ticker, size = 36 }: { ticker: string; size?: number }) {
 }
 
 export default function WatchlistPage() {
-  const [tickers, setTickers] = useState<string[]>([]);
-  const [hydrated, setHydrated] = useState(false);
+  const { symbols: tickers, isLoaded: hydrated, remove: removeOne, reorder: reorderAll } = useWatchlist();
   const [summaries, setSummaries] = useState<Record<string, SymbolSummary>>({});
   const [live, setLive] = useState<Record<string, Tick>>({});
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [overIdx, setOverIdx] = useState<number | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch('/api/watchlist', { cache: 'no-store' });
-        if (!res.ok) return;
-        const json = (await res.json()) as { symbols: string[] };
-        if (!cancelled) setTickers(json.symbols ?? []);
-      } catch {
-        /* ignore */
-      } finally {
-        if (!cancelled) setHydrated(true);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   // Load per-symbol summary from pre-generated /symbols/*.json
   useEffect(() => {
@@ -175,29 +156,18 @@ export default function WatchlistPage() {
     };
   }, [tickers, hydrated]);
 
-  const remove = useCallback((t: string) => {
-    setTickers((prev) => prev.filter((x) => x !== t));
-    fetch(`/api/watchlist/${encodeURIComponent(t)}`, { method: 'DELETE' }).catch(() => {
-      /* ignore — optimistic */
-    });
-  }, []);
+  const remove = useCallback((t: string) => removeOne(t), [removeOne]);
 
-  const reorder = useCallback((from: number, to: number) => {
-    if (from === to) return;
-    setTickers((prev) => {
-      const next = [...prev];
+  const reorder = useCallback(
+    (from: number, to: number) => {
+      if (from === to) return;
+      const next = [...tickers];
       const [item] = next.splice(from, 1);
       next.splice(to, 0, item);
-      fetch('/api/watchlist/reorder', {
-        method: 'PUT',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ symbols: next }),
-      }).catch(() => {
-        /* ignore — optimistic */
-      });
-      return next;
-    });
-  }, []);
+      reorderAll(next);
+    },
+    [tickers, reorderAll],
+  );
 
   const total = tickers.length;
 
