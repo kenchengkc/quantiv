@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { GripVertical, X, Plus } from 'lucide-react';
+import { GripVertical, X, Plus, ChevronUp, ChevronDown, Check } from 'lucide-react';
 import { COMPANY_NAMES } from '@/lib/companyNames';
 import { useWatchlist } from '@/lib/watchlist';
 
@@ -96,12 +96,141 @@ function Logo({ ticker, size = 36 }: { ticker: string; size?: number }) {
   );
 }
 
+// Circular icon button used by the row action cluster. Variant determines
+// fill/outline style; `enabled` toggles disabled/outline treatment.
+function CircleButton({
+  children,
+  onClick,
+  disabled = false,
+  variant = 'neutral',
+  title,
+  ariaLabel,
+}: {
+  children: React.ReactNode;
+  onClick?: () => void;
+  disabled?: boolean;
+  variant?: 'neutral' | 'danger' | 'confirm';
+  title?: string;
+  ariaLabel?: string;
+}) {
+  const base = {
+    width: 32,
+    height: 32,
+    display: 'grid',
+    placeItems: 'center',
+    borderRadius: 999,
+    cursor: disabled ? 'default' : 'pointer',
+    transition: 'background 140ms ease, border-color 140ms ease, color 140ms ease, transform 120ms ease',
+    flexShrink: 0,
+  } as const;
+
+  const variants: Record<
+    'neutral' | 'danger' | 'confirm',
+    { bg: string; border: string; color: string }
+  > = {
+    neutral: { bg: 'var(--bg-3)', border: 'transparent', color: 'var(--ink-2)' },
+    danger: {
+      bg: 'color-mix(in srgb, var(--down) 22%, transparent)',
+      border: 'transparent',
+      color: 'var(--down)',
+    },
+    confirm: {
+      bg: 'color-mix(in srgb, var(--up) 22%, transparent)',
+      border: 'transparent',
+      color: 'var(--up)',
+    },
+  };
+
+  const style = disabled
+    ? {
+        ...base,
+        background: 'transparent',
+        border: '1px solid var(--line)',
+        color: 'var(--ink-4)',
+        opacity: 0.55,
+      }
+    : {
+        ...base,
+        background: variants[variant].bg,
+        border: `1px solid ${variants[variant].border}`,
+        color: variants[variant].color,
+      };
+
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      onDragStart={(e) => e.preventDefault()}
+      title={title}
+      aria-label={ariaLabel ?? title}
+      style={style}
+    >
+      {children}
+    </button>
+  );
+}
+
+function RowActions({
+  canUp,
+  canDown,
+  pendingDelete,
+  onUp,
+  onDown,
+  onDeleteClick,
+  ticker,
+}: {
+  canUp: boolean;
+  canDown: boolean;
+  pendingDelete: boolean;
+  onUp: () => void;
+  onDown: () => void;
+  onDeleteClick: () => void;
+  ticker: string;
+}) {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'flex-end',
+        gap: 6,
+      }}
+      onDragStart={(e) => e.preventDefault()}
+    >
+      <CircleButton
+        onClick={canUp ? onUp : undefined}
+        disabled={!canUp}
+        title={`Move ${ticker} up`}
+      >
+        <ChevronUp size={16} />
+      </CircleButton>
+      <CircleButton
+        onClick={canDown ? onDown : undefined}
+        disabled={!canDown}
+        title={`Move ${ticker} down`}
+      >
+        <ChevronDown size={16} />
+      </CircleButton>
+      <CircleButton
+        onClick={onDeleteClick}
+        variant={pendingDelete ? 'confirm' : 'danger'}
+        title={pendingDelete ? `Confirm remove ${ticker}` : `Remove ${ticker}`}
+      >
+        {pendingDelete ? <Check size={16} /> : <X size={16} />}
+      </CircleButton>
+    </div>
+  );
+}
+
 export default function WatchlistPage() {
   const { symbols: tickers, isLoaded: hydrated, remove: removeOne, reorder: reorderAll } = useWatchlist();
   const [summaries, setSummaries] = useState<Record<string, SymbolSummary>>({});
   const [live, setLive] = useState<Record<string, Tick>>({});
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [overIdx, setOverIdx] = useState<number | null>(null);
+  // Ticker awaiting delete confirmation — X click arms it, ✓ click confirms.
+  const [pendingDelete, setPendingDelete] = useState<string | null>(null);
 
   // Load per-symbol summary from pre-generated /symbols/*.json
   useEffect(() => {
@@ -274,7 +403,7 @@ export default function WatchlistPage() {
                 style={{
                   display: 'grid',
                   gridTemplateColumns:
-                    '18px 36px minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 1.2fr) auto 28px',
+                    '18px 36px minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 1.2fr) auto 116px',
                   alignItems: 'center',
                   gap: 14,
                   padding: '14px 12px',
@@ -407,34 +536,22 @@ export default function WatchlistPage() {
                   )}
                 </div>
 
-                <button
-                  onClick={() => remove(t)}
-                  onDragStart={(e) => e.preventDefault()}
-                  title={`Remove ${t}`}
-                  aria-label={`Remove ${t}`}
-                  style={{
-                    width: 28,
-                    height: 28,
-                    display: 'grid',
-                    placeItems: 'center',
-                    borderRadius: 999,
-                    border: '1px solid var(--line)',
-                    background: 'transparent',
-                    color: 'var(--ink-3)',
-                    cursor: 'pointer',
-                    transition: 'color 140ms ease, border-color 140ms ease, background 140ms ease',
+                <RowActions
+                  canUp={i > 0}
+                  canDown={i < tickers.length - 1}
+                  pendingDelete={pendingDelete === t}
+                  onUp={() => reorder(i, i - 1)}
+                  onDown={() => reorder(i, i + 1)}
+                  onDeleteClick={() => {
+                    if (pendingDelete === t) {
+                      setPendingDelete(null);
+                      remove(t);
+                    } else {
+                      setPendingDelete(t);
+                    }
                   }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.color = 'var(--down)';
-                    e.currentTarget.style.borderColor = 'var(--down)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.color = 'var(--ink-3)';
-                    e.currentTarget.style.borderColor = 'var(--line)';
-                  }}
-                >
-                  <X size={14} />
-                </button>
+                  ticker={t}
+                />
               </li>
             );
           })}
@@ -454,7 +571,7 @@ export default function WatchlistPage() {
           }}
         >
           <span style={{ fontStyle: 'italic' }}>
-            Drag to reorder · click × to remove
+            Use arrows or drag to reorder · click × then ✓ to remove
           </span>
           <span>
             Add from any ticker page with{' '}
