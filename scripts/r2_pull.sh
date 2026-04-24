@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# Pull parquet + models from Cloudflare R2 into the local data/ dir.
+# Used at the start of each GitHub Actions run to restore pipeline inputs.
+#
+# Requires rclone with an `r2` remote configured (see scripts/r2_setup.md).
+# When running in GHA the remote is configured on the fly from env vars.
+
+set -euo pipefail
+
+DATA_DIR="${DATA_DIR:-data}"
+REMOTE="${R2_REMOTE:-r2:${R2_BUCKET:-quantiv-data}}"
+
+echo "📥 Pulling from $REMOTE → $DATA_DIR/"
+
+# Parquet trees — options chain, ohlcv, volatility history
+rclone sync "$REMOTE/parquet" "$DATA_DIR/parquet" \
+  --fast-list --transfers=16 --checkers=16 \
+  --progress
+
+# Models + bias curves
+rclone sync "$REMOTE/models" "$DATA_DIR/models" \
+  --fast-list --transfers=8 --progress
+
+# Small files
+rclone copy "$REMOTE/earnings_calendar.csv" "$DATA_DIR/" 2>/dev/null || true
+rclone copy "$REMOTE/bias_curves.parquet"   "$DATA_DIR/" 2>/dev/null || true
+
+echo "✅ Pull complete"
+du -sh "$DATA_DIR/parquet" "$DATA_DIR/models" 2>/dev/null || true
