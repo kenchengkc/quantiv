@@ -598,28 +598,50 @@ export default function EarningsGrid() {
   useEffect(() => {
     if (!data || data.events.length === 0) return;
     let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
     const symbols = Array.from(new Set(data.events.map((e) => e.ticker))).slice(0, 200);
-    (async () => {
+
+    // Poll live prices until every ticker has a value, then back off. First
+    // request triggers server-side background fetches for any Redis miss;
+    // subsequent polls catch them as they land.
+    const poll = async (attempt = 0) => {
+      if (cancelled) return;
       try {
         const res = await fetch(`/api/stocks/batch-price?symbols=${symbols.join(',')}`, {
           cache: 'no-store',
         });
         if (!res.ok) return;
         const json = (await res.json()) as {
-          data: { symbol: string; change: number | null; changePct: number | null }[];
+          pending?: number;
+          data: { symbol: string; price: number | null; change: number | null; changePct: number | null }[];
         };
         if (cancelled) return;
-        const next: LiveMap = {};
-        for (const t of json.data) {
-          next[t.symbol] = { change: t.change, changePct: t.changePct };
+        setLive((prev) => {
+          const next: LiveMap = { ...prev };
+          for (const t of json.data) {
+            // Only overwrite with non-null values so we never *remove* a
+            // price that landed on an earlier poll.
+            if (t.price !== null) {
+              next[t.symbol] = { change: t.change, changePct: t.changePct };
+            }
+          }
+          return next;
+        });
+        const pending = json.pending ?? 0;
+        if (pending > 0 && attempt < 20) {
+          // 8s between polls — matches the Finnhub warmup cadence reasonably
+          // well without spamming the API. Cap at 20 attempts (~2.5 min).
+          timer = setTimeout(() => poll(attempt + 1), 8_000);
         }
-        setLive(next);
       } catch {
         /* ignore */
       }
-    })();
+    };
+    poll();
+
     return () => {
       cancelled = true;
+      if (timer) clearTimeout(timer);
     };
   }, [data]);
 

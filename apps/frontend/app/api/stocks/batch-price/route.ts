@@ -139,30 +139,24 @@ export async function GET(req: NextRequest) {
 
   const apiKey = process.env.FINNHUB_API_KEY;
 
-  // Classify each symbol as cold (fetch blocking), stale (fetch blocking),
-  // near-fresh (background revalidate), or fresh (cache hit).
+  // Non-blocking strategy: read cache for every symbol, respond immediately
+  // with whatever we have. Anything missing or stale triggers a fire-and-
+  // forget Finnhub fetch so the next poll (client polls every ~10s) sees
+  // fresh data. This keeps p99 response time at cache-read latency (~200ms
+  // on Upstash REST) regardless of cold-start load size.
   const entries = await Promise.all(
     symbols.map(async (s) => ({ s, entry: await readCache(s) })),
   );
   const now = Date.now();
-  const blocking: string[] = [];
-  const background: string[] = [];
+  const toRefresh: string[] = [];
   for (const { s, entry } of entries) {
-    if (!entry) {
-      blocking.push(s);
-      continue;
-    }
-    const age = now - entry.at;
-    if (age >= STALE_TTL_MS) blocking.push(s);
-    else if (age >= FRESH_TTL_MS) background.push(s);
+    if (!entry || now - entry.at >= FRESH_TTL_MS) toRefresh.push(s);
   }
 
-  if (apiKey && blocking.length > 0) {
-    await mapLimit(blocking, CONCURRENCY, (s) => refreshSymbol(s, apiKey));
-  }
-  if (apiKey && background.length > 0) {
-    // Fire-and-forget; the next request will see fresh data.
-    void mapLimit(background, CONCURRENCY, (s) => refreshSymbol(s, apiKey));
+  if (apiKey && toRefresh.length > 0) {
+    // Fire-and-forget. The cron warms the hot set; this catches long-tail
+    // symbols a user navigates to directly or newly-added tickers.
+    void mapLimit(toRefresh, CONCURRENCY, (s) => refreshSymbol(s, apiKey));
   }
 
   let latestAt = 0;
@@ -173,9 +167,14 @@ export async function GET(req: NextRequest) {
     return entry.tick;
   });
 
+  // Surface how many symbols are still waiting so the client knows whether
+  // to keep polling.
+  const pending = data.filter((t) => t.price === null).length;
+
   return NextResponse.json({
     updated: latestAt ? new Date(latestAt).toISOString() : null,
     source: apiKey ? 'finnhub' : 'unavailable',
+    pending,
     data,
   });
 }

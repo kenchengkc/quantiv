@@ -799,6 +799,226 @@ function MLBand({
   );
 }
 
+// Term-structure fan chart — two lines diverging from today's spot:
+// green climbs through spot * (1 + em) at each expiry; red drops through
+// spot * (1 - em). X axis is proportional to days-to-expiry.
+function TermStructureFan({
+  asOf,
+  spot,
+  expiries,
+}: {
+  asOf: string;
+  spot: number;
+  expiries: Straddle[];
+}) {
+  // Only plot expiries with a usable straddle %.
+  const rows = expiries
+    .filter((e) => e.em_straddle_pct !== null && e.em_straddle_pct !== undefined)
+    .sort(
+      (a, b) =>
+        parseLocalDate(a.expiration).getTime() - parseLocalDate(b.expiration).getTime(),
+    );
+  if (rows.length === 0) return null;
+
+  const asOfDate = parseLocalDate(asOf);
+  const points = rows.map((r) => {
+    const exp = parseLocalDate(r.expiration);
+    const dte = Math.max(
+      1,
+      Math.round((exp.getTime() - asOfDate.getTime()) / 86_400_000),
+    );
+    const em = r.em_straddle_pct as number;
+    return { expiration: r.expiration, dte, up: spot * (1 + em), down: spot * (1 - em) };
+  });
+
+  const maxDte = points[points.length - 1].dte;
+  const maxPrice = Math.max(...points.map((p) => p.up));
+  const minPrice = Math.min(...points.map((p) => p.down));
+  // 6% vertical padding so labels don't kiss the edge.
+  const pad = (maxPrice - minPrice) * 0.06;
+  const yMax = maxPrice + pad;
+  const yMin = minPrice - pad;
+
+  // Layout.
+  const W = 760;
+  const H = 280;
+  const M = { top: 14, right: 72, bottom: 34, left: 56 };
+  const innerW = W - M.left - M.right;
+  const innerH = H - M.top - M.bottom;
+
+  const x = (dte: number) => M.left + (dte / maxDte) * innerW;
+  const y = (price: number) =>
+    M.top + innerH - ((price - yMin) / (yMax - yMin)) * innerH;
+
+  const upPath =
+    `M ${x(0)} ${y(spot)} ` +
+    points.map((p) => `L ${x(p.dte)} ${y(p.up)}`).join(' ');
+  const downPath =
+    `M ${x(0)} ${y(spot)} ` +
+    points.map((p) => `L ${x(p.dte)} ${y(p.down)}`).join(' ');
+
+  // Y ticks: 4 evenly spaced price values.
+  const yTicks = Array.from({ length: 5 }, (_, i) => yMin + ((yMax - yMin) * i) / 4);
+
+  return (
+    <div style={{ marginTop: 24 }}>
+      <div
+        style={{
+          fontSize: 10,
+          letterSpacing: '0.18em',
+          textTransform: 'uppercase',
+          color: 'var(--ink-3)',
+          marginBottom: 10,
+        }}
+      >
+        Implied move fan
+      </div>
+      <div style={{ width: '100%', overflowX: 'auto' }}>
+        <svg
+          viewBox={`0 0 ${W} ${H}`}
+          role="img"
+          aria-label="Implied move fan chart across expiries"
+          style={{ width: '100%', maxWidth: W, display: 'block' }}
+        >
+          {/* Y grid + labels */}
+          {yTicks.map((v, i) => (
+            <g key={i}>
+              <line
+                x1={M.left}
+                x2={W - M.right}
+                y1={y(v)}
+                y2={y(v)}
+                stroke="var(--line)"
+                strokeWidth={i === 0 || i === yTicks.length - 1 ? 1 : 0.5}
+                strokeDasharray={i === 0 || i === yTicks.length - 1 ? 'none' : '2 3'}
+              />
+              <text
+                x={M.left - 8}
+                y={y(v)}
+                textAnchor="end"
+                dominantBaseline="central"
+                fontSize="10"
+                fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace"
+                fill="var(--ink-4)"
+              >
+                ${v.toFixed(2)}
+              </text>
+            </g>
+          ))}
+
+          {/* Spot reference line */}
+          <line
+            x1={M.left}
+            x2={W - M.right}
+            y1={y(spot)}
+            y2={y(spot)}
+            stroke="var(--ink-3)"
+            strokeDasharray="3 3"
+            strokeWidth={1}
+          />
+
+          {/* X axis baseline */}
+          <line
+            x1={M.left}
+            x2={W - M.right}
+            y1={H - M.bottom}
+            y2={H - M.bottom}
+            stroke="var(--line)"
+            strokeWidth={1}
+          />
+
+          {/* Fan lines */}
+          <path d={upPath} fill="none" stroke="var(--up)" strokeWidth={2} />
+          <path d={downPath} fill="none" stroke="var(--down)" strokeWidth={2} />
+
+          {/* Origin dot (today, spot) */}
+          <circle cx={x(0)} cy={y(spot)} r={4.5} fill="var(--ink)" />
+
+          {/* Per-expiry endpoint dots + labels */}
+          {points.map((p, i) => {
+            const showLabel = i === points.length - 1 || i % Math.max(1, Math.floor(points.length / 4)) === 0;
+            return (
+              <g key={p.expiration}>
+                <circle cx={x(p.dte)} cy={y(p.up)} r={3} fill="var(--up)" />
+                <circle cx={x(p.dte)} cy={y(p.down)} r={3} fill="var(--down)" />
+                {showLabel && (
+                  <text
+                    x={x(p.dte)}
+                    y={H - M.bottom + 16}
+                    textAnchor="middle"
+                    fontSize="10"
+                    fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace"
+                    fill="var(--ink-4)"
+                  >
+                    {shortDate(p.expiration)?.replace(/^\w{3},\s*/, '')}
+                  </text>
+                )}
+              </g>
+            );
+          })}
+
+          {/* Today label */}
+          <text
+            x={x(0)}
+            y={H - M.bottom + 16}
+            textAnchor="middle"
+            fontSize="10"
+            fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace"
+            fill="var(--ink-3)"
+          >
+            today
+          </text>
+
+          {/* Endpoint value labels (right edge) */}
+          {(() => {
+            const last = points[points.length - 1];
+            return (
+              <g>
+                <text
+                  x={x(last.dte) + 8}
+                  y={y(last.up)}
+                  dominantBaseline="central"
+                  fontSize="10.5"
+                  fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace"
+                  fill="var(--up)"
+                >
+                  ${last.up.toFixed(2)}
+                </text>
+                <text
+                  x={x(last.dte) + 8}
+                  y={y(last.down)}
+                  dominantBaseline="central"
+                  fontSize="10.5"
+                  fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace"
+                  fill="var(--down)"
+                >
+                  ${last.down.toFixed(2)}
+                </text>
+              </g>
+            );
+          })()}
+        </svg>
+      </div>
+      <div
+        style={{
+          display: 'flex',
+          gap: 18,
+          marginTop: 8,
+          fontSize: 11,
+          color: 'var(--ink-4)',
+        }}
+      >
+        <span className="mono">
+          <span style={{ color: 'var(--up)' }}>●</span> spot × (1 + EM)
+        </span>
+        <span className="mono">
+          <span style={{ color: 'var(--down)' }}>●</span> spot × (1 − EM)
+        </span>
+      </div>
+    </div>
+  );
+}
+
 // ---------- Small bits ----------
 function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
@@ -1467,6 +1687,14 @@ export default function SymbolPage() {
               ))}
             </tbody>
           </table>
+
+          {spot > 0 && (
+            <TermStructureFan
+              asOf={data.as_of_date}
+              spot={spot}
+              expiries={data.straddle_features}
+            />
+          )}
         </section>
       )}
 

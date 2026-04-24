@@ -113,29 +113,11 @@ def create_duckdb_views(conn: duckdb.DuckDBPyConnection, data_dir: Path):
         )
     """)
     
-    # Volatility history view  
-    vol_pattern = str(data_dir / "parquet" / "volatility_history" / "*" / "*" / "*.parquet")
-    if Path(vol_pattern.replace("*/*/*", "")).exists():
-        conn.execute(f"""
-            CREATE OR REPLACE VIEW v_volatility_history AS
-            SELECT 
-                ticker,
-                CAST(date AS DATE) as as_of_date,
-                close_price,
-                realized_vol_5d,
-                realized_vol_10d,
-                realized_vol_20d,
-                realized_vol_30d,
-                realized_vol_60d,
-                atr_14
-            FROM read_parquet('{vol_pattern}')
-            WHERE close_price IS NOT NULL
-            AND close_price > 0
-        """)
-        print("✅ Created v_volatility_history view")
-    else:
-        print("⚠️  Volatility history parquet files not found, skipping v_volatility_history view")
-    
+    # (Historical note: a v_volatility_history view used to be created here
+    # from data/parquet/volatility_history/. It's now built by
+    # scripts/setup_duckdb_from_parquet.py as v_volhist_norm / v_volhist on
+    # the persistent DB, and nothing in the frontend pipeline consumes it.)
+
     # ATM helper view - finds ATM strikes for each ticker/date/expiry combination
     conn.execute("""
         CREATE OR REPLACE VIEW v_atm_strikes AS

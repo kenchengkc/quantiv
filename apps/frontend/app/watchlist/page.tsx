@@ -256,11 +256,14 @@ export default function WatchlistPage() {
     };
   }, [tickers, hydrated, summaries]);
 
-  // Batch-fetch live prices for the whole watchlist.
+  // Batch-fetch live prices, polling until all tickers have data.
   useEffect(() => {
     if (!hydrated || tickers.length === 0) return;
     let cancelled = false;
-    (async () => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const poll = async (attempt = 0) => {
+      if (cancelled) return;
       try {
         const res = await fetch(
           `/api/stocks/batch-price?symbols=${tickers.join(',')}`,
@@ -268,20 +271,37 @@ export default function WatchlistPage() {
         );
         if (!res.ok) return;
         const json = (await res.json()) as {
-          data: { symbol: string; change: number | null; changePct: number | null }[];
+          pending?: number;
+          data: {
+            symbol: string;
+            price: number | null;
+            change: number | null;
+            changePct: number | null;
+          }[];
         };
         if (cancelled) return;
-        const next: Record<string, Tick> = {};
-        for (const t of json.data) {
-          next[t.symbol] = { change: t.change, changePct: t.changePct };
+        setLive((prev) => {
+          const next: Record<string, Tick> = { ...prev };
+          for (const t of json.data) {
+            if (t.price !== null) {
+              next[t.symbol] = { change: t.change, changePct: t.changePct };
+            }
+          }
+          return next;
+        });
+        const pending = json.pending ?? 0;
+        if (pending > 0 && attempt < 20) {
+          timer = setTimeout(() => poll(attempt + 1), 8_000);
         }
-        setLive(next);
       } catch {
         /* ignore */
       }
-    })();
+    };
+    poll();
+
     return () => {
       cancelled = true;
+      if (timer) clearTimeout(timer);
     };
   }, [tickers, hydrated]);
 
