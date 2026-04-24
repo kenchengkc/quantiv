@@ -1,0 +1,109 @@
+{
+  "symbol": "MRTN",
+  "as_of_date": "2026-04-22",
+  "spot_price": 15.0,
+  "expected_move": {
+    "earnings_date": "2026-04-15",
+    "expiration": "2026-05-15",
+    "dte": 23,
+    "lead_time_days": -7,
+    "atm_strike": 15.0,
+    "atm_iv": 0.7109,
+    "straddle_abs": 2.15,
+    "straddle_pct": 0.143333,
+    "iv_pct": 0.178454,
+    "skew_atm": 0.0,
+    "term_slope": null,
+    "total_vega": 0.0272,
+    "em_method": "options_math",
+    "timing": "unknown"
+  },
+  "straddle_features": [
+    {
+      "expiration": "2026-05-15",
+      "dte": 23,
+      "atm_strike": 15.0,
+      "atm_iv": 0.7109,
+      "atm_call_iv": 0.7109,
+      "atm_put_iv": 0.7109,
+      "straddle_mid": 2.15,
+      "em_straddle": 2.15,
+      "em_straddle_pct": 0.143333,
+      "em_iv": 2.676808,
+      "em_iv_pct": 0.178454,
+      "call_delta": 0.3831,
+      "call_gamma": 0.1434,
+      "call_vega": 0.0136,
+      "call_theta": -0.0131
+    },
+    {
+      "expiration": "2026-06-18",
+      "dte": 57,
+      "atm_strike": 15.0,
+      "atm_iv": 0.8312,
+      "atm_call_iv": 0.8312,
+      "atm_put_iv": 0.8312,
+      "straddle_mid": 1.5,
+      "em_straddle": 1.5,
+      "em_straddle_pct": 0.1,
+      "em_iv": 4.927059,
+      "em_iv_pct": 0.328471,
+      "call_delta": 0.5648,
+      "call_gamma": 0.084,
+      "call_vega": 0.023,
+      "call_theta": -0.0198
+    }
+  ],
+  "earnings_history": [
+    {
+      "date": "2026-04-15",
+      "timing": "unknown"
+    },
+    {
+      "date": "2026-01-26",
+      "timing": "unknown"
+    },
+    {
+      "date": "2025-10-16",
+      "timing": "unknown"
+    },
+    {
+      "date": "2025-07-17",
+      "timing": "before_market_open"
+    },
+    {
+      "date": "2025-04-17",
+      "timing": "unknown"
+    },
+    {
+      "date": "2025-01-27",
+      "timing": "after_market_close"
+    },
+    {
+      "date": "2024-10-17",
+      "timing": "after_market_close"
+    },
+    {
+      "date": "2024-07-18",
+      "timing": "after_market_close"
+    },
+    {
+      "date": "2024-04-17",
+      "timing": "after_market_close"
+    },
+    {
+      "date": "2024-01-24",
+      "timing": "after_market_close"
+    },
+    {
+      "date": "2023-10-18",
+      "timing": "after_market_close"
+    },
+    {
+      "date": "2023-07-19",
+      "timing": "after_market_close"
+    }
+  ],
+  "next_earnings": "2026-04-15",
+  "next_earnings_timing": "unknown"
+}

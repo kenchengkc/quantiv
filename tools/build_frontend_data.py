@@ -366,10 +366,34 @@ def build_week_events(conn, as_of_date: date, week_start: date, week_end: date,
 
 
 def main():
+    import argparse
+
+    ap = argparse.ArgumentParser()
+    ap.add_argument(
+        "--resume",
+        action="store_true",
+        help=(
+            "Skip symbol detail files that were written AFTER weekly.json "
+            "in this run. Use when recovering from a crash mid-loop so you "
+            "don't re-do hundreds of completed tickers."
+        ),
+    )
+    ap.add_argument(
+        "--skip-weeks",
+        action="store_true",
+        help="Skip the weeks rebuild entirely — jump straight into symbol details. "
+             "Implied by --resume.",
+    )
+    args = ap.parse_args()
+
     (PUBLIC_DIR / "symbols").mkdir(parents=True, exist_ok=True)
     (PUBLIC_DIR / "weeks").mkdir(parents=True, exist_ok=True)
 
     conn = duckdb.connect()
+    # Cap DuckDB memory so long-running symbol-detail loops don't OOM-segfault.
+    # Spills to disk if the working set exceeds this.
+    conn.execute("PRAGMA memory_limit='4GB'")
+    conn.execute("PRAGMA threads=4")
     build_earnings_events_table(conn, EARNINGS_CSV)
     create_duckdb_views(conn, DATA_DIR)
     ml_lookup = load_ml_forecasts()
@@ -384,9 +408,27 @@ def main():
     this_monday = monday_of_week(today) if today.weekday() < 5 else today + timedelta(days=(7 - today.weekday()))
 
     # Build each week (last, this, next, +2) and collect unique tickers for detail pages.
+    # On --resume: reuse the existing per-week JSONs on disk — don't rebuild them.
+    skip_weeks = args.skip_weeks or args.resume
     week_payloads = {}
     tickers_needing_detail: dict[str, date] = {}
-    for offset in WEEK_OFFSETS:
+
+    if skip_weeks:
+        print("⏭️  --resume/--skip-weeks: reading existing weeks/*.json from disk", flush=True)
+        for offset in WEEK_OFFSETS:
+            wk_start = this_monday + timedelta(days=7 * offset)
+            wk_path = PUBLIC_DIR / "weeks" / f"{wk_start.isoformat()}.json"
+            if not wk_path.exists():
+                print(f"  ❌ missing {wk_path.name} — run without --resume to rebuild it")
+                sys.exit(1)
+            payload = json.loads(wk_path.read_text())
+            week_payloads[wk_start] = payload
+            events = payload.get("events", [])
+            print(f"📅 week {wk_start} (offset {offset:+d}) → {len(events)} events (cached)")
+            for ev in events:
+                tickers_needing_detail.setdefault(ev["ticker"], date.fromisoformat(ev["earnings_date"]))
+
+    for offset in ([] if skip_weeks else WEEK_OFFSETS):
         wk_start = this_monday + timedelta(days=7 * offset)
         wk_end = wk_start + timedelta(days=4)
         # daily_score.py only scores upcoming earnings within a ~21-day window,
@@ -427,23 +469,25 @@ def main():
             tickers_needing_detail.setdefault(ev["ticker"], date.fromisoformat(ev["earnings_date"]))
 
     # Primary weekly.json points at the current week (back-compat for any old consumers).
-    write_to_public("weekly.json", json.dumps(week_payloads[this_monday], indent=2, default=str))
+    if not skip_weeks:
+        write_to_public("weekly.json", json.dumps(week_payloads[this_monday], indent=2, default=str))
 
     # Manifest of available weeks (used by the UI to render nav state).
-    manifest = {
-        "as_of_date": as_of_date.isoformat(),
-        "current_week": this_monday.isoformat(),
-        "weeks": [
-            {
-                "start": d.isoformat(),
-                "end": (d + timedelta(days=4)).isoformat(),
-                "offset": offset,
-                "count": len(week_payloads[d]["events"]),
-            }
-            for offset, d in ((off, this_monday + timedelta(days=7 * off)) for off in WEEK_OFFSETS)
-        ],
-    }
-    write_to_public("weeks/manifest.json", json.dumps(manifest, indent=2))
+    if not skip_weeks:
+        manifest = {
+            "as_of_date": as_of_date.isoformat(),
+            "current_week": this_monday.isoformat(),
+            "weeks": [
+                {
+                    "start": d.isoformat(),
+                    "end": (d + timedelta(days=4)).isoformat(),
+                    "offset": offset,
+                    "count": len(week_payloads[d]["events"]),
+                }
+                for offset, d in ((off, this_monday + timedelta(days=7 * off)) for off in WEEK_OFFSETS)
+            ],
+        }
+        write_to_public("weeks/manifest.json", json.dumps(manifest, indent=2))
 
     # Generate per-symbol detail: all tickers seen in any week + a curated popular list.
     popular = [
@@ -464,11 +508,32 @@ def main():
             tickers_needing_detail[ticker] = row[0] if row else None
 
     generated = 0
+    skipped_resume = 0
     total_details = len(tickers_needing_detail)
+    if args.resume:
+        print(
+            "⏭️  --resume: skipping any ticker whose symbols/{TICKER}.json already exists. "
+            "Files from previous runs stay — run without --resume for a full refresh.",
+            flush=True,
+        )
+
     print(f"📝 generating {total_details} symbol detail files", flush=True)
+    # Print every ticker so a segfault leaves the exact culprit on the last
+    # visible line. (Cheap — ~1000 lines over a 10-min run.)
     for i, (ticker, earn_dt) in enumerate(tickers_needing_detail.items(), 1):
-        if i % 50 == 0 or i == total_details:
-            print(f"  detail {i}/{total_details}: {ticker}", flush=True)
+        if args.resume and (PUBLIC_DIR / "symbols" / f"{ticker}.json").exists():
+            skipped_resume += 1
+            continue
+        print(f"  [{i}/{total_details}] {ticker}", flush=True)
+        # Recycle the DuckDB connection every 200 tickers to shed any
+        # accumulated query-plan memory that could push us toward a segfault.
+        if i > 1 and i % 200 == 0:
+            conn.close()
+            conn = duckdb.connect()
+            conn.execute("PRAGMA memory_limit='4GB'")
+            conn.execute("PRAGMA threads=4")
+            build_earnings_events_table(conn, EARNINGS_CSV)
+            create_duckdb_views(conn, DATA_DIR)
         try:
             detail = build_symbol_detail(conn, ticker, as_of_date, earn_dt, ml_lookup)
             if not detail:
@@ -493,7 +558,10 @@ def main():
         except Exception as e:
             print(f"  ⚠️  {ticker} detail: {e}")
 
-    print(f"✅ {len(week_payloads)} weeks written, {generated} symbol files")
+    print(
+        f"✅ {len(week_payloads)} weeks written, {generated} symbol files"
+        + (f", {skipped_resume} skipped (resume)" if skipped_resume else "")
+    )
     conn.close()
 
 
