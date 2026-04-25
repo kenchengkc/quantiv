@@ -290,8 +290,9 @@ export default function WatchlistPage() {
           return next;
         });
         const pending = json.pending ?? 0;
-        if (pending > 0 && attempt < 20) {
-          timer = setTimeout(() => poll(attempt + 1), 8_000);
+        if (pending > 0 && attempt < 30) {
+          const delay = attempt < 10 ? 2_000 : 8_000;
+          timer = setTimeout(() => poll(attempt + 1), delay);
         }
       } catch {
         /* ignore */

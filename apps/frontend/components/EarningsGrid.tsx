@@ -179,9 +179,7 @@ function TickerRow({
               letterSpacing: '0.01em',
             }}
           >
-            {arrow}{' '}
-            {change !== null ? `$${Math.abs(change).toFixed(2)} ` : ''}
-            ({Math.abs(changePct * 100).toFixed(2)}%)
+            {arrow} {Math.abs(changePct * 100).toFixed(2)}%
           </div>
         )}
       </div>
@@ -638,10 +636,11 @@ export default function EarningsGrid() {
           return next;
         });
         const pending = json.pending ?? 0;
-        if (pending > 0 && attempt < 20) {
-          // 8s between polls — matches the Finnhub warmup cadence reasonably
-          // well without spamming the API. Cap at 20 attempts (~2.5 min).
-          timer = setTimeout(() => poll(attempt + 1), 8_000);
+        if (pending > 0 && attempt < 30) {
+          // Aggressive early polling, back off after the first 10 attempts.
+          // 2s × 10 = 20s, then 8s × 20 = 160s. Total ~3 min cap.
+          const delay = attempt < 10 ? 2_000 : 8_000;
+          timer = setTimeout(() => poll(attempt + 1), delay);
         }
       } catch {
         /* ignore */
