@@ -25,8 +25,9 @@ export default {
           const res = await fetch(env.REFRESH_URL, {
             method: 'GET',
             headers: { Authorization: `Bearer ${env.CRON_SECRET}` },
-            // Worker-side timeout safety net. Vercel maxDuration caps it to 300s.
-            signal: AbortSignal.timeout(310_000),
+            // Worker-side timeout safety net. Vercel maxDuration is 60s for
+            // each invocation, so 70s gives us headroom without lingering.
+            signal: AbortSignal.timeout(70_000),
           });
           console.log(`refresh response: ${res.status}`);
           if (!res.ok) {
