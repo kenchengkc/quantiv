@@ -19,10 +19,13 @@ import sp500Constituents from '../../../../../../lib/data/sp500-constituents.jso
 //   - The Worker stays trivial — just a scheduled URL kick.
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 300; // seconds — ride the full Fluid Compute budget
+// 60s is the Hobby Fluid Compute ceiling. With 40 symbols × ~1.2s pacing we
+// finish in ~48s — comfortably under. Worker fires this every 1 min so total
+// throughput is ~50/min, matching Finnhub's rate limit.
+export const maxDuration = 60;
 
-const BATCH_SIZE = 300;
-const RATE_LIMIT_PER_MIN = 55;
+const BATCH_SIZE = 40;
+const RATE_LIMIT_PER_MIN = 50;     // 60/min Finnhub limit, leave 10/min headroom
 const STALE_TTL_S = 60 * 60;
 const CURSOR_KEY = 'quote:cursor';
 

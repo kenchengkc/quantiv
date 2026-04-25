@@ -2,10 +2,11 @@ name = "quantiv-refresh-prices"
 main = "src/index.ts"
 compatibility_date = "2026-04-25"
 
-# Free tier: 100k requests/day. We use 288/day (every 5 min). Easy fit.
-# Cron triggers fire on a real ~5 min cadence — no GitHub Actions throttling.
+# Free tier: 100k requests/day. We use 1440/day (every 1 min). Easy fit.
+# Each fire kicks the Vercel route which processes 40 symbols in ~48s,
+# safely under the 60s Hobby function timeout. Full hot-set cycle ≈ 22 min.
 [triggers]
-crons = ["*/5 * * * *"]
+crons = ["* * * * *"]
 
 # Vars set via `wrangler secret put` after deploy:
 #   - REFRESH_URL    e.g. https://usequantiv.com/api/cron/refresh-prices

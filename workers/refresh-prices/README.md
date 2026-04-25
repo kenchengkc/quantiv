@@ -1,16 +1,19 @@
 # Cloudflare Worker — refresh-prices cron
 
-Replaces the throttled GitHub Actions cron with a real 5-minute scheduler.
+Replaces the throttled GitHub Actions cron with a real 1-minute scheduler.
 
 ```
-Cloudflare Worker (cron */5)  →  Vercel /api/cron/refresh-prices
-                                  ↓
-                                  Upstash Redis (per-ticker quote cache)
-                                  Finnhub API (rate-limited 60/min)
+Cloudflare Worker (cron *)  →  Vercel /api/cron/refresh-prices
+                                ↓
+                                Upstash Redis (per-ticker quote cache)
+                                Finnhub API (rate-limited 60/min)
 ```
+
+Each fire processes 40 symbols in ~48s (under Vercel Hobby's 60s function
+timeout). Full hot-set cycle ≈ 22 min.
 
 The Worker is a 30-line stub that just `fetch()`'s the Vercel route every
-5 minutes with a Bearer token. All the actual refresh logic lives in
+minute with a Bearer token. All the actual refresh logic lives in
 [apps/frontend/app/api/cron/refresh-prices/route.ts](../../apps/frontend/app/api/cron/refresh-prices/route.ts).
 
 ## One-time setup (~10 min)
@@ -36,9 +39,9 @@ curl -H "Authorization: Bearer <your-secret>" \
   https://usequantiv.com/api/cron/refresh-prices
 ```
 
-Expected response: `{"universe":888,"batchSize":300,"cursor":0,"nextCursor":300,"fetched":300,"failed":0,"durationMs":325000}`
+Expected response: `{"universe":888,"batchSize":40,"cursor":0,"nextCursor":40,"fetched":40,"failed":0,"durationMs":48000}`
 
-(Takes ~5 min — Vercel pages 300 symbols at 55/min.)
+(Takes ~48s — Vercel pages 40 symbols at 50/min, comfortably under 60s timeout.)
 
 ### 3. Install + deploy the Worker
 
@@ -82,9 +85,9 @@ Commit + push.
 
 ## Cost
 
-- **Cloudflare Workers Free**: 100,000 req/day. Cron uses 288/day. ✓
-- **Vercel Hobby**: 100GB-hr/mo Fluid Compute. 288 invocations × ~5 min × 1 vCPU = ~24 GB-hr/mo. ✓
-- **Finnhub**: same 60/min rate limit as before; we still pace at 55/min. ✓
+- **Cloudflare Workers Free**: 100,000 req/day. Cron uses 1,440/day. ✓
+- **Vercel Hobby**: 100GB-hr/mo Fluid Compute. 1,440 invocations × ~48s × 1 vCPU ≈ 19 GB-hr/mo. ✓
+- **Finnhub**: 50/min pacing leaves 10/min headroom under the 60/min limit. ✓
 - **Total monthly cost: $0**
 
 ## Troubleshooting
