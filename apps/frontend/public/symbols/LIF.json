@@ -1,0 +1,109 @@
+{
+  "symbol": "LIF",
+  "as_of_date": "2026-04-24",
+  "spot_price": 45.0,
+  "expected_move": {
+    "earnings_date": "2026-05-11",
+    "expiration": "2026-05-15",
+    "dte": 21,
+    "lead_time_days": 17,
+    "atm_strike": 45.0,
+    "atm_iv": 0.993641,
+    "straddle_abs": 8.6,
+    "straddle_pct": 0.191111,
+    "iv_pct": 0.238338,
+    "skew_atm": -0.0138,
+    "term_slope": null,
+    "total_vega": 0.0849,
+    "em_ml_pct": 0.118753,
+    "em_ml_abs": 5.774959,
+    "correction_factor": 0.576471,
+    "model_horizon": 21,
+    "ml_snapshot_date": "2026-04-20",
+    "p10": 0.011736,
+    "p25": 0.038031,
+    "p50": 0.086066,
+    "p75": 0.152635,
+    "p90": 0.23368,
+    "em_method": "ml_lightgbm",
+    "timing": "unknown"
+  },
+  "straddle_features": [
+    {
+      "expiration": "2026-05-15",
+      "dte": 21,
+      "atm_strike": 45.0,
+      "atm_iv": 0.9936,
+      "atm_call_iv": 1.0005,
+      "atm_put_iv": 0.9867,
+      "straddle_mid": 8.6,
+      "em_straddle": 8.6,
+      "em_straddle_pct": 0.191111,
+      "em_iv": 10.724753,
+      "em_iv_pct": 0.238328,
+      "call_delta": 0.5435,
+      "call_gamma": 0.0381,
+      "call_vega": 0.0427,
+      "call_theta": -0.1198
+    },
+    {
+      "expiration": "2026-06-18",
+      "dte": 55,
+      "atm_strike": 50.0,
+      "atm_iv": 0.8036,
+      "atm_call_iv": 0.7816,
+      "atm_put_iv": 0.8256,
+      "straddle_mid": 12.55,
+      "em_straddle": 12.55,
+      "em_straddle_pct": 0.278889,
+      "em_iv": 14.037422,
+      "em_iv_pct": 0.311943,
+      "call_delta": 0.4488,
+      "call_gamma": 0.0304,
+      "call_vega": 0.0692,
+      "call_theta": -0.0611
+    }
+  ],
+  "earnings_history": [
+    {
+      "date": "2026-05-11",
+      "timing": "unknown"
+    },
+    {
+      "date": "2026-03-02",
+      "timing": "after_market_close"
+    },
+    {
+      "date": "2025-11-11",
+      "timing": "unknown"
+    },
+    {
+      "date": "2025-08-14",
+      "timing": "unknown"
+    },
+    {
+      "date": "2025-02-27",
+      "timing": "after_market_close"
+    },
+    {
+      "date": "2024-11-14",
+      "timing": "unknown"
+    },
+    {
+      "date": "2024-08-08",
+      "timing": "after_market_close"
+    }
+  ],
+  "next_earnings": "2026-05-11",
+  "vol_regime": {
+    "iv_current": 0.8143,
+    "iv_rank": 0.684417,
+    "iv_year_high": 1.0235,
+    "iv_year_low": 0.3606,
+    "hv_current": 0.7101,
+    "hv_rank": 0.191198,
+    "iv_mom_week": -0.055,
+    "iv_mom_month": null
+  },
+  "next_earnings_timing": "unknown"
+}
