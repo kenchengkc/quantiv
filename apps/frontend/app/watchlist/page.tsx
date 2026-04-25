@@ -387,8 +387,11 @@ export default function WatchlistPage() {
             const timing = timingText(em?.timing ?? sum?.next_earnings_timing);
             const dte = daysFromToday(earningsIso);
             const tick = live[t];
+            const tickPctR = tick ? Math.round((tick.changePct ?? 0) * 10000) / 10000 : null;
+            const tickChgR = tick ? Math.round((tick.change ?? 0) * 100) / 100 : null;
+            const tickFlat = tickPctR === 0 && (tickChgR === null || tickChgR === 0);
             const spot = sum?.spot_price ?? null;
-            const up = (tick?.changePct ?? 0) >= 0;
+            const up = !tickFlat && (tick?.changePct ?? 0) >= 0;
             const isDragging = dragIdx === i;
             const isOver = overIdx === i && dragIdx !== null && dragIdx !== i;
 
@@ -496,11 +499,13 @@ export default function WatchlistPage() {
                       className="mono tnum"
                       style={{
                         fontSize: 11,
-                        color: up ? 'var(--up)' : 'var(--down)',
+                        color: tickFlat ? 'var(--ink-4)' : up ? 'var(--up)' : 'var(--down)',
                         marginTop: 2,
                       }}
                     >
-                      {up ? '▲' : '▼'} {Math.abs(tick.changePct * 100).toFixed(2)}%
+                      {tickFlat ? '–' : up ? '▲' : '▼'}{' '}
+                      {tick.change !== null ? `$${Math.abs(tick.change).toFixed(2)} ` : ''}
+                      ({Math.abs(tick.changePct * 100).toFixed(2)}%)
                     </div>
                   )}
                 </div>

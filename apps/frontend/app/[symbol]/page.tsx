@@ -1228,7 +1228,13 @@ export default function SymbolPage() {
   const spot = livePrice ?? data.spot_price ?? 0;
   const change = live?.change ?? 0;
   const changePct = live?.changePct ?? 0;
-  const up = change >= 0;
+  // Flat = literally no move at display precision. Don't paint a green/red
+  // arrow when the underlying value is just float noise around zero.
+  const flat = Math.round(change * 100) / 100 === 0
+    && Math.round(changePct * 10000) / 10000 === 0;
+  const up = !flat && change >= 0;
+  const moveArrow = flat ? '–' : up ? '▲' : '▼';
+  const moveColor = flat ? 'var(--ink-4)' : up ? 'var(--up)' : 'var(--down)';
 
   const straddlePct = em?.straddle_pct ?? 0;
   const ivPct = em?.iv_pct ?? straddlePct;
@@ -1342,9 +1348,9 @@ export default function SymbolPage() {
               {live && live.change !== null && (
                 <span
                   className="mono tnum"
-                  style={{ fontSize: 13, color: up ? 'var(--up)' : 'var(--down)' }}
+                  style={{ fontSize: 13, color: moveColor }}
                 >
-                  {up ? '▲' : '▼'} {Math.abs(change).toFixed(2)} (
+                  {moveArrow} {Math.abs(change).toFixed(2)} (
                   {(Math.abs(changePct) * 100).toFixed(2)}%)
                 </span>
               )}
