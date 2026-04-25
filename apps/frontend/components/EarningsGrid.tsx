@@ -609,21 +609,17 @@ export default function EarningsGrid() {
     let timer: ReturnType<typeof setTimeout> | null = null;
     const symbols = Array.from(new Set(data.events.map((e) => e.ticker))).slice(0, 200);
 
-    // Poll live prices until every ticker has a value, then back off. First
-    // request triggers server-side background fetches for any Redis miss;
-    // subsequent polls catch them as they land.
-    const poll = async (attempt = 0) => {
-      if (cancelled) return;
+    const fetchOnce = async (): Promise<number> => {
       try {
         const res = await fetch(`/api/stocks/batch-price?symbols=${symbols.join(',')}`, {
           cache: 'no-store',
         });
-        if (!res.ok) return;
+        if (!res.ok) return 0;
         const json = (await res.json()) as {
           pending?: number;
           data: { symbol: string; price: number | null; change: number | null; changePct: number | null }[];
         };
-        if (cancelled) return;
+        if (cancelled) return 0;
         setLive((prev) => {
           const next: LiveMap = { ...prev };
           for (const t of json.data) {
@@ -635,22 +631,50 @@ export default function EarningsGrid() {
           }
           return next;
         });
-        const pending = json.pending ?? 0;
-        if (pending > 0 && attempt < 30) {
-          // Aggressive early polling, back off after the first 10 attempts.
-          // 2s × 10 = 20s, then 8s × 20 = 160s. Total ~3 min cap.
-          const delay = attempt < 10 ? 2_000 : 8_000;
-          timer = setTimeout(() => poll(attempt + 1), delay);
-        }
+        return json.pending ?? 0;
       } catch {
-        /* ignore */
+        return 0;
       }
     };
-    poll();
+
+    // Phase 1: aggressive polling until the first paint is fully populated.
+    const fastPoll = async (attempt = 0) => {
+      if (cancelled) return;
+      const pending = await fetchOnce();
+      if (pending > 0 && attempt < 30) {
+        const delay = attempt < 10 ? 2_000 : 8_000;
+        timer = setTimeout(() => fastPoll(attempt + 1), delay);
+      } else {
+        // Phase 2: slow background refresh forever, so the dashboard stays
+        // in sync with the cron's rotating updates and any prices that
+        // landed while the user was on a ticker page.
+        const slowLoop = () => {
+          if (cancelled) return;
+          timer = setTimeout(async () => {
+            await fetchOnce();
+            slowLoop();
+          }, 30_000);
+        };
+        slowLoop();
+      }
+    };
+    fastPoll();
+
+    // Re-poll immediately when the tab regains focus — covers the
+    // "I clicked into a ticker, came back, dashboard is stale" case.
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && !cancelled) {
+        fetchOnce();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
 
     return () => {
       cancelled = true;
       if (timer) clearTimeout(timer);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
     };
   }, [data]);
 

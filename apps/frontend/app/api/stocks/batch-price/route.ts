@@ -10,7 +10,11 @@ export const revalidate = 0;
 // then serves from cache until the next expiry. Cold loads are capped by
 // CONCURRENCY to avoid tripping the rate limit on first paint.
 const FRESH_TTL_MS = 60_000;
-const STALE_TTL_MS = 5 * 60_000;
+// Persist last-known prices for a full day. The cron rotates the hot set
+// every ~22 min so active symbols are never close to this limit; the long
+// TTL just keeps the UI showing *something* for symbols that briefly fall
+// off rotation (e.g. between weeks rolling over).
+const STALE_TTL_MS = 24 * 60 * 60_000;
 const CONCURRENCY = 10;
 
 type Tick = {
