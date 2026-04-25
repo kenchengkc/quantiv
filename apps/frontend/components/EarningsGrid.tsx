@@ -117,7 +117,15 @@ function TickerRow({
 }) {
   const movePct = ev.em_straddle_pct ?? ev.em_iv_pct ?? null;
   const changePct = live?.changePct ?? null;
-  const up = (changePct ?? 0) >= 0;
+  const change = live?.change ?? null;
+  // Round to display precision before deciding flat — avoids "−0.00 (-0.00%)"
+  // showing as a down move because the underlying float was -1e-5.
+  const pctRounded = changePct !== null ? Math.round(changePct * 10000) / 10000 : null;
+  const dollarRounded = change !== null ? Math.round(change * 100) / 100 : null;
+  const flat = pctRounded === 0 && (dollarRounded === null || dollarRounded === 0);
+  const up = !flat && (changePct ?? 0) >= 0;
+  const arrow = flat ? '–' : up ? '▲' : '▼';
+  const color = flat ? 'var(--ink-4)' : up ? 'var(--up)' : 'var(--down)';
   return (
     <Link
       href={`/${ev.ticker}`}
@@ -166,12 +174,14 @@ function TickerRow({
             className="mono tnum"
             style={{
               fontSize: 10,
-              color: up ? 'var(--up)' : 'var(--down)',
+              color,
               marginTop: 2,
               letterSpacing: '0.01em',
             }}
           >
-            {up ? '▲' : '▼'} {Math.abs(changePct * 100).toFixed(2)}%
+            {arrow}{' '}
+            {change !== null ? `$${Math.abs(change).toFixed(2)} ` : ''}
+            ({Math.abs(changePct * 100).toFixed(2)}%)
           </div>
         )}
       </div>
