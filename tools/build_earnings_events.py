@@ -113,10 +113,42 @@ def create_duckdb_views(conn: duckdb.DuckDBPyConnection, data_dir: Path):
         )
     """)
     
-    # (Historical note: a v_volatility_history view used to be created here
-    # from data/parquet/volatility_history/. It's now built by
-    # scripts/setup_duckdb_from_parquet.py as v_volhist_norm / v_volhist on
-    # the persistent DB, and nothing in the frontend pipeline consumes it.)
+    # v_volhist — per-ticker per-day HV/IV snapshots. Used downstream to
+    # compute IV Rank and vol-momentum stats on the ticker detail page.
+    # Empty stub when parquet missing so LEFT JOINs still resolve.
+    vol_root = data_dir / "parquet" / "volatility_history"
+    if vol_root.exists() and any(vol_root.glob("year=*/month=*/*.parquet")):
+        vol_glob = str(vol_root / "year=*" / "month=*" / "*.parquet")
+        conn.execute(f"""
+            CREATE OR REPLACE VIEW v_volhist AS
+            SELECT
+                CAST(date AS DATE) AS date,
+                act_symbol,
+                CAST(hv_current   AS DOUBLE) AS hv_current,
+                CAST(hv_week_ago  AS DOUBLE) AS hv_week_ago,
+                CAST(hv_month_ago AS DOUBLE) AS hv_month_ago,
+                CAST(hv_year_high AS DOUBLE) AS hv_year_high,
+                CAST(hv_year_low  AS DOUBLE) AS hv_year_low,
+                CAST(iv_current   AS DOUBLE) AS iv_current,
+                CAST(iv_week_ago  AS DOUBLE) AS iv_week_ago,
+                CAST(iv_month_ago AS DOUBLE) AS iv_month_ago,
+                CAST(iv_year_high AS DOUBLE) AS iv_year_high,
+                CAST(iv_year_low  AS DOUBLE) AS iv_year_low
+            FROM read_parquet('{vol_glob}')
+        """)
+        print("✅ Created v_volhist view")
+    else:
+        conn.execute("""
+            CREATE OR REPLACE VIEW v_volhist AS
+            SELECT NULL::DATE AS date, NULL::VARCHAR AS act_symbol,
+                   NULL::DOUBLE AS hv_current, NULL::DOUBLE AS hv_week_ago,
+                   NULL::DOUBLE AS hv_month_ago, NULL::DOUBLE AS hv_year_high,
+                   NULL::DOUBLE AS hv_year_low,
+                   NULL::DOUBLE AS iv_current, NULL::DOUBLE AS iv_week_ago,
+                   NULL::DOUBLE AS iv_month_ago, NULL::DOUBLE AS iv_year_high,
+                   NULL::DOUBLE AS iv_year_low
+            WHERE 1=0
+        """)
 
     # ATM helper view - finds ATM strikes for each ticker/date/expiry combination
     conn.execute("""

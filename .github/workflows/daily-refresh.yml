@@ -78,6 +78,9 @@ jobs:
       - name: Sync OHLCV
         run: python scripts/sync_dolthub.py --ohlcv
 
+      - name: Sync volatility history
+        run: python scripts/sync_dolthub.py --volhist
+
       - name: Push updated data to R2
         env:
           R2_BUCKET: ${{ secrets.R2_BUCKET }}
@@ -85,6 +88,12 @@ jobs:
 
       - name: Rebuild DuckDB views
         run: python scripts/setup_duckdb_from_parquet.py
+
+      - name: Gate — verify data freshness before scoring
+        # Fails the workflow if any core view is empty, too stale, or has
+        # duplicate rows. Prevents pushing a bad weekly.json to prod when
+        # an upstream sync silently broke.
+        run: python scripts/check_duckdb_freshness.py --strict --max-lag-days 5
 
       - name: Score upcoming earnings
         run: python scripts/daily_score.py --days-ahead 21
