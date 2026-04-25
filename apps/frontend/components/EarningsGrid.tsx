@@ -607,7 +607,10 @@ export default function EarningsGrid() {
     if (!data || data.events.length === 0) return;
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
-    const symbols = Array.from(new Set(data.events.map((e) => e.ticker))).slice(0, 200);
+    // No cap — MGET handles hundreds of symbols in a single round-trip.
+    // The 200 cap was a leftover from per-symbol GETs that's now only a
+    // bug: the busy days at the back of the week were dropped.
+    const symbols = Array.from(new Set(data.events.map((e) => e.ticker)));
 
     const fetchOnce = async (): Promise<number> => {
       try {
