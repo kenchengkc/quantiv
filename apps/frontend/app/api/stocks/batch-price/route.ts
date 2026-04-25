@@ -27,23 +27,6 @@ const inflight = new Map<string, Promise<Tick | null>>();
 
 const redisKey = (symbol: string) => `quote:${symbol}`;
 
-async function readCache(symbol: string): Promise<Cached | null> {
-  const mem = memCache.get(symbol);
-  if (mem) return mem;
-  const redis = getRedis();
-  if (!redis) return null;
-  try {
-    const raw = await redis.get<Cached>(redisKey(symbol));
-    if (raw) {
-      memCache.set(symbol, raw);
-      return raw;
-    }
-  } catch {
-    /* ignore */
-  }
-  return null;
-}
-
 // Batched cache read — one Upstash MGET round-trip for the whole symbol list
 // instead of N individual GETs. For 200 symbols this drops latency from
 // ~6 s to ~80 ms whenever Redis is warm. Falls back to memCache for any

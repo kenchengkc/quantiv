@@ -1,0 +1,12 @@
+name = "quantiv-refresh-prices"
+main = "src/index.ts"
+compatibility_date = "2026-04-25"
+
+# Free tier: 100k requests/day. We use 288/day (every 5 min). Easy fit.
+# Cron triggers fire on a real ~5 min cadence — no GitHub Actions throttling.
+[triggers]
+crons = ["*/5 * * * *"]
+
+# Vars set via `wrangler secret put` after deploy:
+#   - REFRESH_URL    e.g. https://usequantiv.com/api/cron/refresh-prices
+#   - CRON_SECRET    matching the value set in Vercel env
