@@ -524,6 +524,123 @@ def sync_ohlcv(start_date_str: Optional[str] = None, end_date_str: Optional[str]
 
 
 # ---------------------------------------------------------------------------
+# Volatility history sync (post-no-preference/options/volatility_history)
+# ---------------------------------------------------------------------------
+# Moderate-size table: one row per (act_symbol, date). Lives in the *options*
+# repo, not stocks. Paginated per-date via keyset on act_symbol.
+VOLHIST_SCHEMA = pa.schema([
+    ("date", pa.date32()),
+    ("act_symbol", pa.string()),
+    ("hv_current", pa.float64()),
+    ("hv_week_ago", pa.float64()),
+    ("hv_month_ago", pa.float64()),
+    ("hv_year_high", pa.float64()),
+    ("hv_year_high_date", pa.date32()),
+    ("hv_year_low", pa.float64()),
+    ("hv_year_low_date", pa.date32()),
+    ("iv_current", pa.float64()),
+    ("iv_week_ago", pa.float64()),
+    ("iv_month_ago", pa.float64()),
+    ("iv_year_high", pa.float64()),
+    ("iv_year_high_date", pa.date32()),
+    ("iv_year_low", pa.float64()),
+    ("iv_year_low_date", pa.date32()),
+])
+
+
+def sync_volhist(start_date_str: Optional[str] = None, end_date_str: Optional[str] = None,
+                 days: int = 30, full: bool = False):
+    """Sync volatility_history from DoltHub → Parquet.
+
+    Keyed on (act_symbol, date). One row per symbol per day containing current
+    HV/IV plus week/month/year-ago snapshots. Used downstream to compute
+    IV Rank and vol-momentum features.
+    """
+    print(f"{'='*60}\nVOLATILITY HISTORY SYNC\n{'='*60}")
+
+    volhist_root = data_dir() / "parquet" / "volatility_history"
+    volhist_root.mkdir(parents=True, exist_ok=True)
+    meta = load_meta()
+
+    if full:
+        rows_min = query("SELECT date FROM volatility_history ORDER BY date ASC LIMIT 1", OPTIONS_API)
+        rows_max = query("SELECT date FROM volatility_history ORDER BY date DESC LIMIT 1", OPTIONS_API)
+        start = date.fromisoformat(start_date_str) if start_date_str else date.fromisoformat(rows_min[0]["date"])
+        end = date.fromisoformat(end_date_str) if end_date_str else date.fromisoformat(rows_max[0]["date"])
+    else:
+        rows_max = query("SELECT date FROM volatility_history ORDER BY date DESC LIMIT 1", OPTIONS_API)
+        end = date.fromisoformat(rows_max[0]["date"])
+        last = meta.get("last_volhist_date")
+        if last:
+            start = date.fromisoformat(last) + timedelta(days=1)
+        else:
+            start = end - timedelta(days=days)
+
+    if start > end:
+        print(f"Already up to date (synced through {meta.get('last_volhist_date')})")
+        return
+
+    dates = trading_dates(start, end)
+    print(f"Syncing {len(dates)} trading days: {start} → {end}\n")
+
+    cols = (
+        "date, act_symbol, hv_current, hv_week_ago, hv_month_ago, "
+        "hv_year_high, hv_year_high_date, hv_year_low, hv_year_low_date, "
+        "iv_current, iv_week_ago, iv_month_ago, "
+        "iv_year_high, iv_year_high_date, iv_year_low, iv_year_low_date"
+    )
+
+    total = 0
+    for i, d in enumerate(dates):
+        ds = d.isoformat()
+        out_dir = volhist_root / f"year={d.year}" / f"month={d.month:02d}"
+        out_path = out_dir / f"{ds}.parquet"
+        if out_path.exists():
+            continue
+
+        all_rows: list[dict] = []
+        last_sym = ""
+        while True:
+            sql = (
+                f"SELECT {cols} FROM volatility_history "
+                f"WHERE date = '{ds}' AND act_symbol > '{last_sym}' "
+                f"ORDER BY act_symbol LIMIT {ROW_LIMIT}"
+            )
+            rows = query(sql, OPTIONS_API)
+            if not rows:
+                break
+            all_rows.extend(rows)
+            if len(rows) < ROW_LIMIT:
+                break
+            last_sym = rows[-1]["act_symbol"]
+            time.sleep(API_DELAY)
+
+        if not all_rows:
+            continue
+
+        df = pd.DataFrame(all_rows)
+        # Coerce types
+        for c in ["hv_current", "hv_week_ago", "hv_month_ago", "hv_year_high", "hv_year_low",
+                  "iv_current", "iv_week_ago", "iv_month_ago", "iv_year_high", "iv_year_low"]:
+            df[c] = pd.to_numeric(df[c], errors="coerce")
+        for c in ["date", "hv_year_high_date", "hv_year_low_date",
+                  "iv_year_high_date", "iv_year_low_date"]:
+            df[c] = pd.to_datetime(df[c], errors="coerce").dt.date
+
+        out_dir.mkdir(parents=True, exist_ok=True)
+        table = pa.Table.from_pandas(df, schema=VOLHIST_SCHEMA, preserve_index=False)
+        pq.write_table(table, out_path, compression="snappy")
+        total += len(df)
+        print(f"  [{i+1}/{len(dates)}] {ds} — {len(df):,} rows", flush=True)
+        time.sleep(API_DELAY)
+
+    meta["last_volhist_date"] = end.isoformat()
+    meta["last_volhist_sync_time"] = datetime.now().isoformat()
+    save_meta(meta)
+    print(f"\n✅ Volatility history sync complete: {total:,} rows written to {volhist_root}")
+
+
+# ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 def main():
@@ -538,6 +655,8 @@ def main():
     parser.add_argument("--force", action="store_true", help="Re-download even if Parquet exists")
     parser.add_argument("--earnings", action="store_true", help="Sync earnings calendar")
     parser.add_argument("--ohlcv", action="store_true", help="Sync OHLCV stock prices")
+    parser.add_argument("--volhist", action="store_true",
+                        help="Sync volatility history (HV/IV current + week/month/year snapshots)")
 
     args = parser.parse_args()
 
@@ -547,6 +666,10 @@ def main():
 
     if args.ohlcv:
         sync_ohlcv(args.start_date, args.end_date, args.days, args.full)
+        return
+
+    if args.volhist:
+        sync_volhist(args.start_date, args.end_date, args.days, args.full)
         return
 
     print(f"Parquet root: {parquet_root()}\n")

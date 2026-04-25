@@ -82,6 +82,44 @@ def connect_duckdb() -> duckdb.DuckDBPyConnection:
                    NULL::DOUBLE AS volume_ratio_20d, NULL::DOUBLE AS drift_5d
             WHERE 1=0
         """)
+    # v_volhist — daily HV/IV snapshots (current + week/month/year-ago) joined
+    # per (snapshot_date, act_symbol) to give vol-regime context features.
+    # Empty stub when the parquet tree isn't present so LEFT JOINs still work.
+    if "v_volhist" not in views:
+        data_root = get_data_dir()
+        volhist_glob = str(data_root / "parquet" / "volatility_history" / "year=*" / "month=*" / "*.parquet")
+        import glob as _glob
+        if _glob.glob(volhist_glob):
+            conn.execute(f"""
+                CREATE OR REPLACE VIEW v_volhist AS
+                SELECT
+                    CAST(date AS DATE) AS date,
+                    act_symbol,
+                    CAST(hv_current     AS DOUBLE) AS hv_current,
+                    CAST(hv_week_ago    AS DOUBLE) AS hv_week_ago,
+                    CAST(hv_month_ago   AS DOUBLE) AS hv_month_ago,
+                    CAST(hv_year_high   AS DOUBLE) AS hv_year_high,
+                    CAST(hv_year_low    AS DOUBLE) AS hv_year_low,
+                    CAST(iv_current     AS DOUBLE) AS iv_current,
+                    CAST(iv_week_ago    AS DOUBLE) AS iv_week_ago,
+                    CAST(iv_month_ago   AS DOUBLE) AS iv_month_ago,
+                    CAST(iv_year_high   AS DOUBLE) AS iv_year_high,
+                    CAST(iv_year_low    AS DOUBLE) AS iv_year_low
+                FROM read_parquet('{volhist_glob}')
+            """)
+        else:
+            logger.warning("v_volhist parquet not found — vol-history features will be NULL")
+            conn.execute("""
+                CREATE OR REPLACE VIEW v_volhist AS
+                SELECT NULL::DATE AS date, NULL::VARCHAR AS act_symbol,
+                       NULL::DOUBLE AS hv_current, NULL::DOUBLE AS hv_week_ago,
+                       NULL::DOUBLE AS hv_month_ago, NULL::DOUBLE AS hv_year_high,
+                       NULL::DOUBLE AS hv_year_low,
+                       NULL::DOUBLE AS iv_current, NULL::DOUBLE AS iv_week_ago,
+                       NULL::DOUBLE AS iv_month_ago, NULL::DOUBLE AS iv_year_high,
+                       NULL::DOUBLE AS iv_year_low
+                WHERE 1=0
+            """)
     return conn
 
 
@@ -375,6 +413,20 @@ def extract_training_data(conn: duckdb.DuckDBPyConnection,
                  ELSE NULL
             END AS hist_straddle_accuracy,
 
+            -- Volatility regime (from v_volhist; NULL pre-2019 or where missing)
+            CASE
+                WHEN vh.iv_year_high > vh.iv_year_low
+                THEN (vh.iv_current - vh.iv_year_low) / NULLIF(vh.iv_year_high - vh.iv_year_low, 0)
+                ELSE NULL
+            END AS iv_rank,
+            CASE
+                WHEN vh.hv_year_high > vh.hv_year_low
+                THEN (vh.hv_current - vh.hv_year_low) / NULLIF(vh.hv_year_high - vh.hv_year_low, 0)
+                ELSE NULL
+            END AS hv_rank,
+            (vh.iv_current - vh.iv_week_ago)  AS iv_mom_week,
+            (vh.iv_current - vh.iv_month_ago) AS iv_mom_month,
+
             -- Target
             r.realized_move_pct,
             r.realized_source
@@ -396,6 +448,9 @@ def extract_training_data(conn: duckdb.DuckDBPyConnection,
         LEFT JOIN trailing_stats ts
             ON ts.act_symbol = e.act_symbol
             AND ts.earnings_date = e.earnings_date
+        LEFT JOIN v_volhist vh
+            ON vh.act_symbol = sf.act_symbol
+            AND vh.date = sf.date
         WHERE sf.atm_iv > 0 AND sf.atm_strike > 0
     )
 
@@ -438,6 +493,8 @@ def extract_training_data(conn: duckdb.DuckDBPyConnection,
             "hist_move_avg_4q", "hist_move_med_4q", "hist_move_std_4q",
             "hist_move_avg_8q", "hist_move_med_8q", "hist_event_count",
             "hist_straddle_accuracy",
+            # Vol regime (from v_volhist — NULL if volatility_history parquet absent)
+            "iv_rank", "hv_rank", "iv_mom_week", "iv_mom_month",
         ]
 
         hdf["log_spot"] = np.log(hdf["spot_price"].clip(lower=1))
