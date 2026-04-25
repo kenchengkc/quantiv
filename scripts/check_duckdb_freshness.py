@@ -8,9 +8,19 @@ spot gaps.
 
 Usage:
   .venv/bin/python3 scripts/check_duckdb_freshness.py
+  .venv/bin/python3 scripts/check_duckdb_freshness.py --strict
+
+With --strict, the script exits non-zero if any of the following:
+  - Any required view is empty or missing
+  - Options / OHLCV max date is more than --max-lag-days behind today
+    (default 5 — covers a long weekend + DoltHub lag)
+  - Any duplicates detected in the last 30 days
 """
 
+import argparse
 import os
+import sys
+from datetime import date, timedelta
 from pathlib import Path
 
 import duckdb
@@ -22,17 +32,39 @@ DB_PATH = os.getenv(
 
 
 def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--strict", action="store_true",
+                    help="Exit non-zero on any freshness/integrity problem")
+    ap.add_argument("--max-lag-days", type=int, default=5,
+                    help="In --strict mode, fail if options/ohlcv max date is older than this many days")
+    args = ap.parse_args()
+
     conn = duckdb.connect(DB_PATH, read_only=True)
+    problems: list[str] = []
 
     print(f"DuckDB: {DB_PATH}\n")
+
+    today = date.today()
+    lag_views = {"v_options", "v_ohlcv"}  # must be recent
+    required_views = {"v_options", "v_ohlcv", "v_earnings"}  # must exist + have rows
 
     print("=== view range + row count ===")
     for v in ("v_options", "v_ohlcv", "v_earnings"):
         try:
             r = conn.execute(f"SELECT MIN(date), MAX(date), COUNT(*) FROM {v}").fetchone()
             print(f"  {v:12s} {r[0]} → {r[1]}   {r[2]:>12,} rows")
+            if v in required_views and (r[2] or 0) == 0:
+                problems.append(f"{v} is empty")
+            if v in lag_views and r[1] is not None:
+                lag = (today - r[1]).days
+                if lag > args.max_lag_days:
+                    problems.append(
+                        f"{v} max date {r[1]} is {lag} days behind today "
+                        f"(limit {args.max_lag_days})"
+                    )
         except Exception as e:
             print(f"  {v:12s} ERROR: {e}")
+            problems.append(f"{v} query failed: {e}")
 
     for label, sql in (
         (
@@ -95,6 +127,7 @@ def main() -> None:
         print("  v_options:    DUPLICATES FOUND")
         for d, total, uniq in options_dups:
             print(f"    {d}  {total:,} rows vs {uniq:,} unique keys ({total/uniq:.2f}x)")
+        problems.append(f"v_options has duplicates on {len(options_dups)} day(s)")
 
     ohlcv_dups = conn.execute(
         """
@@ -112,6 +145,15 @@ def main() -> None:
         print("  v_ohlcv:      DUPLICATES FOUND")
         for d, total, uniq in ohlcv_dups:
             print(f"    {d}  {total:,} rows vs {uniq:,} unique symbols ({total/uniq:.2f}x)")
+        problems.append(f"v_ohlcv has duplicates on {len(ohlcv_dups)} day(s)")
+
+    if args.strict and problems:
+        print("\n❌ strict mode: freshness check failed")
+        for p in problems:
+            print(f"   - {p}")
+        sys.exit(1)
+    if args.strict:
+        print("\n✅ strict mode: all checks passed")
 
 
 if __name__ == "__main__":

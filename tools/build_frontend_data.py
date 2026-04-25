@@ -287,6 +287,41 @@ def build_symbol_detail(conn, ticker: str, as_of_date: date, earnings_dt: date |
             "iv_pct": near["em_iv_pct"],
         }
 
+    # Pull volatility-regime snapshot for the current as-of date. May not exist
+    # for every ticker (coverage depends on volatility_history parquet).
+    vol_regime = None
+    try:
+        vh = conn.execute(
+            """
+            SELECT iv_current, iv_year_high, iv_year_low,
+                   hv_current, hv_year_high, hv_year_low,
+                   iv_week_ago, iv_month_ago
+            FROM v_volhist
+            WHERE act_symbol = ? AND date = ?
+            LIMIT 1
+            """,
+            [ticker, as_of_date],
+        ).fetchone()
+        if vh:
+            iv_c, iv_hi, iv_lo, hv_c, hv_hi, hv_lo, iv_wk, iv_mo = vh
+            def _rank(cur, hi, lo):
+                if cur is None or hi is None or lo is None or hi <= lo:
+                    return None
+                return max(0.0, min(1.0, (cur - lo) / (hi - lo)))
+            vol_regime = {
+                "iv_current": jsonable(iv_c),
+                "iv_rank":    jsonable(_rank(iv_c, iv_hi, iv_lo)),
+                "iv_year_high": jsonable(iv_hi),
+                "iv_year_low":  jsonable(iv_lo),
+                "hv_current": jsonable(hv_c),
+                "hv_rank":    jsonable(_rank(hv_c, hv_hi, hv_lo)),
+                "iv_mom_week":  jsonable((iv_c - iv_wk) if (iv_c is not None and iv_wk is not None) else None),
+                "iv_mom_month": jsonable((iv_c - iv_mo) if (iv_c is not None and iv_mo is not None) else None),
+            }
+    except Exception:
+        # v_volhist may not exist if volatility_history parquet hasn't been synced yet
+        pass
+
     return {
         "symbol": ticker,
         "as_of_date": as_of_date.isoformat(),
@@ -297,6 +332,7 @@ def build_symbol_detail(conn, ticker: str, as_of_date: date, earnings_dt: date |
             {"date": d.isoformat(), "timing": t} for d, t in history
         ],
         "next_earnings": earnings_dt.isoformat() if earnings_dt else None,
+        "vol_regime": vol_regime,
     }
 
 

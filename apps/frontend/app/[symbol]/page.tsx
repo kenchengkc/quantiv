@@ -51,6 +51,17 @@ interface ExpectedMove {
   p90?: number | null;
 }
 
+interface VolRegime {
+  iv_current: number | null;
+  iv_rank: number | null;
+  iv_year_high: number | null;
+  iv_year_low: number | null;
+  hv_current: number | null;
+  hv_rank: number | null;
+  iv_mom_week: number | null;
+  iv_mom_month: number | null;
+}
+
 interface SymbolDetail {
   symbol: string;
   as_of_date: string;
@@ -60,6 +71,7 @@ interface SymbolDetail {
   earnings_history?: Array<{ date: string; timing: string }>;
   next_earnings?: string | null;
   next_earnings_timing?: string;
+  vol_regime?: VolRegime | null;
 }
 
 interface LivePrice {
@@ -1562,7 +1574,7 @@ export default function SymbolPage() {
         <section
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(4, 1fr)',
+            gridTemplateColumns: `repeat(${data.vol_regime?.iv_rank != null ? 5 : 4}, 1fr)`,
             borderBottom: '1px solid var(--line)',
             columnGap: 24,
           }}
@@ -1576,6 +1588,17 @@ export default function SymbolPage() {
                 : undefined
             }
           />
+          {data.vol_regime?.iv_rank != null && (
+            <Stat
+              label="IV Rank"
+              value={`${Math.round(data.vol_regime.iv_rank * 100)}`}
+              sub={
+                data.vol_regime.iv_year_low != null && data.vol_regime.iv_year_high != null
+                  ? `52w ${(data.vol_regime.iv_year_low * 100).toFixed(0)}–${(data.vol_regime.iv_year_high * 100).toFixed(0)}%`
+                  : undefined
+              }
+            />
+          )}
           <Stat
             label="IV-based EM"
             value={em.iv_pct !== null ? `±${(em.iv_pct * 100).toFixed(1)}%` : '—'}
