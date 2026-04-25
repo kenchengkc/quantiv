@@ -150,7 +150,7 @@ export async function GET(req: NextRequest) {
         .map((s) => s.trim().toUpperCase())
         .filter((s) => /^[A-Z][A-Z.\-]{0,9}$/.test(s)),
     ),
-  ).slice(0, 200);
+  ).slice(0, 1000);   // generous ceiling — MGET + filter regex are O(n), nothing slow about it
 
   if (symbols.length === 0) {
     return NextResponse.json({ error: 'symbols required' }, { status: 400 });
