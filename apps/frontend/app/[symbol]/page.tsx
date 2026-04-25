@@ -1597,7 +1597,7 @@ export default function SymbolPage() {
           {data.vol_regime?.iv_rank != null && (
             <Stat
               label="IV Rank"
-              value={`${Math.round(data.vol_regime.iv_rank * 100)}`}
+              value={`${Math.round(data.vol_regime.iv_rank * 100)}%`}
               sub={
                 data.vol_regime.iv_year_low != null && data.vol_regime.iv_year_high != null
                   ? `52w ${(data.vol_regime.iv_year_low * 100).toFixed(0)}–${(data.vol_regime.iv_year_high * 100).toFixed(0)}%`
