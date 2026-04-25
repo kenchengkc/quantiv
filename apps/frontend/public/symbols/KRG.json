@@ -1,29 +1,29 @@
 {
   "symbol": "KRG",
-  "as_of_date": "2026-04-23",
+  "as_of_date": "2026-04-24",
   "spot_price": 25.0,
   "expected_move": {
     "earnings_date": "2026-04-29",
     "expiration": "2026-05-15",
-    "dte": 22,
-    "lead_time_days": 6,
+    "dte": 21,
+    "lead_time_days": 5,
     "atm_strike": 25.0,
     "atm_iv": 0.3011,
     "straddle_abs": 3.05,
     "straddle_pct": 0.122,
-    "iv_pct": 0.073922,
+    "iv_pct": 0.072223,
     "skew_atm": 0.0,
     "term_slope": null,
     "total_vega": 0.1071,
-    "em_ml_pct": 0.034726,
-    "em_ml_abs": 0.88934,
-    "correction_factor": 0.176276,
+    "em_ml_pct": 0.034591,
+    "em_ml_abs": 0.885875,
+    "correction_factor": 0.165262,
     "model_horizon": 7,
     "ml_snapshot_date": "2026-04-22",
-    "p10": 0.006041,
-    "p25": 0.012433,
-    "p50": 0.020322,
-    "p75": 0.037127,
+    "p10": 0.006022,
+    "p25": 0.012321,
+    "p50": 0.020265,
+    "p75": 0.036737,
     "p90": 0.066743,
     "em_method": "ml_lightgbm",
     "timing": "before_market_open"
@@ -31,7 +31,7 @@
   "straddle_features": [
     {
       "expiration": "2026-05-15",
-      "dte": 22,
+      "dte": 21,
       "atm_strike": 25.0,
       "atm_iv": 0.3011,
       "atm_call_iv": 0.3011,
@@ -39,29 +39,12 @@
       "straddle_mid": 3.05,
       "em_straddle": 3.05,
       "em_straddle_pct": 0.122,
-      "em_iv": 1.848058,
-      "em_iv_pct": 0.073922,
+      "em_iv": 1.805569,
+      "em_iv_pct": 0.072223,
       "call_delta": 0.3942,
       "call_gamma": 0.0861,
       "call_vega": 0.0535,
       "call_theta": -0.0039
-    },
-    {
-      "expiration": "2026-06-18",
-      "dte": 56,
-      "atm_strike": 25.0,
-      "atm_iv": 0.4978,
-      "atm_call_iv": 0.4978,
-      "atm_put_iv": 0.4978,
-      "straddle_mid": 4.1,
-      "em_straddle": 4.1,
-      "em_straddle_pct": 0.164,
-      "em_iv": 4.874639,
-      "em_iv_pct": 0.194986,
-      "call_delta": 0.603,
-      "call_gamma": 0.0725,
-      "call_vega": 0.0387,
-      "call_theta": -0.0124
     }
   ],
   "earnings_history": [
@@ -115,5 +98,15 @@
     }
   ],
   "next_earnings": "2026-04-29",
+  "vol_regime": {
+    "iv_current": 0.2309,
+    "iv_rank": 0.091696,
+    "iv_year_high": 0.7975,
+    "iv_year_low": 0.1737,
+    "hv_current": 0.1911,
+    "hv_rank": 0.748016,
+    "iv_mom_week": -0.0032,
+    "iv_mom_month": null
+  },
   "next_earnings_timing": "before_market_open"
 }
