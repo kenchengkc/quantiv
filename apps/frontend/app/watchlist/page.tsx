@@ -256,20 +256,21 @@ export default function WatchlistPage() {
     };
   }, [tickers, hydrated, summaries]);
 
-  // Batch-fetch live prices, polling until all tickers have data.
+  // Batch-fetch live prices: aggressive poll until populated, then slow
+  // background loop + refetch on focus so prices stay current as the cron
+  // updates Redis.
   useEffect(() => {
     if (!hydrated || tickers.length === 0) return;
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
 
-    const poll = async (attempt = 0) => {
-      if (cancelled) return;
+    const fetchOnce = async (): Promise<number> => {
       try {
         const res = await fetch(
           `/api/stocks/batch-price?symbols=${tickers.join(',')}`,
           { cache: 'no-store' },
         );
-        if (!res.ok) return;
+        if (!res.ok) return 0;
         const json = (await res.json()) as {
           pending?: number;
           data: {
@@ -279,7 +280,7 @@ export default function WatchlistPage() {
             changePct: number | null;
           }[];
         };
-        if (cancelled) return;
+        if (cancelled) return 0;
         setLive((prev) => {
           const next: Record<string, Tick> = { ...prev };
           for (const t of json.data) {
@@ -289,20 +290,42 @@ export default function WatchlistPage() {
           }
           return next;
         });
-        const pending = json.pending ?? 0;
-        if (pending > 0 && attempt < 30) {
-          const delay = attempt < 10 ? 2_000 : 8_000;
-          timer = setTimeout(() => poll(attempt + 1), delay);
-        }
+        return json.pending ?? 0;
       } catch {
-        /* ignore */
+        return 0;
       }
     };
-    poll();
+
+    const fastPoll = async (attempt = 0) => {
+      if (cancelled) return;
+      const pending = await fetchOnce();
+      if (pending > 0 && attempt < 30) {
+        const delay = attempt < 10 ? 2_000 : 8_000;
+        timer = setTimeout(() => fastPoll(attempt + 1), delay);
+      } else {
+        const slowLoop = () => {
+          if (cancelled) return;
+          timer = setTimeout(async () => {
+            await fetchOnce();
+            slowLoop();
+          }, 30_000);
+        };
+        slowLoop();
+      }
+    };
+    fastPoll();
+
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && !cancelled) fetchOnce();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
 
     return () => {
       cancelled = true;
       if (timer) clearTimeout(timer);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
     };
   }, [tickers, hydrated]);
 

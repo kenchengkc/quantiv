@@ -26,7 +26,7 @@ export const maxDuration = 60;
 
 const BATCH_SIZE = 40;
 const RATE_LIMIT_PER_MIN = 50;     // 60/min Finnhub limit, leave 10/min headroom
-const STALE_TTL_S = 60 * 60;
+const STALE_TTL_S = 24 * 60 * 60;  // 24h — surfaces last-known price for symbols that briefly fall off rotation
 const CURSOR_KEY = 'quote:cursor';
 
 type Tick = {
