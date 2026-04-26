@@ -21,7 +21,7 @@ type SymbolSummary = {
   next_earnings_timing?: string;
 };
 
-type Tick = { change: number | null; changePct: number | null };
+type Tick = { price: number | null; change: number | null; changePct: number | null };
 
 function companyName(t: string) {
   return COMPANY_NAMES[t] || t;
@@ -285,7 +285,11 @@ export default function WatchlistPage() {
           const next: Record<string, Tick> = { ...prev };
           for (const t of json.data) {
             if (t.price !== null) {
-              next[t.symbol] = { change: t.change, changePct: t.changePct };
+              next[t.symbol] = {
+                price: t.price,
+                change: t.change,
+                changePct: t.changePct,
+              };
             }
           }
           return next;
@@ -414,7 +418,9 @@ export default function WatchlistPage() {
             const tickPctR = tick ? Math.round((tick.changePct ?? 0) * 10000) / 10000 : null;
             const tickChgR = tick ? Math.round((tick.change ?? 0) * 100) / 100 : null;
             const tickFlat = tickPctR === 0 && (tickChgR === null || tickChgR === 0);
-            const spot = sum?.spot_price ?? null;
+            // Prefer live Finnhub price when available; fall back to the
+            // snapshot from the symbol JSON only while the live cache is cold.
+            const spot = tick?.price ?? sum?.spot_price ?? null;
             const up = !tickFlat && (tick?.changePct ?? 0) >= 0;
             const isDragging = dragIdx === i;
             const isOver = overIdx === i && dragIdx !== null && dragIdx !== i;
