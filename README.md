@@ -223,7 +223,7 @@ Vercel builds `apps/frontend` (`vercel.json`). The app reads static JSON from `a
 
 ## Documentation
 
-Longer design / ML write-ups: [docs/README.md](docs/README.md) (index of `docs/*.md`).
+Longer design / ML write-ups: [docs/README.md](docs/README.md) (index of `docs/*.md`). ML MVP2 archive: [docs/ML_MVP2.md](docs/ML_MVP2.md).
 
 ## License
 
