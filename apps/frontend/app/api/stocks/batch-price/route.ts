@@ -140,6 +140,16 @@ const nullTick = (symbol: string): Tick => ({
   changePct: null,
 });
 
+/** Finnhub often omits d/dp while c and pc are present; derive so clients are not stuck without % until the next 30s poll. */
+function enrichTick(t: Tick): Tick {
+  if (t.price == null || !(t.price > 0)) return t;
+  const pc = t.previousClose;
+  if (pc == null || !(pc > 0)) return t;
+  const change = t.change != null ? t.change : t.price - pc;
+  const changePct = t.changePct != null ? t.changePct : change / pc;
+  return { ...t, change, changePct, previousClose: pc };
+}
+
 export async function GET(req: NextRequest) {
   const url = new URL(req.url);
   const symbolsParam = url.searchParams.get('symbols') ?? '';
@@ -178,16 +188,22 @@ export async function GET(req: NextRequest) {
   }
 
   let latestAt = 0;
+  // Use the batch read map (not only memCache) so this request sees Redis
+  // payloads that were just merged into `cache` for cold keys.
   const data = symbols.map((s) => {
-    const entry = memCache.get(s);
-    if (!entry) return nullTick(s);
+    const entry = cache.get(s) ?? null;
+    if (!entry) return enrichTick(nullTick(s));
     if (entry.at > latestAt) latestAt = entry.at;
-    return entry.tick;
+    return enrichTick({ ...entry.tick, symbol: entry.tick.symbol || s });
   });
 
-  // Surface how many symbols are still waiting so the client knows whether
-  // to keep polling.
-  const pending = data.filter((t) => t.price === null).length;
+  // Count missing prices plus ticks that still have no day %/change after
+  // enrichment (needs another Finnhub refresh). Without the latter, the
+  // dashboard exited "fast" polling while only EM columns updated — users saw
+  // % on the symbol page (single-symbol refresh) but not on the grid for ~1m.
+  const pending =
+    data.filter((t) => t.price === null).length +
+    data.filter((t) => t.price !== null && (t.changePct === null || t.change === null)).length;
 
   return NextResponse.json({
     updated: latestAt ? new Date(latestAt).toISOString() : null,
