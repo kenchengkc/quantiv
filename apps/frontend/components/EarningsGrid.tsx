@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Sun, Moon, Info, ChevronLeft, ChevronRight, Search, Circle } from 'lucide-react';
@@ -344,6 +344,132 @@ function DayBlock({
   );
 }
 
+function SkeletonRow({ delayMs }: { delayMs: number }) {
+  const bar = (extra: number, h: number, w: string | number, r = 5) => ({
+    height: h,
+    borderRadius: r,
+    background: 'var(--bg-3)',
+    width: typeof w === 'number' ? w : w,
+    flexShrink: 0 as const,
+    animation: 'earnings-grid-pulse 1.1s ease-in-out infinite',
+    animationDelay: `${delayMs + extra}ms`,
+  });
+  return (
+    <div
+      style={{
+        padding: '8px 10px',
+        display: 'flex',
+        gap: 8,
+        alignItems: 'center',
+      }}
+    >
+      <div style={bar(0, 24, 24, 6)} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={bar(20, 10, '68%')} />
+        <div style={{ ...bar(40, 8, '42%', 4), marginTop: 6 }} />
+      </div>
+      <div style={bar(10, 12, 44, 4)} />
+    </div>
+  );
+}
+
+function DayColumnSkeleton({
+  dateLabel,
+  label,
+  isToday,
+}: {
+  dateLabel: string;
+  label: string;
+  isToday: boolean;
+}) {
+  return (
+    <div style={{ minWidth: 0 }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'baseline',
+          gap: 10,
+          padding: '0 10px 14px',
+          marginBottom: 4,
+        }}
+      >
+        <div
+          className="serif"
+          style={{
+            fontSize: 32,
+            lineHeight: 1,
+            fontWeight: 800,
+            color: isToday ? 'var(--ink)' : 'var(--ink-2)',
+            letterSpacing: '-0.03em',
+          }}
+        >
+          {dateLabel}
+        </div>
+        <div style={{ flex: 1 }}>
+          <div
+            style={{
+              fontSize: 11,
+              letterSpacing: '0.14em',
+              textTransform: 'uppercase',
+              color: isToday ? 'var(--accent)' : 'var(--ink-3)',
+              fontWeight: 500,
+            }}
+          >
+            {label}
+            {isToday && ' · Today'}
+          </div>
+          <div
+            className="mono tnum"
+            style={{ fontSize: 10.5, color: 'var(--ink-4)', marginTop: 2 }}
+          >
+            Loading…
+          </div>
+        </div>
+      </div>
+      {[0, 1, 2, 3, 4].map((i) => (
+        <SkeletonRow key={i} delayMs={i * 70} />
+      ))}
+    </div>
+  );
+}
+
+function CalendarGridSkeleton({
+  days,
+  today,
+}: {
+  days: Date[];
+  today: Date;
+}) {
+  const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      aria-busy="true"
+      style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
+        marginTop: 20,
+      }}
+    >
+      {days.map((d, i) => (
+        <div
+          key={d.toISOString()}
+          style={{
+            borderRight: i < 4 ? '1px solid var(--line)' : 'none',
+          }}
+        >
+          <DayColumnSkeleton
+            dateLabel={String(d.getDate())}
+            label={dayNames[i]}
+            isToday={d.getTime() === today.getTime()}
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function FilterInfo({ filter }: { filter: Filter }) {
   const msg = {
     popular: 'Ranked by a blend of options volume, market cap, and recent news flow.',
@@ -567,9 +693,10 @@ export default function EarningsGrid() {
     router.replace(url, { scroll: false });
   }, [offset, filter, router]);
   const [data, setData] = useState<WeeklyData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [isFetching, setIsFetching] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [live, setLive] = useState<LiveMap>({});
+  const [isPending, startTransition] = useTransition();
 
   const thisMonday = useMemo(() => mondayOf(new Date()), []);
   const weekStartIso = useMemo(() => {
@@ -594,13 +721,21 @@ export default function EarningsGrid() {
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
+    setIsFetching(true);
     setError(null);
     fetchWeek(weekStartIso)
-      .then((json) => { if (!cancelled) setData(json); })
-      .catch((e) => { if (!cancelled) setError((e as Error).message); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
+      .then((json) => {
+        if (!cancelled) setData(json);
+      })
+      .catch((e) => {
+        if (!cancelled) setError((e as Error).message);
+      })
+      .finally(() => {
+        if (!cancelled) setIsFetching(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [weekStartIso, fetchWeek]);
 
   useEffect(() => {
@@ -681,19 +816,16 @@ export default function EarningsGrid() {
     };
   }, [data]);
 
-  const weekStart = useMemo(
-    () => (data ? parseLocalDate(data.window.start) : parseLocalDate(weekStartIso)),
-    [data, weekStartIso],
-  );
-  const days = useMemo(
-    () =>
-      Array.from({ length: 5 }, (_, i) => {
-        const d = new Date(weekStart);
-        d.setDate(weekStart.getDate() + i);
-        return d;
-      }),
-    [weekStart],
-  );
+  // Calendar columns always follow the selected week (URL offset), so the
+  // header dates stay correct while JSON for that week is still loading.
+  const days = useMemo(() => {
+    const weekStart = parseLocalDate(weekStartIso);
+    return Array.from({ length: 5 }, (_, i) => {
+      const d = new Date(weekStart);
+      d.setDate(weekStart.getDate() + i);
+      return d;
+    });
+  }, [weekStartIso]);
 
   const winLabel = useMemo(() => {
     const s = days[0];
@@ -711,6 +843,12 @@ export default function EarningsGrid() {
     t.setHours(0, 0, 0, 0);
     return t;
   }, []);
+
+  const dataWeekKey = data?.window?.start?.slice(0, 10) ?? null;
+  const weekReady =
+    !!data && !isFetching && !error && dataWeekKey === weekStartIso;
+  const showSkeleton =
+    !error && (isFetching || !data || dataWeekKey !== weekStartIso);
 
   const filteredEvents = useMemo(() => {
     if (!data) return [] as EarningsEvent[];
@@ -742,18 +880,12 @@ export default function EarningsGrid() {
         setOffset={setOffset}
         windowLabel={winLabel}
         filter={filter}
-        setFilter={setFilter}
+        setFilter={(f) => startTransition(() => setFilter(f))}
         search={search}
         setSearch={setSearch}
       />
 
-      {loading && (
-        <div style={{ padding: '60px 0', textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>
-          Loading earnings calendar…
-        </div>
-      )}
-
-      {error && !loading && (
+      {error && (
         <div
           style={{
             padding: 20,
@@ -768,12 +900,17 @@ export default function EarningsGrid() {
         </div>
       )}
 
-      {!loading && !error && data && (
+      {showSkeleton && !error && <CalendarGridSkeleton days={days} today={today} />}
+
+      {weekReady && data && (
         <div
           style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
             marginTop: 20,
+            opacity: isPending ? 0.88 : 1,
+            transition: 'opacity 220ms ease',
+            animation: 'earnings-grid-fade-in 0.22s ease-out',
           }}
         >
           {days.map((d, i) => (
@@ -795,7 +932,7 @@ export default function EarningsGrid() {
         </div>
       )}
 
-      {data && (
+      {weekReady && data && (
         <div
           style={{
             marginTop: 40,
