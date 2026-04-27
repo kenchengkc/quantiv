@@ -81,6 +81,9 @@ jobs:
       - name: Sync volatility history
         run: python scripts/sync_dolthub.py --volhist
 
+      - name: Sync VIX (FRED)
+        run: python scripts/sync_vix.py
+
       - name: Push updated data to R2
         env:
           R2_BUCKET: ${{ secrets.R2_BUCKET }}
