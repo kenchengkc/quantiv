@@ -40,6 +40,9 @@ class FeatureSet:
     horizon: int
     features: pd.DataFrame
     target: pd.Series
+    # Held alongside features but not used as a model input. Lets the trainer
+    # compute sample weights (e.g. time-decay) without re-querying source data.
+    earnings_date: pd.Series = field(default_factory=pd.Series)
     metadata: Dict[str, Any] = field(default_factory=dict)
 
 
@@ -82,6 +85,26 @@ def connect_duckdb() -> duckdb.DuckDBPyConnection:
                    NULL::DOUBLE AS volume_ratio_20d, NULL::DOUBLE AS drift_5d
             WHERE 1=0
         """)
+    # v_vix — daily CBOE VIX close from FRED. Used to derive market regime
+    # features (vix level, change, percentile rank) at each snapshot date.
+    if "v_vix" not in views:
+        data_root = get_data_dir()
+        vix_path = data_root / "parquet" / "vix" / "vix.parquet"
+        if vix_path.exists():
+            conn.execute(f"""
+                CREATE OR REPLACE VIEW v_vix AS
+                SELECT CAST(date AS DATE) AS date,
+                       CAST(vix_close AS DOUBLE) AS vix_close
+                FROM read_parquet('{vix_path}')
+            """)
+        else:
+            logger.warning("v_vix parquet not found — VIX/macro features will be NULL")
+            conn.execute("""
+                CREATE OR REPLACE VIEW v_vix AS
+                SELECT NULL::DATE AS date, NULL::DOUBLE AS vix_close
+                WHERE 1=0
+            """)
+
     # v_volhist — daily HV/IV snapshots (current + week/month/year-ago) joined
     # per (snapshot_date, act_symbol) to give vol-regime context features.
     # Empty stub when the parquet tree isn't present so LEFT JOINs still work.
@@ -348,6 +371,34 @@ def extract_training_data(conn: duckdb.DuckDBPyConnection,
         ) = 1
     ),
 
+    -- Market regime: VIX level + 30d change + 252d percentile, plus SPY
+    -- 60d drift and TLT/SPY 30d ratio (risk-off proxy). LightGBM uses
+    -- these to condition predictions on the prevailing vol regime.
+    macro AS (
+        WITH spy AS (SELECT date, close FROM v_ohlcv WHERE act_symbol = 'SPY'),
+             tlt AS (SELECT date, close FROM v_ohlcv WHERE act_symbol = 'TLT')
+        SELECT
+            spy.date,
+            vix.vix_close                                AS vix_current,
+            vix.vix_close
+              - LAG(vix.vix_close, 21) OVER (ORDER BY spy.date) AS vix_change_30d,
+            PERCENT_RANK() OVER (
+                ORDER BY vix.vix_close
+                ROWS BETWEEN 252 PRECEDING AND CURRENT ROW
+            )                                            AS vix_pct_252d,
+            spy.close
+              / NULLIF(LAG(spy.close, 60) OVER (ORDER BY spy.date), 0) - 1
+                                                         AS spy_drift_60d,
+            (tlt.close
+              / NULLIF(LAG(tlt.close, 30) OVER (ORDER BY spy.date), 0))
+              / NULLIF(spy.close
+              / NULLIF(LAG(spy.close, 30) OVER (ORDER BY spy.date), 0), 0) - 1
+                                                         AS tlt_spy_ratio_30d
+        FROM spy
+        LEFT JOIN v_vix vix ON vix.date = spy.date
+        LEFT JOIN tlt        ON tlt.date = spy.date
+    ),
+
     -- ═══════════════════════════════════════════════════════════════
     -- MAIN FEATURE ASSEMBLY
     -- Uses v_straddle_features (options-only, full 2019-2026 range)
@@ -413,6 +464,13 @@ def extract_training_data(conn: duckdb.DuckDBPyConnection,
                  ELSE NULL
             END AS hist_straddle_accuracy,
 
+            -- Market regime (VIX + SPY/TLT macro context)
+            mc.vix_current,
+            mc.vix_change_30d,
+            mc.vix_pct_252d,
+            mc.spy_drift_60d,
+            mc.tlt_spy_ratio_30d,
+
             -- Volatility regime (from v_volhist; NULL pre-2019 or where missing)
             CASE
                 WHEN vh.iv_year_high > vh.iv_year_low
@@ -451,6 +509,8 @@ def extract_training_data(conn: duckdb.DuckDBPyConnection,
         LEFT JOIN v_volhist vh
             ON vh.act_symbol = sf.act_symbol
             AND vh.date = sf.date
+        LEFT JOIN macro mc
+            ON mc.date = sf.date
         WHERE sf.atm_iv > 0 AND sf.atm_strike > 0
     )
 
@@ -495,6 +555,9 @@ def extract_training_data(conn: duckdb.DuckDBPyConnection,
             "hist_straddle_accuracy",
             # Vol regime (from v_volhist — NULL if volatility_history parquet absent)
             "iv_rank", "hv_rank", "iv_mom_week", "iv_mom_month",
+            # Market regime (from VIX + SPY/TLT — NULL pre-1990 or pre-2023)
+            "vix_current", "vix_change_30d", "vix_pct_252d",
+            "spy_drift_60d", "tlt_spy_ratio_30d",
         ]
 
         hdf["log_spot"] = np.log(hdf["spot_price"].clip(lower=1))
@@ -508,12 +571,14 @@ def extract_training_data(conn: duckdb.DuckDBPyConnection,
 
         X = hdf[feature_cols].copy()
         y = hdf["realized_move_pct"].copy()
+        ed = pd.to_datetime(hdf["earnings_date"]).dt.date
 
         # LightGBM handles NaN natively — only remove inf and extreme outliers
         X = X.replace([np.inf, -np.inf], np.nan)
         valid = y.notna() & (y > 0) & (y < 1.0)
         X = X[valid].reset_index(drop=True)
         y = y[valid].reset_index(drop=True)
+        ed = ed[valid].reset_index(drop=True)
 
         if len(X) < 30:
             logger.warning(f"T-{horizon}: only {len(X)} valid samples after cleaning")
@@ -529,6 +594,7 @@ def extract_training_data(conn: duckdb.DuckDBPyConnection,
             horizon=horizon,
             features=X,
             target=y,
+            earnings_date=ed,
             metadata={
                 "n_samples": len(X),
                 "target_mean": float(y.mean()),
@@ -561,6 +627,10 @@ def save_training_data(feature_sets: Dict[int, FeatureSet], output_dir: Path):
     for horizon, fs in feature_sets.items():
         training_df = fs.features.copy()
         training_df["target"] = fs.target
+        # Sidecar — used by model_trainer_v3 to derive sample weights.
+        # Trainer pops it before fitting; never seen by LightGBM as a feature.
+        if len(fs.earnings_date) == len(fs.features):
+            training_df["__earnings_date"] = fs.earnings_date.values
         path = output_dir / f"training_T{horizon}.parquet"
         training_df.to_parquet(path, index=False)
 

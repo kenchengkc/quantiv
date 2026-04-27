@@ -25,9 +25,13 @@ from typing import Any, Dict, List, Tuple
 
 import joblib
 import numpy as np
+import optuna
 import pandas as pd
 from lightgbm import LGBMRegressor, early_stopping, log_evaluation
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+
+# Quiet Optuna's per-trial INFO chatter; we log a one-liner per study instead.
+optuna.logging.set_verbosity(optuna.logging.WARNING)
 
 import logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -62,27 +66,82 @@ def pinball_loss(y_true: np.ndarray, y_pred: np.ndarray, alpha: float) -> float:
     return float(np.mean(np.where(residual >= 0, alpha * residual, (alpha - 1) * residual)))
 
 
+# Default LightGBM hyperparameters used when tuning is off. Reasonable
+# starting point for ~10–30k row tabular regression.
+DEFAULT_PARAMS: Dict[str, Any] = {
+    "n_estimators": 2000,
+    "learning_rate": 0.03,
+    "max_depth": 7,
+    "num_leaves": 63,
+    "subsample": 0.8,
+    "colsample_bytree": 0.7,
+    "reg_alpha": 0.05,
+    "reg_lambda": 0.1,
+}
+
+
+def tune_hyperparameters(X_train: pd.DataFrame, y_train: pd.Series,
+                         X_val: pd.DataFrame, y_val: pd.Series,
+                         horizon: int, n_trials: int = 30,
+                         sample_weight: np.ndarray | None = None) -> Dict[str, Any]:
+    """Run Optuna search over LightGBM hyperparameters; return the best set.
+
+    Objective: minimize unweighted val MAE so the score is directly comparable
+    across runs (same training set + sample_weight effect, same val split).
+    """
+
+    def objective(trial: optuna.Trial) -> float:
+        params = {
+            "n_estimators": 2000,  # capped by early_stopping
+            "learning_rate":      trial.suggest_float("learning_rate", 0.01, 0.3, log=True),
+            "num_leaves":         trial.suggest_int("num_leaves", 15, 255),
+            "max_depth":          trial.suggest_int("max_depth", 4, 12),
+            "min_child_samples":  trial.suggest_int("min_child_samples", 5, 100),
+            "subsample":          trial.suggest_float("subsample", 0.6, 1.0),
+            "colsample_bytree":   trial.suggest_float("colsample_bytree", 0.5, 1.0),
+            "reg_alpha":          trial.suggest_float("reg_alpha", 0.0, 1.0),
+            "reg_lambda":         trial.suggest_float("reg_lambda", 0.0, 1.0),
+            "random_state": 42,
+            "verbose": -1,
+        }
+        m = LGBMRegressor(**params)
+        m.fit(
+            X_train, y_train,
+            sample_weight=sample_weight,
+            eval_set=[(X_val, y_val)],
+            callbacks=[early_stopping(50, verbose=False), log_evaluation(0)],
+        )
+        return float(mean_absolute_error(y_val, m.predict(X_val)))
+
+    study = optuna.create_study(
+        direction="minimize",
+        sampler=optuna.samplers.TPESampler(seed=42),
+    )
+    study.optimize(objective, n_trials=n_trials, show_progress_bar=False)
+    logger.info(f"  T-{horizon} tuning: best val MAE = {study.best_value:.4f} "
+                f"after {n_trials} trials")
+    return study.best_params
+
+
 def train_point_model(X_train: pd.DataFrame, y_train: pd.Series,
                       X_val: pd.DataFrame, y_val: pd.Series,
-                      horizon: int) -> Tuple[LGBMRegressor, Dict[str, Any]]:
+                      horizon: int,
+                      sample_weight: np.ndarray | None = None,
+                      params: Dict[str, Any] | None = None) -> Tuple[LGBMRegressor, Dict[str, Any]]:
     """Train the main point-estimate model (L2 loss)."""
 
-    model = LGBMRegressor(
-        n_estimators=2000,
-        learning_rate=0.03,
-        max_depth=7,
-        num_leaves=63,
-        min_child_samples=max(10, len(X_train) // 50),
-        subsample=0.8,
-        colsample_bytree=0.7,
-        reg_alpha=0.05,
-        reg_lambda=0.1,
-        random_state=42,
-        verbose=-1,
-    )
+    p = dict(DEFAULT_PARAMS if params is None else params)
+    p.setdefault("min_child_samples", max(10, len(X_train) // 50))
+    p.setdefault("n_estimators", 2000)
+    p["random_state"] = 42
+    p["verbose"] = -1
+    model = LGBMRegressor(**p)
 
+    # `sample_weight` only affects training loss. eval_set stays unweighted so
+    # val MAE remains an honest, comparable score across runs.
     model.fit(
         X_train, y_train,
+        sample_weight=sample_weight,
         eval_set=[(X_val, y_val)],
         callbacks=[
             early_stopping(100, verbose=False),
@@ -126,7 +185,9 @@ def train_point_model(X_train: pd.DataFrame, y_train: pd.Series,
 
 def train_quantile_models(X_train: pd.DataFrame, y_train: pd.Series,
                           X_val: pd.DataFrame, y_val: pd.Series,
-                          horizon: int) -> Tuple[Dict[float, LGBMRegressor], Dict[str, Any]]:
+                          horizon: int,
+                          sample_weight: np.ndarray | None = None,
+                          params: Dict[str, Any] | None = None) -> Tuple[Dict[float, LGBMRegressor], Dict[str, Any]]:
     """Train quantile regression models for proper confidence bands.
 
     Earnings moves are heavily right-skewed with fat tails — Gaussian bands
@@ -137,25 +198,28 @@ def train_quantile_models(X_train: pd.DataFrame, y_train: pd.Series,
     models = {}
     metrics = {"horizon": horizon}
 
+    # Quantile models share the tuned regularization regime from the point
+    # model — same data, same regularization needs. Override n_estimators and
+    # cap depth/leaves slightly for quantile stability.
+    base = dict(params if params is not None else DEFAULT_PARAMS)
+    base["n_estimators"] = 1500
+    base.setdefault("min_child_samples", max(10, len(X_train) // 50))
+    # Cap quantile-specific complexity to avoid unstable extreme-tail fits.
+    base["max_depth"] = min(base.get("max_depth", 6), 6)
+    base["num_leaves"] = min(base.get("num_leaves", 31), 31)
+
     for alpha in QUANTILES:
         qmodel = LGBMRegressor(
             objective="quantile",
             alpha=alpha,
-            n_estimators=1500,
-            learning_rate=0.03,
-            max_depth=6,
-            num_leaves=31,
-            min_child_samples=max(10, len(X_train) // 50),
-            subsample=0.8,
-            colsample_bytree=0.7,
-            reg_alpha=0.05,
-            reg_lambda=0.1,
+            **base,
             random_state=42,
             verbose=-1,
         )
 
         qmodel.fit(
             X_train, y_train,
+            sample_weight=sample_weight,
             eval_set=[(X_val, y_val)],
             callbacks=[
                 early_stopping(80, verbose=False),
@@ -185,11 +249,15 @@ def train_quantile_models(X_train: pd.DataFrame, y_train: pd.Series,
     return models, metrics
 
 
-def run_training(horizons: List[int] = HORIZONS, tune: bool = False):
+def run_training(horizons: List[int] = HORIZONS, tune: bool = False,
+                 time_decay_years: float = 0.0, tune_trials: int = 30):
     data_dir = get_data_dir()
     ml_dir = data_dir / "ml_training"
     models_dir = data_dir / "models"
     models_dir.mkdir(parents=True, exist_ok=True)
+
+    if time_decay_years > 0:
+        logger.info(f"⚖️  Time-decay sample weighting enabled: half-life = {time_decay_years} years")
 
     results = {}
 
@@ -205,10 +273,14 @@ def run_training(horizons: List[int] = HORIZONS, tune: bool = False):
 
         df = pd.read_parquet(path)
         target_col = "target"
-        feature_cols = [c for c in df.columns if c != target_col]
+        # Sidecar columns prefixed with __ aren't features — they hold metadata
+        # the trainer needs (currently: __earnings_date for time-decay weights).
+        meta_cols = [c for c in df.columns if c.startswith("__")]
+        feature_cols = [c for c in df.columns if c != target_col and c not in meta_cols]
 
         X = df[feature_cols]
         y = df[target_col]
+        earnings_date = pd.to_datetime(df["__earnings_date"]) if "__earnings_date" in df.columns else None
 
         X_train, X_val = walk_forward_split(X)
         y_train, y_val = y.iloc[:len(X_train)], y.iloc[len(X_train):len(X_train) + len(X_val)]
@@ -217,8 +289,35 @@ def run_training(horizons: List[int] = HORIZONS, tune: bool = False):
         logger.info(f"Target — train μ={y_train.mean():.4f} σ={y_train.std():.4f} | "
                      f"val μ={y_val.mean():.4f} σ={y_val.std():.4f}")
 
+        # Build training sample weights via exponential time decay.
+        # weight = exp(-days_old / (365 * half_life_years))
+        # Recent rows weight ≈ 1; rows one half-life back weight ≈ 0.5; etc.
+        sample_weight = None
+        if time_decay_years > 0 and earnings_date is not None:
+            ed_train = earnings_date.iloc[:len(X_train)].reset_index(drop=True)
+            max_date = ed_train.max()
+            days_old = (max_date - ed_train).dt.days.clip(lower=0).to_numpy()
+            sample_weight = np.exp(-days_old / (365.0 * time_decay_years))
+            logger.info(
+                f"  decay weights: min={sample_weight.min():.4f} "
+                f"max={sample_weight.max():.4f} "
+                f"effective_n={sample_weight.sum():.0f} (raw n={len(sample_weight)})"
+            )
+
+        # ── Optional hyperparameter tuning ──
+        best_params: Dict[str, Any] | None = None
+        if tune:
+            logger.info(f"  Tuning T-{horizon} with Optuna ({tune_trials} trials)…")
+            best_params = tune_hyperparameters(
+                X_train, y_train, X_val, y_val, horizon,
+                n_trials=tune_trials, sample_weight=sample_weight,
+            )
+            logger.info(f"  Best params: {best_params}")
+
         # ── Point model ──
-        model, metrics = train_point_model(X_train, y_train, X_val, y_val, horizon)
+        model, metrics = train_point_model(
+            X_train, y_train, X_val, y_val, horizon, sample_weight, params=best_params,
+        )
 
         logger.info(f"Point model — MAE: {metrics['val_mae']:.4f}  "
                      f"RMSE: {metrics['val_rmse']:.4f}  R²: {metrics['val_r2']:.4f}")
@@ -227,7 +326,9 @@ def run_training(horizons: List[int] = HORIZONS, tune: bool = False):
         logger.info(f"  Top features: {list(metrics['feature_importance'].keys())[:5]}")
 
         # ── Quantile models ──
-        q_models, q_metrics = train_quantile_models(X_train, y_train, X_val, y_val, horizon)
+        q_models, q_metrics = train_quantile_models(
+            X_train, y_train, X_val, y_val, horizon, sample_weight, params=best_params,
+        )
 
         logger.info(f"Quantile models — 80% coverage: {q_metrics['coverage_80']:.1%} (target: 80%)  "
                      f"50% coverage: {q_metrics['coverage_50']:.1%} (target: 50%)")
@@ -250,6 +351,9 @@ def run_training(horizons: List[int] = HORIZONS, tune: bool = False):
         all_metrics["feature_cols"] = feature_cols
         all_metrics["quantiles"] = QUANTILES
         all_metrics["version"] = "v3"
+        all_metrics["time_decay_years"] = time_decay_years if time_decay_years > 0 else None
+        all_metrics["tuned"] = bool(best_params)
+        all_metrics["best_params"] = best_params
 
         # Also compute the old-style residual_std for backward compat
         y_pred_val = model.predict(X_val)
@@ -283,9 +387,38 @@ def run_training(horizons: List[int] = HORIZONS, tune: bool = False):
 def main():
     parser = argparse.ArgumentParser(description="Train LightGBM models v3 (point + quantile)")
     parser.add_argument("--horizons", nargs="+", type=int, default=HORIZONS)
-    parser.add_argument("--tune", action="store_true", help="Run Optuna hyperparameter search")
+    parser.add_argument(
+        "--tune",
+        action="store_true",
+        help=(
+            "Run Optuna hyperparameter search per horizon. ~30 trials × ~5s each "
+            "= ~3 min/horizon, ~18 min total for 6 horizons. Best params stored "
+            "in metadata.json under 'best_params'."
+        ),
+    )
+    parser.add_argument(
+        "--tune-trials",
+        type=int,
+        default=30,
+        help="Optuna trials per horizon when --tune is set (default 30).",
+    )
+    parser.add_argument(
+        "--time-decay",
+        type=float,
+        default=0.0,
+        help=(
+            "Half-life in years for exponential sample-weight decay. 0 = off. "
+            "Recommended starting value: 1 (rows one year old weigh half). "
+            "Affects training only — val MAE stays unweighted for fair comparison."
+        ),
+    )
     args = parser.parse_args()
-    run_training(args.horizons, args.tune)
+    run_training(
+        args.horizons,
+        args.tune,
+        time_decay_years=args.time_decay,
+        tune_trials=args.tune_trials,
+    )
 
 
 if __name__ == "__main__":

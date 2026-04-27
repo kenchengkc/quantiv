@@ -175,6 +175,19 @@ def setup_views(conn: duckdb.DuckDBPyConnection, data_dir: Path):
     else:
         print(f"[views] ⚠ Volatility history not found (neither Parquet nor CSV)")
 
+    # ── VIX (CBOE Volatility Index, from FRED) ──────────────────────
+    vix_path = data_dir / "parquet" / "vix" / "vix.parquet"
+    if vix_path.exists():
+        conn.execute(f"""
+            CREATE OR REPLACE VIEW v_vix AS
+            SELECT CAST(date AS DATE) AS date, CAST(vix_close AS DOUBLE) AS vix_close
+            FROM read_parquet('{vix_path}')
+        """)
+        vix_count = conn.execute("SELECT COUNT(*) FROM v_vix").fetchone()[0]
+        print(f"[views] v_vix: {vix_count:,} rows")
+    else:
+        print(f"[views] ⚠ VIX not found (run: python scripts/sync_vix.py)")
+
     # ── OHLCV stock prices ───────────────────────────────────────────
     ohlcv_glob = str(data_dir / "parquet" / "ohlcv" / "year=*" / "month=*" / "*.parquet")
     ohlcv_dir = data_dir / "parquet" / "ohlcv"

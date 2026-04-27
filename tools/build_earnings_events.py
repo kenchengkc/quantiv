@@ -113,6 +113,21 @@ def create_duckdb_views(conn: duckdb.DuckDBPyConnection, data_dir: Path):
         )
     """)
     
+    # v_vix — daily VIX close from FRED. Used as a market-regime feature.
+    vix_path = data_dir / "parquet" / "vix" / "vix.parquet"
+    if vix_path.exists():
+        conn.execute(f"""
+            CREATE OR REPLACE VIEW v_vix AS
+            SELECT CAST(date AS DATE) AS date, CAST(vix_close AS DOUBLE) AS vix_close
+            FROM read_parquet('{vix_path}')
+        """)
+    else:
+        conn.execute("""
+            CREATE OR REPLACE VIEW v_vix AS
+            SELECT NULL::DATE AS date, NULL::DOUBLE AS vix_close
+            WHERE 1=0
+        """)
+
     # v_volhist — per-ticker per-day HV/IV snapshots. Used downstream to
     # compute IV Rank and vol-momentum stats on the ticker detail page.
     # Empty stub when parquet missing so LEFT JOINs still resolve.
