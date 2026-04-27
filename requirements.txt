@@ -1,3 +1,8 @@
+# Quantiv — Python deps for GitHub Actions data refresh and local scripts
+# (`daily-refresh.yml` uses this file). The FastAPI Docker image installs
+# apps/backend/requirements.txt separately; overlap is intentional but pins
+# should stay compatible.
+
 # Core Data & Database
 SQLAlchemy>=2.0.0
 psycopg2-binary>=2.9

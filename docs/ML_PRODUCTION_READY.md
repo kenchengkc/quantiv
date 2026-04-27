@@ -296,8 +296,7 @@ Returns ML pipeline status and capabilities.
 - `apps/frontend/components/WeeklyEarnings.tsx` - ML vs Math UI
 
 ### Documentation
-- `docs/ML_MVP2_ARCHITECTURE.md` - Technical architecture
-- `docs/ML_MVP2_STATUS.md` - Development status
+- `docs/ML_MVP2.md` - Technical architecture and MVP2 status (archive)
 - `docs/DEPLOYMENT_GUIDE.md` - Deployment instructions
 - `docs/ML_PRODUCTION_READY.md` - **THIS FILE** - Production summary
 
