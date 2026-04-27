@@ -900,39 +900,43 @@ export default function EarningsGrid() {
         </div>
       )}
 
-      {showSkeleton && !error && <CalendarGridSkeleton days={days} today={today} />}
+      {/* Fixed min-height keeps document height closer between skeleton and a
+          busy week so the layout doesn’t jump when the scrollbar would toggle. */}
+      <div style={{ minHeight: 'min(560px, 62vh)' }}>
+        {showSkeleton && !error && <CalendarGridSkeleton days={days} today={today} />}
 
-      {weekReady && data && (
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
-            marginTop: 20,
-            opacity: isPending ? 0.88 : 1,
-            transition: 'opacity 220ms ease',
-            animation: 'earnings-grid-fade-in 0.22s ease-out',
-          }}
-        >
-          {days.map((d, i) => (
-            <div
-              key={d.toISOString()}
-              style={{
-                borderRight: i < 4 ? '1px solid var(--line)' : 'none',
-              }}
-            >
-              <DayBlock
-                dateLabel={String(d.getDate())}
-                label={dayNames[i]}
-                events={eventsByDay[i]}
-                isToday={d.getTime() === today.getTime()}
-                live={live}
-              />
-            </div>
-          ))}
-        </div>
-      )}
+        {weekReady && data && (
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
+              marginTop: 20,
+              opacity: isPending ? 0.88 : 1,
+              transition: 'opacity 220ms ease',
+              animation: 'earnings-grid-fade-in 0.22s ease-out',
+            }}
+          >
+            {days.map((d, i) => (
+              <div
+                key={d.toISOString()}
+                style={{
+                  borderRight: i < 4 ? '1px solid var(--line)' : 'none',
+                }}
+              >
+                <DayBlock
+                  dateLabel={String(d.getDate())}
+                  label={dayNames[i]}
+                  events={eventsByDay[i]}
+                  isToday={d.getTime() === today.getTime()}
+                  live={live}
+                />
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
-      {weekReady && data && (
+      {(weekReady || showSkeleton) && !error && (
         <div
           style={{
             marginTop: 40,
@@ -942,11 +946,18 @@ export default function EarningsGrid() {
             justifyContent: 'space-between',
             fontSize: 11,
             color: 'var(--ink-4)',
+            minHeight: 36,
           }}
         >
-          <span className="mono">
-            {filteredEvents.length} reports · {data.metadata.method} · as of {data.metadata.as_of_date}
-          </span>
+          {weekReady && data ? (
+            <span className="mono">
+              {filteredEvents.length} reports · {data.metadata.method} · as of {data.metadata.as_of_date}
+            </span>
+          ) : (
+            <span className="mono" style={{ color: 'var(--ink-3)' }}>
+              Updating calendar…
+            </span>
+          )}
         </div>
       )}
     </>

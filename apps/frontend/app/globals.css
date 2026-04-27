@@ -28,6 +28,12 @@
     color: var(--ink);
     font-feature-settings: 'ss01';
   }
+  /* Reserve space for the vertical scrollbar so centered layouts don’t
+     jump horizontally when content height changes (e.g. calendar skeleton
+     ↔ full week + footer). */
+  html {
+    scrollbar-gutter: stable;
+  }
   body {
     font-family: 'Nunito Sans', ui-sans-serif, system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
