@@ -221,6 +221,10 @@ Vercel builds `apps/frontend` (`vercel.json`). The app reads static JSON from `a
 - The dashboard does not call FastAPI for every page — it uses generated JSON.  
 - Spot quotes on Next.js use Finnhub + Redis caching, not a per-ticker Polygon route; Polygon remains optional on the FastAPI side.
 
+## Documentation
+
+Longer design / ML write-ups: [docs/README.md](docs/README.md) (index of `docs/*.md`).
+
 ## License
 
 GPL-3.0 — see [LICENSE](LICENSE).
