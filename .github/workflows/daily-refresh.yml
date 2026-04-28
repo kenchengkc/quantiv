@@ -1,11 +1,16 @@
 name: Daily data refresh
 
-# Nightly pipeline:
+# Nightly pipeline (cron `0 11 * * *`):
 #   1. Pull parquet + models from Cloudflare R2
 #   2. sync_dolthub — pull the latest options_chain / earnings / ohlcv rows
 #   3. Push changed parquet back to R2
 #   4. setup_duckdb → daily_score → build_frontend_data
 #   5. Commit JSON + push → Vercel auto-deploys
+#
+# Weekly ML retrain (cron `0 12 * * 0` — Sunday 12:00 UTC):
+#   Pull R2 → DuckDB → feature_engineering_v3 → model_trainer_v3 → push models
+#   (no DoltHub sync; assumes nightly runs keep R2 fresh. Models land in R2 for
+#   daily_score on the next nightly pull.)
 #
 # Designed for public repo (unlimited free runner minutes). Runtime per run
 # ≈ 15–25 min dominated by build_frontend_data + DuckDB parquet scans.
@@ -14,6 +19,8 @@ on:
   schedule:
     # 11:00 UTC = 07:00 ET. Runs after US markets close + DoltHub has caught up.
     - cron: '0 11 * * *'
+    # Sunday 12:00 UTC — weekly LightGBM retrain (v3 features + point/quantile).
+    - cron: '0 12 * * 0'
   workflow_dispatch:
 
 concurrency:
@@ -25,6 +32,7 @@ permissions:
 
 jobs:
   refresh:
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'schedule' && github.event.schedule == '0 11 * * *')
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -117,3 +125,70 @@ jobs:
             git commit -m "daily refresh $(date -u +%Y-%m-%d)"
             git push origin main
           fi
+
+  # Weekly only — see `on.schedule` second cron. Does not commit to git; uploads
+  # new joblibs + metadata to R2 under data/models (see scripts/r2_push.sh).
+  weekly-retrain:
+    if: github.event_name == 'schedule' && github.event.schedule == '0 12 * * 0'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Install rclone
+        run: |
+          curl -sSL https://rclone.org/install.sh | sudo bash
+          rclone version
+
+      - name: Configure rclone for R2
+        env:
+          R2_ACCOUNT_ID:        ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID:     ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        run: |
+          mkdir -p ~/.config/rclone
+          cat > ~/.config/rclone/rclone.conf <<EOF
+          [r2]
+          type = s3
+          provider = Cloudflare
+          access_key_id = $R2_ACCESS_KEY_ID
+          secret_access_key = $R2_SECRET_ACCESS_KEY
+          endpoint = https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com
+          region = auto
+          EOF
+
+      - name: Pull data from R2
+        env:
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+        run: bash scripts/r2_pull.sh
+
+      - name: Rebuild DuckDB views
+        run: python scripts/setup_duckdb_from_parquet.py
+
+      - name: Gate — verify data freshness before ML
+        run: python scripts/check_duckdb_freshness.py --strict --max-lag-days 5
+
+      - name: Build ML training parquet (v3)
+        run: |
+          END=$(date -u -d '+400 days' +%Y-%m-%d)
+          python apps/ml/feature_engineering_v3.py --end-date "$END"
+
+      - name: Train LightGBM models (v3)
+        run: python apps/ml/model_trainer_v3.py
+
+      - name: Push models to R2
+        env:
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+        run: bash scripts/r2_push.sh
