@@ -1,0 +1,88 @@
+{
+  "symbol": "TXNM",
+  "as_of_date": "2026-04-27",
+  "spot_price": 60.0,
+  "expected_move": {
+    "earnings_date": "2026-05-08",
+    "expiration": "2026-05-15",
+    "dte": 18,
+    "lead_time_days": 11,
+    "atm_strike": 60.0,
+    "atm_iv": 0.442697,
+    "straddle_abs": 2.5,
+    "straddle_pct": 0.041667,
+    "iv_pct": 0.09831,
+    "skew_atm": 0.07535,
+    "term_slope": null,
+    "total_vega": 0.1011,
+    "em_ml_pct": 0.031307,
+    "em_ml_abs": 1.847761,
+    "correction_factor": 0.54845,
+    "model_horizon": 14,
+    "ml_snapshot_date": "2026-04-24",
+    "p10": 0.005951,
+    "p25": 0.0121,
+    "p50": 0.021478,
+    "p75": 0.030763,
+    "p90": 0.0536,
+    "em_method": "ml_lightgbm",
+    "timing": "unknown"
+  },
+  "straddle_features": [
+    {
+      "expiration": "2026-05-15",
+      "dte": 18,
+      "atm_strike": 60.0,
+      "atm_iv": 0.44215,
+      "atm_call_iv": 0.3919,
+      "atm_put_iv": 0.4924,
+      "straddle_mid": 2.5,
+      "em_straddle": 2.5,
+      "em_straddle_pct": 0.041667,
+      "em_iv": 5.891294,
+      "em_iv_pct": 0.098188,
+      "call_delta": 0.3831,
+      "call_gamma": 0.0721,
+      "call_vega": 0.05,
+      "call_theta": -0.0299
+    }
+  ],
+  "earnings_history": [
+    {
+      "date": "2026-05-08",
+      "timing": "unknown"
+    },
+    {
+      "date": "2026-02-20",
+      "timing": "unknown"
+    },
+    {
+      "date": "2025-07-30",
+      "timing": "unknown"
+    },
+    {
+      "date": "2025-05-09",
+      "timing": "before_market_open"
+    },
+    {
+      "date": "2025-02-21",
+      "timing": "before_market_open"
+    },
+    {
+      "date": "2024-11-01",
+      "timing": "before_market_open"
+    }
+  ],
+  "next_earnings": "2026-05-08",
+  "vol_regime": {
+    "iv_current": null,
+    "iv_rank": null,
+    "iv_year_high": null,
+    "iv_year_low": null,
+    "hv_current": 0.0436,
+    "hv_rank": 0.0,
+    "iv_mom_week": null,
+    "iv_mom_month": null
+  },
+  "next_earnings_timing": "unknown"
+}
