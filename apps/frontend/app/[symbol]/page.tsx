@@ -811,17 +811,20 @@ function MLBand({
   );
 }
 
-// Term-structure fan chart — two lines diverging from today's spot:
-// green climbs through spot * (1 + em) at each expiry; red drops through
-// spot * (1 - em). X axis is proportional to days-to-expiry.
+// Term-structure chart — two lines from today's spot: spot×(1±EM) at each
+// expiry. X axis is days-to-expiry. Hover shows the same fields as the table.
 function TermStructureFan({
   asOf,
   spot,
   expiries,
+  highlightExpiration,
+  onHighlightExpiration,
 }: {
   asOf: string;
   spot: number;
   expiries: Straddle[];
+  highlightExpiration: string | null;
+  onHighlightExpiration: (exp: string | null) => void;
 }) {
   // Only plot expiries with a usable straddle %.
   const rows = expiries
@@ -840,7 +843,7 @@ function TermStructureFan({
       Math.round((exp.getTime() - asOfDate.getTime()) / 86_400_000),
     );
     const em = r.em_straddle_pct as number;
-    return { expiration: r.expiration, dte, up: spot * (1 + em), down: spot * (1 - em) };
+    return { row: r, expiration: r.expiration, dte, up: spot * (1 + em), down: spot * (1 - em) };
   });
 
   const maxDte = points[points.length - 1].dte;
@@ -872,6 +875,8 @@ function TermStructureFan({
   // Y ticks: 4 evenly spaced price values.
   const yTicks = Array.from({ length: 5 }, (_, i) => yMin + ((yMax - yMin) * i) / 4);
 
+  const tip = points.find((p) => p.expiration === highlightExpiration);
+
   return (
     <div style={{ marginTop: 24 }}>
       <div
@@ -880,16 +885,22 @@ function TermStructureFan({
           letterSpacing: '0.18em',
           textTransform: 'uppercase',
           color: 'var(--ink-3)',
-          marginBottom: 10,
+          marginBottom: 4,
         }}
       >
-        Implied move fan
+        Implied range by expiry
+      </div>
+      <div
+        className="mono tnum"
+        style={{ fontSize: 10, color: 'var(--ink-4)', marginBottom: 10, lineHeight: 1.35 }}
+      >
+        Hover a date — same numbers as the table above. Green / red: spot × (1 ± straddle EM).
       </div>
       <div style={{ width: '100%', overflowX: 'auto' }}>
         <svg
           viewBox={`0 0 ${W} ${H}`}
           role="img"
-          aria-label="Implied move fan chart across expiries"
+          aria-label="Implied price range by expiration; hover points for expiry details"
           style={{ width: '100%', maxWidth: W, display: 'block' }}
         >
           {/* Y grid + labels */}
@@ -946,13 +957,51 @@ function TermStructureFan({
           {/* Origin dot (today, spot) */}
           <circle cx={x(0)} cy={y(spot)} r={4.5} fill="var(--ink)" />
 
-          {/* Per-expiry endpoint dots + labels */}
+          {/* Per-expiry: wide invisible hit targets + dots + labels */}
           {points.map((p, i) => {
             const showLabel = i === points.length - 1 || i % Math.max(1, Math.floor(points.length / 4)) === 0;
+            const hitW = Math.max(22, innerW / Math.max(points.length * 1.2, 8));
+            const hx = x(p.dte) - hitW / 2;
+            const hy = M.top;
+            const hH = H - M.bottom - M.top;
+            const active = highlightExpiration === p.expiration;
             return (
               <g key={p.expiration}>
-                <circle cx={x(p.dte)} cy={y(p.up)} r={3} fill="var(--up)" />
-                <circle cx={x(p.dte)} cy={y(p.down)} r={3} fill="var(--down)" />
+                <rect
+                  x={hx}
+                  y={hy}
+                  width={hitW}
+                  height={hH}
+                  fill="transparent"
+                  style={{ cursor: 'pointer' }}
+                  onMouseEnter={() => onHighlightExpiration(p.expiration)}
+                  onMouseLeave={() => onHighlightExpiration(null)}
+                />
+                {active && (
+                  <line
+                    x1={x(p.dte)}
+                    x2={x(p.dte)}
+                    y1={hy}
+                    y2={hy + hH}
+                    stroke="color-mix(in srgb, var(--accent) 55%, transparent)"
+                    strokeWidth={2}
+                    pointerEvents="none"
+                  />
+                )}
+                <circle
+                  cx={x(p.dte)}
+                  cy={y(p.up)}
+                  r={active ? 4.5 : 3}
+                  fill="var(--up)"
+                  pointerEvents="none"
+                />
+                <circle
+                  cx={x(p.dte)}
+                  cy={y(p.down)}
+                  r={active ? 4.5 : 3}
+                  fill="var(--down)"
+                  pointerEvents="none"
+                />
                 {showLabel && (
                   <text
                     x={x(p.dte)}
@@ -960,7 +1009,8 @@ function TermStructureFan({
                     textAnchor="middle"
                     fontSize="10"
                     fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace"
-                    fill="var(--ink-4)"
+                    fill={active ? 'var(--ink)' : 'var(--ink-4)'}
+                    pointerEvents="none"
                   >
                     {shortDate(p.expiration)?.replace(/^\w{3},\s*/, '')}
                   </text>
@@ -968,6 +1018,70 @@ function TermStructureFan({
               </g>
             );
           })}
+
+          {/* Hover card — pure SVG so we avoid foreignObject / xmlns typing issues */}
+          {tip && (() => {
+            const tx = Math.min(Math.max(M.left + 4, x(tip.dte) + 10), W - M.right - 188);
+            const ty = Math.max(M.top + 6, (y(tip.up) + y(tip.down)) / 2 - 78);
+            const rowH = 13;
+            const lines: [string, string][] = [
+              ['DTE', `${tip.row.dte}d`],
+              ['ATM IV', tip.row.atm_iv !== null ? `${(tip.row.atm_iv * 100).toFixed(2)}%` : '—'],
+              ['Straddle', tip.row.straddle_mid !== null ? `$${tip.row.straddle_mid.toFixed(2)}` : '—'],
+              ['EM math', tip.row.em_straddle_pct !== null ? `±${(tip.row.em_straddle_pct * 100).toFixed(2)}%` : '—'],
+              ['EM IV', tip.row.em_iv_pct !== null ? `±${(tip.row.em_iv_pct * 100).toFixed(2)}%` : '—'],
+              ['Band', `$${tip.down.toFixed(2)}–$${tip.up.toFixed(2)}`],
+            ];
+            const title = shortDate(tip.row.expiration)?.replace(/^\w{3},\s*/, '') ?? tip.row.expiration;
+            return (
+              <g pointerEvents="none">
+                <rect
+                  x={tx}
+                  y={ty}
+                  width={184}
+                  height={22 + rowH * (lines.length + 1)}
+                  rx={8}
+                  fill="var(--bg-2)"
+                  stroke="var(--line-2)"
+                  strokeWidth={1}
+                />
+                <text
+                  x={tx + 10}
+                  y={ty + 18}
+                  fontSize={11}
+                  fontFamily="Mulish, ui-sans-serif, system-ui, sans-serif"
+                  fontWeight={700}
+                  fill="var(--ink)"
+                >
+                  {title}
+                </text>
+                {lines.map(([k, v], i) => (
+                  <g key={k}>
+                    <text
+                      x={tx + 10}
+                      y={ty + 36 + i * rowH}
+                      fontSize={9.5}
+                      fill="var(--ink-3)"
+                      fontFamily="ui-sans-serif, system-ui, sans-serif"
+                    >
+                      {k}
+                    </text>
+                    <text
+                      x={tx + 174}
+                      y={ty + 36 + i * rowH}
+                      textAnchor="end"
+                      fontSize={9.5}
+                      fill="var(--ink)"
+                      fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace"
+                      fontWeight={500}
+                    >
+                      {v}
+                    </text>
+                  </g>
+                ))}
+              </g>
+            );
+          })()}
 
           {/* Today label */}
           <text
@@ -1121,6 +1235,7 @@ export default function SymbolPage() {
   const [loading, setLoading] = useState(true);
   const [live, setLive] = useState<LivePrice | null>(null);
   const [toast, setToast] = useState<{ msg: string; key: number } | null>(null);
+  const [fanHoverExpiration, setFanHoverExpiration] = useState<string | null>(null);
 
   useEffect(() => {
     if (!symbol) return;
@@ -1688,7 +1803,14 @@ export default function SymbolPage() {
               {data.straddle_features.map((s) => (
                 <tr
                   key={s.expiration}
-                  style={{ borderBottom: '1px solid var(--line)' }}
+                  style={{
+                    borderBottom: '1px solid var(--line)',
+                    background:
+                      fanHoverExpiration === s.expiration ? 'color-mix(in srgb, var(--accent) 12%, transparent)' : undefined,
+                    transition: 'background 120ms ease',
+                  }}
+                  onMouseEnter={() => setFanHoverExpiration(s.expiration)}
+                  onMouseLeave={() => setFanHoverExpiration(null)}
                 >
                   <Td>
                     <span className="serif" style={{ fontSize: 15 }}>
@@ -1722,6 +1844,8 @@ export default function SymbolPage() {
               asOf={data.as_of_date}
               spot={spot}
               expiries={data.straddle_features}
+              highlightExpiration={fanHoverExpiration}
+              onHighlightExpiration={setFanHoverExpiration}
             />
           )}
         </section>
