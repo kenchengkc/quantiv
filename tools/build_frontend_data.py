@@ -4,6 +4,7 @@ Build frontend data from local parquet files.
 
 Generates:
   public/weekly.json         — current week's earnings + expected moves
+  public/screener.json       — merged, deduped earnings rows for /screener (single fetch)
   public/symbols/{SYM}.json  — per-symbol detail with implied moves, Greeks, term structure
 
 Uses the most recent parquet snapshot as the as-of date. Safe to re-run.
@@ -121,6 +122,43 @@ def target_week(today: date) -> tuple[date, date]:
 
 # Week offsets we expose in the UI: last week, this week, next week, week after next.
 WEEK_OFFSETS = [-1, 0, 1, 2]
+
+
+def build_screener_payload(
+    as_of_date: date,
+    this_monday: date,
+    week_payloads: dict[date, dict],
+) -> dict:
+    """Merge week JSON events in calendar order; first row wins on duplicate (ticker, date)."""
+    seen: set[tuple[str, str]] = set()
+    events: list[dict] = []
+    for off in WEEK_OFFSETS:
+        wk_start = this_monday + timedelta(days=7 * off)
+        payload = week_payloads.get(wk_start)
+        if not payload:
+            continue
+        for ev in payload.get("events", []):
+            t = ev.get("ticker") or ""
+            ed = ev.get("earnings_date") or ""
+            if not t or not ed:
+                continue
+            key = (t, ed)
+            if key in seen:
+                continue
+            seen.add(key)
+            events.append(ev)
+    return {
+        "metadata": {
+            "version": "v1",
+            "as_of_date": as_of_date.isoformat(),
+            "generated_at": datetime.now().isoformat(),
+            "event_count": len(events),
+            "week_starts": [
+                (this_monday + timedelta(days=7 * off)).isoformat() for off in WEEK_OFFSETS
+            ],
+        },
+        "events": events,
+    }
 
 
 def jsonable(v):
@@ -524,6 +562,10 @@ def main():
             ],
         }
         write_to_public("weeks/manifest.json", json.dumps(manifest, indent=2))
+
+        screener = build_screener_payload(as_of_date, this_monday, week_payloads)
+        write_to_public("screener.json", json.dumps(screener, indent=2, default=str))
+        print(f"📊 screener.json → {screener['metadata']['event_count']} events", flush=True)
 
     # Generate per-symbol detail: all tickers seen in any week + a curated popular list.
     popular = [

@@ -43,6 +43,12 @@ interface Manifest {
   weeks: { start: string; end: string; offset: number; count: number }[];
 }
 
+/** Built by tools/build_frontend_data.py — preferred single-fetch path */
+interface ScreenerBundle {
+  metadata?: { as_of_date?: string; event_count?: number };
+  events: ScreenerEvent[];
+}
+
 type SortKey = 'edge' | 'dte' | 'date' | 'straddle' | 'ml' | 'iv' | 'band' | 'skew' | 'spot';
 type SortDir = 'asc' | 'desc';
 type TimingFilter = 'all' | 'bmo' | 'amc';
@@ -173,6 +179,18 @@ export default function EarningsScreener() {
       setLoading(true);
       setError(null);
       try {
+        const bundleRes = await fetch('/screener.json', { cache: 'no-store' });
+        if (bundleRes.ok) {
+          const bundle = (await bundleRes.json()) as ScreenerBundle;
+          if (cancelled) return;
+          setManifest({
+            as_of_date: bundle.metadata?.as_of_date,
+            weeks: [],
+          });
+          setEvents(dedupeEvents(bundle.events ?? []));
+          return;
+        }
+
         const manRes = await fetch('/weeks/manifest.json', { cache: 'no-store' });
         if (!manRes.ok) throw new Error('No weeks manifest');
         const man = (await manRes.json()) as Manifest;
