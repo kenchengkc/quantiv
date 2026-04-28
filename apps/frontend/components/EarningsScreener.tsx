@@ -30,6 +30,10 @@ export interface ScreenerEvent {
   p10?: number | null;
   p90?: number | null;
   correction_factor?: number | null;
+  // Screener-only extras emitted by tools/build_frontend_data.screener_extras
+  iv_rank?: number | null;            // 0..1, percentile of current IV in trailing year
+  hist_move_avg_4q?: number | null;   // |close pre→post| avg over last 4 quarters
+  iv_crush_pct?: number | null;       // (front − back) / front
 }
 
 interface WeekPayload {
@@ -49,7 +53,20 @@ interface ScreenerBundle {
   events: ScreenerEvent[];
 }
 
-type SortKey = 'edge' | 'dte' | 'date' | 'straddle' | 'ml' | 'iv' | 'band' | 'skew' | 'spot';
+type SortKey =
+  | 'edge'
+  | 'dte'
+  | 'date'
+  | 'straddle'
+  | 'ml'
+  | 'iv'
+  | 'band'
+  | 'skew'
+  | 'spot'
+  | 'iv_rank'
+  | 'hist_avg'
+  | 'hist_edge'
+  | 'iv_crush';
 type SortDir = 'asc' | 'desc';
 type TimingFilter = 'all' | 'bmo' | 'amc';
 
@@ -106,6 +123,16 @@ function band80(ev: ScreenerEvent): number | null {
   return hi - lo;
 }
 
+/** Hist edge = (straddle − last_4Q avg realized) / last_4Q avg realized.
+ *  +ve → implied move is richer than recent realized history (often a sell).
+ *  -ve → implied is cheaper than recent realized (often a buy). */
+function histEdge(ev: ScreenerEvent): number | null {
+  const s = ev.em_straddle_pct;
+  const h = ev.hist_move_avg_4q;
+  if (s == null || h == null || h === 0) return null;
+  return (s - h) / h;
+}
+
 function dedupeEvents(rows: ScreenerEvent[]): ScreenerEvent[] {
   const seen = new Set<string>();
   const out: ScreenerEvent[] = [];
@@ -118,20 +145,13 @@ function dedupeEvents(rows: ScreenerEvent[]): ScreenerEvent[] {
   return out;
 }
 
+const SORT_KEYS: readonly SortKey[] = [
+  'edge', 'dte', 'date', 'straddle', 'ml', 'iv', 'band', 'skew', 'spot',
+  'iv_rank', 'hist_avg', 'hist_edge', 'iv_crush',
+] as const;
+
 function parseSort(s: string | null): SortKey {
-  if (
-    s === 'edge' ||
-    s === 'dte' ||
-    s === 'date' ||
-    s === 'straddle' ||
-    s === 'ml' ||
-    s === 'iv' ||
-    s === 'band' ||
-    s === 'skew' ||
-    s === 'spot'
-  )
-    return s;
-  return 'edge';
+  return (SORT_KEYS as readonly string[]).includes(s ?? '') ? (s as SortKey) : 'hist_edge';
 }
 
 function parseDir(d: string | null): SortDir {
@@ -157,6 +177,10 @@ export default function EarningsScreener() {
   })();
   const timing = (searchParams.get('timing') ?? 'all') as TimingFilter;
   const mlOnly = searchParams.get('ml') === '1';
+  // Preset chips encode common screener intents in a single string param so
+  // the URL stays shareable. Only one preset can be active at a time.
+  type Preset = 'rich_vol' | 'cheap_vol' | 'big_movers' | 'confident' | null;
+  const preset = (searchParams.get('preset') as Preset) ?? null;
   const sortKey = parseSort(searchParams.get('sort'));
   const sortDir = parseDir(searchParams.get('dir'));
 
@@ -231,9 +255,23 @@ export default function EarningsScreener() {
         if (timing === 'amc' && b !== 'amc') return false;
       }
       if (mlOnly && ev.em_method !== 'ml_lightgbm') return false;
+
+      // Preset filters
+      if (preset === 'rich_vol') {
+        const he = histEdge(ev);
+        if (he == null || he < 0.20) return false;
+      } else if (preset === 'cheap_vol') {
+        if (ev.iv_rank == null || ev.iv_rank > 0.30) return false;
+      } else if (preset === 'big_movers') {
+        const m = ev.em_straddle_pct ?? 0;
+        if (m < 0.10) return false;
+      } else if (preset === 'confident') {
+        const bw = band80(ev);
+        if (bw == null || bw > 0.08) return false;
+      }
       return true;
     });
-  }, [events, q, sp500Only, minSpotN, timing, mlOnly]);
+  }, [events, q, sp500Only, minSpotN, timing, mlOnly, preset]);
 
   const sorted = useMemo(() => {
     const dir = sortDir === 'asc' ? 1 : -1;
@@ -257,6 +295,14 @@ export default function EarningsScreener() {
           return ev.skew_atm ?? -Infinity;
         case 'spot':
           return ev.spot_price ?? -Infinity;
+        case 'iv_rank':
+          return ev.iv_rank ?? -Infinity;
+        case 'hist_avg':
+          return ev.hist_move_avg_4q ?? -Infinity;
+        case 'hist_edge':
+          return histEdge(ev) ?? -Infinity;
+        case 'iv_crush':
+          return ev.iv_crush_pct ?? -Infinity;
         default:
           return 0;
       }
@@ -403,11 +449,15 @@ export default function EarningsScreener() {
             lineHeight: 1.55,
           }}
         >
-          Cross-week view for sizing earnings risk: <strong>straddle-implied move</strong> vs{' '}
-          <strong>ML median</strong> (edge), <strong>ATM IV</strong>, <strong>quantile band</strong>{' '}
-          (tail uncertainty), <strong>session</strong> (BMO vs AMC), <strong>days to print</strong>, and{' '}
-          <strong>1d price change</strong>. Positive edge means the listed straddle embeds a larger one-day
-          move than the model median (often worth comparing to your own vol view before trading).
+          Cross-week view for sizing earnings risk. Compare the{' '}
+          <strong>straddle-implied move</strong> against the <strong>last-4Q realized average</strong>{' '}
+          (hist edge — the canonical &ldquo;options rich vs cheap&rdquo; check), the{' '}
+          <strong>ML model median</strong> (edge), and the <strong>P90−P10 band</strong>{' '}
+          (tail uncertainty). <strong>IV Rank</strong> places current vol in its 52-week range;{' '}
+          <strong>IV crush</strong> shows how much front-month premium exceeds the next-out expiry —
+          a proxy for the post-print IV drop. Click any column to sort, or use the preset chips.{' '}
+          The canonical play: straddle implied move richer than recent realized + low IV crush = sell premium;
+          implied move below recent realized + low IV rank = buy premium.
         </p>
         {manifest?.as_of_date && (
           <div className="mono tnum" style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 10 }}>
@@ -498,6 +548,39 @@ export default function EarningsScreener() {
           <option value="bmo">BMO only</option>
           <option value="amc">AMC only</option>
         </select>
+
+        {/* Preset chips — common options-trader intents one click away */}
+        <div style={{ display: 'flex', gap: 6, marginLeft: 'auto', flexWrap: 'wrap' }}>
+          {([
+            ['rich_vol',   'Rich vs hist',   'Implied move ≥ 20% above last-4Q realized average'],
+            ['cheap_vol',  'Cheap IV',       'IV Rank ≤ 30% — options trading near 52-week lows'],
+            ['big_movers', 'Big movers',     'Implied move ≥ 10%'],
+            ['confident',  'Tight bands',    'P90−P10 ≤ 8% — model is highly confident'],
+          ] as [string, string, string][]).map(([key, label, tip]) => {
+            const active = preset === key;
+            return (
+              <button
+                key={key}
+                type="button"
+                title={tip}
+                onClick={() => setParam({ preset: active ? null : key })}
+                className="mono"
+                style={{
+                  padding: '6px 10px',
+                  borderRadius: 999,
+                  border: `1px solid ${active ? 'var(--accent)' : 'var(--line)'}`,
+                  background: active ? 'color-mix(in srgb, var(--accent) 18%, transparent)' : 'transparent',
+                  color: active ? 'var(--accent)' : 'var(--ink-2)',
+                  fontSize: 11,
+                  letterSpacing: '0.04em',
+                  cursor: 'pointer',
+                }}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       <div style={{ overflowX: 'auto', marginTop: 8, WebkitOverflowScrolling: 'touch' }}>
@@ -520,10 +603,14 @@ export default function EarningsScreener() {
                 Session
               </th>
               {th('straddle', 'Straddle EM', 'ATM straddle-implied one-day move')}
+              {th('hist_avg', 'Hist 4Q avg', 'Average |close-to-close| move over last 4 earnings reports')}
+              {th('hist_edge', 'Hist edge', 'Straddle vs hist average. +ve = implied richer than recent realized')}
               {th('ml', 'ML EM', 'Model median expected |move|')}
-              {th('edge', 'Edge', 'Straddle % minus ML %')}
+              {th('edge', 'Edge (vs ML)', 'Straddle % minus ML %')}
               {th('band', 'P90−P10', 'Quantile spread — wider = more tail uncertainty')}
               {th('iv', 'ATM IV', 'Front ATM implied vol')}
+              {th('iv_rank', 'IV Rank', 'Current IV percentile vs trailing 52 weeks (0% = year low, 100% = year high)')}
+              {th('iv_crush', 'IV crush', 'Front-month IV premium over the next-out expiry — proxy for post-print IV drop')}
               {th('skew', 'Skew', 'ATM call/put IV skew snapshot')}
               <th style={{ textAlign: 'right', padding: '10px 8px', fontSize: 10, color: 'var(--ink-3)', letterSpacing: '0.14em', textTransform: 'uppercase' }}>
                 1d %
@@ -578,6 +665,25 @@ export default function EarningsScreener() {
                   <td className="mono tnum" style={{ textAlign: 'right', padding: '10px 8px' }}>
                     {pct1(ev.em_straddle_pct)}
                   </td>
+                  <td className="mono tnum" style={{ textAlign: 'right', padding: '10px 8px', color: 'var(--ink-2)' }}>
+                    {pct1(ev.hist_move_avg_4q)}
+                  </td>
+                  {(() => {
+                    const hEdge = histEdge(ev);
+                    const hot = hEdge != null && Math.abs(hEdge) >= 0.20;
+                    const tone = hEdge == null
+                      ? 'var(--ink-3)'
+                      : hEdge > 0 ? 'var(--down)' : 'var(--up)';
+                    return (
+                      <td className="mono tnum" style={{
+                        textAlign: 'right', padding: '10px 8px',
+                        color: tone,
+                        fontWeight: hot ? 600 : 400,
+                      }}>
+                        {hEdge == null ? '—' : `${hEdge > 0 ? '+' : ''}${(hEdge * 100).toFixed(0)}%`}
+                      </td>
+                    );
+                  })()}
                   <td className="mono tnum" style={{ textAlign: 'right', padding: '10px 8px' }}>
                     {pct1(ev.em_ml_pct)}
                   </td>
@@ -597,6 +703,12 @@ export default function EarningsScreener() {
                   </td>
                   <td className="mono tnum" style={{ textAlign: 'right', padding: '10px 8px' }}>
                     {ivPct(ev.atm_iv)}
+                  </td>
+                  <td className="mono tnum" style={{ textAlign: 'right', padding: '10px 8px', color: 'var(--ink-2)' }}>
+                    {ev.iv_rank == null ? '—' : `${Math.round(ev.iv_rank * 100)}%`}
+                  </td>
+                  <td className="mono tnum" style={{ textAlign: 'right', padding: '10px 8px', color: 'var(--ink-2)' }}>
+                    {pct1(ev.iv_crush_pct)}
                   </td>
                   <td className="mono tnum" style={{ textAlign: 'right', padding: '10px 8px', color: 'var(--ink-2)' }}>
                     {num(ev.skew_atm, 3)}

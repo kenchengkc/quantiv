@@ -374,6 +374,100 @@ def build_symbol_detail(conn, ticker: str, as_of_date: date, earnings_dt: date |
     }
 
 
+def screener_extras(conn, ticker: str, earnings_dt: date, as_of_date: date) -> dict:
+    """Extra per-event fields the screener needs but the standard event payload
+    doesn't carry: IV rank, last-4-quarter realized average, IV crush proxy.
+
+    All three are best-effort — return None for any field that can't be
+    computed. The screener degrades gracefully on missing fields.
+    """
+    extras: dict = {
+        "iv_rank": None,
+        "hist_move_avg_4q": None,
+        "iv_crush_pct": None,
+    }
+
+    # IV rank from v_volhist
+    try:
+        vh = conn.execute(
+            """
+            SELECT iv_current, iv_year_high, iv_year_low
+            FROM v_volhist
+            WHERE act_symbol = ? AND date = ?
+            LIMIT 1
+            """,
+            [ticker, as_of_date],
+        ).fetchone()
+        if vh:
+            cur, hi, lo = vh
+            if cur is not None and hi is not None and lo is not None and hi > lo:
+                extras["iv_rank"] = jsonable(max(0.0, min(1.0, (cur - lo) / (hi - lo))))
+    except Exception:
+        pass
+
+    # Hist average realized move — last 4 earnings × OHLCV close-to-close
+    try:
+        rows = conn.execute(
+            """
+            SELECT ABS(post.close / NULLIF(pre.close, 0) - 1.0) AS realized
+            FROM v_earnings e
+            JOIN v_ohlcv pre  ON pre.act_symbol = e.act_symbol
+                AND pre.date < e.date AND pre.date >= e.date - INTERVAL '5' DAY
+            JOIN v_ohlcv post ON post.act_symbol = e.act_symbol
+                AND post.date > e.date AND post.date <= e.date + INTERVAL '5' DAY
+            WHERE e.act_symbol = ? AND e.date < ? AND pre.close > 0 AND post.close > 0
+            QUALIFY ROW_NUMBER() OVER (
+                PARTITION BY e.date ORDER BY pre.date DESC, post.date ASC
+            ) = 1
+            ORDER BY e.date DESC LIMIT 4
+            """,
+            [ticker, earnings_dt],
+        ).fetchall()
+        if rows:
+            vals = [r[0] for r in rows if r[0] is not None]
+            if vals:
+                extras["hist_move_avg_4q"] = jsonable(sum(vals) / len(vals))
+    except Exception:
+        pass
+
+    # IV crush proxy — front ATM IV vs the next-out expiry's ATM IV.
+    # Already computed in v_straddle_features as iv_crush_pct upstream;
+    # we recompute here from raw options to avoid coupling to that view.
+    try:
+        front = conn.execute(
+            """
+            SELECT iv FROM v_options_chain
+            WHERE ticker = ? AND as_of_date = ? AND call_put = 'C'
+              AND iv IS NOT NULL AND iv > 0
+              AND expiry_date >= ?
+            ORDER BY expiry_date ASC, ABS(delta - 0.5) ASC
+            LIMIT 1
+            """,
+            [ticker, as_of_date, earnings_dt],
+        ).fetchone()
+        if front:
+            front_iv = float(front[0])
+            back = conn.execute(
+                """
+                SELECT iv FROM v_options_chain
+                WHERE ticker = ? AND as_of_date = ? AND call_put = 'C'
+                  AND iv IS NOT NULL AND iv > 0
+                  AND expiry_date > ?
+                ORDER BY expiry_date ASC, ABS(delta - 0.5) ASC
+                LIMIT 1 OFFSET 1
+                """,
+                [ticker, as_of_date, earnings_dt],
+            ).fetchone()
+            if back:
+                back_iv = float(back[0])
+                if front_iv > 0:
+                    extras["iv_crush_pct"] = jsonable((front_iv - back_iv) / front_iv)
+    except Exception:
+        pass
+
+    return extras
+
+
 def build_week_events(conn, as_of_date: date, week_start: date, week_end: date,
                       ml_lookup: dict[tuple[str, str], dict],
                       require_ml: bool = True) -> list[dict]:
@@ -407,6 +501,7 @@ def build_week_events(conn, as_of_date: date, week_start: date, week_end: date,
         if i % 25 == 0 or i == len(rows):
             print(f"    event {i}/{len(rows)}: {ticker} {earnings_dt}", flush=True)
         ml = ml_fields(fc)
+        extras = screener_extras(conn, ticker, earnings_dt, as_of_date)
         event = {
             "ticker": ticker,
             "earnings_date": earnings_dt.isoformat(),
@@ -426,6 +521,7 @@ def build_week_events(conn, as_of_date: date, week_start: date, week_end: date,
             "term_slope": jsonable(em.get("term_slope")),
             "em_method": "ml_lightgbm" if ml else "options_math",
             "confidence": "high" if ml else "high",
+            **extras,
             **ml,
         }
         events.append(event)
