@@ -1261,12 +1261,16 @@ export default function SymbolPage() {
 
   useEffect(() => {
     if (!symbol) return;
+    setLive(null);
     let cancelled = false;
-    (async () => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const fetchOnce = async (): Promise<number> => {
       try {
         const res = await fetch(`/api/stocks/batch-price?symbols=${symbol}`, { cache: 'no-store' });
-        if (!res.ok) return;
+        if (!res.ok) return 0;
         const json = (await res.json()) as {
+          pending?: number;
           updated: string | null;
           source: 'finnhub' | 'unavailable';
           data: Array<{
@@ -1278,7 +1282,7 @@ export default function SymbolPage() {
           }>;
         };
         const tick = json.data?.[0];
-        if (!cancelled && tick) {
+        if (!cancelled && tick && tick.price !== null) {
           setLive({
             price: tick.price,
             previousClose: tick.previousClose,
@@ -1288,12 +1292,42 @@ export default function SymbolPage() {
             source: json.source === 'finnhub' ? 'finnhub' : 'unavailable',
           });
         }
+        return json.pending ?? 0;
       } catch {
-        /* ignore */
+        return 0;
       }
-    })();
+    };
+
+    const fastPoll = async (attempt = 0) => {
+      if (cancelled) return;
+      const pending = await fetchOnce();
+      if (pending > 0 && attempt < 30) {
+        const delay = attempt < 10 ? 2_000 : 8_000;
+        timer = setTimeout(() => void fastPoll(attempt + 1), delay);
+      } else {
+        const slowLoop = () => {
+          if (cancelled) return;
+          timer = setTimeout(async () => {
+            await fetchOnce();
+            slowLoop();
+          }, 30_000);
+        };
+        slowLoop();
+      }
+    };
+    void fastPoll();
+
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && !cancelled) void fetchOnce();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+
     return () => {
       cancelled = true;
+      if (timer) clearTimeout(timer);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
     };
   }, [symbol]);
 
