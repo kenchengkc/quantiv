@@ -16,7 +16,11 @@ export default clerkMiddleware(async (auth, req) => {
 export const config = {
   matcher: [
     // Skip Next.js internals and static files, always run on API routes.
-    '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
+    // `json` MUST be listed — Clerk's dev-mode handshake will rewrite static
+    // .json files in /public to an HTML page, breaking every screener / week
+    // / symbol fetch with "Unexpected token '<', '<!DOCTYPE'... is not valid
+    // JSON". Same family of bug as the original /api/watchlist regression.
+    '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|json|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
     '/(api|trpc)(.*)',
   ],
 };
