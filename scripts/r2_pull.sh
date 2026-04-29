@@ -21,6 +21,11 @@ rclone sync "$REMOTE/parquet" "$DATA_DIR/parquet" \
 rclone sync "$REMOTE/models" "$DATA_DIR/models" \
   --fast-list --transfers=8 --progress
 
+# Forecasts (small, but keeping them in sync means daily_score finds the
+# previous run's parquet and build_frontend_data has them on hand).
+rclone sync "$REMOTE/forecasts" "$DATA_DIR/forecasts" \
+  --fast-list --transfers=8 --progress 2>/dev/null || true
+
 # Small files
 rclone copy "$REMOTE/earnings_calendar.csv" "$DATA_DIR/" 2>/dev/null || true
 rclone copy "$REMOTE/bias_curves.parquet"   "$DATA_DIR/" 2>/dev/null || true

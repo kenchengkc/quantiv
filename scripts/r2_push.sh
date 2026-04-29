@@ -19,6 +19,13 @@ rclone sync "$DATA_DIR/parquet" "$REMOTE/parquet" \
 rclone sync "$DATA_DIR/models" "$REMOTE/models" \
   --fast-list --transfers=8 --progress
 
+# Forecasts — daily_score writes a new forecasts_YYYY-MM-DD.parquet each run.
+# Cheap to sync (a few MB) and lets local devs pull the latest without rerunning.
+if [ -d "$DATA_DIR/forecasts" ]; then
+  rclone sync "$DATA_DIR/forecasts" "$REMOTE/forecasts" \
+    --fast-list --transfers=8 --progress
+fi
+
 # Small refreshable files
 [ -f "$DATA_DIR/earnings_calendar.csv" ] && \
   rclone copy "$DATA_DIR/earnings_calendar.csv" "$REMOTE/"

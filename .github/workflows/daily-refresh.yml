@@ -181,12 +181,24 @@ jobs:
         run: python scripts/check_duckdb_freshness.py --strict --max-lag-days 5
 
       - name: Build ML training parquet (v3)
+        # Window matches what you A/B-tested locally. start-date 2023-01-01
+        # = full options + OHLCV coverage. end-date = today so we capture the
+        # latest earnings; pre-earnings rows older than today still survive
+        # the WHERE filter inside the SQL.
         run: |
-          END=$(date -u -d '+400 days' +%Y-%m-%d)
-          python apps/ml/feature_engineering_v3.py --end-date "$END"
+          END=$(date -u +%Y-%m-%d)
+          python apps/ml/feature_engineering_v3.py \
+            --start-date 2023-01-01 \
+            --end-date "$END"
 
-      - name: Train LightGBM models (v3)
-        run: python apps/ml/model_trainer_v3.py
+      - name: Train LightGBM models (v3, tuned + time-decay)
+        # Locked-in production settings (settled on after local A/B):
+        #   --tune              Optuna search per horizon (30 trials × 6 horizons ≈ 7 min)
+        #   --time-decay 0.5    half-life 0.5y — modest recency bias on top of VIX features
+        run: python apps/ml/model_trainer_v3.py --tune --time-decay 0.5
+
+      - name: Score upcoming earnings with the new models
+        run: python scripts/daily_score.py --days-ahead 21
 
       - name: Push models to R2
         env:
