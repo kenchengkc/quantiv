@@ -113,6 +113,34 @@ def create_duckdb_views(conn: duckdb.DuckDBPyConnection, data_dir: Path):
         )
     """)
     
+    # v_ohlcv — daily stock prices. Needed by build_frontend_data.screener_extras
+    # to compute hist_move_avg_4q (close-to-close moves over the last 4 earnings).
+    ohlcv_root = data_dir / "parquet" / "ohlcv"
+    if ohlcv_root.exists() and any(ohlcv_root.glob("year=*/month=*/*.parquet")):
+        ohlcv_glob = str(ohlcv_root / "year=*" / "month=*" / "*.parquet")
+        conn.execute(f"""
+            CREATE OR REPLACE VIEW v_ohlcv AS
+            SELECT
+                CAST(date AS DATE) AS date,
+                act_symbol,
+                CAST(open  AS DOUBLE) AS open,
+                CAST(high  AS DOUBLE) AS high,
+                CAST(low   AS DOUBLE) AS low,
+                CAST(close AS DOUBLE) AS close,
+                CAST(volume AS BIGINT) AS volume
+            FROM read_parquet('{ohlcv_glob}')
+        """)
+        print("✅ Created v_ohlcv view")
+    else:
+        conn.execute("""
+            CREATE OR REPLACE VIEW v_ohlcv AS
+            SELECT NULL::DATE AS date, NULL::VARCHAR AS act_symbol,
+                   NULL::DOUBLE AS open, NULL::DOUBLE AS high,
+                   NULL::DOUBLE AS low, NULL::DOUBLE AS close,
+                   NULL::BIGINT AS volume
+            WHERE 1=0
+        """)
+
     # v_vix — daily VIX close from FRED. Used as a market-regime feature.
     vix_path = data_dir / "parquet" / "vix" / "vix.parquet"
     if vix_path.exists():
