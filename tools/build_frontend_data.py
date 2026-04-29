@@ -405,21 +405,24 @@ def screener_extras(conn, ticker: str, earnings_dt: date, as_of_date: date) -> d
     except Exception:
         pass
 
-    # Hist average realized move — last 4 earnings × OHLCV close-to-close
+    # Hist average realized move — last 4 earnings × OHLCV close-to-close.
+    # Uses the canonical `earnings_events` table (built by build_earnings_events_table)
+    # joined to v_ohlcv. Both must exist for this to produce a value; the
+    # try/except suppresses errors when either is missing.
     try:
         rows = conn.execute(
             """
             SELECT ABS(post.close / NULLIF(pre.close, 0) - 1.0) AS realized
-            FROM v_earnings e
-            JOIN v_ohlcv pre  ON pre.act_symbol = e.act_symbol
-                AND pre.date < e.date AND pre.date >= e.date - INTERVAL '5' DAY
-            JOIN v_ohlcv post ON post.act_symbol = e.act_symbol
-                AND post.date > e.date AND post.date <= e.date + INTERVAL '5' DAY
-            WHERE e.act_symbol = ? AND e.date < ? AND pre.close > 0 AND post.close > 0
+            FROM earnings_events e
+            JOIN v_ohlcv pre  ON pre.act_symbol = e.ticker
+                AND pre.date < e.earnings_dt AND pre.date >= e.earnings_dt - INTERVAL '5' DAY
+            JOIN v_ohlcv post ON post.act_symbol = e.ticker
+                AND post.date > e.earnings_dt AND post.date <= e.earnings_dt + INTERVAL '5' DAY
+            WHERE e.ticker = ? AND e.earnings_dt < ? AND pre.close > 0 AND post.close > 0
             QUALIFY ROW_NUMBER() OVER (
-                PARTITION BY e.date ORDER BY pre.date DESC, post.date ASC
+                PARTITION BY e.earnings_dt ORDER BY pre.date DESC, post.date ASC
             ) = 1
-            ORDER BY e.date DESC LIMIT 4
+            ORDER BY e.earnings_dt DESC LIMIT 4
             """,
             [ticker, earnings_dt],
         ).fetchall()
@@ -427,8 +430,8 @@ def screener_extras(conn, ticker: str, earnings_dt: date, as_of_date: date) -> d
             vals = [r[0] for r in rows if r[0] is not None]
             if vals:
                 extras["hist_move_avg_4q"] = jsonable(sum(vals) / len(vals))
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"  ⚠ hist_move_avg_4q failed for {ticker}: {e}", flush=True)
 
     # IV crush proxy — front ATM IV vs the next-out expiry's ATM IV.
     # Already computed in v_straddle_features as iv_crush_pct upstream;
