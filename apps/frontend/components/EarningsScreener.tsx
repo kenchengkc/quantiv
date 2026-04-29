@@ -199,13 +199,29 @@ export default function EarningsScreener() {
 
   useEffect(() => {
     let cancelled = false;
+
+    // Defensive JSON fetch: returns null if the response isn't OK or isn't
+    // actually JSON. The original "<!DOCTYPE" crash was caused by middleware
+    // rewriting a static .json to an HTML page; even after the matcher fix,
+    // we don't want one bad payload to take the whole screener down.
+    async function fetchJson<T>(url: string): Promise<T | null> {
+      const r = await fetch(url, { cache: 'no-store' });
+      if (!r.ok) return null;
+      const ct = r.headers.get('content-type') ?? '';
+      if (!ct.includes('json')) return null;
+      try {
+        return (await r.json()) as T;
+      } catch {
+        return null;
+      }
+    }
+
     (async () => {
       setLoading(true);
       setError(null);
       try {
-        const bundleRes = await fetch('/screener.json', { cache: 'no-store' });
-        if (bundleRes.ok) {
-          const bundle = (await bundleRes.json()) as ScreenerBundle;
+        const bundle = await fetchJson<ScreenerBundle>('/screener.json');
+        if (bundle) {
           if (cancelled) return;
           setManifest({
             as_of_date: bundle.metadata?.as_of_date,
@@ -215,22 +231,19 @@ export default function EarningsScreener() {
           return;
         }
 
-        const manRes = await fetch('/weeks/manifest.json', { cache: 'no-store' });
-        if (!manRes.ok) throw new Error('No weeks manifest');
-        const man = (await manRes.json()) as Manifest;
+        const man = await fetchJson<Manifest>('/weeks/manifest.json');
+        if (!man) throw new Error('No weeks manifest available');
         if (cancelled) return;
         setManifest(man);
 
         const weekUrls = (man.weeks ?? []).map((w) => `/weeks/${w.start}.json`);
         const payloads = await Promise.all(
-          weekUrls.map(async (url) => {
-            const r = await fetch(url, { cache: 'no-store' });
-            if (!r.ok) return { events: [] as ScreenerEvent[] };
-            return (await r.json()) as WeekPayload;
-          }),
+          weekUrls.map((url) => fetchJson<WeekPayload>(url)),
         );
         if (cancelled) return;
-        const merged = dedupeEvents(payloads.flatMap((p) => p.events ?? []));
+        const merged = dedupeEvents(
+          payloads.flatMap((p) => p?.events ?? []),
+        );
         setEvents(merged);
       } catch (e) {
         if (!cancelled) setError((e as Error).message);

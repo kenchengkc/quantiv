@@ -231,6 +231,7 @@ export default function WatchlistPage() {
   const [overIdx, setOverIdx] = useState<number | null>(null);
   // Ticker awaiting delete confirmation — X click arms it, ✓ click confirms.
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
+  const [marketOpen, setMarketOpen] = useState<boolean>(true);
 
   // Load per-symbol summary from pre-generated /symbols/*.json
   useEffect(() => {
@@ -264,15 +265,17 @@ export default function WatchlistPage() {
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
 
-    const fetchOnce = async (): Promise<number> => {
+    let lastOpen = true;
+    const fetchOnce = async (): Promise<{ pending: number; open: boolean }> => {
       try {
         const res = await fetch(
           `/api/stocks/batch-price?symbols=${tickers.join(',')}`,
           { cache: 'no-store' },
         );
-        if (!res.ok) return 0;
+        if (!res.ok) return { pending: 0, open: lastOpen };
         const json = (await res.json()) as {
           pending?: number;
+          marketOpen?: boolean;
           data: {
             symbol: string;
             price: number | null;
@@ -280,7 +283,7 @@ export default function WatchlistPage() {
             changePct: number | null;
           }[];
         };
-        if (cancelled) return 0;
+        if (cancelled) return { pending: 0, open: lastOpen };
         setLive((prev) => {
           const next: Record<string, Tick> = { ...prev };
           for (const t of json.data) {
@@ -294,25 +297,30 @@ export default function WatchlistPage() {
           }
           return next;
         });
-        return json.pending ?? 0;
+        const open = json.marketOpen ?? true;
+        lastOpen = open;
+        setMarketOpen(open);
+        return { pending: json.pending ?? 0, open };
       } catch {
-        return 0;
+        return { pending: 0, open: lastOpen };
       }
     };
 
     const fastPoll = async (attempt = 0) => {
       if (cancelled) return;
-      const pending = await fetchOnce();
-      if (pending > 0 && attempt < 30) {
+      const { pending, open } = await fetchOnce();
+      if (open && pending > 0 && attempt < 30) {
         const delay = attempt < 10 ? 2_000 : 8_000;
         timer = setTimeout(() => fastPoll(attempt + 1), delay);
       } else {
         const slowLoop = () => {
           if (cancelled) return;
+          // Quotes frozen when closed — back off to 5 min instead of 30 s.
+          const interval = lastOpen ? 30_000 : 300_000;
           timer = setTimeout(async () => {
             await fetchOnce();
             slowLoop();
-          }, 30_000);
+          }, interval);
         };
         slowLoop();
       }
@@ -378,9 +386,36 @@ export default function WatchlistPage() {
               textTransform: 'uppercase',
               color: 'var(--ink-3)',
               marginBottom: 6,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              flexWrap: 'wrap',
             }}
           >
-            Your list
+            <span>Your list</span>
+            {!marketOpen && (
+              <span
+                title="US equity market is closed (regular hours 09:30–16:00 ET). Quotes shown are last close."
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 5,
+                  padding: '2px 8px',
+                  borderRadius: 999,
+                  border: '1px solid var(--line)',
+                  background: 'var(--bg-2)',
+                  color: 'var(--ink-3)',
+                  letterSpacing: '0.08em',
+                  fontSize: 9.5,
+                }}
+              >
+                <span style={{
+                  width: 6, height: 6, borderRadius: 999,
+                  background: 'var(--ink-4)',
+                }} />
+                MARKET CLOSED · LAST CLOSE
+              </span>
+            )}
           </div>
           <h1
             className="serif"

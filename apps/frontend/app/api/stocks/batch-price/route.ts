@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getRedis } from '@/lib/redis';
+import { isMarketOpenET } from '@/lib/marketHours';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -181,7 +182,11 @@ export async function GET(req: NextRequest) {
     if (!entry || now - entry.at >= FRESH_TTL_MS) toRefresh.push(s);
   }
 
-  if (apiKey && toRefresh.length > 0) {
+  // Skip background warming outside market hours. Quotes are frozen at the
+  // 4pm close anyway, so spending Finnhub budget to re-fetch them just
+  // returns the same value back into Redis.
+  const marketOpen = isMarketOpenET();
+  if (apiKey && marketOpen && toRefresh.length > 0) {
     // Fire-and-forget. The cron warms the hot set; this catches long-tail
     // symbols a user navigates to directly or newly-added tickers.
     void mapLimit(toRefresh, CONCURRENCY, (s) => refreshSymbol(s, apiKey));
@@ -208,6 +213,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     updated: latestAt ? new Date(latestAt).toISOString() : null,
     source: apiKey ? 'finnhub' : 'unavailable',
+    marketOpen,
     pending,
     data,
   });

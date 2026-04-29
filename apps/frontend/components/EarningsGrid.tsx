@@ -223,25 +223,37 @@ function Group({
 }) {
   if (list.length === 0) return null;
   return (
-    <div style={{ marginBottom: 10 }}>
+    <div style={{ marginBottom: 12 }}>
+      {/* Stronger session separator: tinted background + colored left rule
+          + slightly bolder label so BMO/AMC sections are visually distinct
+          inside a single day cell. */}
       <div
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: 6,
-          padding: '6px 10px',
-          color: 'var(--ink-3)',
-          fontSize: 10,
+          gap: 7,
+          padding: '6px 10px 6px 8px',
+          color: 'var(--ink-2)',
+          fontSize: 10.5,
+          fontWeight: 600,
           letterSpacing: '0.14em',
           textTransform: 'uppercase',
+          background: `color-mix(in srgb, ${tone} 10%, transparent)`,
+          borderLeft: `3px solid ${tone}`,
           borderTop: '1px solid var(--line)',
+          borderBottom: '1px solid var(--line)',
         }}
       >
         <span style={{ color: tone, display: 'inline-flex' }}>{icon}</span>
         <span>{title}</span>
         <span
           className="mono tnum"
-          style={{ marginLeft: 'auto', color: 'var(--ink-4)', letterSpacing: 0 }}
+          style={{
+            marginLeft: 'auto',
+            color: 'var(--ink-3)',
+            letterSpacing: 0,
+            fontWeight: 500,
+          }}
         >
           {list.length}
         </span>
@@ -502,6 +514,7 @@ function WeekHeader({
   setFilter,
   search,
   setSearch,
+  marketOpen,
 }: {
   offset: number;
   setOffset: (n: number) => void;
@@ -510,6 +523,7 @@ function WeekHeader({
   setFilter: (f: Filter) => void;
   search: string;
   setSearch: (s: string) => void;
+  marketOpen: boolean;
 }) {
   return (
     <div style={{ padding: '24px 0 20px', borderBottom: '1px solid var(--line)' }}>
@@ -530,9 +544,36 @@ function WeekHeader({
               textTransform: 'uppercase',
               color: 'var(--ink-3)',
               marginBottom: 6,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              flexWrap: 'wrap',
             }}
           >
-            Earnings Week
+            <span>Earnings Week</span>
+            {!marketOpen && (
+              <span
+                title="US equity market is closed (regular hours 09:30–16:00 ET). Quotes shown are last close."
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 5,
+                  padding: '2px 8px',
+                  borderRadius: 999,
+                  border: '1px solid var(--line)',
+                  background: 'var(--bg-2)',
+                  color: 'var(--ink-3)',
+                  letterSpacing: '0.08em',
+                  fontSize: 9.5,
+                }}
+              >
+                <span style={{
+                  width: 6, height: 6, borderRadius: 999,
+                  background: 'var(--ink-4)',
+                }} />
+                MARKET CLOSED · LAST CLOSE
+              </span>
+            )}
           </div>
           <h1
             className="serif"
@@ -696,6 +737,7 @@ export default function EarningsGrid() {
   const [isFetching, setIsFetching] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [live, setLive] = useState<LiveMap>({});
+  const [marketOpen, setMarketOpen] = useState<boolean>(true);
   const [isPending, startTransition] = useTransition();
 
   const thisMonday = useMemo(() => mondayOf(new Date()), []);
@@ -747,17 +789,19 @@ export default function EarningsGrid() {
     // bug: the busy days at the back of the week were dropped.
     const symbols = Array.from(new Set(data.events.map((e) => e.ticker)));
 
-    const fetchOnce = async (): Promise<number> => {
+    let lastMarketOpen = true;
+    const fetchOnce = async (): Promise<{ pending: number; marketOpen: boolean }> => {
       try {
         const res = await fetch(`/api/stocks/batch-price?symbols=${symbols.join(',')}`, {
           cache: 'no-store',
         });
-        if (!res.ok) return 0;
+        if (!res.ok) return { pending: 0, marketOpen: lastMarketOpen };
         const json = (await res.json()) as {
           pending?: number;
+          marketOpen?: boolean;
           data: { symbol: string; price: number | null; change: number | null; changePct: number | null }[];
         };
-        if (cancelled) return 0;
+        if (cancelled) return { pending: 0, marketOpen: lastMarketOpen };
         setLive((prev) => {
           const next: LiveMap = { ...prev };
           for (const t of json.data) {
@@ -769,29 +813,33 @@ export default function EarningsGrid() {
           }
           return next;
         });
-        return json.pending ?? 0;
+        const open = json.marketOpen ?? true;
+        lastMarketOpen = open;
+        setMarketOpen(open);
+        return { pending: json.pending ?? 0, marketOpen: open };
       } catch {
-        return 0;
+        return { pending: 0, marketOpen: lastMarketOpen };
       }
     };
 
     // Phase 1: aggressive polling until the first paint is fully populated.
+    // Phase 2: gentle 30s loop while market is open. When closed, drop to a
+    // very slow 5-min heartbeat — quotes are frozen anyway, no need to spin.
     const fastPoll = async (attempt = 0) => {
       if (cancelled) return;
-      const pending = await fetchOnce();
-      if (pending > 0 && attempt < 30) {
+      const { pending, marketOpen: open } = await fetchOnce();
+      if (open && pending > 0 && attempt < 30) {
         const delay = attempt < 10 ? 2_000 : 8_000;
         timer = setTimeout(() => fastPoll(attempt + 1), delay);
       } else {
-        // Phase 2: slow background refresh forever, so the dashboard stays
-        // in sync with the cron's rotating updates and any prices that
-        // landed while the user was on a ticker page.
         const slowLoop = () => {
           if (cancelled) return;
+          // 30s when market open, 5min when closed.
+          const interval = lastMarketOpen ? 30_000 : 300_000;
           timer = setTimeout(async () => {
             await fetchOnce();
             slowLoop();
-          }, 30_000);
+          }, interval);
         };
         slowLoop();
       }
@@ -883,6 +931,7 @@ export default function EarningsGrid() {
         setFilter={(f) => startTransition(() => setFilter(f))}
         search={search}
         setSearch={setSearch}
+        marketOpen={marketOpen}
       />
 
       {error && (
