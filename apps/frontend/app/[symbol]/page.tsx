@@ -81,6 +81,7 @@ interface LivePrice {
   changePct: number | null;
   updated: string | null;
   source: 'finnhub' | 'unavailable';
+  marketOpen: boolean;
 }
 
 function logoUrl(t: string) {
@@ -1273,6 +1274,7 @@ export default function SymbolPage() {
           pending?: number;
           updated: string | null;
           source: 'finnhub' | 'unavailable';
+          marketOpen?: boolean;
           data: Array<{
             symbol: string;
             price: number | null;
@@ -1290,6 +1292,7 @@ export default function SymbolPage() {
             changePct: tick.changePct,
             updated: json.updated,
             source: json.source === 'finnhub' ? 'finnhub' : 'unavailable',
+            marketOpen: json.marketOpen ?? true,
           });
         }
         return json.pending ?? 0;
@@ -1512,7 +1515,7 @@ export default function SymbolPage() {
                 }}
               >
                 {live?.source === 'finnhub'
-                  ? 'Live · Finnhub'
+                  ? (live.marketOpen ? 'Live · Finnhub' : 'Last close · Finnhub')
                   : `As of ${data.as_of_date}`}
               </span>
             </div>
