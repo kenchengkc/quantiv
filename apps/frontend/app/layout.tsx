@@ -28,13 +28,16 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <ClerkProvider
+      // Hex equivalents of the OKLCH palette in app/globals.css. Clerk's theme
+      // engine doesn't understand CSS custom-property references, so we hard-
+      // code the colors here. Keep in sync with --accent / --bg-* tokens.
       appearance={{
         variables: {
-          colorPrimary: '#8ab4ff',
-          colorBackground: '#12151c',
-          colorText: '#e6e8ee',
-          colorInputBackground: '#0b0e14',
-          colorInputText: '#e6e8ee',
+          colorPrimary: '#1E90FF',          // matches --accent (logo wave blue)
+          colorBackground: '#171c24',       // matches --bg-2
+          colorText: '#fafbfd',             // near-pure white, matches --ink
+          colorInputBackground: '#0e1218',  // matches --bg
+          colorInputText: '#fafbfd',
           borderRadius: '10px',
         },
       }}
