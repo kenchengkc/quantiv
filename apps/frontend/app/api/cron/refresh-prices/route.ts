@@ -93,13 +93,18 @@ async function buildSymbolList(): Promise<string[]> {
   const thisMon = mondayOf(new Date());
   const lastMon = new Date(thisMon); lastMon.setDate(thisMon.getDate() - 7);
   const nextMon = new Date(thisMon); nextMon.setDate(thisMon.getDate() + 7);
+  const weekAfterNextMon = new Date(thisMon); weekAfterNextMon.setDate(thisMon.getDate() + 14);
 
   const sp500 = (sp500Constituents as { symbol: string }[]).map((c) => c.symbol);
 
+  // Priority tiers — first one wins on dedup. Week +2 sits above SP500 so
+  // earnings the user can see in the calendar refresh before the generic
+  // SP500 list. Cycle time grows ~22 min → ~30 min as a result.
   const tiers = [
     await loadWatchlistSymbols(),
     loadWeekFile(`${isoDay(thisMon)}.json`),
     loadWeekFile(`${isoDay(nextMon)}.json`),
+    loadWeekFile(`${isoDay(weekAfterNextMon)}.json`),
     sp500,
     loadWeekFile(`${isoDay(lastMon)}.json`),
   ];
