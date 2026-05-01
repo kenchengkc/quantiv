@@ -4,19 +4,22 @@
 
 @import url('https://fonts.googleapis.com/css2?family=Mulish:wght@300;400;500;600;700;800;900&family=Nunito+Sans:opsz,wght@6..12,300;6..12,400;6..12,500;6..12,600&family=JetBrains+Mono:wght@300;400;500;600&display=swap');
 
+/* Palette tuned to the Quantiv logo: near-black backgrounds (no warm tint),
+ * pure white type, and a vivid dodger-blue accent (~#1E90FF) matching the
+ * wave through the Q. Hue 248 = the logo blue's true hue in OKLCH. */
 :root {
-  --bg:        oklch(0.17 0.006 60);
-  --bg-2:      oklch(0.21 0.006 60);
-  --bg-3:      oklch(0.24 0.006 60);
-  --line:      oklch(0.30 0.006 60);
-  --line-2:    oklch(0.38 0.006 60);
-  --ink:       oklch(0.97 0.008 80);
-  --ink-2:     oklch(0.82 0.006 70);
-  --ink-3:     oklch(0.62 0.006 70);
-  --ink-4:     oklch(0.48 0.006 70);
-  --paper:     oklch(0.96 0.012 80);
-  --accent:    oklch(0.72 0.09 235);
-  --accent-2:  oklch(0.58 0.09 235);
+  --bg:        oklch(0.13 0.004 250);
+  --bg-2:      oklch(0.17 0.004 250);
+  --bg-3:      oklch(0.21 0.004 250);
+  --line:      oklch(0.28 0.005 250);
+  --line-2:    oklch(0.36 0.006 250);
+  --ink:       oklch(0.98 0 0);          /* pure white, like the wordmark */
+  --ink-2:     oklch(0.83 0.003 250);
+  --ink-3:     oklch(0.63 0.004 250);
+  --ink-4:     oklch(0.48 0.004 250);
+  --paper:     oklch(0.97 0 0);
+  --accent:    oklch(0.66 0.18 248);     /* logo wave blue (~#1E90FF) */
+  --accent-2:  oklch(0.52 0.18 248);
   --up:        oklch(0.76 0.15 150);
   --down:      oklch(0.68 0.19 30);
   --flag:      oklch(0.80 0.12 80);
