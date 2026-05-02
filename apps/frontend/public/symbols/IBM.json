@@ -3,20 +3,13 @@
   "as_of_date": "2026-04-30",
   "spot_price": 225.0,
   "expected_move": {
-    "earnings_date": "2026-04-22",
     "expiration": "2026-05-15",
     "dte": 15,
-    "lead_time_days": -8,
     "atm_strike": 225.0,
     "atm_iv": 0.3382,
     "straddle_abs": 12.4,
     "straddle_pct": 0.055111,
-    "iv_pct": 0.06856,
-    "skew_atm": -0.01017,
-    "term_slope": 0.01014,
-    "total_vega": 0.366,
-    "em_method": "options_math",
-    "timing": "after_market_close"
+    "iv_pct": 0.06856
   },
   "straddle_features": [
     {
@@ -138,7 +131,7 @@
       "timing": "after_market_close"
     }
   ],
-  "next_earnings": "2026-04-22",
+  "next_earnings": null,
   "vol_regime": {
     "iv_current": 0.3159,
     "iv_rank": 0.316596,
@@ -148,6 +141,5 @@
     "hv_rank": 0.315805,
     "iv_mom_week": -0.0377,
     "iv_mom_month": null
-  },
-  "next_earnings_timing": "after_market_close"
+  }
 }
