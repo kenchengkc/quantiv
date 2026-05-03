@@ -32,10 +32,14 @@
     font-feature-settings: 'ss01';
   }
   /* Reserve space for the vertical scrollbar so centered layouts don’t
-     jump horizontally when content height changes (e.g. calendar skeleton
-     ↔ full week + footer). */
+     jump horizontally when content height changes (e.g. dashboard ↔ watchlist
+     when one has scroll and the other doesn’t). `scrollbar-gutter: stable`
+     alone is enough on Chrome/Firefox, but Safari/macOS ignores it — so we
+     also force `overflow-y: scroll` to *always* render the vertical bar.
+     With that combination the centered content never shifts between pages. */
   html {
     scrollbar-gutter: stable;
+    overflow-y: scroll;
   }
   body {
     font-family: 'Nunito Sans', ui-sans-serif, system-ui, sans-serif;
