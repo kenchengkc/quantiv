@@ -405,21 +405,10 @@ export default function EarningsScreener() {
     );
   };
 
-  if (loading) {
-    return (
-      <div style={{ color: 'var(--ink-3)', fontSize: 13, padding: '40px 0' }}>
-        Loading earnings universe…
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div style={{ color: 'var(--down)', fontSize: 13, padding: '24px 0' }}>
-        {error}
-      </div>
-    );
-  }
+  // Loading + error states are rendered inline below (inside the page chrome)
+  // rather than as early returns. Returning early swaps the entire layout
+  // when data lands, causing a jarring vertical jump from "Loading…" to the
+  // full table. Keeping the header + filters fixed eliminates the jitter.
 
   return (
     <div>
@@ -596,6 +585,19 @@ export default function EarningsScreener() {
         </div>
       </div>
 
+      {loading && (
+        <div style={{ color: 'var(--ink-3)', fontSize: 13, padding: '40px 0', minHeight: 480 }}>
+          Loading earnings universe…
+        </div>
+      )}
+
+      {error && !loading && (
+        <div style={{ color: 'var(--down)', fontSize: 13, padding: '24px 0' }}>
+          {error}
+        </div>
+      )}
+
+      {!loading && !error && (
       <div style={{ overflowX: 'auto', marginTop: 8, WebkitOverflowScrolling: 'touch' }}>
         <table
           style={{
@@ -744,8 +746,9 @@ export default function EarningsScreener() {
           </tbody>
         </table>
       </div>
+      )}
 
-      {sorted.length === 0 && (
+      {!loading && !error && sorted.length === 0 && (
         <div style={{ padding: '48px 0', color: 'var(--ink-3)', fontSize: 13 }}>
           No rows match these filters. Try clearing ticker / S&amp;P / ML-only, or lowering min spot.
         </div>
