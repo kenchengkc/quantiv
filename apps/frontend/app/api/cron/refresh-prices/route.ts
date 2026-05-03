@@ -27,7 +27,12 @@ export const maxDuration = 60;
 
 const BATCH_SIZE = 40;
 const RATE_LIMIT_PER_MIN = 50;     // 60/min Finnhub limit, leave 10/min headroom
-const STALE_TTL_S = 24 * 60 * 60;  // 24h — surfaces last-known price for symbols that briefly fall off rotation
+// 7 days — covers Fri close → Mon open weekends, 3-day holiday weekends,
+// and any cron downtime. The cron rewrites every ~30 min during market
+// hours, so active entries are nowhere near this limit; it's purely a
+// safety net to keep last-close prices visible when no fresh data is
+// being written.
+const STALE_TTL_S = 7 * 24 * 60 * 60;
 const CURSOR_KEY = 'quote:cursor';
 
 type Tick = {
