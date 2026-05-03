@@ -1,7 +1,7 @@
 {
   "metadata": {
     "version": "v4_multi_week",
-    "generated_at": "2026-05-02T11:30:41.096559",
+    "generated_at": "2026-05-03T11:28:05.346403",
     "as_of_date": "2026-04-30",
     "method": "ATM straddle + IV baseline",
     "offset": -1
@@ -263,29 +263,6 @@
       "iv_rank": 0.353008,
       "hist_move_avg_4q": 0.035926,
       "iv_crush_pct": 0.000688
-    },
-    {
-      "ticker": "EZPW",
-      "earnings_date": "2026-04-27",
-      "timing": "unknown",
-      "fiscal_q": "Q2",
-      "as_of_date": "2026-04-30",
-      "spot_price": 32.5,
-      "atm_strike": 32.5,
-      "atm_iv": 0.54635,
-      "em_straddle_pct": 0.089231,
-      "em_iv_pct": 0.110757,
-      "em_straddle_abs": 2.9,
-      "expiry_date": "2026-05-15",
-      "days_to_expiry": 15,
-      "lead_time_days": -3,
-      "skew_atm": 0.044067,
-      "term_slope": null,
-      "em_method": "options_math",
-      "confidence": "high",
-      "iv_rank": 0.670008,
-      "hist_move_avg_4q": 0.044004,
-      "iv_crush_pct": -0.277768
     },
     {
       "ticker": "KRC",
@@ -1338,7 +1315,7 @@
       "days_to_expiry": 15,
       "lead_time_days": -2,
       "skew_atm": -0.00247,
-      "term_slope": -0.010588,
+      "term_slope": -0.010587,
       "em_method": "options_math",
       "confidence": "high",
       "iv_rank": 0.775592,
@@ -3315,7 +3292,7 @@
       "expiry_date": "2026-05-15",
       "days_to_expiry": 15,
       "lead_time_days": -1,
-      "skew_atm": 0.0,
+      "skew_atm": -0.0,
       "term_slope": null,
       "em_method": "options_math",
       "confidence": "high",
@@ -4029,7 +4006,7 @@
       "days_to_expiry": 15,
       "lead_time_days": -1,
       "skew_atm": -0.006583,
-      "term_slope": 0.004837,
+      "term_slope": 0.004838,
       "em_method": "options_math",
       "confidence": "high",
       "iv_rank": 0.290928,
@@ -6927,7 +6904,7 @@
       "days_to_expiry": 15,
       "lead_time_days": 0,
       "skew_atm": 0.003808,
-      "term_slope": -0.078688,
+      "term_slope": -0.078687,
       "em_method": "options_math",
       "confidence": "high",
       "iv_rank": 0.80779,
@@ -8330,7 +8307,7 @@
       "days_to_expiry": 15,
       "lead_time_days": 0,
       "skew_atm": -0.003907,
-      "term_slope": -0.066962,
+      "term_slope": -0.066963,
       "em_method": "options_math",
       "confidence": "high",
       "iv_rank": 0.766667,
@@ -8821,29 +8798,6 @@
       "iv_crush_pct": -0.00434
     },
     {
-      "ticker": "ABR",
-      "earnings_date": "2026-05-01",
-      "timing": "unknown",
-      "fiscal_q": "Q2",
-      "as_of_date": "2026-04-30",
-      "spot_price": 8.0,
-      "atm_strike": 8.0,
-      "atm_iv": 0.5265,
-      "em_straddle_pct": 0.0875,
-      "em_iv_pct": 0.106733,
-      "em_straddle_abs": 0.7,
-      "expiry_date": "2026-05-15",
-      "days_to_expiry": 15,
-      "lead_time_days": 1,
-      "skew_atm": 0.0446,
-      "term_slope": -0.19065,
-      "em_method": "options_math",
-      "confidence": "high",
-      "iv_rank": 0.154717,
-      "hist_move_avg_4q": 0.117824,
-      "iv_crush_pct": -0.182569
-    },
-    {
       "ticker": "AN",
       "earnings_date": "2026-05-01",
       "timing": "before_market_open",
@@ -8911,29 +8865,6 @@
       "iv_rank": 0.73752,
       "hist_move_avg_4q": 0.027689,
       "iv_crush_pct": -0.039711
-    },
-    {
-      "ticker": "BRK.B",
-      "earnings_date": "2026-05-01",
-      "timing": "unknown",
-      "fiscal_q": "Q2",
-      "as_of_date": "2026-04-30",
-      "spot_price": 477.5,
-      "atm_strike": 477.5,
-      "atm_iv": 0.216752,
-      "em_straddle_pct": 0.035487,
-      "em_iv_pct": 0.04394,
-      "em_straddle_abs": 16.945,
-      "expiry_date": "2026-05-15",
-      "days_to_expiry": 15,
-      "lead_time_days": 1,
-      "skew_atm": 0.008614,
-      "term_slope": -0.013575,
-      "em_method": "options_math",
-      "confidence": "high",
-      "iv_rank": 0.728022,
-      "hist_move_avg_4q": 0.032229,
-      "iv_crush_pct": 0.005515
     },
     {
       "ticker": "BTSG",
@@ -9558,8 +9489,8 @@
     }
   ],
   "summary": {
-    "total_events": 415,
-    "avg_em_straddle_pct": 0.07724340963855417,
-    "avg_em_iv_pct": 0.10717989879518078
+    "total_events": 412,
+    "avg_em_straddle_pct": 0.0772907694174757,
+    "avg_em_iv_pct": 0.10732579611650492
   }
 }
