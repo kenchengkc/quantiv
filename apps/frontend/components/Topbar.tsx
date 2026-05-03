@@ -16,9 +16,34 @@ const NAV = [
 function useClock() {
   const [now, setNow] = useState<Date | null>(null);
   useEffect(() => {
-    setNow(new Date());
-    const id = setInterval(() => setNow(new Date()), 60_000);
-    return () => clearInterval(id);
+    const tick = () => setNow(new Date());
+    tick();
+
+    // Align the first interval to the next wall-clock minute boundary so
+    // the displayed minute flips ~immediately when the real minute does
+    // (instead of lagging up to 59 s based on mount time).
+    const msToNextMinute = 60_000 - (Date.now() % 60_000);
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+    const timeoutId = setTimeout(() => {
+      tick();
+      intervalId = setInterval(tick, 60_000);
+    }, msToNextMinute);
+
+    // Browsers throttle setInterval in backgrounded tabs (some down to 1/min,
+    // some pause entirely). Refresh on focus / visibility change so the
+    // clock catches up the moment the user looks at it again.
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') tick();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+
+    return () => {
+      clearTimeout(timeoutId);
+      if (intervalId) clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
+    };
   }, []);
   return now;
 }
