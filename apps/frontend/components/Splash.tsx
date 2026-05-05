@@ -102,14 +102,25 @@ export function Splash() {
               rising portion, and tapers to 0 at both tips — visually
               consistent with the brand wave's calligraphic feel. */}
           <g className="quantiv-splash-wave">
+            {/* Inflections: outer edge has a small dip-then-rise at the
+                start of the tail (cubic 3) and a counter-curve flick
+                near the tip (cubic 5). Inner edge mirrors with a small
+                wave at the base of the tail (cubic 8). The right tip
+                is a geometric cusp — cp2 of cubic 5 and cp1 of cubic 6
+                share the same coords (246, 80), making the two tangents
+                anti-parallel at (248, 70) for a perfectly sharp point. */}
             <path
               d="M 50 124
-                 C 56 148, 84 184, 128 192
-                 C 168 198, 196 184, 218 158
-                 C 232 142, 245 110, 244 78
-                 C 240 92, 226 110, 208 128
-                 C 188 148, 156 162, 116 158
-                 C 84 154, 60 142, 50 124 Z"
+                 C 56 150, 86 186, 128 194
+                 C 168 200, 198 192, 218 174
+                 C 222 184, 230 170, 234 162
+                 C 246 138, 254 108, 252 86
+                 C 252 76, 246 80, 248 70
+                 C 246 80, 246 92, 240 102
+                 C 230 124, 224 140, 218 146
+                 C 216 154, 208 152, 200 154
+                 C 180 160, 156 164, 122 162
+                 C 88 158, 62 142, 50 124 Z"
               fill="url(#quantivSplashWave)"
             />
           </g>
