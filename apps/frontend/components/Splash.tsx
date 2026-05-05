@@ -80,19 +80,32 @@ export function Splash() {
             strokeWidth="22"
           />
 
-          {/* Volatility smile. Single continuous path of two cubic Beziers
-              so the stroke-dashoffset reveal reads as one hand gesture.
-              pathLength="100" normalizes the dash math. */}
-          <path
-            className="quantiv-splash-wave"
-            d="M 50 122 C 64 178, 100 198, 148 180 C 192 164, 218 100, 248 42"
-            pathLength="100"
-            fill="none"
-            stroke="url(#quantivSplashWave)"
-            strokeWidth="20"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
+          {/* Volatility smile — authored as a filled silhouette so the two
+              ends taper to sharp points (matching the brand mark) instead
+              of reading as a stroked line with rounded caps.
+
+              The closed path traces:
+                · LEFT TIP at (50, 122) — pointed, inside the ring's hole
+                · OUTER edge clockwise: down through the bottom of the dip,
+                  along the right side of the rising tail, up to the
+                · RIGHT TIP at (254, 42) — pointed, past the ring's upper-right
+                · INNER edge back: down the left side of the rising tail,
+                  across the top of the dip, returning to the left tip.
+
+              Body thickness widens to ~30 px in the middle of the dip and
+              tapers to zero at both tips. */}
+          <g className="quantiv-splash-wave">
+            <path
+              d="M 50 122
+                 C 60 150, 88 180, 124 184
+                 C 156 187, 184 172, 204 146
+                 C 228 114, 250 72, 254 42
+                 C 245 62, 224 98, 200 124
+                 C 176 148, 138 154, 102 150
+                 C 78 148, 62 136, 50 122 Z"
+              fill="url(#quantivSplashWave)"
+            />
+          </g>
         </svg>
       </div>
     </div>
