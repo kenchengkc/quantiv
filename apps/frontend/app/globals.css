@@ -163,8 +163,8 @@
 }
 
 .quantiv-splash-ring {
-  transform-origin: 110px 110px;
-  transform-box: fill-box;
+  transform-origin: 95px 110px;
+  transform-box: view-box;
   /* Phase 1 — ring snaps in with a small overshoot. */
   animation: quantiv-splash-ring-in 520ms cubic-bezier(0.2, 1, 0.3, 1) forwards;
   opacity: 0;
