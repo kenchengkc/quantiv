@@ -5,6 +5,7 @@ import { Providers } from './providers';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Topbar } from '@/components/Topbar';
 import { Footer } from '@/components/Footer';
+import { Splash } from '@/components/Splash';
 import { Analytics } from '@vercel/analytics/next';
 
 export const metadata: Metadata = {
@@ -51,6 +52,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <main className="flex-1">{children}</main>
                 <Footer />
               </div>
+              <Splash />
               <Analytics />
             </ErrorBoundary>
           </Providers>

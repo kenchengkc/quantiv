@@ -137,3 +137,71 @@
   from { opacity: 0; }
   to { opacity: 1; }
 }
+
+/* ─── Quantiv splash (once-per-session intro) ──────────────────────────── */
+.quantiv-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: grid;
+  place-items: center;
+  background: var(--bg);
+  /* Hold the black backdrop opaque almost to the end, then dissolve in
+     sync with the mark's zoom-forward to reveal the dashboard underneath. */
+  animation: quantiv-splash-fade 2400ms ease-in-out forwards;
+  /* Disable interactions while the splash is up so a fast click doesn't
+     register on the dashboard before it's revealed. */
+  pointer-events: auto;
+}
+
+.quantiv-splash-mark {
+  transform-origin: center center;
+  /* Phase 4 — Batman-style burst: the entire mark scales toward the
+     viewer, growing past the viewport while the backdrop fades out. */
+  animation: quantiv-splash-burst 2400ms cubic-bezier(0.55, 0, 0.2, 1) forwards;
+  will-change: transform;
+}
+
+.quantiv-splash-ring {
+  transform-origin: 110px 110px;
+  transform-box: fill-box;
+  /* Phase 1 — ring snaps in with a small overshoot. */
+  animation: quantiv-splash-ring-in 520ms cubic-bezier(0.2, 1, 0.3, 1) forwards;
+  opacity: 0;
+}
+
+.quantiv-splash-wave {
+  /* Phase 2 — volatility smile draws from lower-left through to the
+     upper-right flourish. pathLength=100 makes 100→0 a full reveal. */
+  stroke-dasharray: 100;
+  stroke-dashoffset: 100;
+  animation: quantiv-splash-wave-draw 1100ms cubic-bezier(0.6, 0.05, 0.3, 1) 360ms forwards;
+}
+
+@keyframes quantiv-splash-ring-in {
+  0%   { transform: scale(0.55); opacity: 0; }
+  60%  { transform: scale(1.06); opacity: 1; }
+  100% { transform: scale(1);    opacity: 1; }
+}
+
+@keyframes quantiv-splash-wave-draw {
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes quantiv-splash-burst {
+  /* Hold the assembled mark in place while the wave finishes drawing,
+     then a quick anticipation dip, then the launch to ~10× scale. */
+  0%   { transform: scale(1); }
+  62%  { transform: scale(1); }
+  72%  { transform: scale(0.94); }
+  100% { transform: scale(10); }
+}
+
+@keyframes quantiv-splash-fade {
+  0%, 70% { opacity: 1; }
+  100%    { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .quantiv-splash { display: none; }
+}
