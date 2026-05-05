@@ -32,6 +32,9 @@ type Filter = 'popular' | 'sp500' | 'movers' | 'all';
 
 const MIN_OFFSET = -1;
 const MAX_OFFSET = 2;
+const MIN_GRID_LOADING_MS = 750;
+const INITIAL_QUOTE_WAIT_MS = 3_200;
+const LOGO_PRELOAD_TIMEOUT_MS = 4_000;
 const OFFSETS: { v: number; l: string }[] = [
   { v: -1, l: 'Last week' },
   { v: 0, l: 'This week' },
@@ -67,9 +70,62 @@ function companyName(t: string) {
   return COMPANY_NAMES[t] || t;
 }
 
+type LogoLoadState = 'loaded' | 'failed';
+
+const logoStateCache = new Map<string, LogoLoadState>();
+const logoPromiseCache = new Map<string, Promise<LogoLoadState>>();
+
+function preloadLogo(ticker: string): Promise<LogoLoadState> {
+  const cached = logoStateCache.get(ticker);
+  if (cached) return Promise.resolve(cached);
+
+  const existing = logoPromiseCache.get(ticker);
+  if (existing) return existing;
+
+  if (typeof window === 'undefined') return Promise.resolve('failed');
+
+  const promise = new Promise<LogoLoadState>((resolve) => {
+    const img = new window.Image();
+    let settled = false;
+    let timeoutId: number | null = null;
+
+    const finish = (state: LogoLoadState) => {
+      if (settled) return;
+      settled = true;
+      if (timeoutId !== null) window.clearTimeout(timeoutId);
+      logoStateCache.set(ticker, state);
+      resolve(state);
+    };
+
+    timeoutId = window.setTimeout(() => finish('failed'), LOGO_PRELOAD_TIMEOUT_MS);
+    img.decoding = 'async';
+    img.onload = () => {
+      const decode = typeof img.decode === 'function'
+        ? img.decode().catch(() => undefined)
+        : Promise.resolve();
+      void decode.then(() => finish('loaded'));
+    };
+    img.onerror = () => finish('failed');
+    img.src = logoUrl(ticker);
+
+    if (img.complete) {
+      finish(img.naturalWidth > 0 ? 'loaded' : 'failed');
+    }
+  });
+
+  logoPromiseCache.set(ticker, promise);
+  return promise;
+}
+
+/* eslint-disable @next/next/no-img-element */
 function Logo({ ticker, size = 24 }: { ticker: string; size?: number }) {
-  const [err, setErr] = useState(false);
+  const [err, setErr] = useState(() => logoStateCache.get(ticker) === 'failed');
   const s = { width: size, height: size };
+
+  useEffect(() => {
+    setErr(logoStateCache.get(ticker) === 'failed');
+  }, [ticker]);
+
   if (err) {
     return (
       <div
@@ -91,12 +147,16 @@ function Logo({ ticker, size = 24 }: { ticker: string; size?: number }) {
       </div>
     );
   }
-  // eslint-disable-next-line @next/next/no-img-element
   return (
     <img
       src={logoUrl(ticker)}
       alt={ticker}
-      onError={() => setErr(true)}
+      loading="eager"
+      onLoad={() => logoStateCache.set(ticker, 'loaded')}
+      onError={() => {
+        logoStateCache.set(ticker, 'failed');
+        setErr(true);
+      }}
       style={{
         ...s,
         borderRadius: 6,
@@ -107,6 +167,7 @@ function Logo({ ticker, size = 24 }: { ticker: string; size?: number }) {
     />
   );
 }
+/* eslint-enable @next/next/no-img-element */
 
 function TickerRow({
   ev,
@@ -738,6 +799,9 @@ export default function EarningsGrid() {
   const [error, setError] = useState<string | null>(null);
   const [live, setLive] = useState<LiveMap>({});
   const [marketOpen, setMarketOpen] = useState<boolean>(true);
+  const [minLoadingDoneWeek, setMinLoadingDoneWeek] = useState<string | null>(null);
+  const [quotesReadyWeek, setQuotesReadyWeek] = useState<string | null>(null);
+  const [logosReadyKey, setLogosReadyKey] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const thisMonday = useMemo(() => mondayOf(new Date()), []);
@@ -746,6 +810,14 @@ export default function EarningsGrid() {
     d.setDate(d.getDate() + 7 * offset);
     return isoDay(d);
   }, [thisMonday, offset]);
+
+  useEffect(() => {
+    setMinLoadingDoneWeek(null);
+    const timeoutId = window.setTimeout(() => {
+      setMinLoadingDoneWeek(weekStartIso);
+    }, MIN_GRID_LOADING_MS);
+    return () => window.clearTimeout(timeoutId);
+  }, [weekStartIso]);
 
   const fetchWeek = useCallback(
     async (iso: string) => {
@@ -781,15 +853,37 @@ export default function EarningsGrid() {
   }, [weekStartIso, fetchWeek]);
 
   useEffect(() => {
-    if (!data || data.events.length === 0) return;
+    const dataWeek = data?.window?.start?.slice(0, 10) ?? null;
+    if (!data || dataWeek !== weekStartIso) {
+      setQuotesReadyWeek(null);
+      return;
+    }
+    if (data.events.length === 0) {
+      setQuotesReadyWeek(weekStartIso);
+      return;
+    }
+
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
+    let initialReadyTimer: ReturnType<typeof setTimeout> | null = null;
     // No cap — MGET handles hundreds of symbols in a single round-trip.
     // The 200 cap was a leftover from per-symbol GETs that's now only a
     // bug: the busy days at the back of the week were dropped.
     const symbols = Array.from(new Set(data.events.map((e) => e.ticker)));
 
     let lastMarketOpen = true;
+    const markQuotesReady = () => {
+      if (cancelled) return;
+      if (initialReadyTimer) {
+        clearTimeout(initialReadyTimer);
+        initialReadyTimer = null;
+      }
+      setQuotesReadyWeek(weekStartIso);
+    };
+
+    setQuotesReadyWeek(null);
+    initialReadyTimer = setTimeout(markQuotesReady, INITIAL_QUOTE_WAIT_MS);
+
     const fetchOnce = async (): Promise<{ pending: number; marketOpen: boolean }> => {
       try {
         const res = await fetch(`/api/stocks/batch-price?symbols=${symbols.join(',')}`, {
@@ -832,6 +926,7 @@ export default function EarningsGrid() {
         const delay = attempt < 10 ? 2_000 : 8_000;
         timer = setTimeout(() => fastPoll(attempt + 1), delay);
       } else {
+        markQuotesReady();
         const slowLoop = () => {
           if (cancelled) return;
           // 30s when market open, 5min when closed.
@@ -859,10 +954,11 @@ export default function EarningsGrid() {
     return () => {
       cancelled = true;
       if (timer) clearTimeout(timer);
+      if (initialReadyTimer) clearTimeout(initialReadyTimer);
       document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('focus', onVisible);
     };
-  }, [data]);
+  }, [data, weekStartIso]);
 
   // Calendar columns always follow the selected week (URL offset), so the
   // header dates stay correct while JSON for that week is still loading.
@@ -895,8 +991,6 @@ export default function EarningsGrid() {
   const dataWeekKey = data?.window?.start?.slice(0, 10) ?? null;
   const weekReady =
     !!data && !isFetching && !error && dataWeekKey === weekStartIso;
-  const showSkeleton =
-    !error && (isFetching || !data || dataWeekKey !== weekStartIso);
 
   const filteredEvents = useMemo(() => {
     if (!data) return [] as EarningsEvent[];
@@ -907,6 +1001,40 @@ export default function EarningsGrid() {
     if (search) list = list.filter((e) => e.ticker.startsWith(search));
     return list;
   }, [data, filter, search]);
+
+  // Preload logos for the entire week's events, not just the currently
+  // visible filter slice. Keying readiness on the week (not the filter)
+  // means switching Popular ↔ S&P 500 ↔ Movers ↔ All is instant — no
+  // skeleton flash, no second preload pass when a filter exposes tickers
+  // that weren't in the previous slice.
+  const allTickerKey = useMemo(() => {
+    if (!data) return '';
+    return Array.from(new Set(data.events.map((e) => e.ticker))).join('|');
+  }, [data]);
+
+  useEffect(() => {
+    if (!weekReady) {
+      setLogosReadyKey(null);
+      return;
+    }
+
+    const tickers = allTickerKey ? allTickerKey.split('|') : [];
+    const uncached = tickers.filter((ticker) => !logoStateCache.has(ticker));
+    if (uncached.length === 0) {
+      setLogosReadyKey(weekStartIso);
+      return;
+    }
+
+    let cancelled = false;
+    setLogosReadyKey(null);
+    void Promise.all(uncached.map(preloadLogo)).then(() => {
+      if (!cancelled) setLogosReadyKey(weekStartIso);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [allTickerKey, weekReady, weekStartIso]);
 
   const eventsByDay = useMemo(() => {
     return days.map((day) => {
@@ -920,6 +1048,12 @@ export default function EarningsGrid() {
   }, [days, filteredEvents]);
 
   const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+  const contentReady =
+    weekReady &&
+    minLoadingDoneWeek === weekStartIso &&
+    quotesReadyWeek === weekStartIso &&
+    logosReadyKey === weekStartIso;
+  const showSkeleton = !error && !contentReady;
 
   return (
     <>
@@ -954,7 +1088,7 @@ export default function EarningsGrid() {
       <div style={{ minHeight: 'min(560px, 62vh)' }}>
         {showSkeleton && !error && <CalendarGridSkeleton days={days} today={today} />}
 
-        {weekReady && data && (
+        {contentReady && data && (
           <div
             style={{
               display: 'grid',
@@ -985,7 +1119,7 @@ export default function EarningsGrid() {
         )}
       </div>
 
-      {(weekReady || showSkeleton) && !error && (
+      {(contentReady || showSkeleton) && !error && (
         <div
           style={{
             marginTop: 40,
@@ -998,7 +1132,7 @@ export default function EarningsGrid() {
             minHeight: 36,
           }}
         >
-          {weekReady && data ? (
+          {contentReady && data ? (
             <span className="mono">
               {filteredEvents.length} reports · {data.metadata.method} · as of {data.metadata.as_of_date}
             </span>
