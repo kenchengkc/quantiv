@@ -80,29 +80,36 @@ export function Splash() {
             strokeWidth="22"
           />
 
-          {/* Volatility smile — authored as a filled silhouette so the two
-              ends taper to sharp points (matching the brand mark) instead
-              of reading as a stroked line with rounded caps.
+          {/* Volatility smile — authored as a closed, filled silhouette so
+              the two ends taper to *sharp points* (matching the brand
+              mark) instead of reading as a stroked line with rounded caps.
 
-              The closed path traces:
-                · LEFT TIP at (50, 122) — pointed, inside the ring's hole
-                · OUTER edge clockwise: down through the bottom of the dip,
-                  along the right side of the rising tail, up to the
-                · RIGHT TIP at (254, 42) — pointed, past the ring's upper-right
-                · INNER edge back: down the left side of the rising tail,
-                  across the top of the dip, returning to the left tip.
+              Path layout (clockwise from the left tip):
 
-              Body thickness widens to ~30 px in the middle of the dip and
-              tapers to zero at both tips. */}
+                · LEFT TIP at (50, 124) — pointed, inside the ring's hole
+                  at roughly the 7-8 o'clock interior
+                · OUTER edge: dives below the ring's bottom (y ≈ 192,
+                  ring bottom is at y=170), arcs along the underside of
+                  the dip, then sweeps up the right side past the ring
+                · RIGHT TIP at (244, 78) — pointed, sitting at the ring's
+                  upper-right shoulder (not floating high above it)
+                · INNER edge: returns through the upper edge of the
+                  rising tail, across the top of the dip, back to the
+                  left tip.
+
+              Body width is widest (~34 px) through the dip and the
+              transition into the tail, narrows to ~22 px through the
+              rising portion, and tapers to 0 at both tips — visually
+              consistent with the brand wave's calligraphic feel. */}
           <g className="quantiv-splash-wave">
             <path
-              d="M 50 122
-                 C 60 150, 88 180, 124 184
-                 C 156 187, 184 172, 204 146
-                 C 228 114, 250 72, 254 42
-                 C 245 62, 224 98, 200 124
-                 C 176 148, 138 154, 102 150
-                 C 78 148, 62 136, 50 122 Z"
+              d="M 50 124
+                 C 56 148, 84 184, 128 192
+                 C 168 198, 196 184, 218 158
+                 C 232 142, 245 110, 244 78
+                 C 240 92, 226 110, 208 128
+                 C 188 148, 156 162, 116 158
+                 C 84 154, 60 142, 50 124 Z"
               fill="url(#quantivSplashWave)"
             />
           </g>
