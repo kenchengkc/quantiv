@@ -171,11 +171,14 @@
 }
 
 .quantiv-splash-wave {
-  /* Phase 2 — volatility smile draws from lower-left through to the
-     upper-right flourish. pathLength=100 makes 100→0 a full reveal. */
-  stroke-dasharray: 100;
-  stroke-dashoffset: 100;
-  animation: quantiv-splash-wave-draw 1100ms cubic-bezier(0.6, 0.05, 0.3, 1) 360ms forwards;
+  /* Phase 2 — volatility smile is a filled silhouette (so its tips taper
+     to sharp points), so we can't use stroke-dashoffset to "draw" it.
+     Instead, sweep a horizontal clip-path inset from the right edge to
+     the left, which uncovers the wave left-to-right. The wave's
+     centerline is x-monotonic, so the sweep reads as one continuous
+     hand gesture. */
+  clip-path: inset(0 100% 0 0);
+  animation: quantiv-splash-wave-reveal 1100ms cubic-bezier(0.6, 0.05, 0.3, 1) 360ms forwards;
 }
 
 @keyframes quantiv-splash-ring-in {
@@ -184,8 +187,9 @@
   100% { transform: scale(1);    opacity: 1; }
 }
 
-@keyframes quantiv-splash-wave-draw {
-  to { stroke-dashoffset: 0; }
+@keyframes quantiv-splash-wave-reveal {
+  from { clip-path: inset(0 100% 0 0); }
+  to   { clip-path: inset(0 0 0 0); }
 }
 
 @keyframes quantiv-splash-burst {
