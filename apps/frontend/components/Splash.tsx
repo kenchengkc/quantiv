@@ -41,36 +41,55 @@ export function Splash() {
       className="quantiv-splash"
     >
       <div className="quantiv-splash-mark">
+        {/* The viewBox is wider than tall so the ring sits left-of-center
+            and the wave's flourish has room to extend past it on the right.
+            Ring is at (95, 110) with r=60; the wave enters the ring's
+            lower-left interior, dips below the ring's bottom edge (y≈170),
+            arcs back up around the ring's right side (without re-crossing
+            the stroke), then flourishes up and out to the upper right. */}
         <svg
-          viewBox="0 0 220 220"
-          width="180"
-          height="180"
+          viewBox="0 0 260 220"
+          width="260"
+          height="220"
           aria-hidden="true"
         >
+          <defs>
+            {/* Brand wave gradient: deeper blue at the bottom-left of the
+                smile, brightening toward the upper-right tail. */}
+            <linearGradient
+              id="quantivSplashWave"
+              x1="0"
+              y1="1"
+              x2="1"
+              y2="0"
+            >
+              <stop offset="0%" stopColor="#0F5FD1" />
+              <stop offset="55%" stopColor="#1E90FF" />
+              <stop offset="100%" stopColor="#3FB6FF" />
+            </linearGradient>
+          </defs>
+
           {/* Q ring — pure white, stroked. Pops in first. */}
           <circle
             className="quantiv-splash-ring"
-            cx="110"
+            cx="95"
             cy="110"
-            r="64"
+            r="60"
             fill="none"
             stroke="#FAFBFD"
-            strokeWidth="20"
-            strokeLinecap="round"
+            strokeWidth="22"
           />
-          {/* Volatility smile / wave: enters inside the ring at lower-left,
-              dips down through the bottom, rises across the right edge of
-              the ring, and exits with an upward flourish past the upper-
-              right. Single cubic-Bezier path so a stroke-dashoffset draw
-              animation reads as one continuous gesture. pathLength=100
-              normalizes the dash math regardless of the path's true length. */}
+
+          {/* Volatility smile. Single continuous path of two cubic Beziers
+              so the stroke-dashoffset reveal reads as one hand gesture.
+              pathLength="100" normalizes the dash math. */}
           <path
             className="quantiv-splash-wave"
-            d="M 56 118 C 70 162, 118 170, 144 138 C 162 116, 174 84, 204 50"
+            d="M 50 122 C 64 178, 100 198, 148 180 C 192 164, 218 100, 248 42"
             pathLength="100"
             fill="none"
-            stroke="#1E90FF"
-            strokeWidth="16"
+            stroke="url(#quantivSplashWave)"
+            strokeWidth="20"
             strokeLinecap="round"
             strokeLinejoin="round"
           />
