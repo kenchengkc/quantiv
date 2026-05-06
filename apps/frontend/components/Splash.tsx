@@ -57,16 +57,7 @@ export function Splash() {
           className="quantiv-splash-layer quantiv-splash-open-q"
           draggable={false}
         />
-        <div className="quantiv-splash-slit-half quantiv-splash-slit-upper">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/brand/QuantivSplashSlit.png"
-            alt=""
-            className="quantiv-splash-layer"
-            draggable={false}
-          />
-        </div>
-        <div className="quantiv-splash-slit-half quantiv-splash-slit-lower">
+        <div className="quantiv-splash-slit-arc">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/brand/QuantivSplashSlit.png"
