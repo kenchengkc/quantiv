@@ -14,7 +14,7 @@ export default function SignUpPage() {
         appearance={{
           variables: {
             colorPrimary: 'var(--accent)',
-            colorBackground: 'var(--bg-2)',
+            colorBackground: 'var(--bg)',
             colorText: 'var(--ink)',
             colorInputBackground: 'var(--bg)',
             colorInputText: 'var(--ink)',

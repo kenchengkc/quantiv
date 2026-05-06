@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from 'react';
 
-// Once-per-session intro. The mark is rendered from transparent layers
-// extracted from the real Quantiv icon, so the Q cut and volatility-smile
-// tail match the logo pixels instead of a hand-redrawn SVG approximation.
+// Once-per-session intro. The open Q and volatility-smile tail are rendered
+// from transparent layers extracted from the real Quantiv icon. The sequence
+// starts with a closed ring, opens the bottom-right slit, then reveals the
+// exact logo tail through it.
 const SESSION_KEY = 'quantiv:splash:played';
-const TOTAL_MS = 2400;
+const TOTAL_MS = 3300;
 
 export function Splash() {
   // null on first render (SSR + hydration) so we never produce a markup
@@ -44,11 +45,27 @@ export function Splash() {
       <div className="quantiv-splash-mark" aria-hidden="true">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="/brand/QuantivSplashQ.png"
+          src="/brand/QuantivSplashQClosed.png"
           alt=""
-          className="quantiv-splash-layer quantiv-splash-ring"
+          className="quantiv-splash-layer quantiv-splash-closed-ring"
           draggable={false}
         />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/brand/QuantivSplashQ.png"
+          alt=""
+          className="quantiv-splash-layer quantiv-splash-open-q"
+          draggable={false}
+        />
+        <div className="quantiv-splash-slit-clip">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/brand/QuantivSplashSlit.png"
+            alt=""
+            className="quantiv-splash-layer"
+            draggable={false}
+          />
+        </div>
         <div className="quantiv-splash-tail-clip">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
