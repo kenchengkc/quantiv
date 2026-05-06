@@ -181,22 +181,29 @@
   transform-origin: center center;
   animation:
     quantiv-splash-ring-in 520ms cubic-bezier(0.2, 1, 0.3, 1) forwards,
-    quantiv-splash-closed-ring-out 260ms ease 1420ms forwards;
+    quantiv-splash-closed-ring-out 260ms ease 1660ms forwards;
   opacity: 0;
 }
 
 .quantiv-splash-open-q {
   opacity: 0;
-  animation: quantiv-splash-open-q-in 220ms ease 1340ms forwards;
+  animation: quantiv-splash-open-q-in 220ms ease 1600ms forwards;
 }
 
-.quantiv-splash-slit-clip {
+.quantiv-splash-slit-half {
   position: absolute;
   inset: 0;
-  clip-path: inset(0 50.9% 0 49.1%);
+  clip-path: inset(59.9% 37.1% 40.1% 49.1%);
   opacity: 0;
-  animation: quantiv-splash-slit-open 820ms cubic-bezier(0.22, 0.8, 0.18, 1) 900ms forwards;
   will-change: clip-path, opacity;
+}
+
+.quantiv-splash-slit-upper {
+  animation: quantiv-splash-slit-open-upper 780ms linear 900ms forwards;
+}
+
+.quantiv-splash-slit-lower {
+  animation: quantiv-splash-slit-open-lower 780ms linear 900ms forwards;
 }
 
 .quantiv-splash-tail-clip {
@@ -204,7 +211,7 @@
   inset: 0;
   clip-path: inset(0 60% 0 0);
   opacity: 0;
-  animation: quantiv-splash-tail-reveal 880ms cubic-bezier(0.32, 0, 0.18, 1) 1760ms forwards;
+  animation: quantiv-splash-tail-reveal 880ms cubic-bezier(0.32, 0, 0.18, 1) 1860ms forwards;
   will-change: clip-path, opacity;
 }
 
@@ -224,12 +231,20 @@
   to { opacity: 1; }
 }
 
-@keyframes quantiv-splash-slit-open {
-  0%   { clip-path: inset(0 50.9% 0 49.1%); opacity: 0; }
-  16%  { opacity: 1; }
-  58%  { clip-path: inset(0 37.1% 0 49.1%); opacity: 1; }
-  92%  { clip-path: inset(0 37.1% 0 49.1%); opacity: 1; }
-  100% { clip-path: inset(0 37.1% 0 49.1%); opacity: 0; }
+@keyframes quantiv-splash-slit-open-upper {
+  0%   { clip-path: inset(59.9% 37.1% 40.1% 49.1%); opacity: 0; }
+  12%  { opacity: 1; }
+  82%  { clip-path: inset(53.9% 37.1% 40.1% 49.1%); opacity: 1; }
+  92%  { clip-path: inset(53.9% 37.1% 40.1% 49.1%); opacity: 1; }
+  100% { clip-path: inset(53.9% 37.1% 40.1% 49.1%); opacity: 0; }
+}
+
+@keyframes quantiv-splash-slit-open-lower {
+  0%   { clip-path: inset(59.9% 37.1% 40.1% 49.1%); opacity: 0; }
+  12%  { opacity: 1; }
+  82%  { clip-path: inset(59.9% 37.1% 34.1% 49.1%); opacity: 1; }
+  92%  { clip-path: inset(59.9% 37.1% 34.1% 49.1%); opacity: 1; }
+  100% { clip-path: inset(59.9% 37.1% 34.1% 49.1%); opacity: 0; }
 }
 
 @keyframes quantiv-splash-tail-reveal {
@@ -241,13 +256,13 @@
   /* Hold the assembled mark in place while the wave finishes drawing,
      then a quick anticipation dip, then the launch to ~10× scale. */
   0%   { transform: scale(1); }
-  80%  { transform: scale(1); }
-  88%  { transform: scale(0.94); }
+  84%  { transform: scale(1); }
+  91%  { transform: scale(0.94); }
   100% { transform: scale(10); }
 }
 
 @keyframes quantiv-splash-fade {
-  0%, 82% { opacity: 1; }
+  0%, 86% { opacity: 1; }
   100%    { opacity: 0; }
 }
 
