@@ -55,6 +55,38 @@ function timingText(t?: string | null) {
   return null;
 }
 
+function MarketStatusBadge({ marketOpen }: { marketOpen: boolean | null }) {
+  const visible = marketOpen === false;
+
+  return (
+    <span
+      aria-hidden={!visible}
+      title={visible ? 'US equity market is closed (regular hours 09:30-16:00 ET). Quotes shown are last close.' : undefined}
+      style={{
+        visibility: visible ? 'visible' : 'hidden',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 5,
+        minHeight: 20,
+        padding: '2px 8px',
+        borderRadius: 999,
+        border: '1px solid var(--line)',
+        background: 'var(--bg-2)',
+        color: 'var(--ink-3)',
+        letterSpacing: '0.08em',
+        fontSize: 9.5,
+        whiteSpace: 'nowrap',
+      }}
+    >
+      <span style={{
+        width: 6, height: 6, borderRadius: 999,
+        background: 'var(--ink-4)',
+      }} />
+      MARKET CLOSED · LAST CLOSE
+    </span>
+  );
+}
+
 function Logo({ ticker, size = 36 }: { ticker: string; size?: number }) {
   const [err, setErr] = useState(false);
   if (err) {
@@ -223,6 +255,47 @@ function RowActions({
   );
 }
 
+function WatchlistLoadingRows() {
+  return (
+    <ul aria-label="Loading watchlist" style={{ listStyle: 'none', padding: 0, margin: '12px 0 0' }}>
+      {Array.from({ length: 4 }).map((_, i) => (
+        <li
+          key={i}
+          style={{
+            display: 'grid',
+            gridTemplateColumns:
+              '18px 36px minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 1.2fr) auto 116px',
+            alignItems: 'center',
+            gap: 14,
+            minHeight: 82,
+            padding: '14px 12px',
+            borderBottom: '1px solid var(--line)',
+            boxSizing: 'border-box',
+          }}
+        >
+          <span style={{ width: 16, height: 16, borderRadius: 4, background: 'var(--bg-3)', opacity: 0.55 }} />
+          <span style={{ width: 36, height: 36, borderRadius: 8, background: 'var(--bg-3)', opacity: 0.55 }} />
+          <span style={{ display: 'grid', gap: 7 }}>
+            <span style={{ width: 74, height: 18, borderRadius: 4, background: 'var(--bg-3)', opacity: 0.55 }} />
+            <span style={{ width: 'min(180px, 80%)', height: 13, borderRadius: 4, background: 'var(--bg-3)', opacity: 0.4 }} />
+          </span>
+          <span style={{ display: 'grid', gap: 5 }}>
+            <span style={{ width: 82, height: 20, borderRadius: 4, background: 'var(--bg-3)', opacity: 0.55 }} />
+            <span style={{ width: 116, height: 16, borderRadius: 4, background: 'var(--bg-3)', opacity: 0.4 }} />
+          </span>
+          <span style={{ display: 'grid', gap: 5 }}>
+            <span style={{ width: 62, height: 13, borderRadius: 4, background: 'var(--bg-3)', opacity: 0.4 }} />
+            <span style={{ width: 112, height: 17, borderRadius: 4, background: 'var(--bg-3)', opacity: 0.55 }} />
+            <span style={{ width: 78, height: 16, borderRadius: 4, background: 'var(--bg-3)', opacity: 0.35 }} />
+          </span>
+          <span style={{ width: 58, height: 24, borderRadius: 4, background: 'var(--bg-3)', opacity: 0.55, justifySelf: 'end' }} />
+          <span style={{ width: 116, height: 32, borderRadius: 999, background: 'var(--bg-3)', opacity: 0.45 }} />
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export default function WatchlistPage() {
   const { symbols: tickers, isLoaded: hydrated, remove: removeOne, reorder: reorderAll } = useWatchlist();
   const [summaries, setSummaries] = useState<Record<string, SymbolSummary>>({});
@@ -231,7 +304,7 @@ export default function WatchlistPage() {
   const [overIdx, setOverIdx] = useState<number | null>(null);
   // Ticker awaiting delete confirmation — X click arms it, ✓ click confirms.
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
-  const [marketOpen, setMarketOpen] = useState<boolean>(true);
+  const [marketOpen, setMarketOpen] = useState<boolean | null>(null);
 
   // Load per-symbol summary from pre-generated /symbols/*.json
   useEffect(() => {
@@ -354,15 +427,7 @@ export default function WatchlistPage() {
     [tickers, reorderAll],
   );
 
-  const total = tickers.length;
-
-  if (!hydrated) {
-    return (
-      <div style={{ maxWidth: 960, margin: '0 auto', padding: '40px 28px' }}>
-        <div style={{ color: 'var(--ink-3)', fontSize: 13 }}>Loading watchlist…</div>
-      </div>
-    );
-  }
+  const total = hydrated ? tickers.length : 0;
 
   return (
     <div style={{ maxWidth: 960, margin: '0 auto', padding: '0 28px 60px' }}>
@@ -393,29 +458,7 @@ export default function WatchlistPage() {
             }}
           >
             <span>Your list</span>
-            {!marketOpen && (
-              <span
-                title="US equity market is closed (regular hours 09:30–16:00 ET). Quotes shown are last close."
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 5,
-                  padding: '2px 8px',
-                  borderRadius: 999,
-                  border: '1px solid var(--line)',
-                  background: 'var(--bg-2)',
-                  color: 'var(--ink-3)',
-                  letterSpacing: '0.08em',
-                  fontSize: 9.5,
-                }}
-              >
-                <span style={{
-                  width: 6, height: 6, borderRadius: 999,
-                  background: 'var(--ink-4)',
-                }} />
-                MARKET CLOSED · LAST CLOSE
-              </span>
-            )}
+            <MarketStatusBadge marketOpen={marketOpen} />
           </div>
           <h1
             className="serif"
@@ -435,11 +478,11 @@ export default function WatchlistPage() {
           className="mono tnum"
           style={{ fontSize: 11, color: 'var(--ink-4)', letterSpacing: '0.08em' }}
         >
-          {total} {total === 1 ? 'ticker' : 'tickers'}
+          {hydrated ? `${total} ${total === 1 ? 'ticker' : 'tickers'}` : 'LOADING'}
         </div>
       </div>
 
-      {total === 0 ? <EmptyState /> : (
+      {!hydrated ? <WatchlistLoadingRows /> : total === 0 ? <EmptyState /> : (
         <ul style={{ listStyle: 'none', padding: 0, margin: '12px 0 0' }}>
           {tickers.map((t, i) => {
             const sum = summaries[t];
@@ -495,7 +538,9 @@ export default function WatchlistPage() {
                   alignItems: 'center',
                   gap: 14,
                   padding: '14px 12px',
+                  minHeight: 82,
                   borderBottom: '1px solid var(--line)',
+                  boxSizing: 'border-box',
                   background: isOver ? 'var(--bg-3)' : 'transparent',
                   opacity: isDragging ? 0.35 : 1,
                   transition: 'background 120ms ease, opacity 120ms ease',
@@ -552,32 +597,55 @@ export default function WatchlistPage() {
                   </div>
                 </Link>
 
-                <div style={{ minWidth: 0 }}>
+                <div style={{ minWidth: 0, minHeight: 40 }}>
                   <div
                     className="serif tnum"
-                    style={{ fontSize: 15, fontWeight: 600, color: 'var(--ink)' }}
+                    style={{
+                      height: 20,
+                      lineHeight: '20px',
+                      fontSize: 15,
+                      fontWeight: 600,
+                      color: 'var(--ink)',
+                      whiteSpace: 'nowrap',
+                    }}
                   >
                     {spot !== null ? `$${spot.toFixed(2)}` : '—'}
                   </div>
-                  {tick?.changePct !== null && tick?.changePct !== undefined && (
-                    <div
-                      className="mono tnum"
-                      style={{
-                        fontSize: 11,
-                        color: tickFlat ? 'var(--ink-4)' : up ? 'var(--up)' : 'var(--down)',
-                        marginTop: 2,
-                      }}
-                    >
-                      {tickFlat ? '–' : up ? '▲' : '▼'}{' '}
-                      {tick.change !== null ? `$${Math.abs(tick.change).toFixed(2)} ` : ''}
-                      ({Math.abs(tick.changePct * 100).toFixed(2)}%)
-                    </div>
-                  )}
+                  <div
+                    className="mono tnum"
+                    aria-hidden={tick?.changePct === null || tick?.changePct === undefined}
+                    style={{
+                      height: 16,
+                      lineHeight: '16px',
+                      fontSize: 11,
+                      color: tickFlat ? 'var(--ink-4)' : up ? 'var(--up)' : 'var(--down)',
+                      marginTop: 2,
+                      visibility:
+                        tick?.changePct !== null && tick?.changePct !== undefined
+                          ? 'visible'
+                          : 'hidden',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}
+                  >
+                    {tick?.changePct !== null && tick?.changePct !== undefined ? (
+                      <>
+                        {tickFlat ? '–' : up ? '▲' : '▼'}{' '}
+                        {tick.change !== null ? `$${Math.abs(tick.change).toFixed(2)} ` : ''}
+                        ({Math.abs(tick.changePct * 100).toFixed(2)}%)
+                      </>
+                    ) : (
+                      '▲ $000.00 (0.00%)'
+                    )}
+                  </div>
                 </div>
 
-                <div style={{ minWidth: 0 }}>
+                <div style={{ minWidth: 0, minHeight: 51 }}>
                   <div
                     style={{
+                      height: 14,
+                      lineHeight: '14px',
                       fontSize: 10,
                       letterSpacing: '0.14em',
                       textTransform: 'uppercase',
@@ -589,24 +657,41 @@ export default function WatchlistPage() {
                   </div>
                   <div
                     className="mono tnum"
-                    style={{ fontSize: 12, color: 'var(--ink-2)' }}
+                    style={{
+                      height: 17,
+                      lineHeight: '17px',
+                      fontSize: 12,
+                      color: 'var(--ink-2)',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}
                   >
                     {earningsLabel
                       ? `${earningsLabel}${dte !== null ? ` · ${dte}d` : ''}`
                       : '—'}
                   </div>
-                  {timing && (
-                    <div
-                      style={{ fontSize: 10.5, color: 'var(--ink-4)', marginTop: 2 }}
-                    >
-                      {timing}
-                    </div>
-                  )}
+                  <div
+                    aria-hidden={!timing}
+                    style={{
+                      height: 16,
+                      lineHeight: '16px',
+                      fontSize: 10.5,
+                      color: 'var(--ink-4)',
+                      marginTop: 2,
+                      visibility: timing ? 'visible' : 'hidden',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {timing ?? 'Before open'}
+                  </div>
                 </div>
 
                 <div
                   className="serif tnum"
                   style={{
+                    height: 24,
+                    lineHeight: '24px',
                     fontSize: 20,
                     fontWeight: 700,
                     color: 'var(--ink)',
