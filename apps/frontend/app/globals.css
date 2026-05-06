@@ -190,20 +190,36 @@
   animation: quantiv-splash-open-q-in 220ms ease 1600ms forwards;
 }
 
-.quantiv-splash-slit-half {
+@property --quantiv-slit-start {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 137.06deg;
+}
+
+@property --quantiv-slit-span {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0.02deg;
+}
+
+.quantiv-splash-slit-arc {
+  --quantiv-slit-start: 137.06deg;
+  --quantiv-slit-span: 0.02deg;
   position: absolute;
   inset: 0;
-  clip-path: inset(59.9% 37.1% 40.1% 49.1%);
   opacity: 0;
-  will-change: clip-path, opacity;
-}
-
-.quantiv-splash-slit-upper {
-  animation: quantiv-splash-slit-open-upper 780ms linear 900ms forwards;
-}
-
-.quantiv-splash-slit-lower {
-  animation: quantiv-splash-slit-open-lower 780ms linear 900ms forwards;
+  -webkit-mask-image: conic-gradient(
+    from var(--quantiv-slit-start) at 44.58% 48.56%,
+    #000000 0 var(--quantiv-slit-span),
+    transparent var(--quantiv-slit-span) 360deg
+  );
+  mask-image: conic-gradient(
+    from var(--quantiv-slit-start) at 44.58% 48.56%,
+    #000000 0 var(--quantiv-slit-span),
+    transparent var(--quantiv-slit-span) 360deg
+  );
+  animation: quantiv-splash-slit-arc-open 780ms linear 900ms forwards;
+  will-change: opacity, --quantiv-slit-start, --quantiv-slit-span;
 }
 
 .quantiv-splash-tail-clip {
@@ -231,20 +247,32 @@
   to { opacity: 1; }
 }
 
-@keyframes quantiv-splash-slit-open-upper {
-  0%   { clip-path: inset(59.9% 37.1% 40.1% 49.1%); opacity: 0; }
-  12%  { opacity: 1; }
-  82%  { clip-path: inset(53.9% 37.1% 40.1% 49.1%); opacity: 1; }
-  92%  { clip-path: inset(53.9% 37.1% 40.1% 49.1%); opacity: 1; }
-  100% { clip-path: inset(53.9% 37.1% 40.1% 49.1%); opacity: 0; }
-}
-
-@keyframes quantiv-splash-slit-open-lower {
-  0%   { clip-path: inset(59.9% 37.1% 40.1% 49.1%); opacity: 0; }
-  12%  { opacity: 1; }
-  82%  { clip-path: inset(59.9% 37.1% 34.1% 49.1%); opacity: 1; }
-  92%  { clip-path: inset(59.9% 37.1% 34.1% 49.1%); opacity: 1; }
-  100% { clip-path: inset(59.9% 37.1% 34.1% 49.1%); opacity: 0; }
+@keyframes quantiv-splash-slit-arc-open {
+  0% {
+    --quantiv-slit-start: 137.06deg;
+    --quantiv-slit-span: 0.02deg;
+    opacity: 0;
+  }
+  12% {
+    --quantiv-slit-start: 137.06deg;
+    --quantiv-slit-span: 0.02deg;
+    opacity: 1;
+  }
+  82% {
+    --quantiv-slit-start: 115.85deg;
+    --quantiv-slit-span: 42.42deg;
+    opacity: 1;
+  }
+  92% {
+    --quantiv-slit-start: 115.85deg;
+    --quantiv-slit-span: 42.42deg;
+    opacity: 1;
+  }
+  100% {
+    --quantiv-slit-start: 115.85deg;
+    --quantiv-slit-span: 42.42deg;
+    opacity: 0;
+  }
 }
 
 @keyframes quantiv-splash-tail-reveal {
