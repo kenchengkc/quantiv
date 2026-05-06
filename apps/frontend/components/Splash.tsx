@@ -10,9 +10,9 @@ const SESSION_KEY = 'quantiv:splash:played';
 const TOTAL_MS = 3300;
 
 export function Splash() {
-  // null on first render (SSR + hydration) so we never produce a markup
-  // mismatch. The effect decides whether to play and flips state to true.
-  const [phase, setPhase] = useState<'idle' | 'play' | 'done'>('idle');
+  // Render the splash on the first server/client frame. If we wait for
+  // useEffect to decide, the dashboard can flash before the intro mounts.
+  const [phase, setPhase] = useState<'play' | 'done'>('play');
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -26,7 +26,6 @@ export function Splash() {
       return;
     }
 
-    setPhase('play');
     const t = window.setTimeout(() => {
       window.sessionStorage.setItem(SESSION_KEY, '1');
       setPhase('done');
@@ -34,7 +33,7 @@ export function Splash() {
     return () => window.clearTimeout(t);
   }, []);
 
-  if (phase !== 'play') return null;
+  if (phase === 'done') return null;
 
   return (
     <div

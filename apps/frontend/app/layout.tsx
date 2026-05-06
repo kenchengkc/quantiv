@@ -46,12 +46,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <body>
           <Providers>
             <ErrorBoundary>
+              <Splash />
               <div className="min-h-screen flex flex-col">
                 <Topbar />
                 <main className="flex-1">{children}</main>
                 <Footer />
               </div>
-              <Splash />
               <Analytics />
             </ErrorBoundary>
           </Providers>

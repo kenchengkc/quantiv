@@ -181,13 +181,13 @@
   transform-origin: center center;
   animation:
     quantiv-splash-ring-in 520ms cubic-bezier(0.2, 1, 0.3, 1) forwards,
-    quantiv-splash-closed-ring-out 260ms ease 1660ms forwards;
+    quantiv-splash-closed-ring-out 1ms step-end 1680ms forwards;
   opacity: 0;
 }
 
 .quantiv-splash-open-q {
   opacity: 0;
-  animation: quantiv-splash-open-q-in 220ms ease 1600ms forwards;
+  animation: quantiv-splash-open-q-in 1ms step-end 1680ms forwards;
 }
 
 @property --quantiv-slit-start {
@@ -263,15 +263,10 @@
     --quantiv-slit-span: 42.42deg;
     opacity: 1;
   }
-  92% {
-    --quantiv-slit-start: 115.85deg;
-    --quantiv-slit-span: 42.42deg;
-    opacity: 1;
-  }
   100% {
     --quantiv-slit-start: 115.85deg;
     --quantiv-slit-span: 42.42deg;
-    opacity: 0;
+    opacity: 1;
   }
 }
 
