@@ -218,7 +218,9 @@
     #000000 0 var(--quantiv-slit-span),
     transparent var(--quantiv-slit-span) 360deg
   );
-  animation: quantiv-splash-slit-arc-open 780ms linear 900ms forwards;
+  animation:
+    quantiv-splash-slit-arc-open 780ms linear 900ms forwards,
+    quantiv-splash-slit-arc-hide 1ms step-end 1680ms forwards;
   will-change: opacity, --quantiv-slit-start, --quantiv-slit-span;
 }
 
@@ -268,6 +270,11 @@
     --quantiv-slit-span: 42.42deg;
     opacity: 1;
   }
+}
+
+@keyframes quantiv-splash-slit-arc-hide {
+  from { opacity: 1; }
+  to { opacity: 0; }
 }
 
 @keyframes quantiv-splash-tail-reveal {
