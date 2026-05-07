@@ -203,12 +203,48 @@ class MLService:
         except Exception as e:
             logger.error("Failed to get forecast", symbol=symbol, error=str(e))
             return None
+
+    def get_next_earnings_date(self, symbol: str) -> Optional[str]:
+        """Return the next known earnings date for a symbol."""
+        if not self.conn:
+            return None
+
+        try:
+            result = self.conn.execute("""
+                SELECT earnings_date
+                FROM em_forecasts_view
+                WHERE act_symbol = ?
+                  AND earnings_date >= CURRENT_DATE
+                ORDER BY earnings_date ASC
+                LIMIT 1
+            """, [symbol]).fetchone()
+
+            if not result:
+                result = self.conn.execute("""
+                    SELECT earnings_date
+                    FROM em_forecasts_view
+                    WHERE act_symbol = ?
+                    ORDER BY earnings_date DESC
+                    LIMIT 1
+                """, [symbol]).fetchone()
+
+            if not result:
+                return None
+
+            value = result[0]
+            return value.isoformat() if hasattr(value, "isoformat") else str(value)
+        except Exception as e:
+            logger.error("Failed to get next earnings date", symbol=symbol, error=str(e))
+            return None
     
     def get_predictions_for_symbols(self, symbols: List[str]) -> List[Dict[str, Any]]:
         """Get predictions for multiple symbols."""
         predictions = []
         for symbol in symbols:
-            pred = self.predict_expected_move(symbol)
+            earnings_date = self.get_next_earnings_date(symbol)
+            if not earnings_date:
+                continue
+            pred = self.predict_expected_move(symbol, earnings_date)
             if pred:
                 predictions.append(pred)
         return predictions

@@ -19,14 +19,6 @@ try {
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  env: {
-    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || '',
-    NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL || '',
-  },
-  experimental: {
-    serverComponentsExternalPackages: ['better-sqlite3', 'sqlite3', 'pg', 'ws'],
-  },
-  transpilePackages: [],
   async headers() {
     return [
       {
@@ -35,21 +27,6 @@ const nextConfig = {
           {
             key: 'Cache-Control',
             value: 's-maxage=60, stale-while-revalidate=120',
-          },
-        ],
-      },
-    ];
-  },
-  async rewrites() {
-    return [
-      {
-        source: '/:symbol',
-        destination: '/:symbol',
-        has: [
-          {
-            type: 'query',
-            key: 'symbol',
-            value: '(?<symbol>.*)',
           },
         ],
       },

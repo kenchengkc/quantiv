@@ -14,7 +14,6 @@ Python utilities for **DoltHub → Parquet → DuckDB → scoring → frontend J
 | `data_healthcheck.py` | Data quality checks (`npm run ml:validate`) |
 | `csv_to_parquet.py` | CSV → Parquet helper (`npm run data:csv-parquet`) |
 | `csv_to_parquet_volhist.py` | Vol history CSV → Parquet |
-| `refresh_prices.mjs` | Standalone Finnhub refresh (see `.github/workflows/refresh-prices.yml`) |
 | `r2_pull.sh` / `r2_push.sh` / `r2_bootstrap.sh` | R2 sync for CI / local |
 
 One-off R2 setup steps: **`r2_setup.md`**.

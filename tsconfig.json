@@ -1,12 +1,6 @@
 {
-  "files": [],
-  "include": [],
-  "references": [
-    { "path": "./apps/frontend" },
-    { "path": "./packages/schemas" },
-    { "path": "./packages/shared-types" },
-    { "path": "./packages/database" }
-  ],
+  "include": ["lib/**/*.ts"],
+  "references": [],
   "compilerOptions": {
     "target": "es2015",
     "lib": ["dom", "dom.iterable", "es2015"],
