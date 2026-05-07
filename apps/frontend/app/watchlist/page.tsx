@@ -23,6 +23,9 @@ type SymbolSummary = {
 
 type Tick = { price: number | null; change: number | null; changePct: number | null };
 
+const WATCHLIST_ROW_GRID =
+  '18px 40px minmax(150px, 1fr) 132px 168px 92px 116px';
+
 function companyName(t: string) {
   return COMPANY_NAMES[t] || t;
 }
@@ -84,6 +87,23 @@ function MarketStatusBadge({ marketOpen }: { marketOpen: boolean | null }) {
       }} />
       MARKET CLOSED · LAST CLOSE
     </span>
+  );
+}
+
+function QuoteSkeleton({ width = 72, delayMs = 0 }: { width?: number; delayMs?: number }) {
+  return (
+    <span
+      aria-hidden="true"
+      style={{
+        display: 'inline-block',
+        width,
+        height: 10,
+        borderRadius: 999,
+        background: 'var(--bg-3)',
+        animation: 'earnings-grid-pulse 1.1s ease-in-out infinite',
+        animationDelay: `${delayMs}ms`,
+      }}
+    />
   );
 }
 
@@ -256,6 +276,20 @@ function RowActions({
 }
 
 function WatchlistLoadingRows() {
+  const bar = (
+    delayMs: number,
+    width: number | string,
+    height: number,
+    borderRadius: number | string = 4,
+  ) => ({
+    width,
+    height,
+    borderRadius,
+    background: 'var(--bg-3)',
+    animation: 'earnings-grid-pulse 1.1s ease-in-out infinite',
+    animationDelay: `${delayMs}ms`,
+  });
+
   return (
     <ul aria-label="Loading watchlist" style={{ listStyle: 'none', padding: 0, margin: '12px 0 0' }}>
       {Array.from({ length: 4 }).map((_, i) => (
@@ -263,33 +297,32 @@ function WatchlistLoadingRows() {
           key={i}
           style={{
             display: 'grid',
-            gridTemplateColumns:
-              '18px 36px minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 1.2fr) auto 116px',
+            gridTemplateColumns: WATCHLIST_ROW_GRID,
             alignItems: 'center',
-            gap: 14,
-            minHeight: 82,
-            padding: '14px 12px',
+            gap: 16,
+            minHeight: 86,
+            padding: '14px 14px',
             borderBottom: '1px solid var(--line)',
             boxSizing: 'border-box',
           }}
         >
-          <span style={{ width: 16, height: 16, borderRadius: 4, background: 'var(--bg-3)', opacity: 0.55 }} />
-          <span style={{ width: 36, height: 36, borderRadius: 8, background: 'var(--bg-3)', opacity: 0.55 }} />
+          <span style={bar(i * 35, 16, 16)} />
+          <span style={bar(i * 35 + 15, 40, 40, 8)} />
           <span style={{ display: 'grid', gap: 7 }}>
-            <span style={{ width: 74, height: 18, borderRadius: 4, background: 'var(--bg-3)', opacity: 0.55 }} />
-            <span style={{ width: 'min(180px, 80%)', height: 13, borderRadius: 4, background: 'var(--bg-3)', opacity: 0.4 }} />
+            <span style={bar(i * 35 + 25, 74, 18)} />
+            <span style={bar(i * 35 + 45, 'min(180px, 80%)', 13)} />
+          </span>
+          <span style={{ display: 'grid', gap: 6, justifyItems: 'end' }}>
+            <span style={bar(i * 35 + 35, 76, 18, 999)} />
+            <span style={bar(i * 35 + 55, 112, 12, 999)} />
           </span>
           <span style={{ display: 'grid', gap: 5 }}>
-            <span style={{ width: 82, height: 20, borderRadius: 4, background: 'var(--bg-3)', opacity: 0.55 }} />
-            <span style={{ width: 116, height: 16, borderRadius: 4, background: 'var(--bg-3)', opacity: 0.4 }} />
+            <span style={bar(i * 35 + 45, 62, 13)} />
+            <span style={bar(i * 35 + 65, 128, 17)} />
+            <span style={bar(i * 35 + 85, 86, 16)} />
           </span>
-          <span style={{ display: 'grid', gap: 5 }}>
-            <span style={{ width: 62, height: 13, borderRadius: 4, background: 'var(--bg-3)', opacity: 0.4 }} />
-            <span style={{ width: 112, height: 17, borderRadius: 4, background: 'var(--bg-3)', opacity: 0.55 }} />
-            <span style={{ width: 78, height: 16, borderRadius: 4, background: 'var(--bg-3)', opacity: 0.35 }} />
-          </span>
-          <span style={{ width: 58, height: 24, borderRadius: 4, background: 'var(--bg-3)', opacity: 0.55, justifySelf: 'end' }} />
-          <span style={{ width: 116, height: 32, borderRadius: 999, background: 'var(--bg-3)', opacity: 0.45 }} />
+          <span style={{ ...bar(i * 35 + 75, 66, 24), justifySelf: 'end' }} />
+          <span style={bar(i * 35 + 95, 116, 32, 999)} />
         </li>
       ))}
     </ul>
@@ -359,13 +392,18 @@ export default function WatchlistPage() {
         if (cancelled) return { pending: 0, open: lastOpen };
         setLive((prev) => {
           const next: Record<string, Tick> = { ...prev };
+          const seen = new Set<string>();
           for (const t of json.data) {
-            if (t.price !== null) {
-              next[t.symbol] = {
-                price: t.price,
-                change: t.change,
-                changePct: t.changePct,
-              };
+            seen.add(t.symbol);
+            next[t.symbol] = {
+              price: t.price,
+              change: t.change,
+              changePct: t.changePct,
+            };
+          }
+          for (const symbol of tickers) {
+            if (!seen.has(symbol) && !next[symbol]) {
+              next[symbol] = { price: null, change: null, changePct: null };
             }
           }
           return next;
@@ -375,6 +413,13 @@ export default function WatchlistPage() {
         setMarketOpen(open);
         return { pending: json.pending ?? 0, open };
       } catch {
+        setLive((prev) => {
+          const next: Record<string, Tick> = { ...prev };
+          for (const symbol of tickers) {
+            if (!next[symbol]) next[symbol] = { price: null, change: null, changePct: null };
+          }
+          return next;
+        });
         return { pending: 0, open: lastOpen };
       }
     };
@@ -493,13 +538,22 @@ export default function WatchlistPage() {
             const timing = timingText(em?.timing ?? sum?.next_earnings_timing);
             const dte = daysFromToday(earningsIso);
             const tick = live[t];
-            const tickPctR = tick ? Math.round((tick.changePct ?? 0) * 10000) / 10000 : null;
-            const tickChgR = tick ? Math.round((tick.change ?? 0) * 100) / 100 : null;
+            const quotePending = tick === undefined;
+            const quoteDelay = (i % 12) * 35;
+            const tickPctR = tick?.changePct != null
+              ? Math.round(tick.changePct * 10000) / 10000
+              : null;
+            const tickChgR = tick?.change != null
+              ? Math.round(tick.change * 100) / 100
+              : null;
             const tickFlat = tickPctR === 0 && (tickChgR === null || tickChgR === 0);
             // Prefer live Finnhub price when available; fall back to the
-            // snapshot from the symbol JSON only while the live cache is cold.
-            const spot = tick?.price ?? sum?.spot_price ?? null;
-            const up = !tickFlat && (tick?.changePct ?? 0) >= 0;
+            // snapshot only after the live quote request has resolved.
+            const spot = quotePending ? null : tick?.price ?? sum?.spot_price ?? null;
+            const up = tickPctR !== null && !tickFlat && tickPctR >= 0;
+            const quoteColor = tickPctR === null
+              ? 'var(--ink-4)'
+              : tickFlat ? 'var(--ink-4)' : up ? 'var(--up)' : 'var(--down)';
             const isDragging = dragIdx === i;
             const isOver = overIdx === i && dragIdx !== null && dragIdx !== i;
 
@@ -533,12 +587,11 @@ export default function WatchlistPage() {
                 }}
                 style={{
                   display: 'grid',
-                  gridTemplateColumns:
-                    '18px 36px minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 1.2fr) auto 116px',
+                  gridTemplateColumns: WATCHLIST_ROW_GRID,
                   alignItems: 'center',
-                  gap: 14,
-                  padding: '14px 12px',
-                  minHeight: 82,
+                  gap: 16,
+                  padding: '14px 14px',
+                  minHeight: 86,
                   borderBottom: '1px solid var(--line)',
                   boxSizing: 'border-box',
                   background: isOver ? 'var(--bg-3)' : 'transparent',
@@ -563,7 +616,7 @@ export default function WatchlistPage() {
                   style={{ display: 'inline-flex' }}
                   onDragStart={(e) => e.preventDefault()}
                 >
-                  <Logo ticker={t} size={36} />
+                  <Logo ticker={t} size={40} />
                 </Link>
 
                 <Link
@@ -574,7 +627,7 @@ export default function WatchlistPage() {
                   <div
                     className="serif"
                     style={{
-                      fontSize: 18,
+                      fontSize: 19,
                       fontWeight: 700,
                       color: 'var(--ink)',
                       letterSpacing: '-0.01em',
@@ -597,7 +650,17 @@ export default function WatchlistPage() {
                   </div>
                 </Link>
 
-                <div style={{ minWidth: 0, minHeight: 40 }}>
+                <div
+                  style={{
+                    width: 132,
+                    minHeight: 42,
+                    justifySelf: 'end',
+                    display: 'grid',
+                    alignContent: 'center',
+                    justifyItems: 'end',
+                    gap: 4,
+                  }}
+                >
                   <div
                     className="serif tnum"
                     style={{
@@ -606,42 +669,49 @@ export default function WatchlistPage() {
                       fontSize: 15,
                       fontWeight: 600,
                       color: 'var(--ink)',
+                      width: 124,
+                      textAlign: 'right',
                       whiteSpace: 'nowrap',
                     }}
                   >
-                    {spot !== null ? `$${spot.toFixed(2)}` : '—'}
+                    {quotePending ? (
+                      <QuoteSkeleton width={76} delayMs={quoteDelay} />
+                    ) : (
+                      <span style={{ animation: 'earnings-grid-fade-in 160ms ease-out' }}>
+                        {spot !== null ? `$${spot.toFixed(2)}` : '—'}
+                      </span>
+                    )}
                   </div>
                   <div
                     className="mono tnum"
-                    aria-hidden={tick?.changePct === null || tick?.changePct === undefined}
+                    aria-hidden={quotePending || tickPctR === null}
                     style={{
                       height: 16,
                       lineHeight: '16px',
                       fontSize: 11,
-                      color: tickFlat ? 'var(--ink-4)' : up ? 'var(--up)' : 'var(--down)',
-                      marginTop: 2,
-                      visibility:
-                        tick?.changePct !== null && tick?.changePct !== undefined
-                          ? 'visible'
-                          : 'hidden',
+                      color: quoteColor,
+                      width: 124,
+                      textAlign: 'right',
                       whiteSpace: 'nowrap',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                     }}
                   >
-                    {tick?.changePct !== null && tick?.changePct !== undefined ? (
-                      <>
+                    {quotePending ? (
+                      <QuoteSkeleton width={112} delayMs={quoteDelay + 20} />
+                    ) : tickPctR !== null ? (
+                      <span style={{ animation: 'earnings-grid-fade-in 160ms ease-out' }}>
                         {tickFlat ? '–' : up ? '▲' : '▼'}{' '}
-                        {tick.change !== null ? `$${Math.abs(tick.change).toFixed(2)} ` : ''}
-                        ({Math.abs(tick.changePct * 100).toFixed(2)}%)
-                      </>
+                        {tickChgR !== null ? `$${Math.abs(tickChgR).toFixed(2)} ` : ''}
+                        ({Math.abs(tickPctR * 100).toFixed(2)}%)
+                      </span>
                     ) : (
-                      '▲ $000.00 (0.00%)'
+                      <span style={{ animation: 'earnings-grid-fade-in 160ms ease-out' }}>—</span>
                     )}
                   </div>
                 </div>
 
-                <div style={{ minWidth: 0, minHeight: 51 }}>
+                <div style={{ width: 168, minHeight: 51 }}>
                   <div
                     style={{
                       height: 14,
@@ -695,6 +765,8 @@ export default function WatchlistPage() {
                     fontSize: 20,
                     fontWeight: 700,
                     color: 'var(--ink)',
+                    width: 92,
+                    justifySelf: 'end',
                     textAlign: 'right',
                     whiteSpace: 'nowrap',
                   }}
