@@ -219,7 +219,7 @@
     transparent var(--quantiv-slit-span) 360deg
   );
   animation:
-    quantiv-splash-slit-arc-open 780ms linear 900ms forwards,
+    quantiv-splash-slit-arc-open 702ms linear 900ms forwards,
     quantiv-splash-slit-arc-hide 1ms step-end 1680ms forwards;
   will-change: opacity, --quantiv-slit-start, --quantiv-slit-span;
 }
@@ -229,7 +229,7 @@
   inset: 0;
   clip-path: inset(0 60% 0 0);
   opacity: 0;
-  animation: quantiv-splash-tail-reveal 880ms cubic-bezier(0.32, 0, 0.18, 1) 1860ms forwards;
+  animation: quantiv-splash-tail-reveal 968ms cubic-bezier(0.32, 0, 0.18, 1) 1860ms forwards;
   will-change: clip-path, opacity;
 }
 
@@ -286,7 +286,7 @@
   /* Hold the assembled mark in place while the wave finishes drawing,
      then a quick anticipation dip, then the launch to ~10× scale. */
   0%   { transform: scale(1); }
-  84%  { transform: scale(1); }
+  86%  { transform: scale(1); }
   91%  { transform: scale(0.94); }
   100% { transform: scale(10); }
 }
