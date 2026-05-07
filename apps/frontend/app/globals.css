@@ -178,16 +178,8 @@
 .quantiv-splash-closed-ring {
   transform-origin: center center;
   z-index: 1;
-  animation:
-    quantiv-splash-ring-in 520ms cubic-bezier(0.2, 1, 0.3, 1) forwards,
-    quantiv-splash-layer-off 1ms step-start 1500ms forwards;
+  animation: quantiv-splash-ring-in 520ms cubic-bezier(0.2, 1, 0.3, 1) forwards;
   opacity: 0;
-}
-
-.quantiv-splash-open-q {
-  z-index: 3;
-  opacity: 0;
-  animation: quantiv-splash-layer-on 1ms step-start 1500ms forwards;
 }
 
 .quantiv-splash-slit-arc {
@@ -196,16 +188,14 @@
   z-index: 2;
   opacity: 0;
   clip-path: polygon(51.68% 54.99%, 51.86% 54.83%, 60.89% 64.94%, 60.71% 65.10%);
-  animation:
-    quantiv-splash-slit-arc-open 600ms linear 900ms forwards,
-    quantiv-splash-layer-off 1ms step-start 1500ms forwards;
+  animation: quantiv-splash-slit-arc-open 600ms linear 900ms forwards;
   will-change: clip-path, opacity;
 }
 
 .quantiv-splash-tail-clip {
   position: absolute;
   inset: 0;
-  z-index: 4;
+  z-index: 3;
   clip-path: inset(0 60% 0 0);
   opacity: 0;
   animation: quantiv-splash-tail-reveal 968ms cubic-bezier(0.32, 0, 0.18, 1) 1860ms forwards;
@@ -216,14 +206,6 @@
   0%   { transform: scale(0.72); opacity: 0; }
   58%  { transform: scale(1.035); opacity: 1; }
   100% { transform: scale(1); opacity: 1; }
-}
-
-@keyframes quantiv-splash-layer-on {
-  to { opacity: 1; }
-}
-
-@keyframes quantiv-splash-layer-off {
-  to { opacity: 0; }
 }
 
 @keyframes quantiv-splash-slit-arc-open {

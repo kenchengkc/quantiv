@@ -2,10 +2,8 @@
 
 import { useEffect, useState } from 'react';
 
-// Once-per-session intro. The open Q and volatility-smile tail are rendered
-// from transparent layers extracted from the real Quantiv icon. The sequence
-// starts with a closed ring, opens the bottom-right slit, then reveals the
-// exact logo tail through it.
+// Once-per-session intro. The sequence starts with a closed ring, opens the
+// bottom-right slit, then reveals the exact logo tail through it.
 const SESSION_KEY = 'quantiv:splash:played';
 const TOTAL_MS = 3300;
 
@@ -47,13 +45,6 @@ export function Splash() {
           src="/brand/QuantivSplashQClosed.png"
           alt=""
           className="quantiv-splash-layer quantiv-splash-closed-ring"
-          draggable={false}
-        />
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/brand/QuantivSplashQ.png"
-          alt=""
-          className="quantiv-splash-layer quantiv-splash-open-q"
           draggable={false}
         />
         <div className="quantiv-splash-slit-arc">
