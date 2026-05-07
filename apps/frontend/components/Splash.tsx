@@ -46,7 +46,7 @@ export function Splash() {
         <img
           src="/brand/QuantivSplashQClosed.png"
           alt=""
-          className="quantiv-splash-layer quantiv-splash-slit-fill"
+          className="quantiv-splash-layer quantiv-splash-closed-ring"
           draggable={false}
         />
         {/* eslint-disable-next-line @next/next/no-img-element */}
