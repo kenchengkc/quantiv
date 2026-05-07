@@ -26,6 +26,13 @@ test.describe('watchlist (authenticated)', () => {
 
     // If the bypass failed, Clerk redirects to /sign-in instead.
     await expect(page).toHaveURL(/\/watchlist(\?.*)?$/);
+
+    // Detach @clerk/testing's FAPI route handler before the page tears
+    // down. Clerk's SDK keeps polling for session state in the background;
+    // when Playwright closes the page, an in-flight retry hits the route
+    // handler against a closed context and logs a noisy "Test ended"
+    // error. Unrouting here drains the handler cleanly.
+    await page.unrouteAll({ behavior: 'ignoreErrors' });
   });
 });
 
