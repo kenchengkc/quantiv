@@ -306,34 +306,36 @@ export default function EarningsScreener() {
 
   const sorted = useMemo(() => {
     const dir = sortDir === 'asc' ? 1 : -1;
-    const val = (ev: ScreenerEvent): number => {
+    const finite = (v: number | null | undefined): number | null =>
+      v != null && Number.isFinite(v) ? v : null;
+    const val = (ev: ScreenerEvent): number | null => {
       switch (sortKey) {
         case 'edge':
-          return edgePct(ev) ?? -Infinity;
+          return finite(edgePct(ev));
         case 'dte':
-          return ev.lead_time_days ?? 999;
+          return finite(ev.lead_time_days);
         case 'date':
-          return new Date(ev.earnings_date).getTime();
+          return finite(new Date(ev.earnings_date).getTime());
         case 'straddle':
-          return ev.em_straddle_pct ?? -Infinity;
+          return finite(ev.em_straddle_pct);
         case 'ml':
-          return ev.em_ml_pct ?? -Infinity;
+          return finite(ev.em_ml_pct);
         case 'iv':
-          return ev.atm_iv ?? -Infinity;
+          return finite(ev.atm_iv);
         case 'band':
-          return band80(ev) ?? -Infinity;
+          return finite(band80(ev));
         case 'skew':
-          return ev.skew_atm ?? -Infinity;
+          return finite(ev.skew_atm);
         case 'spot':
-          return ev.spot_price ?? -Infinity;
+          return finite(ev.spot_price);
         case 'iv_rank':
-          return ev.iv_rank ?? -Infinity;
+          return finite(ev.iv_rank);
         case 'hist_avg':
-          return ev.hist_move_avg_4q ?? -Infinity;
+          return finite(ev.hist_move_avg_4q);
         case 'hist_edge':
-          return histEdge(ev) ?? -Infinity;
+          return finite(histEdge(ev));
         case 'iv_crush':
-          return ev.iv_crush_pct ?? -Infinity;
+          return finite(ev.iv_crush_pct);
         default:
           return 0;
       }
@@ -341,6 +343,9 @@ export default function EarningsScreener() {
     return [...filtered].sort((a, b) => {
       const va = val(a);
       const vb = val(b);
+      if (va == null && vb == null) return a.ticker.localeCompare(b.ticker);
+      if (va == null) return 1;
+      if (vb == null) return -1;
       if (va === vb) return a.ticker.localeCompare(b.ticker);
       return va < vb ? -dir : dir;
     });
