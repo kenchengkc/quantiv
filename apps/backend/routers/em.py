@@ -301,13 +301,17 @@ async def get_symbol_history(symbol: str, days: int = 30):
 
 
 @router.get("/api/ml/predict/{symbol}")
-async def get_ml_prediction(symbol: str):
+async def get_ml_prediction(symbol: str, earnings_date: Optional[str] = None, sector: Optional[str] = None):
     ml = _ml()
     if not ml:
         raise HTTPException(status_code=503, detail="ML service not available")
-    prediction = ml.predict_expected_move(symbol.upper())
+    sym = symbol.upper()
+    target_date = earnings_date or ml.get_next_earnings_date(sym)
+    if not target_date:
+        raise HTTPException(status_code=404, detail=f"No earnings date available for {sym}")
+    prediction = ml.predict_expected_move(sym, target_date, sector)
     if not prediction:
-        raise HTTPException(status_code=404, detail=f"No ML prediction available for {symbol}")
+        raise HTTPException(status_code=404, detail=f"No ML prediction available for {sym}")
     return prediction
 
 
@@ -335,4 +339,3 @@ async def get_all_ml_forecasts(days_ahead: int = 30):
     forecasts = ml.get_all_upcoming_forecasts(days_ahead)
     return {"forecasts": forecasts, "count": len(forecasts), "days_ahead": days_ahead,
             "generated_at": datetime.now().isoformat()}
-

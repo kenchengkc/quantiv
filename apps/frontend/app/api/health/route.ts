@@ -1,12 +1,11 @@
 /**
  * /api/health - Health check endpoint
- * Returns system status, cache stats, and Redis connectivity
+ * Returns system status and Redis connectivity.
  */
 
 export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
-import { getAllCacheStats } from '@/lib/cache/lru';
-import { checkRedisHealth } from '@/lib/cache/redis';
+import { getRedis } from '@/lib/redis';
 
 /**
  * GET /api/health
@@ -15,31 +14,27 @@ export async function GET() {
   const startTime = Date.now();
   
   try {
-    // Check Redis health
-    const redisHealth = await checkRedisHealth();
-    
-    // Get L1 cache statistics
-    const cacheStats = getAllCacheStats();
-    const l1Stats = Object.fromEntries(
-      Object.entries(cacheStats).map(([name, stats]) => [
-        name,
-        {
-          size: stats.size,
-          hitRate: Math.round(stats.hitRate * 100) / 100
-        }
-      ])
-    );
-    
-    // Determine overall system status
-    let status: 'healthy' | 'degraded' | 'unhealthy';
+    const redis = getRedis();
+    const redisHealth: {
+      connected: boolean;
+      latency?: number;
+      error?: string;
+    } = { connected: false };
+
+    if (!redis) {
+      redisHealth.error = 'Redis not configured (missing UPSTASH_REDIS_REST_URL or UPSTASH_REDIS_REST_TOKEN)';
+    } else {
+      const redisStart = Date.now();
+      await redis.ping();
+      redisHealth.connected = true;
+      redisHealth.latency = Date.now() - redisStart;
+    }
+
+    let status: 'healthy' | 'degraded';
     
     if (redisHealth.connected) {
       status = 'healthy';
-    } else if (redisHealth.error && redisHealth.error.includes('CRITICAL')) {
-      // If Redis has critical errors, mark as unhealthy
-      status = 'unhealthy';
     } else {
-      // System can still function without Redis (L1 cache only)
       status = 'degraded';
     }
     
@@ -47,10 +42,7 @@ export async function GET() {
       status,
       timestamp: new Date().toISOString(),
       services: {
-        redis: redisHealth,
-        cache: {
-          l1Stats
-        }
+        redis: redisHealth
       },
       version: process.env.npm_package_version || '1.0.0'
     };
@@ -67,7 +59,7 @@ export async function GET() {
     
     return NextResponse.json(healthData, { 
       headers,
-      status: status === 'unhealthy' ? 503 : 200
+      status: 200
     });
     
   } catch (error) {
@@ -80,9 +72,6 @@ export async function GET() {
         redis: {
           connected: false,
           error: error instanceof Error ? error.message : 'Unknown error'
-        },
-        cache: {
-          l1Stats: {}
         }
       }
     };

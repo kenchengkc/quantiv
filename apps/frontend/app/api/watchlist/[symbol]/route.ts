@@ -8,13 +8,14 @@ const SYMBOL_RE = /^[A-Z][A-Z.\-]{0,9}$/;
 
 export async function DELETE(
   _req: Request,
-  { params }: { params: { symbol: string } },
+  { params }: { params: Promise<{ symbol: string }> },
 ) {
   const { userId } = await auth();
   if (!userId) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
-  const symbol = params.symbol.trim().toUpperCase();
+  const { symbol: rawSymbol } = await params;
+  const symbol = rawSymbol.trim().toUpperCase();
   if (!SYMBOL_RE.test(symbol)) {
     return NextResponse.json({ error: 'invalid symbol' }, { status: 400 });
   }

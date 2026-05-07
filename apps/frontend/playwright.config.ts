@@ -1,0 +1,47 @@
+import { defineConfig, devices } from '@playwright/test';
+import path from 'node:path';
+
+// Pull E2E env from `.env.test.local` first (gitignored — holds the Clerk
+// dev-instance Secret Key + a test user email), then fall back to
+// `.env.local` for any other Next.js runtime vars the dev server needs.
+import dotenv from 'dotenv';
+dotenv.config({ path: path.resolve(__dirname, '.env.test.local'), override: false });
+dotenv.config({ path: path.resolve(__dirname, '.env.local'), override: false });
+
+const PORT = Number(process.env.E2E_PORT ?? 3000);
+const BASE_URL = process.env.E2E_BASE_URL ?? `http://localhost:${PORT}`;
+
+export default defineConfig({
+  testDir: './e2e',
+  // clerkSetup() lives here — runs once before any test, exchanges the dev
+  // publishable + secret keys for a Clerk Testing Token that bypasses bot
+  // detection so signIn() can mint sessions.
+  globalSetup: require.resolve('./e2e/global-setup'),
+  fullyParallel: false,            // sign-in serializes against Clerk's rate limits
+  forbidOnly: !!process.env.CI,
+  retries: process.env.CI ? 1 : 0,
+  workers: process.env.CI ? 1 : undefined,
+  reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : 'list',
+  use: {
+    baseURL: BASE_URL,
+    trace: 'on-first-retry',
+    screenshot: 'only-on-failure',
+    video: 'retain-on-failure',
+  },
+  projects: [
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+  ],
+  // Boot the Next dev server unless one is already running.
+  webServer: {
+    command: 'npm run dev',
+    url: BASE_URL,
+    reuseExistingServer: !process.env.CI,
+    timeout: 120_000,
+    // Pass through the Clerk publishable key the app needs at runtime.
+    env: {
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:
+        process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ?? '',
+      CLERK_SECRET_KEY: process.env.CLERK_SECRET_KEY ?? '',
+    },
+  },
+});

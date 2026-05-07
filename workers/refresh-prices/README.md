@@ -64,24 +64,9 @@ Output will include the Worker URL — bookmark it.
 npx wrangler tail
 ```
 
-Wait for the next :00 / :05 / :10 etc. You'll see a log line per fire.
+Wait for the next minute. You'll see a log line per fire.
 Within ~6 min you should see `refresh response: 200` followed shortly by
 the symbol counts in Vercel's function logs (`vercel logs <deployment>`).
-
-### 5. Disable the GitHub Actions cron
-
-The GH workflow keeps firing (~hourly) until you stop it. Edit
-`.github/workflows/refresh-prices.yml` and comment out the `schedule:`
-section, leaving `workflow_dispatch:` so you can still trigger it manually.
-
-```yaml
-on:
-  # schedule:
-  #   - cron: '*/5 * * * *'
-  workflow_dispatch:
-```
-
-Commit + push.
 
 ## Cost
 

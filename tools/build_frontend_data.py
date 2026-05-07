@@ -273,17 +273,53 @@ def build_symbol_detail(conn, ticker: str, as_of_date: date, earnings_dt: date |
     if not straddles:
         return None
 
-    # Earnings history (last 12 events for this ticker)
-    history = conn.execute(
-        """
-        SELECT earnings_dt, timing
-        FROM earnings_events
-        WHERE ticker = ?
-        ORDER BY earnings_dt DESC
-        LIMIT 12
-        """,
-        [ticker],
-    ).fetchall()
+    # Earnings history (last 12 events) with signed close-to-close realized
+    # moves where OHLCV coverage permits. The LEFT JOIN ensures we still
+    # return history rows when v_ohlcv can't bracket the event — those
+    # rows just have actual=NULL and the chart's dot won't render. The
+    # window is ±5 calendar days so weekends/holidays don't drop events.
+    # ROW_NUMBER picks the latest pre-earnings close and the first
+    # post-earnings close per earnings_dt (NULLS LAST keeps the bare row
+    # if no OHLCV exists).
+    try:
+        history = conn.execute(
+            """
+            SELECT
+                e.earnings_dt,
+                e.timing,
+                (post.close / NULLIF(pre.close, 0) - 1.0) AS actual
+            FROM earnings_events e
+            LEFT JOIN v_ohlcv pre  ON pre.act_symbol = e.ticker
+                AND pre.date < e.earnings_dt
+                AND pre.date >= e.earnings_dt - INTERVAL '5' DAY
+            LEFT JOIN v_ohlcv post ON post.act_symbol = e.ticker
+                AND post.date > e.earnings_dt
+                AND post.date <= e.earnings_dt + INTERVAL '5' DAY
+            WHERE e.ticker = ?
+            QUALIFY ROW_NUMBER() OVER (
+                PARTITION BY e.earnings_dt
+                ORDER BY pre.date DESC NULLS LAST, post.date ASC NULLS LAST
+            ) = 1
+            ORDER BY e.earnings_dt DESC
+            LIMIT 12
+            """,
+            [ticker],
+        ).fetchall()
+    except Exception:
+        # v_ohlcv may not exist for this build; fall back to bare history.
+        history = [
+            (d, t, None)
+            for d, t in conn.execute(
+                """
+                SELECT earnings_dt, timing
+                FROM earnings_events
+                WHERE ticker = ?
+                ORDER BY earnings_dt DESC
+                LIMIT 12
+                """,
+                [ticker],
+            ).fetchall()
+        ]
 
     # Use the closest post-earnings expiry as the headline expected move
     em = None
@@ -367,7 +403,18 @@ def build_symbol_detail(conn, ticker: str, as_of_date: date, earnings_dt: date |
         "expected_move": em,
         "straddle_features": straddles,
         "earnings_history": [
-            {"date": d.isoformat(), "timing": t} for d, t in history
+            {
+                "date": d.isoformat(),
+                "timing": t,
+                # Signed close-to-close realized move (e.g. +0.034 = +3.4%).
+                # NULL when OHLCV doesn't bracket the event.
+                "actual": jsonable(a),
+                # At-the-time implied move. Populated once historical
+                # option-chain data is wired into the build; until then
+                # the chart shows only the actual dots.
+                "implied": None,
+            }
+            for d, t, a in history
         ],
         "next_earnings": earnings_dt.isoformat() if earnings_dt else None,
         "vol_regime": vol_regime,
@@ -439,7 +486,7 @@ def screener_extras(conn, ticker: str, earnings_dt: date, as_of_date: date) -> d
     try:
         front = conn.execute(
             """
-            SELECT iv FROM v_options_chain
+            SELECT expiry_date, iv FROM v_options_chain
             WHERE ticker = ? AND as_of_date = ? AND call_put = 'C'
               AND iv IS NOT NULL AND iv > 0
               AND expiry_date >= ?
@@ -449,7 +496,8 @@ def screener_extras(conn, ticker: str, earnings_dt: date, as_of_date: date) -> d
             [ticker, as_of_date, earnings_dt],
         ).fetchone()
         if front:
-            front_iv = float(front[0])
+            front_expiry = front[0]
+            front_iv = float(front[1])
             back = conn.execute(
                 """
                 SELECT iv FROM v_options_chain
@@ -457,9 +505,9 @@ def screener_extras(conn, ticker: str, earnings_dt: date, as_of_date: date) -> d
                   AND iv IS NOT NULL AND iv > 0
                   AND expiry_date > ?
                 ORDER BY expiry_date ASC, ABS(delta - 0.5) ASC
-                LIMIT 1 OFFSET 1
+                LIMIT 1
                 """,
-                [ticker, as_of_date, earnings_dt],
+                [ticker, as_of_date, front_expiry],
             ).fetchone()
             if back:
                 back_iv = float(back[0])
@@ -611,6 +659,12 @@ def main():
         events = build_week_events(conn, as_of_date, wk_start, wk_end, ml_lookup,
                                    require_ml=require_ml)
         print(f"📅 week {wk_start} (offset {offset:+d}) → {len(events)} events")
+        em_straddle_vals = [
+            e["em_straddle_pct"] for e in events if e["em_straddle_pct"] is not None
+        ]
+        em_iv_vals = [
+            e["em_iv_pct"] for e in events if e["em_iv_pct"] is not None
+        ]
         payload = {
             "metadata": {
                 "version": "v4_multi_week",
@@ -624,12 +678,12 @@ def main():
             "summary": {
                 "total_events": len(events),
                 "avg_em_straddle_pct": (
-                    sum(e["em_straddle_pct"] for e in events if e["em_straddle_pct"]) / len(events)
-                    if events else 0
+                    sum(em_straddle_vals) / len(em_straddle_vals)
+                    if em_straddle_vals else 0
                 ),
                 "avg_em_iv_pct": (
-                    sum(e["em_iv_pct"] for e in events if e["em_iv_pct"]) / len(events)
-                    if events else 0
+                    sum(em_iv_vals) / len(em_iv_vals)
+                    if em_iv_vals else 0
                 ),
             },
         }

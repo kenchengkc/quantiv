@@ -1,10 +1,7 @@
 /**
  * S&P 500 Data Service
- * Provides real S&P 500 company data and integrates with Yahoo Finance for live market data
+ * Provides canonical and optionally refreshed S&P 500 company data.
  */
-
-// Note: Do NOT import 'yahoo-finance2' at top-level to avoid bundling it into client code.
-// We'll dynamically import it inside server-only methods when needed.
 
 // Dynamic S&P 500 list refresh interval (24h)
 const DYNAMIC_SP500_TTL_MS = 24 * 60 * 60 * 1000;
@@ -42,56 +39,6 @@ const SP500_COMPANIES: SP500Company[] = [
   { symbol: 'VTI', name: 'Vanguard Total Stock Market ETF', sector: 'ETF', industry: 'Total Market Fund', exchange: 'NYSE' },
 ];
 
-export interface LiveQuoteData {
-  symbol: string;
-  name: string;
-  price: number;
-  change: number;
-  changePercent: number;
-  volume: number;
-  marketCap?: number;
-  pe?: number;
-  high52Week?: number;
-  low52Week?: number;
-  previousClose?: number;
-  dayHigh?: number;
-  dayLow?: number;
-  avgVolume?: number;
-  timestamp: string;
-}
-
-export interface LiveOptionsData {
-  symbol: string;
-  expirationDate: string;
-  strikes: Array<{
-    strike: number;
-    call: {
-      bid: number;
-      ask: number;
-      last: number;
-      volume: number;
-      openInterest: number;
-      impliedVolatility: number;
-      delta?: number;
-      gamma?: number;
-      theta?: number;
-      vega?: number;
-    };
-    put: {
-      bid: number;
-      ask: number;
-      last: number;
-      volume: number;
-      openInterest: number;
-      impliedVolatility: number;
-      delta?: number;
-      gamma?: number;
-      theta?: number;
-      vega?: number;
-    };
-  }>;
-}
-
 class SP500DataService {
   private static instance: SP500DataService;
   private companies: Map<string, SP500Company> = new Map();
@@ -128,7 +75,10 @@ class SP500DataService {
       if (!apiKey) return [];
 
       const url = `${FMP_SP500_URL}?apikey=${apiKey}`;
-      const resp = await fetch(url, { next: { revalidate: 60 * 60 } });
+      const resp = await fetch(
+        url,
+        { next: { revalidate: 60 * 60 } } as RequestInit & { next: { revalidate: number } }
+      );
       if (!resp.ok) return [];
       const data = await resp.json();
 
@@ -300,68 +250,6 @@ class SP500DataService {
     return list.filter(c => c.sector.toLowerCase() === sector.toLowerCase());
   }
 
-  // Fetch live quote data using Yahoo Finance
-  public async fetchLiveQuote(symbol: string): Promise<LiveQuoteData | null> {
-    try {
-      // Guard: this method is server-only to avoid shipping yahoo-finance2 to the browser
-      if (typeof window !== 'undefined') {
-        console.warn('[sp500Service] fetchLiveQuote called on the client; returning null');
-        return null;
-      }
-
-      const yahooFinance = (await import('yahoo-finance2')).default;
-      const quote = await yahooFinance.quote(symbol);
-      const company = this.getCompany(symbol);
-      
-      if (!quote || !quote.regularMarketPrice) {
-        return null;
-      }
-
-      return {
-        symbol: quote.symbol || symbol,
-        name: company?.name || quote.longName || quote.shortName || `${symbol} Company`,
-        price: quote.regularMarketPrice,
-        change: quote.regularMarketChange || 0,
-        changePercent: quote.regularMarketChangePercent || 0,
-        volume: quote.regularMarketVolume || 0,
-        marketCap: quote.marketCap,
-        pe: quote.trailingPE,
-        high52Week: quote.fiftyTwoWeekHigh,
-        low52Week: quote.fiftyTwoWeekLow,
-        previousClose: quote.regularMarketPreviousClose,
-        dayHigh: quote.regularMarketDayHigh,
-        dayLow: quote.regularMarketDayLow,
-        avgVolume: quote.averageDailyVolume3Month,
-        timestamp: new Date().toISOString()
-      };
-    } catch (error) {
-      console.error(`Failed to fetch live quote for ${symbol}:`, error);
-      return null;
-    }
-  }
-
-  // Fetch multiple quotes at once
-  public async fetchMultipleQuotes(symbols: string[]): Promise<Map<string, LiveQuoteData>> {
-    const quotes = new Map<string, LiveQuoteData>();
-    
-    try {
-      const results = await Promise.allSettled(
-        symbols.map(symbol => this.fetchLiveQuote(symbol))
-      );
-
-      results.forEach((result, index) => {
-        if (result.status === 'fulfilled' && result.value) {
-          quotes.set(symbols[index], result.value);
-        }
-      });
-    } catch (error) {
-      console.error('Failed to fetch multiple quotes:', error);
-    }
-
-    return quotes;
-  }
-
-  // All mock data generation methods removed - using only live API data
 }
 
 // Export singleton instance
@@ -392,4 +280,3 @@ export async function searchSP500CompaniesAsync(query: string, limit?: number): 
 export async function getPopularSP500StocksAsync(): Promise<SP500Company[]> {
   return await sp500DataService.getPopularStocksAsync();
 }
-
