@@ -68,7 +68,16 @@ interface SymbolDetail {
   spot_price: number | null;
   expected_move?: ExpectedMove;
   straddle_features: Straddle[];
-  earnings_history?: Array<{ date: string; timing: string }>;
+  earnings_history?: Array<{
+    date: string;
+    timing: string;
+    /** Quarter label like "Q1 25" — optional; falls back to date. */
+    q?: string;
+    /** Implied move at the time, decimal fraction (e.g. 0.045 = 4.5%). */
+    implied?: number | null;
+    /** Realized close-to-close move, signed decimal fraction. */
+    actual?: number | null;
+  }>;
   next_earnings?: string | null;
   next_earnings_timing?: string;
   vol_regime?: VolRegime | null;
@@ -1146,6 +1155,213 @@ function TermStructureFan({
   );
 }
 
+// ---------- Historical implied vs actual ----------
+type HistoryPoint = {
+  q: string;
+  date: string;
+  /** Implied move (always ≥ 0). Null until at-the-time chain data is wired. */
+  implied: number | null;
+  /** Signed realized move (e.g. -0.034 = -3.4%). */
+  actual: number;
+};
+
+/** Build the chart series from earnings_history rows that carry an
+ *  `actual` close-to-close move. `implied` is optional — when present
+ *  the chart draws an implied band around zero; when absent the chart
+ *  shows just the realized dot. Returns rows in chronological order
+ *  (oldest → newest) and clips to the last 8 quarters. */
+function buildHistorySeries(
+  raw: SymbolDetail['earnings_history'] | undefined,
+): HistoryPoint[] {
+  if (!raw || raw.length === 0) return [];
+  const usable = raw
+    .filter(
+      (h): h is typeof h & { actual: number } =>
+        h.actual != null && Number.isFinite(h.actual),
+    )
+    .map((h) => {
+      const d = new Date(h.date);
+      const yy = String(d.getFullYear() % 100).padStart(2, '0');
+      const q = h.q ?? `Q${Math.floor(d.getMonth() / 3) + 1} ${yy}`;
+      const implied =
+        h.implied != null && Number.isFinite(h.implied)
+          ? Math.abs(h.implied)
+          : null;
+      return { q, date: h.date, implied, actual: h.actual };
+    })
+    .sort((a, b) => a.date.localeCompare(b.date));
+  return usable.slice(-8);
+}
+
+function HistoryChart({ history }: { history: HistoryPoint[] }) {
+  const W = 640;
+  const H = 180;
+  const P = 28;
+  if (history.length === 0) return null;
+
+  // Whether any row has implied data — drives whether we draw the band
+  // and show its legend swatch.
+  const hasImplied = history.some((h) => h.implied != null);
+
+  const max =
+    Math.max(
+      ...history.map((h) =>
+        Math.max(h.implied != null ? h.implied : 0, Math.abs(h.actual)),
+      ),
+    ) * 1.15 || 0.05;
+  const colW = (W - P * 2) / history.length;
+  const y = (v: number) => H / 2 - (v / max) * (H / 2 - 22);
+
+  return (
+    <div style={{ marginTop: 14 }}>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto' }}>
+        {/* zero baseline */}
+        <line
+          x1={P}
+          x2={W - P}
+          y1={H / 2}
+          y2={H / 2}
+          stroke="var(--line)"
+        />
+        {/* gridline ticks at ±max for orientation */}
+        <line
+          x1={P}
+          x2={W - P}
+          y1={y(max)}
+          y2={y(max)}
+          stroke="var(--line)"
+          strokeDasharray="2 4"
+          opacity={0.5}
+        />
+        <line
+          x1={P}
+          x2={W - P}
+          y1={y(-max)}
+          y2={y(-max)}
+          stroke="var(--line)"
+          strokeDasharray="2 4"
+          opacity={0.5}
+        />
+        {history.map((h, i) => {
+          const cx = P + colW * i + colW / 2;
+          const actualPositive = h.actual >= 0;
+          // Beat = realized exceeded implied band. Only meaningful when
+          // we have an implied number to compare against.
+          const beat = h.implied != null && Math.abs(h.actual) > h.implied;
+          return (
+            <g key={`${h.date}-${i}`}>
+              {h.implied != null && (
+                <>
+                  <rect
+                    x={cx - 11}
+                    y={y(h.implied)}
+                    width={22}
+                    height={Math.max(1, y(-h.implied) - y(h.implied))}
+                    fill="color-mix(in srgb, var(--accent) 22%, transparent)"
+                  />
+                  <line
+                    x1={cx - 11}
+                    x2={cx + 11}
+                    y1={y(h.implied)}
+                    y2={y(h.implied)}
+                    stroke="var(--accent)"
+                    strokeWidth={1}
+                  />
+                  <line
+                    x1={cx - 11}
+                    x2={cx + 11}
+                    y1={y(-h.implied)}
+                    y2={y(-h.implied)}
+                    stroke="var(--accent)"
+                    strokeWidth={1}
+                  />
+                </>
+              )}
+              {beat && (
+                <circle
+                  cx={cx}
+                  cy={y(h.actual)}
+                  r={6}
+                  fill="none"
+                  stroke={actualPositive ? 'var(--up)' : 'var(--down)'}
+                  strokeWidth={1.4}
+                  opacity={0.55}
+                />
+              )}
+              <circle
+                cx={cx}
+                cy={y(h.actual)}
+                r={3.5}
+                fill={actualPositive ? 'var(--up)' : 'var(--down)'}
+              />
+              <text
+                x={cx}
+                y={H - 8}
+                textAnchor="middle"
+                fill="var(--ink-4)"
+                fontSize="9"
+                fontFamily="JetBrains Mono"
+              >
+                {h.q}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+      <div
+        style={{
+          display: 'flex',
+          gap: 18,
+          marginTop: 8,
+          fontSize: 11,
+          color: 'var(--ink-3)',
+          flexWrap: 'wrap',
+        }}
+      >
+        {hasImplied && (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <span
+              style={{
+                width: 18,
+                height: 8,
+                background: 'color-mix(in srgb, var(--accent) 22%, transparent)',
+                borderTop: '1px solid var(--accent)',
+                borderBottom: '1px solid var(--accent)',
+              }}
+            />
+            Implied range (±)
+          </span>
+        )}
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <span
+            style={{
+              width: 8,
+              height: 8,
+              borderRadius: 999,
+              background: 'var(--up)',
+            }}
+          />
+          Actual move
+        </span>
+        {hasImplied && (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <span
+              style={{
+                width: 12,
+                height: 12,
+                borderRadius: 999,
+                border: '1.4px solid var(--ink-3)',
+                opacity: 0.55,
+              }}
+            />
+            Beat implied
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ---------- Small bits ----------
 function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
@@ -1265,6 +1481,10 @@ export default function SymbolPage() {
     setLive(null);
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
+    // Track the last marketOpen flag from the API across polls so the slow
+    // loop can back off after-hours. Default to `true` so the very first
+    // tick (before any response) uses the open-market cadence.
+    let lastMarketOpen = true;
 
     const fetchOnce = async (): Promise<number> => {
       try {
@@ -1283,6 +1503,8 @@ export default function SymbolPage() {
             changePct: number | null;
           }>;
         };
+        const open = json.marketOpen ?? true;
+        lastMarketOpen = open;
         const tick = json.data?.[0];
         if (!cancelled && tick && tick.price !== null) {
           setLive({
@@ -1292,7 +1514,7 @@ export default function SymbolPage() {
             changePct: tick.changePct,
             updated: json.updated,
             source: json.source === 'finnhub' ? 'finnhub' : 'unavailable',
-            marketOpen: json.marketOpen ?? true,
+            marketOpen: open,
           });
         }
         return json.pending ?? 0;
@@ -1308,12 +1530,17 @@ export default function SymbolPage() {
         const delay = attempt < 10 ? 2_000 : 8_000;
         timer = setTimeout(() => void fastPoll(attempt + 1), delay);
       } else {
+        // Slow loop: 30 s while the market is open, 5 min when closed.
+        // Quotes don't change after hours, so polling every 30 s is
+        // pure waste of the Finnhub budget. Mirrors the grid's cadence
+        // (EarningsGrid.tsx uses lastMarketOpen ? 30_000 : 300_000).
         const slowLoop = () => {
           if (cancelled) return;
+          const interval = lastMarketOpen ? 30_000 : 300_000;
           timer = setTimeout(async () => {
             await fetchOnce();
             slowLoop();
-          }, 30_000);
+          }, interval);
         };
         slowLoop();
       }
@@ -1786,6 +2013,83 @@ export default function SymbolPage() {
           />
         </section>
       )}
+
+      {/* Historical implied vs realized (last 8 quarters).
+          Renders only when the symbol payload's earnings_history rows
+          carry both `implied` and `actual` numbers. The data pipeline
+          does not currently emit those — when it does, the chart will
+          light up automatically. Until then, this section is hidden so
+          we don't show fake or empty data. */}
+      {(() => {
+        const series = buildHistorySeries(data.earnings_history);
+        if (series.length < 2) return null;
+        const withImplied = series.filter((h) => h.implied != null);
+        const hasImplied = withImplied.length > 0;
+        const beats = withImplied.filter(
+          (h) => Math.abs(h.actual) > (h.implied as number),
+        ).length;
+        return (
+          <section style={{ padding: '40px 0', borderBottom: '1px solid var(--line)' }}>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'baseline',
+                marginBottom: 4,
+                gap: 16,
+              }}
+            >
+              <div>
+                <div
+                  style={{
+                    fontSize: 10,
+                    letterSpacing: '0.18em',
+                    textTransform: 'uppercase',
+                    color: 'var(--ink-3)',
+                  }}
+                >
+                  Historical
+                </div>
+                <h2
+                  className="serif"
+                  style={{
+                    margin: '4px 0 0',
+                    fontSize: 22,
+                    fontWeight: 700,
+                    letterSpacing: '-0.01em',
+                  }}
+                >
+                  {hasImplied ? 'Implied vs. actual' : 'Realized moves'}, last{' '}
+                  {series.length} {series.length === 1 ? 'quarter' : 'quarters'}
+                </h2>
+              </div>
+              {hasImplied ? (
+                <div className="mono tnum" style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+                  Beat implied{' '}
+                  <span style={{ color: 'var(--ink)' }}>
+                    {beats}/{withImplied.length}
+                  </span>{' '}
+                  times
+                </div>
+              ) : (
+                <div
+                  className="mono"
+                  style={{
+                    fontSize: 10.5,
+                    color: 'var(--ink-4)',
+                    textAlign: 'right',
+                    maxWidth: 220,
+                    lineHeight: 1.4,
+                  }}
+                >
+                  Implied range pending —<br />historical option chains not yet wired
+                </div>
+              )}
+            </div>
+            <HistoryChart history={series} />
+          </section>
+        );
+      })()}
 
       {/* Term structure */}
       {data.straddle_features.length > 0 && (

@@ -34,7 +34,7 @@ Go to https://github.com/kenchengkc/quantiv/settings/secrets/actions and add:
 | `R2_SECRET_ACCESS_KEY`   | from step 2                             |
 | `R2_BUCKET`              | `quantiv-data`                          |
 
-The workflow also needs the previously-set `FINNHUB_API_KEY` / `UPSTASH_*` / `DATABASE_URL` — already present if you set up `refresh-prices.yml`.
+The workflow also needs the previously-set `FINNHUB_API_KEY` / `UPSTASH_*` / `DATABASE_URL` used by the hosted price refresher.
 
 ## 4. One-time local bootstrap: upload your data/ to R2
 

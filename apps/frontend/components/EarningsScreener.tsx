@@ -105,6 +105,198 @@ function num(v: number | null | undefined, digits = 2) {
   return v.toFixed(digits);
 }
 
+/* eslint-disable @next/next/no-img-element */
+/** Inline ticker logo using the parqet asset CDN with a typographic
+ *  fallback. Mirrors the EarningsGrid's Logo but kept local so the
+ *  screener doesn't import from another component. */
+function ScreenerLogo({ ticker, size = 26 }: { ticker: string; size?: number }) {
+  const [err, setErr] = useState(false);
+  const s = { width: size, height: size };
+  if (err) {
+    return (
+      <div
+        className="serif"
+        style={{
+          ...s,
+          borderRadius: 6,
+          background: 'var(--bg-3)',
+          border: '1px solid var(--line)',
+          display: 'grid',
+          placeItems: 'center',
+          color: 'var(--ink-2)',
+          fontSize: Math.max(9, size * 0.34),
+          fontWeight: 600,
+          letterSpacing: '0.02em',
+        }}
+      >
+        {ticker.slice(0, 3)}
+      </div>
+    );
+  }
+  return (
+    <img
+      src={`https://assets.parqet.com/logos/symbol/${ticker}?format=png`}
+      alt={ticker}
+      loading="lazy"
+      onError={() => setErr(true)}
+      style={{
+        ...s,
+        borderRadius: 6,
+        objectFit: 'cover',
+        background: 'var(--paper)',
+        border: '1px solid var(--line)',
+      }}
+    />
+  );
+}
+/* eslint-enable @next/next/no-img-element */
+
+/** Single KPI panel for the strip below the header. */
+function KpiCell({
+  label,
+  value,
+  sub,
+  tone,
+  divider = true,
+}: {
+  label: string;
+  value: string | number;
+  sub?: string;
+  tone?: string;
+  divider?: boolean;
+}) {
+  return (
+    <div
+      style={{
+        flex: '1 1 0',
+        minWidth: 140,
+        padding: '16px 18px',
+        borderRight: divider ? '1px solid var(--line)' : 'none',
+      }}
+    >
+      <div
+        style={{
+          fontSize: 9.5,
+          letterSpacing: '0.18em',
+          textTransform: 'uppercase',
+          color: 'var(--ink-4)',
+          marginBottom: 8,
+        }}
+      >
+        {label}
+      </div>
+      <div
+        className="serif tnum"
+        style={{
+          fontSize: 28,
+          fontWeight: 700,
+          letterSpacing: '-0.02em',
+          color: tone || 'var(--ink)',
+          lineHeight: 1,
+        }}
+      >
+        {value}
+      </div>
+      {sub && (
+        <div
+          className="mono tnum"
+          style={{ fontSize: 10.5, color: 'var(--ink-3)', marginTop: 6 }}
+        >
+          {sub}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Numeric % cell with a horizontal magnitude bar — used for Straddle EM
+ *  so the eye can rank rows visually before reading the number. */
+function MoveBar({ value, max }: { value: number | null | undefined; max: number }) {
+  if (value == null || !Number.isFinite(value)) {
+    return <span style={{ color: 'var(--ink-4)' }}>—</span>;
+  }
+  const pct = Math.min(1, Math.max(0, value / max));
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        justifyContent: 'flex-end',
+      }}
+    >
+      <span
+        className="mono tnum"
+        style={{ fontSize: 11.5, color: 'var(--ink)', minWidth: 44, textAlign: 'right' }}
+      >
+        {pct1(value)}
+      </span>
+      <div
+        style={{
+          width: 56,
+          height: 6,
+          borderRadius: 3,
+          background: 'var(--bg-3)',
+          overflow: 'hidden',
+        }}
+      >
+        <div
+          style={{
+            width: `${pct * 100}%`,
+            height: '100%',
+            background: 'linear-gradient(90deg, var(--accent-2), var(--accent))',
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
+/** Compact 0–100% progress bar for IV Rank. Color codes the percentile
+ *  band: red ≥70 (rich), green ≤30 (cheap), neutral in between. */
+function IvRankBar({ rank }: { rank: number | null | undefined }) {
+  if (rank == null || !Number.isFinite(rank)) {
+    return <span style={{ color: 'var(--ink-4)' }}>—</span>;
+  }
+  const pct = Math.min(1, Math.max(0, rank));
+  const fill =
+    rank > 0.7 ? 'var(--down)' : rank < 0.3 ? 'var(--up)' : 'var(--ink-3)';
+  return (
+    <div
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 6,
+        justifyContent: 'flex-end',
+      }}
+    >
+      <div
+        style={{
+          width: 36,
+          height: 4,
+          borderRadius: 2,
+          background: 'var(--bg-3)',
+          overflow: 'hidden',
+        }}
+      >
+        <div
+          style={{
+            width: `${pct * 100}%`,
+            height: '100%',
+            background: fill,
+          }}
+        />
+      </div>
+      <span
+        className="mono tnum"
+        style={{ fontSize: 11, color: 'var(--ink-2)', minWidth: 32, textAlign: 'right' }}
+      >
+        {Math.round(pct * 100)}%
+      </span>
+    </div>
+  );
+}
+
 function QuoteSkeleton({ width = 64, delayMs = 0 }: { width?: number; delayMs?: number }) {
   return (
     <span
@@ -351,6 +543,39 @@ export default function EarningsScreener() {
     });
   }, [filtered, sortKey, sortDir]);
 
+  // KPI strip summary across the visible (filtered + sorted) universe.
+  // Computed once per `sorted` change so the panes don't recompute per row.
+  const summary = useMemo(() => {
+    if (sorted.length === 0) return null;
+    let rich = 0;
+    let cheap = 0;
+    let big = 0;
+    let ivSum = 0;
+    let ivCount = 0;
+    for (const e of sorted) {
+      const he = histEdge(e);
+      if (he != null && he >= 0.20) rich++;
+      if (e.iv_rank != null && e.iv_rank <= 0.30) cheap++;
+      if (e.em_straddle_pct != null && e.em_straddle_pct >= 0.10) big++;
+      if (e.atm_iv != null && Number.isFinite(e.atm_iv)) {
+        ivSum += e.atm_iv;
+        ivCount++;
+      }
+    }
+    return {
+      rich,
+      cheap,
+      big,
+      avgIv: ivCount > 0 ? ivSum / ivCount : null,
+    };
+  }, [sorted]);
+
+  // Largest straddle EM in the visible set, used to scale the MoveBar so
+  // the bar lengths read relative to the current view, not an absolute.
+  const maxStraddle = useMemo(() => {
+    return Math.max(0.04, ...sorted.map((e) => e.em_straddle_pct ?? 0));
+  }, [sorted]);
+
   useEffect(() => {
     const syms = Array.from(new Set(sorted.map((e) => e.ticker)));
     if (syms.length === 0) return;
@@ -460,59 +685,118 @@ export default function EarningsScreener() {
     <div>
       <div
         style={{
-          padding: '24px 0 16px',
+          padding: '24px 0 20px',
           borderBottom: '1px solid var(--line)',
         }}
       >
         <div
           style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
             fontSize: 10,
             letterSpacing: '0.18em',
             textTransform: 'uppercase',
             color: 'var(--ink-3)',
-            marginBottom: 6,
+            marginBottom: 10,
           }}
         >
-          Options · earnings
+          <span>Options · Earnings</span>
+          <span style={{ color: 'var(--ink-4)' }}>·</span>
+          <span>Quantiv</span>
         </div>
-        <h1
-          className="serif"
+        <div
           style={{
-            margin: 0,
-            fontSize: 36,
-            fontWeight: 800,
-            letterSpacing: '-0.025em',
-            lineHeight: 1,
-            textTransform: 'uppercase',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-end',
+            gap: 24,
+            flexWrap: 'wrap',
           }}
         >
-          Screener
-        </h1>
-        <p
-          style={{
-            margin: '14px 0 0',
-            fontSize: 13,
-            color: 'var(--ink-3)',
-            maxWidth: 760,
-            lineHeight: 1.55,
-          }}
-        >
-          Cross-week view for sizing earnings risk. Compare the{' '}
-          <strong>straddle-implied move</strong> against the <strong>last-4Q realized average</strong>{' '}
-          (hist edge — the canonical &ldquo;options rich vs cheap&rdquo; check), the{' '}
-          <strong>ML model median</strong> (edge), and the <strong>P90−P10 band</strong>{' '}
-          (tail uncertainty). <strong>IV Rank</strong> places current vol in its 52-week range;{' '}
-          <strong>IV crush</strong> shows how much front-month premium exceeds the next-out expiry —
-          a proxy for the post-print IV drop. Click any column to sort, or use the preset chips.{' '}
-          The canonical play: straddle implied move richer than recent realized + low IV crush = sell premium;
-          implied move below recent realized + low IV rank = buy premium.
-        </p>
-        {manifest?.as_of_date && (
-          <div className="mono tnum" style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 10 }}>
-            Data as of {manifest.as_of_date} · {sorted.length} names
+          <div style={{ maxWidth: 760, minWidth: 0 }}>
+            <h1
+              className="serif"
+              style={{
+                margin: 0,
+                fontSize: 52,
+                fontWeight: 800,
+                letterSpacing: '-0.03em',
+                lineHeight: 0.98,
+                textTransform: 'uppercase',
+                color: 'var(--ink)',
+              }}
+            >
+              Screener
+            </h1>
+            <p
+              style={{
+                margin: '14px 0 0',
+                fontSize: 13,
+                color: 'var(--ink-3)',
+                maxWidth: 720,
+                lineHeight: 1.55,
+              }}
+            >
+              Cross-week view for sizing earnings risk. Compare the{' '}
+              <strong style={{ color: 'var(--ink-2)' }}>straddle-implied move</strong> against the{' '}
+              <strong style={{ color: 'var(--ink-2)' }}>last-4Q realized average</strong>{' '}
+              (hist edge), the{' '}
+              <strong style={{ color: 'var(--ink-2)' }}>ML model median</strong>, and the{' '}
+              <strong style={{ color: 'var(--ink-2)' }}>P90−P10 band</strong>. Click any
+              column to sort, or use the preset chips below.
+            </p>
           </div>
-        )}
+          {manifest?.as_of_date && (
+            <div
+              className="mono tnum"
+              style={{ fontSize: 11, color: 'var(--ink-4)', whiteSpace: 'nowrap' }}
+            >
+              Data as of {manifest.as_of_date} · {sorted.length} names
+            </div>
+          )}
+        </div>
       </div>
+
+      {/* KPI strip — five panes summarizing the visible universe.
+          Tones: rich = down (red, premium overpriced), cheap = up
+          (green, premium discounted), big movers = neutral. */}
+      {summary && (
+        <div
+          style={{
+            display: 'flex',
+            border: '1px solid var(--line)',
+            borderTop: 'none',
+            background: 'var(--bg-2)',
+            flexWrap: 'wrap',
+          }}
+        >
+          <KpiCell label="Universe" value={String(sorted.length)} sub="filtered names" />
+          <KpiCell
+            label="Rich vs hist"
+            value={String(summary.rich)}
+            sub="implied ≥ +20% over 4Q realized"
+            tone="var(--down)"
+          />
+          <KpiCell
+            label="Cheap IV"
+            value={String(summary.cheap)}
+            sub="IV rank ≤ 30%"
+            tone="var(--up)"
+          />
+          <KpiCell
+            label="Big movers"
+            value={String(summary.big)}
+            sub="straddle EM ≥ 10%"
+          />
+          <KpiCell
+            label="Avg ATM IV"
+            value={summary.avgIv != null ? `${(summary.avgIv * 100).toFixed(1)}%` : '—'}
+            sub="annualized"
+            divider={false}
+          />
+        </div>
+      )}
 
       <div
         style={{
@@ -612,16 +896,26 @@ export default function EarningsScreener() {
                 type="button"
                 title={tip}
                 onClick={() => setParam({ preset: active ? null : key })}
-                className="mono"
                 style={{
-                  padding: '6px 10px',
+                  padding: '7px 12px',
                   borderRadius: 999,
                   border: `1px solid ${active ? 'var(--accent)' : 'var(--line)'}`,
-                  background: active ? 'color-mix(in srgb, var(--accent) 18%, transparent)' : 'transparent',
+                  background: active
+                    ? 'color-mix(in srgb, var(--accent) 18%, transparent)'
+                    : 'transparent',
                   color: active ? 'var(--accent)' : 'var(--ink-2)',
-                  fontSize: 11,
+                  fontSize: 11.5,
                   letterSpacing: '0.04em',
+                  fontWeight: active ? 600 : 500,
                   cursor: 'pointer',
+                  transition: 'border-color 140ms ease, background 140ms ease, color 140ms ease',
+                  whiteSpace: 'nowrap',
+                }}
+                onMouseEnter={(e) => {
+                  if (!active) e.currentTarget.style.borderColor = 'var(--line-2)';
+                }}
+                onMouseLeave={(e) => {
+                  if (!active) e.currentTarget.style.borderColor = 'var(--line)';
                 }}
               >
                 {label}
@@ -715,21 +1009,67 @@ export default function EarningsScreener() {
               return (
                 <tr
                   key={`${ev.ticker}-${ev.earnings_date}`}
-                  style={{ borderBottom: '1px solid var(--line)' }}
+                  style={{
+                    borderBottom: '1px solid var(--line)',
+                    transition: 'background 120ms ease',
+                  }}
+                  onMouseEnter={(el) => (el.currentTarget.style.background = 'var(--bg-2)')}
+                  onMouseLeave={(el) => (el.currentTarget.style.background = 'transparent')}
                 >
                   <td style={{ padding: '10px 8px' }}>
                     <Link
                       href={`/${ev.ticker}`}
-                      style={{ textDecoration: 'none', color: 'var(--ink)', fontWeight: 600 }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 10,
+                        textDecoration: 'none',
+                        color: 'var(--ink)',
+                      }}
                     >
-                      {ev.ticker}
+                      <ScreenerLogo ticker={ev.ticker} size={26} />
+                      <div style={{ minWidth: 0 }}>
+                        <div
+                          className="serif"
+                          style={{
+                            fontWeight: 700,
+                            color: 'var(--ink)',
+                            fontSize: 14,
+                            letterSpacing: '-0.005em',
+                          }}
+                        >
+                          {ev.ticker}
+                        </div>
+                        <div
+                          style={{
+                            fontSize: 10.5,
+                            color: 'var(--ink-4)',
+                            marginTop: 1,
+                            maxWidth: 160,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {companyName(ev.ticker)}
+                        </div>
+                        <div
+                          className="mono"
+                          style={{
+                            fontSize: 9,
+                            color:
+                              ev.em_method === 'ml_lightgbm'
+                                ? 'var(--accent)'
+                                : 'var(--ink-4)',
+                            marginTop: 2,
+                            letterSpacing: '0.08em',
+                            textTransform: 'uppercase',
+                          }}
+                        >
+                          {ev.em_method === 'ml_lightgbm' ? 'ML forecast' : 'Options baseline'}
+                        </div>
+                      </div>
                     </Link>
-                    <div style={{ fontSize: 10, color: 'var(--ink-4)', marginTop: 2, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {companyName(ev.ticker)}
-                    </div>
-                    <div className="mono" style={{ fontSize: 9, color: 'var(--ink-4)', marginTop: 2, letterSpacing: '0.06em' }}>
-                      {ev.em_method === 'ml_lightgbm' ? 'ML forecast' : 'Options baseline'}
-                    </div>
                   </td>
                   <td className="mono tnum" style={{ textAlign: 'right', padding: '10px 8px', color: 'var(--ink-2)' }}>
                     {shortDate(ev.earnings_date)}
@@ -740,8 +1080,8 @@ export default function EarningsScreener() {
                   <td className="mono" style={{ padding: '10px 8px', color: 'var(--ink-3)', fontSize: 11 }}>
                     {timingShort(ev.timing)}
                   </td>
-                  <td className="mono tnum" style={{ textAlign: 'right', padding: '10px 8px' }}>
-                    {pct1(ev.em_straddle_pct)}
+                  <td style={{ padding: '10px 8px' }}>
+                    <MoveBar value={ev.em_straddle_pct} max={maxStraddle} />
                   </td>
                   <td className="mono tnum" style={{ textAlign: 'right', padding: '10px 8px', color: 'var(--ink-2)' }}>
                     {pct1(ev.hist_move_avg_4q)}
@@ -782,8 +1122,8 @@ export default function EarningsScreener() {
                   <td className="mono tnum" style={{ textAlign: 'right', padding: '10px 8px' }}>
                     {ivPct(ev.atm_iv)}
                   </td>
-                  <td className="mono tnum" style={{ textAlign: 'right', padding: '10px 8px', color: 'var(--ink-2)' }}>
-                    {ev.iv_rank == null ? '—' : `${Math.round(ev.iv_rank * 100)}%`}
+                  <td style={{ textAlign: 'right', padding: '10px 8px' }}>
+                    <IvRankBar rank={ev.iv_rank} />
                   </td>
                   <td className="mono tnum" style={{ textAlign: 'right', padding: '10px 8px', color: 'var(--ink-2)' }}>
                     {pct1(ev.iv_crush_pct)}
@@ -850,6 +1190,25 @@ export default function EarningsScreener() {
       {!loading && !error && sorted.length === 0 && (
         <div style={{ padding: '48px 0', color: 'var(--ink-3)', fontSize: 13 }}>
           No rows match these filters. Try clearing ticker / S&amp;P / ML-only, or lowering min spot.
+        </div>
+      )}
+
+      {!loading && !error && sorted.length > 0 && (
+        <div
+          style={{
+            marginTop: 24,
+            padding: '16px 0',
+            borderTop: '1px solid var(--line)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            fontSize: 11,
+            color: 'var(--ink-4)',
+          }}
+        >
+          <span className="mono">
+            {sorted.length} rows · Updated hourly
+          </span>
+          <span style={{ letterSpacing: '0.06em' }}>Quantiv Screener</span>
         </div>
       )}
     </div>
