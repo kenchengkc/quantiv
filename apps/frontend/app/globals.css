@@ -189,38 +189,15 @@
   opacity: 0;
 }
 
-@property --quantiv-slit-start {
-  syntax: '<angle>';
-  inherits: false;
-  initial-value: 137.06deg;
-}
-
-@property --quantiv-slit-span {
-  syntax: '<angle>';
-  inherits: false;
-  initial-value: 0.02deg;
-}
-
 .quantiv-splash-slit-arc {
-  --quantiv-slit-start: 137.06deg;
-  --quantiv-slit-span: 0.02deg;
   position: absolute;
   inset: 0;
   z-index: 2;
   opacity: 0;
-  -webkit-mask-image: conic-gradient(
-    from var(--quantiv-slit-start) at 44.58% 48.56%,
-    #000000 0 var(--quantiv-slit-span),
-    transparent var(--quantiv-slit-span) 360deg
-  );
-  mask-image: conic-gradient(
-    from var(--quantiv-slit-start) at 44.58% 48.56%,
-    #000000 0 var(--quantiv-slit-span),
-    transparent var(--quantiv-slit-span) 360deg
-  );
+  clip-path: polygon(51.68% 54.99%, 51.86% 54.83%, 60.89% 64.94%, 60.71% 65.10%);
   animation:
     quantiv-splash-slit-arc-open 600ms linear 900ms forwards;
-  will-change: opacity, --quantiv-slit-start, --quantiv-slit-span;
+  will-change: clip-path, opacity;
 }
 
 .quantiv-splash-tail-clip {
@@ -241,18 +218,15 @@
 
 @keyframes quantiv-splash-slit-arc-open {
   0% {
-    --quantiv-slit-start: 137.06deg;
-    --quantiv-slit-span: 0.02deg;
+    clip-path: polygon(51.68% 54.99%, 51.86% 54.83%, 60.89% 64.94%, 60.71% 65.10%);
     opacity: 0;
   }
   12% {
-    --quantiv-slit-start: 137.06deg;
-    --quantiv-slit-span: 0.02deg;
+    clip-path: polygon(51.68% 54.99%, 51.86% 54.83%, 60.89% 64.94%, 60.71% 65.10%);
     opacity: 1;
   }
   100% {
-    --quantiv-slit-start: 115.85deg;
-    --quantiv-slit-span: 42.42deg;
+    clip-path: polygon(39.31% 65.50%, 63.70% 43.73%, 73.26% 54.43%, 48.87% 76.21%);
     opacity: 1;
   }
 }
