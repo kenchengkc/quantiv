@@ -177,26 +177,16 @@
   user-select: none;
 }
 
-.quantiv-splash-slit-fill {
+.quantiv-splash-closed-ring {
   transform-origin: center center;
   z-index: 1;
-  -webkit-mask-image: url('/brand/QuantivSplashSlitArc.png');
-  mask-image: url('/brand/QuantivSplashSlitArc.png');
-  -webkit-mask-position: center;
-  mask-position: center;
-  -webkit-mask-repeat: no-repeat;
-  mask-repeat: no-repeat;
-  -webkit-mask-size: contain;
-  mask-size: contain;
   animation: quantiv-splash-ring-in 520ms cubic-bezier(0.2, 1, 0.3, 1) forwards;
   opacity: 0;
 }
 
 .quantiv-splash-open-q {
-  transform-origin: center center;
   z-index: 0;
   opacity: 0;
-  animation: quantiv-splash-ring-in 520ms cubic-bezier(0.2, 1, 0.3, 1) forwards;
 }
 
 @property --quantiv-slit-start {
