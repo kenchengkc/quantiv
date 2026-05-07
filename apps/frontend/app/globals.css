@@ -155,12 +155,17 @@
 }
 
 .quantiv-splash-mark {
-  position: relative;
-  width: min(440px, 76vw);
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: min(4400px, 760vw);
   aspect-ratio: 1 / 1;
   transform-origin: center center;
+  transform: translate(-50%, -50%) scale(0.1);
   /* Phase 4 — Batman-style burst: the entire mark scales toward the
-     viewer, growing past the viewport while the backdrop fades out. */
+     viewer, growing past the viewport while the backdrop fades out.
+     The mark is rendered on its final-size canvas from the start so the
+     launch does not upscale a small composited texture. */
   animation: quantiv-splash-burst 3300ms cubic-bezier(0.55, 0, 0.2, 1) forwards;
   will-change: transform;
 }
@@ -172,7 +177,6 @@
   width: 100%;
   height: 100%;
   object-fit: contain;
-  image-rendering: -webkit-optimize-contrast;
   pointer-events: none;
   user-select: none;
 }
@@ -239,10 +243,10 @@
 @keyframes quantiv-splash-burst {
   /* Hold the assembled mark in place while the wave finishes drawing,
      then a quick anticipation dip, then the launch to ~10× scale. */
-  0%   { transform: scale(1); }
-  86%  { transform: scale(1); }
-  91%  { transform: scale(0.94); }
-  100% { transform: scale(10); }
+  0%   { transform: translate(-50%, -50%) scale(0.1); }
+  86%  { transform: translate(-50%, -50%) scale(0.1); }
+  91%  { transform: translate(-50%, -50%) scale(0.094); }
+  100% { transform: translate(-50%, -50%) scale(1); }
 }
 
 @keyframes quantiv-splash-fade {
