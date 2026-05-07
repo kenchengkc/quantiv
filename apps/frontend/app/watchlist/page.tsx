@@ -23,8 +23,13 @@ type SymbolSummary = {
 
 type Tick = { price: number | null; change: number | null; changePct: number | null };
 
+// Fixed Name column (200px) keeps the price column flush to the ticker
+// instead of stranded at the right edge of an expanding 1fr column.
+// The 1fr spacer between Quote and Reports absorbs any slack so the
+// right-side block (Reports / EM / Actions) still anchors to the row's
+// right edge regardless of viewport width.
 const WATCHLIST_ROW_GRID =
-  '18px 40px minmax(150px, 1fr) 132px 168px 92px 116px';
+  '18px 40px 200px 132px 1fr 168px 92px 116px';
 
 function companyName(t: string) {
   return COMPANY_NAMES[t] || t;
@@ -312,10 +317,13 @@ function WatchlistLoadingRows() {
             <span style={bar(i * 35 + 25, 74, 18)} />
             <span style={bar(i * 35 + 45, 'min(180px, 80%)', 13)} />
           </span>
-          <span style={{ display: 'grid', gap: 6, justifyItems: 'end' }}>
+          <span style={{ display: 'grid', gap: 6, justifyItems: 'start' }}>
             <span style={bar(i * 35 + 35, 76, 18, 999)} />
             <span style={bar(i * 35 + 55, 112, 12, 999)} />
           </span>
+          {/* Spacer column (1fr) — empty in the skeleton, mirrors the
+              real row's spacer between quote and reports. */}
+          <span aria-hidden />
           <span style={{ display: 'grid', gap: 5 }}>
             <span style={bar(i * 35 + 45, 62, 13)} />
             <span style={bar(i * 35 + 65, 128, 17)} />
@@ -654,10 +662,9 @@ export default function WatchlistPage() {
                   style={{
                     width: 132,
                     minHeight: 42,
-                    justifySelf: 'end',
                     display: 'grid',
                     alignContent: 'center',
-                    justifyItems: 'end',
+                    justifyItems: 'start',
                     gap: 4,
                   }}
                 >
@@ -670,7 +677,7 @@ export default function WatchlistPage() {
                       fontWeight: 600,
                       color: 'var(--ink)',
                       width: 124,
-                      textAlign: 'right',
+                      textAlign: 'left',
                       whiteSpace: 'nowrap',
                     }}
                   >
@@ -691,7 +698,7 @@ export default function WatchlistPage() {
                       fontSize: 11,
                       color: quoteColor,
                       width: 124,
-                      textAlign: 'right',
+                      textAlign: 'left',
                       whiteSpace: 'nowrap',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
