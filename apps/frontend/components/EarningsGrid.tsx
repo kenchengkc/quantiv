@@ -293,16 +293,16 @@ function Group({
           display: 'flex',
           alignItems: 'center',
           gap: 7,
-          padding: '6px 10px 6px 8px',
-          color: 'var(--ink-2)',
-          fontSize: 10.5,
-          fontWeight: 600,
+          padding: '7px 11px 7px 9px',
+          color: 'var(--ink)',
+          fontSize: 11,
+          fontWeight: 700,
           letterSpacing: '0.14em',
           textTransform: 'uppercase',
-          background: `color-mix(in srgb, ${tone} 10%, transparent)`,
-          borderLeft: `3px solid ${tone}`,
-          borderTop: '1px solid var(--line)',
-          borderBottom: '1px solid var(--line)',
+          background: `color-mix(in srgb, ${tone} 24%, var(--bg-2))`,
+          borderLeft: `5px solid ${tone}`,
+          borderTop: `1px solid color-mix(in srgb, ${tone} 55%, var(--line))`,
+          borderBottom: `1px solid color-mix(in srgb, ${tone} 55%, var(--line))`,
         }}
       >
         <span style={{ color: tone, display: 'inline-flex' }}>{icon}</span>
@@ -311,9 +311,9 @@ function Group({
           className="mono tnum"
           style={{
             marginLeft: 'auto',
-            color: 'var(--ink-3)',
+            color: 'var(--ink-2)',
             letterSpacing: 0,
-            fontWeight: 500,
+            fontWeight: 700,
           }}
         >
           {list.length}

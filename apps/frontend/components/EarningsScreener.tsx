@@ -70,7 +70,7 @@ type SortKey =
 type SortDir = 'asc' | 'desc';
 type TimingFilter = 'all' | 'bmo' | 'amc';
 
-type LiveTick = { change: number | null; changePct: number | null };
+type LiveTick = { price: number | null; change: number | null; changePct: number | null };
 
 function companyName(t: string) {
   return COMPANY_NAMES[t] || t;
@@ -103,6 +103,24 @@ function ivPct(iv: number | null | undefined) {
 function num(v: number | null | undefined, digits = 2) {
   if (v == null || !Number.isFinite(v)) return '—';
   return v.toFixed(digits);
+}
+
+function QuoteSkeleton({ width = 64, delayMs = 0 }: { width?: number; delayMs?: number }) {
+  return (
+    <span
+      aria-hidden="true"
+      style={{
+        display: 'inline-block',
+        width,
+        height: 10,
+        borderRadius: 999,
+        background: 'var(--bg-3)',
+        animation: 'earnings-grid-pulse 1.1s ease-in-out infinite',
+        animationDelay: `${delayMs}ms`,
+        verticalAlign: '-1px',
+      }}
+    />
+  );
 }
 
 function shortDate(iso: string) {
@@ -344,15 +362,26 @@ export default function EarningsScreener() {
         };
         setLive((prev) => {
           const next = { ...prev };
+          const seen = new Set<string>();
           for (const t of json.data) {
-            if (t.price !== null) {
-              next[t.symbol] = { change: t.change, changePct: t.changePct };
+            seen.add(t.symbol);
+            next[t.symbol] = { price: t.price, change: t.change, changePct: t.changePct };
+          }
+          for (const symbol of cap) {
+            if (!seen.has(symbol) && !next[symbol]) {
+              next[symbol] = { price: null, change: null, changePct: null };
             }
           }
           return next;
         });
       } catch {
-        /* ignore */
+        setLive((prev) => {
+          const next = { ...prev };
+          for (const symbol of cap) {
+            if (!next[symbol]) next[symbol] = { price: null, change: null, changePct: null };
+          }
+          return next;
+        });
       }
     };
     void fetchOnce();
@@ -377,10 +406,22 @@ export default function EarningsScreener() {
     }
   };
 
-  const th = (key: SortKey, label: string, hint?: string) => {
+  const liveRequested = useMemo(
+    () => new Set(sorted.slice(0, 400).map((e) => e.ticker)),
+    [sorted],
+  );
+
+  const th = (key: SortKey, label: string, hint?: string, width?: number) => {
     const active = sortKey === key;
     return (
-      <th style={{ textAlign: 'right', padding: '10px 8px', whiteSpace: 'nowrap' }}>
+      <th
+        style={{
+          textAlign: 'right',
+          padding: '10px 8px',
+          whiteSpace: 'nowrap',
+          ...(width ? { width, minWidth: width } : {}),
+        }}
+      >
         <button
           type="button"
           onClick={() => toggleSort(key)}
@@ -627,10 +668,21 @@ export default function EarningsScreener() {
               {th('iv_rank', 'IV Rank', 'Current IV percentile vs trailing 52 weeks (0% = year low, 100% = year high)')}
               {th('iv_crush', 'IV crush', 'Front-month IV premium over the next-out expiry — proxy for post-print IV drop')}
               {th('skew', 'Skew', 'ATM call/put IV skew snapshot')}
-              <th style={{ textAlign: 'right', padding: '10px 8px', fontSize: 10, color: 'var(--ink-3)', letterSpacing: '0.14em', textTransform: 'uppercase' }}>
+              <th
+                style={{
+                  textAlign: 'right',
+                  padding: '10px 8px',
+                  fontSize: 10,
+                  color: 'var(--ink-3)',
+                  letterSpacing: '0.14em',
+                  textTransform: 'uppercase',
+                  width: 84,
+                  minWidth: 84,
+                }}
+              >
                 1d %
               </th>
-              {th('spot', 'Spot', 'Underlying price at snapshot')}
+              {th('spot', 'Spot', 'Latest underlying price when quote data is available', 88)}
               <th style={{ textAlign: 'right', padding: '10px 8px', fontSize: 10, color: 'var(--ink-3)', letterSpacing: '0.14em', textTransform: 'uppercase' }}>
                 $ Straddle
               </th>
@@ -640,14 +692,20 @@ export default function EarningsScreener() {
             </tr>
           </thead>
           <tbody>
-            {sorted.map((ev) => {
+            {sorted.map((ev, rowIndex) => {
               const e = edgePct(ev);
               const bw = band80(ev);
               const tick = live[ev.ticker];
+              const quotePending = liveRequested.has(ev.ticker) && tick === undefined;
+              const quoteDelay = (rowIndex % 12) * 35;
               const chg = tick?.changePct;
               const flat = chg != null && Math.round(chg * 10000) / 10000 === 0;
               const up = !flat && (chg ?? 0) >= 0;
               const chgColor = flat ? 'var(--ink-4)' : up ? 'var(--up)' : 'var(--down)';
+              const chgText = chg == null
+                ? '—'
+                : `${flat ? '–' : up ? '▲' : '▼'} ${(Math.abs(chg) * 100).toFixed(2)}%`;
+              const liveSpot = tick?.price ?? ev.spot_price ?? null;
 
               return (
                 <tr
@@ -728,11 +786,47 @@ export default function EarningsScreener() {
                   <td className="mono tnum" style={{ textAlign: 'right', padding: '10px 8px', color: 'var(--ink-2)' }}>
                     {num(ev.skew_atm, 3)}
                   </td>
-                  <td className="mono tnum" style={{ textAlign: 'right', padding: '10px 8px', color: chgColor, fontSize: 11 }}>
-                    {chg == null ? '—' : `${flat ? '–' : up ? '▲' : '▼'} ${(Math.abs(chg) * 100).toFixed(2)}%`}
+                  <td
+                    className="mono tnum"
+                    style={{
+                      textAlign: 'right',
+                      padding: '10px 8px',
+                      color: chgColor,
+                      fontSize: 11,
+                      width: 84,
+                      minWidth: 84,
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    <span style={{ display: 'inline-flex', justifyContent: 'flex-end', alignItems: 'center', width: 70 }}>
+                      {quotePending ? (
+                        <QuoteSkeleton width={58} delayMs={quoteDelay} />
+                      ) : (
+                        <span style={{ animation: 'earnings-grid-fade-in 160ms ease-out' }}>
+                          {chgText}
+                        </span>
+                      )}
+                    </span>
                   </td>
-                  <td className="mono tnum" style={{ textAlign: 'right', padding: '10px 8px' }}>
-                    {ev.spot_price != null ? `$${num(ev.spot_price, 2)}` : '—'}
+                  <td
+                    className="mono tnum"
+                    style={{
+                      textAlign: 'right',
+                      padding: '10px 8px',
+                      width: 88,
+                      minWidth: 88,
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    <span style={{ display: 'inline-flex', justifyContent: 'flex-end', alignItems: 'center', width: 74 }}>
+                      {quotePending ? (
+                        <QuoteSkeleton width={62} delayMs={quoteDelay + 20} />
+                      ) : (
+                        <span style={{ animation: 'earnings-grid-fade-in 160ms ease-out' }}>
+                          {liveSpot != null ? `$${num(liveSpot, 2)}` : '—'}
+                        </span>
+                      )}
+                    </span>
                   </td>
                   <td className="mono tnum" style={{ textAlign: 'right', padding: '10px 8px', color: 'var(--ink-2)' }}>
                     {ev.em_straddle_abs != null ? `$${num(ev.em_straddle_abs, 2)}` : '—'}
