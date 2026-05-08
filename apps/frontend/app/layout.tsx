@@ -7,6 +7,7 @@ import { Topbar } from '@/components/Topbar';
 import { Footer } from '@/components/Footer';
 import { Splash } from '@/components/Splash';
 import { Analytics } from '@vercel/analytics/next';
+import { SpeedInsights } from '@vercel/speed-insights/next';
 
 export const metadata: Metadata = {
   title: 'Quantiv — Options Trading Intelligence',
@@ -53,6 +54,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <Footer />
               </div>
               <Analytics />
+              <SpeedInsights />
             </ErrorBoundary>
           </Providers>
         </body>
