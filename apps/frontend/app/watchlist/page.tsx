@@ -24,15 +24,15 @@ type SymbolSummary = {
 type Tick = { price: number | null; change: number | null; changePct: number | null };
 
 // Column order, left → right:
-//   drag · logo · name · price · [spacer] · reports · expected-move · actions
-// `auto` for the name column makes it hug ticker + company text, so the
-// gap between name and price matches every other column gap (uniform 16px).
-// The 1fr spacer between price and reports absorbs viewport slack so the
-// right-side block (reports + EM + actions) anchors to the row's right edge.
-// The data row and skeleton each render an explicit empty cell for the
-// spacer so grid auto-placement doesn't shift later columns.
+//   drag · logo · name · [1fr] · price · [1fr] · reports · expected-move · actions
+// Twin 1fr spacers on either side of price split the leftover horizontal
+// space evenly, so the price floats centered between the end of the
+// ticker name and the start of the Reports column. Reports + EM + Actions
+// stay anchored to the row's right edge. The data row and skeleton each
+// render two explicit empty cells (one per spacer) so grid auto-placement
+// keeps later columns aligned.
 const WATCHLIST_ROW_GRID =
-  '18px 40px auto 132px 1fr 168px 92px 116px';
+  '18px 40px auto 1fr 132px 1fr 168px 92px 116px';
 
 function companyName(t: string) {
   return COMPANY_NAMES[t] || t;
@@ -320,12 +320,13 @@ function WatchlistLoadingRows() {
             <span style={bar(i * 35 + 25, 74, 18)} />
             <span style={bar(i * 35 + 45, 'min(180px, 80%)', 13)} />
           </span>
+          {/* 1fr spacer — empty cell that floats the price toward the row's center. */}
+          <span aria-hidden />
           <span style={{ display: 'grid', gap: 6, justifyItems: 'start' }}>
             <span style={bar(i * 35 + 35, 76, 18, 999)} />
             <span style={bar(i * 35 + 55, 112, 12, 999)} />
           </span>
-          {/* Spacer column (1fr) — empty in the skeleton, mirrors the
-              real row's spacer between price and reports. */}
+          {/* 1fr spacer between price and reports — completes the centering. */}
           <span aria-hidden />
           <span style={{ display: 'grid', gap: 5 }}>
             <span style={bar(i * 35 + 45, 62, 13)} />
@@ -660,6 +661,9 @@ export default function WatchlistPage() {
                     {companyName(t)}
                   </div>
                 </Link>
+
+                {/* 1fr spacer — pushes price toward the row's center. */}
+                <span aria-hidden />
 
                 <div
                   style={{
