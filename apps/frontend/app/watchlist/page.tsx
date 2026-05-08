@@ -24,14 +24,15 @@ type SymbolSummary = {
 type Tick = { price: number | null; change: number | null; changePct: number | null };
 
 // Column order, left → right:
-//   drag · logo · name · price · expected-move · [spacer] · reports · actions
-// Price and Expected Move are clustered on the left near the ticker.
-// The 1fr spacer absorbs viewport slack so Reports + Actions anchor to
-// the row's right edge regardless of width. The data row and skeleton
-// both render an explicit empty cell for the spacer so grid auto-placement
-// doesn't shift later columns.
+//   drag · logo · name · price · [spacer] · reports · expected-move · actions
+// `auto` for the name column makes it hug ticker + company text, so the
+// gap between name and price matches every other column gap (uniform 16px).
+// The 1fr spacer between price and reports absorbs viewport slack so the
+// right-side block (reports + EM + actions) anchors to the row's right edge.
+// The data row and skeleton each render an explicit empty cell for the
+// spacer so grid auto-placement doesn't shift later columns.
 const WATCHLIST_ROW_GRID =
-  '18px 40px 200px 132px 92px 1fr 168px 116px';
+  '18px 40px auto 132px 1fr 168px 92px 116px';
 
 function companyName(t: string) {
   return COMPANY_NAMES[t] || t;
@@ -323,15 +324,15 @@ function WatchlistLoadingRows() {
             <span style={bar(i * 35 + 35, 76, 18, 999)} />
             <span style={bar(i * 35 + 55, 112, 12, 999)} />
           </span>
-          <span style={bar(i * 35 + 75, 66, 24)} />
           {/* Spacer column (1fr) — empty in the skeleton, mirrors the
-              real row's spacer between expected-move and reports. */}
+              real row's spacer between price and reports. */}
           <span aria-hidden />
           <span style={{ display: 'grid', gap: 5 }}>
             <span style={bar(i * 35 + 45, 62, 13)} />
             <span style={bar(i * 35 + 65, 128, 17)} />
             <span style={bar(i * 35 + 85, 86, 16)} />
           </span>
+          <span style={bar(i * 35 + 75, 66, 24)} />
           <span style={bar(i * 35 + 95, 116, 32, 999)} />
         </li>
       ))}
@@ -720,32 +721,7 @@ export default function WatchlistPage() {
                   </div>
                 </div>
 
-                <div
-                  className="serif tnum"
-                  style={{
-                    height: 24,
-                    lineHeight: '24px',
-                    fontSize: 20,
-                    fontWeight: 700,
-                    color: 'var(--ink)',
-                    width: 92,
-                    textAlign: 'left',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {movePct !== null ? (
-                    <>
-                      ±{(movePct * 100).toFixed(1)}
-                      <span style={{ fontSize: 11, color: 'var(--ink-3)', marginLeft: 1 }}>
-                        %
-                      </span>
-                    </>
-                  ) : (
-                    <span style={{ fontSize: 12, color: 'var(--ink-4)' }}>—</span>
-                  )}
-                </div>
-
-                {/* 1fr spacer — keeps Reports + Actions anchored right. */}
+                {/* 1fr spacer — keeps Reports + EM + Actions anchored right. */}
                 <span aria-hidden />
 
                 <div style={{ width: 168, minHeight: 51 }}>
@@ -792,6 +768,31 @@ export default function WatchlistPage() {
                   >
                     {timing ?? 'Before open'}
                   </div>
+                </div>
+
+                <div
+                  className="serif tnum"
+                  style={{
+                    height: 24,
+                    lineHeight: '24px',
+                    fontSize: 20,
+                    fontWeight: 700,
+                    color: 'var(--ink)',
+                    width: 92,
+                    textAlign: 'left',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {movePct !== null ? (
+                    <>
+                      ±{(movePct * 100).toFixed(1)}
+                      <span style={{ fontSize: 11, color: 'var(--ink-3)', marginLeft: 1 }}>
+                        %
+                      </span>
+                    </>
+                  ) : (
+                    <span style={{ fontSize: 12, color: 'var(--ink-4)' }}>—</span>
+                  )}
                 </div>
 
                 <RowActions
