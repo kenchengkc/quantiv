@@ -1,118 +1,142 @@
 {
   "symbol": "FTV",
-  "as_of_date": "2026-05-06",
+  "as_of_date": "2026-05-07",
   "spot_price": 60.0,
   "expected_move": {
     "earnings_date": "2026-04-30",
     "expiration": "2026-05-15",
-    "dte": 9,
-    "lead_time_days": -6,
+    "dte": 8,
+    "lead_time_days": -7,
     "atm_strike": 60.0,
-    "atm_iv": 0.839244,
-    "straddle_abs": 2.6,
-    "straddle_pct": 0.043333,
-    "iv_pct": 0.131784,
-    "skew_atm": 0.2102,
+    "atm_iv": 0.64295,
+    "straddle_abs": 2.075,
+    "straddle_pct": 0.034583,
+    "iv_pct": 0.095187,
+    "skew_atm": 0.2709,
     "term_slope": null,
-    "total_vega": 0.0755,
+    "total_vega": 0.0706,
     "em_method": "options_math",
     "timing": "before_market_open"
   },
   "straddle_features": [
     {
       "expiration": "2026-05-15",
-      "dte": 9,
+      "dte": 8,
       "atm_strike": 60.0,
-      "atm_iv": 0.8391,
-      "atm_call_iv": 0.7302,
-      "atm_put_iv": 0.948,
-      "straddle_mid": 2.6,
-      "em_straddle": 2.6,
-      "em_straddle_pct": 0.043333,
-      "em_iv": 7.90569,
-      "em_iv_pct": 0.131762,
-      "call_delta": 0.599,
-      "call_gamma": 0.0545,
-      "call_vega": 0.0377,
-      "call_theta": -0.162
+      "atm_iv": 0.64295,
+      "atm_call_iv": 0.643,
+      "atm_put_iv": 0.6429,
+      "straddle_mid": 2.075,
+      "em_straddle": 2.075,
+      "em_straddle_pct": 0.034583,
+      "em_iv": 5.711195,
+      "em_iv_pct": 0.095187,
+      "call_delta": 0.5766,
+      "call_gamma": 0.0681,
+      "call_vega": 0.0352,
+      "call_theta": -0.1584
     },
     {
       "expiration": "2026-06-18",
-      "dte": 43,
+      "dte": 42,
       "atm_strike": 60.0,
-      "atm_iv": 0.2488,
-      "atm_call_iv": 0.2488,
-      "atm_put_iv": 0.2488,
-      "straddle_mid": 4.25,
-      "em_straddle": 4.25,
-      "em_straddle_pct": 0.070833,
-      "em_iv": 5.123768,
-      "em_iv_pct": 0.085396,
-      "call_delta": 0.6076,
-      "call_gamma": 0.0731,
-      "call_vega": 0.0805,
-      "call_theta": -0.0242
+      "atm_iv": 0.2869,
+      "atm_call_iv": 0.2869,
+      "atm_put_iv": 0.2869,
+      "straddle_mid": 4.75,
+      "em_straddle": 4.75,
+      "em_straddle_pct": 0.079167,
+      "em_iv": 5.83929,
+      "em_iv_pct": 0.097321,
+      "call_delta": 0.579,
+      "call_gamma": 0.0664,
+      "call_vega": 0.0804,
+      "call_theta": -0.0313
     }
   ],
   "earnings_history": [
     {
       "date": "2026-04-30",
-      "timing": "before_market_open"
+      "timing": "before_market_open",
+      "actual": -0.044049,
+      "implied": null
     },
     {
       "date": "2026-02-04",
-      "timing": "before_market_open"
+      "timing": "before_market_open",
+      "actual": 0.107636,
+      "implied": null
     },
     {
       "date": "2025-10-29",
-      "timing": "before_market_open"
+      "timing": "before_market_open",
+      "actual": 0.042514,
+      "implied": null
     },
     {
       "date": "2025-07-30",
-      "timing": "before_market_open"
+      "timing": "before_market_open",
+      "actual": -0.05872,
+      "implied": null
     },
     {
       "date": "2025-05-01",
-      "timing": "before_market_open"
+      "timing": "before_market_open",
+      "actual": -0.030707,
+      "implied": null
     },
     {
       "date": "2025-02-07",
-      "timing": "before_market_open"
+      "timing": "before_market_open",
+      "actual": 0.008267,
+      "implied": null
     },
     {
       "date": "2024-10-30",
-      "timing": "before_market_open"
+      "timing": "before_market_open",
+      "actual": -0.042493,
+      "implied": null
     },
     {
       "date": "2024-07-24",
-      "timing": "before_market_open"
+      "timing": "before_market_open",
+      "actual": -0.087246,
+      "implied": null
     },
     {
       "date": "2024-04-24",
-      "timing": "before_market_open"
+      "timing": "before_market_open",
+      "actual": -0.055638,
+      "implied": null
     },
     {
       "date": "2024-01-31",
-      "timing": "before_market_open"
+      "timing": "before_market_open",
+      "actual": 0.100803,
+      "implied": null
     },
     {
       "date": "2023-10-25",
-      "timing": "before_market_open"
+      "timing": "before_market_open",
+      "actual": -0.07331,
+      "implied": null
     },
     {
       "date": "2023-07-26",
-      "timing": "before_market_open"
+      "timing": "before_market_open",
+      "actual": 0.029531,
+      "implied": null
     }
   ],
   "next_earnings": "2026-04-30",
   "vol_regime": {
-    "iv_current": 0.2884,
-    "iv_rank": 0.346997,
+    "iv_current": 0.2507,
+    "iv_rank": 0.211435,
     "iv_year_high": 0.47,
     "iv_year_low": 0.1919,
-    "hv_current": 0.2483,
-    "hv_rank": 0.090014,
-    "iv_mom_week": -0.074,
+    "hv_current": 0.2482,
+    "hv_rank": 0.089545,
+    "iv_mom_week": -0.0792,
     "iv_mom_month": null
   },
   "next_earnings_timing": "before_market_open"
