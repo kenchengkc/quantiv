@@ -24,15 +24,16 @@ type SymbolSummary = {
 type Tick = { price: number | null; change: number | null; changePct: number | null };
 
 // Column order, left → right:
-//   drag · logo · name · [1fr] · price · [1fr] · reports · expected-move · actions
-// Twin 1fr spacers on either side of price split the leftover horizontal
-// space evenly, so the price floats centered between the end of the
-// ticker name and the start of the Reports column. Reports + EM + Actions
-// stay anchored to the row's right edge. The data row and skeleton each
-// render two explicit empty cells (one per spacer) so grid auto-placement
-// keeps later columns aligned.
+//   drag · logo · name · [1.5fr] · price · [1fr] · reports · expected-move · actions
+// Asymmetric spacers (1.5fr left, 1fr right) place the price about 60%
+// of the way between the end of the ticker name and the start of the
+// Reports column — biased rightward to put more breathing room between
+// the company text and the price. Reports + EM + Actions stay anchored
+// to the row's right edge. The data row and skeleton each render two
+// explicit empty cells (one per spacer) so grid auto-placement keeps
+// later columns aligned.
 const WATCHLIST_ROW_GRID =
-  '18px 40px auto 1fr 132px 1fr 168px 92px 116px';
+  '18px 40px auto 1.5fr 132px 1fr 168px 92px 116px';
 
 function companyName(t: string) {
   return COMPANY_NAMES[t] || t;
