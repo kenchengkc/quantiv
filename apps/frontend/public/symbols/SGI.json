@@ -1,100 +1,100 @@
 {
   "symbol": "SGI",
-  "as_of_date": "2026-05-06",
-  "spot_price": 75.0,
+  "as_of_date": "2026-05-07",
+  "spot_price": 70.0,
   "expected_move": {
     "earnings_date": "2026-05-07",
     "expiration": "2026-05-15",
-    "dte": 9,
-    "lead_time_days": 1,
-    "atm_strike": 75.0,
-    "atm_iv": 0.673653,
-    "straddle_abs": 6.695,
-    "straddle_pct": 0.089267,
-    "iv_pct": 0.105782,
-    "skew_atm": -0.0403,
+    "dte": 8,
+    "lead_time_days": 0,
+    "atm_strike": 70.0,
+    "atm_iv": 0.4501,
+    "straddle_abs": 3.85,
+    "straddle_pct": 0.055,
+    "iv_pct": 0.066636,
+    "skew_atm": -0.0079,
     "term_slope": null,
-    "total_vega": 0.093,
-    "em_ml_pct": 0.065441,
-    "em_ml_abs": 5.144981,
-    "correction_factor": 0.501224,
-    "model_horizon": 1,
-    "ml_snapshot_date": "2026-05-06",
-    "p10": 0.009524,
-    "p25": 0.027929,
-    "p50": 0.056407,
-    "p75": 0.090994,
-    "p90": 0.128968,
-    "em_method": "ml_lightgbm",
+    "total_vega": 0.0816,
+    "em_method": "options_math",
     "timing": "before_market_open"
   },
   "straddle_features": [
     {
       "expiration": "2026-05-15",
-      "dte": 9,
-      "atm_strike": 75.0,
-      "atm_iv": 0.6736,
-      "atm_call_iv": 0.6859,
-      "atm_put_iv": 0.6613,
-      "straddle_mid": 6.695,
-      "em_straddle": 6.695,
-      "em_straddle_pct": 0.089267,
-      "em_iv": 7.933013,
-      "em_iv_pct": 0.105774,
-      "call_delta": 0.6181,
-      "call_gamma": 0.0457,
-      "call_vega": 0.0467,
-      "call_theta": -0.1934
+      "dte": 8,
+      "atm_strike": 70.0,
+      "atm_iv": 0.4501,
+      "atm_call_iv": 0.4501,
+      "atm_put_iv": 0.4501,
+      "straddle_mid": 3.85,
+      "em_straddle": 3.85,
+      "em_straddle_pct": 0.055,
+      "em_iv": 4.664506,
+      "em_iv_pct": 0.066636,
+      "call_delta": 0.5922,
+      "call_gamma": 0.0823,
+      "call_vega": 0.0407,
+      "call_theta": -0.1224
     },
     {
       "expiration": "2026-06-18",
-      "dte": 43,
-      "atm_strike": 80.0,
-      "atm_iv": 0.47205,
-      "atm_call_iv": 0.4885,
-      "atm_put_iv": 0.4556,
-      "straddle_mid": 10.445,
-      "em_straddle": 10.445,
-      "em_straddle_pct": 0.139267,
-      "em_iv": 12.151701,
-      "em_iv_pct": 0.162023,
-      "call_delta": 0.4689,
-      "call_gamma": 0.031,
-      "call_vega": 0.1058,
-      "call_theta": -0.0703
+      "dte": 42,
+      "atm_strike": 70.0,
+      "atm_iv": 0.4051,
+      "atm_call_iv": 0.4064,
+      "atm_put_iv": 0.4038,
+      "straddle_mid": 7.75,
+      "em_straddle": 7.75,
+      "em_straddle_pct": 0.110714,
+      "em_iv": 9.61919,
+      "em_iv_pct": 0.137417,
+      "call_delta": 0.5687,
+      "call_gamma": 0.0401,
+      "call_vega": 0.0942,
+      "call_theta": -0.0474
     }
   ],
   "earnings_history": [
     {
       "date": "2026-05-07",
-      "timing": "before_market_open"
+      "timing": "before_market_open",
+      "actual": null,
+      "implied": null
     },
     {
       "date": "2026-02-17",
-      "timing": "before_market_open"
+      "timing": "before_market_open",
+      "actual": -0.061641,
+      "implied": null
     },
     {
       "date": "2025-11-06",
-      "timing": "before_market_open"
+      "timing": "before_market_open",
+      "actual": 0.146357,
+      "implied": null
     },
     {
       "date": "2025-08-07",
-      "timing": "before_market_open"
+      "timing": "before_market_open",
+      "actual": 0.017789,
+      "implied": null
     },
     {
       "date": "2025-05-08",
-      "timing": "before_market_open"
+      "timing": "before_market_open",
+      "actual": -0.001485,
+      "implied": null
     }
   ],
   "next_earnings": "2026-05-07",
   "vol_regime": {
-    "iv_current": 0.5834,
-    "iv_rank": 1.0,
+    "iv_current": 0.4107,
+    "iv_rank": 0.444873,
     "iv_year_high": 0.5834,
     "iv_year_low": 0.2723,
-    "hv_current": 0.4922,
-    "hv_rank": 0.894057,
-    "iv_mom_week": 0.11,
+    "hv_current": 0.5829,
+    "hv_rank": 1.0,
+    "iv_mom_week": -0.0643,
     "iv_mom_month": null
   },
   "next_earnings_timing": "before_market_open"
