@@ -199,8 +199,8 @@
   z-index: 3;
   clip-path: inset(0 60% 0 0);
   opacity: 0;
-  /* Per-keyframe timing in @keyframes — avoids ease-in/out stacking at stops. */
-  animation: quantiv-splash-tail-reveal 1073ms ease 773ms forwards;
+  /* Tail runs 20% faster (÷1.2) than 1073ms / 773ms; rest of splash unchanged. */
+  animation: quantiv-splash-tail-reveal 894ms ease 644ms forwards;
   will-change: clip-path, opacity;
 }
 
