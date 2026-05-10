@@ -17,16 +17,16 @@
     "total_vega": 0.238,
     "em_ml_pct": 0.035812,
     "em_ml_abs": 5.566982,
-    "correction_factor": 0.560694,
+    "correction_factor": 0.480594,
     "model_horizon": 14,
     "ml_snapshot_date": "2026-05-06",
     "p10": 0.003985,
     "p25": 0.010975,
-    "p50": 0.027529,
+    "p50": 0.027192,
     "p75": 0.041452,
     "p90": 0.074004,
     "em_method": "ml_lightgbm",
-    "timing": "unknown"
+    "timing": "before_market_open"
   },
   "straddle_features": [
     {
@@ -101,7 +101,7 @@
   "earnings_history": [
     {
       "date": "2026-05-20",
-      "timing": "unknown",
+      "timing": "before_market_open",
       "actual": null,
       "implied": null
     },
@@ -174,5 +174,5 @@
   ],
   "next_earnings": "2026-05-20",
   "vol_regime": null,
-  "next_earnings_timing": "unknown"
+  "next_earnings_timing": "before_market_open"
 }
