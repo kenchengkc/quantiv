@@ -199,8 +199,7 @@
   z-index: 3;
   clip-path: inset(0 60% 0 0);
   opacity: 0;
-  /* Per-keyframe timing (see @keyframes) — a single global easing on both
-     segments eases *into* the 60% stop and *out* of it, which reads as a lag. */
+  /* Per-keyframe timing in @keyframes — avoids ease-in/out stacking at stops. */
   animation: quantiv-splash-tail-reveal 1180ms ease 850ms forwards;
   will-change: clip-path, opacity;
 }
@@ -226,14 +225,13 @@
   0% {
     clip-path: inset(0 60% 0 0);
     opacity: 1;
-    /* 0% → 60% time: slow emergence; curve ends with decent speed so we don’t
-       crawl into the middle keyframe (that crawl + default ease-in = “pause”). */
-    animation-timing-function: cubic-bezier(0.22, 0.1, 0.45, 1);
+    /* First 30% of duration: only ~12% of the clip travel — slow emergence */
+    animation-timing-function: cubic-bezier(0.5, 0, 0.9, 1);
   }
-  60% {
-    clip-path: inset(0 32% 0 0);
+  30% {
+    clip-path: inset(0 53% 0 0);
     opacity: 1;
-    /* 60% → 100%: constant rate — no ease-in ramp after the knot */
+    /* Remaining 70%: finishes the reveal at a higher average rate */
     animation-timing-function: linear;
   }
   100% {
