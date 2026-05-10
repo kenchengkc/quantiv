@@ -188,13 +188,16 @@
   z-index: 2;
   background: #000000;
   opacity: 1;
-  clip-path: polygon(48.31% 51.13%, 48.31% 51.13%, 61.05% 65.39%, 61.05% 65.39%);
-  /* Stable layer without will-change on clip-path — dropping will-change at
-     animation end can cause a one-frame compositor snap (“jitter”). */
+  /* Four distinct corners (was two pairs of duplicates). A collapsed “line”
+     polygon can make engines hit a discontinuous interpolation path ~midway. */
+  clip-path: polygon(
+    48.31% 51.13%,
+    48.34% 51.16%,
+    61.02% 65.36%,
+    61.05% 65.39%
+  );
   transform: translateZ(0);
   backface-visibility: hidden;
-  /* Linear = uniform rate over time; easing made the end feel like a second,
-     slower “final” open before the tail layer reads as active. */
   animation: quantiv-splash-slit-arc-open 327ms linear 473ms forwards;
 }
 
@@ -204,9 +207,11 @@
   z-index: 3;
   clip-path: inset(0 60% 0 0);
   opacity: 0;
-  /* Tail runs 20% faster (÷1.2) than 1073ms / 773ms; rest of splash unchanged. */
-  animation: quantiv-splash-tail-reveal 894ms ease 644ms forwards;
-  will-change: clip-path, opacity;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  /* After slit finishes (473+327ms). Starting the tail mid-slit promoted a new
+     layer on top and caused a one-frame compositor hitch ~halfway through. */
+  animation: quantiv-splash-tail-reveal 894ms ease 800ms forwards;
 }
 
 @keyframes quantiv-splash-ring-in {
@@ -217,7 +222,12 @@
 
 @keyframes quantiv-splash-slit-arc-open {
   0% {
-    clip-path: polygon(48.31% 51.13%, 48.31% 51.13%, 61.05% 65.39%, 61.05% 65.39%);
+    clip-path: polygon(
+      48.31% 51.13%,
+      48.34% 51.16%,
+      61.02% 65.36%,
+      61.05% 65.39%
+    );
     opacity: 1;
   }
   100% {
