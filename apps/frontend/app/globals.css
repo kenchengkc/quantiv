@@ -189,7 +189,9 @@
   background: #000000;
   opacity: 1;
   clip-path: polygon(48.31% 51.13%, 48.31% 51.13%, 61.05% 65.39%, 61.05% 65.39%);
-  animation: quantiv-splash-slit-arc-open 327ms cubic-bezier(0.42, 0, 0.58, 1) 473ms forwards;
+  /* Ease-out-ish: ease-in-out made the first frames barely move after the
+     ring handoff, which read as a pause. */
+  animation: quantiv-splash-slit-arc-open 327ms cubic-bezier(0.2, 0.85, 0.35, 1) 473ms forwards;
   will-change: clip-path, opacity;
 }
 
