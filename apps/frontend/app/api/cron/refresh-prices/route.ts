@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { Redis } from '@upstash/redis';
 import { neon } from '@neondatabase/serverless';
 import sp500Constituents from '../../../../../../lib/data/sp500-constituents.json';
-import { isMarketOpenET } from '@/lib/marketHours';
+import { isQuoteRefreshWindowET } from '@/lib/marketHours';
 
 // Cron-driven Finnhub price refresher. Triggered every 5 min by an external
 // scheduler (Cloudflare Worker). Walks a rotating cursor through a priority-
@@ -155,12 +155,12 @@ export async function GET(req: NextRequest) {
   const ok = auth === `Bearer ${required}` || param === required;
   if (!ok) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
-  // Skip Finnhub work outside US equity market hours (09:25–16:15 ET, M–F).
-  // The Cloudflare Worker still fires every minute — the early-exit just
-  // saves Finnhub quota and avoids redundant Redis writes. `?force=1`
-  // overrides for manual back-fills.
+  // Skip Finnhub work outside the quote refresh window (09:25–16:35 ET, M–F
+  // non-holiday). Post-close minutes cover delayed vendor settlement. The
+  // Cloudflare Worker still fires every minute — the early-exit saves quota.
+  // `?force=1` overrides for manual back-fills.
   const force = new URL(req.url).searchParams.get('force') === '1';
-  if (!force && !isMarketOpenET()) {
+  if (!force && !isQuoteRefreshWindowET()) {
     return NextResponse.json({
       universe: 0,
       fetched: 0,
