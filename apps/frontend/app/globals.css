@@ -148,7 +148,7 @@
   background: #000000;
   /* Hold the black backdrop opaque almost to the end, then dissolve in
      sync with the mark's zoom-forward to reveal the dashboard underneath. */
-  animation: quantiv-splash-fade 2560ms ease-in-out forwards;
+  animation: quantiv-splash-fade 2327ms ease-in-out forwards;
   /* Disable interactions while the splash is up so a fast click doesn't
      register on the dashboard before it's revealed. */
   pointer-events: auto;
@@ -161,7 +161,7 @@
   transform-origin: center center;
   /* Phase 4 — Batman-style burst: the entire mark scales toward the
      viewer, growing past the viewport while the backdrop fades out. */
-  animation: quantiv-splash-burst 2560ms cubic-bezier(0.55, 0, 0.2, 1) forwards;
+  animation: quantiv-splash-burst 2327ms cubic-bezier(0.55, 0, 0.2, 1) forwards;
 }
 
 .quantiv-splash-layer {
@@ -178,7 +178,7 @@
 .quantiv-splash-closed-ring {
   transform-origin: center center;
   z-index: 1;
-  animation: quantiv-splash-ring-in 520ms cubic-bezier(0.2, 1, 0.3, 1) forwards;
+  animation: quantiv-splash-ring-in 473ms cubic-bezier(0.2, 1, 0.3, 1) forwards;
   opacity: 0;
 }
 
@@ -189,7 +189,7 @@
   background: #000000;
   opacity: 1;
   clip-path: polygon(48.31% 51.13%, 48.31% 51.13%, 61.05% 65.39%, 61.05% 65.39%);
-  animation: quantiv-splash-slit-arc-open 360ms cubic-bezier(0.42, 0, 0.58, 1) 520ms forwards;
+  animation: quantiv-splash-slit-arc-open 327ms cubic-bezier(0.42, 0, 0.58, 1) 473ms forwards;
   will-change: clip-path, opacity;
 }
 
@@ -200,7 +200,7 @@
   clip-path: inset(0 60% 0 0);
   opacity: 0;
   /* Per-keyframe timing in @keyframes — avoids ease-in/out stacking at stops. */
-  animation: quantiv-splash-tail-reveal 1180ms ease 850ms forwards;
+  animation: quantiv-splash-tail-reveal 1073ms ease 773ms forwards;
   will-change: clip-path, opacity;
 }
 
@@ -243,8 +243,8 @@
 @keyframes quantiv-splash-burst {
   /* Hold the assembled mark in place while the wave finishes drawing,
      then a quick anticipation dip, then the launch to ~10× scale.
-     Hold ends at 82% (= 2099ms of 2560ms), dip at 88% (= 2253ms),
-     final scale at 100% — same ~470ms burst window as before. */
+     Hold ends at 82% (= ~1908ms of 2327ms), dip at 88% (= ~2048ms),
+     final scale at 100% — same relative burst window as before. */
   0%   { transform: scale(1); }
   82%  { transform: scale(1); }
   88%  { transform: scale(0.94); }
