@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useState } from 'react';
 
 // Once-per-session intro. The sequence starts with a closed ring, opens the
 // bottom-right slit, then reveals the exact logo tail through it.
@@ -8,28 +8,27 @@ const SESSION_KEY = 'quantiv:splash:played';
 const TOTAL_MS = 2327;
 
 export function Splash() {
-  // Render the splash on the first server/client frame. If we wait for
-  // useEffect to decide, the dashboard can flash before the intro mounts.
+  // Start in `play` so first-time visitors never see a dashboard flash before
+  // the intro (see layout comment below). Returning visitors / Clerk redirects
+  // must skip *before paint* — `useEffect` runs too late and the ring flashes
+  // for one frame after sessionStorage already says the intro ran.
   const [phase, setPhase] = useState<'play' | 'done'>('play');
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (typeof window === 'undefined') return;
-
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const alreadyPlayed =
-      window.sessionStorage.getItem(SESSION_KEY) === '1';
+    const alreadyPlayed = window.sessionStorage.getItem(SESSION_KEY) === '1';
+    if (reduced || alreadyPlayed) setPhase('done');
+  }, []);
 
-    if (reduced || alreadyPlayed) {
-      setPhase('done');
-      return;
-    }
-
+  useEffect(() => {
+    if (phase !== 'play') return;
     const t = window.setTimeout(() => {
       window.sessionStorage.setItem(SESSION_KEY, '1');
       setPhase('done');
     }, TOTAL_MS);
     return () => window.clearTimeout(t);
-  }, []);
+  }, [phase]);
 
   if (phase === 'done') return null;
 
