@@ -614,7 +614,7 @@ function WeekHeader({
             <span>Earnings Week</span>
             {!marketOpen && (
               <span
-                title="US equity market is closed (regular hours 09:30–16:00 ET). Quotes shown are last close."
+                title="US equity regular session is 09:30–16:00 ET. After the close, quotes may still update for a short time while data feeds settle."
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -872,6 +872,7 @@ export default function EarningsGrid() {
     const symbols = Array.from(new Set(data.events.map((e) => e.ticker)));
 
     let lastMarketOpen = true;
+    let lastQuoteRefreshActive = true;
     const markQuotesReady = () => {
       if (cancelled) return;
       if (initialReadyTimer) {
@@ -884,18 +885,23 @@ export default function EarningsGrid() {
     setQuotesReadyWeek(null);
     initialReadyTimer = setTimeout(markQuotesReady, INITIAL_QUOTE_WAIT_MS);
 
-    const fetchOnce = async (): Promise<{ pending: number; marketOpen: boolean }> => {
+    const fetchOnce = async (): Promise<{ pending: number; marketOpen: boolean; quoteRefreshActive: boolean }> => {
       try {
         const res = await fetch(`/api/stocks/batch-price?symbols=${symbols.join(',')}`, {
           cache: 'no-store',
         });
-        if (!res.ok) return { pending: 0, marketOpen: lastMarketOpen };
+        if (!res.ok) {
+          return { pending: 0, marketOpen: lastMarketOpen, quoteRefreshActive: lastQuoteRefreshActive };
+        }
         const json = (await res.json()) as {
           pending?: number;
           marketOpen?: boolean;
+          quoteRefreshActive?: boolean;
           data: { symbol: string; price: number | null; change: number | null; changePct: number | null }[];
         };
-        if (cancelled) return { pending: 0, marketOpen: lastMarketOpen };
+        if (cancelled) {
+          return { pending: 0, marketOpen: lastMarketOpen, quoteRefreshActive: lastQuoteRefreshActive };
+        }
         setLive((prev) => {
           const next: LiveMap = { ...prev };
           for (const t of json.data) {
@@ -908,11 +914,13 @@ export default function EarningsGrid() {
           return next;
         });
         const open = json.marketOpen ?? true;
+        const refreshOn = json.quoteRefreshActive ?? open;
         lastMarketOpen = open;
+        lastQuoteRefreshActive = refreshOn;
         setMarketOpen(open);
-        return { pending: json.pending ?? 0, marketOpen: open };
+        return { pending: json.pending ?? 0, marketOpen: open, quoteRefreshActive: refreshOn };
       } catch {
-        return { pending: 0, marketOpen: lastMarketOpen };
+        return { pending: 0, marketOpen: lastMarketOpen, quoteRefreshActive: lastQuoteRefreshActive };
       }
     };
 
@@ -921,16 +929,16 @@ export default function EarningsGrid() {
     // very slow 5-min heartbeat — quotes are frozen anyway, no need to spin.
     const fastPoll = async (attempt = 0) => {
       if (cancelled) return;
-      const { pending, marketOpen: open } = await fetchOnce();
-      if (open && pending > 0 && attempt < 30) {
+      const { pending, quoteRefreshActive: refreshOn } = await fetchOnce();
+      if (refreshOn && pending > 0 && attempt < 30) {
         const delay = attempt < 10 ? 2_000 : 8_000;
         timer = setTimeout(() => fastPoll(attempt + 1), delay);
       } else {
         markQuotesReady();
         const slowLoop = () => {
           if (cancelled) return;
-          // 30s when market open, 5min when closed.
-          const interval = lastMarketOpen ? 30_000 : 300_000;
+          // 30s while Finnhub refresh window (incl. post-close settlement), 5min otherwise.
+          const interval = lastQuoteRefreshActive ? 30_000 : 300_000;
           timer = setTimeout(async () => {
             await fetchOnce();
             slowLoop();

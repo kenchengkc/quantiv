@@ -1,18 +1,26 @@
 // US equity market-hours helpers.
 //
-// "Open" = regular session + a small pre/post buffer:
-//   weekday 09:25 ET → 16:15 ET inclusive,
-//   excluding Sat/Sun and full NYSE holidays.
-// The buffer lets the cron pre-warm just before the bell and capture the
-// final settlement just after close.
+// Two notions:
+//   • NYSE regular session (for UI "market closed" badges): 09:30–16:00 ET.
+//   • Quote refresh window (Finnhub cron + cache warming + fast client polls):
+//     weekday 09:25 ET → 16:35 ET inclusive, excluding Sat/Sun and NYSE holidays.
+// The pre-open buffer pre-warms before the bell. The post-close buffer (~35 min
+// after the 16:00 bell) covers vendor delay before same-day close / day change
+// show up in Finnhub.
 //
 // Half-day sessions (e.g. 13:00 ET early close on Black Friday and Christmas
 // Eve) are intentionally treated as full days. The harm is limited to a few
 // hours of redundant Finnhub fetches that overwrite the same close price —
 // not worth the two extra dates/year of calendar maintenance.
 
-const OPEN_MIN = 9 * 60 + 25;   // 09:25 ET
-const CLOSE_MIN = 16 * 60 + 15; // 16:15 ET
+/** First minute we start hitting Finnhub (slightly before the 09:30 open). */
+const QUOTE_REFRESH_OPEN_MIN = 9 * 60 + 25; // 09:25 ET
+/** Last minute we still refresh quotes (after 16:00 close; feeds often lag 15–20+ min). */
+const QUOTE_REFRESH_CLOSE_MIN = 16 * 60 + 35; // 16:35 ET
+
+const REGULAR_OPEN_MIN = 9 * 60 + 30; // 09:30 ET
+/** First minute after the 16:00 regular close (exclusive end for session-open check). */
+const REGULAR_CLOSE_MIN = 16 * 60; // 16:00 ET
 
 // Full NYSE closures, ISO dates in ET. Sources: nyse.com/markets/hours-calendars.
 // Update annually — appending a new year is fine; old years can stay (irrelevant
@@ -79,19 +87,41 @@ function nowParts(d: Date = new Date()): NowParts {
   };
 }
 
-export function isMarketOpenET(now: Date = new Date()): boolean {
-  const { weekday, minutes, isoDate } = nowParts(now);
+function isTradingDayET(now: Date): boolean {
+  const { weekday, isoDate } = nowParts(now);
   if (weekday === 'Sat' || weekday === 'Sun') return false;
   if (NYSE_HOLIDAYS.has(isoDate)) return false;
-  return minutes >= OPEN_MIN && minutes <= CLOSE_MIN;
+  return true;
 }
 
-/** Human-readable status string for UI badges. Returns null when open. */
+/** NYSE regular session only — drives "market closed" UI while quotes may still refresh. */
+export function isNyseRegularSessionET(now: Date = new Date()): boolean {
+  if (!isTradingDayET(now)) return false;
+  const { minutes } = nowParts(now);
+  return minutes >= REGULAR_OPEN_MIN && minutes < REGULAR_CLOSE_MIN;
+}
+
+/** When cron / batch-price / fast polling should still hit Finnhub. */
+export function isQuoteRefreshWindowET(now: Date = new Date()): boolean {
+  if (!isTradingDayET(now)) return false;
+  const { minutes } = nowParts(now);
+  return minutes >= QUOTE_REFRESH_OPEN_MIN && minutes <= QUOTE_REFRESH_CLOSE_MIN;
+}
+
+/** @deprecated Prefer isNyseRegularSessionET or isQuoteRefreshWindowET for clarity. */
+export function isMarketOpenET(now: Date = new Date()): boolean {
+  return isQuoteRefreshWindowET(now);
+}
+
+/** Human-readable status string for UI badges. Returns null during regular hours. */
 export function marketClosedReason(now: Date = new Date()): string | null {
   const { weekday, minutes, isoDate } = nowParts(now);
   if (weekday === 'Sat' || weekday === 'Sun') return 'Weekend · last close';
   if (NYSE_HOLIDAYS.has(isoDate)) return 'Market holiday · last close';
-  if (minutes < OPEN_MIN) return 'Pre-market · last close';
-  if (minutes > CLOSE_MIN) return 'After-hours · last close';
+  if (minutes < REGULAR_OPEN_MIN) return 'Pre-market · last close';
+  if (minutes >= REGULAR_CLOSE_MIN && minutes <= QUOTE_REFRESH_CLOSE_MIN) {
+    return 'After close · quotes settling';
+  }
+  if (minutes > QUOTE_REFRESH_CLOSE_MIN) return 'After-hours · last close';
   return null;
 }

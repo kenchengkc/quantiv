@@ -73,7 +73,7 @@ function MarketStatusBadge({ marketOpen }: { marketOpen: boolean | null }) {
   return (
     <span
       aria-hidden={!visible}
-      title={visible ? 'US equity market is closed (regular hours 09:30-16:00 ET). Quotes shown are last close.' : undefined}
+      title={visible ? 'US equity regular session is 09:30–16:00 ET. After the close, quotes may still update briefly while feeds settle.' : undefined}
       style={{
         visibility: visible ? 'visible' : 'hidden',
         display: 'inline-flex',
@@ -385,16 +385,20 @@ export default function WatchlistPage() {
     let timer: ReturnType<typeof setTimeout> | null = null;
 
     let lastOpen = true;
-    const fetchOnce = async (): Promise<{ pending: number; open: boolean }> => {
+    let lastQuoteRefreshActive = true;
+    const fetchOnce = async (): Promise<{ pending: number; open: boolean; quoteRefreshActive: boolean }> => {
       try {
         const res = await fetch(
           `/api/stocks/batch-price?symbols=${tickers.join(',')}`,
           { cache: 'no-store' },
         );
-        if (!res.ok) return { pending: 0, open: lastOpen };
+        if (!res.ok) {
+          return { pending: 0, open: lastOpen, quoteRefreshActive: lastQuoteRefreshActive };
+        }
         const json = (await res.json()) as {
           pending?: number;
           marketOpen?: boolean;
+          quoteRefreshActive?: boolean;
           data: {
             symbol: string;
             price: number | null;
@@ -402,7 +406,9 @@ export default function WatchlistPage() {
             changePct: number | null;
           }[];
         };
-        if (cancelled) return { pending: 0, open: lastOpen };
+        if (cancelled) {
+          return { pending: 0, open: lastOpen, quoteRefreshActive: lastQuoteRefreshActive };
+        }
         setLive((prev) => {
           const next: Record<string, Tick> = { ...prev };
           const seen = new Set<string>();
@@ -422,9 +428,11 @@ export default function WatchlistPage() {
           return next;
         });
         const open = json.marketOpen ?? true;
+        const refreshOn = json.quoteRefreshActive ?? open;
         lastOpen = open;
+        lastQuoteRefreshActive = refreshOn;
         setMarketOpen(open);
-        return { pending: json.pending ?? 0, open };
+        return { pending: json.pending ?? 0, open, quoteRefreshActive: refreshOn };
       } catch {
         setLive((prev) => {
           const next: Record<string, Tick> = { ...prev };
@@ -433,21 +441,20 @@ export default function WatchlistPage() {
           }
           return next;
         });
-        return { pending: 0, open: lastOpen };
+        return { pending: 0, open: lastOpen, quoteRefreshActive: lastQuoteRefreshActive };
       }
     };
 
     const fastPoll = async (attempt = 0) => {
       if (cancelled) return;
-      const { pending, open } = await fetchOnce();
-      if (open && pending > 0 && attempt < 30) {
+      const { pending, quoteRefreshActive: refreshOn } = await fetchOnce();
+      if (refreshOn && pending > 0 && attempt < 30) {
         const delay = attempt < 10 ? 2_000 : 8_000;
         timer = setTimeout(() => fastPoll(attempt + 1), delay);
       } else {
         const slowLoop = () => {
           if (cancelled) return;
-          // Quotes frozen when closed — back off to 5 min instead of 30 s.
-          const interval = lastOpen ? 30_000 : 300_000;
+          const interval = lastQuoteRefreshActive ? 30_000 : 300_000;
           timer = setTimeout(async () => {
             await fetchOnce();
             slowLoop();
