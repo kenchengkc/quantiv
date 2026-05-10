@@ -199,9 +199,9 @@
   z-index: 3;
   clip-path: inset(0 60% 0 0);
   opacity: 0;
-  /* Longer duration + eased keyframes: first half of the clip opens slowly
-     (tail eases out of the slit), then the rest catches up — avoids a sudden jump. */
-  animation: quantiv-splash-tail-reveal 1180ms cubic-bezier(0.45, 0, 0.2, 1) 850ms forwards;
+  /* Per-keyframe timing (see @keyframes) — a single global easing on both
+     segments eases *into* the 60% stop and *out* of it, which reads as a lag. */
+  animation: quantiv-splash-tail-reveal 1180ms ease 850ms forwards;
   will-change: clip-path, opacity;
 }
 
@@ -226,11 +226,15 @@
   0% {
     clip-path: inset(0 60% 0 0);
     opacity: 1;
+    /* 0% → 60% time: slow emergence; curve ends with decent speed so we don’t
+       crawl into the middle keyframe (that crawl + default ease-in = “pause”). */
+    animation-timing-function: cubic-bezier(0.22, 0.1, 0.45, 1);
   }
-  /* ~half the inward travel in ~60% of the time — slow emergence */
   60% {
     clip-path: inset(0 32% 0 0);
     opacity: 1;
+    /* 60% → 100%: constant rate — no ease-in ramp after the knot */
+    animation-timing-function: linear;
   }
   100% {
     clip-path: inset(0 0 0 0);
