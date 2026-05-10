@@ -199,7 +199,9 @@
   z-index: 3;
   clip-path: inset(0 60% 0 0);
   opacity: 0;
-  animation: quantiv-splash-tail-reveal 968ms cubic-bezier(0.32, 0, 0.18, 1) 850ms forwards;
+  /* Longer duration + eased keyframes: first half of the clip opens slowly
+     (tail eases out of the slit), then the rest catches up — avoids a sudden jump. */
+  animation: quantiv-splash-tail-reveal 1180ms cubic-bezier(0.45, 0, 0.2, 1) 850ms forwards;
   will-change: clip-path, opacity;
 }
 
@@ -221,8 +223,19 @@
 }
 
 @keyframes quantiv-splash-tail-reveal {
-  0%   { clip-path: inset(0 60% 0 0); opacity: 1; }
-  100% { clip-path: inset(0 0 0 0); opacity: 1; }
+  0% {
+    clip-path: inset(0 60% 0 0);
+    opacity: 1;
+  }
+  /* ~half the inward travel in ~60% of the time — slow emergence */
+  60% {
+    clip-path: inset(0 32% 0 0);
+    opacity: 1;
+  }
+  100% {
+    clip-path: inset(0 0 0 0);
+    opacity: 1;
+  }
 }
 
 @keyframes quantiv-splash-burst {
