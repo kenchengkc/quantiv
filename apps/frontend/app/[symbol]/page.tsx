@@ -1485,7 +1485,7 @@ export default function SymbolPage() {
     // loop can back off after-hours. Default to `true` so the very first
     // tick (before any response) uses the open-market cadence.
     let lastMarketOpen = true;
-
+    let lastQuoteRefreshActive = true;
     const fetchOnce = async (): Promise<number> => {
       try {
         const res = await fetch(`/api/stocks/batch-price?symbols=${symbol}`, { cache: 'no-store' });
@@ -1495,6 +1495,7 @@ export default function SymbolPage() {
           updated: string | null;
           source: 'finnhub' | 'unavailable';
           marketOpen?: boolean;
+          quoteRefreshActive?: boolean;
           data: Array<{
             symbol: string;
             price: number | null;
@@ -1504,7 +1505,9 @@ export default function SymbolPage() {
           }>;
         };
         const open = json.marketOpen ?? true;
+        const refreshOn = json.quoteRefreshActive ?? open;
         lastMarketOpen = open;
+        lastQuoteRefreshActive = refreshOn;
         const tick = json.data?.[0];
         if (!cancelled && tick && tick.price !== null) {
           setLive({
@@ -1530,13 +1533,10 @@ export default function SymbolPage() {
         const delay = attempt < 10 ? 2_000 : 8_000;
         timer = setTimeout(() => void fastPoll(attempt + 1), delay);
       } else {
-        // Slow loop: 30 s while the market is open, 5 min when closed.
-        // Quotes don't change after hours, so polling every 30 s is
-        // pure waste of the Finnhub budget. Mirrors the grid's cadence
-        // (EarningsGrid.tsx uses lastMarketOpen ? 30_000 : 300_000).
+        // Slow loop: 30 s while quote refresh is active (incl. post-close), 5 min otherwise.
         const slowLoop = () => {
           if (cancelled) return;
-          const interval = lastMarketOpen ? 30_000 : 300_000;
+          const interval = lastQuoteRefreshActive ? 30_000 : 300_000;
           timer = setTimeout(async () => {
             await fetchOnce();
             slowLoop();
