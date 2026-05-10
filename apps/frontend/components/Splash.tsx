@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 // Once-per-session intro. The sequence starts with a closed ring, opens the
 // bottom-right slit, then reveals the exact logo tail through it.
 const SESSION_KEY = 'quantiv:splash:played';
-const TOTAL_MS = 2560;
+const TOTAL_MS = 2327;
 
 export function Splash() {
   // Render the splash on the first server/client frame. If we wait for
