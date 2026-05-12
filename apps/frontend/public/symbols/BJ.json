@@ -1,20 +1,20 @@
 {
   "symbol": "BJ",
-  "as_of_date": "2026-05-08",
+  "as_of_date": "2026-05-11",
   "spot_price": null,
   "expected_move": {
     "earnings_date": "2026-05-22",
     "expiration": "2026-06-18",
-    "dte": 41,
-    "lead_time_days": 14,
+    "dte": 38,
+    "lead_time_days": 11,
     "atm_strike": 95.0,
-    "atm_iv": 0.404002,
-    "straddle_abs": 10.25,
-    "straddle_pct": 0.107895,
-    "iv_pct": 0.135403,
-    "skew_atm": 0.0031,
+    "atm_iv": 0.391303,
+    "straddle_abs": 9.7,
+    "straddle_pct": 0.102105,
+    "iv_pct": 0.126258,
+    "skew_atm": -0.005867,
     "term_slope": null,
-    "total_vega": 0.2479,
+    "total_vega": 0.2341,
     "em_ml_pct": 0.059582,
     "em_ml_abs": 5.539324,
     "correction_factor": 1.583294,
@@ -31,20 +31,20 @@
   "straddle_features": [
     {
       "expiration": "2026-06-18",
-      "dte": 41,
+      "dte": 38,
       "atm_strike": 95.0,
-      "atm_iv": 0.404,
-      "atm_call_iv": 0.3995,
-      "atm_put_iv": 0.4085,
-      "straddle_mid": 10.25,
-      "em_straddle": 10.25,
+      "atm_iv": 0.3913,
+      "atm_call_iv": 0.3974,
+      "atm_put_iv": 0.3852,
+      "straddle_mid": 9.7,
+      "em_straddle": 9.7,
       "em_straddle_pct": null,
       "em_iv": null,
       "em_iv_pct": null,
-      "call_delta": 0.4725,
-      "call_gamma": 0.0319,
-      "call_vega": 0.1239,
-      "call_theta": -0.0641
+      "call_delta": 0.4354,
+      "call_gamma": 0.0332,
+      "call_vega": 0.1171,
+      "call_theta": -0.0636
     }
   ],
   "earnings_history": [
@@ -122,6 +122,15 @@
     }
   ],
   "next_earnings": "2026-05-22",
-  "vol_regime": null,
+  "vol_regime": {
+    "iv_current": 0.4038,
+    "iv_rank": 0.709949,
+    "iv_year_high": 0.4659,
+    "iv_year_low": 0.2518,
+    "hv_current": 0.2799,
+    "hv_rank": 0.071429,
+    "iv_mom_week": 0.0203,
+    "iv_mom_month": null
+  },
   "next_earnings_timing": "before_market_open"
 }
