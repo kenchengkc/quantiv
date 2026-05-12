@@ -1,18 +1,18 @@
 {
   "symbol": "CVSA",
-  "as_of_date": "2026-05-08",
+  "as_of_date": "2026-05-11",
   "spot_price": 100.0,
   "expected_move": {
     "earnings_date": "2026-05-07",
     "expiration": "2026-05-15",
-    "dte": 7,
-    "lead_time_days": -1,
+    "dte": 4,
+    "lead_time_days": -4,
     "atm_strike": 100.0,
     "atm_iv": 0.4782,
     "straddle_abs": 17.75,
     "straddle_pct": 0.1775,
-    "iv_pct": 0.066224,
-    "skew_atm": 0.05575,
+    "iv_pct": 0.05006,
+    "skew_atm": -0.4042,
     "term_slope": null,
     "total_vega": 0.3681,
     "em_method": "options_math",
@@ -21,7 +21,7 @@
   "straddle_features": [
     {
       "expiration": "2026-05-15",
-      "dte": 7,
+      "dte": 4,
       "atm_strike": 100.0,
       "atm_iv": 0.4782,
       "atm_call_iv": 0.4782,
@@ -29,8 +29,8 @@
       "straddle_mid": 17.75,
       "em_straddle": 17.75,
       "em_straddle_pct": 0.1775,
-      "em_iv": 6.62235,
-      "em_iv_pct": 0.066224,
+      "em_iv": 5.006026,
+      "em_iv_pct": 0.05006,
       "call_delta": 0.5225,
       "call_gamma": 0.0178,
       "call_vega": 0.1838,
@@ -38,20 +38,20 @@
     },
     {
       "expiration": "2026-06-18",
-      "dte": 41,
+      "dte": 38,
       "atm_strike": 135.0,
-      "atm_iv": 0.3247,
-      "atm_call_iv": 0.3195,
-      "atm_put_iv": 0.3299,
-      "straddle_mid": 11.8,
-      "em_straddle": 11.8,
-      "em_straddle_pct": 0.118,
-      "em_iv": 10.882478,
-      "em_iv_pct": 0.108825,
-      "call_delta": 0.4358,
-      "call_gamma": 0.0277,
-      "call_vega": 0.1735,
-      "call_theta": -0.068
+      "atm_iv": 0.3315,
+      "atm_call_iv": 0.3306,
+      "atm_put_iv": 0.3324,
+      "straddle_mid": 11.595,
+      "em_straddle": 11.595,
+      "em_straddle_pct": 0.11595,
+      "em_iv": 10.696185,
+      "em_iv_pct": 0.106962,
+      "call_delta": 0.4526,
+      "call_gamma": 0.0279,
+      "call_vega": 0.1693,
+      "call_theta": -0.0766
     }
   ],
   "earnings_history": [
@@ -63,6 +63,15 @@
     }
   ],
   "next_earnings": "2026-05-07",
-  "vol_regime": null,
+  "vol_regime": {
+    "iv_current": 0.3741,
+    "iv_rank": 0.233427,
+    "iv_year_high": 0.5915,
+    "iv_year_low": 0.3079,
+    "hv_current": 0.5267,
+    "hv_rank": 1.0,
+    "iv_mom_week": -0.1962,
+    "iv_mom_month": null
+  },
   "next_earnings_timing": "after_market_close"
 }
