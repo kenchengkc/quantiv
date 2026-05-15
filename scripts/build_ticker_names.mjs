@@ -83,7 +83,7 @@ function titleCaseAmpersandToken(tok) {
   }).join('&');
 }
 
-function fixToken(tok, isFirst) {
+function fixToken(tok, isFirst, ticker) {
   // Dotted abbreviation like "S.A.", "S.a.", "N.V.", "P.L.C." — force
   // uppercase. SEC occasionally lowercases the trailing letter of these
   // legal-form suffixes ("Banco Santander (Brasil) S.a."); normalize.
@@ -133,6 +133,23 @@ function fixToken(tok, isFirst) {
   }
   if (core.includes('&')) return titleCaseAmpersandToken(core) + trailing;
 
+  // Brand-acronym first-token rule: if this is the first token, all
+  // uppercase, 2-3 letters long, AND its uppercase form equals the
+  // ticker, it's an unambiguous brand acronym — preserve uppercase.
+  // "NVR INC" (ticker NVR) → "NVR Inc.", "IBM CORP" (ticker IBM) → "IBM
+  // Corp.". Length cap at 3 deliberately excludes 4-char word-names like
+  // ROKU and PEAR that should still title-case (Roku, Pear).
+  if (
+    isFirst &&
+    ticker &&
+    /^[A-Z]+$/.test(core) &&
+    core.length >= 2 &&
+    core.length <= 3 &&
+    core === ticker.toUpperCase()
+  ) {
+    return core + trailing;
+  }
+
   // Short alphanumeric tokens containing a digit (3M, 3D, 7-Eleven's
   // "7") are brand IDs — preserve their uppercase letters. Pure-letter
   // acronyms (IBM, GE) deliberately fall through to title-casing: the
@@ -154,7 +171,7 @@ function fixToken(tok, isFirst) {
   return withInlineCaps + trailing;
 }
 
-function fixCasing(name) {
+function fixCasing(name, ticker) {
   // Pre-clean: strip SEC artifacts that aren't useful display text.
   let cleaned = name
     // Trailing /XX/ or /XX (state-of-incorporation, /ADR, /PFD, etc.).
@@ -186,7 +203,7 @@ function fixCasing(name) {
       if (/^\s+$/.test(part) || part === '') return part;
       const isFirst = nonWsIdx === 0;
       nonWsIdx += 1;
-      return fixToken(part, isFirst);
+      return fixToken(part, isFirst, ticker);
     })
     .join('')
     .trim();
@@ -210,7 +227,7 @@ async function main() {
     if (!ticker || !title) { skipped += 1; continue; }
     const tk = String(ticker).toUpperCase().trim();
     const raw = String(title).trim();
-    const fixed = fixCasing(raw);
+    const fixed = fixCasing(raw, tk);
     if (fixed !== raw) normalized += 1;
     // First-wins for duplicates (SEC's iteration order roughly matches
     // primary listings).
