@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { companyName } from '@/lib/companyNames';
+import { useEnsureCompanyNames } from '@/lib/useCompanyNames';
 import sp500Constituents from '../../../lib/data/sp500-constituents.json';
 
 const SP500_SET = new Set(
@@ -527,6 +528,12 @@ function parseDir(d: string | null): SortDir {
 }
 
 export default function EarningsScreener() {
+  // Triggers the one-time EDGAR ticker-names fetch and re-renders this
+  // component when the data lands, so non-S&P-500 tickers (SOFI, RIOT,
+  // JBL, etc.) pick up their proper company names rather than echoing
+  // the ticker symbol.
+  useEnsureCompanyNames();
+
   const router = useRouter();
   const searchParams = useSearchParams();
 
