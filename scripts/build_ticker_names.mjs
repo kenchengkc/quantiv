@@ -84,6 +84,32 @@ function titleCaseAmpersandToken(tok) {
 }
 
 function fixToken(tok, isFirst) {
+  // Dotted abbreviation like "S.A.", "S.a.", "N.V.", "P.L.C." — force
+  // uppercase. SEC occasionally lowercases the trailing letter of these
+  // legal-form suffixes ("Banco Santander (Brasil) S.a."); normalize.
+  // Pattern: 2-4 single-letter segments separated by periods, optional
+  // trailing period.
+  if (/^([A-Za-z]\.){1,3}[A-Za-z]\.?$/.test(tok)) {
+    const upperized = tok.replace(/[a-z]/g, (c) => c.toUpperCase());
+    // Ensure a trailing period.
+    return upperized.endsWith('.') ? upperized : `${upperized}.`;
+  }
+
+  // Parenthesized token like "(SGHC)" — process inside content with the
+  // same rules but preserve uppercase for short all-caps acronyms inside.
+  // (The whole-name pre-pass already uppercased lowercase inner content,
+  // so here we mainly need to stop the default rule from lowercasing
+  // the inside of "(SGHC)".)
+  const parenMatch = tok.match(/^(\()([A-Za-z]+)(\)[.,;:]?)$/);
+  if (parenMatch) {
+    const [, open, inner, close] = parenMatch;
+    if (/^[A-Z]+$/.test(inner) && inner.length <= 5) {
+      return `${open}${inner}${close}`;
+    }
+    // Mixed-case or long content — title-case the first letter.
+    return `${open}${inner[0].toUpperCase()}${inner.slice(1).toLowerCase()}${close}`;
+  }
+
   // Strip trailing punctuation for lookup, re-attach after.
   const trailing = tok.match(/[.,;:]+$/)?.[0] ?? '';
   const core = trailing ? tok.slice(0, -trailing.length) : tok;
@@ -116,13 +142,44 @@ function fixToken(tok, isFirst) {
     return core + trailing;
   }
 
-  // Default: capitalize first letter, lowercase the rest.
-  return core[0] + core.slice(1).toLowerCase() + trailing;
+  // Default: capitalize first letter, lowercase the rest. Then restore
+  // uppercase for any short parenthesized acronyms inside the token —
+  // catches things like "STRATS(SM)" which is a single whitespace-token
+  // but contains an inline "(SM)" marker that should stay uppercase.
+  const titled = core[0] + core.slice(1).toLowerCase();
+  const withInlineCaps = titled.replace(
+    /\(([A-Za-z]{2,5})\)/g,
+    (_, inner) => `(${inner.toUpperCase()})`,
+  );
+  return withInlineCaps + trailing;
 }
 
 function fixCasing(name) {
+  // Pre-clean: strip SEC artifacts that aren't useful display text.
+  let cleaned = name
+    // Trailing /XX/ or /XX (state-of-incorporation, /ADR, /PFD, etc.).
+    // SEC uses both forms — "8X8 Inc. /de/", "Puig Brands S.A./ADR".
+    .replace(/\s*\/[A-Za-z]{2,4}\/?\s*$/, '')
+    // Trailing parenthesized 2-3 letter state code: "(DE)", "(de)".
+    .replace(/\s*\([A-Za-z]{2,3}\)\s*$/, '')
+    .trim();
+
+  // Force uppercase on 2-5 letter parenthesized content anywhere in the
+  // name — these are typically ticker codes, brand acronyms, or ISO codes
+  // SEC stored partially lowercased ("Super Group (sghc)" → "(SGHC)").
+  // Longer parenthesized content (e.g. "(Brasil)", "(Cayman)") stays as-is.
+  cleaned = cleaned.replace(
+    /\(([A-Za-z]{2,5})\)/g,
+    (_, inner) => `(${inner.toUpperCase()})`,
+  );
+
+  // Whole name is a single short all-caps token — a brand acronym (RH,
+  // VTEX, BBBY). Preserve. Mid-sentence all-caps tokens (e.g. the "ELI"
+  // in "ELI LILLY") still get title-cased by the per-token rules below.
+  if (/^[A-Z]+$/.test(cleaned) && cleaned.length <= 5) return cleaned;
+
   // Split preserving whitespace runs so we can rejoin exactly.
-  const parts = name.split(/(\s+)/);
+  const parts = cleaned.split(/(\s+)/);
   let nonWsIdx = 0;
   return parts
     .map((part) => {
