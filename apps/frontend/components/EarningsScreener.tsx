@@ -105,19 +105,85 @@ function num(v: number | null | undefined, digits = 2) {
   return v.toFixed(digits);
 }
 
+// ── Loading-gate timings ─────────────────────────────────────────────────
+// MIN_LOADING_MS prevents the skeleton from flashing on a fast cache hit.
+// INITIAL_QUOTE_WAIT_MS bounds how long we wait for the live-quote batch
+// before unblocking the row render (rows show bundle spot + "—" 1d % if
+// the quote API is slow). LOGO_PRELOAD_TIMEOUT_MS keeps a single
+// failed/slow logo from holding up the whole page.
+const MIN_LOADING_MS = 600;
+const INITIAL_QUOTE_WAIT_MS = 3_200;
+const LOGO_PRELOAD_TIMEOUT_MS = 4_000;
+
+function logoUrl(t: string) {
+  return `https://assets.parqet.com/logos/symbol/${t}?format=png`;
+}
+
+// Module-level logo caches. Shared across renders so a ticker preloaded
+// once doesn't have to be fetched a second time when the user filters,
+// sorts, or navigates back to the page in the same session.
+type LogoLoadState = 'loaded' | 'failed';
+const logoStateCache = new Map<string, LogoLoadState>();
+const logoPromiseCache = new Map<string, Promise<LogoLoadState>>();
+
+function preloadLogo(ticker: string): Promise<LogoLoadState> {
+  const cached = logoStateCache.get(ticker);
+  if (cached) return Promise.resolve(cached);
+  const existing = logoPromiseCache.get(ticker);
+  if (existing) return existing;
+  if (typeof window === 'undefined') return Promise.resolve('failed');
+
+  const promise = new Promise<LogoLoadState>((resolve) => {
+    const img = new window.Image();
+    let settled = false;
+    let timeoutId: number | null = null;
+    const finish = (state: LogoLoadState) => {
+      if (settled) return;
+      settled = true;
+      if (timeoutId !== null) window.clearTimeout(timeoutId);
+      logoStateCache.set(ticker, state);
+      resolve(state);
+    };
+    timeoutId = window.setTimeout(() => finish('failed'), LOGO_PRELOAD_TIMEOUT_MS);
+    img.decoding = 'async';
+    img.onload = () => {
+      const decode =
+        typeof img.decode === 'function'
+          ? img.decode().catch(() => undefined)
+          : Promise.resolve();
+      void decode.then(() => finish('loaded'));
+    };
+    img.onerror = () => finish('failed');
+    img.src = logoUrl(ticker);
+    if (img.complete) {
+      finish(img.naturalWidth > 0 ? 'loaded' : 'failed');
+    }
+  });
+  logoPromiseCache.set(ticker, promise);
+  return promise;
+}
+
 /* eslint-disable @next/next/no-img-element */
 /** Inline ticker logo using the parqet asset CDN with a typographic
- *  fallback. Mirrors the EarningsGrid's Logo but kept local so the
- *  screener doesn't import from another component. */
+ *  fallback. Reads from the shared module cache and sets HTML
+ *  `width`/`height` attributes (not just CSS) so the browser reserves
+ *  the exact bounding box before any image bytes arrive — kills the
+ *  logo-load jitter that used to shift each row left → right. */
 function ScreenerLogo({ ticker, size = 26 }: { ticker: string; size?: number }) {
-  const [err, setErr] = useState(false);
-  const s = { width: size, height: size };
+  const [err, setErr] = useState(() => logoStateCache.get(ticker) === 'failed');
+
+  useEffect(() => {
+    setErr(logoStateCache.get(ticker) === 'failed');
+  }, [ticker]);
+
   if (err) {
     return (
       <div
         className="serif"
         style={{
-          ...s,
+          width: size,
+          height: size,
+          flexShrink: 0,
           borderRadius: 6,
           background: 'var(--bg-3)',
           border: '1px solid var(--line)',
@@ -135,16 +201,25 @@ function ScreenerLogo({ ticker, size = 26 }: { ticker: string; size?: number }) 
   }
   return (
     <img
-      src={`https://assets.parqet.com/logos/symbol/${ticker}?format=png`}
+      src={logoUrl(ticker)}
       alt={ticker}
-      loading="lazy"
-      onError={() => setErr(true)}
+      width={size}
+      height={size}
+      loading="eager"
+      onLoad={() => logoStateCache.set(ticker, 'loaded')}
+      onError={() => {
+        logoStateCache.set(ticker, 'failed');
+        setErr(true);
+      }}
       style={{
-        ...s,
+        width: size,
+        height: size,
+        flexShrink: 0,
         borderRadius: 6,
         objectFit: 'cover',
         background: 'var(--paper)',
         border: '1px solid var(--line)',
+        display: 'block',
       }}
     />
   );
@@ -315,6 +390,92 @@ function QuoteSkeleton({ width = 64, delayMs = 0 }: { width?: number; delayMs?: 
   );
 }
 
+/** One row of waterfall skeleton bars, mirroring the screener's table
+ *  columns. Each row uses a staggered animation-delay so the rows pulse
+ *  in a wave from top to bottom — same idea as the calendar grid's
+ *  per-column waterfall, just stretched to one wide ticker per row. */
+function ScreenerSkeletonRow({ delayMs }: { delayMs: number }) {
+  const bar = (extra: number, w: number | string, h: number, r = 4) =>
+    ({
+      width: w,
+      height: h,
+      borderRadius: r,
+      background: 'var(--bg-3)',
+      animation: 'earnings-grid-pulse 1.1s ease-in-out infinite',
+      animationDelay: `${delayMs + extra}ms`,
+    }) as const;
+  const cell = (extra: number, w: number, h: number, align: 'left' | 'right' = 'right') => (
+    <td style={{ padding: '10px 8px', textAlign: align }}>
+      <span
+        aria-hidden
+        style={{ display: 'inline-block', ...bar(extra, w, h, 999) }}
+      />
+    </td>
+  );
+  return (
+    <tr style={{ borderBottom: '1px solid var(--line)' }}>
+      {/* Name: logo + ticker + company + method tag */}
+      <td style={{ padding: '10px 8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ ...bar(0, 26, 26, 6), display: 'inline-block', flexShrink: 0 }} />
+          <span style={{ display: 'inline-block', minWidth: 0 }}>
+            <span style={{ display: 'block', ...bar(20, 56, 12) }} />
+            <span style={{ display: 'block', ...bar(40, 110, 9), marginTop: 5 }} />
+            <span style={{ display: 'block', ...bar(60, 78, 8), marginTop: 4 }} />
+          </span>
+        </div>
+      </td>
+      {cell(10, 38, 10)}   {/* Date */}
+      {cell(15, 24, 10)}   {/* DTE */}
+      <td style={{ padding: '10px 8px' }}>
+        <span aria-hidden style={{ display: 'inline-block', ...bar(20, 26, 10, 999) }} />
+      </td>
+      {/* Straddle EM — wider, mimics text + bar block */}
+      <td style={{ padding: '10px 8px' }}>
+        <span
+          aria-hidden
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            justifyContent: 'flex-end',
+          }}
+        >
+          <span style={{ display: 'inline-block', ...bar(30, 36, 10, 999) }} />
+          <span style={{ display: 'inline-block', ...bar(35, 56, 6, 3) }} />
+        </span>
+      </td>
+      {cell(40, 40, 10)}   {/* Hist 4Q avg */}
+      {cell(45, 32, 10)}   {/* Hist edge */}
+      {cell(50, 40, 10)}   {/* ML EM */}
+      {cell(55, 36, 10)}   {/* Edge */}
+      {cell(60, 44, 10)}   {/* P90−P10 */}
+      {cell(65, 44, 10)}   {/* ATM IV */}
+      {/* IV Rank — bar + small number */}
+      <td style={{ padding: '10px 8px', textAlign: 'right' }}>
+        <span
+          aria-hidden
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            justifyContent: 'flex-end',
+          }}
+        >
+          <span style={{ display: 'inline-block', ...bar(70, 36, 4, 2) }} />
+          <span style={{ display: 'inline-block', ...bar(72, 26, 10, 999) }} />
+        </span>
+      </td>
+      {cell(75, 40, 10)}   {/* IV crush */}
+      {cell(80, 30, 10)}   {/* Skew */}
+      {cell(85, 54, 10)}   {/* 1d % */}
+      {cell(90, 58, 10)}   {/* Spot */}
+      {cell(95, 48, 10)}   {/* $ Straddle */}
+      {cell(100, 24, 10)}  {/* Opt DTE */}
+    </tr>
+  );
+}
+
 function shortDate(iso: string) {
   return iso.slice(5, 10).replace('-', '/');
 }
@@ -377,6 +538,15 @@ export default function EarningsScreener() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [live, setLive] = useState<Record<string, LiveTick>>({});
+
+  // Three independent gates that together unblock the real table.
+  // Each defaults to false and flips true asynchronously:
+  //   logosReady — every logo in the bundle has preloaded (or failed cleanly)
+  //   quotesReady — first live-quote batch returned, or fallback timer fired
+  //   minLoadingDone — minimum skeleton hold elapsed (kills sub-second flash)
+  const [logosReady, setLogosReady] = useState(false);
+  const [quotesReady, setQuotesReady] = useState(false);
+  const [minLoadingDone, setMinLoadingDone] = useState(false);
 
   const q = (searchParams.get('q') ?? '').trim().toUpperCase();
   const sp500Only = searchParams.get('sp500') === '1';
@@ -465,6 +635,39 @@ export default function EarningsScreener() {
       cancelled = true;
     };
   }, []);
+
+  // Min-loading hold — guarantees the skeleton shows at least
+  // MIN_LOADING_MS so a cached fetch doesn't strobe through it.
+  useEffect(() => {
+    const t = window.setTimeout(() => setMinLoadingDone(true), MIN_LOADING_MS);
+    return () => window.clearTimeout(t);
+  }, []);
+
+  // Preload every logo in the bundle so the actual <img> render hits a
+  // warm browser cache and never reflow-shifts a row. Keyed on `events`
+  // (the full set) rather than `sorted` so filter / sort changes don't
+  // trigger a redundant preload pass.
+  useEffect(() => {
+    if (loading || error) return;
+    if (events.length === 0) {
+      setLogosReady(true);
+      return;
+    }
+    const tickers = Array.from(new Set(events.map((e) => e.ticker)));
+    const uncached = tickers.filter((t) => !logoStateCache.has(t));
+    if (uncached.length === 0) {
+      setLogosReady(true);
+      return;
+    }
+    let cancelled = false;
+    setLogosReady(false);
+    void Promise.all(uncached.map(preloadLogo)).then(() => {
+      if (!cancelled) setLogosReady(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [events, loading, error]);
 
   const filtered = useMemo(() => {
     return events.filter((ev) => {
@@ -581,6 +784,19 @@ export default function EarningsScreener() {
     if (syms.length === 0) return;
     const cap = syms.slice(0, 400);
     let cancelled = false;
+    // Fallback: unblock the page even if the quote API is slow / down.
+    let initialReadyTimer: ReturnType<typeof setTimeout> | null = setTimeout(
+      () => setQuotesReady(true),
+      INITIAL_QUOTE_WAIT_MS,
+    );
+    const markQuotesReady = () => {
+      if (cancelled) return;
+      if (initialReadyTimer) {
+        clearTimeout(initialReadyTimer);
+        initialReadyTimer = null;
+      }
+      setQuotesReady(true);
+    };
     const fetchOnce = async () => {
       try {
         const res = await fetch(`/api/stocks/batch-price?symbols=${cap.join(',')}`, {
@@ -604,6 +820,7 @@ export default function EarningsScreener() {
           }
           return next;
         });
+        markQuotesReady();
       } catch {
         setLive((prev) => {
           const next = { ...prev };
@@ -612,6 +829,7 @@ export default function EarningsScreener() {
           }
           return next;
         });
+        markQuotesReady();
       }
     };
     void fetchOnce();
@@ -622,6 +840,7 @@ export default function EarningsScreener() {
     window.addEventListener('focus', onVis);
     return () => {
       cancelled = true;
+      if (initialReadyTimer) clearTimeout(initialReadyTimer);
       document.removeEventListener('visibilitychange', onVis);
       window.removeEventListener('focus', onVis);
     };
@@ -680,6 +899,13 @@ export default function EarningsScreener() {
   // rather than as early returns. Returning early swaps the entire layout
   // when data lands, causing a jarring vertical jump from "Loading…" to the
   // full table. Keeping the header + filters fixed eliminates the jitter.
+
+  // Real rows + KPI strip only unblock once *every* gate is green: data
+  // fetched, logos cached, initial quotes back (or timer expired), and
+  // the min skeleton hold elapsed. Until then, render the waterfall.
+  const contentReady =
+    !loading && !error && logosReady && quotesReady && minLoadingDone;
+  const showSkeleton = !error && !contentReady;
 
   return (
     <div>
@@ -760,8 +986,10 @@ export default function EarningsScreener() {
 
       {/* KPI strip — five panes summarizing the visible universe.
           Tones: rich = down (red, premium overpriced), cheap = up
-          (green, premium discounted), big movers = neutral. */}
-      {summary && (
+          (green, premium discounted), big movers = neutral.
+          Hidden until contentReady so the panes don't flash in before
+          the table below them. */}
+      {contentReady && summary && (
         <div
           style={{
             display: 'flex',
@@ -925,20 +1153,19 @@ export default function EarningsScreener() {
         </div>
       </div>
 
-      {loading && (
-        <div style={{ color: 'var(--ink-3)', fontSize: 13, padding: '40px 0', minHeight: 480 }}>
-          Loading earnings universe…
-        </div>
-      )}
-
       {error && !loading && (
         <div style={{ color: 'var(--down)', fontSize: 13, padding: '24px 0' }}>
           {error}
         </div>
       )}
 
-      {!loading && !error && (
-      <div style={{ overflowX: 'auto', marginTop: 8, WebkitOverflowScrolling: 'touch' }}>
+      {!error && (
+      <div
+        role={showSkeleton ? 'status' : undefined}
+        aria-busy={showSkeleton || undefined}
+        aria-label={showSkeleton ? 'Loading screener' : undefined}
+        style={{ overflowX: 'auto', marginTop: 8, WebkitOverflowScrolling: 'touch' }}
+      >
         <table
           style={{
             width: '100%',
@@ -991,7 +1218,14 @@ export default function EarningsScreener() {
             </tr>
           </thead>
           <tbody>
-            {sorted.map((ev, rowIndex) => {
+            {showSkeleton &&
+              // Waterfall: 12 cascading rows, 75ms stagger each. Looks
+              // similar to the earnings-calendar grid skeleton but
+              // stretched horizontally — one full ticker per row.
+              Array.from({ length: 12 }).map((_, i) => (
+                <ScreenerSkeletonRow key={`sk-${i}`} delayMs={i * 75} />
+              ))}
+            {contentReady && sorted.map((ev, rowIndex) => {
               const e = edgePct(ev);
               const bw = band80(ev);
               const tick = live[ev.ticker];
@@ -1187,13 +1421,13 @@ export default function EarningsScreener() {
       </div>
       )}
 
-      {!loading && !error && sorted.length === 0 && (
+      {contentReady && sorted.length === 0 && (
         <div style={{ padding: '48px 0', color: 'var(--ink-3)', fontSize: 13 }}>
           No rows match these filters. Try clearing ticker / S&amp;P / ML-only, or lowering min spot.
         </div>
       )}
 
-      {!loading && !error && sorted.length > 0 && (
+      {contentReady && sorted.length > 0 && (
         <div
           style={{
             marginTop: 24,
