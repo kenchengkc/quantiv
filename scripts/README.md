@@ -15,6 +15,7 @@ Python utilities for **DoltHub → Parquet → DuckDB → scoring → frontend J
 | `csv_to_parquet.py` | CSV → Parquet helper (`npm run data:csv-parquet`) |
 | `csv_to_parquet_volhist.py` | Vol history CSV → Parquet |
 | `r2_pull.sh` / `r2_push.sh` / `r2_bootstrap.sh` | R2 sync for CI / local |
+| `build_ticker_names.mjs` | Fetches SEC EDGAR company tickers, normalizes casing, writes `apps/frontend/public/ticker-names.json` (consumed by the frontend `companyName()` helper as a fallback for non-S&P-500 names). Refresh a few times per year — SEC updates infrequently. Run with `node scripts/build_ticker_names.mjs`. |
 
 One-off R2 setup steps: **`r2_setup.md`**.
 

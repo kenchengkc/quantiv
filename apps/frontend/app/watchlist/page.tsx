@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { GripVertical, X, Plus, ChevronUp, ChevronDown, Check } from 'lucide-react';
 import { companyName } from '@/lib/companyNames';
+import { useEnsureCompanyNames } from '@/lib/useCompanyNames';
 import { useWatchlist } from '@/lib/watchlist';
 
 type SymbolSummary = {
@@ -350,6 +351,10 @@ function WatchlistLoadingRows() {
 }
 
 export default function WatchlistPage() {
+  // Triggers the EDGAR ticker-names fetch + re-render so watched tickers
+  // outside the S&P 500 (small/mid-caps, ADRs) render their full names.
+  useEnsureCompanyNames();
+
   const { symbols: tickers, isLoaded: hydrated, remove: removeOne, reorder: reorderAll } = useWatchlist();
   const [summaries, setSummaries] = useState<Record<string, SymbolSummary>>({});
   const [live, setLive] = useState<Record<string, Tick>>({});

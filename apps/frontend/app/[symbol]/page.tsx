@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { ChevronLeft } from 'lucide-react';
 import { SignedIn, SignedOut, SignInButton } from '@clerk/nextjs';
 import { companyName } from '@/lib/companyNames';
+import { useEnsureCompanyNames } from '@/lib/useCompanyNames';
 import { useWatchlist } from '@/lib/watchlist';
 
 interface Straddle {
@@ -1440,6 +1441,10 @@ function Td({
 
 // ---------- Page ----------
 export default function SymbolPage() {
+  // Triggers EDGAR ticker-names fetch + re-render so the header company
+  // name resolves even when the symbol isn't in the S&P 500 or curated map.
+  useEnsureCompanyNames();
+
   const params = useParams();
   const router = useRouter();
   const symbol = (params.symbol as string)?.toUpperCase();

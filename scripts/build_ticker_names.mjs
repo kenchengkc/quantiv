@@ -84,20 +84,37 @@ function titleCaseAmpersandToken(tok) {
 }
 
 function fixToken(tok, isFirst) {
-  // Tokens containing a lowercase letter are assumed already-cased.
-  if (/[a-z]/.test(tok)) return tok;
-  // Tokens with no letters (punctuation, numbers) pass through.
-  if (!/[A-Z]/.test(tok)) return tok;
-
   // Strip trailing punctuation for lookup, re-attach after.
   const trailing = tok.match(/[.,;:]+$/)?.[0] ?? '';
   const core = trailing ? tok.slice(0, -trailing.length) : tok;
   const upper = core.toUpperCase();
 
-  if (SUFFIX_MAP[upper]) return SUFFIX_MAP[upper] + (trailing.includes('.') ? '' : '');
+  // Suffix normalization runs regardless of original case, so
+  // "Co" / "CO" / "co" all collapse to "Co." with the conventional
+  // period. SEC mixes these inside otherwise-correct strings (e.g.
+  // "Procter & Gamble Co"), and this normalizes the punctuation too.
+  if (SUFFIX_MAP[upper]) return SUFFIX_MAP[upper];
+
+  // Tokens with mixed case are assumed already-correct beyond the
+  // suffix rule above — leave them as-is.
+  if (/[a-z]/.test(core)) return tok;
+  // Tokens with no letters at all (punctuation, pure numbers).
+  if (!/[A-Z]/.test(core)) return tok;
+
   if (KEEP_UPPER.has(upper)) return core + trailing;
-  if (!isFirst && LOWER_SHORT.has(upper.toLowerCase())) return upper.toLowerCase() + trailing;
+  if (!isFirst && LOWER_SHORT.has(upper.toLowerCase())) {
+    return upper.toLowerCase() + trailing;
+  }
   if (core.includes('&')) return titleCaseAmpersandToken(core) + trailing;
+
+  // Short alphanumeric tokens containing a digit (3M, 3D, 7-Eleven's
+  // "7") are brand IDs — preserve their uppercase letters. Pure-letter
+  // acronyms (IBM, GE) deliberately fall through to title-casing: the
+  // famous ones are covered by the hand-curated COMPANY_NAMES and the
+  // S&P 500 JSON, which both take priority over this EDGAR fallback.
+  if (core.length <= 4 && /\d/.test(core) && /^[A-Z0-9]+$/.test(core)) {
+    return core + trailing;
+  }
 
   // Default: capitalize first letter, lowercase the rest.
   return core[0] + core.slice(1).toLowerCase() + trailing;
