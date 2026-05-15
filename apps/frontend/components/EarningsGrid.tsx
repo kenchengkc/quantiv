@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Sun, Moon, Info, ChevronLeft, ChevronRight, Search, Circle } from 'lucide-react';
 import { POPULAR_WEIGHT } from '@/lib/popular';
 import { companyName } from '@/lib/companyNames';
+import { useEnsureCompanyNames } from '@/lib/useCompanyNames';
 import sp500Constituents from '../../../lib/data/sp500-constituents.json';
 
 // Full S&P 500 (503 constituents incl. dual-class). Used for the "S&P 500"
@@ -762,6 +763,11 @@ function WeekHeader({
 }
 
 export default function EarningsGrid() {
+  // Triggers the one-time EDGAR ticker-names fetch + re-render on
+  // arrival so non-S&P-500 tickers in the weekly view get their real
+  // names instead of echoing the ticker symbol.
+  useEnsureCompanyNames();
+
   // Persist (offset, filter) in the URL so that navigating to a ticker and
   // hitting back returns the user to the same week + filter they were on.
   const router = useRouter();

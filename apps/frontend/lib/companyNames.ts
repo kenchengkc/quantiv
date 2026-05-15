@@ -63,10 +63,60 @@ export const COMPANY_NAMES: Record<string, string> = {
   VZ: 'Verizon',
 };
 
+// ── EDGAR extended-names cache ─────────────────────────────────────────
+// Fetched lazily from /public/ticker-names.json on first call. The JSON
+// is built by scripts/build_ticker_names.mjs from SEC EDGAR's company
+// registry (~10k US tickers, casing-normalized). Stored in module-level
+// state so a single fetch serves every consumer; React components are
+// notified via a subscribe/snapshot pair consumed by useEnsureCompanyNames.
+
+let extendedNames: Record<string, string> = {};
+let extendedNamesVersion = 0;
+let extendedNamesPromise: Promise<void> | null = null;
+const extendedSubscribers = new Set<() => void>();
+
+/** Kicks off the EDGAR fetch on first call (idempotent — subsequent
+ *  callers get the same in-flight promise). Returns the promise so
+ *  callers can `await` if they need the data sync-style; most just
+ *  fire-and-forget via the hook. Server-side calls return immediately
+ *  (no window → no fetch). */
+export function loadExtendedCompanyNames(): Promise<void> {
+  if (extendedNamesPromise) return extendedNamesPromise;
+  if (typeof window === 'undefined') return Promise.resolve();
+  extendedNamesPromise = fetch('/ticker-names.json', { cache: 'force-cache' })
+    .then((r) => (r.ok ? (r.json() as Promise<Record<string, string>>) : {}))
+    .catch(() => ({}))
+    .then((m) => {
+      extendedNames = m ?? {};
+      extendedNamesVersion += 1;
+      for (const fn of extendedSubscribers) fn();
+    });
+  return extendedNamesPromise;
+}
+
+/** Subscription primitives for useSyncExternalStore. Internal — the
+ *  hook in useCompanyNames.ts is the only intended consumer. */
+export function subscribeToCompanyNames(cb: () => void): () => void {
+  extendedSubscribers.add(cb);
+  return () => {
+    extendedSubscribers.delete(cb);
+  };
+}
+export function getCompanyNamesVersion(): number {
+  return extendedNamesVersion;
+}
+
 /** Returns the friendliest company name we have for `ticker`. Priority:
  *  1. Hand-curated COMPANY_NAMES override (most recognizable brand form)
  *  2. S&P 500 constituents JSON (covers ~500 names)
- *  3. The ticker itself (graceful fallback) */
+ *  3. SEC EDGAR fallback (covers ~10k US public companies, lazy-loaded)
+ *  4. The ticker itself (graceful fallback while #3 is in flight or if
+ *     the JSON 404s for any reason). */
 export function companyName(ticker: string): string {
-  return COMPANY_NAMES[ticker] ?? SP500_NAMES[ticker] ?? ticker;
+  return (
+    COMPANY_NAMES[ticker] ??
+    SP500_NAMES[ticker] ??
+    extendedNames[ticker] ??
+    ticker
+  );
 }
