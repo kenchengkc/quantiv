@@ -166,6 +166,7 @@ function CircleButton({
   variant = 'neutral',
   title,
   ariaLabel,
+  ...rest
 }: {
   children: React.ReactNode;
   onClick?: () => void;
@@ -173,7 +174,10 @@ function CircleButton({
   variant?: 'neutral' | 'danger' | 'confirm';
   title?: string;
   ariaLabel?: string;
-}) {
+} & Omit<
+  React.ButtonHTMLAttributes<HTMLButtonElement>,
+  'onClick' | 'disabled' | 'title' | 'aria-label' | 'children' | 'style' | 'type'
+>) {
   const base = {
     width: 32,
     height: 32,
@@ -226,6 +230,7 @@ function CircleButton({
       title={title}
       aria-label={ariaLabel ?? title}
       style={style}
+      {...rest}
     >
       {children}
     </button>
@@ -277,6 +282,11 @@ function RowActions({
         onClick={onDeleteClick}
         variant={pendingDelete ? 'confirm' : 'danger'}
         title={pendingDelete ? `Confirm remove ${ticker}` : `Remove ${ticker}`}
+        // Tag the confirm button so the page-level outside-click effect
+        // can recognize a click on the check and not cancel the pending
+        // delete. The attribute is omitted in danger (X) mode so a click
+        // on the X always reaches React's onClick to arm pendingDelete.
+        data-watchlist-confirm={pendingDelete ? ticker : undefined}
       >
         {pendingDelete ? <Check size={16} /> : <X size={16} />}
       </CircleButton>
@@ -351,6 +361,30 @@ export default function WatchlistPage() {
   // Ticker awaiting delete confirmation — X click arms it, ✓ click confirms.
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
   const [marketOpen, setMarketOpen] = useState<boolean | null>(null);
+
+  // While a delete is armed, a click/tap anywhere outside the confirm
+  // button (or Escape) cancels and reverts the check back to an X.
+  // The confirm button itself is tagged with `data-watchlist-confirm`,
+  // so target.closest() identifies same-button clicks and leaves them
+  // alone (those reach React's onClick, which performs the removal).
+  // Listener is only attached while pendingDelete is non-null.
+  useEffect(() => {
+    if (!pendingDelete) return;
+    const onPointerDown = (e: PointerEvent) => {
+      const target = e.target as Element | null;
+      if (target && target.closest('[data-watchlist-confirm]')) return;
+      setPendingDelete(null);
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setPendingDelete(null);
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [pendingDelete]);
 
   // Load per-symbol summary from pre-generated /symbols/*.json
   useEffect(() => {
