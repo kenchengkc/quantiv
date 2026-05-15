@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { GripVertical, X, Plus, ChevronUp, ChevronDown, Check } from 'lucide-react';
-import { COMPANY_NAMES } from '@/lib/companyNames';
+import { companyName } from '@/lib/companyNames';
 import { useWatchlist } from '@/lib/watchlist';
 
 type SymbolSummary = {
@@ -35,9 +35,6 @@ type Tick = { price: number | null; change: number | null; changePct: number | n
 const WATCHLIST_ROW_GRID =
   '18px 40px auto 1.5fr 132px 1fr 168px 92px 116px';
 
-function companyName(t: string) {
-  return COMPANY_NAMES[t] || t;
-}
 
 function parseLocalDate(iso: string): Date {
   const [y, m, d] = iso.slice(0, 10).split('-').map(Number);

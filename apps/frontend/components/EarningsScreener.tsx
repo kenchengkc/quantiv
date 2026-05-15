@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { COMPANY_NAMES } from '@/lib/companyNames';
+import { companyName } from '@/lib/companyNames';
 import sp500Constituents from '../../../lib/data/sp500-constituents.json';
 
 const SP500_SET = new Set(
@@ -72,9 +72,6 @@ type TimingFilter = 'all' | 'bmo' | 'amc';
 
 type LiveTick = { price: number | null; change: number | null; changePct: number | null };
 
-function companyName(t: string) {
-  return COMPANY_NAMES[t] || t;
-}
 
 function timingBucket(t?: string): 'bmo' | 'amc' | 'unknown' {
   const k = (t || '').toLowerCase();
@@ -1176,7 +1173,26 @@ export default function EarningsScreener() {
         >
           <thead>
             <tr style={{ borderBottom: '1px solid var(--line)' }}>
-              <th style={{ textAlign: 'left', padding: '10px 8px', fontSize: 10, color: 'var(--ink-3)', letterSpacing: '0.14em', textTransform: 'uppercase' }}>
+              {/* Pin the Name column to a stable minimum width. With
+                  table-layout: auto, column width tracks the widest row
+                  content — different filter subsets (Cheap IV, Big
+                  movers) happen to drop the longest company names, so
+                  the column would shrink and every column to its right
+                  would slide left. Pinning Name at 220px holds that
+                  edge in place; the other columns are fixed-width or
+                  carry tabular-nums content that doesn't vary. */}
+              <th
+                style={{
+                  textAlign: 'left',
+                  padding: '10px 8px',
+                  fontSize: 10,
+                  color: 'var(--ink-3)',
+                  letterSpacing: '0.14em',
+                  textTransform: 'uppercase',
+                  width: 220,
+                  minWidth: 220,
+                }}
+              >
                 Name
               </th>
               {th('date', 'Date', 'Earnings date')}
