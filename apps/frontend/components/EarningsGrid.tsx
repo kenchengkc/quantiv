@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Sun, Moon, Info, ChevronLeft, ChevronRight, Search, Circle } from 'lucide-react';
 import { POPULAR_WEIGHT } from '@/lib/popular';
-import { COMPANY_NAMES } from '@/lib/companyNames';
+import { companyName } from '@/lib/companyNames';
 import sp500Constituents from '../../../lib/data/sp500-constituents.json';
 
 // Full S&P 500 (503 constituents incl. dual-class). Used for the "S&P 500"
@@ -65,9 +65,6 @@ function timingKey(t?: string) {
 }
 function logoUrl(t: string) {
   return `https://assets.parqet.com/logos/symbol/${t}?format=png`;
-}
-function companyName(t: string) {
-  return COMPANY_NAMES[t] || t;
 }
 
 type LogoLoadState = 'loaded' | 'failed';

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ChevronLeft } from 'lucide-react';
 import { SignedIn, SignedOut, SignInButton } from '@clerk/nextjs';
-import { COMPANY_NAMES } from '@/lib/companyNames';
+import { companyName } from '@/lib/companyNames';
 import { useWatchlist } from '@/lib/watchlist';
 
 interface Straddle {
@@ -95,9 +95,6 @@ interface LivePrice {
 
 function logoUrl(t: string) {
   return `https://assets.parqet.com/logos/symbol/${t}?format=png`;
-}
-function companyName(t: string) {
-  return COMPANY_NAMES[t] || t;
 }
 function parseLocalDate(iso: string): Date {
   const [y, m, d] = iso.slice(0, 10).split('-').map(Number);
@@ -1574,6 +1571,21 @@ export default function SymbolPage() {
   }
 
   if (error || !data) {
+    // Limited view for tickers that exist (search hit, valid ticker)
+    // but have no pre-built /symbols/SYM.json (e.g. not in the options
+    // universe yet, or in flight to be added). We still know the
+    // company name (sp500 lookup) and can usually show a live quote
+    // via the batch-price API.
+    const tick = live;
+    const knownName = companyName(symbol);
+    const hasFriendlyName = knownName !== symbol;
+    const pct = tick?.changePct;
+    const chg = tick?.change;
+    const flat = pct != null && Math.round(pct * 10000) / 10000 === 0;
+    const upMove = !flat && (pct ?? 0) >= 0;
+    const arrow = pct == null ? '' : flat ? '–' : upMove ? '▲' : '▼';
+    const tone = pct == null ? 'var(--ink-3)' : flat ? 'var(--ink-4)' : upMove ? 'var(--up)' : 'var(--down)';
+
     return (
       <div style={{ maxWidth: 720, margin: '0 auto', padding: '40px 28px' }}>
         <button
@@ -1586,17 +1598,96 @@ export default function SymbolPage() {
         >
           <ChevronLeft size={14} /> Return
         </button>
+
+        {/* Header: logo + ticker + company name + live quote (when
+            available). Matches the look of the full ticker page header
+            so the page doesn't read as "broken". */}
+        <div
+          style={{
+            marginTop: 20,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 18,
+            padding: '20px 0 24px',
+            borderBottom: '1px solid var(--line)',
+          }}
+        >
+          <Logo ticker={symbol} size={60} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div
+              className="serif"
+              style={{ fontSize: 36, fontWeight: 800, letterSpacing: '-0.025em', lineHeight: 1 }}
+            >
+              {symbol}
+            </div>
+            {hasFriendlyName && (
+              <div
+                style={{
+                  marginTop: 6,
+                  fontSize: 13,
+                  color: 'var(--ink-3)',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                }}
+              >
+                {knownName}
+              </div>
+            )}
+          </div>
+          {tick?.price != null && (
+            <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+              <div
+                className="serif tnum"
+                style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-0.015em' }}
+              >
+                ${tick.price.toFixed(2)}
+              </div>
+              {pct != null && (
+                <div className="mono tnum" style={{ fontSize: 12, color: tone, marginTop: 2 }}>
+                  {arrow} {chg != null ? `$${Math.abs(chg).toFixed(2)} ` : ''}
+                  ({Math.abs(pct * 100).toFixed(2)}%)
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Friendly missing-data card — replaces the red error block.
+            Tone is neutral, not destructive, because the user reached
+            here via the search bar and the ticker is real; we just
+            haven't ingested its options data. */}
         <div
           style={{
             marginTop: 24,
-            padding: 20,
-            border: '1px solid var(--down)',
+            padding: '24px 22px',
+            border: '1px solid var(--line)',
             borderRadius: 12,
-            color: 'var(--down)',
-            fontSize: 13,
+            background: 'var(--bg-2)',
+            color: 'var(--ink-2)',
+            fontSize: 13.5,
+            lineHeight: 1.55,
           }}
         >
-          No data for {symbol}. {error ?? ''}
+          <div
+            style={{
+              fontSize: 10,
+              letterSpacing: '0.18em',
+              textTransform: 'uppercase',
+              color: 'var(--ink-4)',
+              marginBottom: 8,
+            }}
+          >
+            Options data not tracked
+          </div>
+          <div className="serif" style={{ fontSize: 18, fontWeight: 600, color: 'var(--ink)', marginBottom: 8 }}>
+            We don&apos;t have an options snapshot for {symbol} yet.
+          </div>
+          <div style={{ color: 'var(--ink-3)', fontSize: 13 }}>
+            Expected moves, IV rank, straddle quotes, and the historical
+            implied-vs-actual chart all require an options-chain ingest
+            for this symbol. Live spot quotes above {tick?.price != null ? 'are working' : 'will appear when the market is open'}.
+          </div>
         </div>
       </div>
     );
