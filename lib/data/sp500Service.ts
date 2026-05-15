@@ -29,11 +29,17 @@ export interface SP500Company {
 import sp500Constituents from './sp500-constituents.json';
 
 /** Clean Wikipedia-style sort artifacts out of company display names.
- *  - "Walt Disney Company (The)" → "Walt Disney Company"
- *  Add other display-name fixes here so every consumer (search route,
- *  companyName lookup, ticker pages) sees the same names. */
+ *  Applied at every entry point so search, companyName lookup, and ticker
+ *  pages all see the same normalized names regardless of source.
+ *  - "Walt Disney Company (The)" → "Walt Disney Company"   (article suffix)
+ *  - "Lilly (Eli)"               → "Eli Lilly"             (surname-first
+ *    inversion: when the parenthesized content is a single capitalized
+ *    forename, prepend it. Only one S&P 500 entry uses this pattern.) */
 function normalizeDisplayName(name: string): string {
-  return name.replace(/\s*\(The\)\s*$/i, '').trim();
+  return name
+    .replace(/\s*\(The\)\s*$/i, '')
+    .replace(/^(\S+)\s+\(([A-Z][a-z]+)\)\s*$/, '$2 $1')
+    .trim();
 }
 
 const SP500_COMPANIES: SP500Company[] = [
@@ -95,12 +101,16 @@ class SP500DataService {
 
       if (!Array.isArray(data)) return [];
 
-      // Map FMP fields to our shape; industry/exchange may be unknown here
+      // Map FMP fields to our shape; industry/exchange may be unknown here.
+      // Names are normalized so dynamic data picks up the same display
+      // rules as the static SP500_COMPANIES list (no "(The)" suffix, etc.).
       const mapped: SP500Company[] = data
         .filter((d: any) => typeof d?.symbol === 'string' && d.symbol.length > 0)
         .map((d: any) => ({
           symbol: d.symbol.toUpperCase(),
-          name: (d.name || d.companyName || d.symbol).toString(),
+          name: normalizeDisplayName(
+            (d.name || d.companyName || d.symbol).toString(),
+          ),
           sector: (d.sector || 'Unknown').toString(),
           industry: (d.subSector || 'Unknown').toString(),
           exchange: 'NYSE',
@@ -222,7 +232,10 @@ class SP500DataService {
     return results
       .sort((a, b) => b.score - a.score)
       .slice(0, limit)
-      .map(r => r.company);
+      // Apply normalization on output too as a safety net — if a stale
+      // singleton or upstream caller bypassed the import-time normalization,
+      // the search response still gets clean names.
+      .map((r) => ({ ...r.company, name: normalizeDisplayName(r.company.name) }));
   }
 
   // Get popular/most traded stocks

@@ -11,10 +11,19 @@ import sp500Constituents from '../../../lib/data/sp500-constituents.json';
 // not a display name, so we strip the suffix here. Hand-curated entries
 // in COMPANY_NAMES still win for the tickers we want shorter / branded
 // forms for (DIS → "Disney", KO → "Coca-Cola").
+function cleanSp500Name(raw: string): string {
+  return raw
+    // Drop trailing "(The)" sort suffix.
+    .replace(/\s*\(The\)\s*$/i, '')
+    // Surname-first inversion: "Lilly (Eli)" → "Eli Lilly".
+    .replace(/^(\S+)\s+\(([A-Z][a-z]+)\)\s*$/, '$2 $1')
+    .trim();
+}
+
 const SP500_NAMES: Record<string, string> = Object.fromEntries(
   (sp500Constituents as { symbol: string; name: string }[]).map((c) => [
     c.symbol,
-    c.name.replace(/\s*\(The\)\s*$/i, '').trim(),
+    cleanSp500Name(c.name),
   ]),
 );
 
