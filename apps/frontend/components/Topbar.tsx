@@ -48,6 +48,58 @@ function useClock() {
   return now;
 }
 
+/* eslint-disable @next/next/no-img-element */
+/** Tiny ticker logo for the search-suggestions dropdown. HTML width/
+ *  height attributes reserve the box before bytes arrive so suggestions
+ *  don't reflow as logos stream in. Falls back to a 3-letter monogram. */
+function SearchResultLogo({ ticker, size = 24 }: { ticker: string; size?: number }) {
+  const [err, setErr] = useState(false);
+  if (err) {
+    return (
+      <span
+        aria-hidden
+        className="serif"
+        style={{
+          width: size,
+          height: size,
+          flexShrink: 0,
+          borderRadius: 6,
+          background: 'var(--bg-3)',
+          border: '1px solid var(--line)',
+          display: 'grid',
+          placeItems: 'center',
+          color: 'var(--ink-2)',
+          fontSize: Math.max(9, size * 0.34),
+          fontWeight: 600,
+          letterSpacing: '0.02em',
+        }}
+      >
+        {ticker.slice(0, 3)}
+      </span>
+    );
+  }
+  return (
+    <img
+      src={`https://assets.parqet.com/logos/symbol/${ticker}?format=png`}
+      alt=""
+      width={size}
+      height={size}
+      onError={() => setErr(true)}
+      style={{
+        width: size,
+        height: size,
+        flexShrink: 0,
+        borderRadius: 6,
+        objectFit: 'cover',
+        background: 'var(--paper)',
+        border: '1px solid var(--line)',
+        display: 'block',
+      }}
+    />
+  );
+}
+/* eslint-enable @next/next/no-img-element */
+
 function NavSearch() {
   const [query, setQuery] = useState('');
   const [suggestions, setSuggestions] = useState<{ symbol: string; name: string }[]>([]);
@@ -141,22 +193,29 @@ function NavSearch() {
             <button
               key={item.symbol}
               onClick={() => go(item.symbol)}
-              className="w-full px-4 py-3 text-left flex items-center justify-between transition-colors"
+              className="w-full px-4 py-3 text-left flex items-center transition-colors"
               style={{
+                gap: 10,
                 borderBottom: i < suggestions.length - 1 ? '1px solid var(--line)' : 'none',
               }}
               onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-3)')}
               onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
             >
-              <div>
-                <span className="serif" style={{ fontWeight: 700, color: 'var(--ink)', fontSize: 13 }}>
-                  {item.symbol}
-                </span>
-                <span style={{ marginLeft: 10, fontSize: 12, color: 'var(--ink-3)' }}>
-                  {item.name}
-                </span>
-              </div>
-              <ChevronRight size={14} style={{ color: 'var(--ink-4)' }} />
+              <SearchResultLogo ticker={item.symbol} />
+              <span
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  fontSize: 13,
+                  color: 'var(--ink)',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {item.name || item.symbol}
+              </span>
+              <ChevronRight size={14} style={{ color: 'var(--ink-4)', flexShrink: 0 }} />
             </button>
           ))}
         </div>
