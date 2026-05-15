@@ -28,8 +28,19 @@ export interface SP500Company {
 // from https://en.wikipedia.org/wiki/List_of_S%26P_500_companies periodically.
 import sp500Constituents from './sp500-constituents.json';
 
+/** Clean Wikipedia-style sort artifacts out of company display names.
+ *  - "Walt Disney Company (The)" → "Walt Disney Company"
+ *  Add other display-name fixes here so every consumer (search route,
+ *  companyName lookup, ticker pages) sees the same names. */
+function normalizeDisplayName(name: string): string {
+  return name.replace(/\s*\(The\)\s*$/i, '').trim();
+}
+
 const SP500_COMPANIES: SP500Company[] = [
-  ...(sp500Constituents as SP500Company[]),
+  ...(sp500Constituents as SP500Company[]).map((c) => ({
+    ...c,
+    name: normalizeDisplayName(c.name),
+  })),
 
   // ETFs (popular S&P-tracking funds — not constituents but users still search them)
   { symbol: 'SPY', name: 'SPDR S&P 500 ETF Trust', sector: 'ETF', industry: 'Index Fund', exchange: 'NYSE' },
