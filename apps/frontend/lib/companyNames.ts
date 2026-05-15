@@ -4,10 +4,17 @@ import sp500Constituents from '../../../lib/data/sp500-constituents.json';
 // when the hand-curated COMPANY_NAMES map below doesn't have an entry,
 // so tickers like EA, JBL, KMX render their real company names on the
 // screener / detail / watchlist instead of just echoing the symbol.
+//
+// The source list (Wikipedia-derived) alphabetizes legal names by moving
+// a leading "The" to a trailing "(The)" suffix — e.g. "The Walt Disney
+// Company" becomes "Walt Disney Company (The)". That's a sort key,
+// not a display name, so we strip the suffix here. Hand-curated entries
+// in COMPANY_NAMES still win for the tickers we want shorter / branded
+// forms for (DIS → "Disney", KO → "Coca-Cola").
 const SP500_NAMES: Record<string, string> = Object.fromEntries(
   (sp500Constituents as { symbol: string; name: string }[]).map((c) => [
     c.symbol,
-    c.name,
+    c.name.replace(/\s*\(The\)\s*$/i, '').trim(),
   ]),
 );
 
