@@ -198,7 +198,7 @@ function fixCasing(name, ticker) {
   // Split preserving whitespace runs so we can rejoin exactly.
   const parts = cleaned.split(/(\s+)/);
   let nonWsIdx = 0;
-  return parts
+  const titled = parts
     .map((part) => {
       if (/^\s+$/.test(part) || part === '') return part;
       const isFirst = nonWsIdx === 0;
@@ -207,6 +207,27 @@ function fixCasing(name, ticker) {
     })
     .join('')
     .trim();
+
+  // Final pass: strip legal-form suffixes ("Inc.", "Corp.", "Co.",
+  // "Ltd.", "Company", "Holdings", "Group", "PLC", "& Co.", ...) so
+  // every name in ticker-names.json comes out in the short brand form.
+  // Iterates until stable so chained suffixes ("Holdings, Inc.",
+  // "Group, Inc.") strip in one call. Matches the same regex used by
+  // apps/frontend/lib/companyNames.ts so all three sources stay in sync.
+  return stripLegalSuffix(titled);
+}
+
+const LEGAL_SUFFIX_RE =
+  /,?\s+(?:Inc\.?|Incorporated|Corp(?:oration)?\.?|(?:&\s+)?Co(?:mpany|mpanies)?\.?|Ltd\.?|Limited|Holdings?|Group|LLC|PLC)$/i;
+
+function stripLegalSuffix(name) {
+  let prev;
+  let current = name.trim();
+  do {
+    prev = current;
+    current = current.replace(LEGAL_SUFFIX_RE, '').trim();
+  } while (current !== prev && current.length > 0);
+  return current;
 }
 
 // ───── Fetch & write ────────────────────────────────────────────────────

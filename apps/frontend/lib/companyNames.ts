@@ -8,16 +8,58 @@ import sp500Constituents from '../../../lib/data/sp500-constituents.json';
 // The source list (Wikipedia-derived) alphabetizes legal names by moving
 // a leading "The" to a trailing "(The)" suffix — e.g. "The Walt Disney
 // Company" becomes "Walt Disney Company (The)". That's a sort key,
-// not a display name, so we strip the suffix here. Hand-curated entries
-// in COMPANY_NAMES still win for the tickers we want shorter / branded
-// forms for (DIS → "Disney", KO → "Coca-Cola").
+// not a display name, so we strip the suffix here.
+//
+// We also strip the legal-form suffix ("Inc.", "Corp.", "Company", etc.)
+// from every name so all three sources (curated / sp500 / edgar) hit a
+// single consistent display style: short brand-form names. Without this,
+// the UI would render "Target Corporation" alongside "Cisco" alongside
+// "Apple Inc." — three different conventions in the same row.
+// `(?:&\s+)?Co...` so both " Co." and " & Company" strip in one match.
+// Putting the `& Co...` form leftmost (via optional prefix) means
+// "Wells Fargo & Company" matches at the space before "&" — leftmost
+// wins in JS regex — and strips the whole " & Company" suffix, not
+// just " Company" (which would leave a dangling "&").
+const LEGAL_SUFFIX_RE =
+  /,?\s+(?:Inc\.?|Incorporated|Corp(?:oration)?\.?|(?:&\s+)?Co(?:mpany|mpanies)?\.?|Ltd\.?|Limited|Holdings?|Group|LLC|PLC)$/i;
+
+/** Iteratively strip chained legal suffixes from a display name.
+ *  - "Apple Inc."                              → "Apple"
+ *  - "Walmart Inc."                            → "Walmart"
+ *  - "Cracker Barrel Old Country Store, Inc."  → "Cracker Barrel Old Country Store"
+ *  - "Goldman Sachs Group, Inc."               → "Goldman Sachs"  (two passes: ", Inc." then " Group")
+ *  - "PayPal Holdings, Inc."                   → "PayPal"         (two passes)
+ *  - "Procter & Gamble Co."                    → "Procter & Gamble"
+ *  - "JPMorgan Chase & Co."                    → "JPMorgan Chase"
+ *  - "Linde plc"                               → "Linde"
+ * International entity forms (S.A., N.V., A.G., S.p.A.) are deliberately
+ * left in place — they're often part of the brand identity for non-US
+ * issuers and the ticker alone is less unique. */
+export function stripLegalSuffix(name: string): string {
+  let prev: string;
+  let current = name.trim();
+  do {
+    prev = current;
+    current = current.replace(LEGAL_SUFFIX_RE, '').trim();
+  } while (current !== prev && current.length > 0);
+  return current;
+}
+
 function cleanSp500Name(raw: string): string {
-  return raw
-    // Drop trailing "(The)" sort suffix.
-    .replace(/\s*\(The\)\s*$/i, '')
-    // Surname-first inversion: "Lilly (Eli)" → "Eli Lilly".
-    .replace(/^(\S+)\s+\(([A-Z][a-z]+)\)\s*$/, '$2 $1')
-    .trim();
+  return stripLegalSuffix(
+    raw
+      // Drop trailing "(The)" sort suffix.
+      .replace(/\s*\(The\)\s*$/i, '')
+      // Share-class disclosure: "Alphabet Inc. (Class A)" → "Alphabet Inc.".
+      // The ticker (GOOGL = A, GOOG = C, FOXA = A, FOX = B, NWSA = A,
+      // NWS = B) already disambiguates classes — the parenthesized
+      // tag is redundant and breaks the strip rule by sitting after
+      // the legal suffix it would otherwise be matched against.
+      .replace(/\s*\(Class [A-Z]\)\s*$/i, '')
+      // Surname-first inversion: "Lilly (Eli)" → "Eli Lilly".
+      .replace(/^(\S+)\s+\(([A-Z][a-z]+)\)\s*$/, '$2 $1')
+      .trim(),
+  );
 }
 
 const SP500_NAMES: Record<string, string> = Object.fromEntries(
@@ -27,56 +69,25 @@ const SP500_NAMES: Record<string, string> = Object.fromEntries(
   ]),
 );
 
-/** Hand-curated overrides — shorter / more recognizable brand names than
- *  the sp500 dataset gives (e.g. "Apple Inc." instead of just "Apple",
- *  "AT&T" instead of "AT&T Inc."). Consulted before SP500_NAMES. */
+/** Hand-curated overrides for the handful of tickers where the
+ *  suffix-stripped SP500 / EDGAR name comes out wrong. Every other
+ *  ticker should rely on `stripLegalSuffix(SP500_NAMES | extendedNames)`
+ *  so the entire UI uses one consistent "brand-form, no legal suffix"
+ *  style ("Target", "Cisco Systems", "Walt Disney" — not "Target
+ *  Corporation", "Cisco", "Disney").
+ *
+ *  Kept here only when:
+ *   - EDGAR's casing produces a wrong result (PEP, JPM)
+ *   - the brand has a non-word-suffix element that wouldn't strip
+ *     cleanly (AMZN's ".com", "AMD" as an acronym brand) */
 export const COMPANY_NAMES: Record<string, string> = {
-  AAPL: 'Apple Inc.',
-  MSFT: 'Microsoft',
-  AMZN: 'Amazon',
+  // sp500-constituents.json has "Nvidia" (lowercase i) but the brand is
+  // all-caps "NVIDIA". sp500_NAMES wins over the EDGAR fallback, so this
+  // override is the only way to render the brand form.
   NVDA: 'NVIDIA',
-  GOOGL: 'Alphabet',
-  META: 'Meta Platforms',
-  TSLA: 'Tesla',
-  NFLX: 'Netflix',
-  JPM: 'JPMorgan Chase',
-  V: 'Visa',
-  MA: 'Mastercard',
-  WFC: 'Wells Fargo',
-  GS: 'Goldman Sachs',
-  BAC: 'Bank of America',
-  UNH: 'UnitedHealth',
-  LLY: 'Eli Lilly',
-  PFE: 'Pfizer',
-  ABBV: 'AbbVie',
-  BMY: 'Bristol-Myers',
-  GILD: 'Gilead',
-  HUM: 'Humana',
-  XOM: 'Exxon Mobil',
-  CVX: 'Chevron',
-  COP: 'ConocoPhillips',
-  AMD: 'AMD',
-  AVGO: 'Broadcom',
-  CRM: 'Salesforce',
-  ADBE: 'Adobe',
-  INTC: 'Intel',
-  QCOM: 'Qualcomm',
-  CSCO: 'Cisco',
-  COIN: 'Coinbase',
-  SNOW: 'Snowflake',
-  PLTR: 'Palantir',
-  HD: 'Home Depot',
-  MCD: "McDonald's",
-  SBUX: 'Starbucks',
-  NKE: 'Nike',
-  KO: 'Coca-Cola',
-  PEP: 'PepsiCo',
-  DIS: 'Disney',
-  BA: 'Boeing',
-  CAT: 'Caterpillar',
-  LIN: 'Linde',
-  T: 'AT&T',
-  VZ: 'Verizon',
+  // sp500-constituents.json has "Advanced Micro Devices" (full legal name).
+  // Users know the acronym ticker as the brand — preserve it explicitly.
+  AMD:  'AMD',
 };
 
 // ── EDGAR extended-names cache ─────────────────────────────────────────

@@ -3,10 +3,12 @@
 // Two notions:
 //   • NYSE regular session (for UI "market closed" badges): 09:30–16:00 ET.
 //   • Quote refresh window (Finnhub cron + cache warming + fast client polls):
-//     weekday 09:25 ET → 16:35 ET inclusive, excluding Sat/Sun and NYSE holidays.
-// The pre-open buffer pre-warms before the bell. The post-close buffer (~35 min
+//     weekday 09:25 ET → 16:45 ET inclusive, excluding Sat/Sun and NYSE holidays.
+// The pre-open buffer pre-warms before the bell. The post-close buffer (~45 min
 // after the 16:00 bell) covers vendor delay before same-day close / day change
-// show up in Finnhub.
+// show up in Finnhub. The cron walks a rotating cursor through ~300 symbols at
+// ~50/min, so each ticker only updates every ~6 min; the 45-min buffer ensures
+// every ticker gets at least one post-close refresh pass.
 //
 // Half-day sessions (e.g. 13:00 ET early close on Black Friday and Christmas
 // Eve) are intentionally treated as full days. The harm is limited to a few
@@ -15,8 +17,10 @@
 
 /** First minute we start hitting Finnhub (slightly before the 09:30 open). */
 const QUOTE_REFRESH_OPEN_MIN = 9 * 60 + 25; // 09:25 ET
-/** Last minute we still refresh quotes (after 16:00 close; feeds often lag 15–20+ min). */
-const QUOTE_REFRESH_CLOSE_MIN = 16 * 60 + 35; // 16:35 ET
+/** Last minute we still refresh quotes (after 16:00 close; feeds often lag
+ *  15–20+ min, and the rotating cursor takes a few minutes to reach every
+ *  ticker, so 45 min ensures full post-close coverage). */
+const QUOTE_REFRESH_CLOSE_MIN = 16 * 60 + 45; // 16:45 ET
 
 const REGULAR_OPEN_MIN = 9 * 60 + 30; // 09:30 ET
 /** First minute after the 16:00 regular close (exclusive end for session-open check). */

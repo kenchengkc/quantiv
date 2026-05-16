@@ -1298,6 +1298,11 @@ export default function EarningsScreener() {
                           {ev.ticker}
                         </div>
                         <div
+                          // Native browser tooltip on hover — surfaces
+                          // the full name when the column truncates long
+                          // ones (CBRL → "Cracker Barrel Old Country
+                          // Store"). Zero layout impact, no extra deps.
+                          title={companyName(ev.ticker)}
                           style={{
                             fontSize: 10.5,
                             color: 'var(--ink-4)',
