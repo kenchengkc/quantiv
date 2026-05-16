@@ -1,10 +1,10 @@
 {
   "metadata": {
     "version": "v4_multi_week",
-    "generated_at": "2026-05-15T11:53:53.516723",
+    "generated_at": "2026-05-16T11:31:44.819788",
     "as_of_date": "2026-05-12",
     "method": "ATM straddle + IV baseline",
-    "offset": 0
+    "offset": -1
   },
   "window": {
     "start": "2026-05-11",
@@ -1040,21 +1040,11 @@
       "lead_time_days": 3,
       "skew_atm": 0.018975,
       "term_slope": -0.020797,
-      "em_method": "ml_lightgbm",
+      "em_method": "options_math",
       "confidence": "high",
       "iv_rank": 0.76061,
       "hist_move_avg_4q": 0.045428,
-      "iv_crush_pct": 0.478871,
-      "em_ml_pct": 0.05997,
-      "em_ml_abs": 36.767666,
-      "correction_factor": 0.6989,
-      "model_horizon": 3,
-      "ml_snapshot_date": "2026-05-12",
-      "p10": 0.007431,
-      "p25": 0.021494,
-      "p50": 0.051767,
-      "p75": 0.073426,
-      "p90": 0.123737
+      "iv_crush_pct": 0.478871
     }
   ],
   "summary": {
