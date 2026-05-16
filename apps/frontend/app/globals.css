@@ -189,7 +189,9 @@
   background: #000000;
   opacity: 1;
   /* Four distinct corners (was two pairs of duplicates). A collapsed “line”
-     polygon can make engines hit a discontinuous interpolation path ~midway. */
+     polygon can make engines hit a discontinuous interpolation path ~midway.
+     The final visual shape lands before the nominal end of the animation so
+     the ring is already settled when the tail layer becomes visible. */
   clip-path: polygon(
     48.31% 51.13%,
     48.34% 51.16%,
@@ -205,13 +207,14 @@
   position: absolute;
   inset: 0;
   z-index: 3;
-  clip-path: inset(0 60% 0 0);
+  clip-path: inset(0 60.65% 0 0);
   opacity: 0;
   transform: translateZ(0);
   backface-visibility: hidden;
-  /* After slit finishes (473+327ms). Starting the tail mid-slit promoted a new
-     layer on top and caused a one-frame compositor hitch ~halfway through. */
-  animation: quantiv-splash-tail-reveal 894ms ease 800ms forwards;
+  /* Start one 60fps frame after the slit animation's nominal end. The initial
+     clip sits just outside the tail asset's alpha bounds, avoiding a first-
+     frame white tail pop while the ring is completing. */
+  animation: quantiv-splash-tail-reveal 894ms ease 817ms forwards;
 }
 
 @keyframes quantiv-splash-ring-in {
@@ -230,7 +233,7 @@
     );
     opacity: 1;
   }
-  100% {
+  90%, 100% {
     clip-path: polygon(44.11% 54.88%, 52.51% 47.38%, 65.25% 61.63%, 56.85% 69.14%);
     opacity: 1;
   }
@@ -238,7 +241,7 @@
 
 @keyframes quantiv-splash-tail-reveal {
   0% {
-    clip-path: inset(0 60% 0 0);
+    clip-path: inset(0 60.65% 0 0);
     opacity: 1;
     /* First 30% of duration: only ~12% of the clip travel — slow emergence */
     animation-timing-function: cubic-bezier(0.5, 0, 0.9, 1);
