@@ -28,18 +28,39 @@ export interface SP500Company {
 // from https://en.wikipedia.org/wiki/List_of_S%26P_500_companies periodically.
 import sp500Constituents from './sp500-constituents.json';
 
-/** Clean Wikipedia-style sort artifacts out of company display names.
- *  Applied at every entry point so search, companyName lookup, and ticker
- *  pages all see the same normalized names regardless of source.
- *  - "Walt Disney Company (The)" → "Walt Disney Company"   (article suffix)
- *  - "Lilly (Eli)"               → "Eli Lilly"             (surname-first
- *    inversion: when the parenthesized content is a single capitalized
- *    forename, prepend it. Only one S&P 500 entry uses this pattern.) */
+/** Clean Wikipedia-style sort artifacts AND legal-form suffixes out of
+ *  company display names. Applied at every entry point so search,
+ *  companyName lookup, and ticker pages all see the same normalized
+ *  names regardless of source.
+ *  - "Walt Disney Company (The)" → "Walt Disney"   (sort suffix + legal form)
+ *  - "Lilly (Eli)"               → "Eli Lilly"    (surname-first inversion)
+ *  - "Target Corporation"        → "Target"       (legal-form suffix)
+ *  - "Cisco Systems, Inc."       → "Cisco Systems"
+ *  Matches the strip rules in apps/frontend/lib/companyNames.ts so the
+ *  search dropdown and the ticker pages can't drift apart on style. */
+const LEGAL_SUFFIX_RE =
+  /,?\s+(?:Inc\.?|Incorporated|Corp(?:oration)?\.?|(?:&\s+)?Co(?:mpany|mpanies)?\.?|Ltd\.?|Limited|Holdings?|Group|LLC|PLC)$/i;
+
+function stripLegalSuffix(name: string): string {
+  let prev: string;
+  let current = name.trim();
+  do {
+    prev = current;
+    current = current.replace(LEGAL_SUFFIX_RE, '').trim();
+  } while (current !== prev && current.length > 0);
+  return current;
+}
+
 function normalizeDisplayName(name: string): string {
-  return name
-    .replace(/\s*\(The\)\s*$/i, '')
-    .replace(/^(\S+)\s+\(([A-Z][a-z]+)\)\s*$/, '$2 $1')
-    .trim();
+  return stripLegalSuffix(
+    name
+      .replace(/\s*\(The\)\s*$/i, '')
+      // Share-class tag: "Alphabet Inc. (Class A)" → "Alphabet Inc."
+      // (ticker already distinguishes share class; the tag is noise).
+      .replace(/\s*\(Class [A-Z]\)\s*$/i, '')
+      .replace(/^(\S+)\s+\(([A-Z][a-z]+)\)\s*$/, '$2 $1')
+      .trim(),
+  );
 }
 
 const SP500_COMPANIES: SP500Company[] = [
