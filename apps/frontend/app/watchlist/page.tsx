@@ -308,15 +308,30 @@ function WatchlistLoadingRows() {
   });
 
   return (
-    <ul aria-label="Loading watchlist" style={{ listStyle: 'none', padding: 0, margin: '12px 0 0' }}>
+    <ul
+      aria-label="Loading watchlist"
+      style={{
+        listStyle: 'none',
+        padding: 0,
+        margin: '12px 0 0',
+        // Single shared grid so the auto-sized Name column lines up
+        // across all rows. Each <li> spans all columns and inherits
+        // the parent template via `subgrid` (see real rows below).
+        display: 'grid',
+        gridTemplateColumns: WATCHLIST_ROW_GRID,
+        rowGap: 0,
+        columnGap: 16,
+      }}
+    >
       {Array.from({ length: 4 }).map((_, i) => (
         <li
           key={i}
           style={{
             display: 'grid',
-            gridTemplateColumns: WATCHLIST_ROW_GRID,
+            gridColumn: '1 / -1',
+            gridTemplateColumns: 'subgrid',
             alignItems: 'center',
-            gap: 16,
+            columnGap: 16,
             minHeight: 86,
             padding: '14px 14px',
             borderBottom: '1px solid var(--line)',
@@ -584,7 +599,23 @@ export default function WatchlistPage() {
       </div>
 
       {!hydrated ? <WatchlistLoadingRows /> : total === 0 ? <EmptyState /> : (
-        <ul style={{ listStyle: 'none', padding: 0, margin: '12px 0 0' }}>
+        <ul
+          style={{
+            listStyle: 'none',
+            padding: 0,
+            margin: '12px 0 0',
+            // Single shared CSS Grid so the `auto` Name column sizes
+            // against every row's content (widest wins) and the Price
+            // column lands at the same x in every row. Without this,
+            // each <li> was its own grid and rows with longer company
+            // names (e.g. TGT → "Target Corporation") rendered the
+            // Price column shifted right vs shorter rows (NVDA, INTU).
+            display: 'grid',
+            gridTemplateColumns: WATCHLIST_ROW_GRID,
+            rowGap: 0,
+            columnGap: 16,
+          }}
+        >
           {tickers.map((t, i) => {
             const sum = summaries[t];
             const em = sum?.expected_move;
@@ -643,9 +674,13 @@ export default function WatchlistPage() {
                 }}
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: WATCHLIST_ROW_GRID,
+                  // Subgrid inherits the column template + widths from
+                  // the parent <ul>, so all rows share one set of
+                  // column widths.
+                  gridColumn: '1 / -1',
+                  gridTemplateColumns: 'subgrid',
                   alignItems: 'center',
-                  gap: 16,
+                  columnGap: 16,
                   padding: '14px 14px',
                   minHeight: 86,
                   borderBottom: '1px solid var(--line)',
