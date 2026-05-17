@@ -28,9 +28,46 @@ def build_earnings_events_table(conn: duckdb.DuckDBPyConnection, earnings_csv: P
     """Build canonical earnings_events table from CSV."""
     
     print("📅 Building canonical earnings_events table...")
+
+    header = set()
+    if earnings_csv.exists():
+        with open(earnings_csv, "r", encoding="utf-8") as f:
+            first = f.readline().strip()
+        header = {c.strip() for c in first.split(",") if c.strip()}
+
+    fiscal_year_expr = (
+        "COALESCE(TRY_CAST(fiscal_year AS BIGINT), EXTRACT(YEAR FROM CAST(date AS DATE)))"
+        if "fiscal_year" in header
+        else "EXTRACT(YEAR FROM CAST(date AS DATE))"
+    )
+    fiscal_q_expr = (
+        """
+            CASE
+                WHEN UPPER(TRIM(fiscal_q)) IN ('Q1','Q2','Q3','Q4') THEN UPPER(TRIM(fiscal_q))
+                WHEN EXTRACT(MONTH FROM CAST(date AS DATE)) IN (1,2,3) THEN 'Q1'
+                WHEN EXTRACT(MONTH FROM CAST(date AS DATE)) IN (4,5,6) THEN 'Q2'
+                WHEN EXTRACT(MONTH FROM CAST(date AS DATE)) IN (7,8,9) THEN 'Q3'
+                ELSE 'Q4'
+            END
+        """
+        if "fiscal_q" in header
+        else """
+            CASE
+                WHEN EXTRACT(MONTH FROM CAST(date AS DATE)) IN (1,2,3) THEN 'Q1'
+                WHEN EXTRACT(MONTH FROM CAST(date AS DATE)) IN (4,5,6) THEN 'Q2'
+                WHEN EXTRACT(MONTH FROM CAST(date AS DATE)) IN (7,8,9) THEN 'Q3'
+                ELSE 'Q4'
+            END
+        """
+    )
+    source_expr = "COALESCE(NULLIF(source, ''), 'earnings_calendar_csv')" if "source" in header else "'earnings_calendar_csv'"
+    eps_actual_expr = "TRY_CAST(eps_actual AS DOUBLE)" if "eps_actual" in header else "CAST(NULL AS DOUBLE)"
+    eps_estimate_expr = "TRY_CAST(eps_estimate AS DOUBLE)" if "eps_estimate" in header else "CAST(NULL AS DOUBLE)"
+    revenue_actual_expr = "TRY_CAST(revenue_actual AS DOUBLE)" if "revenue_actual" in header else "CAST(NULL AS DOUBLE)"
+    revenue_estimate_expr = "TRY_CAST(revenue_estimate AS DOUBLE)" if "revenue_estimate" in header else "CAST(NULL AS DOUBLE)"
     
     # Create earnings_events table
-    conn.execute("""
+    conn.execute(f"""
         CREATE OR REPLACE TABLE earnings_events AS
         SELECT 
             act_symbol as ticker,
@@ -38,18 +75,18 @@ def build_earnings_events_table(conn: duckdb.DuckDBPyConnection, earnings_csv: P
             CASE
                 WHEN UPPER(timing) = 'BMO' THEN 'before_market_open'
                 WHEN UPPER(timing) = 'AMC' THEN 'after_market_close'
+                WHEN UPPER(timing) = 'DMH' THEN 'during_market_hours'
                 ELSE 'unknown'
             END as timing,
-            'earnings_calendar_csv' as source,
+            {source_expr} as source,
             true as confirmed_flag,
-            -- Add fiscal quarter placeholder (can be enhanced later)
-            CASE 
-                WHEN EXTRACT(MONTH FROM CAST(date AS DATE)) IN (1,2,3) THEN 'Q1'
-                WHEN EXTRACT(MONTH FROM CAST(date AS DATE)) IN (4,5,6) THEN 'Q2'
-                WHEN EXTRACT(MONTH FROM CAST(date AS DATE)) IN (7,8,9) THEN 'Q3'
-                ELSE 'Q4'
-            END as fiscal_q
-        FROM read_csv(?, header=true, columns={'act_symbol': 'VARCHAR', 'date': 'VARCHAR', 'timing': 'VARCHAR'})
+            {fiscal_year_expr} as fiscal_year,
+            {fiscal_q_expr} as fiscal_q,
+            {eps_actual_expr} as eps_actual,
+            {eps_estimate_expr} as eps_estimate,
+            {revenue_actual_expr} as revenue_actual,
+            {revenue_estimate_expr} as revenue_estimate
+        FROM read_csv_auto(?)
         WHERE date IS NOT NULL 
         AND act_symbol IS NOT NULL
     """, [str(earnings_csv)])

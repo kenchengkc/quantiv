@@ -524,7 +524,8 @@ def build_week_events(conn, as_of_date: date, week_start: date, week_end: date,
                       require_ml: bool = True) -> list[dict]:
     rows = conn.execute(
         """
-        SELECT ticker, earnings_dt, timing, fiscal_q
+        SELECT ticker, earnings_dt, timing, fiscal_q,
+               eps_actual, eps_estimate, revenue_actual, revenue_estimate
         FROM earnings_events
         WHERE earnings_dt BETWEEN ? AND ?
         ORDER BY earnings_dt, ticker
@@ -536,7 +537,16 @@ def build_week_events(conn, as_of_date: date, week_start: date, week_end: date,
     skipped_no_ml = 0
     skipped_no_options = 0
     today = date.today()
-    for i, (ticker, earnings_dt, timing, fiscal_q) in enumerate(rows, 1):
+    for i, (
+        ticker,
+        earnings_dt,
+        timing,
+        fiscal_q,
+        eps_actual,
+        eps_estimate,
+        revenue_actual,
+        revenue_estimate,
+    ) in enumerate(rows, 1):
         fc = ml_lookup.get((ticker, earnings_dt.isoformat()))
         # Require ML only for *future* earnings. Past earnings within the same
         # week (e.g. Mon/Tue when today is Wed) fall back to options_math —
@@ -558,6 +568,10 @@ def build_week_events(conn, as_of_date: date, week_start: date, week_end: date,
             "earnings_date": earnings_dt.isoformat(),
             "timing": timing or "unknown",
             "fiscal_q": fiscal_q,
+            "eps_actual": jsonable(eps_actual),
+            "eps_estimate": jsonable(eps_estimate),
+            "revenue_actual": jsonable(revenue_actual),
+            "revenue_estimate": jsonable(revenue_estimate),
             "as_of_date": as_of_date.isoformat(),
             "spot_price": jsonable(em["estimated_spot"]),
             "atm_strike": jsonable(em["atm_strike"]),
