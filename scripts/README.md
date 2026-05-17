@@ -16,8 +16,20 @@ Python utilities for **DoltHub → Parquet → DuckDB → scoring → frontend J
 | `csv_to_parquet_volhist.py` | Vol history CSV → Parquet |
 | `r2_pull.sh` / `r2_push.sh` / `r2_bootstrap.sh` | R2 sync for CI / local |
 | `build_ticker_names.mjs` | Fetches SEC EDGAR company tickers, normalizes casing, writes `apps/frontend/public/ticker-names.json` (consumed by the frontend `companyName()` helper as a fallback for non-S&P-500 names). Refresh a few times per year — SEC updates infrequently. Run with `node scripts/build_ticker_names.mjs`. |
+| `probe_massive_capabilities.py` | **Phase 0 / read-only.** Hits Massive.com's REST option-chain snapshot endpoint with the user's Starter credentials and writes a schema + coverage report to `data/ref/provider_samples/massive/<date>/`. Does not modify any production data. Run once before writing the Massive overlay sync to confirm IV/Greeks coverage near ATM, pagination behavior, and `contract_type` value mapping. See `docs/EXTENDED_HOURS_AND_OPTIONS_DATA_PLAN.md` for pass/fail criteria. |
 
 One-off R2 setup steps: **`r2_setup.md`**.
+
+## Options-data provider strategy
+
+DoltHub remains the **historical baseline** for options data. The repo is
+in Phase 0 of evaluating Massive.com as a **forward-collection overlay**
+(broader ticker coverage, fresher IV/Greeks for upcoming earnings) — not
+a replacement. See `docs/EXTENDED_HOURS_AND_OPTIONS_DATA_PLAN.md` for the
+full rollout plan; `probe_massive_capabilities.py` is the only script
+added in this phase. Subsequent scripts (`sync_massive_snapshots.py`,
+canonical-union DuckDB views, optional GitHub Actions step) are gated on
+the probe results.
 
 ## ML training (not in `scripts/`)
 

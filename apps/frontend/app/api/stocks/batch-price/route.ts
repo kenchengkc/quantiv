@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { getRedis } from '@/lib/redis';
-import { isNyseRegularSessionET, isQuoteRefreshWindowET } from '@/lib/marketHours';
+import {
+  isNyseRegularSessionET,
+  isQuoteRefreshWindowET,
+  currentRefreshWindow,
+  etDateIso,
+} from '@/lib/marketHours';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -25,12 +32,79 @@ type Tick = {
   change: number | null;
   changePct: number | null;
 };
-type Cached = { at: number; tick: Tick };
+
+/** Cache envelope — must stay in sync with the writer at
+ *  apps/frontend/app/api/cron/refresh-prices/route.ts. The `source` and
+ *  `session` fields are additive: pre-extended-hours cache entries
+ *  written by older deploys have neither, and we treat those as
+ *  `finnhub` / `regular` for response labeling. */
+type Source = 'finnhub' | 'alpaca_iex';
+type Session = 'premarket' | 'regular' | 'afterhours';
+type Cached = {
+  at: number;
+  tick: Tick;
+  source?: Source;
+  session?: Session;
+};
 
 const memCache = new Map<string, Cached>();
 const inflight = new Map<string, Promise<Tick | null>>();
 
 const redisKey = (symbol: string) => `quote:${symbol}`;
+
+function publicDir(): string {
+  const candidates = [
+    join(process.cwd(), 'apps', 'frontend', 'public'),
+    join(process.cwd(), 'public'),
+  ];
+  for (const c of candidates) if (existsSync(c)) return c;
+  return candidates[0];
+}
+
+function mondayIsoForEtDate(isoDate: string): string {
+  const d = new Date(`${isoDate}T00:00:00Z`);
+  const day = d.getUTCDay();
+  const delta = day === 0 ? -6 : 1 - day;
+  d.setUTCDate(d.getUTCDate() + delta);
+  return d.toISOString().slice(0, 10);
+}
+
+function loadTodaysReporterSet(
+  todayIso: string,
+  session: 'bmo' | 'amc',
+): Set<string> {
+  const candidates = [
+    join(publicDir(), 'weeks', `${mondayIsoForEtDate(todayIso)}.json`),
+    join(publicDir(), 'weeks', `${todayIso}.json`),
+  ];
+
+  for (const path of candidates) {
+    if (!existsSync(path)) continue;
+    try {
+      const payload = JSON.parse(readFileSync(path, 'utf8'));
+      const events = (payload.events as {
+        ticker?: string;
+        earnings_date?: string;
+        timing?: string;
+      }[] | undefined) ?? [];
+      return new Set(
+        events
+          .filter((e) => {
+            if (!e.ticker) return false;
+            if ((e.earnings_date ?? '').slice(0, 10) !== todayIso) return false;
+            const t = (e.timing ?? '').toLowerCase();
+            return session === 'bmo'
+              ? t === 'bmo' || t.includes('before')
+              : t === 'amc' || t.includes('after');
+          })
+          .map((e) => e.ticker!.toUpperCase()),
+      );
+    } catch {
+      /* try next candidate */
+    }
+  }
+  return new Set();
+}
 
 // Batched cache read — one Upstash MGET round-trip for the whole symbol list
 // instead of N individual GETs. For 200 symbols this drops latency from
@@ -104,7 +178,14 @@ function refreshSymbol(symbol: string, apiKey: string): Promise<Tick | null> {
   const p = (async () => {
     try {
       const tick = await fetchQuote(symbol, apiKey);
-      if (tick) await writeCache(symbol, { at: Date.now(), tick });
+      if (tick) {
+        await writeCache(symbol, {
+          at: Date.now(),
+          tick,
+          source: 'finnhub',
+          session: 'regular',
+        });
+      }
       return tick;
     } finally {
       inflight.delete(symbol);
@@ -182,37 +263,82 @@ export async function GET(req: NextRequest) {
     if (!entry || now - entry.at >= FRESH_TTL_MS) toRefresh.push(s);
   }
 
-  // Skip background warming outside the quote refresh window (includes ~35m
-  // after the 4pm ET bell so delayed feeds can update last close / day change).
+  // The route's own background-warming is Finnhub-only (regular hours).
+  // Extended-hours quotes get into the cache via the cron route writing
+  // Alpaca ticks — we just serve them here.
   const marketOpen = isNyseRegularSessionET();
-  const quoteRefreshActive = isQuoteRefreshWindowET();
-  if (apiKey && quoteRefreshActive && toRefresh.length > 0) {
-    // Fire-and-forget. The cron warms the hot set; this catches long-tail
-    // symbols a user navigates to directly or newly-added tickers.
-    void mapLimit(toRefresh, CONCURRENCY, (s) => refreshSymbol(s, apiKey));
+  const session: Session | 'closed' = currentRefreshWindow() ?? 'closed';
+  const todayIso = etDateIso();
+  const extendedReporterSet =
+    session === 'premarket' ? loadTodaysReporterSet(todayIso, 'bmo') :
+    session === 'afterhours' ? loadTodaysReporterSet(todayIso, 'amc') :
+    new Set<string>();
+  const requestedExtendedReporter =
+    extendedReporterSet.size > 0 && symbols.some((s) => extendedReporterSet.has(s));
+  const regularSettleActive = isQuoteRefreshWindowET();
+  const quoteRefreshActive = regularSettleActive || requestedExtendedReporter;
+  // Only warm the Finnhub cache during the regular-hours window. During
+  // extended windows the cron does the writes via Alpaca; we don't want
+  // batch-price calling Finnhub /quote outside RTH (that endpoint
+  // doesn't update during extended hours anyway and would just spend
+  // calls against the 60/min cap).
+  const finnhubRefreshSymbols =
+    session === 'afterhours'
+      ? toRefresh.filter((s) => !extendedReporterSet.has(s))
+      : toRefresh;
+  if (apiKey && regularSettleActive && finnhubRefreshSymbols.length > 0) {
+    void mapLimit(finnhubRefreshSymbols, CONCURRENCY, (s) => refreshSymbol(s, apiKey));
   }
 
   let latestAt = 0;
+  const seenSources = new Set<Source>();
   // Use the batch read map (not only memCache) so this request sees Redis
   // payloads that were just merged into `cache` for cold keys.
   const data = symbols.map((s) => {
     const entry = cache.get(s) ?? null;
     if (!entry) return enrichTick(nullTick(s));
     if (entry.at > latestAt) latestAt = entry.at;
-    return enrichTick({ ...entry.tick, symbol: entry.tick.symbol || s });
+    const src = entry.source ?? 'finnhub';
+    seenSources.add(src);
+    return {
+      ...enrichTick({ ...entry.tick, symbol: entry.tick.symbol || s }),
+      source: src,
+      session: entry.session ?? 'regular',
+    };
   });
 
   // Count missing prices plus ticks that still have no day %/change after
   // enrichment (needs another Finnhub refresh). Without the latter, the
-  // dashboard exited "fast" polling while only EM columns updated — users saw
-  // % on the symbol page (single-symbol refresh) but not on the grid for ~1m.
+  // dashboard exited "fast" polling while only EM columns updated.
+  const refreshableSymbols =
+    regularSettleActive ? new Set(symbols) : extendedReporterSet;
+  const isRefreshable = (symbol: string) => refreshableSymbols.has(symbol);
   const pending =
-    data.filter((t) => t.price === null).length +
-    data.filter((t) => t.price !== null && (t.changePct === null || t.change === null)).length;
+    data.filter((t) => isRefreshable(t.symbol) && t.price === null).length +
+    data.filter((t) => (
+      isRefreshable(t.symbol) &&
+      t.price !== null &&
+      (t.changePct === null || t.change === null)
+    )).length;
+
+  // Top-level source: pick the dominant cached source so older clients
+  // that read this field get a meaningful label. If the cache mixes
+  // Finnhub regular-hours entries with Alpaca extended entries (common
+  // around 4 PM ET when AMC reporters update via Alpaca while everyone
+  // else is still on Finnhub), call it 'mixed'.
+  let topSource: 'finnhub' | 'alpaca_iex' | 'mixed' | 'unavailable';
+  if (seenSources.size === 0) {
+    topSource = 'unavailable';
+  } else if (seenSources.size === 1) {
+    topSource = [...seenSources][0];
+  } else {
+    topSource = 'mixed';
+  }
 
   return NextResponse.json({
     updated: latestAt ? new Date(latestAt).toISOString() : null,
-    source: apiKey ? 'finnhub' : 'unavailable',
+    source: topSource,
+    session,
     marketOpen,
     quoteRefreshActive,
     pending,

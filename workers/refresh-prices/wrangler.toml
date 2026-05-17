@@ -2,11 +2,39 @@ name = "quantiv-refresh-prices"
 main = "src/index.ts"
 compatibility_date = "2026-04-25"
 
-# Free tier: 100k requests/day. We use 1440/day (every 1 min). Easy fit.
-# Each fire kicks the Vercel route which processes 40 symbols in ~48s,
-# safely under the 60s Hobby function timeout. Full hot-set cycle ≈ 22 min.
+# Cron fires every minute during UTC windows that are loose supersets of
+# the three ET refresh windows in marketHours.ts. The Worker's
+# `currentRefreshWindow()` does the precise ET check (with NYSE holiday
+# filter) and only invokes Vercel when truly inside a productive minute,
+# passing the window kind as ?window=premarket|regular|afterhours.
+#
+# US DST: starts 2nd Sun of Mar, ends 1st Sun of Nov (since 2007).
+#   ET windows:
+#     • premarket  08:00–09:24 ET — Alpaca Basic IEX, today's BMO reporters
+#     • regular    09:25–16:45 ET — Finnhub rotating cursor, full universe
+#     • afterhours 16:00–17:00 ET — Alpaca Basic IEX, today's AMC reporters
+#       The 16:00-16:45 overlap is intentional: the Worker passes `afterhours`,
+#       and the Vercel route also runs the Finnhub settle pass for non-AMC
+#       reporters so the old post-close cache behavior is preserved.
+#   UTC ranges (depending on DST):
+#     • EDT (UTC-4): premarket 12:00-13:24, regular 13:25-20:45, afterhours 20:00-21:00
+#     • EST (UTC-5): premarket 13:00-14:24, regular 14:25-21:45, afterhours 21:00-22:00
+# Combined: 12:00-22:00 UTC Mon-Fri. The Worker filters edge minutes exactly.
+#
+# Cost picture:
+#   Old (* * * * *): 43,200 Worker fires/mo → 43,200 Vercel invocations/mo.
+#   New: ~7,260 Worker fires/mo, ~6,500 Vercel invocations/mo after
+#        precise ET filtering. Off-window minutes never hit Vercel.
+# Cloudflare cron weekday numbers use `1 = Sunday`, not Monday — so use
+# named weekdays to avoid an off-by-one bug. (Many other cron systems use
+# `1 = Monday`; the numeric form is genuinely ambiguous on Cloudflare.)
 [triggers]
-crons = ["* * * * *"]
+crons = [
+  # Pattern — premarket + regular + IEX post-market.
+  # 12:00-22:59 UTC on weekdays covers both EDT and EST variants; the
+  # Worker drops the off-window edge minutes inside that superset.
+  "* 12-22 * * MON-FRI",
+]
 
 # Vars set via `wrangler secret put` after deploy:
 #   - REFRESH_URL    e.g. https://usequantiv.com/api/cron/refresh-prices
