@@ -4,7 +4,14 @@ import { join } from 'node:path';
 import { Redis } from '@upstash/redis';
 import { neon } from '@neondatabase/serverless';
 import sp500Constituents from '../../../../../../lib/data/sp500-constituents.json';
-import { isQuoteRefreshWindowET } from '@/lib/marketHours';
+import {
+  isQuoteRefreshWindowET,
+  isPremarketWindowET,
+  isAfterhoursWindowET,
+  etDateIso,
+  type RefreshWindowKind,
+} from '@/lib/marketHours';
+import { fetchExtendedHoursSnapshot } from '@/lib/alpaca';
 
 // Cron-driven Finnhub price refresher. Triggered every 5 min by an external
 // scheduler (Cloudflare Worker). Walks a rotating cursor through a priority-
@@ -43,6 +50,18 @@ type Tick = {
   changePct: number | null;
 };
 
+/** Cache envelope stored in Upstash under `quote:SYMBOL`. The two new
+ *  fields (source, session) are additive — older readers that destructure
+ *  `{ at, tick }` keep working. batch-price reads them to label the
+ *  response with the actual upstream provider + ET session the tick
+ *  came from, instead of always reporting 'finnhub'. */
+type CachedQuote = {
+  at: number;
+  tick: Tick;
+  source?: 'finnhub' | 'alpaca_iex';
+  session?: 'premarket' | 'regular' | 'afterhours';
+};
+
 // In a Vercel deployment the public dir is at /var/task/apps/frontend/public.
 // During `next dev` it's relative to cwd. Both layouts have the file at
 // `apps/frontend/public/weeks/*.json` from the repo root.
@@ -56,6 +75,20 @@ function publicDir(): string {
   return candidates[0];
 }
 
+function redisOrError(): { redis: Redis } | { response: NextResponse } {
+  const url = process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (!url || !token) {
+    return {
+      response: NextResponse.json(
+        { error: 'Upstash Redis env missing' },
+        { status: 500 },
+      ),
+    };
+  }
+  return { redis: new Redis({ url, token }) };
+}
+
 function loadWeekFile(filename: string): string[] {
   const path = join(publicDir(), 'weeks', filename);
   if (!existsSync(path)) return [];
@@ -67,6 +100,56 @@ function loadWeekFile(filename: string): string[] {
   } catch {
     return [];
   }
+}
+
+/** Today's reporters filtered to a specific session. `todayIso` must be
+ *  the ET date (use etDateIso(), not server local). The week file is
+ *  indexed by ET Monday, computed from the same ET date here. */
+function loadTodaysReporters(
+  todayIso: string,
+  session: 'bmo' | 'amc',
+): string[] {
+  const monIso = mondayIsoForEtDate(todayIso);
+  const candidatePaths = [
+    join(publicDir(), 'weeks', `${monIso}.json`),
+    // Fallback for any future per-day file layout.
+    join(publicDir(), 'weeks', `${todayIso}.json`),
+  ];
+  for (const p of candidatePaths) {
+    if (!existsSync(p)) continue;
+    try {
+      const payload = JSON.parse(readFileSync(p, 'utf8'));
+      const events = (payload.events as {
+        ticker: string;
+        earnings_date?: string;
+        timing?: string;
+      }[] | undefined) ?? [];
+      return Array.from(new Set(
+        events
+          .filter((e) => {
+            if (!e.ticker) return false;
+            if ((e.earnings_date ?? '').slice(0, 10) !== todayIso) return false;
+            const t = (e.timing ?? '').toLowerCase();
+            if (session === 'bmo') {
+              return t === 'bmo' || t.includes('before');
+            }
+            return t === 'amc' || t.includes('after');
+          })
+          .map((e) => e.ticker.toUpperCase()),
+      ));
+    } catch {
+      /* fall through to next candidate */
+    }
+  }
+  return [];
+}
+
+function mondayIsoForEtDate(isoDate: string): string {
+  const d = new Date(`${isoDate}T00:00:00Z`);
+  const day = d.getUTCDay();
+  const delta = day === 0 ? -6 : 1 - day;
+  d.setUTCDate(d.getUTCDate() + delta);
+  return d.toISOString().slice(0, 10);
 }
 
 function mondayOf(d: Date): Date {
@@ -151,35 +234,120 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'CRON_SECRET not configured' }, { status: 500 });
   }
   const auth = req.headers.get('authorization') ?? '';
-  const param = new URL(req.url).searchParams.get('secret');
+  const reqUrl = new URL(req.url);
+  const param = reqUrl.searchParams.get('secret');
   const ok = auth === `Bearer ${required}` || param === required;
   if (!ok) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
-  // Skip Finnhub work outside the quote refresh window (09:25–16:35 ET, M–F
-  // non-holiday). Post-close minutes cover delayed vendor settlement. The
-  // Cloudflare Worker still fires every minute — the early-exit saves quota.
-  // `?force=1` overrides for manual back-fills.
-  const force = new URL(req.url).searchParams.get('force') === '1';
-  if (!force && !isQuoteRefreshWindowET()) {
+  // Three refresh modes:
+  //   • regular     — Finnhub rotating cursor (09:25–16:45 ET)
+  //   • premarket   — Alpaca extended-hours snapshot for today's BMO reporters
+  //   • afterhours  — Alpaca extended-hours snapshot for today's AMC reporters
+  //
+  // Worker passes `?window=...` based on its own ET-window check. `?force=1`
+  // overrides the market-hours guard for manual back-fills (force defaults to
+  // the regular flow if no window is specified).
+  const windowRaw = reqUrl.searchParams.get('window');
+  const windowParam =
+    windowRaw === 'premarket' || windowRaw === 'regular' || windowRaw === 'afterhours'
+      ? windowRaw
+      : null;
+  if (windowRaw && !windowParam) {
+    return NextResponse.json({ error: 'invalid window' }, { status: 400 });
+  }
+  const force = reqUrl.searchParams.get('force') === '1';
+  const kind: RefreshWindowKind = windowParam ?? 'regular';
+
+  const inWindow =
+    kind === 'premarket' ? isPremarketWindowET() :
+    kind === 'afterhours' ? isAfterhoursWindowET() :
+    isQuoteRefreshWindowET();
+  if (!force && !inWindow) {
     return NextResponse.json({
       universe: 0,
       fetched: 0,
+      window: kind,
       skipped: 'market_closed',
     });
   }
 
+  // Feature flag for the Alpaca extended-hours rollout. While off, the
+  // route still classifies the window and returns 200 so the Worker stays
+  // healthy, but no upstream call is made. Existing regular-hours flow is
+  // unaffected by this flag.
+  const extendedEnabled = process.env.ENABLE_ALPACA_EXTENDED_QUOTES === '1';
+  if ((kind === 'premarket' || kind === 'afterhours') && !extendedEnabled) {
+    if (kind === 'afterhours' && isQuoteRefreshWindowET()) {
+      const ready = redisOrError();
+      if ('response' in ready) return ready.response;
+      const regularSettle = await runRegularHours(ready.redis);
+      const regularBody = await responseJson(regularSettle);
+      return NextResponse.json(
+        {
+          window: kind,
+          universe: 0,
+          fetched: 0,
+          skipped: 'extended_quotes_disabled',
+          regularSettle: {
+            status: regularSettle.status,
+            body: regularBody,
+          },
+        },
+        { status: regularSettle.status },
+      );
+    }
+    return NextResponse.json({
+      universe: 0,
+      fetched: 0,
+      window: kind,
+      skipped: 'extended_quotes_disabled',
+    });
+  }
+
+  const ready = redisOrError();
+  if ('response' in ready) return ready.response;
+  const { redis } = ready;
+
+  if (kind === 'premarket' || kind === 'afterhours') {
+    if (kind === 'afterhours' && isQuoteRefreshWindowET()) {
+      // Preserve the original full-universe Finnhub settle pass during
+      // 16:00-16:45 ET, but exclude today's AMC reporters so fresh Alpaca
+      // extended-hours writes cannot be overwritten by stale Finnhub ticks.
+      const amcReporters = new Set(loadTodaysReporters(etDateIso(), 'amc'));
+      const regularSettlePromise = runRegularHours(redis, amcReporters);
+      const extended = await runExtendedHours(kind, redis);
+      const regularSettle = await regularSettlePromise;
+      const extendedBody = await responseJson(extended);
+      const regularBody = await responseJson(regularSettle);
+      return NextResponse.json(
+        {
+          ...(isRecord(extendedBody) ? extendedBody : { extended: extendedBody }),
+          regularSettle: {
+            status: regularSettle.status,
+            body: regularBody,
+          },
+        },
+        { status: extended.status },
+      );
+    }
+    return runExtendedHours(kind, redis);
+  }
+  return runRegularHours(redis);
+}
+
+/** Regular-hours flow — Finnhub rotating cursor across the full universe.
+ *  This is the original behavior, refactored out so the new GET handler
+ *  can branch cleanly. Unchanged semantics. */
+async function runRegularHours(
+  redis: Redis,
+  excludeSymbols: ReadonlySet<string> = new Set(),
+): Promise<NextResponse> {
   const apiKey = process.env.FINNHUB_API_KEY;
   if (!apiKey) {
     return NextResponse.json({ error: 'FINNHUB_API_KEY missing' }, { status: 500 });
   }
-  const url = process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
-  if (!url || !token) {
-    return NextResponse.json({ error: 'Upstash Redis env missing' }, { status: 500 });
-  }
-  const redis = new Redis({ url, token });
 
-  const symbols = await buildSymbolList();
+  const symbols = (await buildSymbolList()).filter((s) => !excludeSymbols.has(s.toUpperCase()));
   if (symbols.length === 0) {
     return NextResponse.json({ universe: 0, fetched: 0, message: 'no symbols to refresh' });
   }
@@ -200,7 +368,13 @@ export async function GET(req: NextRequest) {
     const tick = await fetchQuote(symbol, apiKey);
     if (tick) {
       try {
-        await redis.set(`quote:${symbol}`, { at: Date.now(), tick }, { ex: STALE_TTL_S });
+        const entry: CachedQuote = {
+          at: Date.now(),
+          tick,
+          source: 'finnhub',
+          session: 'regular',
+        };
+        await redis.set(`quote:${symbol}`, entry, { ex: STALE_TTL_S });
         ok2++;
       } catch {
         fail++;
@@ -214,6 +388,7 @@ export async function GET(req: NextRequest) {
   await redis.set(CURSOR_KEY, nextCursor);
 
   return NextResponse.json({
+    window: 'regular',
     universe: symbols.length,
     batchSize: batch.length,
     cursor,
@@ -221,5 +396,84 @@ export async function GET(req: NextRequest) {
     fetched: ok2,
     failed: fail,
     durationMs: Date.now() - start,
+  });
+}
+
+async function responseJson(res: Response): Promise<unknown> {
+  try {
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+/** Extended-hours flow — Alpaca snapshot for *only* today's BMO or AMC
+ *  reporters. No rotating cursor: the universe is small (~10-40 tickers
+ *  per session) and the snapshot endpoint batches them in one HTTP call,
+ *  so each window finishes in well under a second. */
+async function runExtendedHours(
+  kind: 'premarket' | 'afterhours',
+  redis: Redis,
+): Promise<NextResponse> {
+  const session = kind === 'premarket' ? 'bmo' : 'amc';
+  // ET date — NOT server local. During EST after-hours, 19:30 ET Monday
+  // is 00:30 UTC Tuesday, so a server-local-date filter would look for
+  // Tuesday reporters instead of Monday AMC reporters.
+  const todayIso = etDateIso();
+  const symbols = loadTodaysReporters(todayIso, session);
+
+  if (symbols.length === 0) {
+    return NextResponse.json({
+      window: kind,
+      universe: 0,
+      fetched: 0,
+      message: 'no reporters today',
+      todayEt: todayIso,
+    });
+  }
+
+  const start = Date.now();
+  let fetched = 0;
+  let fail = 0;
+  try {
+    const snap = await fetchExtendedHoursSnapshot(symbols);
+    for (const symbol of symbols) {
+      const tick = snap.get(symbol);
+      if (!tick) {
+        fail++;
+        continue;
+      }
+      try {
+        const entry: CachedQuote = {
+          at: Date.now(),
+          tick,
+          source: 'alpaca_iex',
+          session: kind,
+        };
+        await redis.set(`quote:${symbol}`, entry, { ex: STALE_TTL_S });
+        fetched++;
+      } catch {
+        fail++;
+      }
+    }
+  } catch (err) {
+    return NextResponse.json(
+      { window: kind, error: (err as Error).message },
+      { status: 502 },
+    );
+  }
+
+  return NextResponse.json({
+    window: kind,
+    universe: symbols.length,
+    fetched,
+    failed: fail,
+    durationMs: Date.now() - start,
+    symbols,
+    todayEt: todayIso,
   });
 }
