@@ -3,6 +3,7 @@ name: Daily data refresh
 # Nightly pipeline (cron `0 11 * * *`):
 #   1. Pull parquet + models from Cloudflare R2
 #   2. sync_dolthub — pull the latest options_chain / earnings / ohlcv rows
+#      then overlay near-term earnings from Finnhub when FINNHUB_API_KEY exists
 #   3. Push changed parquet back to R2
 #   4. setup_duckdb → daily_score → build_frontend_data
 #   5. Commit JSON + push → Vercel auto-deploys
@@ -82,6 +83,11 @@ jobs:
 
       - name: Sync earnings calendar
         run: python scripts/sync_dolthub.py --earnings
+
+      - name: Overlay near-term earnings from Finnhub
+        env:
+          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+        run: python scripts/sync_finnhub_earnings.py --allow-missing-key
 
       - name: Sync OHLCV
         run: python scripts/sync_dolthub.py --ohlcv

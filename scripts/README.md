@@ -7,6 +7,7 @@ Python utilities for **DoltHub → Parquet → DuckDB → scoring → frontend J
 | Script | Purpose |
 |--------|---------|
 | `sync_dolthub.py` | Incremental / full sync of options, `--earnings`, `--ohlcv`, `--volhist` |
+| `sync_finnhub_earnings.py` | Rolling near-term earnings overlay from Finnhub; merges EPS/revenue estimates into `data/earnings_calendar.{csv,parquet}` while keeping DoltHub history |
 | `sync_vix.py` | VIX daily closes from FRED → Parquet |
 | `setup_duckdb_from_parquet.py` | Recreate DuckDB views over Parquet (`npm run data:views`) |
 | `daily_score.py` | ML scoring for upcoming earnings (`npm run ml:score`) |
@@ -39,6 +40,7 @@ Feature engineering and training live under **`apps/ml/`** (`feature_engineering
 
 ```bash
 npm run data:sync
+npm run data:earnings:finnhub
 npm run data:views
 npm run data:frontend
 ```

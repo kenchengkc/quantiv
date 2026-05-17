@@ -26,6 +26,7 @@
     "data:sync": "python scripts/sync_dolthub.py",
     "data:sync-full": "python scripts/sync_dolthub.py --full",
     "data:earnings": "python scripts/sync_dolthub.py --earnings",
+    "data:earnings:finnhub": "python scripts/sync_finnhub_earnings.py",
     "data:ohlcv": "python scripts/sync_dolthub.py --ohlcv",
     "data:csv-parquet": "python scripts/csv_to_parquet.py",
     "data:views": "python scripts/setup_duckdb_from_parquet.py",
