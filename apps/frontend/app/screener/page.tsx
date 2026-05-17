@@ -1,5 +1,10 @@
 import { Suspense } from 'react';
+import type { Metadata } from 'next';
 import EarningsScreener from '@/components/EarningsScreener';
+
+export const metadata: Metadata = {
+  title: 'Earnings Screener',
+};
 
 export default function ScreenerPage() {
   return (
