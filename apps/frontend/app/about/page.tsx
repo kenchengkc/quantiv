@@ -1,3 +1,9 @@
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: 'About',
+};
+
 export default function AboutPage() {
   return (
     <div style={{ maxWidth: 860, margin: '0 auto', padding: '0 28px 60px' }}>
