@@ -1164,6 +1164,10 @@ type HistoryPoint = {
   actual: number;
 };
 
+function signedPct(v: number, digits = 1) {
+  return `${v >= 0 ? '+' : ''}${(v * 100).toFixed(digits)}%`;
+}
+
 /** Build the chart series from earnings_history rows that carry an
  *  `actual` close-to-close move. `implied` is optional — when present
  *  the chart draws an implied band around zero; when absent the chart
@@ -1194,8 +1198,9 @@ function buildHistorySeries(
 
 function HistoryChart({ history }: { history: HistoryPoint[] }) {
   const W = 640;
-  const H = 180;
-  const P = 28;
+  const H = 214;
+  const P = 36;
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   if (history.length === 0) return null;
 
   // Whether any row has implied data — drives whether we draw the band
@@ -1210,10 +1215,41 @@ function HistoryChart({ history }: { history: HistoryPoint[] }) {
     ) * 1.15 || 0.05;
   const colW = (W - P * 2) / history.length;
   const y = (v: number) => H / 2 - (v / max) * (H / 2 - 22);
+  const hovered = hoveredIndex != null ? history[hoveredIndex] : null;
 
   return (
-    <div style={{ marginTop: 14 }}>
+    <div style={{ marginTop: 14, position: 'relative' }}>
       <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto' }}>
+        <text
+          x={P - 8}
+          y={y(max) + 3}
+          textAnchor="end"
+          fill="var(--ink-4)"
+          fontSize="9"
+          fontFamily="JetBrains Mono"
+        >
+          +{(max * 100).toFixed(0)}%
+        </text>
+        <text
+          x={P - 8}
+          y={H / 2 + 3}
+          textAnchor="end"
+          fill="var(--ink-4)"
+          fontSize="9"
+          fontFamily="JetBrains Mono"
+        >
+          0%
+        </text>
+        <text
+          x={P - 8}
+          y={y(-max) + 3}
+          textAnchor="end"
+          fill="var(--ink-4)"
+          fontSize="9"
+          fontFamily="JetBrains Mono"
+        >
+          −{(max * 100).toFixed(0)}%
+        </text>
         {/* zero baseline */}
         <line
           x1={P}
@@ -1244,11 +1280,23 @@ function HistoryChart({ history }: { history: HistoryPoint[] }) {
         {history.map((h, i) => {
           const cx = P + colW * i + colW / 2;
           const actualPositive = h.actual >= 0;
+          const cy = y(h.actual);
+          const labelY = Math.min(H - 30, Math.max(14, cy + (actualPositive ? -10 : 17)));
           // Beat = realized exceeded implied band. Only meaningful when
           // we have an implied number to compare against.
           const beat = h.implied != null && Math.abs(h.actual) > h.implied;
           return (
-            <g key={`${h.date}-${i}`}>
+            <g
+              key={`${h.date}-${i}`}
+              onMouseEnter={() => setHoveredIndex(i)}
+              onMouseLeave={() => setHoveredIndex(null)}
+              onFocus={() => setHoveredIndex(i)}
+              onBlur={() => setHoveredIndex(null)}
+              tabIndex={0}
+              role="listitem"
+              aria-label={`${h.q} realized move ${signedPct(h.actual)}${h.implied != null ? `, implied move ${(h.implied * 100).toFixed(1)}%` : ''}`}
+              style={{ cursor: 'default', outline: 'none' }}
+            >
               {h.implied != null && (
                 <>
                   <rect
@@ -1279,7 +1327,7 @@ function HistoryChart({ history }: { history: HistoryPoint[] }) {
               {beat && (
                 <circle
                   cx={cx}
-                  cy={y(h.actual)}
+                  cy={cy}
                   r={6}
                   fill="none"
                   stroke={actualPositive ? 'var(--up)' : 'var(--down)'}
@@ -1289,10 +1337,29 @@ function HistoryChart({ history }: { history: HistoryPoint[] }) {
               )}
               <circle
                 cx={cx}
-                cy={y(h.actual)}
+                cy={cy}
                 r={3.5}
                 fill={actualPositive ? 'var(--up)' : 'var(--down)'}
               />
+              <circle
+                cx={cx}
+                cy={cy}
+                r={13}
+                fill="transparent"
+                stroke={hoveredIndex === i ? 'var(--line-2)' : 'transparent'}
+                strokeWidth={1}
+              />
+              <text
+                x={cx}
+                y={labelY}
+                textAnchor="middle"
+                fill={actualPositive ? 'var(--up)' : 'var(--down)'}
+                fontSize="10"
+                fontFamily="JetBrains Mono"
+                fontWeight={700}
+              >
+                {signedPct(h.actual)}
+              </text>
               <text
                 x={cx}
                 y={H - 8}
@@ -1307,6 +1374,63 @@ function HistoryChart({ history }: { history: HistoryPoint[] }) {
           );
         })}
       </svg>
+      {hovered && (() => {
+        const i = hoveredIndex ?? 0;
+        const cx = P + colW * i + colW / 2;
+        const cy = y(hovered.actual);
+        const left = `clamp(94px, ${(cx / W) * 100}%, calc(100% - 94px))`;
+        const top = `${(cy / H) * 100}%`;
+        const beat =
+          hovered.implied != null && Math.abs(hovered.actual) > hovered.implied;
+        return (
+          <div
+            style={{
+              position: 'absolute',
+              left,
+              top,
+              transform: cy < H / 2 ? 'translate(-50%, 18px)' : 'translate(-50%, calc(-100% - 18px))',
+              minWidth: 178,
+              padding: '9px 10px',
+              border: '1px solid var(--line-2)',
+              borderRadius: 6,
+              background: 'var(--bg-3)',
+              boxShadow: '0 14px 32px rgba(0,0,0,.38)',
+              pointerEvents: 'none',
+              zIndex: 2,
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                gap: 12,
+                marginBottom: 6,
+                fontSize: 11,
+                color: 'var(--ink-3)',
+              }}
+            >
+              <span>{hovered.q}</span>
+              <span>{shortDate(hovered.date)}</span>
+            </div>
+            <div
+              className="mono tnum"
+              style={{
+                fontSize: 16,
+                fontWeight: 700,
+                color: hovered.actual >= 0 ? 'var(--up)' : 'var(--down)',
+                lineHeight: 1,
+              }}
+            >
+              {signedPct(hovered.actual)}
+            </div>
+            <div className="mono tnum" style={{ marginTop: 6, fontSize: 11, color: 'var(--ink-3)' }}>
+              {hovered.implied != null
+                ? `Implied ±${(hovered.implied * 100).toFixed(1)}%${beat ? ' · beat' : ''}`
+                : 'Implied range unavailable'}
+            </div>
+          </div>
+        );
+      })()}
       <div
         style={{
           display: 'flex',
