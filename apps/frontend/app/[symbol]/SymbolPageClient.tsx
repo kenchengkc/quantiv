@@ -90,7 +90,8 @@ interface LivePrice {
   change: number | null;
   changePct: number | null;
   updated: string | null;
-  source: 'finnhub' | 'unavailable';
+  source: 'finnhub' | 'alpaca_iex' | 'mixed' | 'unavailable';
+  session?: 'premarket' | 'regular' | 'afterhours' | 'closed';
   marketOpen: boolean;
 }
 
@@ -1483,10 +1484,6 @@ export default function SymbolPage() {
     setLive(null);
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
-    // Track the last marketOpen flag from the API across polls so the slow
-    // loop can back off after-hours. Default to `true` so the very first
-    // tick (before any response) uses the open-market cadence.
-    let lastMarketOpen = true;
     let lastQuoteRefreshActive = true;
     const fetchOnce = async (): Promise<number> => {
       try {
@@ -1495,7 +1492,8 @@ export default function SymbolPage() {
         const json = (await res.json()) as {
           pending?: number;
           updated: string | null;
-          source: 'finnhub' | 'unavailable';
+          source: 'finnhub' | 'alpaca_iex' | 'mixed' | 'unavailable';
+          session?: 'premarket' | 'regular' | 'afterhours' | 'closed';
           marketOpen?: boolean;
           quoteRefreshActive?: boolean;
           data: Array<{
@@ -1504,11 +1502,12 @@ export default function SymbolPage() {
             previousClose: number | null;
             change: number | null;
             changePct: number | null;
+            source?: 'finnhub' | 'alpaca_iex';
+            session?: 'premarket' | 'regular' | 'afterhours';
           }>;
         };
         const open = json.marketOpen ?? true;
         const refreshOn = json.quoteRefreshActive ?? open;
-        lastMarketOpen = open;
         lastQuoteRefreshActive = refreshOn;
         const tick = json.data?.[0];
         if (!cancelled && tick && tick.price !== null) {
@@ -1518,7 +1517,8 @@ export default function SymbolPage() {
             change: tick.change,
             changePct: tick.changePct,
             updated: json.updated,
-            source: json.source === 'finnhub' ? 'finnhub' : 'unavailable',
+            source: tick.source ?? json.source ?? 'unavailable',
+            session: tick.session ?? json.session,
             marketOpen: open,
           });
         }
@@ -1837,9 +1837,11 @@ export default function SymbolPage() {
                   textTransform: 'uppercase',
                 }}
               >
-                {live?.source === 'finnhub'
-                  ? (live.marketOpen ? 'Live · Finnhub' : 'Last close · Finnhub')
-                  : `As of ${data.as_of_date}`}
+                {live?.source === 'alpaca_iex'
+                  ? 'Extended hours · Alpaca IEX'
+                  : live?.source === 'finnhub'
+                    ? (live.marketOpen ? 'Live · Finnhub' : 'Last close · Finnhub')
+                    : `As of ${data.as_of_date}`}
               </span>
             </div>
           </div>

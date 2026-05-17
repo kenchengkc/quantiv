@@ -26,6 +26,24 @@ const REGULAR_OPEN_MIN = 9 * 60 + 30; // 09:30 ET
 /** First minute after the 16:00 regular close (exclusive end for session-open check). */
 const REGULAR_CLOSE_MIN = 16 * 60; // 16:00 ET
 
+// Extended-hours windows for "tickers reporting today" focused refresh via
+// Alpaca Basic's free IEX feed. IEX system hours are 08:00-17:00 ET, so
+// the free feed is useful for the BMO window shortly before the open and
+// the first post-close hour for AMC reporters. If we later pay for SIP,
+// these bounds can widen toward the full 04:00-20:00 extended-hours span.
+// The regular cron (above) walks the full universe inside RTH; these two
+// narrower windows fire only for today's BMO / AMC reporters, which keeps
+// Alpaca rate-limit pressure low.
+//
+// After-hours starts at 16:00 ET (the bell), not after the old regular
+// cron's 16:45 settle. The first 15-45 minutes after the print is where
+// most of the earnings move happens, so the refresh-session classifier
+// gives after-hours precedence over the broader settle window below.
+const PREMARKET_OPEN_MIN  = 8 * 60;       // 08:00 ET — start of IEX pre-market session
+const PREMARKET_CLOSE_MIN = 9 * 60 + 24;  // 09:24 ET — hand off to the regular cron at 09:25
+const AFTERHOURS_OPEN_MIN = 16 * 60;      // 16:00 ET — at the bell (earnings prints land here)
+const AFTERHOURS_CLOSE_MIN = 17 * 60;     // 17:00 ET — end of IEX post-market session
+
 // Full NYSE closures, ISO dates in ET. Sources: nyse.com/markets/hours-calendars.
 // Update annually — appending a new year is fine; old years can stay (irrelevant
 // dates simply never match the current ET date).
@@ -98,6 +116,14 @@ function isTradingDayET(now: Date): boolean {
   return true;
 }
 
+/** Returns today's date in ET as YYYY-MM-DD. Use this anywhere a route is
+ *  filtering by "today" — server local time can disagree with ET around
+ *  UTC midnight, e.g. 19:30 ET Monday is 00:30 UTC Tuesday during EST,
+ *  and `new Date().toISOString().slice(0,10)` would pick Tuesday. */
+export function etDateIso(now: Date = new Date()): string {
+  return nowParts(now).isoDate;
+}
+
 /** NYSE regular session only — drives "market closed" UI while quotes may still refresh. */
 export function isNyseRegularSessionET(now: Date = new Date()): boolean {
   if (!isTradingDayET(now)) return false;
@@ -110,6 +136,39 @@ export function isQuoteRefreshWindowET(now: Date = new Date()): boolean {
   if (!isTradingDayET(now)) return false;
   const { minutes } = nowParts(now);
   return minutes >= QUOTE_REFRESH_OPEN_MIN && minutes <= QUOTE_REFRESH_CLOSE_MIN;
+}
+
+/** Pre-market window — Alpaca extended-hours quotes for BMO reporters
+ *  reporting *today*. Window ends right before the regular cron starts
+ *  so the two never compete for the same minute. */
+export function isPremarketWindowET(now: Date = new Date()): boolean {
+  if (!isTradingDayET(now)) return false;
+  const { minutes } = nowParts(now);
+  return minutes >= PREMARKET_OPEN_MIN && minutes <= PREMARKET_CLOSE_MIN;
+}
+
+/** After-hours window — Alpaca extended-hours quotes for AMC reporters
+ *  reporting *today*. Window starts at the regular 16:00 ET close. */
+export function isAfterhoursWindowET(now: Date = new Date()): boolean {
+  if (!isTradingDayET(now)) return false;
+  const { minutes } = nowParts(now);
+  return minutes >= AFTERHOURS_OPEN_MIN && minutes <= AFTERHOURS_CLOSE_MIN;
+}
+
+/** Classify the current minute into the matching window kind, or null
+ *  if outside all windows. Used by the cron route to pick a refresh
+ *  strategy without re-running every window check. */
+export type RefreshWindowKind = 'premarket' | 'regular' | 'afterhours';
+
+export function currentRefreshWindow(now: Date = new Date()): RefreshWindowKind | null {
+  if (!isTradingDayET(now)) return null;
+  const { minutes } = nowParts(now);
+  if (minutes >= PREMARKET_OPEN_MIN  && minutes <= PREMARKET_CLOSE_MIN)  return 'premarket';
+  // After-hours takes precedence over the broader quote-refresh settle
+  // window so AMC reporters get Alpaca ticks immediately after 16:00 ET.
+  if (minutes >= AFTERHOURS_OPEN_MIN && minutes <= AFTERHOURS_CLOSE_MIN) return 'afterhours';
+  if (minutes >= QUOTE_REFRESH_OPEN_MIN && minutes <= QUOTE_REFRESH_CLOSE_MIN) return 'regular';
+  return null;
 }
 
 /** @deprecated Prefer isNyseRegularSessionET or isQuoteRefreshWindowET for clarity. */
