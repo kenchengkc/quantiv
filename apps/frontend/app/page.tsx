@@ -1,5 +1,10 @@
 import { Suspense } from 'react';
+import type { Metadata } from 'next';
 import EarningsGrid from '@/components/EarningsGrid';
+
+export const metadata: Metadata = {
+  title: 'Earnings Calendar',
+};
 
 export default function Home() {
   return (

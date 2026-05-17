@@ -10,18 +10,21 @@ import { Analytics } from '@vercel/analytics/next';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 
 export const metadata: Metadata = {
-  title: 'Quantiv — Options Trading Intelligence',
+  title: {
+    default: 'Quantiv',
+    template: '%s | Quantiv',
+  },
   description: 'Instantly see market-implied moves before earnings. Compute expected moves, greeks, and IV rank from live options chains.',
   keywords: ['options', 'trading', 'earnings', 'implied volatility', 'greeks', 'expected move'],
   openGraph: {
-    title: 'Quantiv — Options Trading Intelligence',
+    title: 'Quantiv',
     description: 'Know the move before earnings. Expected moves, Greeks, IV rank from live options chains.',
     type: 'website',
     locale: 'en_US',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Quantiv — Options Trading Intelligence',
+    title: 'Quantiv',
     description: 'Know the move before earnings.',
   },
   robots: { index: true, follow: true },
