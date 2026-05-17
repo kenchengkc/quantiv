@@ -3,7 +3,9 @@ import type { Metadata } from 'next';
 import EarningsGrid from '@/components/EarningsGrid';
 
 export const metadata: Metadata = {
-  title: 'Earnings Calendar',
+  title: {
+    absolute: 'Earnings Calendar | Quantiv',
+  },
 };
 
 export default function Home() {
