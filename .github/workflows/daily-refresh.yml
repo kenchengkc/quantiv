@@ -118,6 +118,45 @@ jobs:
       - name: Build frontend JSON
         run: python -u tools/build_frontend_data.py
 
+      - name: Refresh ticker names if DoltHub introduced new tickers
+        # Cheap diff: extract distinct act_symbols from the just-synced
+        # DoltHub parquet, compare to keys in apps/frontend/public/
+        # ticker-names.json. If DoltHub now prices options on a ticker
+        # we don't yet have a display name for, run the SEC EDGAR ingest
+        # to refresh names. Most days this is a no-op; a typical month
+        # has 2-5 days where a new IPO / re-listing lands in DoltHub.
+        #
+        # Costs are tiny: duckdb + the parquet read are already on disk,
+        # and `node scripts/build_ticker_names.mjs` only commits if the
+        # SEC JSON actually changed (the script's `git diff --quiet`
+        # early-exit handles SEC also having no record yet). The
+        # downstream "Commit + push frontend data" step picks up the
+        # updated ticker-names.json in the same push as the daily data.
+        run: |
+          python3 -c "
+          import duckdb, glob, sys
+          files = sorted(glob.glob('data/parquet/options_chain/**/*.parquet', recursive=True))
+          if not files:
+              sys.exit(0)
+          rows = duckdb.connect().execute(
+              'SELECT DISTINCT act_symbol FROM read_parquet(?)', [files]
+          ).fetchall()
+          print('\n'.join(r[0] for r in rows if r[0]))
+          " | sort -u > /tmp/dolt_tickers.txt
+
+          jq -r 'keys[]' apps/frontend/public/ticker-names.json | sort -u > /tmp/known_names.txt
+
+          NEW=$(comm -23 /tmp/dolt_tickers.txt /tmp/known_names.txt)
+          if [ -n "$NEW" ]; then
+            echo "DoltHub now prices options on tickers without display names:"
+            echo "$NEW" | head -20
+            COUNT=$(echo "$NEW" | wc -l)
+            echo "(${COUNT} total — refreshing from SEC EDGAR)"
+            node scripts/build_ticker_names.mjs
+          else
+            echo "No forecast-eligible tickers missing display names — skipping EDGAR refresh."
+          fi
+
       - name: Commit + push frontend data
         # data/forecasts is gitignored — the JSON in apps/frontend/public is
         # the only thing that ships to Vercel. Forecast parquet stays in R2.
