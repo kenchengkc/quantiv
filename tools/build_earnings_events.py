@@ -131,16 +131,26 @@ def infer_unknown_timings(conn: duckdb.DuckDBPyConnection) -> None:
     ticker's recent reporting history.
 
     Rule cascade (apply in order, stop at first that produces an answer):
-      1. The most recent 3 known-timing reports all agree → use that.
-      2. Majority of the most recent 5 reports (if 5 are available).
+      1. The 3 nearest known-timing reports all agree → use that.
+      2. Majority of the 5 nearest reports (if 5 are available).
          N=5 is odd so a majority always exists (worst case 3-2).
-      3. Majority of the most recent 4 reports (if 4 are available, 5
+      3. Majority of the 4 nearest reports (if 4 are available, 5
          wasn't). N=4 can be a 2-2 tie → no majority → fall through to
          Rule 4 instead of leaving the row unknown.
-      4. Majority of the most recent 3 reports (2 of 3 agree). Used both
-         as a primary path (when fewer than 4 prior reports exist) and
+      4. Majority of the 3 nearest reports (2 of 3 agree). Used both
+         as a primary path (when fewer than 4 reports exist) and
          as the fallback when Rule 3 hit a 2-2 tie.
     Otherwise leave the row 'unknown'.
+
+    "Nearest" is measured in absolute calendar days from the unknown
+    event, so the cascade pulls from both past and future reported
+    rows. This is safe because `history_by_ticker` is snapshotted from
+    `timing IN ('before_market_open','after_market_close')` BEFORE any
+    inferred UPDATE fires (updates are batched at the end of this
+    function), so the cascade never reads its own output. Earlier
+    versions restricted to strictly-prior reports, which left a
+    ticker's earliest unknowns dark even when years of later reported
+    history established a consistent timing.
 
     Only `before_market_open` and `after_market_close` participate in the
     cascade. `during_market_hours` and `unknown` are excluded from the
@@ -193,16 +203,19 @@ def infer_unknown_timings(conn: duckdb.DuckDBPyConnection) -> None:
     updates: list[tuple[str, Any, str, str]] = []
     for ticker, unknown_dt in unknowns:
         history = history_by_ticker.get(ticker, [])
-        # Only consider reports STRICTLY EARLIER than this unknown event —
-        # otherwise a future unknown could be "informed" by a later report
-        # we already inferred backwards in time.
-        prior = [t for (d, t) in history if d < unknown_dt]
-        if len(prior) < 2:
+        # Rank known reports by absolute calendar distance from the
+        # unknown event so the cascade pulls from past AND future
+        # reported rows. Safe against inference-on-inference because
+        # `history_by_ticker` is a pre-update snapshot of original
+        # reported rows only (see function docstring).
+        nearest = sorted(history, key=lambda dt_t: abs((dt_t[0] - unknown_dt).days))
+        nearest_timings = [t for (_, t) in nearest]
+        if len(nearest_timings) < 2:
             continue
 
-        n3 = prior[:3]
-        n4 = prior[:4]
-        n5 = prior[:5]
+        n3 = nearest_timings[:3]
+        n4 = nearest_timings[:4]
+        n5 = nearest_timings[:5]
 
         inferred: str | None = None
         source: str | None = None
