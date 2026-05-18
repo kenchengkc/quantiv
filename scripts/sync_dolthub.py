@@ -415,6 +415,12 @@ def sync_earnings():
     # DoltHub is the timing + universe baseline; Finnhub overlay adds the
     # fundamentals. If we overwrite, every nightly CI run wipes the actuals
     # we just spent calls fetching and the historical chart never deepens.
+    #
+    # how="outer" preserves rows that exist only in the prior CSV — typically
+    # near-term earnings Finnhub posted ahead of DoltHub. We filter those
+    # Finnhub-only rows to tickers that DoltHub HAS at some point carried,
+    # so foreign-only tickers (.HK/.KS/.TW/etc.) and other Finnhub-only
+    # symbols without forecast coverage don't leak into the universe.
     enriched_cols = [
         "fiscal_year",
         "fiscal_q",
@@ -430,14 +436,41 @@ def sync_earnings():
             existing = pd.read_csv(csv_path, keep_default_na=False)
             existing["date"] = pd.to_datetime(existing["date"], errors="coerce").dt.date
             existing = existing.dropna(subset=["date", "act_symbol"])
+
+            # Universe gate: only carry forward existing rows whose ticker is
+            # in the fresh DoltHub pull (covers both past + future tickers).
+            dolthub_universe = set(df["act_symbol"].unique())
+            existing = existing[existing["act_symbol"].isin(dolthub_universe)]
+
             kept = [c for c in enriched_cols if c in existing.columns]
-            if kept:
-                df = df.merge(
-                    existing[["act_symbol", "date", *kept]],
-                    on=["act_symbol", "date"],
-                    how="left",
+            merge_subset = ["act_symbol", "date", *kept]
+            if "timing" in existing.columns:
+                merge_subset.append("timing")
+                existing = existing.rename(columns={"timing": "timing_prior"})
+                merge_subset[-1] = "timing_prior"
+
+            df = df.merge(
+                existing[merge_subset],
+                on=["act_symbol", "date"],
+                how="outer",
+            )
+
+            # For Finnhub-only rows (no DoltHub side), df.timing is NaN — fall
+            # back to the prior CSV's timing. For matched rows, DoltHub wins
+            # unless DoltHub itself is 'unknown', in which case we preserve
+            # any non-unknown timing we already had (e.g., Finnhub overlay,
+            # inference, or CSV-level propagation).
+            if "timing_prior" in df.columns:
+                prior = df["timing_prior"].fillna("")
+                new = df["timing"].fillna("")
+                df["timing"] = new.where(
+                    (new != "") & (new != "unknown"),
+                    prior.where(prior != "", "unknown"),
                 )
-                print(f"  Preserved {len(kept)} enriched column(s) from existing CSV: {kept}")
+                df = df.drop(columns=["timing_prior"])
+
+            print(f"  Preserved {len(kept)} enriched column(s) from existing CSV: {kept}")
+            print(f"  Merge: {len(df):,} total rows (DoltHub fresh + Finnhub-only carried forward)")
         except Exception as exc:
             print(f"  ⚠ Could not merge existing enriched columns: {exc}")
 
