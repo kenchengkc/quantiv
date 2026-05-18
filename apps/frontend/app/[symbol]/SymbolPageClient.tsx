@@ -5,7 +5,9 @@ import { useParams, useRouter } from 'next/navigation';
 import { ChevronLeft } from 'lucide-react';
 import { SignedIn, SignedOut, SignInButton } from '@clerk/nextjs';
 import { companyName } from '@/lib/companyNames';
+import { listingExchangeLabel } from '@/lib/listingExchanges';
 import { useEnsureCompanyNames } from '@/lib/useCompanyNames';
+import { useEnsureListingExchanges } from '@/lib/useListingExchanges';
 import { useWatchlist } from '@/lib/watchlist';
 
 interface Straddle {
@@ -72,12 +74,25 @@ interface SymbolDetail {
   earnings_history?: Array<{
     date: string;
     timing: string;
-    /** Quarter label like "Q1 25" — optional; falls back to date. */
+    /** Quarter label like "Q1 25" — set by the build from Finnhub
+     *  fiscal_year/fiscal_q so it's correct for non-calendar fiscal
+     *  years (AAPL, NVDA, ADBE…). Falls back to a date-derived guess. */
     q?: string;
+    fiscal_year?: number | null;
+    fiscal_q?: string | null;
     /** Implied move at the time, decimal fraction (e.g. 0.045 = 4.5%). */
     implied?: number | null;
     /** Realized close-to-close move, signed decimal fraction. */
     actual?: number | null;
+    /** Non-GAAP EPS actual / estimate from Finnhub. */
+    eps_actual?: number | null;
+    eps_estimate?: number | null;
+    /** Signed EPS surprise = (actual - estimate) / |estimate|. */
+    eps_surprise_pct?: number | null;
+    revenue_actual?: number | null;
+    revenue_estimate?: number | null;
+    /** Signed revenue surprise = (actual - estimate) / |estimate|. */
+    rev_surprise_pct?: number | null;
   }>;
   next_earnings?: string | null;
   next_earnings_timing?: string;
@@ -124,6 +139,21 @@ function timingText(t?: string | null) {
   if (k === 'bmo' || k === 'before_market_open' || k === 'before_open') return 'Before open';
   if (k === 'amc' || k === 'after_market_close' || k === 'after_close') return 'After close';
   return null;
+}
+
+function quoteSourceLabel(live: LivePrice | null, ticker: string, asOfDate: string): string {
+  if (!live) return `As of ${asOfDate}`;
+  if (live.source === 'alpaca_iex') {
+    return live.session === 'premarket' || live.session === 'afterhours'
+      ? 'Live extended hours · IEX'
+      : 'Last quote · IEX';
+  }
+  if (live.source === 'finnhub') {
+    const exchange = listingExchangeLabel(ticker);
+    return live.marketOpen ? `Live · ${exchange}` : `Last close · ${exchange}`;
+  }
+  if (live.source === 'mixed') return 'Live · mixed venues';
+  return `As of ${asOfDate}`;
 }
 
 // ---------- math helpers ----------
@@ -1162,16 +1192,45 @@ type HistoryPoint = {
   implied: number | null;
   /** Signed realized move (e.g. -0.034 = -3.4%). */
   actual: number;
+  /** Non-GAAP EPS fundamentals from Finnhub. */
+  epsActual: number | null;
+  epsEstimate: number | null;
+  /** Signed EPS surprise (e.g. 0.061 = beat by 6.1%). */
+  epsSurprise: number | null;
+  revActual: number | null;
+  revEstimate: number | null;
+  revSurprise: number | null;
 };
 
 function signedPct(v: number, digits = 1) {
   return `${v >= 0 ? '+' : ''}${(v * 100).toFixed(digits)}%`;
 }
 
+function pickNum(v: number | null | undefined): number | null {
+  return v != null && Number.isFinite(v) ? v : null;
+}
+
+function formatRevenue(v: number | null): string {
+  if (v == null) return '—';
+  const abs = Math.abs(v);
+  if (abs >= 1e12) return `$${(v / 1e12).toFixed(2)}T`;
+  if (abs >= 1e9) return `$${(v / 1e9).toFixed(2)}B`;
+  if (abs >= 1e6) return `$${(v / 1e6).toFixed(1)}M`;
+  if (abs >= 1e3) return `$${(v / 1e3).toFixed(1)}K`;
+  return `$${v.toFixed(0)}`;
+}
+
+function formatEps(v: number | null): string {
+  if (v == null) return '—';
+  return `$${v.toFixed(2)}`;
+}
+
 /** Build the chart series from earnings_history rows that carry an
  *  `actual` close-to-close move. `implied` is optional — when present
  *  the chart draws an implied band around zero; when absent the chart
- *  shows just the realized dot. Returns rows in chronological order
+ *  shows just the realized dot. EPS / revenue surprise come from the
+ *  Finnhub overlay and may be null for older rows that predate the
+ *  overlay's coverage window. Returns rows in chronological order
  *  (oldest → newest) and clips to the last 8 quarters. */
 function buildHistorySeries(
   raw: SymbolDetail['earnings_history'] | undefined,
@@ -1190,22 +1249,177 @@ function buildHistorySeries(
         h.implied != null && Number.isFinite(h.implied)
           ? Math.abs(h.implied)
           : null;
-      return { q, date: h.date, implied, actual: h.actual };
+      return {
+        q,
+        date: h.date,
+        implied,
+        actual: h.actual,
+        epsActual: pickNum(h.eps_actual),
+        epsEstimate: pickNum(h.eps_estimate),
+        epsSurprise: pickNum(h.eps_surprise_pct),
+        revActual: pickNum(h.revenue_actual),
+        revEstimate: pickNum(h.revenue_estimate),
+        revSurprise: pickNum(h.rev_surprise_pct),
+      };
     })
     .sort((a, b) => a.date.localeCompare(b.date));
   return usable.slice(-8);
 }
 
-function HistoryChart({ history }: { history: HistoryPoint[] }) {
+// EPS surprise strip — one bar per quarter, sharing column positions with
+// HistoryChart so beats / misses line up vertically with their realized
+// dots. Bars are green for beat, red for miss, hollow gray for missing.
+// Renders nothing when the entire series lacks EPS data, so older AAPL
+// payloads (pre-Finnhub overlay) degrade gracefully.
+function EpsSurpriseStrip({
+  history,
+  hoveredIndex,
+  onHover,
+}: {
+  history: HistoryPoint[];
+  hoveredIndex: number | null;
+  onHover: (i: number | null) => void;
+}) {
+  const W = 640;
+  const H = 56;
+  const P = 36;
+  const hasAny = history.some((h) => h.epsSurprise != null);
+  if (!hasAny) return null;
+
+  // Clamp to ±20% for layout; anything larger lives on top of the chart
+  // as a clipped bar with the exact value in the tooltip.
+  const cap = 0.2;
+  const colW = (W - P * 2) / history.length;
+  const y = (v: number) => H / 2 - (Math.max(-cap, Math.min(cap, v)) / cap) * (H / 2 - 8);
+
+  return (
+    <div style={{ marginTop: 18 }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'baseline',
+          marginBottom: 4,
+        }}
+      >
+        <div
+          style={{
+            fontSize: 10,
+            letterSpacing: '0.16em',
+            textTransform: 'uppercase',
+            color: 'var(--ink-3)',
+          }}
+        >
+          EPS surprise
+        </div>
+        <div className="mono" style={{ fontSize: 10, color: 'var(--ink-4)' }}>
+          non-GAAP · vs sell-side consensus
+        </div>
+      </div>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto' }}>
+        <line
+          x1={P}
+          x2={W - P}
+          y1={H / 2}
+          y2={H / 2}
+          stroke="var(--line)"
+        />
+        {history.map((h, i) => {
+          const cx = P + colW * i + colW / 2;
+          const s = h.epsSurprise;
+          if (s == null) {
+            return (
+              <g key={`eps-${h.date}-${i}`} onMouseEnter={() => onHover(i)} onMouseLeave={() => onHover(null)}>
+                <rect
+                  x={cx - 7}
+                  y={H / 2 - 6}
+                  width={14}
+                  height={12}
+                  fill="transparent"
+                  stroke="var(--line)"
+                  strokeDasharray="2 2"
+                  strokeWidth={0.8}
+                />
+              </g>
+            );
+          }
+          const beat = s >= 0;
+          const top = beat ? y(s) : H / 2;
+          const bot = beat ? H / 2 : y(s);
+          const height = Math.max(2, bot - top);
+          return (
+            <g
+              key={`eps-${h.date}-${i}`}
+              onMouseEnter={() => onHover(i)}
+              onMouseLeave={() => onHover(null)}
+              style={{ cursor: 'default' }}
+            >
+              <rect
+                x={cx - 9}
+                y={top}
+                width={18}
+                height={height}
+                fill={beat ? 'var(--up)' : 'var(--down)'}
+                opacity={hoveredIndex == null || hoveredIndex === i ? 0.78 : 0.32}
+              />
+              {Math.abs(s) > cap && (
+                // clipped: small marker indicating the bar continues
+                <line
+                  x1={cx - 9}
+                  x2={cx + 9}
+                  y1={beat ? 4 : H - 4}
+                  y2={beat ? 4 : H - 4}
+                  stroke={beat ? 'var(--up)' : 'var(--down)'}
+                  strokeWidth={2}
+                />
+              )}
+            </g>
+          );
+        })}
+        {/* ±cap reference labels */}
+        <text
+          x={P - 8}
+          y={y(cap) + 3}
+          textAnchor="end"
+          fill="var(--ink-4)"
+          fontSize="9"
+          fontFamily="JetBrains Mono"
+        >
+          +{(cap * 100).toFixed(0)}%
+        </text>
+        <text
+          x={P - 8}
+          y={y(-cap) + 3}
+          textAnchor="end"
+          fill="var(--ink-4)"
+          fontSize="9"
+          fontFamily="JetBrains Mono"
+        >
+          −{(cap * 100).toFixed(0)}%
+        </text>
+      </svg>
+    </div>
+  );
+}
+
+function HistoryChart({
+  history,
+  hoveredIndex,
+  setHoveredIndex,
+}: {
+  history: HistoryPoint[];
+  hoveredIndex: number | null;
+  setHoveredIndex: (i: number | null) => void;
+}) {
   const W = 640;
   const H = 214;
   const P = 36;
-  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   if (history.length === 0) return null;
 
   // Whether any row has implied data — drives whether we draw the band
   // and show its legend swatch.
   const hasImplied = history.some((h) => h.implied != null);
+  const hasEps = history.some((h) => h.epsSurprise != null);
 
   const max =
     Math.max(
@@ -1282,9 +1496,18 @@ function HistoryChart({ history }: { history: HistoryPoint[] }) {
           const actualPositive = h.actual >= 0;
           const cy = y(h.actual);
           const labelY = Math.min(H - 30, Math.max(14, cy + (actualPositive ? -10 : 17)));
-          // Beat = realized exceeded implied band. Only meaningful when
-          // we have an implied number to compare against.
-          const beat = h.implied != null && Math.abs(h.actual) > h.implied;
+          // Beat-implied = realized exceeded implied band. Only meaningful
+          // when we have an implied number to compare against.
+          const beatImplied = h.implied != null && Math.abs(h.actual) > h.implied;
+          // EPS dot styling:
+          //   beat (eps_surprise >= 0)  → filled dot (current behavior)
+          //   miss (eps_surprise < 0)   → hollow dot (filled background,
+          //                               colored ring), signals fundamentals
+          //                               disagreed with price direction
+          //   unknown                   → filled dot, neutral (pre-Finnhub rows)
+          const epsBeat = h.epsSurprise != null && h.epsSurprise >= 0;
+          const epsMiss = h.epsSurprise != null && h.epsSurprise < 0;
+          const moveColor = actualPositive ? 'var(--up)' : 'var(--down)';
           return (
             <g
               key={`${h.date}-${i}`}
@@ -1294,7 +1517,13 @@ function HistoryChart({ history }: { history: HistoryPoint[] }) {
               onBlur={() => setHoveredIndex(null)}
               tabIndex={0}
               role="listitem"
-              aria-label={`${h.q} realized move ${signedPct(h.actual)}${h.implied != null ? `, implied move ${(h.implied * 100).toFixed(1)}%` : ''}`}
+              aria-label={
+                `${h.q} realized move ${signedPct(h.actual)}` +
+                (h.implied != null ? `, implied move ${(h.implied * 100).toFixed(1)}%` : '') +
+                (h.epsSurprise != null
+                  ? `, EPS ${epsBeat ? 'beat' : 'miss'} ${signedPct(h.epsSurprise)}`
+                  : '')
+              }
               style={{ cursor: 'default', outline: 'none' }}
             >
               {h.implied != null && (
@@ -1324,23 +1553,34 @@ function HistoryChart({ history }: { history: HistoryPoint[] }) {
                   />
                 </>
               )}
-              {beat && (
+              {beatImplied && (
                 <circle
                   cx={cx}
                   cy={cy}
                   r={6}
                   fill="none"
-                  stroke={actualPositive ? 'var(--up)' : 'var(--down)'}
+                  stroke={moveColor}
                   strokeWidth={1.4}
                   opacity={0.55}
                 />
               )}
-              <circle
-                cx={cx}
-                cy={cy}
-                r={3.5}
-                fill={actualPositive ? 'var(--up)' : 'var(--down)'}
-              />
+              {epsMiss ? (
+                <circle
+                  cx={cx}
+                  cy={cy}
+                  r={3.8}
+                  fill="var(--bg)"
+                  stroke={moveColor}
+                  strokeWidth={1.6}
+                />
+              ) : (
+                <circle
+                  cx={cx}
+                  cy={cy}
+                  r={3.5}
+                  fill={moveColor}
+                />
+              )}
               <circle
                 cx={cx}
                 cy={cy}
@@ -1353,7 +1593,7 @@ function HistoryChart({ history }: { history: HistoryPoint[] }) {
                 x={cx}
                 y={labelY}
                 textAnchor="middle"
-                fill={actualPositive ? 'var(--up)' : 'var(--down)'}
+                fill={moveColor}
                 fontSize="10"
                 fontFamily="JetBrains Mono"
                 fontWeight={700}
@@ -1378,10 +1618,12 @@ function HistoryChart({ history }: { history: HistoryPoint[] }) {
         const i = hoveredIndex ?? 0;
         const cx = P + colW * i + colW / 2;
         const cy = y(hovered.actual);
-        const left = `clamp(94px, ${(cx / W) * 100}%, calc(100% - 94px))`;
+        const left = `clamp(110px, ${(cx / W) * 100}%, calc(100% - 110px))`;
         const top = `${(cy / H) * 100}%`;
         const beat =
           hovered.implied != null && Math.abs(hovered.actual) > hovered.implied;
+        const hasEpsRow = hovered.epsActual != null || hovered.epsEstimate != null;
+        const hasRevRow = hovered.revActual != null || hovered.revEstimate != null;
         return (
           <div
             style={{
@@ -1389,7 +1631,7 @@ function HistoryChart({ history }: { history: HistoryPoint[] }) {
               left,
               top,
               transform: cy < H / 2 ? 'translate(-50%, 18px)' : 'translate(-50%, calc(-100% - 18px))',
-              minWidth: 178,
+              minWidth: 210,
               padding: '9px 10px',
               border: '1px solid var(--line-2)',
               borderRadius: 6,
@@ -1428,6 +1670,70 @@ function HistoryChart({ history }: { history: HistoryPoint[] }) {
                 ? `Implied ±${(hovered.implied * 100).toFixed(1)}%${beat ? ' · beat' : ''}`
                 : 'Implied range unavailable'}
             </div>
+            {(hasEpsRow || hasRevRow) && (
+              <div
+                style={{
+                  marginTop: 8,
+                  paddingTop: 8,
+                  borderTop: '1px solid var(--line)',
+                  display: 'grid',
+                  gap: 4,
+                }}
+              >
+                {hasEpsRow && (
+                  <div
+                    className="mono tnum"
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      gap: 8,
+                      fontSize: 10.5,
+                    }}
+                  >
+                    <span style={{ color: 'var(--ink-3)' }}>EPS</span>
+                    <span style={{ color: 'var(--ink-2)' }}>
+                      {formatEps(hovered.epsActual)} vs {formatEps(hovered.epsEstimate)}
+                      {hovered.epsSurprise != null && (
+                        <span
+                          style={{
+                            marginLeft: 6,
+                            color: hovered.epsSurprise >= 0 ? 'var(--up)' : 'var(--down)',
+                          }}
+                        >
+                          {signedPct(hovered.epsSurprise)}
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                )}
+                {hasRevRow && (
+                  <div
+                    className="mono tnum"
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      gap: 8,
+                      fontSize: 10.5,
+                    }}
+                  >
+                    <span style={{ color: 'var(--ink-3)' }}>Rev</span>
+                    <span style={{ color: 'var(--ink-2)' }}>
+                      {formatRevenue(hovered.revActual)} vs {formatRevenue(hovered.revEstimate)}
+                      {hovered.revSurprise != null && (
+                        <span
+                          style={{
+                            marginLeft: 6,
+                            color: hovered.revSurprise >= 0 ? 'var(--up)' : 'var(--down)',
+                          }}
+                        >
+                          {signedPct(hovered.revSurprise)}
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         );
       })()}
@@ -1466,6 +1772,20 @@ function HistoryChart({ history }: { history: HistoryPoint[] }) {
           />
           Actual move
         </span>
+        {hasEps && (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <span
+              style={{
+                width: 9,
+                height: 9,
+                borderRadius: 999,
+                border: '1.6px solid var(--ink-3)',
+                background: 'transparent',
+              }}
+            />
+            EPS miss
+          </span>
+        )}
         {hasImplied && (
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
             <span
@@ -1482,6 +1802,114 @@ function HistoryChart({ history }: { history: HistoryPoint[] }) {
         )}
       </div>
     </div>
+  );
+}
+
+// Owns the shared hoveredIndex so EpsSurpriseStrip + HistoryChart light up
+// the same quarter together. Hovering the strip highlights the dot below
+// and vice versa. Section header summarizes both implied- and EPS-beat
+// rates so the eye can scan the headline number before reading the chart.
+function HistoricalSection({
+  series,
+  hasImplied,
+  beats,
+  withImpliedLen,
+  withEpsLen,
+  epsBeats,
+}: {
+  series: HistoryPoint[];
+  hasImplied: boolean;
+  beats: number;
+  withImpliedLen: number;
+  withEpsLen: number;
+  epsBeats: number;
+}) {
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const headline = hasImplied
+    ? 'Implied vs. actual'
+    : withEpsLen > 0
+      ? 'Fundamentals vs. realized'
+      : 'Realized moves';
+  return (
+    <section style={{ padding: '40px 0', borderBottom: '1px solid var(--line)' }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'baseline',
+          marginBottom: 4,
+          gap: 16,
+        }}
+      >
+        <div>
+          <div
+            style={{
+              fontSize: 10,
+              letterSpacing: '0.18em',
+              textTransform: 'uppercase',
+              color: 'var(--ink-3)',
+            }}
+          >
+            Historical
+          </div>
+          <h2
+            className="serif"
+            style={{
+              margin: '4px 0 0',
+              fontSize: 22,
+              fontWeight: 700,
+              letterSpacing: '-0.01em',
+            }}
+          >
+            {headline}, last {series.length}{' '}
+            {series.length === 1 ? 'quarter' : 'quarters'}
+          </h2>
+        </div>
+        <div
+          className="mono tnum"
+          style={{
+            fontSize: 11,
+            color: 'var(--ink-3)',
+            textAlign: 'right',
+            lineHeight: 1.55,
+          }}
+        >
+          {hasImplied && (
+            <div>
+              Beat implied{' '}
+              <span style={{ color: 'var(--ink)' }}>
+                {beats}/{withImpliedLen}
+              </span>{' '}
+              times
+            </div>
+          )}
+          {withEpsLen > 0 && (
+            <div>
+              Beat EPS{' '}
+              <span style={{ color: 'var(--ink)' }}>
+                {epsBeats}/{withEpsLen}
+              </span>{' '}
+              times
+            </div>
+          )}
+          {!hasImplied && withEpsLen === 0 && (
+            <div style={{ color: 'var(--ink-4)', maxWidth: 220 }}>
+              Implied range pending —<br />historical option chains not yet wired
+            </div>
+          )}
+        </div>
+      </div>
+      <EpsSurpriseStrip
+        history={series}
+        hoveredIndex={hoveredIndex}
+        onHover={setHoveredIndex}
+      />
+      <HistoryChart
+        history={series}
+        hoveredIndex={hoveredIndex}
+        setHoveredIndex={setHoveredIndex}
+      />
+    </section>
   );
 }
 
@@ -1569,6 +1997,7 @@ export default function SymbolPage() {
   // Triggers EDGAR ticker-names fetch + re-render so the header company
   // name resolves even when the symbol isn't in the S&P 500 or curated map.
   useEnsureCompanyNames();
+  useEnsureListingExchanges();
 
   const params = useParams();
   const router = useRouter();
@@ -1961,11 +2390,7 @@ export default function SymbolPage() {
                   textTransform: 'uppercase',
                 }}
               >
-                {live?.source === 'alpaca_iex'
-                  ? 'Extended hours · Alpaca IEX'
-                  : live?.source === 'finnhub'
-                    ? (live.marketOpen ? 'Live · Finnhub' : 'Last close · Finnhub')
-                    : `As of ${data.as_of_date}`}
+                {quoteSourceLabel(live, symbol, data.as_of_date)}
               </span>
             </div>
           </div>
@@ -2237,11 +2662,13 @@ export default function SymbolPage() {
       )}
 
       {/* Historical implied vs realized (last 8 quarters).
-          Renders only when the symbol payload's earnings_history rows
-          carry both `implied` and `actual` numbers. The data pipeline
-          does not currently emit those — when it does, the chart will
-          light up automatically. Until then, this section is hidden so
-          we don't show fake or empty data. */}
+          Realized close-to-close moves come from v_ohlcv bracketed by
+          Finnhub-grade earnings timing. EPS / revenue surprise come
+          from the Finnhub overlay and may be null on older rows that
+          predate the overlay's rolling window; the chart degrades
+          gracefully (no strip, no surprise styling). The `implied`
+          band remains pending — it requires historical option chains
+          captured at T-N, which is a separate data ingest. */}
       {(() => {
         const series = buildHistorySeries(data.earnings_history);
         if (series.length < 2) return null;
@@ -2250,66 +2677,17 @@ export default function SymbolPage() {
         const beats = withImplied.filter(
           (h) => Math.abs(h.actual) > (h.implied as number),
         ).length;
+        const withEps = series.filter((h) => h.epsSurprise != null);
+        const epsBeats = withEps.filter((h) => (h.epsSurprise as number) >= 0).length;
         return (
-          <section style={{ padding: '40px 0', borderBottom: '1px solid var(--line)' }}>
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'baseline',
-                marginBottom: 4,
-                gap: 16,
-              }}
-            >
-              <div>
-                <div
-                  style={{
-                    fontSize: 10,
-                    letterSpacing: '0.18em',
-                    textTransform: 'uppercase',
-                    color: 'var(--ink-3)',
-                  }}
-                >
-                  Historical
-                </div>
-                <h2
-                  className="serif"
-                  style={{
-                    margin: '4px 0 0',
-                    fontSize: 22,
-                    fontWeight: 700,
-                    letterSpacing: '-0.01em',
-                  }}
-                >
-                  {hasImplied ? 'Implied vs. actual' : 'Realized moves'}, last{' '}
-                  {series.length} {series.length === 1 ? 'quarter' : 'quarters'}
-                </h2>
-              </div>
-              {hasImplied ? (
-                <div className="mono tnum" style={{ fontSize: 11, color: 'var(--ink-3)' }}>
-                  Beat implied{' '}
-                  <span style={{ color: 'var(--ink)' }}>
-                    {beats}/{withImplied.length}
-                  </span>{' '}
-                  times
-                </div>
-              ) : (
-                <div
-                  className="mono"
-                  style={{
-                    fontSize: 10.5,
-                    color: 'var(--ink-4)',
-                    textAlign: 'right',
-                    maxWidth: 220,
-                    lineHeight: 1.4,
-                  }}
-                >
-                  Implied range pending —<br />historical option chains not yet wired
-                </div>
-              )}
-            </div>
-            <HistoryChart history={series} />
-          </section>
+          <HistoricalSection
+            series={series}
+            hasImplied={hasImplied}
+            beats={beats}
+            withImpliedLen={withImplied.length}
+            withEpsLen={withEps.length}
+            epsBeats={epsBeats}
+          />
         );
       })()}
 
