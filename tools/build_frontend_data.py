@@ -173,6 +173,67 @@ def jsonable(v):
     return v
 
 
+def _surprise_pct(actual, estimate):
+    """Surprise % = (actual - estimate) / |estimate|. Signed.
+    None when either side is missing or estimate is zero. Uses |estimate|
+    so a beat against a negative estimate still reads as positive."""
+    if actual is None or estimate is None:
+        return None
+    try:
+        a, e = float(actual), float(estimate)
+    except (TypeError, ValueError):
+        return None
+    if math.isnan(a) or math.isnan(e) or e == 0:
+        return None
+    return (a - e) / abs(e)
+
+
+def _quarter_label(fiscal_year, fiscal_q, fallback_date):
+    """Render 'Q3 24' from Finnhub-provided fiscal_year/fiscal_q. Falls
+    back to a calendar-month inference when either piece is missing —
+    correct for ~70% of names, wrong for non-calendar-year filers, but
+    no worse than the current frontend default."""
+    fy = fiscal_year
+    fq = (fiscal_q or "").upper() if isinstance(fiscal_q, str) else None
+    if not fq or fq not in {"Q1", "Q2", "Q3", "Q4"}:
+        month = fallback_date.month
+        fq = f"Q{(month - 1) // 3 + 1}"
+    if fy is None:
+        fy = fallback_date.year
+    try:
+        yy = str(int(fy) % 100).zfill(2)
+    except (TypeError, ValueError):
+        yy = str(fallback_date.year % 100).zfill(2)
+    return f"{fq} {yy}"
+
+
+def _history_row(d, timing, fiscal_year, fiscal_q, eps_actual, eps_estimate,
+                 rev_actual, rev_estimate, actual_move):
+    """Shape one earnings_history entry. Implied is null until historical
+    option-chain data is wired; everything else is best-effort from the
+    Finnhub-overlaid earnings_events table."""
+    return {
+        "date": d.isoformat(),
+        "timing": timing,
+        "q": _quarter_label(fiscal_year, fiscal_q, d),
+        "fiscal_year": int(fiscal_year) if fiscal_year is not None else None,
+        "fiscal_q": (fiscal_q or "").upper() or None,
+        # Signed close-to-close realized move (e.g. +0.034 = +3.4%).
+        # NULL when OHLCV doesn't bracket the event.
+        "actual": jsonable(actual_move),
+        # At-the-time implied move. Populated once historical
+        # option-chain data is wired into the build; until then
+        # the chart shows only the actual dots.
+        "implied": None,
+        "eps_actual": jsonable(eps_actual),
+        "eps_estimate": jsonable(eps_estimate),
+        "eps_surprise_pct": jsonable(_surprise_pct(eps_actual, eps_estimate)),
+        "revenue_actual": jsonable(rev_actual),
+        "revenue_estimate": jsonable(rev_estimate),
+        "rev_surprise_pct": jsonable(_surprise_pct(rev_actual, rev_estimate)),
+    }
+
+
 def build_symbol_detail(conn, ticker: str, as_of_date: date, earnings_dt: date | None,
                         ml_lookup: dict[tuple[str, str], dict] | None = None) -> dict | None:
     """Build per-symbol detail: implied moves across expiries + term structure."""
@@ -278,23 +339,43 @@ def build_symbol_detail(conn, ticker: str, as_of_date: date, earnings_dt: date |
     # return history rows when v_ohlcv can't bracket the event — those
     # rows just have actual=NULL and the chart's dot won't render. The
     # window is ±5 calendar days so weekends/holidays don't drop events.
-    # ROW_NUMBER picks the latest pre-earnings close and the first
-    # post-earnings close per earnings_dt (NULLS LAST keeps the bare row
-    # if no OHLCV exists).
+    #
+    # Bracket is timing-aware (Finnhub-grade timing once overlay has run):
+    #   BMO  → pre = last close BEFORE earnings_dt, post = close ON OR AFTER earnings_dt
+    #   AMC  → pre = close ON OR BEFORE earnings_dt, post = first close AFTER earnings_dt
+    #   DMH / unknown → symmetric (pre <, post >) — original behavior.
+    # ROW_NUMBER picks the latest pre and earliest post per earnings_dt
+    # (NULLS LAST keeps the bare row if no OHLCV exists).
+    #
+    # Also pulls EPS/revenue actual+estimate (populated by the Finnhub
+    # overlay) so the historical chart can color realized-move dots by
+    # surprise and surface fundamentals in the tooltip.
     try:
         history = conn.execute(
             """
             SELECT
                 e.earnings_dt,
                 e.timing,
+                e.fiscal_year,
+                e.fiscal_q,
+                e.eps_actual,
+                e.eps_estimate,
+                e.revenue_actual,
+                e.revenue_estimate,
                 (post.close / NULLIF(pre.close, 0) - 1.0) AS actual
             FROM earnings_events e
             LEFT JOIN v_ohlcv pre  ON pre.act_symbol = e.ticker
-                AND pre.date < e.earnings_dt
                 AND pre.date >= e.earnings_dt - INTERVAL '5' DAY
+                AND (
+                    (e.timing = 'after_market_close' AND pre.date <= e.earnings_dt)
+                    OR (e.timing <> 'after_market_close' AND pre.date < e.earnings_dt)
+                )
             LEFT JOIN v_ohlcv post ON post.act_symbol = e.ticker
-                AND post.date > e.earnings_dt
                 AND post.date <= e.earnings_dt + INTERVAL '5' DAY
+                AND (
+                    (e.timing = 'before_market_open' AND post.date >= e.earnings_dt)
+                    OR (e.timing <> 'before_market_open' AND post.date > e.earnings_dt)
+                )
             WHERE e.ticker = ?
             QUALIFY ROW_NUMBER() OVER (
                 PARTITION BY e.earnings_dt
@@ -308,10 +389,11 @@ def build_symbol_detail(conn, ticker: str, as_of_date: date, earnings_dt: date |
     except Exception:
         # v_ohlcv may not exist for this build; fall back to bare history.
         history = [
-            (d, t, None)
-            for d, t in conn.execute(
+            (d, t, fy, fq, epa, epe, rva, rve, None)
+            for d, t, fy, fq, epa, epe, rva, rve in conn.execute(
                 """
-                SELECT earnings_dt, timing
+                SELECT earnings_dt, timing, fiscal_year, fiscal_q,
+                       eps_actual, eps_estimate, revenue_actual, revenue_estimate
                 FROM earnings_events
                 WHERE ticker = ?
                 ORDER BY earnings_dt DESC
@@ -403,18 +485,8 @@ def build_symbol_detail(conn, ticker: str, as_of_date: date, earnings_dt: date |
         "expected_move": em,
         "straddle_features": straddles,
         "earnings_history": [
-            {
-                "date": d.isoformat(),
-                "timing": t,
-                # Signed close-to-close realized move (e.g. +0.034 = +3.4%).
-                # NULL when OHLCV doesn't bracket the event.
-                "actual": jsonable(a),
-                # At-the-time implied move. Populated once historical
-                # option-chain data is wired into the build; until then
-                # the chart shows only the actual dots.
-                "implied": None,
-            }
-            for d, t, a in history
+            _history_row(d, t, fy, fq, epa, epe, rva, rve, a)
+            for d, t, fy, fq, epa, epe, rva, rve, a in history
         ],
         "next_earnings": earnings_dt.isoformat() if earnings_dt else None,
         "vol_regime": vol_regime,

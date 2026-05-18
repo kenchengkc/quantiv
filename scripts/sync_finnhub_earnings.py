@@ -247,7 +247,31 @@ def date_chunks(start: date, end: date) -> list[tuple[date, date]]:
     return chunks
 
 
-def fetch_finnhub(start: date, end: date, token: str, symbol: str | None = None) -> list[dict[str, Any]]:
+class CallBudget:
+    """Defensive cap on Finnhub HTTP calls so a wide --symbols run can't
+    accidentally exhaust the 60-calls/min ceiling shared with intraday
+    quote workers. None = unlimited (legacy behavior)."""
+
+    def __init__(self, limit: int | None) -> None:
+        self.limit = limit
+        self.used = 0
+
+    def consume(self) -> None:
+        if self.limit is not None and self.used >= self.limit:
+            raise RuntimeError(
+                f"Finnhub call budget exhausted ({self.used} >= {self.limit}). "
+                "Raise --max-calls or narrow --symbols / date range."
+            )
+        self.used += 1
+
+
+def fetch_finnhub(
+    start: date,
+    end: date,
+    token: str,
+    symbol: str | None = None,
+    budget: CallBudget | None = None,
+) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for chunk_start, chunk_end in date_chunks(start, end):
         params: dict[str, Any] = {
@@ -257,6 +281,8 @@ def fetch_finnhub(start: date, end: date, token: str, symbol: str | None = None)
         }
         if symbol:
             params["symbol"] = symbol.upper()
+        if budget is not None:
+            budget.consume()
         for attempt in range(3):
             try:
                 resp = requests.get(BASE_URL, params=params, timeout=60)
@@ -275,6 +301,13 @@ def fetch_finnhub(start: date, end: date, token: str, symbol: str | None = None)
             break
         time.sleep(REQUEST_DELAY_S)
     return rows
+
+
+def parse_symbol_list(value: str | None) -> list[str]:
+    if not value:
+        return []
+    parts = [p.strip().upper() for p in value.replace(",", " ").split()]
+    return [p for p in parts if p]
 
 
 def normalize_finnhub(rows: list[dict[str, Any]]) -> pd.DataFrame:
@@ -400,6 +433,24 @@ def main() -> int:
     parser.add_argument("--past-days", type=int, default=30)
     parser.add_argument("--future-days", type=int, default=60)
     parser.add_argument("--symbol", help="Optional single-symbol probe/sync")
+    parser.add_argument(
+        "--symbols",
+        help=(
+            "Comma- or space-separated list of symbols. When set, runs a "
+            "per-symbol query for each (useful for deep backfill on a "
+            "curated universe). Mutually exclusive with --symbol."
+        ),
+    )
+    parser.add_argument(
+        "--max-calls",
+        type=int,
+        default=None,
+        help=(
+            "Defensive ceiling on Finnhub HTTP calls in this run. "
+            "Each chunked request counts as one. Default: unlimited. "
+            "Set this to leave headroom for intraday quote workers (60/min)."
+        ),
+    )
     parser.add_argument("--data-dir", type=Path, default=None)
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument(
@@ -408,6 +459,9 @@ def main() -> int:
         help="Exit 0 instead of failing when FINNHUB_API_KEY is missing (useful in CI until the secret is added).",
     )
     args = parser.parse_args()
+
+    if args.symbol and args.symbols:
+        parser.error("--symbol and --symbols are mutually exclusive")
 
     start = args.from_date or (today - timedelta(days=args.past_days))
     end = args.to_date or (today + timedelta(days=args.future_days))
@@ -423,13 +477,36 @@ def main() -> int:
         print(f"✗ {msg}", file=sys.stderr)
         return 1
 
+    symbols = parse_symbol_list(args.symbols)
+    if args.symbol:
+        symbols = [args.symbol.upper()]
+
     print(f"Finnhub earnings overlay: {start} → {end}")
+    if symbols:
+        print(f"per-symbol mode: {len(symbols)} symbols ({', '.join(symbols[:8])}"
+              f"{'…' if len(symbols) > 8 else ''})")
     data_dir = args.data_dir or default_data_dir()
 
+    budget = CallBudget(args.max_calls)
+
     existing = load_existing(data_dir)
-    raw_rows = fetch_finnhub(start, end, token, args.symbol)
+    try:
+        if symbols:
+            raw_rows: list[dict[str, Any]] = []
+            for i, sym in enumerate(symbols, 1):
+                if i == 1 or i % 25 == 0 or i == len(symbols):
+                    print(f"  [{i}/{len(symbols)}] {sym} (calls used: {budget.used})")
+                raw_rows.extend(fetch_finnhub(start, end, token, sym, budget=budget))
+        else:
+            raw_rows = fetch_finnhub(start, end, token, None, budget=budget)
+    except RuntimeError as exc:
+        print(f"⚠ {exc}", file=sys.stderr)
+        if budget.used == 0:
+            return 1
+        print("  proceeding with partial data already fetched")
     overlay = normalize_finnhub(raw_rows)
     merged, stats = merge_overlay(existing, overlay)
+    stats["finnhub_calls"] = budget.used
 
     for key, value in stats.items():
         print(f"{key}: {value:,}")
