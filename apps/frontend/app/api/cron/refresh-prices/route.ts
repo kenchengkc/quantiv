@@ -27,21 +27,21 @@ import { fetchExtendedHoursSnapshot } from '@/lib/alpaca';
 //   - The Worker stays trivial — just a scheduled URL kick.
 
 export const dynamic = 'force-dynamic';
-// 60s is the Hobby Fluid Compute ceiling. With 40 symbols × ~1.035s pacing
-// (58/min cap) we finish in ~41s — comfortable margin under the 60s timeout
-// and 2 calls/min headroom below Finnhub's 60/min limit. Worker fires this
-// every 1 min so total throughput is ~58/min.
+// 60s is the Hobby Fluid Compute ceiling. With 45 symbols × ~1.091s pacing
+// (55/min cap) starts span ~49s; including per-call latency + Redis writes,
+// expect ~55s wall clock — safe margin under the 60s timeout and 5 calls/min
+// headroom below Finnhub's 60/min limit. Worker fires this every 1 min so
+// total throughput is ~45 symbols/min (rotation bottlenecked by cron cadence,
+// not within-batch pacing).
 export const maxDuration = 60;
 
-const BATCH_SIZE = 40;
-// 58/min stays just under the 60/min Finnhub free-tier cap with a 2-call
-// safety margin for occasional retries / clock-skew at minute boundaries.
-// The fixed `setTimeout(spacingMs - elapsed)` pacing below uses ceil()
-// rounding, so the practical floor is ~57.6 calls/min — still inside the
-// cap. Increasing this further would risk transient 429s on a hot
-// minute where two requests land in the same wall-clock minute due to
-// JS event-loop jitter.
-const RATE_LIMIT_PER_MIN = 58;
+const BATCH_SIZE = 45;
+// 55/min stays under the 60/min Finnhub free-tier cap with a 5-call safety
+// margin for occasional retries / clock-skew at minute boundaries. Pushing
+// higher (e.g. 58) leaves only 2 calls/min of headroom; one stalled call +
+// the next fire on schedule can briefly exceed the rolling-minute window and
+// trigger a 429.
+const RATE_LIMIT_PER_MIN = 55;
 // 7 days — covers Fri close → Mon open weekends, 3-day holiday weekends,
 // and any cron downtime. The cron rewrites every ~30 min during market
 // hours, so active entries are nowhere near this limit; it's purely a
