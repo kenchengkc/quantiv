@@ -54,12 +54,34 @@ def load_local_env() -> None:
             os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
 
 
+def fetch(token: str, symbol: str, start: date, end: date) -> list[dict]:
+    params = {
+        "from": start.isoformat(),
+        "to": end.isoformat(),
+        "symbol": symbol.upper(),
+        "token": token,
+    }
+    resp = requests.get(BASE_URL, params=params, timeout=30)
+    resp.raise_for_status()
+    return resp.json().get("earningsCalendar") or []
+
+
 def main() -> int:
     load_local_env()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--symbol", default="AAPL")
     parser.add_argument("--years", type=int, default=3,
                         help="How many years back to ask for (default 3).")
+    parser.add_argument(
+        "--walk",
+        action="store_true",
+        help=(
+            "Walk 90-day historical windows backward to test whether narrow "
+            "windows unlock past quarters even when a wide window returns just "
+            "one event. Costs N calls where N = years * 4. Use after a wide "
+            "probe returns 'shallow' to decide if backfill-by-walking is viable."
+        ),
+    )
     args = parser.parse_args()
 
     token = os.getenv("FINNHUB_API_KEY")
@@ -68,51 +90,88 @@ def main() -> int:
         return 1
 
     today = date.today()
-    start = today - timedelta(days=args.years * 365)
-    end = today + timedelta(days=30)
+    symbol = args.symbol.upper()
 
-    params = {
-        "from": start.isoformat(),
-        "to": end.isoformat(),
-        "symbol": args.symbol.upper(),
-        "token": token,
-    }
-    print(f"GET {BASE_URL}?from={params['from']}&to={params['to']}&symbol={params['symbol']}")
-    resp = requests.get(BASE_URL, params=params, timeout=30)
-    if not resp.ok:
-        print(f"✗ HTTP {resp.status_code}: {resp.text[:300]}", file=sys.stderr)
+    # Test 1: wide window (the original probe).
+    wide_start = today - timedelta(days=args.years * 365)
+    wide_end = today + timedelta(days=30)
+    print(f"GET {BASE_URL}?from={wide_start}&to={wide_end}&symbol={symbol}")
+    try:
+        wide_rows = fetch(token, symbol, wide_start, wide_end)
+    except requests.HTTPError as exc:
+        print(f"✗ {exc}", file=sys.stderr)
         return 1
+    print(f"\nWide window: returned {len(wide_rows)} events")
+    if wide_rows:
+        dates = sorted(r.get("date") for r in wide_rows if r.get("date"))
+        oldest, newest = dates[0], dates[-1]
+        span_days = (date.fromisoformat(newest[:10]) - date.fromisoformat(oldest[:10])).days
+        print(f"  date range: {oldest} → {newest} ({span_days} days)")
+        sample = wide_rows[0]
+        populated = {k: v for k, v in sample.items() if v not in (None, "", 0)}
+        print(f"  sample keys with values: {sorted(populated.keys())}")
 
-    body = resp.json()
-    rows = body.get("earningsCalendar") or []
-    print(f"\nReturned {len(rows)} events")
-    if not rows:
-        print("verdict: shallow (free tier may be near-term only for this query shape)")
+    if len(wide_rows) > 4:
+        wide_verdict = "deep — per-symbol queries return multi-year history"
+    elif len(wide_rows) >= 2:
+        wide_verdict = "moderate — a few quarters available"
+    else:
+        wide_verdict = "shallow — effectively near-term only"
+    print(f"\nwide-window verdict: {wide_verdict}")
+
+    if not args.walk:
+        print(
+            "\nNext: re-run with --walk to test whether narrow historical "
+            "windows unlock past quarters (the deciding experiment for "
+            "full historical backfill on free tier)."
+        )
         return 0
 
-    dates = sorted([r.get("date") for r in rows if r.get("date")])
-    oldest, newest = dates[0], dates[-1]
-    span_days = (date.fromisoformat(newest[:10]) - date.fromisoformat(oldest[:10])).days
-    print(f"Date range: {oldest} → {newest} ({span_days} days)")
+    # Test 2: walk 90-day windows backward. If Finnhub returns events
+    # within each window even though it returns 1 for the wide query,
+    # window-walking is a viable backfill strategy.
+    print(f"\n--- walking 90-day windows backward for {symbol} ---")
+    quarters_back = args.years * 4
+    found_via_walk: list[tuple[str, str]] = []
+    seen_dates: set[str] = set(r.get("date", "")[:10] for r in wide_rows)
+    for q in range(1, quarters_back + 1):
+        window_end = today - timedelta(days=(q - 1) * 91)
+        window_start = window_end - timedelta(days=91)
+        try:
+            rows = fetch(token, symbol, window_start, window_end)
+        except requests.HTTPError as exc:
+            print(f"  Q-{q} {window_start}→{window_end}: HTTP error {exc}")
+            break
+        new_events = [r for r in rows if r.get("date", "")[:10] not in seen_dates]
+        seen_dates.update(r.get("date", "")[:10] for r in rows)
+        if new_events:
+            for r in new_events:
+                found_via_walk.append((r.get("date", "?"), r.get("quarter", "?")))
+            print(
+                f"  Q-{q} {window_start}→{window_end}: {len(rows)} events, "
+                f"{len(new_events)} NEW (e.g. {new_events[0].get('date')} "
+                f"Q{new_events[0].get('quarter')} eps={new_events[0].get('epsActual')})"
+            )
+        else:
+            print(f"  Q-{q} {window_start}→{window_end}: {len(rows)} events, 0 new")
 
-    # Sample row so it's obvious which fields are populated for historical
-    # events (esp. epsActual / revenueActual — null on future events).
-    sample = rows[0]
-    populated = {k: v for k, v in sample.items() if v not in (None, "", 0)}
-    print(f"Sample event keys with values: {sorted(populated.keys())}")
-
-    if len(rows) > 4:
-        verdict = "deep — per-symbol queries return multiple years of history"
-    elif len(rows) >= 2:
-        verdict = "moderate — a few quarters available"
+    print(f"\nWalk discovered {len(found_via_walk)} additional historical events")
+    if len(found_via_walk) >= quarters_back // 2:
+        walk_verdict = (
+            "WALKING WORKS — full historical backfill is viable. "
+            "Add a window-walking mode to sync_finnhub_earnings.py and run on weekends."
+        )
+    elif len(found_via_walk) > 0:
+        walk_verdict = (
+            "WALKING PARTIAL — some past quarters retrievable. "
+            "Worth a weekly Sunday sweep across the full universe."
+        )
     else:
-        verdict = "shallow — effectively near-term only"
-    print(f"\nverdict: {verdict}")
-    print(
-        "\nNext step: if 'deep', add a --symbols mode to sync_finnhub_earnings.py "
-        "and backfill watchlist + popular names overnight. If 'shallow', keep "
-        "the existing 3-call/day accumulation and let history fill in over time."
-    )
+        walk_verdict = (
+            "WALKING DOESN'T HELP — free tier truly returns only the most "
+            "recent event regardless of window. Accumulate forward over time."
+        )
+    print(f"\nwalk verdict: {walk_verdict}")
     return 0
 
 
