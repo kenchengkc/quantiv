@@ -271,6 +271,7 @@ def fetch_finnhub(
     token: str,
     symbol: str | None = None,
     budget: CallBudget | None = None,
+    delay_s: float = REQUEST_DELAY_S,
 ) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for chunk_start, chunk_end in date_chunks(start, end):
@@ -292,14 +293,16 @@ def fetch_finnhub(
                 time.sleep(2 ** attempt)
                 continue
             if resp.status_code == 429 and attempt < 2:
-                time.sleep(5)
+                # Backoff doubles each retry; 5s → 10s. Free tier is 60/min,
+                # so a single 429 means we briefly exceeded — recover quickly.
+                time.sleep(5 * (attempt + 1))
                 continue
             if not resp.ok:
                 raise RuntimeError(f"Finnhub HTTP {resp.status_code}: {resp.text[:300]}")
             body = resp.json()
             rows.extend(body.get("earningsCalendar") or [])
             break
-        time.sleep(REQUEST_DELAY_S)
+        time.sleep(delay_s)
     return rows
 
 
@@ -451,6 +454,28 @@ def main() -> int:
             "Set this to leave headroom for intraday quote workers (60/min)."
         ),
     )
+    parser.add_argument(
+        "--delay",
+        type=float,
+        default=REQUEST_DELAY_S,
+        help=(
+            "Seconds to sleep between Finnhub HTTP calls. Default "
+            f"{REQUEST_DELAY_S}s (≈ {int(60 / REQUEST_DELAY_S)}/min). "
+            "Use 1.05 for full-universe sweeps to stay under the 60/min "
+            "free-tier rate limit with margin (≈ 57/min)."
+        ),
+    )
+    parser.add_argument(
+        "--all-recent",
+        action="store_true",
+        help=(
+            "Replace --symbols with every ticker that has had an earnings "
+            "event in the last 2 years. Used for the weekly full-universe "
+            "Sunday sweep: catches the last reported event for every active "
+            "US ticker, which the broad daily fetch misses for anyone who "
+            "reported >~7 days ago."
+        ),
+    )
     parser.add_argument("--data-dir", type=Path, default=None)
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument(
@@ -460,8 +485,9 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    if args.symbol and args.symbols:
-        parser.error("--symbol and --symbols are mutually exclusive")
+    mutually_exclusive = sum(bool(x) for x in (args.symbol, args.symbols, args.all_recent))
+    if mutually_exclusive > 1:
+        parser.error("--symbol, --symbols, and --all-recent are mutually exclusive")
 
     start = args.from_date or (today - timedelta(days=args.past_days))
     end = args.to_date or (today + timedelta(days=args.future_days))
@@ -477,28 +503,51 @@ def main() -> int:
         print(f"✗ {msg}", file=sys.stderr)
         return 1
 
+    data_dir = args.data_dir or default_data_dir()
+    existing = load_existing(data_dir)
+
     symbols = parse_symbol_list(args.symbols)
     if args.symbol:
         symbols = [args.symbol.upper()]
+    if args.all_recent:
+        # Anyone who has reported in the last 2 years is treated as "active"
+        # for the purposes of the weekly sweep. Older-only tickers are
+        # almost certainly delisted; not worth the API calls.
+        recent_cutoff = today - timedelta(days=730)
+        symbols = sorted(
+            existing.loc[existing["date"] >= recent_cutoff, "act_symbol"]
+            .dropna()
+            .unique()
+            .tolist()
+        )
+        if not symbols:
+            print("⚠ --all-recent: no tickers found in existing earnings_calendar", file=sys.stderr)
+            return 1
 
     print(f"Finnhub earnings overlay: {start} → {end}")
     if symbols:
-        print(f"per-symbol mode: {len(symbols)} symbols ({', '.join(symbols[:8])}"
-              f"{'…' if len(symbols) > 8 else ''})")
+        eta_s = len(symbols) * args.delay
+        print(
+            f"per-symbol mode: {len(symbols)} symbols "
+            f"({', '.join(symbols[:8])}{'…' if len(symbols) > 8 else ''})"
+            f"  delay={args.delay}s  ETA≈{eta_s / 60:.0f} min"
+        )
     data_dir = args.data_dir or default_data_dir()
 
     budget = CallBudget(args.max_calls)
 
-    existing = load_existing(data_dir)
+    raw_rows: list[dict[str, Any]] = []
     try:
         if symbols:
-            raw_rows: list[dict[str, Any]] = []
             for i, sym in enumerate(symbols, 1):
-                if i == 1 or i % 25 == 0 or i == len(symbols):
-                    print(f"  [{i}/{len(symbols)}] {sym} (calls used: {budget.used})")
-                raw_rows.extend(fetch_finnhub(start, end, token, sym, budget=budget))
+                if i == 1 or i % 100 == 0 or i == len(symbols):
+                    print(f"  [{i}/{len(symbols)}] {sym} (calls used: {budget.used})",
+                          flush=True)
+                raw_rows.extend(
+                    fetch_finnhub(start, end, token, sym, budget=budget, delay_s=args.delay)
+                )
         else:
-            raw_rows = fetch_finnhub(start, end, token, None, budget=budget)
+            raw_rows = fetch_finnhub(start, end, token, None, budget=budget, delay_s=args.delay)
     except RuntimeError as exc:
         print(f"⚠ {exc}", file=sys.stderr)
         if budget.used == 0:
