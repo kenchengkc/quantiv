@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Sun, Moon, Info, ChevronLeft, ChevronRight, Search, Circle } from 'lucide-react';
+import { Sun, Moon, Info, ChevronLeft, ChevronRight, Search, Circle, Clock } from 'lucide-react';
 import { POPULAR_WEIGHT } from '@/lib/popular';
 import { companyName } from '@/lib/companyNames';
 import { useEnsureCompanyNames } from '@/lib/useCompanyNames';
@@ -62,6 +62,7 @@ function timingKey(t?: string) {
   const k = (t || '').toLowerCase();
   if (k === 'bmo' || k === 'before_market_open' || k === 'before_open') return 'bmo' as const;
   if (k === 'amc' || k === 'after_market_close' || k === 'after_close') return 'amc' as const;
+  if (k === 'dmh' || k === 'during_market_hours' || k === 'during_market_hour') return 'dmh' as const;
   return 'unknown' as const;
 }
 function logoUrl(t: string) {
@@ -341,6 +342,7 @@ function DayBlock({
 }) {
   const bmo = events.filter((e) => timingKey(e.timing) === 'bmo');
   const amc = events.filter((e) => timingKey(e.timing) === 'amc');
+  const dmh = events.filter((e) => timingKey(e.timing) === 'dmh');
   const unk = events.filter((e) => timingKey(e.timing) === 'unknown');
 
   return (
@@ -390,6 +392,13 @@ function DayBlock({
 
       <Group title="Before open" icon={<Sun size={12} />} list={bmo} tone="var(--flag)" live={live} />
       <Group title="After close" icon={<Moon size={12} />} list={amc} tone="var(--accent)" live={live} />
+      <Group
+        title="During market hours"
+        icon={<Clock size={12} />}
+        list={dmh}
+        tone="var(--ink-3)"
+        live={live}
+      />
       <Group
         title="Timing unconfirmed"
         icon={<Circle size={10} />}
