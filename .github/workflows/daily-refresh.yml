@@ -191,10 +191,17 @@ jobs:
       - name: Commit + push frontend data
         # data/forecasts is gitignored — the JSON in apps/frontend/public is
         # the only thing that ships to Vercel. Forecast parquet stays in R2.
+        #
+        # data/earnings_calendar.csv is tracked: every run merges DoltHub
+        # baseline + Finnhub overlay back into the canonical CSV. Committing
+        # it lets EPS/revenue surprise actuals accumulate over time instead
+        # of being re-fetched (and lost) on every run. Finnhub free tier
+        # only returns the most recent reported event per symbol, so without
+        # persistence the historical chart can never deepen past 1 quarter.
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name  "Quantiv bot"
-          git add apps/frontend/public
+          git add apps/frontend/public data/earnings_calendar.csv
           if git diff --staged --quiet; then
             echo "No changes to commit"
           else

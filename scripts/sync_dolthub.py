@@ -410,14 +410,43 @@ def sync_earnings():
     }
     df["timing"] = df["timing"].map(timing_map).fillna("unknown")
 
+    # Merge with existing CSV so we don't clobber Finnhub-overlaid columns
+    # (eps_actual, eps_estimate, revenue_*, fiscal_year, fiscal_q, source).
+    # DoltHub is the timing + universe baseline; Finnhub overlay adds the
+    # fundamentals. If we overwrite, every nightly CI run wipes the actuals
+    # we just spent calls fetching and the historical chart never deepens.
+    enriched_cols = [
+        "fiscal_year",
+        "fiscal_q",
+        "eps_actual",
+        "eps_estimate",
+        "revenue_actual",
+        "revenue_estimate",
+        "source",
+    ]
+    csv_path = data_dir() / "earnings_calendar.csv"
+    if csv_path.exists():
+        try:
+            existing = pd.read_csv(csv_path, keep_default_na=False)
+            existing["date"] = pd.to_datetime(existing["date"], errors="coerce").dt.date
+            existing = existing.dropna(subset=["date", "act_symbol"])
+            kept = [c for c in enriched_cols if c in existing.columns]
+            if kept:
+                df = df.merge(
+                    existing[["act_symbol", "date", *kept]],
+                    on=["act_symbol", "date"],
+                    how="left",
+                )
+                print(f"  Preserved {len(kept)} enriched column(s) from existing CSV: {kept}")
+        except Exception as exc:
+            print(f"  ⚠ Could not merge existing enriched columns: {exc}")
+
     # Write Parquet
     out_path = data_dir() / "earnings_calendar.parquet"
     table = pa.Table.from_pandas(df, preserve_index=False)
     pq.write_table(table, out_path, compression="snappy")
     print(f"  Written to {out_path}")
 
-    # Also write CSV for backward compatibility
-    csv_path = data_dir() / "earnings_calendar.csv"
     df.to_csv(csv_path, index=False)
     print(f"  Written to {csv_path}")
 

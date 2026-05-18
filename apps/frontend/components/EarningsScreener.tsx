@@ -74,10 +74,11 @@ type TimingFilter = 'all' | 'bmo' | 'amc';
 type LiveTick = { price: number | null; change: number | null; changePct: number | null };
 
 
-function timingBucket(t?: string): 'bmo' | 'amc' | 'unknown' {
+function timingBucket(t?: string): 'bmo' | 'amc' | 'dmh' | 'unknown' {
   const k = (t || '').toLowerCase();
   if (k.includes('before') || k === 'bmo') return 'bmo';
   if (k.includes('after') || k === 'amc') return 'amc';
+  if (k.includes('during') || k === 'dmh') return 'dmh';
   return 'unknown';
 }
 
@@ -85,6 +86,7 @@ function timingShort(t?: string) {
   const b = timingBucket(t);
   if (b === 'bmo') return 'BMO';
   if (b === 'amc') return 'AMC';
+  if (b === 'dmh') return 'DMH';
   return '—';
 }
 

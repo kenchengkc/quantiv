@@ -513,15 +513,24 @@ def main() -> int:
         # Anyone who has reported in the last 2 years is treated as "active"
         # for the purposes of the weekly sweep. Older-only tickers are
         # almost certainly delisted; not worth the API calls.
+        # Filter out foreign tickers (Taiwan .TW, Hong Kong .HK, Shanghai
+        # .SS, etc.) — Finnhub's free tier is US-only and returns HTTP 403
+        # for them. The free-tier 60/min budget is best spent on tickers
+        # we can actually fetch.
         recent_cutoff = today - timedelta(days=730)
-        symbols = sorted(
+        candidates = (
             existing.loc[existing["date"] >= recent_cutoff, "act_symbol"]
             .dropna()
             .unique()
             .tolist()
         )
+        us_only = [s for s in candidates if "." not in s and ":" not in s]
+        symbols = sorted(us_only)
+        skipped = len(candidates) - len(symbols)
+        if skipped:
+            print(f"--all-recent: skipping {skipped} non-US symbols (Finnhub free tier is US-only)")
         if not symbols:
-            print("⚠ --all-recent: no tickers found in existing earnings_calendar", file=sys.stderr)
+            print("⚠ --all-recent: no US tickers found in existing earnings_calendar", file=sys.stderr)
             return 1
 
     print(f"Finnhub earnings overlay: {start} → {end}")
@@ -537,15 +546,32 @@ def main() -> int:
     budget = CallBudget(args.max_calls)
 
     raw_rows: list[dict[str, Any]] = []
+    skipped_errors: dict[str, int] = {}
     try:
         if symbols:
             for i, sym in enumerate(symbols, 1):
                 if i == 1 or i % 100 == 0 or i == len(symbols):
                     print(f"  [{i}/{len(symbols)}] {sym} (calls used: {budget.used})",
                           flush=True)
-                raw_rows.extend(
-                    fetch_finnhub(start, end, token, sym, budget=budget, delay_s=args.delay)
-                )
+                try:
+                    raw_rows.extend(
+                        fetch_finnhub(start, end, token, sym, budget=budget, delay_s=args.delay)
+                    )
+                except RuntimeError as exc:
+                    msg = str(exc)
+                    # Budget exhausted is fatal for the loop — re-raise so
+                    # the outer handler captures it and prints partial-data
+                    # message. Everything else (403 on foreign tickers,
+                    # 404 on delisted symbols, transient 5xx) is per-symbol;
+                    # log, count, and continue.
+                    if "budget exhausted" in msg:
+                        raise
+                    key = msg.split(":")[0][:32]
+                    skipped_errors[key] = skipped_errors.get(key, 0) + 1
+                    if skipped_errors[key] <= 3:
+                        print(f"  ⚠ {sym}: {msg[:100]}")
+                    elif skipped_errors[key] == 4:
+                        print(f"  ⚠ (suppressing further '{key}' messages)")
         else:
             raw_rows = fetch_finnhub(start, end, token, None, budget=budget, delay_s=args.delay)
     except RuntimeError as exc:
@@ -553,6 +579,10 @@ def main() -> int:
         if budget.used == 0:
             return 1
         print("  proceeding with partial data already fetched")
+    if skipped_errors:
+        print(f"  skipped {sum(skipped_errors.values())} symbols due to per-symbol errors:")
+        for key, count in sorted(skipped_errors.items(), key=lambda kv: -kv[1]):
+            print(f"    {count:>5}  {key}")
     overlay = normalize_finnhub(raw_rows)
     merged, stats = merge_overlay(existing, overlay)
     stats["finnhub_calls"] = budget.used
