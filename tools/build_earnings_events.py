@@ -93,21 +93,192 @@ def build_earnings_events_table(conn: duckdb.DuckDBPyConnection, earnings_csv: P
     
     # Create index for fast lookups
     conn.execute("CREATE INDEX IF NOT EXISTS idx_earnings_ticker_dt ON earnings_events(ticker, earnings_dt)")
-    
+
+    # `timing_source` flags whether each row's timing came from the
+    # original calendar feed ('reported') or was filled in by the
+    # history-based inference below. Lets us audit accuracy later.
+    conn.execute("""
+        ALTER TABLE earnings_events
+        ADD COLUMN timing_source VARCHAR DEFAULT 'reported'
+    """)
+    conn.execute("""
+        UPDATE earnings_events
+        SET timing_source = 'unknown'
+        WHERE timing = 'unknown'
+    """)
+
     count = conn.execute("SELECT COUNT(*) FROM earnings_events").fetchone()[0]
     print(f"✅ Created earnings_events table with {count:,} events")
-    
+
+    # Backfill 'unknown' timings using each ticker's reporting history.
+    infer_unknown_timings(conn)
+
     # Show sample data
     sample = conn.execute("""
-        SELECT ticker, earnings_dt, timing, fiscal_q 
-        FROM earnings_events 
-        ORDER BY earnings_dt DESC 
+        SELECT ticker, earnings_dt, timing, fiscal_q
+        FROM earnings_events
+        ORDER BY earnings_dt DESC
         LIMIT 5
     """).fetchall()
-    
+
     print("Sample events:")
     for row in sample:
         print(f"  {row[0]} | {row[1]} | {row[2]} | {row[3]}")
+
+
+def infer_unknown_timings(conn: duckdb.DuckDBPyConnection) -> None:
+    """Backfill rows where timing = 'unknown' by looking at each
+    ticker's recent reporting history.
+
+    Rule cascade (apply in order, stop at first that produces an answer):
+      1. The most recent 3 known-timing reports all agree → use that.
+      2. Majority of the most recent 5 reports (if 5 are available).
+         N=5 is odd so a majority always exists (worst case 3-2).
+      3. Majority of the most recent 4 reports (if 4 are available, 5
+         wasn't). N=4 can be a 2-2 tie → no majority → fall through to
+         Rule 4 instead of leaving the row unknown.
+      4. Majority of the most recent 3 reports (2 of 3 agree). Used both
+         as a primary path (when fewer than 4 prior reports exist) and
+         as the fallback when Rule 3 hit a 2-2 tie.
+    Otherwise leave the row 'unknown'.
+
+    Only `before_market_open` and `after_market_close` participate in the
+    cascade. `during_market_hours` and `unknown` are excluded from the
+    history window — they don't predict anything reliable. The fired
+    rule is recorded in `timing_source` for auditing.
+
+    Companies almost always report at the same time each quarter (>90%
+    by hand-survey), so this fills in the source feed's empty timings
+    without sacrificing much accuracy. Rows that resist all four rules
+    typically belong to companies in a reporting-time transition or
+    with very short histories — those stay 'unknown', which is the
+    correct conservative fallback.
+    """
+    unknowns = conn.execute("""
+        SELECT ticker, earnings_dt
+        FROM earnings_events
+        WHERE timing = 'unknown'
+        ORDER BY ticker, earnings_dt
+    """).fetchall()
+    if not unknowns:
+        print("  (no unknown-timing rows to backfill)")
+        return
+
+    # Pre-pull all known-timing reports indexed by ticker so the inner
+    # loop is a dict lookup, not 1+ SQL query per unknown row.
+    known_rows = conn.execute("""
+        SELECT ticker, earnings_dt, timing
+        FROM earnings_events
+        WHERE timing IN ('before_market_open', 'after_market_close')
+        ORDER BY ticker, earnings_dt DESC
+    """).fetchall()
+    history_by_ticker: Dict[str, list] = {}
+    for ticker, dt, timing in known_rows:
+        history_by_ticker.setdefault(ticker, []).append((dt, timing))
+
+    def majority_of(values: list) -> str | None:
+        """Return the value appearing strictly more than half the time,
+        or None on a tie. Only meaningful for 3-element lists here."""
+        if not values:
+            return None
+        bmo = sum(1 for v in values if v == 'before_market_open')
+        amc = sum(1 for v in values if v == 'after_market_close')
+        if bmo > amc:
+            return 'before_market_open'
+        if amc > bmo:
+            return 'after_market_close'
+        return None  # tie → no majority
+
+    # Build a batch of updates: (ticker, earnings_dt, inferred_timing, source_tag)
+    updates: list[tuple[str, Any, str, str]] = []
+    for ticker, unknown_dt in unknowns:
+        history = history_by_ticker.get(ticker, [])
+        # Only consider reports STRICTLY EARLIER than this unknown event —
+        # otherwise a future unknown could be "informed" by a later report
+        # we already inferred backwards in time.
+        prior = [t for (d, t) in history if d < unknown_dt]
+        if len(prior) < 2:
+            continue
+
+        n3 = prior[:3]
+        n4 = prior[:4]
+        n5 = prior[:5]
+
+        inferred: str | None = None
+        source: str | None = None
+
+        # Rule 1 — most recent 3 unanimous.
+        if len(n3) == 3 and len(set(n3)) == 1:
+            inferred, source = n3[0], 'inferred_all_3'
+        # Rule 2 — majority of most recent 5 (if 5 available). With two
+        # categories and N=5 (odd), a majority always exists.
+        if inferred is None and len(n5) == 5:
+            maj = majority_of(n5)
+            if maj is not None:
+                inferred, source = maj, 'inferred_majority_5'
+        # Rule 3 — majority of most recent 4 (if 4 available, 5 wasn't).
+        # N=4 can produce a 2-2 tie with no majority — in that case
+        # we leave `inferred` as None and fall through to Rule 4.
+        if inferred is None and len(n4) == 4:
+            maj = majority_of(n4)
+            if maj is not None:
+                inferred, source = maj, 'inferred_majority_4'
+        # Rule 4 — majority of most recent 3 (fallback).
+        if inferred is None and len(n3) >= 2:
+            maj = majority_of(n3)
+            if maj is not None:
+                inferred, source = maj, 'inferred_majority_3'
+
+        if inferred is not None:
+            updates.append((ticker, unknown_dt, inferred, source))
+
+    if not updates:
+        print(f"  ({len(unknowns):,} unknown-timing rows; none satisfied any rule)")
+        return
+
+    # Apply updates in one transaction. DuckDB doesn't have batch-UPDATE
+    # via executemany on a row-level WHERE, so we INSERT into a temp
+    # table and UPDATE FROM it.
+    conn.execute("""
+        CREATE OR REPLACE TEMP TABLE _timing_infer AS
+        SELECT
+            NULL::VARCHAR AS ticker,
+            NULL::DATE    AS earnings_dt,
+            NULL::VARCHAR AS new_timing,
+            NULL::VARCHAR AS new_source
+        WHERE 1 = 0
+    """)
+    conn.executemany(
+        "INSERT INTO _timing_infer VALUES (?, ?, ?, ?)",
+        updates,
+    )
+    conn.execute("""
+        UPDATE earnings_events e
+        SET timing = i.new_timing,
+            timing_source = i.new_source
+        FROM _timing_infer i
+        WHERE e.ticker = i.ticker
+          AND e.earnings_dt = i.earnings_dt
+    """)
+    conn.execute("DROP TABLE _timing_infer")
+
+    # Summary: how many rows landed in each rule.
+    breakdown = conn.execute("""
+        SELECT timing_source, COUNT(*)
+        FROM earnings_events
+        WHERE timing_source LIKE 'inferred%'
+        GROUP BY timing_source
+        ORDER BY timing_source
+    """).fetchall()
+    still_unknown = conn.execute("""
+        SELECT COUNT(*) FROM earnings_events WHERE timing = 'unknown'
+    """).fetchone()[0]
+    print(
+        f"  inferred {len(updates):,} of {len(unknowns):,} unknown-timing rows; "
+        f"{still_unknown:,} remain 'unknown'"
+    )
+    for source, n in breakdown:
+        print(f"    {source}: {n:,}")
 
 def create_duckdb_views(conn: duckdb.DuckDBPyConnection, data_dir: Path):
     """Create DuckDB views for options_chain and volatility_history."""
