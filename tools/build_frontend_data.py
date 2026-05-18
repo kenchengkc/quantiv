@@ -12,6 +12,7 @@ Uses the most recent parquet snapshot as the as-of date. Safe to re-run.
 
 import json
 import math
+import os
 import sys
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -710,6 +711,29 @@ def main():
     if as_of_date is None:
         print("❌ No options data available")
         sys.exit(1)
+
+    # Staleness guardrail. CI's daily-refresh pulls fresh parquet from R2
+    # before building, so as_of_date should be within a few days of today.
+    # Running this script with weeks-old local parquet produces empty
+    # upcoming-week JSONs and silently regresses production data. Bail
+    # loudly instead. Set ALLOW_STALE_OPTIONS=1 to override (e.g. for
+    # offline development or testing historical snapshots).
+    age_days = (date.today() - as_of_date).days
+    stale_threshold = int(os.getenv("STALE_OPTIONS_MAX_DAYS", "7"))
+    if age_days > stale_threshold and not os.getenv("ALLOW_STALE_OPTIONS"):
+        print(
+            f"❌ Options chain is {age_days} days stale "
+            f"(as_of={as_of_date}, today={date.today()}, "
+            f"threshold={stale_threshold}d).\n"
+            "   Run `bash scripts/r2_pull.sh` to refresh local parquet, "
+            "or set ALLOW_STALE_OPTIONS=1 to override.\n"
+            "   Building with stale data produces empty upcoming-week "
+            "JSONs and regresses production. Aborting.",
+            file=sys.stderr,
+        )
+        sys.exit(2)
+    if age_days > 1:
+        print(f"⚠ Options chain is {age_days} days old (as_of={as_of_date})")
 
     today = date.today()
     this_monday = monday_of_week(today) if today.weekday() < 5 else today + timedelta(days=(7 - today.weekday()))
