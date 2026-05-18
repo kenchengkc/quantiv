@@ -2,9 +2,9 @@
 /**
  * SEC EDGAR ticker-name ingest.
  *
- * Fetches https://www.sec.gov/files/company_tickers.json (the canonical
- * US-public-company registry — free, no auth, ~10k entries) and writes a
- * normalized `{ ticker: name }` map to apps/frontend/public/ticker-names.json.
+ * Fetches SEC's free US-public-company registry files and writes:
+ *   - apps/frontend/public/ticker-names.json      → { ticker: name }
+ *   - apps/frontend/public/ticker-exchanges.json → { ticker: listing exchange }
  *
  * The frontend's companyName() consults this file as the third fallback,
  * after the hand-curated COMPANY_NAMES map and the S&P 500 constituents
@@ -21,14 +21,21 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '..');
-const DEST = path.join(REPO_ROOT, 'apps/frontend/public/ticker-names.json');
+const NAMES_DEST = path.join(REPO_ROOT, 'apps/frontend/public/ticker-names.json');
+const EXCHANGES_DEST = path.join(REPO_ROOT, 'apps/frontend/public/ticker-exchanges.json');
 
-const SOURCE = 'https://www.sec.gov/files/company_tickers.json';
+const NAMES_SOURCE = 'https://www.sec.gov/files/company_tickers.json';
+const NASDAQ_LISTED_SOURCE = 'https://www.nasdaqtrader.com/dynamic/SymDir/nasdaqlisted.txt';
+const OTHER_LISTED_SOURCE = 'https://www.nasdaqtrader.com/dynamic/SymDir/otherlisted.txt';
 const SEC_HEADERS = {
   // SEC requires a descriptive User-Agent for any programmatic access;
   // anonymous requests return 403.
   'User-Agent': 'Quantiv ticker-names ingest (ken@quantiv.app)',
   Accept: 'application/json',
+};
+const SYMBOL_DIR_HEADERS = {
+  'User-Agent': 'Quantiv ticker-exchanges ingest (ken@quantiv.app)',
+  Accept: 'text/plain,*/*',
 };
 
 // ───── Casing rules ─────────────────────────────────────────────────────
@@ -231,13 +238,49 @@ function stripLegalSuffix(name) {
 }
 
 // ───── Fetch & write ────────────────────────────────────────────────────
-async function main() {
-  console.log(`Fetching ${SOURCE}…`);
-  const res = await fetch(SOURCE, { headers: SEC_HEADERS });
+const OTHER_LISTED_EXCHANGE_MAP = {
+  A: 'NYSE American',
+  N: 'NYSE',
+  P: 'NYSE Arca',
+  Z: 'Cboe BZX',
+  V: 'IEX',
+};
+
+function normalizeTicker(ticker) {
+  return String(ticker || '').toUpperCase().trim().replace(/\./g, '-');
+}
+
+async function fetchJson(url) {
+  console.log(`Fetching ${url}…`);
+  const res = await fetch(url, { headers: SEC_HEADERS });
   if (!res.ok) {
-    throw new Error(`SEC EDGAR returned ${res.status} ${res.statusText}`);
+    throw new Error(`SEC EDGAR returned ${res.status} ${res.statusText} for ${url}`);
   }
-  const data = await res.json();
+  return res.json();
+}
+
+async function fetchText(url) {
+  console.log(`Fetching ${url}…`);
+  const res = await fetch(url, { headers: SYMBOL_DIR_HEADERS });
+  if (!res.ok) {
+    throw new Error(`Symbol directory returned ${res.status} ${res.statusText} for ${url}`);
+  }
+  return res.text();
+}
+
+function parsePipeTable(text) {
+  const lines = text.split(/\r?\n/).filter((line) => line && !line.startsWith('File Creation Time'));
+  const header = lines.shift()?.split('|') ?? [];
+  return lines.map((line) => {
+    const cells = line.split('|');
+    return Object.fromEntries(header.map((h, i) => [h, cells[i] ?? '']));
+  });
+}
+
+async function main() {
+  const data = await fetchJson(NAMES_SOURCE);
+  const nasdaqListedText = await fetchText(NASDAQ_LISTED_SOURCE);
+  const otherListedText = await fetchText(OTHER_LISTED_SOURCE);
 
   const out = {};
   let normalized = 0;
@@ -255,16 +298,39 @@ async function main() {
     if (!(tk in out)) out[tk] = fixed;
   }
 
+  const exchanges = {};
+  let exchangeSkipped = 0;
+  for (const row of parsePipeTable(nasdaqListedText)) {
+    if (row['Test Issue'] === 'Y') continue;
+    const tk = normalizeTicker(row.Symbol);
+    if (!tk) { exchangeSkipped += 1; continue; }
+    if (!(tk in exchanges)) exchanges[tk] = 'NASDAQ';
+  }
+  for (const row of parsePipeTable(otherListedText)) {
+    if (row['Test Issue'] === 'Y') continue;
+    const tk = normalizeTicker(row['ACT Symbol']);
+    const exchange = OTHER_LISTED_EXCHANGE_MAP[row.Exchange];
+    if (!tk || !exchange) { exchangeSkipped += 1; continue; }
+    if (!(tk in exchanges)) exchanges[tk] = exchange;
+  }
+
   const count = Object.keys(out).length;
   console.log(
     `Parsed ${count} tickers (${normalized} casing-normalized, ${skipped} skipped)`,
   );
+  const exchangeCount = Object.keys(exchanges).length;
+  console.log(
+    `Parsed ${exchangeCount} ticker exchanges (${exchangeSkipped} skipped)`,
+  );
 
-  await fs.mkdir(path.dirname(DEST), { recursive: true });
+  await fs.mkdir(path.dirname(NAMES_DEST), { recursive: true });
   // Compact JSON (no pretty-printing) keeps the served file ~30% smaller.
-  await fs.writeFile(DEST, JSON.stringify(out) + '\n');
-  const stat = await fs.stat(DEST);
-  console.log(`Wrote ${DEST} (${(stat.size / 1024).toFixed(1)} kB)`);
+  await fs.writeFile(NAMES_DEST, JSON.stringify(out) + '\n');
+  await fs.writeFile(EXCHANGES_DEST, JSON.stringify(exchanges) + '\n');
+  const namesStat = await fs.stat(NAMES_DEST);
+  const exchangesStat = await fs.stat(EXCHANGES_DEST);
+  console.log(`Wrote ${NAMES_DEST} (${(namesStat.size / 1024).toFixed(1)} kB)`);
+  console.log(`Wrote ${EXCHANGES_DEST} (${(exchangesStat.size / 1024).toFixed(1)} kB)`);
 }
 
 main().catch((err) => {
