@@ -58,8 +58,8 @@ def main() -> int:
     p.add_argument(
         "--max-row-drop-pct",
         type=float,
-        default=2.0,
-        help="Fail if total row count drops more than this percent (default 2.0)",
+        default=1.0,
+        help="Fail if total row count drops more than this percent (default 1.0)",
     )
     p.add_argument(
         "--max-ticker-drop",
@@ -68,10 +68,16 @@ def main() -> int:
         help="Fail if more than this many tickers vanish from the universe (default 50)",
     )
     p.add_argument(
-        "--max-week-drop-pct",
-        type=float,
-        default=20.0,
-        help="Fail if last-7-day event count drops more than this percent (default 20.0)",
+        "--max-past-vanished",
+        type=int,
+        default=30,
+        help="Fail if more than this many (ticker, date) events from the past 30 days vanish vs HEAD (default 30)",
+    )
+    p.add_argument(
+        "--max-future-vanished",
+        type=int,
+        default=30,
+        help="Fail if more than this many (ticker, date) events in the next 60 days vanish vs HEAD (default 30)",
     )
     p.add_argument(
         "--anchor-min-history",
@@ -122,12 +128,28 @@ def main() -> int:
     removed = k_old - k_new
     print(f"Events: +{len(added):,} added, −{len(removed):,} removed")
 
-    # Last 7 days
+    # Past 30d / next 60d windows. We compare SETS of (ticker, date) keys
+    # across CSVs — not bare counts — so events naturally rolling out of
+    # the window don't look like a regression. Only events that existed
+    # in HEAD's window AND are missing from the new CSV count as
+    # "vanished" (the actual silent-drop signature).
     today = pd.Timestamp.today().date()
-    week_ago = today - pd.Timedelta(days=7)
-    week_new = sum(1 for _, d in k_new if week_ago <= d <= today)
-    week_old = sum(1 for _, d in k_old if week_ago <= d <= today)
-    print(f"Last 7d: {fmt_delta(week_new, week_old)}")
+    past_start = today - pd.Timedelta(days=30)
+    future_end = today + pd.Timedelta(days=60)
+    past_old = {k for k in k_old if past_start <= k[1] <= today}
+    past_new = {k for k in k_new if past_start <= k[1] <= today}
+    future_old = {k for k in k_old if today < k[1] <= future_end}
+    future_new = {k for k in k_new if today < k[1] <= future_end}
+    past_vanished = past_old - past_new
+    future_vanished = future_old - future_new
+    print(
+        f"Past 30d:  {len(past_new):,} events  "
+        f"({len(past_vanished):,} vanished vs HEAD, {len(past_new - past_old):,} new)"
+    )
+    print(
+        f"Next 60d:  {len(future_new):,} events  "
+        f"({len(future_vanished):,} vanished vs HEAD, {len(future_new - future_old):,} new)"
+    )
 
     print()
 
@@ -153,15 +175,23 @@ def main() -> int:
             f"(threshold: {args.max_ticker_drop}). Sample: {sample}"
         )
 
-    # 3. Last-7-day event count drop
-    if week_old > 0:
-        week_drop_pct = (week_old - week_new) / week_old * 100
-        if week_drop_pct > args.max_week_drop_pct:
-            tripped.append(
-                f"Last-7-day event count dropped {week_drop_pct:.2f}% "
-                f"(threshold: {args.max_week_drop_pct}%, "
-                f"{week_old} → {week_new})"
-            )
+    # 3. Past 30d events vanishing (regressing already-happened earnings).
+    if len(past_vanished) > args.max_past_vanished:
+        sample = sorted(past_vanished, key=lambda x: (x[1], x[0]), reverse=True)[:15]
+        tripped.append(
+            f"{len(past_vanished):,} events from the past 30 days vanished vs HEAD "
+            f"(threshold: {args.max_past_vanished}). Sample: {sample}"
+        )
+
+    # 4. Next 60d events vanishing (regressing upcoming earnings — the
+    #    signature of the 2026-05-18 bug, where 712 of the 961 dropped
+    #    rows were future-dated upcoming events).
+    if len(future_vanished) > args.max_future_vanished:
+        sample = sorted(future_vanished, key=lambda x: (x[1], x[0]))[:15]
+        tripped.append(
+            f"{len(future_vanished):,} events in the next 60 days vanished vs HEAD "
+            f"(threshold: {args.max_future_vanished}). Sample: {sample}"
+        )
 
     # 4. Anchor tickers losing all rows. "Anchor" = had ≥N historical rows
     #    in the prior CSV — established names whose disappearance signals
