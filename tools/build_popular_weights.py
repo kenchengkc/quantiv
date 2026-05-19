@@ -104,8 +104,15 @@ def main() -> int:
     # Filter to tickers that ACTUALLY file earnings — exclude preferred
     # stock vehicles (STRC/STRK/STRF for MSTR's BTC raises), delisted
     # remnants, and other zombie symbols that have high residual flow but
-    # no real corporate reporting. "Recent earner" = at least one
-    # earnings event in the past 365 days.
+    # no real corporate reporting. "Active reporter" = at least one
+    # earnings event in past 365 days OR future. The OR-of-sides catches:
+    #   - Established quarterly reporters (past entries) ✓
+    #   - Fresh IPOs whose first earnings is scheduled but not yet filed
+    #     (e.g. SpaceX IPO — popular by trading flow + market cap but no
+    #     past 10-Q yet). Future entry alone is enough. ✓
+    #   - Recently delisted: past entries age out within 365d → naturally
+    #     filtered as time passes.
+    # Both-sides-empty (no past in window, no future projection) = zombie.
     dv_rows = conn.execute(
         f"""
         WITH dv AS (
@@ -115,13 +122,14 @@ def main() -> int:
               AND volume IS NOT NULL AND close IS NOT NULL
             GROUP BY act_symbol
         ),
-        recent_earners AS (
+        active_reporters AS (
             SELECT DISTINCT act_symbol
             FROM v_earnings
             WHERE date >= CURRENT_DATE - INTERVAL '365' DAY
+               OR date > CURRENT_DATE
         )
         SELECT d.act_symbol, d.dv
-        FROM dv d JOIN recent_earners e USING (act_symbol)
+        FROM dv d JOIN active_reporters e USING (act_symbol)
         ORDER BY d.dv DESC
         """
     ).fetchall()
