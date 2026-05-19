@@ -151,6 +151,14 @@ jobs:
       - name: Score upcoming earnings
         run: python scripts/daily_score.py --days-ahead 21
 
+      - name: Build popular-ticker weights
+        # Regenerate apps/frontend/lib/popular.ts from the top 100 tickers
+        # by 90-day dollar volume (filtered to symbols with earnings).
+        # Captures retail favorites (HOOD/MSTR/PLTR/COIN) and recent IPOs
+        # (CRWV/RKLB/CRCL) without hand-curation. Replaces the stale
+        # 47-entry static map.
+        run: python -u tools/build_popular_weights.py
+
       - name: Build frontend JSON
         run: python -u tools/build_frontend_data.py
 
@@ -226,7 +234,7 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name  "Quantiv bot"
-          git add apps/frontend/public
+          git add apps/frontend/public apps/frontend/lib/popular.ts
           git add -f data/earnings_calendar.csv
           if git diff --staged --quiet; then
             echo "No changes to commit"
