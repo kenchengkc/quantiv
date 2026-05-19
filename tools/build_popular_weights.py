@@ -43,7 +43,7 @@ import duckdb
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DB_PATH = REPO_ROOT / "data" / "quantiv.duckdb"
 OUT_PATH = REPO_ROOT / "apps" / "frontend" / "lib" / "popular.ts"
-TOP_N = 100
+TOP_N = 200
 WINDOW_DAYS = 90
 MIN_WEIGHT = 76  # must match the >=76 filter in EarningsGrid.tsx
 MAX_WEIGHT = 100
