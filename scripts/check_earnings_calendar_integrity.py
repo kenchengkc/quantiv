@@ -21,6 +21,13 @@ from pathlib import Path
 
 import pandas as pd
 
+# Single source of truth for the foreign-suffix denylist (US dual-class
+# share classes like BRK.B / BF.B / MOG.A / GRP.U stay correctly
+# classified as US). Both scripts live in scripts/, so a sibling import
+# works when invoked as `python scripts/check_earnings_calendar_integrity.py`.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from sync_finnhub_earnings import is_us_symbol  # noqa: E402
+
 CSV_PATH = Path("data/earnings_calendar.csv")
 
 
@@ -55,29 +62,39 @@ def fmt_delta(new: int, old: int) -> str:
 
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__)
+    # Thresholds tuned 2026-05-18 against the first full nightly CI run after
+    # commit d8d97f0 (CSV persisted across runs). Observed daily churn vs the
+    # prior committed CSV: ~300 US-only past-30d vanishes, ~90 US-only next-60d
+    # vanishes, and ~1.5% row drop — almost entirely DoltHub's daily aggregator
+    # revisions (small-cap projection dates that shift by ±5-10 days as the
+    # SEC filing deadline approaches), not data loss. The anchor-ticker gate
+    # (any anchor with ≥10 prior rows losing ALL rows) is the real silent-drop
+    # protection; these per-event thresholds are secondary backstops sized
+    # well below the 712-row failure mode of the 2026-05-18 sync_dolthub
+    # left-join bug.
     p.add_argument(
         "--max-row-drop-pct",
         type=float,
-        default=1.0,
-        help="Fail if total row count drops more than this percent (default 1.0)",
+        default=2.5,
+        help="Fail if US-only row count drops more than this percent (default 2.5)",
     )
     p.add_argument(
         "--max-ticker-drop",
         type=int,
         default=50,
-        help="Fail if more than this many tickers vanish from the universe (default 50)",
+        help="Fail if more than this many US tickers vanish from the universe (default 50)",
     )
     p.add_argument(
         "--max-past-vanished",
         type=int,
-        default=30,
-        help="Fail if more than this many (ticker, date) events from the past 30 days vanish vs HEAD (default 30)",
+        default=400,
+        help="Fail if more than this many US (ticker, date) events from the past 30 days vanish vs HEAD (default 400)",
     )
     p.add_argument(
         "--max-future-vanished",
         type=int,
-        default=30,
-        help="Fail if more than this many (ticker, date) events in the next 60 days vanish vs HEAD (default 30)",
+        default=150,
+        help="Fail if more than this many US (ticker, date) events in the next 60 days vanish vs HEAD (default 150)",
     )
     p.add_argument(
         "--anchor-min-history",
@@ -145,17 +162,24 @@ def main() -> int:
     # dropped silently) is still caught because dropped tickers have zero
     # nearby rows. Anchor-ticker gate (below) provides a second safety net.
     DATE_DRIFT_DAYS = 14
+
     today = pd.Timestamp.today().date()
     past_start = today - pd.Timedelta(days=30)
     future_end = today + pd.Timedelta(days=60)
-    past_old = {k for k in k_old if past_start <= k[1] <= today}
-    past_new = {k for k in k_new if past_start <= k[1] <= today}
-    future_old = {k for k in k_old if today < k[1] <= future_end}
-    future_new = {k for k in k_new if today < k[1] <= future_end}
+    # Restrict the windows to US-only keys. sync_dolthub.py's universe gate
+    # intentionally trims foreign-suffix tickers (.HK/.KS/.TW/.TA/.OL/.PA/
+    # .TO/.L/.BR/.IR/.V/.PA/etc.) every run — events for those tickers
+    # vanishing is expected behavior, not a regression. We measure the
+    # vanished-event count on the US subset only.
+    past_old = {k for k in k_old if past_start <= k[1] <= today and is_us_symbol(k[0])}
+    past_new = {k for k in k_new if past_start <= k[1] <= today and is_us_symbol(k[0])}
+    future_old = {k for k in k_old if today < k[1] <= future_end and is_us_symbol(k[0])}
+    future_new = {k for k in k_new if today < k[1] <= future_end and is_us_symbol(k[0])}
 
     new_dates_by_ticker: dict[str, list] = {}
     for sym, d in k_new:
-        new_dates_by_ticker.setdefault(sym, []).append(d)
+        if is_us_symbol(sym):
+            new_dates_by_ticker.setdefault(sym, []).append(d)
 
     def _rescued(sym, d) -> bool:
         nearby = new_dates_by_ticker.get(sym)
@@ -187,12 +211,8 @@ def main() -> int:
 
     # 1. Total row count drop — measured on the US-only subset so that
     #    sync_dolthub's foreign-symbol cleanup doesn't trip the gate.
-    def _is_us(s: str) -> bool:
-        s = str(s)
-        return "." not in s and ":" not in s
-
-    old_us = old[old["act_symbol"].map(_is_us)]
-    new_us = new[new["act_symbol"].map(_is_us)]
+    old_us = old[old["act_symbol"].map(is_us_symbol)]
+    new_us = new[new["act_symbol"].map(is_us_symbol)]
     if len(old_us) > 0:
         row_drop_pct = (len(old_us) - len(new_us)) / len(old_us) * 100
         print(
@@ -207,14 +227,14 @@ def main() -> int:
             )
 
     # 2. Vanished tickers — but exclude foreign symbols, which sync_dolthub's
-    #    universe gate (commit 9876311e) intentionally trims out. A '.' or ':'
-    #    in the ticker reliably identifies a foreign exchange suffix
-    #    (.HK/.KS/.TW/.TA/.OL/.TO/etc.) or a Bloomberg-style listing code.
-    #    Those rows leak into the CSV during broad Finnhub overlays and get
+    #    universe gate (commit 9876311e) intentionally trims out. Foreign
+    #    rows leak into the CSV during broad Finnhub overlays and get
     #    cleaned up the next time sync_dolthub runs — expected behavior, not
-    #    a regression.
+    #    a regression. Uses the shared is_us_symbol denylist so US dual-class
+    #    share tickers (BRK.B, BF.B, MOG.A, GRP.U) are correctly counted as
+    #    US and a regression affecting them would still trip the gate.
     vanished_all = set(old["act_symbol"]) - set(new["act_symbol"])
-    foreign_trimmed = {t for t in vanished_all if "." in str(t) or ":" in str(t)}
+    foreign_trimmed = {t for t in vanished_all if not is_us_symbol(t)}
     vanished = vanished_all - foreign_trimmed
     if foreign_trimmed:
         print(f"  ({len(foreign_trimmed):,} foreign-symbol trims excluded from gate)")
