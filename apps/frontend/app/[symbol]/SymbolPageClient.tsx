@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ChevronLeft } from 'lucide-react';
 import { SignedIn, SignedOut, SignInButton } from '@clerk/nextjs';
@@ -1271,7 +1271,13 @@ function buildHistorySeries(
 // dots. Bars are green for beat, red for miss, hollow gray for missing.
 // Renders nothing when the entire series lacks EPS data, so older AAPL
 // payloads (pre-Finnhub overlay) degrade gracefully.
-function EpsSurpriseStrip({
+// Compact fundamentals strip showing EPS + revenue surprise as
+// colored chips per quarter. Aligned with HistoryChart's columns so
+// hover state highlights the same quarter across both. Rendered
+// BELOW the realized-move chart (the chart is the hero — surprise
+// is supporting context). Hidden entirely when the series has no
+// fundamentals data.
+function SurpriseStrip({
   history,
   hoveredIndex,
   onHover,
@@ -1280,124 +1286,91 @@ function EpsSurpriseStrip({
   hoveredIndex: number | null;
   onHover: (i: number | null) => void;
 }) {
-  const W = 640;
-  const H = 56;
-  const P = 36;
-  const hasAny = history.some((h) => h.epsSurprise != null);
-  if (!hasAny) return null;
+  const hasEps = history.some((h) => h.epsSurprise != null);
+  const hasRev = history.some((h) => h.revSurprise != null);
+  if (!hasEps && !hasRev) return null;
 
-  // Clamp to ±20% for layout; anything larger lives on top of the chart
-  // as a clipped bar with the exact value in the tooltip.
-  const cap = 0.2;
-  const colW = (W - P * 2) / history.length;
-  const y = (v: number) => H / 2 - (Math.max(-cap, Math.min(cap, v)) / cap) * (H / 2 - 8);
+  const rows: { label: string; key: keyof HistoryPoint }[] = [];
+  if (hasEps) rows.push({ label: 'EPS', key: 'epsSurprise' });
+  if (hasRev) rows.push({ label: 'Rev', key: 'revSurprise' });
 
   return (
-    <div style={{ marginTop: 18 }}>
+    <div
+      style={{
+        marginTop: 20,
+        paddingTop: 16,
+        borderTop: '1px solid var(--line)',
+      }}
+    >
       <div
         style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'baseline',
-          marginBottom: 4,
+          display: 'grid',
+          gridTemplateColumns: `36px repeat(${history.length}, 1fr)`,
+          rowGap: 6,
+          alignItems: 'center',
         }}
       >
-        <div
-          style={{
-            fontSize: 10,
-            letterSpacing: '0.16em',
-            textTransform: 'uppercase',
-            color: 'var(--ink-3)',
-          }}
-        >
-          EPS surprise
-        </div>
-        <div className="mono" style={{ fontSize: 10, color: 'var(--ink-4)' }}>
-          non-GAAP · vs sell-side consensus
-        </div>
-      </div>
-      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto' }}>
-        <line
-          x1={P}
-          x2={W - P}
-          y1={H / 2}
-          y2={H / 2}
-          stroke="var(--line)"
-        />
-        {history.map((h, i) => {
-          const cx = P + colW * i + colW / 2;
-          const s = h.epsSurprise;
-          if (s == null) {
-            return (
-              <g key={`eps-${h.date}-${i}`} onMouseEnter={() => onHover(i)} onMouseLeave={() => onHover(null)}>
-                <rect
-                  x={cx - 7}
-                  y={H / 2 - 6}
-                  width={14}
-                  height={12}
-                  fill="transparent"
-                  stroke="var(--line)"
-                  strokeDasharray="2 2"
-                  strokeWidth={0.8}
-                />
-              </g>
-            );
-          }
-          const beat = s >= 0;
-          const top = beat ? y(s) : H / 2;
-          const bot = beat ? H / 2 : y(s);
-          const height = Math.max(2, bot - top);
-          return (
-            <g
-              key={`eps-${h.date}-${i}`}
-              onMouseEnter={() => onHover(i)}
-              onMouseLeave={() => onHover(null)}
-              style={{ cursor: 'default' }}
+        {rows.map((row) => (
+          <Fragment key={row.key}>
+            <div
+              style={{
+                fontSize: 10,
+                letterSpacing: '0.14em',
+                textTransform: 'uppercase',
+                color: 'var(--ink-3)',
+                fontWeight: 500,
+              }}
             >
-              <rect
-                x={cx - 9}
-                y={top}
-                width={18}
-                height={height}
-                fill={beat ? 'var(--up)' : 'var(--down)'}
-                opacity={hoveredIndex == null || hoveredIndex === i ? 0.78 : 0.32}
-              />
-              {Math.abs(s) > cap && (
-                // clipped: small marker indicating the bar continues
-                <line
-                  x1={cx - 9}
-                  x2={cx + 9}
-                  y1={beat ? 4 : H - 4}
-                  y2={beat ? 4 : H - 4}
-                  stroke={beat ? 'var(--up)' : 'var(--down)'}
-                  strokeWidth={2}
-                />
-              )}
-            </g>
-          );
-        })}
-        {/* ±cap reference labels */}
-        <text
-          x={P - 8}
-          y={y(cap) + 3}
-          textAnchor="end"
-          fill="var(--ink-4)"
-          fontSize="9"
-          fontFamily="JetBrains Mono"
-        >
-          +{(cap * 100).toFixed(0)}%
-        </text>
-        <text
-          x={P - 8}
-          y={y(-cap) + 3}
-          textAnchor="end"
-          fill="var(--ink-4)"
-          fontSize="9"
-          fontFamily="JetBrains Mono"
-        >
-          −{(cap * 100).toFixed(0)}%
-        </text>
-      </svg>
+              {row.label}
+            </div>
+            {history.map((h, i) => {
+              const v = h[row.key] as number | null | undefined;
+              const isHovered = hoveredIndex === i;
+              const dim = hoveredIndex != null && !isHovered;
+              if (v == null || !Number.isFinite(v)) {
+                return (
+                  <div
+                    key={`${row.key}-${h.date}-${i}`}
+                    onMouseEnter={() => onHover(i)}
+                    onMouseLeave={() => onHover(null)}
+                    className="mono tnum"
+                    style={{
+                      textAlign: 'center',
+                      fontSize: 10.5,
+                      color: 'var(--ink-4)',
+                      opacity: dim ? 0.4 : 1,
+                      cursor: 'default',
+                    }}
+                  >
+                    —
+                  </div>
+                );
+              }
+              const beat = v >= 0;
+              const tone = beat ? 'var(--up)' : 'var(--down)';
+              return (
+                <div
+                  key={`${row.key}-${h.date}-${i}`}
+                  onMouseEnter={() => onHover(i)}
+                  onMouseLeave={() => onHover(null)}
+                  className="mono tnum"
+                  style={{
+                    textAlign: 'center',
+                    fontSize: 10.5,
+                    color: tone,
+                    fontWeight: 600,
+                    opacity: dim ? 0.45 : 1,
+                    cursor: 'default',
+                    letterSpacing: '-0.01em',
+                  }}
+                >
+                  {signedPct(v, 1)}
+                </div>
+              );
+            })}
+          </Fragment>
+        ))}
+      </div>
     </div>
   );
 }
@@ -1412,102 +1385,114 @@ function HistoryChart({
   setHoveredIndex: (i: number | null) => void;
 }) {
   const W = 640;
-  const H = 214;
-  const P = 36;
+  const H = 220;
+  const P = 40;
+  const TOP = 22;        // top padding for max label / clearance above dots
+  const BOT = 30;        // bottom padding for quarter labels
   if (history.length === 0) return null;
 
-  // Whether any row has implied data — drives whether we draw the band
-  // and show its legend swatch.
   const hasImplied = history.some((h) => h.implied != null);
-  const hasEps = history.some((h) => h.epsSurprise != null);
+  // hasEps no longer needed at chart level — the SurpriseStrip below
+  // renders both EPS and revenue surprise explicitly. Keeping that
+  // signal off the dots removes the hollow-circle encoding that users
+  // found confusing.
 
-  const max =
+  const maxAbs =
     Math.max(
       ...history.map((h) =>
         Math.max(h.implied != null ? h.implied : 0, Math.abs(h.actual)),
       ),
-    ) * 1.15 || 0.05;
+    ) * 1.18 || 0.05;
+  const plotH = H - TOP - BOT;
+  const midY = TOP + plotH / 2;
   const colW = (W - P * 2) / history.length;
-  const y = (v: number) => H / 2 - (v / max) * (H / 2 - 22);
+  const y = (v: number) => midY - (v / maxAbs) * (plotH / 2);
   const hovered = hoveredIndex != null ? history[hoveredIndex] : null;
 
+  // Pre-compute label positions so we can flip when a label would
+  // collide with the row above/below (cleaner than per-dot fudging).
+  const labelOffsetForAbove = -12;
+  const labelOffsetForBelow = 18;
+
   return (
-    <div style={{ marginTop: 14, position: 'relative' }}>
+    <div style={{ marginTop: 18, position: 'relative' }}>
       <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto' }}>
+        {/* Subtle alternating column bands for readability — no dashed
+            gridlines competing for attention. */}
+        {history.map((_, i) =>
+          i % 2 === 1 ? (
+            <rect
+              key={`band-${i}`}
+              x={P + colW * i}
+              y={TOP}
+              width={colW}
+              height={plotH}
+              fill="var(--ink)"
+              opacity={0.018}
+            />
+          ) : null,
+        )}
+        {/* Hover column highlight */}
+        {hoveredIndex != null && (
+          <rect
+            x={P + colW * hoveredIndex}
+            y={TOP}
+            width={colW}
+            height={plotH}
+            fill="var(--ink)"
+            opacity={0.04}
+          />
+        )}
+        {/* Axis labels — only at zero and ±max for orientation. */}
         <text
-          x={P - 8}
-          y={y(max) + 3}
+          x={P - 10}
+          y={y(maxAbs) + 3}
           textAnchor="end"
           fill="var(--ink-4)"
-          fontSize="9"
+          fontSize="9.5"
           fontFamily="JetBrains Mono"
         >
-          +{(max * 100).toFixed(0)}%
+          +{(maxAbs * 100).toFixed(0)}%
         </text>
         <text
-          x={P - 8}
-          y={H / 2 + 3}
+          x={P - 10}
+          y={midY + 3}
           textAnchor="end"
-          fill="var(--ink-4)"
-          fontSize="9"
+          fill="var(--ink-3)"
+          fontSize="9.5"
           fontFamily="JetBrains Mono"
         >
-          0%
+          0
         </text>
         <text
-          x={P - 8}
-          y={y(-max) + 3}
+          x={P - 10}
+          y={y(-maxAbs) + 3}
           textAnchor="end"
           fill="var(--ink-4)"
-          fontSize="9"
+          fontSize="9.5"
           fontFamily="JetBrains Mono"
         >
-          −{(max * 100).toFixed(0)}%
+          −{(maxAbs * 100).toFixed(0)}%
         </text>
-        {/* zero baseline */}
+        {/* Zero baseline — single crisp line, no dashed clutter. */}
         <line
           x1={P}
           x2={W - P}
-          y1={H / 2}
-          y2={H / 2}
-          stroke="var(--line)"
-        />
-        {/* gridline ticks at ±max for orientation */}
-        <line
-          x1={P}
-          x2={W - P}
-          y1={y(max)}
-          y2={y(max)}
-          stroke="var(--line)"
-          strokeDasharray="2 4"
-          opacity={0.5}
-        />
-        <line
-          x1={P}
-          x2={W - P}
-          y1={y(-max)}
-          y2={y(-max)}
-          stroke="var(--line)"
-          strokeDasharray="2 4"
-          opacity={0.5}
+          y1={midY}
+          y2={midY}
+          stroke="var(--line-2)"
+          strokeWidth={1}
         />
         {history.map((h, i) => {
           const cx = P + colW * i + colW / 2;
           const actualPositive = h.actual >= 0;
           const cy = y(h.actual);
-          const labelY = Math.min(H - 30, Math.max(14, cy + (actualPositive ? -10 : 17)));
-          // Beat-implied = realized exceeded implied band. Only meaningful
-          // when we have an implied number to compare against.
-          const beatImplied = h.implied != null && Math.abs(h.actual) > h.implied;
-          // EPS dot styling:
-          //   beat (eps_surprise >= 0)  → filled dot (current behavior)
-          //   miss (eps_surprise < 0)   → hollow dot (filled background,
-          //                               colored ring), signals fundamentals
-          //                               disagreed with price direction
-          //   unknown                   → filled dot, neutral (pre-Finnhub rows)
-          const epsBeat = h.epsSurprise != null && h.epsSurprise >= 0;
-          const epsMiss = h.epsSurprise != null && h.epsSurprise < 0;
           const moveColor = actualPositive ? 'var(--up)' : 'var(--down)';
+          // Label flips to the OTHER side of zero so it sits in the
+          // open vertical space rather than colliding with the next dot.
+          const labelY = cy + (actualPositive ? labelOffsetForAbove : labelOffsetForBelow);
+          const isHovered = hoveredIndex === i;
+          const dim = hoveredIndex != null && !isHovered;
           return (
             <g
               key={`${h.date}-${i}`}
@@ -1519,94 +1504,63 @@ function HistoryChart({
               role="listitem"
               aria-label={
                 `${h.q} realized move ${signedPct(h.actual)}` +
-                (h.implied != null ? `, implied move ${(h.implied * 100).toFixed(1)}%` : '') +
-                (h.epsSurprise != null
-                  ? `, EPS ${epsBeat ? 'beat' : 'miss'} ${signedPct(h.epsSurprise)}`
+                (h.implied != null
+                  ? `, implied ±${(h.implied * 100).toFixed(1)}%`
                   : '')
               }
-              style={{ cursor: 'default', outline: 'none' }}
+              style={{ cursor: 'default', outline: 'none', opacity: dim ? 0.45 : 1 }}
             >
+              {/* Implied range band — only when data present. */}
               {h.implied != null && (
-                <>
-                  <rect
-                    x={cx - 11}
-                    y={y(h.implied)}
-                    width={22}
-                    height={Math.max(1, y(-h.implied) - y(h.implied))}
-                    fill="color-mix(in srgb, var(--accent) 22%, transparent)"
-                  />
-                  <line
-                    x1={cx - 11}
-                    x2={cx + 11}
-                    y1={y(h.implied)}
-                    y2={y(h.implied)}
-                    stroke="var(--accent)"
-                    strokeWidth={1}
-                  />
-                  <line
-                    x1={cx - 11}
-                    x2={cx + 11}
-                    y1={y(-h.implied)}
-                    y2={y(-h.implied)}
-                    stroke="var(--accent)"
-                    strokeWidth={1}
-                  />
-                </>
-              )}
-              {beatImplied && (
-                <circle
-                  cx={cx}
-                  cy={cy}
-                  r={6}
-                  fill="none"
-                  stroke={moveColor}
-                  strokeWidth={1.4}
-                  opacity={0.55}
+                <rect
+                  x={cx - 14}
+                  y={y(h.implied)}
+                  width={28}
+                  height={Math.max(1, y(-h.implied) - y(h.implied))}
+                  fill="color-mix(in srgb, var(--accent) 18%, transparent)"
+                  stroke="var(--accent)"
+                  strokeWidth={0.8}
                 />
               )}
-              {epsMiss ? (
-                <circle
-                  cx={cx}
-                  cy={cy}
-                  r={3.8}
-                  fill="var(--bg)"
-                  stroke={moveColor}
-                  strokeWidth={1.6}
-                />
-              ) : (
-                <circle
-                  cx={cx}
-                  cy={cy}
-                  r={3.5}
-                  fill={moveColor}
-                />
-              )}
+              {/* Drop line from zero to dot — gives each point a body
+                  and reinforces direction at a glance. */}
+              <line
+                x1={cx}
+                x2={cx}
+                y1={midY}
+                y2={cy}
+                stroke={moveColor}
+                strokeWidth={isHovered ? 2 : 1.2}
+                opacity={0.55}
+              />
+              {/* The dot. */}
               <circle
                 cx={cx}
                 cy={cy}
-                r={13}
-                fill="transparent"
-                stroke={hoveredIndex === i ? 'var(--line-2)' : 'transparent'}
-                strokeWidth={1}
+                r={isHovered ? 5 : 4}
+                fill={moveColor}
               />
+              {/* Numeric label. */}
               <text
                 x={cx}
                 y={labelY}
                 textAnchor="middle"
                 fill={moveColor}
-                fontSize="10"
+                fontSize={isHovered ? '11' : '10'}
                 fontFamily="JetBrains Mono"
                 fontWeight={700}
               >
                 {signedPct(h.actual)}
               </text>
+              {/* Quarter label. */}
               <text
                 x={cx}
-                y={H - 8}
+                y={H - 10}
                 textAnchor="middle"
-                fill="var(--ink-4)"
-                fontSize="9"
+                fill="var(--ink-3)"
+                fontSize="10"
                 fontFamily="JetBrains Mono"
+                fontWeight={isHovered ? 600 : 400}
               >
                 {h.q}
               </text>
@@ -1737,67 +1691,38 @@ function HistoryChart({
           </div>
         );
       })()}
+      {/* Minimal legend — drops the obsolete EPS-miss / beat-implied
+          chips since those encodings moved to the SurpriseStrip below
+          the chart. */}
       <div
         style={{
           display: 'flex',
           gap: 18,
-          marginTop: 8,
+          marginTop: 10,
           fontSize: 11,
           color: 'var(--ink-3)',
           flexWrap: 'wrap',
         }}
       >
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ width: 8, height: 8, borderRadius: 999, background: 'var(--up)' }} />
+          Up
+        </span>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ width: 8, height: 8, borderRadius: 999, background: 'var(--down)' }} />
+          Down
+        </span>
         {hasImplied && (
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
             <span
               style={{
                 width: 18,
                 height: 8,
-                background: 'color-mix(in srgb, var(--accent) 22%, transparent)',
-                borderTop: '1px solid var(--accent)',
-                borderBottom: '1px solid var(--accent)',
+                background: 'color-mix(in srgb, var(--accent) 18%, transparent)',
+                border: '1px solid var(--accent)',
               }}
             />
-            Implied range (±)
-          </span>
-        )}
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-          <span
-            style={{
-              width: 8,
-              height: 8,
-              borderRadius: 999,
-              background: 'var(--up)',
-            }}
-          />
-          Actual move
-        </span>
-        {hasEps && (
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-            <span
-              style={{
-                width: 9,
-                height: 9,
-                borderRadius: 999,
-                border: '1.6px solid var(--ink-3)',
-                background: 'transparent',
-              }}
-            />
-            EPS miss
-          </span>
-        )}
-        {hasImplied && (
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-            <span
-              style={{
-                width: 12,
-                height: 12,
-                borderRadius: 999,
-                border: '1.4px solid var(--ink-3)',
-                opacity: 0.55,
-              }}
-            />
-            Beat implied
+            Implied range
           </span>
         )}
       </div>
@@ -1805,10 +1730,12 @@ function HistoryChart({
   );
 }
 
-// Owns the shared hoveredIndex so EpsSurpriseStrip + HistoryChart light up
-// the same quarter together. Hovering the strip highlights the dot below
-// and vice versa. Section header summarizes both implied- and EPS-beat
-// rates so the eye can scan the headline number before reading the chart.
+// Owns the shared hoveredIndex so HistoryChart + SurpriseStrip light up
+// the same quarter together — hovering a column in either highlights
+// the matching column in the other. Header summarizes implied-beat and
+// EPS-beat rates so the eye can scan the headline before reading the
+// chart. Layout: chart (hero, the realized moves are the primary
+// signal) → SurpriseStrip (secondary, fundamentals context).
 function HistoricalSection({
   series,
   hasImplied,
@@ -1899,15 +1826,16 @@ function HistoricalSection({
           )}
         </div>
       </div>
-      <EpsSurpriseStrip
-        history={series}
-        hoveredIndex={hoveredIndex}
-        onHover={setHoveredIndex}
-      />
+      {/* Chart is the hero — surprise strip is secondary context. */}
       <HistoryChart
         history={series}
         hoveredIndex={hoveredIndex}
         setHoveredIndex={setHoveredIndex}
+      />
+      <SurpriseStrip
+        history={series}
+        hoveredIndex={hoveredIndex}
+        onHover={setHoveredIndex}
       />
     </section>
   );
