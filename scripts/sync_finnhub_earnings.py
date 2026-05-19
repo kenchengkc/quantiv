@@ -346,6 +346,60 @@ def normalize_finnhub(rows: list[dict[str, Any]]) -> pd.DataFrame:
     )
 
 
+def _drop_stale_dolthub_ghosts(
+    merged: pd.DataFrame, window_days: int = 14
+) -> tuple[pd.DataFrame, int]:
+    """Drop dolthub-only rows for upcoming events when the same ticker has
+    a Finnhub-confirmed row within ±window_days.
+
+    Why this is correct: DoltHub's earnings_calendar comes from public
+    aggregators (earnings.com / Earnings Whispers / WSJ) that record
+    analyst-estimated next dates based on prior_quarter + ~91 days. Those
+    estimates often persist for weeks before the aggregator picks up the
+    company's IR-confirmed date. Finnhub aggregates broker analyst
+    calendars + IR feeds + a proprietary estimator, refreshed multiple
+    times per day. When the two disagree on an upcoming date for the
+    same ticker, Finnhub is consistently right (SNOW May 20 vs May 27,
+    PANW May 19 vs Jun 2, BIDU May 20 vs May 18, etc.).
+
+    Without this dedup the stale DoltHub row stays in the CSV as a ghost
+    that production never renders (the build pipeline already prefers
+    the Finnhub-touched row because that's the one with an EPS estimate
+    and matching options chain) but that bloats the file and trips the
+    integrity gate's vanished-event counter on subsequent CI runs.
+
+    Historical rows (date < today) are untouched — the actual report
+    already happened, so neither side is "stale". If DoltHub and Finnhub
+    disagreed on a past date, that's a different cleanup problem (manual
+    `tools/patch_timing.py`-style overrides)."""
+    today_dt = pd.Timestamp.today().date()
+    finnhub_by_sym: dict[str, list] = (
+        merged[
+            (merged["date"] >= today_dt)
+            & merged["source"].isin(["finnhub", "dolthub+finnhub"])
+        ]
+        .groupby("act_symbol")["date"]
+        .apply(list)
+        .to_dict()
+    )
+    if not finnhub_by_sym:
+        return merged, 0
+
+    def _is_ghost(row) -> bool:
+        if row["date"] < today_dt or row["source"] != "dolthub":
+            return False
+        nearby = finnhub_by_sym.get(row["act_symbol"])
+        if not nearby:
+            return False
+        return any(abs((row["date"] - fd).days) <= window_days for fd in nearby)
+
+    ghost_mask = merged.apply(_is_ghost, axis=1)
+    dropped = int(ghost_mask.sum())
+    if dropped:
+        merged = merged[~ghost_mask].reset_index(drop=True)
+    return merged, dropped
+
+
 def merge_overlay(existing: pd.DataFrame, overlay: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, int]]:
     existing = normalize_existing(existing)
     overlay = normalize_existing(overlay)
@@ -360,6 +414,7 @@ def merge_overlay(existing: pd.DataFrame, overlay: pd.DataFrame) -> tuple[pd.Dat
         "inserted": 0,
         "updated": 0,
         "timing_updates": 0,
+        "dolthub_ghosts_dropped": 0,
     }
 
     for _, row in overlay.iterrows():
@@ -397,6 +452,10 @@ def merge_overlay(existing: pd.DataFrame, overlay: pd.DataFrame) -> tuple[pd.Dat
 
     merged = pd.DataFrame(by_key.values(), columns=OUTPUT_COLUMNS)
     merged = merged.sort_values(["date", "act_symbol"]).reset_index(drop=True)
+
+    merged, ghosts_dropped = _drop_stale_dolthub_ghosts(merged)
+    stats["dolthub_ghosts_dropped"] = ghosts_dropped
+
     stats["merged_rows"] = len(merged)
     return merged, stats
 
