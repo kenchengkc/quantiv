@@ -101,6 +101,11 @@ def main() -> int:
     mcaps = load_market_caps()
 
     conn = duckdb.connect(str(DB_PATH), read_only=True)
+    # Filter to tickers that ACTUALLY file earnings — exclude preferred
+    # stock vehicles (STRC/STRK/STRF for MSTR's BTC raises), delisted
+    # remnants, and other zombie symbols that have high residual flow but
+    # no real corporate reporting. "Recent earner" = at least one
+    # earnings event in the past 365 days.
     dv_rows = conn.execute(
         f"""
         WITH dv AS (
@@ -110,9 +115,13 @@ def main() -> int:
               AND volume IS NOT NULL AND close IS NOT NULL
             GROUP BY act_symbol
         ),
-        earners AS (SELECT DISTINCT act_symbol FROM v_earnings)
+        recent_earners AS (
+            SELECT DISTINCT act_symbol
+            FROM v_earnings
+            WHERE date >= CURRENT_DATE - INTERVAL '365' DAY
+        )
         SELECT d.act_symbol, d.dv
-        FROM dv d JOIN earners e USING (act_symbol)
+        FROM dv d JOIN recent_earners e USING (act_symbol)
         ORDER BY d.dv DESC
         """
     ).fetchall()
