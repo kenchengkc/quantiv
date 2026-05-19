@@ -44,7 +44,18 @@ blob-report/
 *.parquet
 *.duckdb
 
-# Exception: Include essential data files for GitHub Actions
+# Exception: Include essential data files for GitHub Actions.
+#
+# Caveat: git cannot re-include a file via `!path` when its parent
+# directory is excluded (git's .gitignore precedence rule). `/data/`
+# above excludes the whole dir, so the `!data/earnings_calendar.csv`
+# negation alone is insufficient — `git add data/earnings_calendar.csv`
+# will reject the file as ignored. CI works around this with
+# `git add -f data/earnings_calendar.csv` (see daily-refresh.yml).
+# Any NEW tracked file added under data/ will need the same -f.
+#
+# The `!data/parquet/` chain below works without -f because it
+# re-includes the directory itself first, then the contents.
 !data/earnings_calendar.csv
 !data/.gitkeep
 !data/parquet/
