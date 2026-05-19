@@ -437,9 +437,22 @@ def sync_earnings():
             existing["date"] = pd.to_datetime(existing["date"], errors="coerce").dt.date
             existing = existing.dropna(subset=["date", "act_symbol"])
 
-            # Universe gate: only carry forward existing rows whose ticker is
-            # in the fresh DoltHub pull (covers both past + future tickers).
-            dolthub_universe = set(df["act_symbol"].unique())
+            # Universe gate: keep existing rows whose ticker is EITHER in
+            # tonight's DoltHub snapshot OR has ever had a DoltHub-source
+            # row in the existing CSV. DoltHub's earnings_calendar is a
+            # forward-looking projection feed — a ticker drops from the
+            # snapshot in the gap between "already reported" and "next
+            # estimate published" — so snapshot-only would silently wipe
+            # 8-26 rows of historical earnings for ~600 tickers per run.
+            # Foreign-only tickers (no DoltHub history) are still filtered
+            # because they never had a 'dolthub' source row.
+            historical_dolthub_tickers = set(
+                existing.loc[
+                    existing["source"].astype(str).str.contains("dolthub", na=False),
+                    "act_symbol",
+                ].unique()
+            )
+            dolthub_universe = set(df["act_symbol"].unique()) | historical_dolthub_tickers
             existing = existing[existing["act_symbol"].isin(dolthub_universe)]
 
             kept = [c for c in enriched_cols if c in existing.columns]
@@ -468,6 +481,15 @@ def sync_earnings():
                     prior.where(prior != "", "unknown"),
                 )
                 df = df.drop(columns=["timing_prior"])
+
+            # Rows from the fresh DoltHub pull that aren't yet in existing
+            # have source=NaN after the outer merge. They came from DoltHub
+            # by construction, so label them as such — otherwise they'd
+            # write as empty-string source (e.g. the 194 mystery rows in
+            # the failed 2026-05-19 run).
+            if "source" in df.columns:
+                df["source"] = df["source"].fillna("").astype(str)
+                df.loc[df["source"].eq(""), "source"] = "dolthub"
 
             print(f"  Preserved {len(kept)} enriched column(s) from existing CSV: {kept}")
             print(f"  Merge: {len(df):,} total rows (DoltHub fresh + Finnhub-only carried forward)")
