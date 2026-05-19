@@ -768,6 +768,37 @@ def main():
         require_ml = offset in (0, 1)
         events = build_week_events(conn, as_of_date, wk_start, wk_end, ml_lookup,
                                    require_ml=require_ml)
+
+        # Past-week preservation: once a week is fully in the past, the
+        # rebuild loses events whose options chains have rolled off
+        # (compute_em_math returns None for past-dated expiries). Friday's
+        # 45-event bundle for May 11-15 shrank to 8 events by Monday for
+        # this reason. Merge new events with the prior committed bundle —
+        # new entries win on (ticker, date) collisions so any post-hoc
+        # data update (e.g. an EPS actual landing late) replaces the
+        # stale entry, but events with expired options are preserved
+        # from the original "when this week was current" build.
+        if wk_end < today:
+            wk_path = PUBLIC_DIR / "weeks" / f"{wk_start.isoformat()}.json"
+            if wk_path.exists():
+                try:
+                    prior = json.loads(wk_path.read_text())
+                    prior_events = prior.get("events", [])
+                    new_keys = {(e["ticker"], e["earnings_date"]) for e in events}
+                    preserved = [
+                        e for e in prior_events
+                        if (e["ticker"], e["earnings_date"]) not in new_keys
+                    ]
+                    if preserved:
+                        print(
+                            f"    preserving {len(preserved)} events from prior bundle "
+                            f"(options data expired since first build)"
+                        )
+                        events.extend(preserved)
+                        events.sort(key=lambda e: (e["earnings_date"], e["ticker"]))
+                except (json.JSONDecodeError, OSError) as exc:
+                    print(f"    ⚠ could not read prior bundle: {exc}")
+
         print(f"📅 week {wk_start} (offset {offset:+d}) → {len(events)} events")
         em_straddle_vals = [
             e["em_straddle_pct"] for e in events if e["em_straddle_pct"] is not None
