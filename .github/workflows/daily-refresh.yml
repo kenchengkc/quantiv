@@ -219,10 +219,15 @@ jobs:
         # of being re-fetched (and lost) on every run. Finnhub free tier
         # only returns the most recent reported event per symbol, so without
         # persistence the historical chart can never deepen past 1 quarter.
+        #
+        # `git add -f` on the CSV is required because data/ is broadly
+        # gitignored — git can't re-include a file via !data/earnings_calendar.csv
+        # when the parent directory is excluded.
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name  "Quantiv bot"
-          git add apps/frontend/public data/earnings_calendar.csv
+          git add apps/frontend/public
+          git add -f data/earnings_calendar.csv
           if git diff --staged --quiet; then
             echo "No changes to commit"
           else
