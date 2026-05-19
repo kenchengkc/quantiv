@@ -23,6 +23,11 @@ on:
     # Sunday 12:00 UTC — weekly LightGBM retrain (v3 features + point/quantile).
     - cron: '0 12 * * 0'
   workflow_dispatch:
+    inputs:
+      warn_only_integrity:
+        description: "Run earnings_calendar integrity gate in --warn-only mode (commit even if guardrails trip). Use for legitimate large changes like a one-time universe cleanup."
+        type: boolean
+        default: false
 
 concurrency:
   group: daily-refresh
@@ -190,14 +195,19 @@ jobs:
 
       - name: Gate — earnings_calendar integrity
         # Prints a structured diff of the about-to-be-committed CSV vs HEAD
-        # and aborts if any guardrail trips (row drop >2%, >50 tickers
-        # vanish, last-week event count drops >20%, or any anchor ticker
-        # with ≥10 prior rows loses all rows). Wired in after the
-        # 2026-05-18 incident where a left-join in sync_dolthub silently
-        # dropped ~960 Finnhub-discovered upcoming earnings rows. The
-        # diff summary alone (printed every run) makes any future
-        # silent drop visible in the workflow log.
-        run: python scripts/check_earnings_calendar_integrity.py
+        # and aborts if any guardrail trips (row drop >2.5%, >50 tickers
+        # vanish, >400 past-30d events vanish, >150 next-60d events
+        # vanish, or any anchor ticker with ≥10 prior rows loses all
+        # rows). Wired in after the 2026-05-18 incident where a left-join
+        # in sync_dolthub silently dropped ~960 Finnhub-discovered
+        # upcoming earnings rows.
+        #
+        # warn_only_integrity input lets a workflow_dispatch run accept
+        # a legitimate large change (e.g. a one-time universe cleanup)
+        # without changing thresholds — diff still prints to the log.
+        run: |
+          python scripts/check_earnings_calendar_integrity.py \
+            ${{ github.event.inputs.warn_only_integrity == 'true' && '--warn-only' || '' }}
 
       - name: Commit + push frontend data
         # data/forecasts is gitignored — the JSON in apps/frontend/public is
