@@ -133,6 +133,18 @@ def main() -> int:
     # the window don't look like a regression. Only events that existed
     # in HEAD's window AND are missing from the new CSV count as
     # "vanished" (the actual silent-drop signature).
+    #
+    # Date-drift rescue: DoltHub refreshes its earnings_calendar daily and
+    # routinely shifts a ticker's estimated date by 1-7 days as the print
+    # approaches. Those shifts would otherwise show up as a (ticker, date)
+    # pair vanishing in HEAD while a new (ticker, date') pair appears for
+    # the same ticker. We don't want to fail the gate on those — they're
+    # date corrections, not data loss. A vanished (ticker, date) is rescued
+    # if the same ticker has ANY row within ±DATE_DRIFT_DAYS of that date
+    # in the new CSV. The original 2026-05-18 regression-mode bug (rows
+    # dropped silently) is still caught because dropped tickers have zero
+    # nearby rows. Anchor-ticker gate (below) provides a second safety net.
+    DATE_DRIFT_DAYS = 14
     today = pd.Timestamp.today().date()
     past_start = today - pd.Timedelta(days=30)
     future_end = today + pd.Timedelta(days=60)
@@ -140,15 +152,32 @@ def main() -> int:
     past_new = {k for k in k_new if past_start <= k[1] <= today}
     future_old = {k for k in k_old if today < k[1] <= future_end}
     future_new = {k for k in k_new if today < k[1] <= future_end}
-    past_vanished = past_old - past_new
-    future_vanished = future_old - future_new
+
+    new_dates_by_ticker: dict[str, list] = {}
+    for sym, d in k_new:
+        new_dates_by_ticker.setdefault(sym, []).append(d)
+
+    def _rescued(sym, d) -> bool:
+        nearby = new_dates_by_ticker.get(sym)
+        if not nearby:
+            return False
+        return any(abs((d - nd).days) <= DATE_DRIFT_DAYS for nd in nearby)
+
+    past_vanished_raw = past_old - past_new
+    future_vanished_raw = future_old - future_new
+    past_vanished = {k for k in past_vanished_raw if not _rescued(*k)}
+    future_vanished = {k for k in future_vanished_raw if not _rescued(*k)}
+    past_drifted = len(past_vanished_raw) - len(past_vanished)
+    future_drifted = len(future_vanished_raw) - len(future_vanished)
     print(
         f"Past 30d:  {len(past_new):,} events  "
-        f"({len(past_vanished):,} vanished vs HEAD, {len(past_new - past_old):,} new)"
+        f"({len(past_vanished):,} vanished vs HEAD, "
+        f"{past_drifted:,} date-drifted, {len(past_new - past_old):,} new)"
     )
     print(
         f"Next 60d:  {len(future_new):,} events  "
-        f"({len(future_vanished):,} vanished vs HEAD, {len(future_new - future_old):,} new)"
+        f"({len(future_vanished):,} vanished vs HEAD, "
+        f"{future_drifted:,} date-drifted, {len(future_new - future_old):,} new)"
     )
 
     print()
@@ -156,22 +185,43 @@ def main() -> int:
     # --- Guardrails --------------------------------------------------
     tripped: list[str] = []
 
-    # 1. Total row count drop
-    if len(old) > 0:
-        row_drop_pct = (len(old) - len(new)) / len(old) * 100
+    # 1. Total row count drop — measured on the US-only subset so that
+    #    sync_dolthub's foreign-symbol cleanup doesn't trip the gate.
+    def _is_us(s: str) -> bool:
+        s = str(s)
+        return "." not in s and ":" not in s
+
+    old_us = old[old["act_symbol"].map(_is_us)]
+    new_us = new[new["act_symbol"].map(_is_us)]
+    if len(old_us) > 0:
+        row_drop_pct = (len(old_us) - len(new_us)) / len(old_us) * 100
+        print(
+            f"  (US-only rows: {len(old_us):,} → {len(new_us):,}; "
+            f"foreign trimmed: {len(old) - len(old_us):,} → {len(new) - len(new_us):,})"
+        )
         if row_drop_pct > args.max_row_drop_pct:
             tripped.append(
-                f"Row count dropped {row_drop_pct:.2f}% "
+                f"US row count dropped {row_drop_pct:.2f}% "
                 f"(threshold: {args.max_row_drop_pct}%, "
-                f"{len(old):,} → {len(new):,})"
+                f"{len(old_us):,} → {len(new_us):,})"
             )
 
-    # 2. Vanished tickers
-    vanished = set(old["act_symbol"]) - set(new["act_symbol"])
+    # 2. Vanished tickers — but exclude foreign symbols, which sync_dolthub's
+    #    universe gate (commit 9876311e) intentionally trims out. A '.' or ':'
+    #    in the ticker reliably identifies a foreign exchange suffix
+    #    (.HK/.KS/.TW/.TA/.OL/.TO/etc.) or a Bloomberg-style listing code.
+    #    Those rows leak into the CSV during broad Finnhub overlays and get
+    #    cleaned up the next time sync_dolthub runs — expected behavior, not
+    #    a regression.
+    vanished_all = set(old["act_symbol"]) - set(new["act_symbol"])
+    foreign_trimmed = {t for t in vanished_all if "." in str(t) or ":" in str(t)}
+    vanished = vanished_all - foreign_trimmed
+    if foreign_trimmed:
+        print(f"  ({len(foreign_trimmed):,} foreign-symbol trims excluded from gate)")
     if len(vanished) > args.max_ticker_drop:
         sample = sorted(vanished)[:15]
         tripped.append(
-            f"{len(vanished):,} tickers vanished from universe "
+            f"{len(vanished):,} US tickers vanished from universe "
             f"(threshold: {args.max_ticker_drop}). Sample: {sample}"
         )
 
