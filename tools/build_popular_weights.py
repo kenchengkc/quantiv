@@ -54,7 +54,7 @@ DB_PATH = REPO_ROOT / "data" / "quantiv.duckdb"
 MCAP_PATH = REPO_ROOT / "data" / "market_caps.json"
 OUT_PATH = REPO_ROOT / "apps" / "frontend" / "lib" / "popular.ts"
 
-TOP_N = 250
+TOP_N = 300
 WINDOW_DAYS = 90
 MIN_WEIGHT = 76  # must match the >=76 filter in EarningsGrid.tsx
 MAX_WEIGHT = 100
