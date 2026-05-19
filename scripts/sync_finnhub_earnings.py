@@ -107,6 +107,66 @@ def parse_iso_date(value: str) -> date:
         raise argparse.ArgumentTypeError(f"invalid YYYY-MM-DD date: {value}") from exc
 
 
+# Denylist of foreign-exchange suffixes seen in upstream feeds. Anything
+# else with a dot is assumed to be a US dual-class share suffix (.A, .B,
+# .U for SPAC units). Denylist > allowlist because US class letters are
+# few and stable while foreign exchanges are many but well-known.
+FOREIGN_EXCHANGE_SUFFIXES: frozenset[str] = frozenset({
+    "AS",  # Amsterdam
+    "AX",  # Australia
+    "BA",  # Buenos Aires
+    "BC",  # Colombia (BVC)
+    "BR",  # Brussels
+    "CN",  # Canadian Securities Exchange
+    "CO",  # Copenhagen
+    "DE",  # Germany (XETRA/Frankfurt)
+    "HE",  # Helsinki
+    "HK",  # Hong Kong
+    "IR",  # Ireland
+    "IS",  # Istanbul
+    "JK",  # Jakarta
+    "JO",  # Johannesburg
+    "KS",  # Korea (KOSPI)
+    "L",   # London
+    "MC",  # Madrid
+    "MI",  # Milan
+    "MX",  # Mexico
+    "NE",  # NEO Exchange (Canada)
+    "NS",  # NSE India
+    "OL",  # Oslo
+    "PA",  # Paris
+    "PM",  # Philippines
+    "SA",  # Brazil (B3)
+    "SN",  # Santiago
+    "SS",  # Shanghai
+    "ST",  # Stockholm
+    "SW",  # Swiss (SIX)
+    "T",   # Tokyo
+    "TA",  # Tel Aviv
+    "TO",  # Toronto
+    "TW",  # Taiwan
+    "V",   # TSX Venture
+})
+
+
+def is_us_symbol(value: Any) -> bool:
+    """True iff the ticker is a plain US exchange listing.
+
+    Foreign tickers have no forecast pipeline (DoltHub doesn't list
+    them) and Finnhub's free tier 403s on them — so we drop them at
+    every CSV boundary. Distinguishes US dual-class share classes
+    (BRK.B, BF.B, GRP.U) from foreign-exchange suffixes (HDFCBANK.NS,
+    005490.KS, RCI.B.TO) via FOREIGN_EXCHANGE_SUFFIXES.
+    """
+    s = str(value or "").strip().upper()
+    if not s or ":" in s:
+        return False
+    if "." in s:
+        # Use the LAST dot-suffix — handles RCI.B.TO → .TO (foreign).
+        return s.rsplit(".", 1)[1] not in FOREIGN_EXCHANGE_SUFFIXES
+    return True
+
+
 def normalize_timing(value: Any) -> str:
     s = str(value or "").strip().lower()
     if s in {"bmo", "before_market_open", "before open", "before market open"}:
@@ -193,6 +253,10 @@ def normalize_existing(df: pd.DataFrame) -> pd.DataFrame:
     out["act_symbol"] = out["act_symbol"].astype(str).str.strip().str.upper()
     out["date"] = pd.to_datetime(out["date"], errors="coerce").dt.date
     out = out[out["act_symbol"].ne("") & out["date"].notna()].copy()
+    # Drop foreign-exchange tickers at the boundary so they never
+    # accumulate in the CSV (no forecast pipeline, no Finnhub free-tier
+    # coverage). See is_us_symbol() for the convention.
+    out = out[out["act_symbol"].map(is_us_symbol)].copy()
     if "timing" not in out.columns:
         out["timing"] = "unknown"
     out["timing"] = out["timing"].map(normalize_timing)
@@ -317,7 +381,7 @@ def normalize_finnhub(rows: list[dict[str, Any]]) -> pd.DataFrame:
     out_rows: list[dict[str, Any]] = []
     for row in rows:
         symbol = str(row.get("symbol") or "").strip().upper()
-        if not symbol:
+        if not is_us_symbol(symbol):
             continue
         try:
             d = date.fromisoformat(str(row.get("date"))[:10])
@@ -349,29 +413,32 @@ def normalize_finnhub(rows: list[dict[str, Any]]) -> pd.DataFrame:
 def _drop_stale_dolthub_ghosts(
     merged: pd.DataFrame, window_days: int = 14
 ) -> tuple[pd.DataFrame, int]:
-    """Drop dolthub-only rows for upcoming events when the same ticker has
-    a Finnhub-confirmed row within ±window_days.
+    """Drop dolthub-only rows for upcoming events when the same ticker
+    has a Finnhub-touched row within ±window_days.
 
-    Why this is correct: DoltHub's earnings_calendar comes from public
-    aggregators (earnings.com / Earnings Whispers / WSJ) that record
-    analyst-estimated next dates based on prior_quarter + ~91 days. Those
-    estimates often persist for weeks before the aggregator picks up the
-    company's IR-confirmed date. Finnhub aggregates broker analyst
-    calendars + IR feeds + a proprietary estimator, refreshed multiple
-    times per day. When the two disagree on an upcoming date for the
-    same ticker, Finnhub is consistently right (SNOW May 20 vs May 27,
-    PANW May 19 vs Jun 2, BIDU May 20 vs May 18, etc.).
+    Why prefer Finnhub deterministically (even when both sources are
+    projecting): keeping both rows in the CSV creates a non-
+    deterministic build, where build_frontend_data.py's join to
+    v_options_chain implicitly picks whichever date happens to align
+    with active options expiries. That can silently flip production
+    from one projected date to the other across CI runs as options
+    coverage shifts week to week. Picking one date deterministically
+    is more important than picking the "right" date when neither
+    source is IR-confirmed.
 
-    Without this dedup the stale DoltHub row stays in the CSV as a ghost
-    that production never renders (the build pipeline already prefers
-    the Finnhub-touched row because that's the one with an EPS estimate
-    and matching options chain) but that bloats the file and trips the
-    integrity gate's vanished-event counter on subsequent CI runs.
+    The rule: Finnhub wins. For confirmed-timing cases (SNOW May 27
+    amc, PANW Jun 2 amc, BIDU May 18 bmo, ZKH May 21 bmo, …), this
+    is also the *correct* answer. For projection-only cases (SAIC
+    Jun 8, AGX Jun 10, ABM Jun 9, …), it's an arbitrary but stable
+    choice — both DoltHub and Finnhub are guessing, and consistency
+    across CI runs matters more than picking the closer guess. Net
+    payoff: SNOW / PANW class definitively cleaned, SAIC class stops
+    creating ghost-row noise on every refresh.
 
     Historical rows (date < today) are untouched — the actual report
-    already happened, so neither side is "stale". If DoltHub and Finnhub
-    disagreed on a past date, that's a different cleanup problem (manual
-    `tools/patch_timing.py`-style overrides)."""
+    already happened, so neither side is "stale" by date. If the two
+    disagreed on a past date, that's a different cleanup problem
+    (manual `tools/patch_timing.py`-style overrides)."""
     today_dt = pd.Timestamp.today().date()
     finnhub_by_sym: dict[str, list] = (
         merged[
@@ -583,8 +650,7 @@ def main() -> int:
             .unique()
             .tolist()
         )
-        us_only = [s for s in candidates if "." not in s and ":" not in s]
-        symbols = sorted(us_only)
+        symbols = sorted(s for s in candidates if is_us_symbol(s))
         skipped = len(candidates) - len(symbols)
         if skipped:
             print(f"--all-recent: skipping {skipped} non-US symbols (Finnhub free tier is US-only)")
