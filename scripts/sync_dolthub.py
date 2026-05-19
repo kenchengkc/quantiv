@@ -82,7 +82,9 @@ COLUMN_LIST = [f.name for f in ARROW_SCHEMA]
 # ---------------------------------------------------------------------------
 # Config helpers
 # ---------------------------------------------------------------------------
-DEFAULT_DATA_DIR = Path(__file__).resolve().parent.parent / "data"
+REPO_ROOT = Path(__file__).resolve().parent.parent
+DEFAULT_DATA_DIR = REPO_ROOT / "data"
+SYMBOLS_DIR = REPO_ROOT / "apps" / "frontend" / "public" / "symbols"
 METADATA_FILE = "sync_metadata.json"
 API_DELAY = 0.3  # seconds between API calls
 
@@ -438,22 +440,28 @@ def sync_earnings():
             existing = existing.dropna(subset=["date", "act_symbol"])
 
             # Universe gate: keep existing rows whose ticker is EITHER in
-            # tonight's DoltHub snapshot OR has ever had a DoltHub-source
-            # row in the existing CSV. DoltHub's earnings_calendar is a
-            # forward-looking projection feed — a ticker drops from the
-            # snapshot in the gap between "already reported" and "next
-            # estimate published" — so snapshot-only would silently wipe
-            # 8-26 rows of historical earnings for ~600 tickers per run.
-            # Foreign-only tickers (no DoltHub history) are still filtered
-            # because they never had a 'dolthub' source row.
-            historical_dolthub_tickers = set(
-                existing.loc[
-                    existing["source"].astype(str).str.contains("dolthub", na=False),
-                    "act_symbol",
-                ].unique()
-            )
-            dolthub_universe = set(df["act_symbol"].unique()) | historical_dolthub_tickers
+            # tonight's fresh DoltHub snapshot OR has a current symbol JSON
+            # (= the build pipeline successfully generated a forecast for
+            # it in the last run). Anything else is dead weight — DoltHub
+            # has stopped tracking it AND the frontend has no forecast to
+            # show. The two legs handle the two cases we care about:
+            #   - Fresh DoltHub snapshot: admits new tickers (1-cycle
+            #     grace period so the build can generate a forecast).
+            #   - Forecast set: preserves established coverage even when
+            #     DoltHub temporarily drops a ticker from its forward-
+            #     looking earnings projection between "reported" and
+            #     "next estimate published".
+            # Foreign-only Finnhub tickers stay filtered (never in DoltHub
+            # snapshot, never get a forecast).
+            forecast_tickers = {p.stem for p in SYMBOLS_DIR.glob("*.json")}
+            dolthub_universe = set(df["act_symbol"].unique()) | forecast_tickers
+            kept_before = len(existing)
             existing = existing[existing["act_symbol"].isin(dolthub_universe)]
+            print(
+                f"  Universe gate: forecast set {len(forecast_tickers):,} ∪ "
+                f"fresh DoltHub {df['act_symbol'].nunique():,} → "
+                f"kept {len(existing):,} of {kept_before:,} existing rows"
+            )
 
             kept = [c for c in enriched_cols if c in existing.columns]
             merge_subset = ["act_symbol", "date", *kept]
