@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import katex from 'katex';
 
 // ──────────────────────────────────────────────────────────────────────────
 // Reveal-on-scroll wrapper
@@ -110,67 +111,54 @@ function CountUp({
 }
 
 // ──────────────────────────────────────────────────────────────────────────
-// Animated hero glyph — ring + volatility-smile tail that draws on a loop
+// Hero glyph — same reveal sequence as the homepage Splash (closed ring →
+// slit opens → tail clips in left-to-right). Plays once when the hero
+// scrolls into view. CSS lives in globals.css under .quantiv-hero-q*.
 // ──────────────────────────────────────────────────────────────────────────
 function HeroGlyph() {
-  return (
-    <svg
-      viewBox="0 0 240 200"
-      style={{ width: 240, height: 200, display: 'block' }}
-      aria-hidden="true"
-    >
-      <defs>
-        <linearGradient id="hero-smile" x1="0" x2="1" y1="1" y2="0">
-          <stop offset="0%" stopColor="var(--brand-blue-2)" />
-          <stop offset="55%" stopColor="var(--brand-blue-1)" />
-          <stop offset="100%" stopColor="var(--accent-hi)" />
-        </linearGradient>
-        <radialGradient id="hero-glow" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="var(--brand-blue-1)" stopOpacity="0.30" />
-          <stop offset="100%" stopColor="var(--brand-blue-1)" stopOpacity="0" />
-        </radialGradient>
-      </defs>
-      <circle cx="120" cy="100" r="90" fill="url(#hero-glow)" />
-      {Array.from({ length: 8 }).map((_, i) =>
-        Array.from({ length: 6 }).map((_, j) => (
-          <circle
-            key={`${i}-${j}`}
-            cx={24 + i * 27}
-            cy={20 + j * 28}
-            r="0.8"
-            fill="var(--ink-4)"
-            opacity="0.25"
-          />
-        )),
-      )}
-      <circle
-        cx="120"
-        cy="100"
-        r="56"
-        fill="none"
-        stroke="var(--ink)"
-        strokeWidth="6"
-        opacity="0.95"
-      />
-      <path
-        d="M 76 122 C 90 162, 156 174, 184 142 S 220 70, 232 30"
-        fill="none"
-        stroke="url(#hero-smile)"
-        strokeWidth="10"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeDasharray="280"
-        strokeDashoffset="0"
-        style={{ animation: 'hero-glyph-draw 4200ms cubic-bezier(.5,0,.2,1) infinite' }}
-      />
-      <style>{`
-        @keyframes hero-glyph-draw {
-          0%   { stroke-dashoffset: 280; }
-          50%  { stroke-dashoffset: 0; }
-          100% { stroke-dashoffset: 0; }
+  const ref = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    if (typeof IntersectionObserver === 'undefined') {
+      el.classList.add('in');
+      return;
+    }
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (e.isIntersecting) {
+            el.classList.add('in');
+            io.disconnect();
+            break;
+          }
         }
-      `}</style>
-    </svg>
+      },
+      { threshold: 0.35 },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+  return (
+    <div ref={ref} className="quantiv-hero-q" aria-hidden="true">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/brand/QuantivSplashQClosed.png"
+        alt=""
+        className="quantiv-hero-q-layer quantiv-hero-q-ring"
+        draggable={false}
+      />
+      <div className="quantiv-hero-q-slit" />
+      <div className="quantiv-hero-q-tail-clip">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/brand/QuantivSplashTail.png"
+          alt=""
+          className="quantiv-hero-q-layer"
+          draggable={false}
+        />
+      </div>
+    </div>
   );
 }
 
@@ -572,18 +560,40 @@ function QIcon({ size = 16 }: { size?: number }) {
 }
 
 // ──────────────────────────────────────────────────────────────────────────
+// Tex · KaTeX-rendered LaTeX. Render to HTML string once per formula and
+// drop into a span. Display mode for block equations, inline otherwise.
+// ──────────────────────────────────────────────────────────────────────────
+function Tex({ math, displayMode = true }: { math: string; displayMode?: boolean }) {
+  const html = useMemo(
+    () =>
+      katex.renderToString(math, {
+        displayMode,
+        throwOnError: false,
+        output: 'html',
+      }),
+    [math, displayMode],
+  );
+  return (
+    <span
+      className="qv-tex"
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
+  );
+}
+
+// ──────────────────────────────────────────────────────────────────────────
 // Methodology · formula card row
 // ──────────────────────────────────────────────────────────────────────────
 function FormulaCard({
   kicker,
   title,
   body,
-  formula,
+  tex,
 }: {
   kicker: string;
   title: string;
   body: string;
-  formula: React.ReactNode;
+  tex: string;
 }) {
   return (
     <div
@@ -621,18 +631,16 @@ function FormulaCard({
         {title}
       </h3>
       <div
-        className="mono"
         style={{
-          padding: '12px 14px',
+          padding: '14px 16px',
           borderRadius: 8,
           background: 'color-mix(in oklab, var(--bg-3) 50%, transparent)',
           border: '1px solid color-mix(in oklab, var(--line) 60%, transparent)',
-          fontSize: 13,
           color: 'var(--ink)',
-          lineHeight: 1.55,
+          overflowX: 'auto',
         }}
       >
-        {formula}
+        <Tex math={tex} />
       </div>
       <p style={{ margin: 0, fontSize: 12.5, color: 'var(--ink-3)', lineHeight: 1.55 }}>{body}</p>
     </div>
@@ -968,11 +976,7 @@ export default function AboutPageClient() {
           <FormulaCard
             kicker="Straddle EM"
             title="What dealers are pricing"
-            formula={
-              <>
-                EM<sub>straddle</sub> = (call<sub>ATM</sub> + put<sub>ATM</sub>) / S₀
-              </>
-            }
+            tex={String.raw`\mathrm{EM}_{\text{straddle}} \;=\; \frac{c_{\mathrm{ATM}} \,+\, p_{\mathrm{ATM}}}{S_0}`}
             body="ATM straddle mid divided by spot. The print-expiry straddle prices a ±1σ
               move at expiry — collect it if you think the stock will move less than
               implied; pay it if you think more."
@@ -980,11 +984,7 @@ export default function AboutPageClient() {
           <FormulaCard
             kicker="IV-based EM"
             title="Scale IV to the horizon"
-            formula={
-              <>
-                EM<sub>IV</sub> = σ<sub>ATM</sub> &middot; √(DTE / 365)
-              </>
-            }
+            tex={String.raw`\mathrm{EM}_{\mathrm{IV}} \;=\; \sigma_{\mathrm{ATM}} \,\cdot\, \sqrt{\tfrac{\mathrm{DTE}}{365}}`}
             body="ATM IV is annualized. To compare it with the straddle move, we
               scale it down to the print expiry. Front-month IV bakes in earnings
               risk; the next expiry is your &lsquo;quieter&rsquo; reference."
@@ -992,15 +992,11 @@ export default function AboutPageClient() {
           <FormulaCard
             kicker="Greeks"
             title="Black–Scholes with dividends"
-            formula={
-              <>
-                d₁ = (ln(S/K) + (r − q + σ²/2)·T) / (σ·√T)
-                <br />
-                Δ_call = e<sup>−qT</sup>·N(d₁)&nbsp;&nbsp;Γ = e<sup>−qT</sup>·φ(d₁) / (S·σ·√T)
-                <br />
-                𝜈 = S·e<sup>−qT</sup>·φ(d₁)·√T&nbsp;&nbsp;Θ_call = …
-              </>
-            }
+            tex={String.raw`\begin{aligned}
+              d_1 &= \tfrac{\ln(S/K) + (r - q + \tfrac{1}{2}\sigma^{2})\,T}{\sigma\sqrt{T}} \\[2pt]
+              \Delta_{\text{call}} &= e^{-qT}\,N(d_1) \qquad \Gamma = \tfrac{e^{-qT}\,\varphi(d_1)}{S\,\sigma\sqrt{T}} \\[2pt]
+              \nu &= S\,e^{-qT}\,\varphi(d_1)\,\sqrt{T}
+              \end{aligned}`}
             body="IV is solved with Brent&apos;s method to 1e-6 tolerance from mid quotes.
               Greeks are surfaced per expiry so you can see how delta-flat your
               position is, how much it&apos;ll move on a 1-vol jump, and how fast
@@ -1009,26 +1005,18 @@ export default function AboutPageClient() {
           <FormulaCard
             kicker="Density"
             title="Two-sided log-normal probability"
-            formula={
-              <>
-                z₊ = ln(1 + |x|) / σ&nbsp;&nbsp;z₋ = ln(1 − |x|) / σ
-                <br />
-                P(|S/S₀ − 1| ≥ |x|) = (1 − Φ(z₊)) + Φ(z₋)
-              </>
-            }
+            tex={String.raw`\begin{aligned}
+              z_{+} &= \tfrac{\ln(1 + |x|)}{\sigma} \qquad z_{-} = \tfrac{\ln(1 - |x|)}{\sigma} \\[2pt]
+              P\!\left(\,\left|\tfrac{S}{S_0} - 1\right| \ge |x|\,\right) &= \bigl(1 - \Phi(z_{+})\bigr) + \Phi(z_{-})
+              \end{aligned}`}
             body="The hover probability on the density bar uses the correct asymmetric
-              form — naïve `2·(1 − Φ(z₊))` slightly overstates the tail because
-              the downside in simple-return space is fatter than the upside."
+              form — naïve 2·(1 − Φ(z₊)) slightly overstates the tail because the
+              downside in simple-return space is fatter than the upside."
           />
           <FormulaCard
             kicker="Hist edge"
             title="Rich versus what actually printed"
-            formula={
-              <>
-                hist_edge = (EM<sub>straddle</sub> − μ₄Q<sub>|move|</sub>) / μ₄Q
-                <sub>|move|</sub>
-              </>
-            }
+            tex={String.raw`\text{hist\_edge} \;=\; \frac{\mathrm{EM}_{\text{straddle}} \,-\, \mu_{4\mathrm{Q},\,|\Delta|}}{\mu_{4\mathrm{Q},\,|\Delta|}}`}
             body="Compares today's implied move to the average |close-to-close| over
               the last four prints. ≥ +20% = options are pricing the print at least a
               fifth richer than recent history. Sample size is small; treat as a
@@ -1037,13 +1025,7 @@ export default function AboutPageClient() {
           <FormulaCard
             kicker="Forecast"
             title="LightGBM quantile ensemble"
-            formula={
-              <>
-                ŷ_τ = argmin Σ ρ<sub>τ</sub>(y − ŷ),&nbsp;&nbsp;τ ∈ {'{'}.10, .25, .50, .75, .90{'}'}
-                <br />
-                Features: σ_ATM · √T, σ_skew, Δ_term, β_realized…
-              </>
-            }
+            tex={String.raw`\hat{y}_{\tau} \;=\; \arg\min_{\hat{y}}\,\sum_{i} \rho_{\tau}\!\bigl(y_{i} - \hat{y}\bigr),\quad \tau \in \{0.10,\,0.25,\,0.50,\,0.75,\,0.90\}`}
             body="Five gradient-boosted models, one per quantile of |move|, trained
               walk-forward across every observed earnings event in the universe with
               no look-ahead. The 80% band P10–P90 is the model&apos;s confidence
