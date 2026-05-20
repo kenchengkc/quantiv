@@ -43,6 +43,7 @@ goes stale.
 from __future__ import annotations
 
 import json
+import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -53,6 +54,13 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 DB_PATH = REPO_ROOT / "data" / "quantiv.duckdb"
 MCAP_PATH = REPO_ROOT / "data" / "market_caps.json"
 OUT_PATH = REPO_ROOT / "apps" / "frontend" / "lib" / "popular.ts"
+# Yesterday's top-N snapshot. Compared against today to produce the
+# added/removed/movers diff written to CHANGES_PATH. Atomically overwritten
+# at the end of each successful run.
+SNAPSHOT_PATH = REPO_ROOT / "data" / "popular_snapshot.json"
+# Append-only JSONL audit log of every rebuild's diff. One line per build.
+# Reasonable to tail in CI logs or pipe into a Slack/Discord webhook.
+CHANGES_PATH = REPO_ROOT / "data" / "popular_changes.jsonl"
 
 TOP_N = 400
 WINDOW_DAYS = 90
@@ -61,6 +69,11 @@ MAX_WEIGHT = 100
 
 W_DV = 0.7    # weight on dollar-volume half of composite
 W_MCAP = 0.3  # weight on market-cap half of composite
+
+# Threshold for highlighting a rank change in the diff log. With TOP_N=400,
+# 25 places is ~6% of the list — small enough to surface real movement,
+# large enough to filter out daily jitter at the edges of the universe.
+MOVER_DELTA = 25
 # Tuned by sweep — 50/50 over-weighted size and pushed retail favorites
 # (MSTR/COIN/CRWV) out in favor of mid-cap S&P names. 0.7/0.3 keeps DV
 # as the primary signal (activity = popularity) while mcap acts as a
@@ -91,6 +104,161 @@ def rank_pct(rank: int, n: int) -> float:
     if n <= 1:
         return 1.0
     return 1.0 - (rank - 1) / (n - 1)
+
+
+def load_snapshot() -> dict | None:
+    """Load yesterday's snapshot if it exists. Returns None on missing or
+    unreadable file — the diff just treats that as a fresh baseline."""
+    if not SNAPSHOT_PATH.exists():
+        return None
+    try:
+        return json.loads(SNAPSHOT_PATH.read_text())
+    except Exception as exc:
+        print(f"⚠ could not parse {SNAPSHOT_PATH}: {exc} — treating as fresh baseline")
+        return None
+
+
+def compute_diff(
+    today_ranks: dict[str, int],
+    prev_snapshot: dict | None,
+) -> dict:
+    """Compare today's rank map to the previous snapshot.
+
+    Returns a dict with `added`, `removed`, `movers_up`, `movers_down`.
+    `movers_*` only contain tickers whose absolute rank change clears
+    MOVER_DELTA — without that floor the list is dominated by churn at the
+    bottom of the universe where one bad volume day shifts a name 5-10
+    places.
+    """
+    prev_ranks: dict[str, int] = {}
+    if prev_snapshot and isinstance(prev_snapshot.get("ranks"), dict):
+        for sym, rank in prev_snapshot["ranks"].items():
+            if isinstance(rank, int) and rank > 0:
+                prev_ranks[sym] = rank
+
+    today_set = set(today_ranks)
+    prev_set = set(prev_ranks)
+
+    added = sorted(
+        (
+            {"ticker": s, "rank": today_ranks[s]}
+            for s in today_set - prev_set
+        ),
+        key=lambda r: r["rank"],
+    )
+    removed = sorted(
+        (
+            {"ticker": s, "prev_rank": prev_ranks[s]}
+            for s in prev_set - today_set
+        ),
+        key=lambda r: r["prev_rank"],
+    )
+
+    movers_up: list[dict] = []
+    movers_down: list[dict] = []
+    for sym in today_set & prev_set:
+        delta = today_ranks[sym] - prev_ranks[sym]
+        # delta < 0 means the ticker moved UP the leaderboard (rank 50 → 10).
+        if delta <= -MOVER_DELTA:
+            movers_up.append(
+                {
+                    "ticker": sym,
+                    "prev_rank": prev_ranks[sym],
+                    "rank": today_ranks[sym],
+                    "delta": delta,
+                }
+            )
+        elif delta >= MOVER_DELTA:
+            movers_down.append(
+                {
+                    "ticker": sym,
+                    "prev_rank": prev_ranks[sym],
+                    "rank": today_ranks[sym],
+                    "delta": delta,
+                }
+            )
+    movers_up.sort(key=lambda r: r["delta"])  # most negative (biggest climb) first
+    movers_down.sort(key=lambda r: -r["delta"])  # biggest drop first
+
+    return {
+        "added": added,
+        "removed": removed,
+        "movers_up": movers_up,
+        "movers_down": movers_down,
+    }
+
+
+def write_snapshot(today_ranks: dict[str, int], as_of: str) -> None:
+    """Atomically replace the snapshot file. Writes to a sibling .tmp and
+    renames so a crash mid-write never leaves a half-baked snapshot that
+    would corrupt tomorrow's diff."""
+    payload = {"as_of": as_of, "ranks": today_ranks}
+    SNAPSHOT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    tmp = SNAPSHOT_PATH.with_suffix(SNAPSHOT_PATH.suffix + ".tmp")
+    tmp.write_text(json.dumps(payload, separators=(",", ":")))
+    os.replace(tmp, SNAPSHOT_PATH)
+
+
+def append_changes(
+    diff: dict,
+    as_of: str,
+    prev_as_of: str | None,
+    universe_size: int,
+) -> None:
+    """Append one JSONL entry per build. JSONL is easier to tail/grep
+    than a daily-keyed JSON object and lets us preserve same-day re-runs."""
+    entry = {
+        "ts": datetime.now(tz=timezone.utc).isoformat(timespec="seconds"),
+        "as_of": as_of,
+        "previous_as_of": prev_as_of,
+        "universe_size": universe_size,
+        "summary": {
+            "added": len(diff["added"]),
+            "removed": len(diff["removed"]),
+            "movers_up": len(diff["movers_up"]),
+            "movers_down": len(diff["movers_down"]),
+        },
+        **diff,
+    }
+    CHANGES_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with CHANGES_PATH.open("a") as fh:
+        fh.write(json.dumps(entry, separators=(",", ":")) + "\n")
+
+
+def print_diff_summary(diff: dict, prev_as_of: str | None) -> None:
+    """Render the diff for the CI / shell operator. Kept short on purpose —
+    the JSONL log has the full record if you want to look later."""
+    if prev_as_of is None:
+        print("📓 No previous snapshot found — establishing baseline (no diff to report).")
+        return
+    print(f"📓 Diff vs {prev_as_of}:")
+    print(
+        f"   +{len(diff['added'])} added · −{len(diff['removed'])} removed · "
+        f"↑{len(diff['movers_up'])} climbers · ↓{len(diff['movers_down'])} fallers "
+        f"(|Δrank| ≥ {MOVER_DELTA})"
+    )
+    if diff["added"]:
+        sample = ", ".join(f"{r['ticker']} (#{r['rank']})" for r in diff["added"][:8])
+        more = "" if len(diff["added"]) <= 8 else f" … +{len(diff['added']) - 8} more"
+        print(f"   ➕ {sample}{more}")
+    if diff["removed"]:
+        sample = ", ".join(
+            f"{r['ticker']} (was #{r['prev_rank']})" for r in diff["removed"][:8]
+        )
+        more = "" if len(diff["removed"]) <= 8 else f" … +{len(diff['removed']) - 8} more"
+        print(f"   ➖ {sample}{more}")
+    if diff["movers_up"]:
+        sample = ", ".join(
+            f"{r['ticker']} #{r['prev_rank']}→#{r['rank']}"
+            for r in diff["movers_up"][:5]
+        )
+        print(f"   ↑  {sample}")
+    if diff["movers_down"]:
+        sample = ", ".join(
+            f"{r['ticker']} #{r['prev_rank']}→#{r['rank']}"
+            for r in diff["movers_down"][:5]
+        )
+        print(f"   ↓  {sample}")
 
 
 def main() -> int:
@@ -193,6 +361,25 @@ def main() -> int:
     print(f"   Market-cap coverage: {mcap_coverage}/{total} ({mcap_coverage*100/total:.0f}%)")
     print(f"   Top 10: {', '.join(s for s, *_ in top[:10])}")
     print(f"   Last 5: {', '.join(s for s, *_ in top[-5:])}")
+
+    # Diff vs the previous snapshot, then atomically replace the snapshot.
+    # On the very first run we just establish the baseline — no diff entry
+    # is written so the log doesn't start with a misleading "everything
+    # added" blast.
+    today_ranks = {sym: rank for rank, (sym, *_) in enumerate(top, 1)}
+    prev_snapshot = load_snapshot()
+    prev_as_of = prev_snapshot.get("as_of") if prev_snapshot else None
+    diff = compute_diff(today_ranks, prev_snapshot)
+    print_diff_summary(diff, prev_as_of)
+    if prev_snapshot is not None:
+        append_changes(
+            diff,
+            as_of=now_iso,
+            prev_as_of=prev_as_of,
+            universe_size=n_universe,
+        )
+    write_snapshot(today_ranks, as_of=now_iso)
+
     return 0
 
 

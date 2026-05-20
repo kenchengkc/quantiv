@@ -249,6 +249,10 @@ jobs:
           git config --local user.name  "Quantiv bot"
           git add apps/frontend/public apps/frontend/lib/popular.ts
           git add -f data/earnings_calendar.csv data/market_caps.json
+          # Snapshot + diff log are gitignored under /data/ but need to
+          # persist across CI runs so tomorrow's build can diff against
+          # today. -f force-includes them past the gitignore.
+          git add -f data/popular_snapshot.json data/popular_changes.jsonl
           if git diff --staged --quiet; then
             echo "No changes to commit"
           else
