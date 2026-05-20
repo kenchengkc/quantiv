@@ -1053,10 +1053,10 @@ export default function EarningsScreener() {
               className="serif"
               style={{
                 margin: 0,
-                fontSize: 40,
+                fontSize: 56,
                 fontWeight: 800,
-                letterSpacing: '-0.025em',
-                lineHeight: 1,
+                letterSpacing: '-0.03em',
+                lineHeight: 0.95,
                 color: 'var(--ink)',
                 textTransform: 'uppercase',
               }}
@@ -1079,9 +1079,9 @@ export default function EarningsScreener() {
         </div>
         <p
           style={{
-            margin: '12px 0 0',
-            fontSize: 13,
-            color: 'var(--ink-3)',
+            margin: '14px 0 0',
+            fontSize: 15,
+            color: 'var(--ink-2)',
             maxWidth: 720,
             lineHeight: 1.55,
           }}
