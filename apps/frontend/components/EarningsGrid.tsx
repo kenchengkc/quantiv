@@ -665,10 +665,10 @@ function WeekHeader({
             className="serif"
             style={{
               margin: 0,
-              fontSize: 40,
+              fontSize: 56,
               fontWeight: 800,
-              letterSpacing: '-0.025em',
-              lineHeight: 1.0,
+              letterSpacing: '-0.03em',
+              lineHeight: 0.95,
               color: 'var(--ink)',
               textWrap: 'balance',
               textTransform: 'uppercase',
