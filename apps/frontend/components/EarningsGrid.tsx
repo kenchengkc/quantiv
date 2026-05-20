@@ -616,32 +616,41 @@ function WeekHeader({
               alignItems: 'center',
               gap: 8,
               flexWrap: 'wrap',
+              // Reserve the row's height so the MARKET CLOSED badge can
+              // appear without pushing the headline below it. The badge
+              // is ~22px tall; matching that here keeps the row stable
+              // whether the badge is rendered or not.
+              minHeight: 22,
             }}
           >
             <span>Earnings Week</span>
-            {!marketOpen && (
-              <span
-                title="US equity regular session is 09:30–16:00 ET. After the close, quotes may still update for a short time while data feeds settle."
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 5,
-                  padding: '2px 8px',
-                  borderRadius: 999,
-                  border: '1px solid var(--line)',
-                  background: 'var(--bg-2)',
-                  color: 'var(--ink-3)',
-                  letterSpacing: '0.08em',
-                  fontSize: 9.5,
-                }}
-              >
-                <span style={{
-                  width: 6, height: 6, borderRadius: 999,
-                  background: 'var(--ink-4)',
-                }} />
-                MARKET CLOSED · LAST CLOSE
-              </span>
-            )}
+            <span
+              title="US equity regular session is 09:30–16:00 ET. After the close, quotes may still update for a short time while data feeds settle."
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                padding: '2px 8px',
+                borderRadius: 999,
+                border: '1px solid var(--line)',
+                background: 'var(--bg-2)',
+                color: 'var(--ink-3)',
+                letterSpacing: '0.08em',
+                fontSize: 9.5,
+                // visibility (not display) keeps the badge in the
+                // layout flow regardless of marketOpen, so the row
+                // height is fixed and there's no CLS when the API
+                // result flips marketOpen from true → false.
+                visibility: marketOpen ? 'hidden' : 'visible',
+              }}
+              aria-hidden={marketOpen}
+            >
+              <span style={{
+                width: 6, height: 6, borderRadius: 999,
+                background: 'var(--ink-4)',
+              }} />
+              MARKET CLOSED · LAST CLOSE
+            </span>
           </div>
           <h1
             className="serif"
