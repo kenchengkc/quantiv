@@ -447,10 +447,21 @@ function InteractiveBar({
 
   const sigma = (atmIV || 0.3) * Math.sqrt((dte || 28) / 365);
 
+  // Two-sided log-normal: P(|S/S0 − 1| ≥ |x|)
+  //   = P(S ≥ S0(1 + |x|)) + P(S ≤ S0(1 − |x|))
+  //   = [1 − Φ(log(1+|x|)/σ)] + Φ(log(1−|x|)/σ)
+  // The previous form (`2 (1 − Φ(z_up))`) treated the two tails as
+  // symmetric in `pct`, which slightly overstates the probability for
+  // any non-trivial move because the downside tail in `pct` is fatter
+  // in log-space.
   const probBeyond = useCallback(
     (pct: number) => {
-      const z = Math.log(1 + Math.abs(pct)) / sigma;
-      return 2 * (1 - normCDF(z));
+      const ax = Math.abs(pct);
+      if (ax === 0) return 1;
+      if (ax >= 1) return 0; // can't physically lose 100%+
+      const zUp = Math.log(1 + ax) / sigma;
+      const zDn = Math.log(1 - ax) / sigma; // negative
+      return (1 - normCDF(zUp)) + normCDF(zDn);
     },
     [sigma],
   );
@@ -469,18 +480,30 @@ function InteractiveBar({
     if (hover) setPinned(hover);
   };
 
+  // PDF of the *return* `pct = S/S0 − 1` under log-normal. By change of
+  // variable from log-return to simple-return we pick up the Jacobian
+  // `1 / (1 + pct)`, which makes the curve correctly skewed (the
+  // downside tail is fatter in pct-space than the upside). The curve
+  // is normalized to peak at 1.0 just for display.
   const density = useMemo(() => {
     const n = 80;
     const arr: { x: number; y: number }[] = [];
     for (let i = 0; i <= n; i++) {
       const x = i / n;
       const pct = minPct + x * (maxPct - minPct);
+      // Guard against pct ≤ −1 (would blow up log); our visible
+      // window always sits well above −1, so this is just defensive.
+      if (1 + pct <= 0) {
+        arr.push({ x: x * 100, y: 0 });
+        continue;
+      }
       const z = Math.log(1 + pct) / sigma;
-      const pdf = Math.exp(-0.5 * z * z) / Math.sqrt(2 * Math.PI) / sigma;
+      const pdf =
+        Math.exp(-0.5 * z * z) / Math.sqrt(2 * Math.PI) / sigma / (1 + pct);
       arr.push({ x: x * 100, y: pdf });
     }
     const maxP = Math.max(...arr.map((p) => p.y));
-    return arr.map((p) => ({ x: p.x, y: p.y / maxP }));
+    return arr.map((p) => ({ x: p.x, y: maxP > 0 ? p.y / maxP : 0 }));
   }, [sigma, minPct, maxPct]);
 
   const emLow = toX(-em);
@@ -1743,6 +1766,7 @@ function HistoricalSection({
   withImpliedLen,
   withEpsLen,
   epsBeats,
+  cardChrome,
 }: {
   series: HistoryPoint[];
   hasImplied: boolean;
@@ -1750,6 +1774,7 @@ function HistoricalSection({
   withImpliedLen: number;
   withEpsLen: number;
   epsBeats: number;
+  cardChrome?: boolean;
 }) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const headline = hasImplied
@@ -1758,7 +1783,14 @@ function HistoricalSection({
       ? 'Fundamentals vs. realized'
       : 'Realized moves';
   return (
-    <section style={{ padding: '40px 0', borderBottom: '1px solid var(--line)' }}>
+    <section
+      className={cardChrome ? 'qv-card' : undefined}
+      style={
+        cardChrome
+          ? { padding: '22px 24px' }
+          : { padding: '40px 0', borderBottom: '1px solid var(--line)' }
+      }
+    >
       <div
         style={{
           display: 'flex',
@@ -1920,6 +1952,80 @@ function Td({
   );
 }
 
+/** A scroll-triggered fade-up wrapper. The first render mounts the element
+ *  as hidden (opacity 0, translated down); an IntersectionObserver flips
+ *  the `in` class once it enters the viewport, animating into place via
+ *  the global `.reveal` CSS transition. */
+function Reveal({
+  children,
+  as = 'section',
+  delay = 0,
+  style,
+  className,
+}: {
+  children: React.ReactNode;
+  as?: 'section' | 'div';
+  delay?: number;
+  style?: React.CSSProperties;
+  className?: string;
+}) {
+  const ref = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    if (typeof IntersectionObserver === 'undefined') {
+      el.classList.add('in');
+      return;
+    }
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            el.classList.add('in');
+            io.disconnect();
+            break;
+          }
+        }
+      },
+      { rootMargin: '-40px 0px -40px 0px' },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+  const cls = `reveal${className ? ' ' + className : ''}`;
+  const mergedStyle: React.CSSProperties = delay ? { transitionDelay: `${delay}ms`, ...style } : style ?? {};
+  if (as === 'div') {
+    return (
+      <div ref={ref as React.RefObject<HTMLDivElement>} className={cls} style={mergedStyle}>
+        {children}
+      </div>
+    );
+  }
+  return (
+    <section ref={ref as React.RefObject<HTMLElement>} className={cls} style={mergedStyle}>
+      {children}
+    </section>
+  );
+}
+
+const DETAIL_LAYOUT_KEY = 'quantiv-detail-layout-v1';
+type DetailLayout = 'cards' | 'editorial';
+
+function useDetailLayout(): [DetailLayout, (next: DetailLayout) => void] {
+  const [layout, setLayout] = useState<DetailLayout>('cards');
+  useEffect(() => {
+    try {
+      const v = localStorage.getItem(DETAIL_LAYOUT_KEY);
+      if (v === 'editorial' || v === 'cards') setLayout(v);
+    } catch {}
+  }, []);
+  const update = useCallback((next: DetailLayout) => {
+    setLayout(next);
+    try { localStorage.setItem(DETAIL_LAYOUT_KEY, next); } catch {}
+  }, []);
+  return [layout, update];
+}
+
 // ---------- Page ----------
 export default function SymbolPage() {
   // Triggers EDGAR ticker-names fetch + re-render so the header company
@@ -1937,6 +2043,8 @@ export default function SymbolPage() {
   const [live, setLive] = useState<LivePrice | null>(null);
   const [toast, setToast] = useState<{ msg: string; key: number } | null>(null);
   const [fanHoverExpiration, setFanHoverExpiration] = useState<string | null>(null);
+  const [detailLayout, setDetailLayout] = useDetailLayout();
+  const isCards = detailLayout === 'cards';
 
   useEffect(() => {
     if (!symbol) return;
@@ -2206,16 +2314,61 @@ export default function SymbolPage() {
       {toast && <Toast key={toast.key} message={toast.msg} onDone={() => setToast(null)} />}
 
       <div style={{ paddingTop: 24 }}>
-        <button
-          onClick={() => {
-            if (window.history.length > 1) router.back();
-            else router.push('/');
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: 12,
           }}
-          className="chip"
-          style={{ border: 'none', color: 'var(--ink-3)', paddingLeft: 0, cursor: 'pointer' }}
         >
-          <ChevronLeft size={14} /> Return
-        </button>
+          <button
+            onClick={() => {
+              if (window.history.length > 1) router.back();
+              else router.push('/');
+            }}
+            className="chip"
+            style={{ border: 'none', color: 'var(--ink-3)', paddingLeft: 0, cursor: 'pointer' }}
+          >
+            <ChevronLeft size={14} /> Return
+          </button>
+          <div
+            role="group"
+            aria-label="Detail layout"
+            style={{
+              display: 'inline-flex',
+              border: '1px solid var(--line)',
+              borderRadius: 999,
+              overflow: 'hidden',
+              fontSize: 11,
+            }}
+          >
+            {([
+              ['cards', 'Cards'],
+              ['editorial', 'Editorial'],
+            ] as const).map(([key, label]) => {
+              const active = detailLayout === key;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setDetailLayout(key)}
+                  style={{
+                    padding: '6px 14px',
+                    background: active ? 'var(--ink)' : 'transparent',
+                    color: active ? 'var(--bg)' : 'var(--ink-3)',
+                    border: 'none',
+                    cursor: 'pointer',
+                    letterSpacing: '0.04em',
+                    fontWeight: active ? 600 : 500,
+                  }}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
 
         <div
           style={{
@@ -2373,7 +2526,15 @@ export default function SymbolPage() {
 
       {/* EM hero */}
       {em && (
-        <section style={{ padding: '32px 0 16px', borderBottom: '1px solid var(--line)' }}>
+        <Reveal
+          style={isCards
+            ? { margin: '28px 0 0' }
+            : { padding: '32px 0 16px', borderBottom: '1px solid var(--line)' }}
+        >
+          <div
+            className={isCards ? 'qv-card-hi' : undefined}
+            style={isCards ? { padding: '26px 28px' } : undefined}
+          >
           <div
             style={{
               display: 'flex',
@@ -2384,12 +2545,17 @@ export default function SymbolPage() {
           >
             <div>
               <div
-                style={{
-                  fontSize: 10,
-                  letterSpacing: '0.18em',
-                  textTransform: 'uppercase',
-                  color: 'var(--ink-3)',
-                }}
+                className={isCards ? 'qv-pill' : undefined}
+                style={
+                  isCards
+                    ? undefined
+                    : {
+                        fontSize: 10,
+                        letterSpacing: '0.18em',
+                        textTransform: 'uppercase',
+                        color: 'var(--ink-3)',
+                      }
+                }
               >
                 Expected move · {em.earnings_date ? 'Earnings' : 'Nearest expiry'}
               </div>
@@ -2436,17 +2602,19 @@ export default function SymbolPage() {
               dte={dte}
             />
           )}
-        </section>
+          </div>
+        </Reveal>
       )}
 
       {/* ML forecast card */}
       {em?.em_ml_pct != null && (
-        <section
-          style={{
-            padding: '24px 0',
-            borderBottom: '1px solid var(--line)',
-          }}
+        <Reveal
+          delay={60}
+          style={isCards
+            ? { margin: '14px 0 0' }
+            : { padding: '24px 0', borderBottom: '1px solid var(--line)' }}
         >
+          <div className={isCards ? 'qv-card' : undefined}>
           <div
             style={{
               display: 'flex',
@@ -2458,12 +2626,17 @@ export default function SymbolPage() {
           >
             <div>
               <div
-                style={{
-                  fontSize: 10,
-                  letterSpacing: '0.18em',
-                  textTransform: 'uppercase',
-                  color: 'var(--accent)',
-                }}
+                className={isCards ? 'qv-pill' : undefined}
+                style={
+                  isCards
+                    ? undefined
+                    : {
+                        fontSize: 10,
+                        letterSpacing: '0.18em',
+                        textTransform: 'uppercase',
+                        color: 'var(--accent)',
+                      }
+                }
               >
                 LightGBM forecast
                 {em.model_horizon != null ? ` · T-${em.model_horizon}` : ''}
@@ -2526,19 +2699,26 @@ export default function SymbolPage() {
               straddle={straddlePct}
             />
           )}
-        </section>
+          </div>
+        </Reveal>
       )}
 
       {/* Stat row */}
       {em && (
-        <section
-          style={{
-            display: 'grid',
-            gridTemplateColumns: `repeat(${data.vol_regime?.iv_rank != null ? 5 : 4}, 1fr)`,
-            borderBottom: '1px solid var(--line)',
-            columnGap: 24,
-          }}
+        <Reveal
+          delay={120}
+          style={isCards ? { margin: '14px 0 0' } : undefined}
         >
+          <div
+            className={isCards ? 'qv-card' : undefined}
+            style={{
+              display: 'grid',
+              gridTemplateColumns: `repeat(${data.vol_regime?.iv_rank != null ? 5 : 4}, 1fr)`,
+              ...(isCards
+                ? { columnGap: 24, padding: '6px 20px' }
+                : { borderBottom: '1px solid var(--line)', columnGap: 24 }),
+            }}
+          >
           <Stat
             label="ATM IV"
             value={em.atm_iv !== null ? `${(em.atm_iv * 100).toFixed(1)}%` : '—'}
@@ -2586,7 +2766,8 @@ export default function SymbolPage() {
                 : undefined
             }
           />
-        </section>
+          </div>
+        </Reveal>
       )}
 
       {/* Historical implied vs realized (last 8 quarters).
@@ -2608,20 +2789,35 @@ export default function SymbolPage() {
         const withEps = series.filter((h) => h.epsSurprise != null);
         const epsBeats = withEps.filter((h) => (h.epsSurprise as number) >= 0).length;
         return (
-          <HistoricalSection
-            series={series}
-            hasImplied={hasImplied}
-            beats={beats}
-            withImpliedLen={withImplied.length}
-            withEpsLen={withEps.length}
-            epsBeats={epsBeats}
-          />
+          <Reveal
+            delay={140}
+            style={isCards ? { margin: '14px 0 0' } : undefined}
+          >
+            <HistoricalSection
+              series={series}
+              hasImplied={hasImplied}
+              beats={beats}
+              withImpliedLen={withImplied.length}
+              withEpsLen={withEps.length}
+              epsBeats={epsBeats}
+              cardChrome={isCards}
+            />
+          </Reveal>
         );
       })()}
 
       {/* Term structure */}
       {data.straddle_features.length > 0 && (
-        <section style={{ padding: '40px 0', borderBottom: '1px solid var(--line)' }}>
+        <Reveal
+          delay={180}
+          style={isCards
+            ? { margin: '14px 0 0' }
+            : { padding: '40px 0', borderBottom: '1px solid var(--line)' }}
+        >
+          <div
+            className={isCards ? 'qv-card' : undefined}
+            style={isCards ? { padding: '22px 24px' } : undefined}
+          >
           <div
             style={{
               display: 'flex',
@@ -2632,12 +2828,17 @@ export default function SymbolPage() {
           >
             <div>
               <div
-                style={{
-                  fontSize: 10,
-                  letterSpacing: '0.18em',
-                  textTransform: 'uppercase',
-                  color: 'var(--ink-3)',
-                }}
+                className={isCards ? 'qv-pill' : undefined}
+                style={
+                  isCards
+                    ? undefined
+                    : {
+                        fontSize: 10,
+                        letterSpacing: '0.18em',
+                        textTransform: 'uppercase',
+                        color: 'var(--ink-3)',
+                      }
+                }
               >
                 Term structure
               </div>
@@ -2717,7 +2918,8 @@ export default function SymbolPage() {
               onHighlightExpiration={setFanHoverExpiration}
             />
           )}
-        </section>
+          </div>
+        </Reveal>
       )}
 
       <div
