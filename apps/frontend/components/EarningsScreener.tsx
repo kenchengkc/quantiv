@@ -1,10 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { companyName } from '@/lib/companyNames';
 import { useEnsureCompanyNames } from '@/lib/useCompanyNames';
+import { useTickerHover } from '@/components/TickerHoverCard';
 import sp500Constituents from '../../../lib/data/sp500-constituents.json';
 
 const SP500_SET = new Set(
@@ -226,61 +227,190 @@ function ScreenerLogo({ ticker, size = 26 }: { ticker: string; size?: number }) 
 }
 /* eslint-enable @next/next/no-img-element */
 
-/** Single KPI panel for the strip below the header. */
-function KpiCell({
-  label,
-  value,
-  sub,
-  tone,
-  divider = true,
-}: {
-  label: string;
-  value: string | number;
-  sub?: string;
-  tone?: string;
-  divider?: boolean;
-}) {
+/** Name cell for a screener row. Owns its own hover handlers so the
+ *  shared ticker hover-card only fires when the cursor is over the
+ *  logo / ticker / company-name area, not the entire row. */
+function NameCell({ ev }: { ev: ScreenerEvent }) {
+  const hover = useTickerHover(ev.ticker);
   return (
-    <div
+    <td style={{ padding: '10px 8px' }} {...hover}>
+      <Link
+        href={`/${ev.ticker}`}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          textDecoration: 'none',
+          color: 'var(--ink)',
+        }}
+      >
+        <ScreenerLogo ticker={ev.ticker} size={26} />
+        <div style={{ minWidth: 0 }}>
+          <div
+            className="serif"
+            style={{
+              fontWeight: 700,
+              color: 'var(--ink)',
+              fontSize: 14,
+              letterSpacing: '-0.005em',
+            }}
+          >
+            {ev.ticker}
+          </div>
+          <div
+            title={companyName(ev.ticker)}
+            style={{
+              fontSize: 10.5,
+              color: 'var(--ink-4)',
+              marginTop: 1,
+              maxWidth: 160,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {companyName(ev.ticker)}
+          </div>
+          <div
+            className="mono"
+            style={{
+              fontSize: 9,
+              color:
+                ev.em_method === 'ml_lightgbm'
+                  ? 'var(--accent)'
+                  : 'var(--ink-4)',
+              marginTop: 2,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+            }}
+          >
+            {ev.em_method === 'ml_lightgbm' ? 'ML forecast' : 'Options baseline'}
+          </div>
+        </div>
+      </Link>
+    </td>
+  );
+}
+
+/** Sortable column header with a delayed (~600ms) hover tooltip that
+ *  anchors to the left edge of the header so it extends to the right.
+ *  The tooltip itself shows the column name in brand blue with a
+ *  one-line plain-English description below. */
+function SortHeader({
+  active,
+  dir,
+  label,
+  hint,
+  width,
+  onClick,
+}: {
+  active: boolean;
+  dir: SortDir;
+  label: string;
+  hint?: string;
+  width?: number;
+  onClick: () => void;
+}) {
+  const [show, setShow] = useState(false);
+  const timerRef = useRef<number | null>(null);
+
+  const clearTimer = () => {
+    if (timerRef.current !== null) {
+      window.clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+  };
+  const onEnter = () => {
+    clearTimer();
+    if (!hint) return;
+    timerRef.current = window.setTimeout(() => setShow(true), 600);
+  };
+  const onLeave = () => {
+    clearTimer();
+    setShow(false);
+  };
+  useEffect(() => () => clearTimer(), []);
+
+  return (
+    <th
       style={{
-        flex: '1 1 0',
-        minWidth: 140,
-        padding: '16px 18px',
-        borderRight: divider ? '1px solid var(--line)' : 'none',
+        textAlign: 'right',
+        padding: '14px 12px',
+        whiteSpace: 'nowrap',
+        position: 'relative',
+        ...(width ? { width, minWidth: width } : {}),
       }}
     >
-      <div
+      <button
+        type="button"
+        onClick={onClick}
+        onMouseEnter={onEnter}
+        onMouseLeave={onLeave}
+        onFocus={onEnter}
+        onBlur={onLeave}
+        className="mono"
         style={{
-          fontSize: 9.5,
+          background: 'transparent',
+          border: 'none',
+          cursor: 'pointer',
+          fontSize: 10.5,
           letterSpacing: '0.18em',
           textTransform: 'uppercase',
-          color: 'var(--ink-4)',
-          marginBottom: 8,
+          color: active ? 'var(--ink)' : 'var(--ink-3)',
+          fontWeight: active ? 700 : 600,
+          padding: 0,
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 5,
         }}
       >
         {label}
-      </div>
-      <div
-        className="serif tnum"
-        style={{
-          fontSize: 28,
-          fontWeight: 700,
-          letterSpacing: '-0.02em',
-          color: tone || 'var(--ink)',
-          lineHeight: 1,
-        }}
-      >
-        {value}
-      </div>
-      {sub && (
+        <span style={{ opacity: active ? 1 : 0.25, fontSize: 9 }}>
+          {active ? (dir === 'desc' ? '▼' : '▲') : '▼'}
+        </span>
+      </button>
+      {show && hint && (
         <div
-          className="mono tnum"
-          style={{ fontSize: 10.5, color: 'var(--ink-3)', marginTop: 6 }}
+          style={{
+            position: 'absolute',
+            left: 8,
+            top: 'calc(100% + 6px)',
+            zIndex: 50,
+            padding: '8px 12px',
+            background: 'linear-gradient(180deg, var(--bg-3), var(--bg-2))',
+            border: '1px solid var(--line-2)',
+            borderRadius: 8,
+            boxShadow: '0 12px 32px rgba(0,0,0,0.55)',
+            maxWidth: 260,
+            minWidth: 180,
+            fontSize: 11.5,
+            lineHeight: 1.4,
+            color: 'var(--ink-2)',
+            textAlign: 'left',
+            letterSpacing: 0,
+            textTransform: 'none',
+            whiteSpace: 'normal',
+            fontWeight: 400,
+            animation: 'qv-hover-pop 160ms cubic-bezier(.2,.8,.3,1) both',
+            pointerEvents: 'none',
+          }}
         >
-          {sub}
+          <div
+            style={{
+              fontSize: 9.5,
+              letterSpacing: '0.16em',
+              textTransform: 'uppercase',
+              color: 'var(--brand-blue-1)',
+              fontWeight: 700,
+              marginBottom: 4,
+            }}
+          >
+            {label}
+          </div>
+          {hint}
         </div>
       )}
-    </div>
+    </th>
   );
 }
 
@@ -761,6 +891,8 @@ export default function EarningsScreener() {
     let big = 0;
     let ivSum = 0;
     let ivCount = 0;
+    let ivMin = Infinity;
+    let ivMax = -Infinity;
     for (const e of sorted) {
       const he = histEdge(e);
       if (he != null && he >= 0.20) rich++;
@@ -769,6 +901,8 @@ export default function EarningsScreener() {
       if (e.atm_iv != null && Number.isFinite(e.atm_iv)) {
         ivSum += e.atm_iv;
         ivCount++;
+        if (e.atm_iv < ivMin) ivMin = e.atm_iv;
+        if (e.atm_iv > ivMax) ivMax = e.atm_iv;
       }
     }
     return {
@@ -776,6 +910,8 @@ export default function EarningsScreener() {
       cheap,
       big,
       avgIv: ivCount > 0 ? ivSum / ivCount : null,
+      minIv: ivCount > 0 ? ivMin : null,
+      maxIv: ivCount > 0 ? ivMax : null,
     };
   }, [sorted]);
 
@@ -866,40 +1002,16 @@ export default function EarningsScreener() {
     [sorted],
   );
 
-  const th = (key: SortKey, label: string, hint?: string, width?: number) => {
-    const active = sortKey === key;
-    return (
-      <th
-        style={{
-          textAlign: 'right',
-          padding: '10px 8px',
-          whiteSpace: 'nowrap',
-          ...(width ? { width, minWidth: width } : {}),
-        }}
-      >
-        <button
-          type="button"
-          onClick={() => toggleSort(key)}
-          title={hint}
-          className="mono"
-          style={{
-            border: 'none',
-            background: 'transparent',
-            cursor: 'pointer',
-            fontSize: 10,
-            letterSpacing: '0.12em',
-            textTransform: 'uppercase',
-            color: active ? 'var(--ink)' : 'var(--ink-3)',
-            fontWeight: active ? 600 : 500,
-            padding: 0,
-          }}
-        >
-          {label}
-          {active ? (sortDir === 'desc' ? ' ▼' : ' ▲') : ''}
-        </button>
-      </th>
-    );
-  };
+  const th = (key: SortKey, label: string, hint?: string, width?: number) => (
+    <SortHeader
+      active={sortKey === key}
+      dir={sortDir}
+      label={label}
+      hint={hint}
+      width={width}
+      onClick={() => toggleSort(key)}
+    />
+  );
 
   // Loading + error states are rendered inline below (inside the page chrome)
   // rather than as early returns. Returning early swaps the entire layout
@@ -915,22 +1027,18 @@ export default function EarningsScreener() {
 
   return (
     <div>
-      <div
-        style={{
-          padding: '24px 0 20px',
-          borderBottom: '1px solid var(--line)',
-        }}
-      >
+      <div style={{ padding: '32px 0 24px' }}>
         <div
           style={{
             display: 'flex',
             alignItems: 'center',
             gap: 10,
-            fontSize: 10,
-            letterSpacing: '0.18em',
+            fontSize: 10.5,
+            letterSpacing: '0.2em',
             textTransform: 'uppercase',
             color: 'var(--ink-3)',
-            marginBottom: 10,
+            marginBottom: 14,
+            fontWeight: 600,
           }}
         >
           <span>Options · Earnings</span>
@@ -942,93 +1050,260 @@ export default function EarningsScreener() {
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'flex-end',
-            gap: 24,
+            gap: 32,
             flexWrap: 'wrap',
           }}
         >
-          <div style={{ maxWidth: 760, minWidth: 0 }}>
+          <div style={{ minWidth: 0, flex: '1 1 480px' }}>
             <h1
               className="serif"
               style={{
                 margin: 0,
-                fontSize: 52,
+                fontSize: 64,
                 fontWeight: 800,
-                letterSpacing: '-0.03em',
-                lineHeight: 0.98,
-                textTransform: 'uppercase',
+                letterSpacing: '-0.035em',
+                lineHeight: 0.92,
                 color: 'var(--ink)',
+                textTransform: 'uppercase',
               }}
             >
               Screener
             </h1>
-            <p
+            <div
               style={{
-                margin: '14px 0 0',
-                fontSize: 13,
-                color: 'var(--ink-3)',
-                maxWidth: 720,
+                marginTop: 18,
+                fontSize: 16,
+                color: 'var(--ink-2)',
+                maxWidth: 660,
                 lineHeight: 1.55,
+                letterSpacing: '-0.005em',
               }}
             >
-              Cross-week view for sizing earnings risk. Compare the{' '}
-              <strong style={{ color: 'var(--ink-2)' }}>straddle-implied move</strong> against the{' '}
-              <strong style={{ color: 'var(--ink-2)' }}>last-4Q realized average</strong>{' '}
-              (hist edge), the{' '}
-              <strong style={{ color: 'var(--ink-2)' }}>ML model median</strong>, and the{' '}
-              <strong style={{ color: 'var(--ink-2)' }}>P90−P10 band</strong>. Click any
-              column to sort, or use the preset chips below.
-            </p>
-          </div>
-          {manifest?.as_of_date && (
-            <div
-              className="mono tnum"
-              style={{ fontSize: 11, color: 'var(--ink-4)', whiteSpace: 'nowrap' }}
-            >
-              Data as of {manifest.as_of_date} · {sorted.length} names
+              Every earnings name on one page. See what options are pricing,
+              how it stacks up against recent history and the ML model,
+              and where IV sits in its 52-week range.
             </div>
-          )}
+          </div>
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'flex-end',
+              gap: 4,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            <div
+              className="serif tnum"
+              style={{
+                fontSize: 32,
+                fontWeight: 700,
+                letterSpacing: '-0.02em',
+                color: 'var(--ink)',
+                lineHeight: 1,
+              }}
+            >
+              {sorted.length}
+            </div>
+            <div
+              style={{
+                fontSize: 10,
+                letterSpacing: '0.18em',
+                textTransform: 'uppercase',
+                color: 'var(--ink-3)',
+                fontWeight: 600,
+              }}
+            >
+              names · filtered
+            </div>
+            {manifest?.as_of_date && (
+              <div className="mono tnum" style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 6 }}>
+                As of {manifest.as_of_date}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* KPI strip — five panes summarizing the visible universe.
-          Tones: rich = down (red, premium overpriced), cheap = up
-          (green, premium discounted), big movers = neutral.
-          Hidden until contentReady so the panes don't flash in before
-          the table below them. */}
+      {/* Insight cards — four cards summarizing the visible universe.
+          Each shows the count of names meeting a criterion, the ratio
+          of the universe, and a one-line definition. */}
       {contentReady && summary && (
         <div
           style={{
-            display: 'flex',
-            border: '1px solid var(--line)',
-            borderTop: 'none',
-            background: 'var(--bg-2)',
-            flexWrap: 'wrap',
+            display: 'grid',
+            gridTemplateColumns: 'repeat(4, 1fr)',
+            gap: 14,
           }}
         >
-          <KpiCell label="Universe" value={String(sorted.length)} sub="filtered names" />
-          <KpiCell
-            label="Rich vs hist"
-            value={String(summary.rich)}
-            sub="implied ≥ +20% over 4Q realized"
-            tone="var(--down)"
-          />
-          <KpiCell
-            label="Cheap IV"
-            value={String(summary.cheap)}
-            sub="IV rank ≤ 30%"
-            tone="var(--up)"
-          />
-          <KpiCell
-            label="Big movers"
-            value={String(summary.big)}
-            sub="straddle EM ≥ 10%"
-          />
-          <KpiCell
-            label="Avg ATM IV"
-            value={summary.avgIv != null ? `${(summary.avgIv * 100).toFixed(1)}%` : '—'}
-            sub="annualized"
-            divider={false}
-          />
+          {([
+            {
+              key: 'rich',
+              count: summary.rich,
+              ratio: summary.rich / Math.max(1, sorted.length),
+              isPct: false,
+              tone: 'var(--down)',
+              kicker: 'Hist edge',
+              label: 'Rich vs history',
+              desc:
+                'Implied move at least 20% above last-4Q realized. Often a sell candidate.',
+            },
+            {
+              key: 'cheap',
+              count: summary.cheap,
+              ratio: summary.cheap / Math.max(1, sorted.length),
+              isPct: false,
+              tone: 'var(--up)',
+              kicker: 'IV rank',
+              label: 'Cheap implied vol',
+              desc:
+                'ATM IV in the bottom 30% of its 52-week range. Often a buy candidate.',
+            },
+            {
+              key: 'big',
+              count: summary.big,
+              ratio: summary.big / Math.max(1, sorted.length),
+              isPct: false,
+              tone: 'var(--brand-blue-1)',
+              kicker: 'Straddle EM',
+              label: 'Big movers',
+              desc: 'Straddle pricing a ≥ 10% one-day move on print.',
+            },
+            {
+              key: 'iv',
+              count:
+                summary.avgIv != null
+                  ? `${(summary.avgIv * 100).toFixed(1)}%`
+                  : '–',
+              // Position the bar fill at where the avg sits between the
+              // visible universe's min and max IV. A flat universe (or a
+              // single name) parks the marker at the midpoint.
+              ratio:
+                summary.avgIv != null && summary.minIv != null && summary.maxIv != null
+                  ? summary.maxIv === summary.minIv
+                    ? 0.5
+                    : (summary.avgIv - summary.minIv) /
+                      (summary.maxIv - summary.minIv)
+                  : 0,
+              isPct: true,
+              tone: 'var(--flag)',
+              kicker: 'ATM IV',
+              label: 'Average vol',
+              desc:
+                'Front-month implied volatility across the universe, annualized.',
+              caption:
+                summary.minIv != null && summary.maxIv != null
+                  ? `Range across universe: ${(summary.minIv * 100).toFixed(1)}% – ${(summary.maxIv * 100).toFixed(1)}%`
+                  : null,
+            },
+          ] as const).map((k) => (
+            <div
+              key={k.key}
+              style={{
+                position: 'relative',
+                overflow: 'hidden',
+                borderRadius: 14,
+                border: '1px solid var(--line)',
+                background: `linear-gradient(135deg,
+                  color-mix(in oklab, ${k.tone} 8%, var(--bg-2)) 0%,
+                  var(--bg-2) 60%)`,
+                padding: '18px 20px 20px',
+                display: 'flex',
+                flexDirection: 'column',
+                minHeight: 178,
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 10,
+                  letterSpacing: '0.18em',
+                  textTransform: 'uppercase',
+                  color: k.tone,
+                  fontWeight: 700,
+                  opacity: 0.85,
+                }}
+              >
+                {k.kicker}
+              </div>
+              <div
+                className="serif tnum"
+                style={{
+                  fontSize: 56,
+                  fontWeight: 800,
+                  letterSpacing: '-0.035em',
+                  color: 'var(--ink)',
+                  lineHeight: 0.95,
+                  marginTop: 10,
+                }}
+              >
+                {k.count}
+                {!k.isPct && (
+                  <span
+                    style={{
+                      fontSize: 16,
+                      color: 'var(--ink-3)',
+                      fontWeight: 500,
+                      letterSpacing: '0.01em',
+                      marginLeft: 8,
+                    }}
+                  >
+                    / {sorted.length}
+                  </span>
+                )}
+              </div>
+              <div style={{ marginTop: 12, marginBottom: 12 }}>
+                <div
+                  style={{
+                    height: 4,
+                    borderRadius: 2,
+                    background: 'color-mix(in oklab, var(--bg-3) 70%, transparent)',
+                    overflow: 'hidden',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: `${k.ratio * 100}%`,
+                      height: '100%',
+                      background: k.tone,
+                      boxShadow: `0 0 8px color-mix(in oklab, ${k.tone} 50%, transparent)`,
+                      borderRadius: 2,
+                    }}
+                  />
+                </div>
+                <div
+                  className="mono tnum"
+                  style={{ fontSize: 10.5, color: 'var(--ink-3)', marginTop: 4 }}
+                >
+                  {'caption' in k && k.caption
+                    ? k.caption
+                    : `${(k.ratio * 100).toFixed(0)}% of universe`}
+                </div>
+              </div>
+              <div style={{ marginTop: 'auto' }}>
+                <div
+                  className="serif"
+                  style={{
+                    fontSize: 15,
+                    fontWeight: 700,
+                    color: 'var(--ink)',
+                    letterSpacing: '-0.005em',
+                  }}
+                >
+                  {k.label}
+                </div>
+                <div
+                  style={{
+                    fontSize: 11.5,
+                    color: 'var(--ink-3)',
+                    marginTop: 4,
+                    lineHeight: 1.45,
+                  }}
+                >
+                  {k.desc}
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
@@ -1204,21 +1479,21 @@ export default function EarningsScreener() {
               >
                 Name
               </th>
-              {th('date', 'Date', 'Earnings date')}
-              {th('dte', 'DTE', 'Calendar days until earnings (from snapshot)')}
+              {th('date', 'Date', 'Reporting date for the upcoming earnings event.')}
+              {th('dte', 'DTE', 'Calendar days from today until the earnings print.')}
               <th style={{ textAlign: 'left', padding: '10px 8px', fontSize: 10, color: 'var(--ink-3)', letterSpacing: '0.14em', textTransform: 'uppercase' }}>
                 Session
               </th>
-              {th('straddle', 'Straddle EM', 'ATM straddle-implied one-day move')}
-              {th('hist_avg', 'Hist 4Q avg', 'Average |close-to-close| move over last 4 earnings reports')}
-              {th('hist_edge', 'Hist edge', 'Straddle vs hist average. +ve = implied richer than recent realized')}
-              {th('ml', 'ML EM', 'Model median expected |move|')}
-              {th('edge', 'Edge (vs ML)', 'Straddle % minus ML %')}
-              {th('band', 'P90−P10', 'Quantile spread — wider = more tail uncertainty')}
-              {th('iv', 'ATM IV', 'Front ATM implied vol')}
-              {th('iv_rank', 'IV Rank', 'Current IV percentile vs trailing 52 weeks (0% = year low, 100% = year high)')}
-              {th('iv_crush', 'IV crush', 'Front-month IV premium over the next-out expiry — proxy for post-print IV drop')}
-              {th('skew', 'Skew', 'ATM call/put IV skew snapshot')}
+              {th('straddle', 'Straddle EM', 'One-day move priced by the print-expiry ATM straddle.')}
+              {th('hist_avg', 'Hist 4Q avg', 'Mean absolute close-to-close move over the last 4 prints.')}
+              {th('hist_edge', 'Hist edge', '(Straddle EM − hist 4Q avg) / hist 4Q avg. Positive = richer.')}
+              {th('ml', 'ML EM', 'LightGBM median expected absolute one-day move on print.')}
+              {th('edge', 'Edge (vs ML)', 'Straddle EM minus ML EM in percentage points.')}
+              {th('band', 'P90−P10', "Width of model's 80% prediction interval. Tighter = more confident.")}
+              {th('iv', 'ATM IV', 'Annualized front-month at-the-money implied volatility.')}
+              {th('iv_rank', 'IV Rank', "Percentile of today's ATM IV in its trailing 52-week range.")}
+              {th('iv_crush', 'IV crush', '(Front IV − next-expiry IV) / front IV. Higher = more crush.')}
+              {th('skew', 'Skew', 'ATM call IV minus ATM put IV. Positive = calls richer than puts.')}
               <th
                 style={{
                   textAlign: 'right',
@@ -1233,7 +1508,7 @@ export default function EarningsScreener() {
               >
                 1d %
               </th>
-              {th('spot', 'Spot', 'Latest underlying price when quote data is available', 88)}
+              {th('spot', 'Spot', 'Latest underlying share price at the snapshot.', 88)}
               <th style={{ textAlign: 'right', padding: '10px 8px', fontSize: 10, color: 'var(--ink-3)', letterSpacing: '0.14em', textTransform: 'uppercase' }}>
                 $ Straddle
               </th>
@@ -1275,66 +1550,7 @@ export default function EarningsScreener() {
                   onMouseEnter={(el) => (el.currentTarget.style.background = 'var(--bg-2)')}
                   onMouseLeave={(el) => (el.currentTarget.style.background = 'transparent')}
                 >
-                  <td style={{ padding: '10px 8px' }}>
-                    <Link
-                      href={`/${ev.ticker}`}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 10,
-                        textDecoration: 'none',
-                        color: 'var(--ink)',
-                      }}
-                    >
-                      <ScreenerLogo ticker={ev.ticker} size={26} />
-                      <div style={{ minWidth: 0 }}>
-                        <div
-                          className="serif"
-                          style={{
-                            fontWeight: 700,
-                            color: 'var(--ink)',
-                            fontSize: 14,
-                            letterSpacing: '-0.005em',
-                          }}
-                        >
-                          {ev.ticker}
-                        </div>
-                        <div
-                          // Native browser tooltip on hover — surfaces
-                          // the full name when the column truncates long
-                          // ones (CBRL → "Cracker Barrel Old Country
-                          // Store"). Zero layout impact, no extra deps.
-                          title={companyName(ev.ticker)}
-                          style={{
-                            fontSize: 10.5,
-                            color: 'var(--ink-4)',
-                            marginTop: 1,
-                            maxWidth: 160,
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          {companyName(ev.ticker)}
-                        </div>
-                        <div
-                          className="mono"
-                          style={{
-                            fontSize: 9,
-                            color:
-                              ev.em_method === 'ml_lightgbm'
-                                ? 'var(--accent)'
-                                : 'var(--ink-4)',
-                            marginTop: 2,
-                            letterSpacing: '0.08em',
-                            textTransform: 'uppercase',
-                          }}
-                        >
-                          {ev.em_method === 'ml_lightgbm' ? 'ML forecast' : 'Options baseline'}
-                        </div>
-                      </div>
-                    </Link>
-                  </td>
+                  <NameCell ev={ev} />
                   <td className="mono tnum" style={{ textAlign: 'right', padding: '10px 8px', color: 'var(--ink-2)' }}>
                     {shortDate(ev.earnings_date)}
                   </td>

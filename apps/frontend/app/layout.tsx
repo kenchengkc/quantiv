@@ -6,6 +6,7 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Topbar } from '@/components/Topbar';
 import { Footer } from '@/components/Footer';
 import { Splash } from '@/components/Splash';
+import { TickerHoverHost } from '@/components/TickerHoverCard';
 import { Analytics } from '@vercel/analytics/next';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 
@@ -56,6 +57,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <main className="flex-1">{children}</main>
                 <Footer />
               </div>
+              <TickerHoverHost />
               <Analytics />
               <SpeedInsights />
             </ErrorBoundary>
