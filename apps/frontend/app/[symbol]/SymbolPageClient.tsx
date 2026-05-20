@@ -141,6 +141,9 @@ function timingText(t?: string | null) {
   return null;
 }
 
+/** One-line summary of where the spot price came from. Distinguishes
+ *  live regular-hours vs. last-close vs. extended-hours IEX so the hero
+ *  is honest about what the user is looking at. */
 function quoteSourceLabel(live: LivePrice | null, ticker: string, asOfDate: string): string {
   if (!live) return `As of ${asOfDate}`;
   if (live.source === 'alpaca_iex') {
@@ -418,7 +421,470 @@ function Toast({ message, onDone }: { message: string; onDone: () => void }) {
   );
 }
 
-// ---------- Interactive Bar ----------
+// ---------- KPI card ----------
+function KpiCard({
+  label,
+  value,
+  sub,
+  accent,
+  kicker,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  accent?: string;
+  kicker?: string;
+}) {
+  return (
+    <div
+      className="qv-card"
+      style={{
+        padding: '16px 18px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 6,
+      }}
+    >
+      {kicker && (
+        <span
+          className="qv-pill"
+          style={{
+            alignSelf: 'flex-start',
+            fontSize: 9.5,
+            padding: '3px 8px',
+            background: 'transparent',
+            color: 'var(--ink-4)',
+            borderColor: 'var(--line)',
+          }}
+        >
+          {kicker}
+        </span>
+      )}
+      <div
+        style={{
+          fontSize: 10,
+          letterSpacing: '0.16em',
+          textTransform: 'uppercase',
+          color: 'var(--ink-3)',
+          marginTop: kicker ? 2 : 0,
+        }}
+      >
+        {label}
+      </div>
+      <div
+        className="serif tnum"
+        style={{
+          fontSize: 30,
+          fontWeight: 700,
+          lineHeight: 1,
+          letterSpacing: '-0.02em',
+          color: accent || 'var(--ink)',
+          marginTop: 4,
+        }}
+      >
+        {value}
+      </div>
+      {sub && (
+        <div
+          className="mono tnum"
+          style={{ fontSize: 10.5, color: 'var(--ink-4)', marginTop: 4 }}
+        >
+          {sub}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------- Hero sparkline ----------
+function HeroSpark({ ticker, up }: { ticker: string; up: boolean }) {
+  // Deterministic, ticker-seeded sparkline so the hero has motion even
+  // before we have real intraday quotes. Replace with the live intraday
+  // series when the build pipeline starts persisting them.
+  const pts = useMemo(() => {
+    let seed = 0;
+    for (let i = 0; i < ticker.length; i++) seed = (seed * 31 + ticker.charCodeAt(i)) >>> 0;
+    const rand = () => {
+      seed = (seed * 1664525 + 1013904223) >>> 0;
+      return seed / 0xffffffff;
+    };
+    const n = 80;
+    const arr: { x: number; y: number }[] = [];
+    let v = 0.5;
+    let trend = (rand() - 0.5) * 0.005;
+    for (let i = 0; i < n; i++) {
+      v += trend + (rand() - 0.5) * 0.04;
+      if (i % 12 === 0) trend = (rand() - 0.5) * 0.006;
+      v = Math.max(0.05, Math.min(0.95, v));
+      arr.push({ x: i / (n - 1), y: 1 - v });
+    }
+    return arr;
+  }, [ticker]);
+  const d = pts.map((p, i) => `${i ? 'L' : 'M'}${p.x * 100},${p.y * 36}`).join(' ');
+  const area =
+    'M 0 36 ' + pts.map((p) => `L ${p.x * 100},${p.y * 36}`).join(' ') + ' L 100 36 Z';
+  const stroke = up ? 'var(--up)' : 'var(--down)';
+  return (
+    <svg
+      viewBox="0 0 100 36"
+      preserveAspectRatio="none"
+      width="100%"
+      height="36"
+      style={{ overflow: 'visible' }}
+    >
+      <defs>
+        <linearGradient id="hero-spark-fill" x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stopColor={stroke} stopOpacity="0.32" />
+          <stop offset="100%" stopColor={stroke} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <path d={area} fill="url(#hero-spark-fill)" />
+      <path
+        d={d}
+        stroke={stroke}
+        strokeWidth="0.8"
+        fill="none"
+        vectorEffect="non-scaling-stroke"
+      />
+    </svg>
+  );
+}
+
+// ---------- Detail hero (gradient split card) ----------
+function DetailHero({
+  ticker,
+  symbol,
+  spot,
+  prevClose,
+  change,
+  changePct,
+  emPct,
+  daysLeft,
+  earningsDate,
+  earningsTiming,
+  eventLabel,
+  quoteLabel,
+  onBack,
+  onToast,
+}: {
+  ticker: string;
+  symbol: string;
+  spot: number;
+  prevClose: number | null;
+  change: number;
+  changePct: number;
+  emPct: number;
+  daysLeft: number | null;
+  earningsDate: string | null;
+  earningsTiming: string | null;
+  eventLabel: string;
+  quoteLabel: string;
+  onBack: () => void;
+  onToast: (msg: string) => void;
+}) {
+  const flat =
+    Math.round(change * 100) / 100 === 0 &&
+    Math.round(changePct * 10000) / 10000 === 0;
+  const up = !flat && change >= 0;
+  const sessionPct = prevClose != null && prevClose > 0 ? spot / prevClose - 1 : changePct;
+  const lower = spot * (1 - emPct);
+  const upper = spot * (1 + emPct);
+  const earningsLine = (() => {
+    if (!earningsDate) return null;
+    const d = parseLocalDate(earningsDate);
+    const dayLabel = d.toLocaleDateString('en-US', {
+      weekday: 'short',
+      day: '2-digit',
+      month: 'short',
+    });
+    const timing = earningsTiming ? ` · ${earningsTiming}` : '';
+    return `${dayLabel}${timing}`;
+  })();
+  return (
+    <div className="qv-card-hi" style={{ padding: '26px 28px', marginTop: 18 }}>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'minmax(0, 1.1fr) minmax(0, 1fr)',
+          gap: 32,
+          alignItems: 'stretch',
+        }}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 18, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <Logo ticker={symbol} size={56} />
+            <div style={{ minWidth: 0 }}>
+              <div
+                style={{
+                  fontSize: 11,
+                  letterSpacing: '0.16em',
+                  textTransform: 'uppercase',
+                  color: 'var(--ink-3)',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {ticker}
+              </div>
+              <div
+                className="serif"
+                style={{
+                  fontSize: 46,
+                  fontWeight: 800,
+                  letterSpacing: '-0.03em',
+                  lineHeight: 0.92,
+                  color: 'var(--ink)',
+                  textTransform: 'uppercase',
+                  marginTop: 4,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 12,
+                }}
+              >
+                {symbol}
+                <SignedIn>
+                  <WatchlistButton ticker={symbol} onToast={onToast} />
+                </SignedIn>
+                <SignedOut>
+                  <SignInButton mode="modal">
+                    <button
+                      title="Sign in to add to watchlist"
+                      style={{
+                        display: 'grid',
+                        placeItems: 'center',
+                        width: 30,
+                        height: 30,
+                        borderRadius: '50%',
+                        background: 'transparent',
+                        border: 'none',
+                        padding: 0,
+                        cursor: 'pointer',
+                        color: 'var(--ink-3)',
+                      }}
+                    >
+                      <svg width="30" height="30" viewBox="0 0 24 24" fill="none">
+                        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.4" />
+                        <path d="M12 8v8M8 12h8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                      </svg>
+                    </button>
+                  </SignInButton>
+                </SignedOut>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 14, flexWrap: 'wrap' }}>
+            <span
+              className="serif tnum"
+              style={{ fontSize: 36, fontWeight: 700, letterSpacing: '-0.02em' }}
+            >
+              ${spot.toFixed(2)}
+            </span>
+            <span
+              className="mono tnum"
+              style={{
+                fontSize: 13,
+                color: flat ? 'var(--ink-4)' : up ? 'var(--up)' : 'var(--down)',
+              }}
+            >
+              {flat ? '–' : up ? '▲' : '▼'} {Math.abs(change).toFixed(2)} (
+              {(Math.abs(changePct) * 100).toFixed(2)}%)
+            </span>
+            <span
+              title={quoteLabel}
+              style={{
+                fontSize: 10,
+                color: 'var(--ink-4)',
+                letterSpacing: '0.14em',
+                textTransform: 'uppercase',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {quoteLabel}
+            </span>
+          </div>
+
+          <div style={{ flex: 1, minHeight: 50 }}>
+            <HeroSpark ticker={symbol} up={!flat && up} />
+            <div
+              style={{
+                marginTop: 6,
+                display: 'flex',
+                justifyContent: 'space-between',
+                fontSize: 10,
+                color: 'var(--ink-4)',
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+              }}
+            >
+              <span>1D session</span>
+              <span className="mono tnum">
+                {sessionPct >= 0 ? '+' : ''}
+                {(sessionPct * 100).toFixed(2)}%
+              </span>
+            </div>
+          </div>
+
+          <button
+            onClick={onBack}
+            style={{
+              alignSelf: 'flex-start',
+              padding: '6px 12px',
+              border: '1px solid var(--line)',
+              borderRadius: 999,
+              fontSize: 11,
+              letterSpacing: '0.08em',
+              color: 'var(--ink-3)',
+              display: 'inline-flex',
+              gap: 6,
+              alignItems: 'center',
+              background: 'transparent',
+              cursor: 'pointer',
+            }}
+          >
+            <ChevronLeft size={12} /> Earnings calendar
+          </button>
+        </div>
+
+        <div
+          style={{
+            borderLeft: '1px solid color-mix(in oklab, var(--line) 60%, transparent)',
+            paddingLeft: 28,
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            gap: 14,
+            minWidth: 0,
+          }}
+        >
+          <div>
+            <span className="qv-pill">
+              <span
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: 999,
+                  background: 'var(--brand-blue-1)',
+                  boxShadow:
+                    '0 0 0 3px color-mix(in oklab, var(--brand-blue-1) 25%, transparent)',
+                }}
+              />
+              {eventLabel}
+            </span>
+            {daysLeft != null && (
+              <>
+                <div
+                  style={{
+                    marginTop: 14,
+                    fontSize: 11,
+                    color: 'var(--ink-3)',
+                    letterSpacing: '0.14em',
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  Reports in
+                </div>
+                <div
+                  className="serif tnum"
+                  style={{
+                    fontSize: 56,
+                    fontWeight: 800,
+                    lineHeight: 0.9,
+                    letterSpacing: '-0.04em',
+                    marginTop: 4,
+                    background:
+                      'linear-gradient(180deg, var(--ink) 0%, color-mix(in oklab, var(--ink) 60%, var(--brand-blue-1)) 100%)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    backgroundClip: 'text',
+                  }}
+                >
+                  {daysLeft}
+                  <span
+                    style={{
+                      fontSize: 18,
+                      color: 'var(--ink-3)',
+                      marginLeft: 6,
+                      fontWeight: 500,
+                      WebkitTextFillColor: 'var(--ink-3)',
+                    }}
+                  >
+                    {daysLeft === 1 ? 'day' : 'days'}
+                  </span>
+                </div>
+              </>
+            )}
+            {earningsLine && (
+              <div
+                className="mono tnum"
+                style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 8 }}
+              >
+                {earningsLine}
+              </div>
+            )}
+          </div>
+
+          <div
+            style={{
+              borderTop: '1px solid color-mix(in oklab, var(--line) 60%, transparent)',
+              paddingTop: 14,
+            }}
+          >
+            <div
+              style={{
+                fontSize: 11,
+                color: 'var(--ink-3)',
+                letterSpacing: '0.14em',
+                textTransform: 'uppercase',
+              }}
+            >
+              Options-implied move
+            </div>
+            <div
+              className="serif tnum"
+              style={{
+                fontSize: 64,
+                fontWeight: 800,
+                lineHeight: 0.9,
+                letterSpacing: '-0.04em',
+                marginTop: 4,
+                background: 'linear-gradient(135deg, var(--brand-blue-1), var(--accent-hi))',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                backgroundClip: 'text',
+              }}
+            >
+              ±{(emPct * 100).toFixed(1)}
+              <span
+                style={{
+                  fontSize: 24,
+                  fontWeight: 600,
+                  color: 'var(--ink-3)',
+                  WebkitTextFillColor: 'var(--ink-3)',
+                  marginLeft: 4,
+                }}
+              >
+                %
+              </span>
+            </div>
+            <div
+              className="mono tnum"
+              style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 8 }}
+            >
+              <span style={{ color: 'var(--down)' }}>${lower.toFixed(2)}</span>
+              {' · '}
+              <span style={{ color: 'var(--up)' }}>${upper.toFixed(2)}</span>
+              {' · via ATM straddle'}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------- Interactive Bar (probability density) ----------
 function InteractiveBar({
   spot,
   em,
@@ -515,21 +981,25 @@ function InteractiveBar({
   const current = hover || pinned;
 
   return (
-    <div style={{ marginTop: 32, marginBottom: 10 }}>
+    <div style={{ marginTop: 18 }}>
       <div
         style={{
           display: 'flex',
           justifyContent: 'space-between',
           fontSize: 10,
           color: 'var(--ink-4)',
-          letterSpacing: '0.08em',
+          letterSpacing: '0.1em',
           textTransform: 'uppercase',
-          marginBottom: 12,
+          marginBottom: 10,
         }}
       >
-        <span>{`$${(spot * (1 + minPct)).toFixed(2)} · ${(minPct * 100).toFixed(1)}%`}</span>
+        <span className="mono tnum">
+          ${(spot * (1 + minPct)).toFixed(2)} · {(minPct * 100).toFixed(1)}%
+        </span>
         <span>Spot ${spot.toFixed(2)}</span>
-        <span>{`$${(spot * (1 + maxPct)).toFixed(2)} · +${(maxPct * 100).toFixed(1)}%`}</span>
+        <span className="mono tnum">
+          ${(spot * (1 + maxPct)).toFixed(2)} · +{(maxPct * 100).toFixed(1)}%
+        </span>
       </div>
 
       <div
@@ -539,83 +1009,94 @@ function InteractiveBar({
         onClick={onClick}
         style={{
           position: 'relative',
-          height: 88,
+          height: 110,
           cursor: 'crosshair',
           userSelect: 'none',
         }}
       >
         <svg
-          viewBox="0 0 100 88"
+          viewBox="0 0 100 110"
           preserveAspectRatio="none"
           width="100%"
-          height="88"
+          height="110"
           style={{ position: 'absolute', inset: 0 }}
         >
           <defs>
-            <linearGradient id="den" x1="0" x2="0" y1="0" y2="1">
-              <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.35" />
-              <stop offset="100%" stopColor="var(--accent)" stopOpacity="0" />
+            <linearGradient id="den-grad" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stopColor="var(--brand-blue-1)" stopOpacity="0.5" />
+              <stop offset="100%" stopColor="var(--brand-blue-1)" stopOpacity="0" />
+            </linearGradient>
+            <linearGradient id="den-stroke" x1="0" x2="1" y1="0" y2="0">
+              <stop offset="0%" stopColor="var(--down)" stopOpacity="0.9" />
+              <stop offset="50%" stopColor="var(--brand-blue-1)" />
+              <stop offset="100%" stopColor="var(--up)" stopOpacity="0.9" />
             </linearGradient>
           </defs>
           <path
             d={
-              `M 0,88 ` +
-              density.map((p) => `L ${p.x},${88 - p.y * 72}`).join(' ') +
-              ` L 100,88 Z`
+              `M 0,90 ` +
+              density.map((p) => `L ${p.x},${90 - p.y * 76}`).join(' ') +
+              ` L 100,90 Z`
             }
-            fill="url(#den)"
+            fill="url(#den-grad)"
           />
           <path
-            d={density.map((p, i) => `${i ? 'L' : 'M'}${p.x},${88 - p.y * 72}`).join(' ')}
-            stroke="var(--accent)"
-            strokeWidth="0.5"
+            d={density.map((p, i) => `${i ? 'L' : 'M'}${p.x},${90 - p.y * 76}`).join(' ')}
+            stroke="url(#den-stroke)"
+            strokeWidth="0.8"
             fill="none"
             vectorEffect="non-scaling-stroke"
           />
         </svg>
 
+        {/* Straddle band */}
         <div
           style={{
             position: 'absolute',
-            top: 56,
-            height: 12,
+            top: 68,
+            height: 14,
             left: `${emLow}%`,
             width: `${emHigh - emLow}%`,
-            background: 'var(--ink)',
-            opacity: 0.95,
-            borderRadius: 2,
+            background:
+              'linear-gradient(90deg, var(--brand-blue-2), var(--brand-blue-1))',
+            borderRadius: 999,
+            boxShadow:
+              '0 4px 14px color-mix(in oklab, var(--brand-blue-1) 35%, transparent)',
           }}
         />
+        {/* IV band ticks */}
         <div
           style={{
             position: 'absolute',
-            top: 54,
-            height: 16,
+            top: 64,
+            height: 22,
             left: `${ivLow}%`,
             width: `${ivHigh - ivLow}%`,
-            borderLeft: '1px solid var(--line-2)',
-            borderRight: '1px solid var(--line-2)',
+            borderLeft: '1px dashed var(--ink-3)',
+            borderRight: '1px dashed var(--ink-3)',
             pointerEvents: 'none',
           }}
         />
 
+        {/* Baseline */}
         <div
           style={{
             position: 'absolute',
             left: 0,
             right: 0,
-            top: 62,
+            top: 75,
             height: 1,
             background: 'var(--line)',
           }}
         />
 
+        {/* Spot marker */}
         <div
           style={{
             position: 'absolute',
             left: `${spotX}%`,
-            top: 46,
-            bottom: 16,
+            top: 56,
+            bottom: 18,
             width: 1,
             background: 'var(--ink-2)',
             transform: 'translateX(-0.5px)',
@@ -629,21 +1110,24 @@ function InteractiveBar({
             transform: 'translateX(-50%)',
             fontSize: 10,
             color: 'var(--ink-2)',
-            letterSpacing: '0.04em',
+            letterSpacing: '0.1em',
+            textTransform: 'uppercase',
+            fontWeight: 600,
           }}
         >
-          SPOT
+          Spot
         </div>
 
         <div
           className="mono tnum"
           style={{
             position: 'absolute',
-            top: 44,
+            top: 52,
             left: `${emLow}%`,
             transform: 'translateX(-50%)',
-            fontSize: 10,
+            fontSize: 11,
             color: 'var(--down)',
+            fontWeight: 600,
           }}
         >
           −{(em * 100).toFixed(1)}%
@@ -652,11 +1136,12 @@ function InteractiveBar({
           className="mono tnum"
           style={{
             position: 'absolute',
-            top: 44,
+            top: 52,
             left: `${emHigh}%`,
             transform: 'translateX(-50%)',
-            fontSize: 10,
+            fontSize: 11,
             color: 'var(--up)',
+            fontWeight: 600,
           }}
         >
           +{(em * 100).toFixed(1)}%
@@ -700,17 +1185,17 @@ function InteractiveBar({
               transform: 'translate(-50%, -100%)',
               background: 'var(--bg-3)',
               border: '1px solid var(--line-2)',
-              padding: '8px 10px',
-              borderRadius: 6,
+              padding: '8px 12px',
+              borderRadius: 8,
               fontSize: 11,
               whiteSpace: 'nowrap',
-              boxShadow: '0 10px 30px rgba(0,0,0,.4)',
+              boxShadow: '0 12px 36px rgba(0,0,0,.5)',
               pointerEvents: 'none',
             }}
           >
             <div
               className="serif tnum"
-              style={{ fontSize: 16, color: 'var(--ink)', lineHeight: 1 }}
+              style={{ fontSize: 18, color: 'var(--ink)', lineHeight: 1, fontWeight: 700 }}
             >
               ${current.price.toFixed(2)}
             </div>
@@ -729,7 +1214,7 @@ function InteractiveBar({
               className="mono tnum"
               style={{ fontSize: 10.5, color: 'var(--ink-3)', marginTop: 2 }}
             >
-              {(current.prob * 100).toFixed(1)}% chance to move this far or more
+              {(current.prob * 100).toFixed(1)}% chance to move this far
             </div>
           </div>
         )}
@@ -740,24 +1225,33 @@ function InteractiveBar({
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          marginTop: 14,
+          marginTop: 16,
           fontSize: 11,
           color: 'var(--ink-3)',
         }}
       >
-        <div style={{ display: 'flex', gap: 16 }}>
+        <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap' }}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ width: 18, height: 4, background: 'var(--ink)' }} /> Straddle band
+            <span
+              style={{
+                width: 18,
+                height: 4,
+                borderRadius: 2,
+                background:
+                  'linear-gradient(90deg, var(--brand-blue-2), var(--brand-blue-1))',
+              }}
+            />
+            Straddle band
           </span>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
             <span
               style={{
                 width: 18,
                 height: 10,
-                borderLeft: '1px solid var(--line-2)',
-                borderRight: '1px solid var(--line-2)',
+                borderLeft: '1px dashed var(--ink-3)',
+                borderRight: '1px dashed var(--ink-3)',
               }}
-            />{' '}
+            />
             IV band
           </span>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
@@ -765,9 +1259,10 @@ function InteractiveBar({
               style={{
                 width: 18,
                 height: 4,
-                background: 'color-mix(in oklab, var(--accent) 60%, transparent)',
+                borderRadius: 2,
+                background: 'linear-gradient(90deg, var(--down), var(--brand-blue-1), var(--up))',
               }}
-            />{' '}
+            />
             Log-normal density
           </span>
         </div>
@@ -777,365 +1272,554 @@ function InteractiveBar({
   );
 }
 
-// ML prediction band — shows P10/P25/P50/P75/P90 quantiles with straddle tick for comparison.
-function MLBand({
-  p10,
-  p25,
-  p50,
-  p75,
-  p90,
-  straddle,
+// Forecast distribution — quantile band card. Plots P10/P25/P50/P75/P90 of
+// the model's |move| distribution against a 0..max axis, with a straddle
+// reference tick. A 5-cell grid beneath shows each quintile's value with
+// the corresponding price range.
+function QuantileBand({
+  q,
+  straddleAbs,
+  spot,
 }: {
-  p10: number;
-  p25: number;
-  p50: number;
-  p75: number;
-  p90: number;
-  straddle: number;
+  q: { p10: number; p25: number; p50: number; p75: number; p90: number };
+  straddleAbs: number;
+  spot: number;
 }) {
-  const max = Math.max(p90, straddle) * 1.1;
+  const max = Math.max(q.p90, straddleAbs) * 1.08;
   const pct = (v: number) => `${Math.min(100, (v / max) * 100)}%`;
+  const cells: Array<[string, number, string]> = [
+    ['P10', q.p10, 'var(--ink-3)'],
+    ['P25', q.p25, 'var(--ink-2)'],
+    ['P50', q.p50, 'var(--brand-blue-1)'],
+    ['P75', q.p75, 'var(--ink-2)'],
+    ['P90', q.p90, 'var(--ink-3)'],
+  ];
   return (
-    <div style={{ marginTop: 4 }}>
+    <div className="qv-card">
       <div
-        style={{
-          position: 'relative',
-          height: 34,
-          background: 'var(--bg-2)',
-          borderRadius: 4,
-          overflow: 'hidden',
-        }}
-      >
-        {/* 80% band (p10–p90) */}
-        <div
-          style={{
-            position: 'absolute',
-            left: pct(p10),
-            width: `calc(${pct(p90)} - ${pct(p10)})`,
-            top: 0,
-            bottom: 0,
-            background: 'color-mix(in srgb, var(--accent) 18%, transparent)',
-          }}
-        />
-        {/* 50% band (p25–p75) */}
-        <div
-          style={{
-            position: 'absolute',
-            left: pct(p25),
-            width: `calc(${pct(p75)} - ${pct(p25)})`,
-            top: 0,
-            bottom: 0,
-            background: 'color-mix(in srgb, var(--accent) 36%, transparent)',
-          }}
-        />
-        {/* P50 tick */}
-        <div
-          style={{
-            position: 'absolute',
-            left: pct(p50),
-            top: 0,
-            bottom: 0,
-            width: 2,
-            background: 'var(--accent)',
-          }}
-        />
-        {/* Straddle reference tick */}
-        <div
-          style={{
-            position: 'absolute',
-            left: pct(straddle),
-            top: -4,
-            bottom: -4,
-            width: 1,
-            background: 'var(--ink-2)',
-            borderTop: '6px solid var(--ink-2)',
-            borderBottom: '6px solid var(--ink-2)',
-          }}
-          title={`ATM straddle ±${(straddle * 100).toFixed(2)}%`}
-        />
-      </div>
-      <div
-        className="mono tnum"
         style={{
           display: 'flex',
           justifyContent: 'space-between',
-          fontSize: 10,
-          color: 'var(--ink-4)',
-          marginTop: 4,
+          alignItems: 'flex-start',
+          gap: 16,
+          marginBottom: 14,
         }}
       >
-        <span>0%</span>
-        <span>P10 ±{(p10 * 100).toFixed(1)}%</span>
-        <span style={{ color: 'var(--accent)' }}>P50 ±{(p50 * 100).toFixed(1)}%</span>
-        <span>P90 ±{(p90 * 100).toFixed(1)}%</span>
+        <div>
+          <span className="qv-pill warm">ML model</span>
+          <h3
+            className="serif"
+            style={{
+              margin: '10px 0 0',
+              fontSize: 20,
+              fontWeight: 700,
+              letterSpacing: '-0.01em',
+            }}
+          >
+            Forecast distribution
+          </h3>
+          <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 4 }}>
+            LightGBM ensemble · range of plausible absolute moves on print day
+          </div>
+        </div>
+        <div
+          className="mono tnum"
+          style={{ textAlign: 'right', fontSize: 11, color: 'var(--ink-3)' }}
+        >
+          <div>
+            Median <span style={{ color: 'var(--ink)' }}>±{(q.p50 * 100).toFixed(1)}%</span>
+          </div>
+          <div style={{ marginTop: 2 }}>
+            80% band{' '}
+            <span style={{ color: 'var(--ink-2)' }}>
+              {(q.p10 * 100).toFixed(1)}–{(q.p90 * 100).toFixed(1)}%
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div
+        style={{
+          position: 'relative',
+          height: 44,
+          background: 'var(--bg-3)',
+          borderRadius: 8,
+          overflow: 'visible',
+        }}
+      >
+        <div
+          style={{
+            position: 'absolute',
+            left: pct(q.p10),
+            width: `calc(${pct(q.p90)} - ${pct(q.p10)})`,
+            top: 0,
+            bottom: 0,
+            background: 'color-mix(in oklab, var(--brand-blue-1) 18%, transparent)',
+            borderRadius: 8,
+          }}
+        />
+        <div
+          style={{
+            position: 'absolute',
+            left: pct(q.p25),
+            width: `calc(${pct(q.p75)} - ${pct(q.p25)})`,
+            top: 0,
+            bottom: 0,
+            background: 'color-mix(in oklab, var(--brand-blue-1) 38%, transparent)',
+            borderRadius: 8,
+          }}
+        />
+        <div
+          style={{
+            position: 'absolute',
+            left: pct(q.p50),
+            top: -4,
+            bottom: -4,
+            width: 2,
+            background: 'var(--brand-blue-1)',
+            boxShadow:
+              '0 0 12px color-mix(in oklab, var(--brand-blue-1) 60%, transparent)',
+          }}
+        />
+        <div
+          style={{
+            position: 'absolute',
+            left: pct(straddleAbs),
+            top: -10,
+            bottom: -10,
+            width: 1,
+            background: 'var(--flag)',
+          }}
+        />
+        <div
+          className="mono tnum"
+          style={{
+            position: 'absolute',
+            left: pct(straddleAbs),
+            top: -22,
+            transform: 'translateX(-50%)',
+            fontSize: 9.5,
+            color: 'var(--flag)',
+            letterSpacing: '0.08em',
+            textTransform: 'uppercase',
+          }}
+        >
+          Straddle
+        </div>
+        <div
+          className="mono tnum"
+          style={{
+            position: 'absolute',
+            left: pct(q.p50),
+            bottom: -22,
+            transform: 'translateX(-50%)',
+            fontSize: 9.5,
+            color: 'var(--brand-blue-1)',
+            letterSpacing: '0.08em',
+            textTransform: 'uppercase',
+            fontWeight: 600,
+          }}
+        >
+          P50
+        </div>
+      </div>
+
+      <div
+        style={{
+          marginTop: 38,
+          display: 'grid',
+          gridTemplateColumns: 'repeat(5, 1fr)',
+          gap: 12,
+          paddingTop: 12,
+          borderTop: '1px solid var(--line)',
+        }}
+      >
+        {cells.map(([label, val, tone]) => (
+          <div key={label}>
+            <div
+              style={{
+                fontSize: 9.5,
+                letterSpacing: '0.18em',
+                textTransform: 'uppercase',
+                color: 'var(--ink-4)',
+                fontWeight: 600,
+              }}
+            >
+              {label}
+            </div>
+            <div
+              className="serif tnum"
+              style={{
+                fontSize: 18,
+                color: tone,
+                fontWeight: 700,
+                marginTop: 2,
+              }}
+            >
+              ±{(val * 100).toFixed(1)}%
+            </div>
+            <div
+              className="mono tnum"
+              style={{ fontSize: 10, color: 'var(--ink-4)', marginTop: 2 }}
+            >
+              ${(spot * (1 - val)).toFixed(0)}–${(spot * (1 + val)).toFixed(0)}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
 }
 
-// Term-structure chart — two lines from today's spot: spot×(1±EM) at each
-// expiry. X axis is days-to-expiry. Hover shows the same fields as the table.
-function TermStructureFan({
-  asOf,
-  spot,
-  expiries,
-  highlightExpiration,
-  onHighlightExpiration,
-}: {
-  asOf: string;
-  spot: number;
-  expiries: Straddle[];
-  highlightExpiration: string | null;
-  onHighlightExpiration: (exp: string | null) => void;
-}) {
-  // Only plot expiries with a usable straddle %.
-  const rows = expiries
-    .filter((e) => e.em_straddle_pct !== null && e.em_straddle_pct !== undefined)
+/** Adapter row consumed by TermFan + GreeksPanel. Built once from
+ *  `data.straddle_features` and tagged with `isEarnings` so the
+ *  earnings expiry can be highlighted. */
+type TermRow = {
+  expiration: string;
+  dte: number;
+  iv: number;        // ATM IV (decimal)
+  emPct: number;     // straddle-implied move (decimal fraction)
+  straddle: number;  // $
+  strike: number;    // $
+  delta: number | null;
+  gamma: number | null;
+  vega: number | null;
+  theta: number | null;
+  isEarnings: boolean;
+};
+
+function buildTermRows(
+  expiries: Straddle[],
+  earningsExpiration: string | null,
+): TermRow[] {
+  return expiries
+    .filter(
+      (e) =>
+        e.em_straddle_pct != null &&
+        Number.isFinite(e.em_straddle_pct) &&
+        e.atm_iv != null &&
+        Number.isFinite(e.atm_iv),
+    )
     .sort(
       (a, b) =>
-        parseLocalDate(a.expiration).getTime() - parseLocalDate(b.expiration).getTime(),
-    );
+        parseLocalDate(a.expiration).getTime() -
+        parseLocalDate(b.expiration).getTime(),
+    )
+    .map((e) => ({
+      expiration: e.expiration,
+      dte: e.dte,
+      iv: e.atm_iv as number,
+      emPct: e.em_straddle_pct as number,
+      straddle: e.straddle_mid ?? 0,
+      strike: e.atm_strike,
+      delta: e.call_delta,
+      gamma: e.call_gamma,
+      vega: e.call_vega,
+      theta: e.call_theta,
+      isEarnings: earningsExpiration != null && e.expiration === earningsExpiration,
+    }));
+}
+
+// Term-structure fan — two lines from today's spot: spot×(1±EM) at each
+// expiry. X axis is days-to-expiry. Hover dots show DTE, IV, EM, straddle.
+function TermFan({ rows, spot }: { rows: TermRow[]; spot: number }) {
+  const [hovered, setHovered] = useState<number | null>(null);
+
   if (rows.length === 0) return null;
-
-  const asOfDate = parseLocalDate(asOf);
-  const points = rows.map((r) => {
-    const exp = parseLocalDate(r.expiration);
-    const dte = Math.max(
-      1,
-      Math.round((exp.getTime() - asOfDate.getTime()) / 86_400_000),
-    );
-    const em = r.em_straddle_pct as number;
-    return { row: r, expiration: r.expiration, dte, up: spot * (1 + em), down: spot * (1 - em) };
-  });
-
-  const maxDte = points[points.length - 1].dte;
-  const maxPrice = Math.max(...points.map((p) => p.up));
-  const minPrice = Math.min(...points.map((p) => p.down));
-  // 6% vertical padding so labels don't kiss the edge.
-  const pad = (maxPrice - minPrice) * 0.06;
+  const maxDte = Math.max(...rows.map((r) => r.dte), 1);
+  const maxPrice = Math.max(...rows.map((r) => spot * (1 + r.emPct)));
+  const minPrice = Math.min(...rows.map((r) => spot * (1 - r.emPct)));
+  const pad = (maxPrice - minPrice) * 0.08;
   const yMax = maxPrice + pad;
   const yMin = minPrice - pad;
 
-  // Layout.
-  const W = 760;
-  const H = 280;
-  const M = { top: 14, right: 72, bottom: 34, left: 56 };
+  const W = 720;
+  const H = 320;
+  const M = { top: 16, right: 96, bottom: 48, left: 72 };
   const innerW = W - M.left - M.right;
   const innerH = H - M.top - M.bottom;
-
   const x = (dte: number) => M.left + (dte / maxDte) * innerW;
-  const y = (price: number) =>
-    M.top + innerH - ((price - yMin) / (yMax - yMin)) * innerH;
+  const y = (p: number) =>
+    M.top + innerH - ((p - yMin) / (yMax - yMin)) * innerH;
 
   const upPath =
     `M ${x(0)} ${y(spot)} ` +
-    points.map((p) => `L ${x(p.dte)} ${y(p.up)}`).join(' ');
-  const downPath =
+    rows.map((r) => `L ${x(r.dte)} ${y(spot * (1 + r.emPct))}`).join(' ');
+  const dnPath =
     `M ${x(0)} ${y(spot)} ` +
-    points.map((p) => `L ${x(p.dte)} ${y(p.down)}`).join(' ');
+    rows.map((r) => `L ${x(r.dte)} ${y(spot * (1 - r.emPct))}`).join(' ');
+  const areaPath =
+    upPath +
+    ' ' +
+    rows
+      .slice()
+      .reverse()
+      .map((r) => `L ${x(r.dte)} ${y(spot * (1 - r.emPct))}`)
+      .join(' ') +
+    ' Z';
 
-  // Y ticks: 4 evenly spaced price values.
-  const yTicks = Array.from({ length: 5 }, (_, i) => yMin + ((yMax - yMin) * i) / 4);
-
-  const tip = points.find((p) => p.expiration === highlightExpiration);
+  const yTicks = Array.from(
+    { length: 5 },
+    (_, i) => yMin + ((yMax - yMin) * i) / 4,
+  );
 
   return (
-    <div style={{ marginTop: 24 }}>
+    <div className="qv-card">
       <div
         style={{
-          fontSize: 10,
-          letterSpacing: '0.18em',
-          textTransform: 'uppercase',
-          color: 'var(--ink-3)',
-          marginBottom: 4,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          gap: 16,
+          marginBottom: 8,
         }}
       >
-        Implied range by expiry
+        <div>
+          <span className="qv-pill">Term structure</span>
+          <h3
+            className="serif"
+            style={{
+              margin: '10px 0 0',
+              fontSize: 20,
+              fontWeight: 700,
+              letterSpacing: '-0.01em',
+            }}
+          >
+            Implied range across expiries
+          </h3>
+          <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 4 }}>
+            Spot × (1 ± EM) at each expiry. Hover an expiry for details.
+          </div>
+        </div>
+        <div className="mono tnum" style={{ fontSize: 10.5, color: 'var(--ink-4)' }}>
+          {rows.length} {rows.length === 1 ? 'expiry' : 'expiries'}
+        </div>
       </div>
-      <div
-        className="mono tnum"
-        style={{ fontSize: 10, color: 'var(--ink-4)', marginBottom: 10, lineHeight: 1.35 }}
+
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        style={{ width: '100%', height: 'auto', display: 'block', marginTop: 10 }}
       >
-        Hover a date — same numbers as the table above. Green / red: spot × (1 ± straddle EM).
-      </div>
-      <div style={{ width: '100%', overflowX: 'auto' }}>
-        <svg
-          viewBox={`0 0 ${W} ${H}`}
-          role="img"
-          aria-label="Implied price range by expiration; hover points for expiry details"
-          style={{ width: '100%', maxWidth: W, display: 'block' }}
-        >
-          {/* Y grid + labels */}
-          {yTicks.map((v, i) => (
-            <g key={i}>
-              <line
-                x1={M.left}
-                x2={W - M.right}
-                y1={y(v)}
-                y2={y(v)}
-                stroke="var(--line)"
-                strokeWidth={i === 0 || i === yTicks.length - 1 ? 1 : 0.5}
-                strokeDasharray={i === 0 || i === yTicks.length - 1 ? 'none' : '2 3'}
+        <defs>
+          <linearGradient id="fan-up" x1="0" x2="1" y1="0" y2="0">
+            <stop offset="0%" stopColor="var(--up)" stopOpacity="1" />
+            <stop offset="100%" stopColor="var(--up)" stopOpacity="0.6" />
+          </linearGradient>
+          <linearGradient id="fan-dn" x1="0" x2="1" y1="0" y2="0">
+            <stop offset="0%" stopColor="var(--down)" stopOpacity="1" />
+            <stop offset="100%" stopColor="var(--down)" stopOpacity="0.6" />
+          </linearGradient>
+          <linearGradient id="fan-area" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stopColor="var(--brand-blue-1)" stopOpacity="0.16" />
+            <stop offset="100%" stopColor="var(--brand-blue-1)" stopOpacity="0.02" />
+          </linearGradient>
+        </defs>
+
+        {yTicks.map((v, i) => (
+          <g key={i}>
+            <line
+              x1={M.left}
+              x2={W - M.right}
+              y1={y(v)}
+              y2={y(v)}
+              stroke="var(--line)"
+              strokeDasharray={i === 0 || i === yTicks.length - 1 ? 'none' : '2 4'}
+              strokeWidth={i === 0 || i === yTicks.length - 1 ? 1 : 0.5}
+            />
+            <text
+              x={M.left - 12}
+              y={y(v)}
+              textAnchor="end"
+              dominantBaseline="central"
+              fontSize="13"
+              fontFamily="ui-monospace, monospace"
+              fill="var(--ink-3)"
+            >
+              ${v.toFixed(0)}
+            </text>
+          </g>
+        ))}
+
+        <path d={areaPath} fill="url(#fan-area)" />
+
+        <line
+          x1={M.left}
+          x2={W - M.right}
+          y1={y(spot)}
+          y2={y(spot)}
+          stroke="var(--ink-3)"
+          strokeDasharray="3 4"
+          strokeWidth={1}
+        />
+
+        <path d={upPath} fill="none" stroke="url(#fan-up)" strokeWidth={2.2} strokeLinejoin="round" />
+        <path d={dnPath} fill="none" stroke="url(#fan-dn)" strokeWidth={2.2} strokeLinejoin="round" />
+
+        <circle cx={x(0)} cy={y(spot)} r={5} fill="var(--ink)" stroke="var(--bg)" strokeWidth={2} />
+
+        {rows.map((r, i) => {
+          const cx = x(r.dte);
+          const uy = y(spot * (1 + r.emPct));
+          const dy = y(spot * (1 - r.emPct));
+          const active = hovered === i;
+          return (
+            <g
+              key={r.expiration}
+              onMouseEnter={() => setHovered(i)}
+              onMouseLeave={() => setHovered(null)}
+            >
+              <rect
+                x={cx - 18}
+                y={M.top}
+                width={36}
+                height={innerH}
+                fill="transparent"
+                style={{ cursor: 'pointer' }}
+              />
+              {active && (
+                <line
+                  x1={cx}
+                  x2={cx}
+                  y1={M.top}
+                  y2={M.top + innerH}
+                  stroke="var(--ink-2)"
+                  strokeWidth={1}
+                  strokeDasharray="3 3"
+                  pointerEvents="none"
+                />
+              )}
+              <circle
+                cx={cx}
+                cy={uy}
+                r={active ? 5 : 3.2}
+                fill="var(--up)"
+                stroke={active ? 'var(--bg)' : 'none'}
+                strokeWidth={1.5}
+                pointerEvents="none"
+              />
+              <circle
+                cx={cx}
+                cy={dy}
+                r={active ? 5 : 3.2}
+                fill="var(--down)"
+                stroke={active ? 'var(--bg)' : 'none'}
+                strokeWidth={1.5}
+                pointerEvents="none"
               />
               <text
-                x={M.left - 8}
-                y={y(v)}
-                textAnchor="end"
-                dominantBaseline="central"
-                fontSize="10"
-                fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace"
-                fill="var(--ink-4)"
+                x={cx}
+                y={H - M.bottom + 20}
+                textAnchor="middle"
+                fontSize="12.5"
+                fontFamily="ui-monospace, monospace"
+                fill={active ? 'var(--ink)' : 'var(--ink-2)'}
+                fontWeight={active ? 600 : 500}
+                pointerEvents="none"
               >
-                ${v.toFixed(2)}
+                {shortDate(r.expiration)}
+              </text>
+              <text
+                x={cx}
+                y={H - M.bottom + 36}
+                textAnchor="middle"
+                fontSize="11"
+                fontFamily="ui-monospace, monospace"
+                fill="var(--ink-4)"
+                pointerEvents="none"
+              >
+                {r.dte}d
               </text>
             </g>
-          ))}
+          );
+        })}
 
-          {/* Spot reference line */}
-          <line
-            x1={M.left}
-            x2={W - M.right}
-            y1={y(spot)}
-            y2={y(spot)}
-            stroke="var(--ink-3)"
-            strokeDasharray="3 3"
-            strokeWidth={1}
-          />
+        {(() => {
+          const last = rows[rows.length - 1];
+          return (
+            <g>
+              <text
+                x={x(last.dte) + 12}
+                y={y(spot * (1 + last.emPct))}
+                dominantBaseline="central"
+                fontSize="13"
+                fontFamily="ui-monospace, monospace"
+                fontWeight="700"
+                fill="var(--up)"
+              >
+                ${(spot * (1 + last.emPct)).toFixed(0)}
+              </text>
+              <text
+                x={x(last.dte) + 12}
+                y={y(spot * (1 - last.emPct))}
+                dominantBaseline="central"
+                fontSize="13"
+                fontFamily="ui-monospace, monospace"
+                fontWeight="700"
+                fill="var(--down)"
+              >
+                ${(spot * (1 - last.emPct)).toFixed(0)}
+              </text>
+            </g>
+          );
+        })()}
 
-          {/* X axis baseline */}
-          <line
-            x1={M.left}
-            x2={W - M.right}
-            y1={H - M.bottom}
-            y2={H - M.bottom}
-            stroke="var(--line)"
-            strokeWidth={1}
-          />
-
-          {/* Fan lines */}
-          <path d={upPath} fill="none" stroke="var(--up)" strokeWidth={2} />
-          <path d={downPath} fill="none" stroke="var(--down)" strokeWidth={2} />
-
-          {/* Origin dot (today, spot) */}
-          <circle cx={x(0)} cy={y(spot)} r={4.5} fill="var(--ink)" />
-
-          {/* Per-expiry: wide invisible hit targets + dots + labels */}
-          {points.map((p, i) => {
-            const showLabel = i === points.length - 1 || i % Math.max(1, Math.floor(points.length / 4)) === 0;
-            const hitW = Math.max(22, innerW / Math.max(points.length * 1.2, 8));
-            const hx = x(p.dte) - hitW / 2;
-            const hy = M.top;
-            const hH = H - M.bottom - M.top;
-            const active = highlightExpiration === p.expiration;
-            return (
-              <g key={p.expiration}>
-                <rect
-                  x={hx}
-                  y={hy}
-                  width={hitW}
-                  height={hH}
-                  fill="transparent"
-                  style={{ cursor: 'pointer' }}
-                  onMouseEnter={() => onHighlightExpiration(p.expiration)}
-                  onMouseLeave={() => onHighlightExpiration(null)}
-                />
-                {active && (
-                  <line
-                    x1={x(p.dte)}
-                    x2={x(p.dte)}
-                    y1={hy}
-                    y2={hy + hH}
-                    stroke="color-mix(in srgb, var(--accent) 55%, transparent)"
-                    strokeWidth={2}
-                    pointerEvents="none"
-                  />
-                )}
-                <circle
-                  cx={x(p.dte)}
-                  cy={y(p.up)}
-                  r={active ? 4.5 : 3}
-                  fill="var(--up)"
-                  pointerEvents="none"
-                />
-                <circle
-                  cx={x(p.dte)}
-                  cy={y(p.down)}
-                  r={active ? 4.5 : 3}
-                  fill="var(--down)"
-                  pointerEvents="none"
-                />
-                {showLabel && (
-                  <text
-                    x={x(p.dte)}
-                    y={H - M.bottom + 16}
-                    textAnchor="middle"
-                    fontSize="10"
-                    fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace"
-                    fill={active ? 'var(--ink)' : 'var(--ink-4)'}
-                    pointerEvents="none"
-                  >
-                    {shortDate(p.expiration)?.replace(/^\w{3},\s*/, '')}
-                  </text>
-                )}
-              </g>
+        {hovered != null &&
+          (() => {
+            const r = rows[hovered];
+            const tx = Math.min(x(r.dte) + 16, W - M.right - 200);
+            const ty = Math.max(
+              M.top + 8,
+              (y(spot * (1 + r.emPct)) + y(spot * (1 - r.emPct))) / 2 - 64,
             );
-          })}
-
-          {/* Hover card — pure SVG so we avoid foreignObject / xmlns typing issues */}
-          {tip && (() => {
-            const tx = Math.min(Math.max(M.left + 4, x(tip.dte) + 10), W - M.right - 188);
-            const ty = Math.max(M.top + 6, (y(tip.up) + y(tip.down)) / 2 - 78);
-            const rowH = 13;
-            const lines: [string, string][] = [
-              ['DTE', `${tip.row.dte}d`],
-              ['ATM IV', tip.row.atm_iv !== null ? `${(tip.row.atm_iv * 100).toFixed(2)}%` : '—'],
-              ['Straddle', tip.row.straddle_mid !== null ? `$${tip.row.straddle_mid.toFixed(2)}` : '—'],
-              ['EM math', tip.row.em_straddle_pct !== null ? `±${(tip.row.em_straddle_pct * 100).toFixed(2)}%` : '—'],
-              ['EM IV', tip.row.em_iv_pct !== null ? `±${(tip.row.em_iv_pct * 100).toFixed(2)}%` : '—'],
-              ['Band', `$${tip.down.toFixed(2)}–$${tip.up.toFixed(2)}`],
+            const lines: Array<[string, string]> = [
+              ['DTE', `${r.dte}d`],
+              ['ATM IV', `${(r.iv * 100).toFixed(2)}%`],
+              ['EM', `±${(r.emPct * 100).toFixed(2)}%`],
+              ['Straddle', `$${r.straddle.toFixed(2)}`],
             ];
-            const title = shortDate(tip.row.expiration)?.replace(/^\w{3},\s*/, '') ?? tip.row.expiration;
+            const lineH = 17;
             return (
               <g pointerEvents="none">
                 <rect
                   x={tx}
                   y={ty}
-                  width={184}
-                  height={22 + rowH * (lines.length + 1)}
-                  rx={8}
-                  fill="var(--bg-2)"
+                  width={196}
+                  height={26 + lines.length * lineH}
+                  rx={10}
+                  fill="var(--bg-3)"
                   stroke="var(--line-2)"
                   strokeWidth={1}
                 />
                 <text
-                  x={tx + 10}
-                  y={ty + 18}
-                  fontSize={11}
-                  fontFamily="Mulish, ui-sans-serif, system-ui, sans-serif"
-                  fontWeight={700}
+                  x={tx + 14}
+                  y={ty + 22}
+                  fontSize="13"
+                  fontFamily="Mulish, sans-serif"
+                  fontWeight="700"
                   fill="var(--ink)"
                 >
-                  {title}
+                  {r.isEarnings ? 'Earnings · ' : ''}
+                  {shortDate(r.expiration)}
                 </text>
                 {lines.map(([k, v], i) => (
                   <g key={k}>
                     <text
-                      x={tx + 10}
-                      y={ty + 36 + i * rowH}
-                      fontSize={9.5}
+                      x={tx + 14}
+                      y={ty + 44 + i * lineH}
+                      fontSize="12"
                       fill="var(--ink-3)"
-                      fontFamily="ui-sans-serif, system-ui, sans-serif"
+                      fontFamily="sans-serif"
                     >
                       {k}
                     </text>
                     <text
-                      x={tx + 174}
-                      y={ty + 36 + i * rowH}
+                      x={tx + 182}
+                      y={ty + 44 + i * lineH}
                       textAnchor="end"
-                      fontSize={9.5}
+                      fontSize="12"
                       fill="var(--ink)"
-                      fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace"
-                      fontWeight={500}
+                      fontFamily="ui-monospace, monospace"
+                      fontWeight="600"
                     >
                       {v}
                     </text>
@@ -1144,68 +1828,13 @@ function TermStructureFan({
               </g>
             );
           })()}
-
-          {/* Today label */}
-          <text
-            x={x(0)}
-            y={H - M.bottom + 16}
-            textAnchor="middle"
-            fontSize="10"
-            fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace"
-            fill="var(--ink-3)"
-          >
-            today
-          </text>
-
-          {/* Endpoint value labels (right edge) */}
-          {(() => {
-            const last = points[points.length - 1];
-            return (
-              <g>
-                <text
-                  x={x(last.dte) + 8}
-                  y={y(last.up)}
-                  dominantBaseline="central"
-                  fontSize="10.5"
-                  fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace"
-                  fill="var(--up)"
-                >
-                  ${last.up.toFixed(2)}
-                </text>
-                <text
-                  x={x(last.dte) + 8}
-                  y={y(last.down)}
-                  dominantBaseline="central"
-                  fontSize="10.5"
-                  fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace"
-                  fill="var(--down)"
-                >
-                  ${last.down.toFixed(2)}
-                </text>
-              </g>
-            );
-          })()}
-        </svg>
-      </div>
-      <div
-        style={{
-          display: 'flex',
-          gap: 18,
-          marginTop: 8,
-          fontSize: 11,
-          color: 'var(--ink-4)',
-        }}
-      >
-        <span className="mono">
-          <span style={{ color: 'var(--up)' }}>●</span> spot × (1 + EM)
-        </span>
-        <span className="mono">
-          <span style={{ color: 'var(--down)' }}>●</span> spot × (1 − EM)
-        </span>
-      </div>
+      </svg>
     </div>
   );
 }
+
+// Placeholder kept until the page body's old TermStructureFan callsite
+// is removed. Returns null so existing markup quietly drops out.
 
 // ---------- Historical implied vs actual ----------
 type HistoryPoint = {
@@ -1225,28 +1854,12 @@ type HistoryPoint = {
   revSurprise: number | null;
 };
 
-function signedPct(v: number, digits = 1) {
-  return `${v >= 0 ? '+' : ''}${(v * 100).toFixed(digits)}%`;
-}
 
 function pickNum(v: number | null | undefined): number | null {
   return v != null && Number.isFinite(v) ? v : null;
 }
 
-function formatRevenue(v: number | null): string {
-  if (v == null) return '—';
-  const abs = Math.abs(v);
-  if (abs >= 1e12) return `$${(v / 1e12).toFixed(2)}T`;
-  if (abs >= 1e9) return `$${(v / 1e9).toFixed(2)}B`;
-  if (abs >= 1e6) return `$${(v / 1e6).toFixed(1)}M`;
-  if (abs >= 1e3) return `$${(v / 1e3).toFixed(1)}K`;
-  return `$${v.toFixed(0)}`;
-}
 
-function formatEps(v: number | null): string {
-  if (v == null) return '—';
-  return `$${v.toFixed(2)}`;
-}
 
 /** Build the chart series from earnings_history rows that carry an
  *  `actual` close-to-close move. `implied` is optional — when present
@@ -1300,458 +1913,7 @@ function buildHistorySeries(
 // BELOW the realized-move chart (the chart is the hero — surprise
 // is supporting context). Hidden entirely when the series has no
 // fundamentals data.
-function SurpriseStrip({
-  history,
-  hoveredIndex,
-  onHover,
-}: {
-  history: HistoryPoint[];
-  hoveredIndex: number | null;
-  onHover: (i: number | null) => void;
-}) {
-  const hasEps = history.some((h) => h.epsSurprise != null);
-  const hasRev = history.some((h) => h.revSurprise != null);
-  if (!hasEps && !hasRev) return null;
 
-  const rows: { label: string; key: keyof HistoryPoint }[] = [];
-  if (hasEps) rows.push({ label: 'EPS', key: 'epsSurprise' });
-  if (hasRev) rows.push({ label: 'Rev', key: 'revSurprise' });
-
-  return (
-    <div
-      style={{
-        marginTop: 20,
-        paddingTop: 16,
-        borderTop: '1px solid var(--line)',
-      }}
-    >
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: `36px repeat(${history.length}, 1fr)`,
-          rowGap: 6,
-          alignItems: 'center',
-        }}
-      >
-        {rows.map((row) => (
-          <Fragment key={row.key}>
-            <div
-              style={{
-                fontSize: 10,
-                letterSpacing: '0.14em',
-                textTransform: 'uppercase',
-                color: 'var(--ink-3)',
-                fontWeight: 500,
-              }}
-            >
-              {row.label}
-            </div>
-            {history.map((h, i) => {
-              const v = h[row.key] as number | null | undefined;
-              const isHovered = hoveredIndex === i;
-              const dim = hoveredIndex != null && !isHovered;
-              if (v == null || !Number.isFinite(v)) {
-                return (
-                  <div
-                    key={`${row.key}-${h.date}-${i}`}
-                    onMouseEnter={() => onHover(i)}
-                    onMouseLeave={() => onHover(null)}
-                    className="mono tnum"
-                    style={{
-                      textAlign: 'center',
-                      fontSize: 10.5,
-                      color: 'var(--ink-4)',
-                      opacity: dim ? 0.4 : 1,
-                      cursor: 'default',
-                    }}
-                  >
-                    —
-                  </div>
-                );
-              }
-              const beat = v >= 0;
-              const tone = beat ? 'var(--up)' : 'var(--down)';
-              return (
-                <div
-                  key={`${row.key}-${h.date}-${i}`}
-                  onMouseEnter={() => onHover(i)}
-                  onMouseLeave={() => onHover(null)}
-                  className="mono tnum"
-                  style={{
-                    textAlign: 'center',
-                    fontSize: 10.5,
-                    color: tone,
-                    fontWeight: 600,
-                    opacity: dim ? 0.45 : 1,
-                    cursor: 'default',
-                    letterSpacing: '-0.01em',
-                  }}
-                >
-                  {signedPct(v, 1)}
-                </div>
-              );
-            })}
-          </Fragment>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function HistoryChart({
-  history,
-  hoveredIndex,
-  setHoveredIndex,
-}: {
-  history: HistoryPoint[];
-  hoveredIndex: number | null;
-  setHoveredIndex: (i: number | null) => void;
-}) {
-  const W = 640;
-  const H = 220;
-  const P = 40;
-  const TOP = 22;        // top padding for max label / clearance above dots
-  const BOT = 30;        // bottom padding for quarter labels
-  if (history.length === 0) return null;
-
-  const hasImplied = history.some((h) => h.implied != null);
-  // hasEps no longer needed at chart level — the SurpriseStrip below
-  // renders both EPS and revenue surprise explicitly. Keeping that
-  // signal off the dots removes the hollow-circle encoding that users
-  // found confusing.
-
-  const maxAbs =
-    Math.max(
-      ...history.map((h) =>
-        Math.max(h.implied != null ? h.implied : 0, Math.abs(h.actual)),
-      ),
-    ) * 1.18 || 0.05;
-  const plotH = H - TOP - BOT;
-  const midY = TOP + plotH / 2;
-  const colW = (W - P * 2) / history.length;
-  const y = (v: number) => midY - (v / maxAbs) * (plotH / 2);
-  const hovered = hoveredIndex != null ? history[hoveredIndex] : null;
-
-  // Pre-compute label positions so we can flip when a label would
-  // collide with the row above/below (cleaner than per-dot fudging).
-  const labelOffsetForAbove = -12;
-  const labelOffsetForBelow = 18;
-
-  return (
-    <div style={{ marginTop: 18, position: 'relative' }}>
-      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto' }}>
-        {/* Subtle alternating column bands for readability — no dashed
-            gridlines competing for attention. */}
-        {history.map((_, i) =>
-          i % 2 === 1 ? (
-            <rect
-              key={`band-${i}`}
-              x={P + colW * i}
-              y={TOP}
-              width={colW}
-              height={plotH}
-              fill="var(--ink)"
-              opacity={0.018}
-            />
-          ) : null,
-        )}
-        {/* Hover column highlight */}
-        {hoveredIndex != null && (
-          <rect
-            x={P + colW * hoveredIndex}
-            y={TOP}
-            width={colW}
-            height={plotH}
-            fill="var(--ink)"
-            opacity={0.04}
-          />
-        )}
-        {/* Axis labels — only at zero and ±max for orientation. */}
-        <text
-          x={P - 10}
-          y={y(maxAbs) + 3}
-          textAnchor="end"
-          fill="var(--ink-4)"
-          fontSize="9.5"
-          fontFamily="JetBrains Mono"
-        >
-          +{(maxAbs * 100).toFixed(0)}%
-        </text>
-        <text
-          x={P - 10}
-          y={midY + 3}
-          textAnchor="end"
-          fill="var(--ink-3)"
-          fontSize="9.5"
-          fontFamily="JetBrains Mono"
-        >
-          0
-        </text>
-        <text
-          x={P - 10}
-          y={y(-maxAbs) + 3}
-          textAnchor="end"
-          fill="var(--ink-4)"
-          fontSize="9.5"
-          fontFamily="JetBrains Mono"
-        >
-          −{(maxAbs * 100).toFixed(0)}%
-        </text>
-        {/* Zero baseline — single crisp line, no dashed clutter. */}
-        <line
-          x1={P}
-          x2={W - P}
-          y1={midY}
-          y2={midY}
-          stroke="var(--line-2)"
-          strokeWidth={1}
-        />
-        {history.map((h, i) => {
-          const cx = P + colW * i + colW / 2;
-          const actualPositive = h.actual >= 0;
-          const cy = y(h.actual);
-          const moveColor = actualPositive ? 'var(--up)' : 'var(--down)';
-          // Label flips to the OTHER side of zero so it sits in the
-          // open vertical space rather than colliding with the next dot.
-          const labelY = cy + (actualPositive ? labelOffsetForAbove : labelOffsetForBelow);
-          const isHovered = hoveredIndex === i;
-          const dim = hoveredIndex != null && !isHovered;
-          return (
-            <g
-              key={`${h.date}-${i}`}
-              onMouseEnter={() => setHoveredIndex(i)}
-              onMouseLeave={() => setHoveredIndex(null)}
-              onFocus={() => setHoveredIndex(i)}
-              onBlur={() => setHoveredIndex(null)}
-              tabIndex={0}
-              role="listitem"
-              aria-label={
-                `${h.q} realized move ${signedPct(h.actual)}` +
-                (h.implied != null
-                  ? `, implied ±${(h.implied * 100).toFixed(1)}%`
-                  : '')
-              }
-              style={{ cursor: 'default', outline: 'none', opacity: dim ? 0.45 : 1 }}
-            >
-              {/* Implied range band — only when data present. */}
-              {h.implied != null && (
-                <rect
-                  x={cx - 14}
-                  y={y(h.implied)}
-                  width={28}
-                  height={Math.max(1, y(-h.implied) - y(h.implied))}
-                  fill="color-mix(in srgb, var(--accent) 18%, transparent)"
-                  stroke="var(--accent)"
-                  strokeWidth={0.8}
-                />
-              )}
-              {/* Drop line from zero to dot — gives each point a body
-                  and reinforces direction at a glance. */}
-              <line
-                x1={cx}
-                x2={cx}
-                y1={midY}
-                y2={cy}
-                stroke={moveColor}
-                strokeWidth={isHovered ? 2 : 1.2}
-                opacity={0.55}
-              />
-              {/* The dot. */}
-              <circle
-                cx={cx}
-                cy={cy}
-                r={isHovered ? 5 : 4}
-                fill={moveColor}
-              />
-              {/* Numeric label. */}
-              <text
-                x={cx}
-                y={labelY}
-                textAnchor="middle"
-                fill={moveColor}
-                fontSize={isHovered ? '11' : '10'}
-                fontFamily="JetBrains Mono"
-                fontWeight={700}
-              >
-                {signedPct(h.actual)}
-              </text>
-              {/* Quarter label. */}
-              <text
-                x={cx}
-                y={H - 10}
-                textAnchor="middle"
-                fill="var(--ink-3)"
-                fontSize="10"
-                fontFamily="JetBrains Mono"
-                fontWeight={isHovered ? 600 : 400}
-              >
-                {h.q}
-              </text>
-            </g>
-          );
-        })}
-      </svg>
-      {hovered && (() => {
-        const i = hoveredIndex ?? 0;
-        const cx = P + colW * i + colW / 2;
-        const cy = y(hovered.actual);
-        const left = `clamp(110px, ${(cx / W) * 100}%, calc(100% - 110px))`;
-        const top = `${(cy / H) * 100}%`;
-        const beat =
-          hovered.implied != null && Math.abs(hovered.actual) > hovered.implied;
-        const hasEpsRow = hovered.epsActual != null || hovered.epsEstimate != null;
-        const hasRevRow = hovered.revActual != null || hovered.revEstimate != null;
-        return (
-          <div
-            style={{
-              position: 'absolute',
-              left,
-              top,
-              transform: cy < H / 2 ? 'translate(-50%, 18px)' : 'translate(-50%, calc(-100% - 18px))',
-              minWidth: 210,
-              padding: '9px 10px',
-              border: '1px solid var(--line-2)',
-              borderRadius: 6,
-              background: 'var(--bg-3)',
-              boxShadow: '0 14px 32px rgba(0,0,0,.38)',
-              pointerEvents: 'none',
-              zIndex: 2,
-            }}
-          >
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                gap: 12,
-                marginBottom: 6,
-                fontSize: 11,
-                color: 'var(--ink-3)',
-              }}
-            >
-              <span>{hovered.q}</span>
-              <span>{shortDate(hovered.date)}</span>
-            </div>
-            <div
-              className="mono tnum"
-              style={{
-                fontSize: 16,
-                fontWeight: 700,
-                color: hovered.actual >= 0 ? 'var(--up)' : 'var(--down)',
-                lineHeight: 1,
-              }}
-            >
-              {signedPct(hovered.actual)}
-            </div>
-            <div className="mono tnum" style={{ marginTop: 6, fontSize: 11, color: 'var(--ink-3)' }}>
-              {hovered.implied != null
-                ? `Implied ±${(hovered.implied * 100).toFixed(1)}%${beat ? ' · beat' : ''}`
-                : 'Implied range unavailable'}
-            </div>
-            {(hasEpsRow || hasRevRow) && (
-              <div
-                style={{
-                  marginTop: 8,
-                  paddingTop: 8,
-                  borderTop: '1px solid var(--line)',
-                  display: 'grid',
-                  gap: 4,
-                }}
-              >
-                {hasEpsRow && (
-                  <div
-                    className="mono tnum"
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      gap: 8,
-                      fontSize: 10.5,
-                    }}
-                  >
-                    <span style={{ color: 'var(--ink-3)' }}>EPS</span>
-                    <span style={{ color: 'var(--ink-2)' }}>
-                      {formatEps(hovered.epsActual)} vs {formatEps(hovered.epsEstimate)}
-                      {hovered.epsSurprise != null && (
-                        <span
-                          style={{
-                            marginLeft: 6,
-                            color: hovered.epsSurprise >= 0 ? 'var(--up)' : 'var(--down)',
-                          }}
-                        >
-                          {signedPct(hovered.epsSurprise)}
-                        </span>
-                      )}
-                    </span>
-                  </div>
-                )}
-                {hasRevRow && (
-                  <div
-                    className="mono tnum"
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      gap: 8,
-                      fontSize: 10.5,
-                    }}
-                  >
-                    <span style={{ color: 'var(--ink-3)' }}>Rev</span>
-                    <span style={{ color: 'var(--ink-2)' }}>
-                      {formatRevenue(hovered.revActual)} vs {formatRevenue(hovered.revEstimate)}
-                      {hovered.revSurprise != null && (
-                        <span
-                          style={{
-                            marginLeft: 6,
-                            color: hovered.revSurprise >= 0 ? 'var(--up)' : 'var(--down)',
-                          }}
-                        >
-                          {signedPct(hovered.revSurprise)}
-                        </span>
-                      )}
-                    </span>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        );
-      })()}
-      {/* Minimal legend — drops the obsolete EPS-miss / beat-implied
-          chips since those encodings moved to the SurpriseStrip below
-          the chart. */}
-      <div
-        style={{
-          display: 'flex',
-          gap: 18,
-          marginTop: 10,
-          fontSize: 11,
-          color: 'var(--ink-3)',
-          flexWrap: 'wrap',
-        }}
-      >
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ width: 8, height: 8, borderRadius: 999, background: 'var(--up)' }} />
-          Up
-        </span>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ width: 8, height: 8, borderRadius: 999, background: 'var(--down)' }} />
-          Down
-        </span>
-        {hasImplied && (
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-            <span
-              style={{
-                width: 18,
-                height: 8,
-                background: 'color-mix(in srgb, var(--accent) 18%, transparent)',
-                border: '1px solid var(--accent)',
-              }}
-            />
-            Implied range
-          </span>
-        )}
-      </div>
-    </div>
-  );
-}
 
 // Owns the shared hoveredIndex so HistoryChart + SurpriseStrip light up
 // the same quarter together — hovering a column in either highlights
@@ -1759,198 +1921,584 @@ function HistoryChart({
 // EPS-beat rates so the eye can scan the headline before reading the
 // chart. Layout: chart (hero, the realized moves are the primary
 // signal) → SurpriseStrip (secondary, fundamentals context).
-function HistoricalSection({
-  series,
-  hasImplied,
-  beats,
-  withImpliedLen,
-  withEpsLen,
-  epsBeats,
-  cardChrome,
-}: {
-  series: HistoryPoint[];
-  hasImplied: boolean;
-  beats: number;
-  withImpliedLen: number;
-  withEpsLen: number;
-  epsBeats: number;
-  cardChrome?: boolean;
-}) {
-  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
-  const headline = hasImplied
-    ? 'Implied vs. actual'
-    : withEpsLen > 0
-      ? 'Fundamentals vs. realized'
-      : 'Realized moves';
+// ---------- History block (chart + EPS strip combined) ----------
+function HistoryBlock({ history }: { history: HistoryPoint[] }) {
+  const [hovered, setHovered] = useState<number | null>(null);
+  if (history.length === 0) return null;
+
+  const hasImplied = history.some((h) => h.implied != null);
+  const hasEps = history.some((h) => h.epsSurprise != null);
+
+  const W = 700;
+  const H = 240;
+  const P = 48;
+  const colW = (W - P * 2) / history.length;
+  const max =
+    Math.max(
+      ...history.map((h) =>
+        Math.max(h.implied != null ? h.implied : 0, Math.abs(h.actual)),
+      ),
+    ) * 1.18 || 0.05;
+  const y = (v: number) => H / 2 - (v / max) * (H / 2 - 26);
+
+  const epsH = 72;
+  const epsCap = 0.20;
+  const epsY = (v: number) =>
+    epsH / 2 - (Math.max(-epsCap, Math.min(epsCap, v)) / epsCap) * (epsH / 2 - 10);
+
+  const hovered_ = hovered != null ? history[hovered] : null;
+
+  const beatImplied = hasImplied
+    ? history.filter(
+        (h) => h.implied != null && Math.abs(h.actual) > (h.implied as number),
+      ).length
+    : 0;
+  const epsBeats = hasEps
+    ? history.filter((h) => (h.epsSurprise ?? 0) >= 0).length
+    : 0;
+
   return (
-    <section
-      className={cardChrome ? 'qv-card' : undefined}
-      style={
-        cardChrome
-          ? { padding: '22px 24px' }
-          : { padding: '40px 0', borderBottom: '1px solid var(--line)' }
-      }
-    >
+    <div className="qv-card">
       <div
         style={{
           display: 'flex',
           justifyContent: 'space-between',
-          alignItems: 'baseline',
-          marginBottom: 4,
+          alignItems: 'flex-start',
+          marginBottom: 8,
           gap: 16,
         }}
       >
         <div>
-          <div
+          <span
+            className="qv-pill"
             style={{
-              fontSize: 10,
-              letterSpacing: '0.18em',
-              textTransform: 'uppercase',
-              color: 'var(--ink-3)',
+              background: 'color-mix(in oklab, var(--up) 14%, transparent)',
+              color: 'var(--up)',
+              borderColor: 'color-mix(in oklab, var(--up) 30%, transparent)',
             }}
           >
             Historical
-          </div>
-          <h2
+          </span>
+          <h3
             className="serif"
             style={{
-              margin: '4px 0 0',
-              fontSize: 22,
+              margin: '10px 0 0',
+              fontSize: 20,
               fontWeight: 700,
               letterSpacing: '-0.01em',
             }}
           >
-            {headline}, last {series.length}{' '}
-            {series.length === 1 ? 'quarter' : 'quarters'}
-          </h2>
+            {hasImplied
+              ? 'Implied vs realized · last '
+              : 'Realized moves · last '}
+            {history.length} {history.length === 1 ? 'quarter' : 'quarters'}
+          </h3>
+          <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 4 }}>
+            {hasImplied
+              ? 'Realized moves overlaid on what options priced going in.'
+              : 'Close-to-close moves; implied range pending historical option chains.'}
+          </div>
         </div>
         <div
           className="mono tnum"
-          style={{
-            fontSize: 11,
-            color: 'var(--ink-3)',
-            textAlign: 'right',
-            lineHeight: 1.55,
-          }}
+          style={{ fontSize: 11, color: 'var(--ink-3)', textAlign: 'right', lineHeight: 1.6 }}
         >
           {hasImplied && (
             <div>
               Beat implied{' '}
               <span style={{ color: 'var(--ink)' }}>
-                {beats}/{withImpliedLen}
-              </span>{' '}
-              times
+                {beatImplied}/{history.length}
+              </span>
             </div>
           )}
-          {withEpsLen > 0 && (
+          {hasEps && (
             <div>
-              Beat EPS{' '}
-              <span style={{ color: 'var(--ink)' }}>
-                {epsBeats}/{withEpsLen}
-              </span>{' '}
-              times
-            </div>
-          )}
-          {!hasImplied && withEpsLen === 0 && (
-            <div style={{ color: 'var(--ink-4)', maxWidth: 220 }}>
-              Implied range pending —<br />historical option chains not yet wired
+              EPS beat{' '}
+              <span style={{ color: 'var(--up)' }}>
+                {epsBeats}/{history.length}
+              </span>
             </div>
           )}
         </div>
       </div>
-      {/* Chart is the hero — surprise strip is secondary context. */}
-      <HistoryChart
-        history={series}
-        hoveredIndex={hoveredIndex}
-        setHoveredIndex={setHoveredIndex}
-      />
-      <SurpriseStrip
-        history={series}
-        hoveredIndex={hoveredIndex}
-        onHover={setHoveredIndex}
-      />
-    </section>
-  );
-}
 
-// ---------- Small bits ----------
-function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
-  return (
-    <div style={{ padding: '18px 0' }}>
-      <div
-        style={{
-          fontSize: 10,
-          letterSpacing: '0.14em',
-          textTransform: 'uppercase',
-          color: 'var(--ink-3)',
-          marginBottom: 6,
-        }}
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        style={{ width: '100%', height: 'auto', marginTop: 10 }}
       >
-        {label}
-      </div>
-      <div
-        className="serif tnum"
-        style={{ fontSize: 26, fontWeight: 700, lineHeight: 1, letterSpacing: '-0.02em' }}
-      >
-        {value}
-      </div>
-      {sub && (
-        <div
-          className="mono tnum"
-          style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 6 }}
+        <line x1={P} x2={W - P} y1={H / 2} y2={H / 2} stroke="var(--line)" />
+        <line
+          x1={P}
+          x2={W - P}
+          y1={y(max)}
+          y2={y(max)}
+          stroke="var(--line)"
+          strokeDasharray="2 4"
+          opacity={0.5}
+        />
+        <line
+          x1={P}
+          x2={W - P}
+          y1={y(-max)}
+          y2={y(-max)}
+          stroke="var(--line)"
+          strokeDasharray="2 4"
+          opacity={0.5}
+        />
+        <text
+          x={P - 10}
+          y={y(max) + 4}
+          textAnchor="end"
+          fill="var(--ink-3)"
+          fontSize="12"
+          fontFamily="JetBrains Mono"
         >
-          {sub}
+          +{(max * 100).toFixed(0)}%
+        </text>
+        <text
+          x={P - 10}
+          y={y(-max) + 4}
+          textAnchor="end"
+          fill="var(--ink-3)"
+          fontSize="12"
+          fontFamily="JetBrains Mono"
+        >
+          −{(max * 100).toFixed(0)}%
+        </text>
+        <text
+          x={P - 10}
+          y={H / 2 + 4}
+          textAnchor="end"
+          fill="var(--ink-3)"
+          fontSize="12"
+          fontFamily="JetBrains Mono"
+        >
+          0%
+        </text>
+
+        {history.map((h, i) => {
+          const cx = P + colW * i + colW / 2;
+          const impliedDecimal = h.implied ?? 0;
+          const actualDecimal = h.actual;
+          const up = actualDecimal >= 0;
+          const moveColor = up ? 'var(--up)' : 'var(--down)';
+          const beat = h.implied != null && Math.abs(actualDecimal) > impliedDecimal;
+          const active = hovered === i;
+          return (
+            <g
+              key={`${h.q}-${h.date}`}
+              onMouseEnter={() => setHovered(i)}
+              onMouseLeave={() => setHovered(null)}
+              style={{ cursor: 'default' }}
+            >
+              <rect x={cx - colW / 2} y={0} width={colW} height={H} fill="transparent" />
+              {h.implied != null && (
+                <>
+                  <rect
+                    x={cx - 13}
+                    y={y(impliedDecimal)}
+                    width="26"
+                    height={Math.max(1, y(-impliedDecimal) - y(impliedDecimal))}
+                    fill={
+                      active
+                        ? 'color-mix(in oklab, var(--brand-blue-1) 32%, transparent)'
+                        : 'color-mix(in oklab, var(--brand-blue-1) 18%, transparent)'
+                    }
+                    rx="2"
+                  />
+                  <line
+                    x1={cx - 13}
+                    x2={cx + 13}
+                    y1={y(impliedDecimal)}
+                    y2={y(impliedDecimal)}
+                    stroke="var(--brand-blue-1)"
+                    strokeWidth="1.2"
+                  />
+                  <line
+                    x1={cx - 13}
+                    x2={cx + 13}
+                    y1={y(-impliedDecimal)}
+                    y2={y(-impliedDecimal)}
+                    stroke="var(--brand-blue-1)"
+                    strokeWidth="1.2"
+                  />
+                </>
+              )}
+              {beat && (
+                <circle
+                  cx={cx}
+                  cy={y(actualDecimal)}
+                  r="7"
+                  fill="none"
+                  stroke={moveColor}
+                  strokeWidth="1.2"
+                  opacity="0.5"
+                />
+              )}
+              <circle
+                cx={cx}
+                cy={y(actualDecimal)}
+                r={active ? 4.6 : 3.8}
+                fill={moveColor}
+                style={{ transition: 'r 160ms ease' }}
+              />
+              <text
+                x={cx}
+                y={H - 10}
+                textAnchor="middle"
+                fill={active ? 'var(--ink)' : 'var(--ink-2)'}
+                fontSize="12"
+                fontFamily="JetBrains Mono"
+                fontWeight={active ? 700 : 500}
+              >
+                {h.q}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+
+      {/* EPS surprise strip (hidden when no fundamentals data) */}
+      {hasEps && (
+        <div style={{ marginTop: 14, position: 'relative' }}>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              fontSize: 10,
+              color: 'var(--ink-3)',
+              letterSpacing: '0.14em',
+              textTransform: 'uppercase',
+              marginBottom: 6,
+            }}
+          >
+            <span>EPS surprise</span>
+            <span style={{ color: 'var(--ink-4)', letterSpacing: '0.06em', textTransform: 'none' }}>
+              vs sell-side consensus
+            </span>
+          </div>
+          <svg
+            viewBox={`0 0 ${W} ${epsH}`}
+            style={{ width: '100%', height: 'auto' }}
+          >
+            <line x1={P} x2={W - P} y1={epsH / 2} y2={epsH / 2} stroke="var(--line)" />
+            {history.map((h, i) => {
+              const cx = P + colW * i + colW / 2;
+              const s = h.epsSurprise ?? 0;
+              const beat = s >= 0;
+              const top = beat ? epsY(s) : epsH / 2;
+              const bot = beat ? epsH / 2 : epsY(s);
+              const height = Math.max(2, bot - top);
+              const active = hovered === i;
+              return (
+                <g
+                  key={`eps-${h.q}-${h.date}`}
+                  onMouseEnter={() => setHovered(i)}
+                  onMouseLeave={() => setHovered(null)}
+                >
+                  <rect
+                    x={cx - 12}
+                    y={top}
+                    width="24"
+                    height={height}
+                    fill={beat ? 'var(--up)' : 'var(--down)'}
+                    opacity={hovered == null || active ? 0.85 : 0.4}
+                    rx="2"
+                  />
+                </g>
+              );
+            })}
+          </svg>
+          {hovered_ && hovered_.epsSurprise != null && (
+            <div
+              style={{
+                position: 'absolute',
+                top: -2,
+                right: 0,
+                background: 'var(--bg-3)',
+                border: '1px solid var(--line-2)',
+                padding: '8px 12px',
+                borderRadius: 8,
+                fontSize: 11,
+                color: 'var(--ink-2)',
+                whiteSpace: 'nowrap',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+                pointerEvents: 'none',
+              }}
+            >
+              <div>
+                <div
+                  style={{
+                    fontSize: 9.5,
+                    letterSpacing: '0.14em',
+                    textTransform: 'uppercase',
+                    color: 'var(--ink-4)',
+                  }}
+                >
+                  {hovered_.q}
+                </div>
+                <div
+                  className="serif tnum"
+                  style={{ fontSize: 16, color: 'var(--ink)', marginTop: 2 }}
+                >
+                  {hovered_.actual >= 0 ? '+' : ''}
+                  {(hovered_.actual * 100).toFixed(1)}%
+                </div>
+              </div>
+              <div style={{ width: 1, alignSelf: 'stretch', background: 'var(--line)' }} />
+              <div className="mono tnum" style={{ fontSize: 10.5 }}>
+                <div style={{ color: 'var(--ink-3)' }}>
+                  EPS {hovered_.epsActual?.toFixed(2) ?? '–'} vs{' '}
+                  {hovered_.epsEstimate?.toFixed(2) ?? '–'}
+                </div>
+                <div
+                  style={{
+                    color: hovered_.epsSurprise >= 0 ? 'var(--up)' : 'var(--down)',
+                    marginTop: 2,
+                  }}
+                >
+                  {hovered_.epsSurprise >= 0 ? '+' : ''}
+                  {(hovered_.epsSurprise * 100).toFixed(1)}% surprise
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
+
+      <div
+        style={{
+          marginTop: 14,
+          display: 'flex',
+          gap: 18,
+          fontSize: 11,
+          color: 'var(--ink-3)',
+          flexWrap: 'wrap',
+        }}
+      >
+        {hasImplied && (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <span
+              style={{
+                width: 18,
+                height: 8,
+                background: 'color-mix(in oklab, var(--brand-blue-1) 22%, transparent)',
+                borderTop: '1px solid var(--brand-blue-1)',
+                borderBottom: '1px solid var(--brand-blue-1)',
+              }}
+            />
+            Implied range
+          </span>
+        )}
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ width: 8, height: 8, borderRadius: 999, background: 'var(--up)' }} />
+          Realized (up)
+        </span>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ width: 8, height: 8, borderRadius: 999, background: 'var(--down)' }} />
+          Realized (down)
+        </span>
+        {hasImplied && (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <span
+              style={{
+                width: 12,
+                height: 12,
+                borderRadius: 999,
+                border: '1.2px solid var(--ink-3)',
+                display: 'inline-block',
+              }}
+            />
+            Beat implied
+          </span>
+        )}
+      </div>
     </div>
   );
 }
 
-function Th({ children, align = 'left' }: { children: React.ReactNode; align?: 'left' | 'right' }) {
+// ---------- Greeks panel ----------
+function GreeksPanel({ rows }: { rows: TermRow[] }) {
+  if (rows.length === 0) return null;
   return (
-    <th
-      style={{
-        textAlign: align,
-        padding: '10px 0',
-        fontSize: 10,
-        letterSpacing: '0.14em',
-        textTransform: 'uppercase',
-        color: 'var(--ink-3)',
-        fontWeight: 500,
-      }}
-    >
-      {children}
-    </th>
+    <div className="qv-card">
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          marginBottom: 16,
+        }}
+      >
+        <div>
+          <span
+            className="qv-pill"
+            style={{
+              background: 'color-mix(in oklab, var(--accent) 14%, transparent)',
+              color: 'var(--accent-hi)',
+              borderColor: 'color-mix(in oklab, var(--accent) 30%, transparent)',
+            }}
+          >
+            ATM greeks
+          </span>
+          <h3
+            className="serif"
+            style={{
+              margin: '10px 0 0',
+              fontSize: 20,
+              fontWeight: 700,
+              letterSpacing: '-0.01em',
+            }}
+          >
+            Greeks by expiry
+          </h3>
+          <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 4 }}>
+            ATM call · delta hedge ratios, sensitivity to vol and time.
+          </div>
+        </div>
+      </div>
+
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 640 }}>
+          <thead>
+            <tr style={{ borderBottom: '1px solid var(--line)' }}>
+              {['Expiry', 'DTE', 'ATM IV', 'Δ Delta', 'Γ Gamma', '𝜈 Vega', 'Θ Theta', 'Straddle'].map(
+                (h, i) => (
+                  <th
+                    key={h}
+                    style={{
+                      textAlign: i === 0 ? 'left' : 'right',
+                      padding: '10px 12px',
+                      fontSize: 9.5,
+                      letterSpacing: '0.16em',
+                      textTransform: 'uppercase',
+                      color: 'var(--ink-3)',
+                      fontWeight: 500,
+                    }}
+                  >
+                    {h}
+                  </th>
+                ),
+              )}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => {
+              const baseBg = r.isEarnings
+                ? 'color-mix(in oklab, var(--brand-blue-1) 5%, transparent)'
+                : 'transparent';
+              return (
+                <tr
+                  key={r.expiration}
+                  style={{
+                    borderBottom: '1px solid var(--line)',
+                    background: baseBg,
+                    transition: 'background 140ms ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'var(--bg-3)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = baseBg;
+                  }}
+                >
+                  <td style={{ padding: '12px 12px' }}>
+                    <div
+                      className="serif"
+                      style={{
+                        fontSize: 14,
+                        fontWeight: 600,
+                        color: 'var(--ink)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                      }}
+                    >
+                      {shortDate(r.expiration)}
+                      {r.isEarnings && (
+                        <span
+                          className="qv-pill warm"
+                          style={{ fontSize: 8.5, padding: '2px 6px' }}
+                        >
+                          Earnings
+                        </span>
+                      )}
+                    </div>
+                    <div
+                      className="mono"
+                      style={{
+                        fontSize: 10,
+                        color: 'var(--ink-4)',
+                        marginTop: 2,
+                        letterSpacing: '0.08em',
+                        textTransform: 'uppercase',
+                      }}
+                    >
+                      K ${r.strike.toFixed(0)}
+                    </div>
+                  </td>
+                  <td
+                    className="mono tnum"
+                    style={{ textAlign: 'right', padding: '12px 12px', color: 'var(--ink-2)' }}
+                  >
+                    {r.dte}d
+                  </td>
+                  <td
+                    className="mono tnum"
+                    style={{ textAlign: 'right', padding: '12px 12px', color: 'var(--ink)' }}
+                  >
+                    {(r.iv * 100).toFixed(2)}%
+                  </td>
+                  <td
+                    className="mono tnum"
+                    style={{ textAlign: 'right', padding: '12px 12px', color: 'var(--ink-2)' }}
+                  >
+                    {r.delta != null ? r.delta.toFixed(3) : '–'}
+                  </td>
+                  <td
+                    className="mono tnum"
+                    style={{ textAlign: 'right', padding: '12px 12px', color: 'var(--ink-2)' }}
+                  >
+                    {r.gamma != null ? r.gamma.toFixed(4) : '–'}
+                  </td>
+                  <td
+                    className="mono tnum"
+                    style={{ textAlign: 'right', padding: '12px 12px', color: 'var(--ink-2)' }}
+                  >
+                    {r.vega != null ? r.vega.toFixed(2) : '–'}
+                  </td>
+                  <td
+                    className="mono tnum"
+                    style={{ textAlign: 'right', padding: '12px 12px', color: 'var(--down)' }}
+                  >
+                    {r.theta != null ? r.theta.toFixed(2) : '–'}
+                  </td>
+                  <td
+                    className="mono tnum"
+                    style={{
+                      textAlign: 'right',
+                      padding: '12px 12px',
+                      color: 'var(--ink)',
+                      fontWeight: 600,
+                    }}
+                  >
+                    {r.straddle > 0 ? `$${r.straddle.toFixed(2)}` : '–'}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
   );
 }
-function Td({
-  children,
-  align = 'left',
-  mono,
-  bold,
-  tone,
-}: {
-  children: React.ReactNode;
-  align?: 'left' | 'right';
-  mono?: boolean;
-  bold?: boolean;
-  tone?: string;
-}) {
-  return (
-    <td
-      className={mono ? 'mono tnum' : ''}
-      style={{
-        textAlign: align,
-        padding: '14px 0',
-        fontSize: 13,
-        color: tone || 'var(--ink-2)',
-        fontWeight: bold ? 500 : 400,
-      }}
-    >
-      {children}
-    </td>
-  );
-}
+
+
+// ---------- Small bits ----------
+
 
 /** A scroll-triggered fade-up wrapper. The first render mounts the element
  *  as hidden (opacity 0, translated down); an IntersectionObserver flips
@@ -2008,24 +2556,6 @@ function Reveal({
   );
 }
 
-const DETAIL_LAYOUT_KEY = 'quantiv-detail-layout-v1';
-type DetailLayout = 'cards' | 'editorial';
-
-function useDetailLayout(): [DetailLayout, (next: DetailLayout) => void] {
-  const [layout, setLayout] = useState<DetailLayout>('cards');
-  useEffect(() => {
-    try {
-      const v = localStorage.getItem(DETAIL_LAYOUT_KEY);
-      if (v === 'editorial' || v === 'cards') setLayout(v);
-    } catch {}
-  }, []);
-  const update = useCallback((next: DetailLayout) => {
-    setLayout(next);
-    try { localStorage.setItem(DETAIL_LAYOUT_KEY, next); } catch {}
-  }, []);
-  return [layout, update];
-}
-
 // ---------- Page ----------
 export default function SymbolPage() {
   // Triggers EDGAR ticker-names fetch + re-render so the header company
@@ -2042,9 +2572,6 @@ export default function SymbolPage() {
   const [loading, setLoading] = useState(true);
   const [live, setLive] = useState<LivePrice | null>(null);
   const [toast, setToast] = useState<{ msg: string; key: number } | null>(null);
-  const [fanHoverExpiration, setFanHoverExpiration] = useState<string | null>(null);
-  const [detailLayout, setDetailLayout] = useDetailLayout();
-  const isCards = detailLayout === 'cards';
 
   useEffect(() => {
     if (!symbol) return;
@@ -2292,308 +2819,168 @@ export default function SymbolPage() {
   const spot = livePrice ?? data.spot_price ?? 0;
   const change = live?.change ?? 0;
   const changePct = live?.changePct ?? 0;
-  // Flat = literally no move at display precision. Don't paint a green/red
-  // arrow when the underlying value is just float noise around zero.
-  const flat = Math.round(change * 100) / 100 === 0
-    && Math.round(changePct * 10000) / 10000 === 0;
-  const up = !flat && change >= 0;
-  const moveArrow = flat ? '–' : up ? '▲' : '▼';
-  const moveColor = flat ? 'var(--ink-4)' : up ? 'var(--up)' : 'var(--down)';
 
   const straddlePct = em?.straddle_pct ?? 0;
   const ivPct = em?.iv_pct ?? straddlePct;
   const atmIV = em?.atm_iv ?? 0.3;
   const dte = em?.dte ?? 28;
-  const lower = spot * (1 - straddlePct);
-  const upper = spot * (1 + straddlePct);
 
-  const timingLabel = timingText(em?.timing ?? data.next_earnings_timing);
+  const earningsDate = em?.earnings_date ?? data.next_earnings ?? null;
+  const earningsTiming = timingText(em?.timing ?? data.next_earnings_timing);
+  const daysLeft = daysFromToday(earningsDate);
+  const eventLabel = (() => {
+    // Try to derive next quarter from the most recent history item.
+    const hist = data.earnings_history ?? [];
+    const last = hist[hist.length - 1];
+    if (last?.q) {
+      const m = /Q([1-4])\s*(\d{2,4})/.exec(last.q);
+      if (m) {
+        let qn = Number(m[1]);
+        let yr = Number(m[2]);
+        if (yr < 100) yr += 2000;
+        qn += 1;
+        if (qn > 4) {
+          qn = 1;
+          yr += 1;
+        }
+        return `Q${qn} ${yr} Earnings`;
+      }
+    }
+    return 'Upcoming earnings';
+  })();
+
+  const quantiles =
+    em?.p10 != null && em?.p50 != null && em?.p90 != null
+      ? {
+          p10: em.p10,
+          p25: em.p25 ?? em.p10,
+          p50: em.p50,
+          p75: em.p75 ?? em.p90,
+          p90: em.p90,
+        }
+      : null;
+
+  const termRows = buildTermRows(
+    data.straddle_features,
+    em?.expiration ?? null,
+  );
+  const historySeries = buildHistorySeries(data.earnings_history);
 
   return (
-    <div style={{ maxWidth: 960, margin: '0 auto', padding: '0 28px 60px' }}>
+    <div style={{ maxWidth: 1100, margin: '0 auto', padding: '0 28px 80px' }}>
       {toast && <Toast key={toast.key} message={toast.msg} onDone={() => setToast(null)} />}
 
-      <div style={{ paddingTop: 24 }}>
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            gap: 12,
+      <Reveal as="div" style={{ marginTop: 8 }}>
+        <DetailHero
+          ticker={companyName(symbol)}
+          symbol={symbol}
+          spot={spot}
+          prevClose={live?.previousClose ?? null}
+          change={change}
+          changePct={changePct}
+          emPct={straddlePct}
+          daysLeft={daysLeft}
+          earningsDate={earningsDate}
+          earningsTiming={earningsTiming}
+          eventLabel={eventLabel}
+          quoteLabel={quoteSourceLabel(live, symbol, data.as_of_date)}
+          onBack={() => {
+            if (window.history.length > 1) router.back();
+            else router.push('/');
           }}
-        >
-          <button
-            onClick={() => {
-              if (window.history.length > 1) router.back();
-              else router.push('/');
-            }}
-            className="chip"
-            style={{ border: 'none', color: 'var(--ink-3)', paddingLeft: 0, cursor: 'pointer' }}
-          >
-            <ChevronLeft size={14} /> Return
-          </button>
-          <div
-            role="group"
-            aria-label="Detail layout"
-            style={{
-              display: 'inline-flex',
-              border: '1px solid var(--line)',
-              borderRadius: 999,
-              overflow: 'hidden',
-              fontSize: 11,
-            }}
-          >
-            {([
-              ['cards', 'Cards'],
-              ['editorial', 'Editorial'],
-            ] as const).map(([key, label]) => {
-              const active = detailLayout === key;
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setDetailLayout(key)}
-                  style={{
-                    padding: '6px 14px',
-                    background: active ? 'var(--ink)' : 'transparent',
-                    color: active ? 'var(--bg)' : 'var(--ink-3)',
-                    border: 'none',
-                    cursor: 'pointer',
-                    letterSpacing: '0.04em',
-                    fontWeight: active ? 600 : 500,
-                  }}
-                >
-                  {label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
+          onToast={showToast}
+        />
+      </Reveal>
 
-        <div
-          style={{
-            marginTop: 18,
-            paddingBottom: 24,
-            borderBottom: '1px solid var(--line)',
-            display: 'grid',
-            gridTemplateColumns: 'auto 1fr auto',
-            gap: 24,
-            alignItems: 'flex-start',
-          }}
-        >
-          <Logo ticker={symbol} size={60} />
-          <div>
-            <div
-              style={{
-                fontSize: 11,
-                letterSpacing: '0.18em',
-                textTransform: 'uppercase',
-                color: 'var(--ink-3)',
-              }}
-            >
-              {companyName(symbol)}
-            </div>
-            <h1
-              className="serif"
-              style={{
-                margin: '4px 0 0',
-                fontSize: 52,
-                fontWeight: 800,
-                letterSpacing: '-0.035em',
-                lineHeight: 0.95,
-                color: 'var(--ink)',
-                textTransform: 'uppercase',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 14,
-              }}
-            >
-              {symbol}
-              <SignedIn>
-                <WatchlistButton ticker={symbol} onToast={showToast} />
-              </SignedIn>
-              <SignedOut>
-                <SignInButton mode="modal">
-                  <button
-                    title="Sign in to add to watchlist"
-                    style={{
-                      display: 'grid',
-                      placeItems: 'center',
-                      width: 30,
-                      height: 30,
-                      borderRadius: '50%',
-                      background: 'transparent',
-                      border: 'none',
-                      padding: 0,
-                      cursor: 'pointer',
-                      color: 'var(--ink-3)',
-                    }}
-                  >
-                    <svg width="30" height="30" viewBox="0 0 24 24" fill="none">
-                      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.6" />
-                      <path
-                        d="M12 8v8M8 12h8"
-                        stroke="currentColor"
-                        strokeWidth="1.6"
-                        strokeLinecap="round"
-                      />
-                    </svg>
-                  </button>
-                </SignInButton>
-              </SignedOut>
-            </h1>
-            <div
-              style={{
-                marginTop: 10,
-                display: 'flex',
-                alignItems: 'baseline',
-                gap: 14,
-                flexWrap: 'wrap',
-              }}
-            >
-              <span className="serif tnum" style={{ fontSize: 28, fontWeight: 700 }}>
-                ${spot.toFixed(2)}
-              </span>
-              {live && live.change !== null && (
-                <span
-                  className="mono tnum"
-                  style={{ fontSize: 13, color: moveColor }}
-                >
-                  {moveArrow} {Math.abs(change).toFixed(2)} (
-                  {(Math.abs(changePct) * 100).toFixed(2)}%)
-                </span>
-              )}
-              <span
-                style={{
-                  fontSize: 10.5,
-                  color: 'var(--ink-4)',
-                  letterSpacing: '0.1em',
-                  textTransform: 'uppercase',
-                }}
-              >
-                {quoteSourceLabel(live, symbol, data.as_of_date)}
-              </span>
-            </div>
-          </div>
-
-          {em?.earnings_date && (() => {
-            const daysOut = daysFromToday(em.earnings_date);
-            const past = daysOut !== null && daysOut < 0;
-            const magnitude = daysOut === null ? null : Math.abs(daysOut);
-            return (
-              <div style={{ textAlign: 'right' }}>
-                <div
-                  style={{
-                    fontSize: 11,
-                    letterSpacing: '0.14em',
-                    textTransform: 'uppercase',
-                    color: 'var(--ink-3)',
-                  }}
-                >
-                  {past ? 'Reported' : 'Reports in'}
-                </div>
-                <div
-                  className="serif tnum"
-                  style={{
-                    fontSize: 38,
-                    fontWeight: 800,
-                    lineHeight: 1,
-                    marginTop: 4,
-                    letterSpacing: '-0.03em',
-                  }}
-                >
-                  {magnitude ?? '—'}
-                  <span
-                    style={{
-                      fontSize: 13,
-                      color: 'var(--ink-3)',
-                      marginLeft: 4,
-                      fontWeight: 500,
-                    }}
-                  >
-                    {past ? (magnitude === 1 ? 'day ago' : 'days ago') : 'days'}
-                  </span>
-                </div>
-                <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 6 }}>
-                  {shortDate(em.earnings_date)}
-                  {timingLabel ? ` · ${timingLabel}` : ''}
-                </div>
-              </div>
-            );
-          })()}
-        </div>
-      </div>
-
-      {/* EM hero */}
+      {/* KPI strip */}
       {em && (
-        <Reveal
-          style={isCards
-            ? { margin: '28px 0 0' }
-            : { padding: '32px 0 16px', borderBottom: '1px solid var(--line)' }}
-        >
-          <div
-            className={isCards ? 'qv-card-hi' : undefined}
-            style={isCards ? { padding: '26px 28px' } : undefined}
-          >
+        <Reveal delay={80}>
           <div
             style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'flex-start',
-              gap: 24,
+              marginTop: 22,
+              display: 'grid',
+              gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+              gap: 14,
             }}
           >
-            <div>
-              <div
-                className={isCards ? 'qv-pill' : undefined}
-                style={
-                  isCards
-                    ? undefined
-                    : {
-                        fontSize: 10,
-                        letterSpacing: '0.18em',
-                        textTransform: 'uppercase',
-                        color: 'var(--ink-3)',
-                      }
-                }
-              >
-                Expected move · {em.earnings_date ? 'Earnings' : 'Nearest expiry'}
-              </div>
-              <h2
-                className="serif"
-                style={{
-                  margin: '4px 0 0',
-                  fontSize: 26,
-                  fontWeight: 700,
-                  letterSpacing: '-0.015em',
-                }}
-              >
-                Options are pricing a move of
-              </h2>
-            </div>
-            <div style={{ textAlign: 'right' }}>
-              <div
-                className="serif tnum"
-                style={{
-                  fontSize: 84,
-                  fontWeight: 800,
-                  lineHeight: 0.9,
-                  letterSpacing: '-0.04em',
-                }}
-              >
-                ±{(straddlePct * 100).toFixed(1)}
-                <span style={{ fontSize: 32, color: 'var(--ink-3)', fontWeight: 600 }}>%</span>
-              </div>
-              <div
-                className="mono tnum"
-                style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 6 }}
-              >
-                ${lower.toFixed(2)} – ${upper.toFixed(2)} · via ATM straddle
-              </div>
-            </div>
+            <KpiCard
+              label="ATM IV"
+              value={em.atm_iv != null ? `${(em.atm_iv * 100).toFixed(1)}%` : '–'}
+              sub={
+                em.term_slope != null
+                  ? `Δ term slope ${(em.term_slope * 100).toFixed(1)} v/30d`
+                  : `Front-month, ${em.dte}d`
+              }
+              accent="var(--brand-blue-1)"
+            />
+            <KpiCard
+              label="IV-based EM"
+              value={em.iv_pct != null ? `±${(em.iv_pct * 100).toFixed(1)}%` : '–'}
+              sub={
+                em.atm_iv != null
+                  ? `σ ${(em.atm_iv * 100).toFixed(0)}% · ${em.dte}d`
+                  : undefined
+              }
+            />
+            <KpiCard
+              label="ATM Straddle"
+              value={em.straddle_abs != null ? `$${em.straddle_abs.toFixed(2)}` : '–'}
+              sub={`Strike $${em.atm_strike.toFixed(2)}`}
+            />
+            <KpiCard
+              label={data.vol_regime?.iv_rank != null ? 'IV Rank' : 'ATM Skew'}
+              value={
+                data.vol_regime?.iv_rank != null
+                  ? `${Math.round(data.vol_regime.iv_rank * 100)}%`
+                  : em.skew_atm != null
+                    ? `${(em.skew_atm * 100).toFixed(2)}v`
+                    : '–'
+              }
+              sub={
+                data.vol_regime?.iv_rank != null
+                  ? data.vol_regime.iv_year_low != null && data.vol_regime.iv_year_high != null
+                    ? `52w ${(data.vol_regime.iv_year_low * 100).toFixed(0)}–${(data.vol_regime.iv_year_high * 100).toFixed(0)}%`
+                    : undefined
+                  : em.total_vega != null
+                    ? `Vega $${(em.total_vega * 1000).toFixed(0)}`
+                    : undefined
+              }
+            />
           </div>
+        </Reveal>
+      )}
 
-          {spot > 0 && straddlePct > 0 && (
+      {/* Interactive density bar */}
+      {em && spot > 0 && straddlePct > 0 && (
+        <Reveal delay={120}>
+          <div className="qv-card" style={{ marginTop: 22 }}>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-start',
+                gap: 16,
+              }}
+            >
+              <div>
+                <span className="qv-pill">Expected move</span>
+                <h3
+                  className="serif"
+                  style={{
+                    margin: '10px 0 0',
+                    fontSize: 20,
+                    fontWeight: 700,
+                    letterSpacing: '-0.01em',
+                  }}
+                >
+                  Probability density around spot
+                </h3>
+                <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 4 }}>
+                  Log-normal model with ATM IV {(atmIV * 100).toFixed(1)}% over {dte} days.
+                  Range ${(spot * (1 - straddlePct)).toFixed(2)}–${(spot * (1 + straddlePct)).toFixed(2)}.
+                </div>
+              </div>
+            </div>
             <InteractiveBar
               spot={spot}
               em={straddlePct}
@@ -2601,345 +2988,76 @@ export default function SymbolPage() {
               atmIV={atmIV}
               dte={dte}
             />
-          )}
           </div>
         </Reveal>
       )}
 
-      {/* ML forecast card */}
-      {em?.em_ml_pct != null && (
-        <Reveal
-          delay={60}
-          style={isCards
-            ? { margin: '14px 0 0' }
-            : { padding: '24px 0', borderBottom: '1px solid var(--line)' }}
-        >
-          <div className={isCards ? 'qv-card' : undefined}>
+      {/* Quantile band + Term fan side-by-side on wide; stacked otherwise */}
+      {(quantiles != null || termRows.length > 0) && (
+        <Reveal delay={160}>
           <div
             style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'flex-start',
-              gap: 24,
-              marginBottom: 14,
-            }}
-          >
-            <div>
-              <div
-                className={isCards ? 'qv-pill' : undefined}
-                style={
-                  isCards
-                    ? undefined
-                    : {
-                        fontSize: 10,
-                        letterSpacing: '0.18em',
-                        textTransform: 'uppercase',
-                        color: 'var(--accent)',
-                      }
-                }
-              >
-                LightGBM forecast
-                {em.model_horizon != null ? ` · T-${em.model_horizon}` : ''}
-              </div>
-              <div
-                className="serif"
-                style={{
-                  margin: '4px 0 0',
-                  fontSize: 18,
-                  fontWeight: 600,
-                  color: 'var(--ink-2)',
-                  letterSpacing: '-0.01em',
-                }}
-              >
-                Model predicts{' '}
-                <span className="tnum" style={{ color: 'var(--ink)' }}>
-                  ±{(em.em_ml_pct * 100).toFixed(2)}%
-                </span>
-                {em.correction_factor != null && (
-                  <span
-                    className="mono tnum"
-                    style={{
-                      marginLeft: 10,
-                      fontSize: 12,
-                      color:
-                        em.correction_factor < 0.9
-                          ? 'var(--up)'
-                          : em.correction_factor > 1.1
-                            ? 'var(--down)'
-                            : 'var(--ink-3)',
-                    }}
-                  >
-                    {em.correction_factor < 1
-                      ? `straddle overstates by ${((1 - em.correction_factor) * 100).toFixed(0)}%`
-                      : `straddle understates by ${((em.correction_factor - 1) * 100).toFixed(0)}%`}
-                  </span>
-                )}
-              </div>
-            </div>
-            <div
-              className="mono tnum"
-              style={{ fontSize: 11, color: 'var(--ink-3)', textAlign: 'right' }}
-            >
-              Straddle ±{(straddlePct * 100).toFixed(2)}%
-              {em.p10 != null && em.p90 != null && (
-                <div style={{ marginTop: 2 }}>
-                  80% band: ±{(em.p10 * 100).toFixed(2)}% – ±{(em.p90 * 100).toFixed(2)}%
-                </div>
-              )}
-            </div>
-          </div>
-
-          {em.p10 != null && em.p90 != null && em.p50 != null && (
-            <MLBand
-              p10={em.p10}
-              p25={em.p25 ?? em.p10}
-              p50={em.p50}
-              p75={em.p75 ?? em.p90}
-              p90={em.p90}
-              straddle={straddlePct}
-            />
-          )}
-          </div>
-        </Reveal>
-      )}
-
-      {/* Stat row */}
-      {em && (
-        <Reveal
-          delay={120}
-          style={isCards ? { margin: '14px 0 0' } : undefined}
-        >
-          <div
-            className={isCards ? 'qv-card' : undefined}
-            style={{
+              marginTop: 18,
               display: 'grid',
-              gridTemplateColumns: `repeat(${data.vol_regime?.iv_rank != null ? 5 : 4}, 1fr)`,
-              ...(isCards
-                ? { columnGap: 24, padding: '6px 20px' }
-                : { borderBottom: '1px solid var(--line)', columnGap: 24 }),
+              gridTemplateColumns:
+                quantiles != null && termRows.length > 0 ? '1fr 1.1fr' : '1fr',
+              gap: 16,
             }}
           >
-          <Stat
-            label="ATM IV"
-            value={em.atm_iv !== null ? `${(em.atm_iv * 100).toFixed(1)}%` : '—'}
-            sub={
-              em.term_slope !== null && em.term_slope !== undefined
-                ? `Δ term slope ${(em.term_slope * 100).toFixed(1)} vol/30d`
-                : undefined
-            }
-          />
-          {data.vol_regime?.iv_rank != null && (
-            <Stat
-              label="IV Rank"
-              value={`${Math.round(data.vol_regime.iv_rank * 100)}%`}
-              sub={
-                data.vol_regime.iv_year_low != null && data.vol_regime.iv_year_high != null
-                  ? `52w ${(data.vol_regime.iv_year_low * 100).toFixed(0)}–${(data.vol_regime.iv_year_high * 100).toFixed(0)}%`
-                  : undefined
-              }
-            />
-          )}
-          <Stat
-            label="IV-based EM"
-            value={em.iv_pct !== null ? `±${(em.iv_pct * 100).toFixed(1)}%` : '—'}
-            sub={
-              em.atm_iv !== null
-                ? `σ ${(em.atm_iv * 100).toFixed(0)}% · ${em.dte}d`
-                : undefined
-            }
-          />
-          <Stat
-            label="ATM straddle"
-            value={em.straddle_abs !== null ? `$${em.straddle_abs.toFixed(2)}` : '—'}
-            sub={`Strike $${em.atm_strike.toFixed(2)}`}
-          />
-          <Stat
-            label="Skew (ATM)"
-            value={
-              em.skew_atm !== null && em.skew_atm !== undefined
-                ? `${(em.skew_atm * 100).toFixed(2)}v`
-                : '—'
-            }
-            sub={
-              em.total_vega !== null && em.total_vega !== undefined
-                ? `Vega $${(em.total_vega * 1000).toFixed(0)}`
-                : undefined
-            }
-          />
+            {quantiles != null && (
+              <QuantileBand q={quantiles} straddleAbs={straddlePct} spot={spot} />
+            )}
+            {termRows.length > 0 && <TermFan rows={termRows} spot={spot} />}
           </div>
         </Reveal>
       )}
 
-      {/* Historical implied vs realized (last 8 quarters).
-          Realized close-to-close moves come from v_ohlcv bracketed by
-          Finnhub-grade earnings timing. EPS / revenue surprise come
-          from the Finnhub overlay and may be null on older rows that
-          predate the overlay's rolling window; the chart degrades
-          gracefully (no strip, no surprise styling). The `implied`
-          band remains pending — it requires historical option chains
-          captured at T-N, which is a separate data ingest. */}
-      {(() => {
-        const series = buildHistorySeries(data.earnings_history);
-        if (series.length < 2) return null;
-        const withImplied = series.filter((h) => h.implied != null);
-        const hasImplied = withImplied.length > 0;
-        const beats = withImplied.filter(
-          (h) => Math.abs(h.actual) > (h.implied as number),
-        ).length;
-        const withEps = series.filter((h) => h.epsSurprise != null);
-        const epsBeats = withEps.filter((h) => (h.epsSurprise as number) >= 0).length;
-        return (
-          <Reveal
-            delay={140}
-            style={isCards ? { margin: '14px 0 0' } : undefined}
-          >
-            <HistoricalSection
-              series={series}
-              hasImplied={hasImplied}
-              beats={beats}
-              withImpliedLen={withImplied.length}
-              withEpsLen={withEps.length}
-              epsBeats={epsBeats}
-              cardChrome={isCards}
-            />
-          </Reveal>
-        );
-      })()}
+      {/* History + EPS surprise */}
+      {historySeries.length >= 2 && (
+        <Reveal delay={200}>
+          <div style={{ marginTop: 18 }}>
+            <HistoryBlock history={historySeries} />
+          </div>
+        </Reveal>
+      )}
 
-      {/* Term structure */}
-      {data.straddle_features.length > 0 && (
-        <Reveal
-          delay={180}
-          style={isCards
-            ? { margin: '14px 0 0' }
-            : { padding: '40px 0', borderBottom: '1px solid var(--line)' }}
+      {/* Greeks panel */}
+      {termRows.length > 0 && (
+        <Reveal delay={240}>
+          <div style={{ marginTop: 18 }}>
+            <GreeksPanel rows={termRows} />
+          </div>
+        </Reveal>
+      )}
+
+      {/* Footer */}
+      <Reveal delay={280}>
+        <div
+          style={{
+            marginTop: 32,
+            padding: '18px 0 0',
+            borderTop: '1px solid var(--line)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            fontSize: 11,
+            color: 'var(--ink-4)',
+            flexWrap: 'wrap',
+            gap: 10,
+          }}
         >
-          <div
-            className={isCards ? 'qv-card' : undefined}
-            style={isCards ? { padding: '22px 24px' } : undefined}
-          >
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'baseline',
-              marginBottom: 14,
-            }}
-          >
-            <div>
-              <div
-                className={isCards ? 'qv-pill' : undefined}
-                style={
-                  isCards
-                    ? undefined
-                    : {
-                        fontSize: 10,
-                        letterSpacing: '0.18em',
-                        textTransform: 'uppercase',
-                        color: 'var(--ink-3)',
-                      }
-                }
-              >
-                Term structure
-              </div>
-              <h2
-                className="serif"
-                style={{
-                  margin: '2px 0 0',
-                  fontSize: 22,
-                  fontWeight: 700,
-                  letterSpacing: '-0.01em',
-                }}
-              >
-                Expected move by expiry
-              </h2>
-            </div>
-            <span className="mono" style={{ fontSize: 10.5, color: 'var(--ink-4)' }}>
-              {data.straddle_features.length} expiries
-            </span>
-          </div>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid var(--line)' }}>
-                <Th>Expiry</Th>
-                <Th align="right">DTE</Th>
-                <Th align="right">ATM IV</Th>
-                <Th align="right">Straddle</Th>
-                <Th align="right">EM · math</Th>
-                <Th align="right">EM · IV</Th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.straddle_features.map((s) => (
-                <tr
-                  key={s.expiration}
-                  style={{
-                    borderBottom: '1px solid var(--line)',
-                    background:
-                      fanHoverExpiration === s.expiration ? 'color-mix(in srgb, var(--accent) 12%, transparent)' : undefined,
-                    transition: 'background 120ms ease',
-                  }}
-                  onMouseEnter={() => setFanHoverExpiration(s.expiration)}
-                  onMouseLeave={() => setFanHoverExpiration(null)}
-                >
-                  <Td>
-                    <span className="serif" style={{ fontSize: 15 }}>
-                      {shortDate(s.expiration)}
-                    </span>
-                  </Td>
-                  <Td align="right" mono>
-                    {s.dte}d
-                  </Td>
-                  <Td align="right" mono>
-                    {s.atm_iv !== null ? `${(s.atm_iv * 100).toFixed(2)}%` : '—'}
-                  </Td>
-                  <Td align="right" mono>
-                    {s.straddle_mid !== null ? `$${s.straddle_mid.toFixed(2)}` : '—'}
-                  </Td>
-                  <Td align="right" mono bold tone="var(--ink)">
-                    {s.em_straddle_pct !== null
-                      ? `±${(s.em_straddle_pct * 100).toFixed(2)}%`
-                      : '—'}
-                  </Td>
-                  <Td align="right" mono tone="var(--accent)">
-                    {s.em_iv_pct !== null ? `±${(s.em_iv_pct * 100).toFixed(2)}%` : '—'}
-                  </Td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          {spot > 0 && (
-            <TermStructureFan
-              asOf={data.as_of_date}
-              spot={spot}
-              expiries={data.straddle_features}
-              highlightExpiration={fanHoverExpiration}
-              onHighlightExpiration={setFanHoverExpiration}
-            />
-          )}
-          </div>
-        </Reveal>
-      )}
-
-      <div
-        style={{
-          padding: '20px 0 0',
-          fontSize: 11,
-          color: 'var(--ink-4)',
-          display: 'flex',
-          justifyContent: 'space-between',
-        }}
-      >
-        <span>Options data · as of {data.as_of_date}</span>
-        <span>
-          Method: {em?.em_method === 'ml_lightgbm'
-            ? 'ML forecast'
-            : em?.em_method === 'ensemble'
-              ? 'Math + ML'
-              : 'options math baseline'}
-        </span>
-      </div>
+          <span className="mono">
+            Options data · as of {data.as_of_date}
+          </span>
+          <span>
+            Method:{' '}
+            {em?.em_method === 'ml_lightgbm'
+              ? 'ML forecast'
+              : em?.em_method === 'ensemble'
+                ? 'Math + ML'
+                : 'options math baseline'}
+          </span>
+        </div>
+      </Reveal>
     </div>
   );
 }

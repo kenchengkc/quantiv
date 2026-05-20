@@ -1027,102 +1027,69 @@ export default function EarningsScreener() {
 
   return (
     <div>
-      <div style={{ padding: '32px 0 24px' }}>
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-            fontSize: 10.5,
-            letterSpacing: '0.2em',
-            textTransform: 'uppercase',
-            color: 'var(--ink-3)',
-            marginBottom: 14,
-            fontWeight: 600,
-          }}
-        >
-          <span>Options · Earnings</span>
-          <span style={{ color: 'var(--ink-4)' }}>·</span>
-          <span>Quantiv</span>
-        </div>
+      <div style={{ padding: '24px 0 18px' }}>
         <div
           style={{
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'flex-end',
-            gap: 32,
+            gap: 16,
             flexWrap: 'wrap',
           }}
         >
-          <div style={{ minWidth: 0, flex: '1 1 480px' }}>
-            <h1
-              className="serif"
-              style={{
-                margin: 0,
-                fontSize: 64,
-                fontWeight: 800,
-                letterSpacing: '-0.035em',
-                lineHeight: 0.92,
-                color: 'var(--ink)',
-                textTransform: 'uppercase',
-              }}
-            >
-              Screener
-            </h1>
-            <div
-              style={{
-                marginTop: 18,
-                fontSize: 16,
-                color: 'var(--ink-2)',
-                maxWidth: 660,
-                lineHeight: 1.55,
-                letterSpacing: '-0.005em',
-              }}
-            >
-              Every earnings name on one page. See what options are pricing,
-              how it stacks up against recent history and the ML model,
-              and where IV sits in its 52-week range.
-            </div>
-          </div>
-          <div
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'flex-end',
-              gap: 4,
-              whiteSpace: 'nowrap',
-            }}
-          >
-            <div
-              className="serif tnum"
-              style={{
-                fontSize: 32,
-                fontWeight: 700,
-                letterSpacing: '-0.02em',
-                color: 'var(--ink)',
-                lineHeight: 1,
-              }}
-            >
-              {sorted.length}
-            </div>
+          <div style={{ minWidth: 0 }}>
             <div
               style={{
                 fontSize: 10,
                 letterSpacing: '0.18em',
                 textTransform: 'uppercase',
                 color: 'var(--ink-3)',
-                fontWeight: 600,
+                marginBottom: 6,
               }}
             >
-              names · filtered
+              Options · Earnings
             </div>
-            {manifest?.as_of_date && (
-              <div className="mono tnum" style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 6 }}>
-                As of {manifest.as_of_date}
-              </div>
-            )}
+            <h1
+              className="serif"
+              style={{
+                margin: 0,
+                fontSize: 40,
+                fontWeight: 800,
+                letterSpacing: '-0.025em',
+                lineHeight: 1,
+                color: 'var(--ink)',
+                textTransform: 'uppercase',
+              }}
+            >
+              Screener
+            </h1>
+          </div>
+          <div
+            className="mono tnum"
+            style={{
+              fontSize: 11,
+              color: 'var(--ink-4)',
+              letterSpacing: '0.08em',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {sorted.length} {sorted.length === 1 ? 'name' : 'names'}
+            {manifest?.as_of_date ? ` · as of ${manifest.as_of_date}` : ''}
           </div>
         </div>
+        <p
+          style={{
+            margin: '12px 0 0',
+            fontSize: 13,
+            color: 'var(--ink-3)',
+            maxWidth: 720,
+            lineHeight: 1.55,
+          }}
+        >
+          Every earnings name on one page. See what options are pricing, how it
+          stacks up against recent history and the ML model, and where IV sits
+          in its 52-week range.
+        </p>
       </div>
 
       {/* Insight cards — four cards summarizing the visible universe.
