@@ -7,6 +7,7 @@ import { Sun, Moon, Info, ChevronLeft, ChevronRight, Search, Circle, Clock } fro
 import { POPULAR_WEIGHT } from '@/lib/popular';
 import { companyName } from '@/lib/companyNames';
 import { useEnsureCompanyNames } from '@/lib/useCompanyNames';
+import { useTickerHover } from '@/components/TickerHoverCard';
 import sp500Constituents from '../../../lib/data/sp500-constituents.json';
 
 // Full S&P 500 (503 constituents incl. dual-class). Used for the "S&P 500"
@@ -186,6 +187,7 @@ function TickerRow({
   const up = !flat && (changePct ?? 0) >= 0;
   const arrow = flat ? '–' : up ? '▲' : '▼';
   const color = flat ? 'var(--ink-4)' : up ? 'var(--up)' : 'var(--down)';
+  const hover = useTickerHover(ev.ticker);
   return (
     <Link
       href={`/${ev.ticker}`}
@@ -199,8 +201,15 @@ function TickerRow({
         textDecoration: 'none',
         transition: 'background 120ms ease',
       }}
-      onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-3)')}
-      onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.background = 'var(--bg-3)';
+        hover.onMouseEnter(e);
+      }}
+      onMouseMove={hover.onMouseMove}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = 'transparent';
+        hover.onMouseLeave();
+      }}
     >
       <Logo ticker={ev.ticker} size={24} />
       <div style={{ minWidth: 0 }}>
