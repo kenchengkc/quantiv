@@ -21,10 +21,15 @@ import { test, expect } from '@playwright/test';
 test.describe('screener · virtualization', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/screener');
-    // Wait until the skeleton row class is gone — that's the signal that
-    // contentReady is true and the virtuoso table has taken over.
-    await page.waitForSelector('table tbody tr', { state: 'attached' });
-    // Give virtuoso one more frame to mount its visible rows.
+    // Wait until the real data count replaces the initial zero-count
+    // skeleton state.
+    await page.waitForFunction(() => {
+      const text = document.querySelector('[data-testid="screener-filtered-count"]')
+        ?.textContent
+        ?.trim();
+      return Number(text) > 50;
+    });
+    // Give virtuoso one more frame to settle after contentReady flips.
     await page.waitForTimeout(300);
   });
 
@@ -33,10 +38,9 @@ test.describe('screener · virtualization', () => {
   });
 
   test('mounts only a virtualized window of rows', async ({ page }) => {
-    // Total result set is in the header callout "N names · as of …".
-    const callout = page.locator('text=/^\\s*\\d+\\s+names? · as of/');
-    const text = (await callout.first().textContent()) ?? '';
-    const total = Number(text.match(/^(\d+)/)?.[1] ?? 0);
+    // Total result set is in the stacked header callout.
+    const text = (await page.getByTestId('screener-filtered-count').textContent()) ?? '';
+    const total = Number(text.trim());
     expect(total).toBeGreaterThan(50); // we expect a real population
 
     // Scroll the page so the table is squarely in view. We use a fixed
@@ -59,6 +63,9 @@ test.describe('screener · virtualization', () => {
   });
 
   test('Name column is position: sticky', async ({ page }) => {
+    await page.evaluate(() => window.scrollBy(0, 600));
+    await page.waitForSelector('table tbody tr td', { state: 'attached' });
+
     const nameCell = page.locator('table tbody tr td').first();
     const position = await nameCell.evaluate(
       (el) => getComputedStyle(el).position,
@@ -83,20 +90,18 @@ test.describe('screener · virtualization', () => {
     // inside the viewport, and its position should be byte-for-byte
     // identical regardless of which filter is active because the
     // colgroup widths are fixed.
-    const headerCell = page.getByRole('columnheader', { name: /Hist 4Q avg/i }).first();
+    const headerCell = page.locator('thead th').nth(5);
     await expect(headerCell).toBeVisible();
-    const before = await headerCell.boundingBox();
-    expect(before).not.toBeNull();
+    const beforeX = await headerCell.evaluate((el) => el.getBoundingClientRect().x);
 
     // Click AMC in the All/BMO/AMC segmented pill group.
     await page.getByRole('button', { name: /^AMC$/, exact: true }).first().click();
     // Give the filter a tick to settle.
     await page.waitForTimeout(300);
 
-    const after = await headerCell.boundingBox();
-    expect(after).not.toBeNull();
+    const afterX = await headerCell.evaluate((el) => el.getBoundingClientRect().x);
     // Allow 1px of jitter for sub-pixel rounding; nothing more.
-    expect(Math.abs(after!.x - before!.x)).toBeLessThanOrEqual(1);
+    expect(Math.abs(afterX - beforeX)).toBeLessThanOrEqual(1);
   });
 
   test('sorting wires up to URL params', async ({ page }) => {
