@@ -125,6 +125,18 @@ function shortDate(iso: string | undefined | null) {
     day: 'numeric',
   });
 }
+
+/** Tighter date label for chart axes / greeks-table expiry column.
+ *  Drops the weekday prefix so labels read as "Jun 26" instead of
+ *  "Fri, Jun 26" — the longer form crowds the term-structure fan's
+ *  x-axis when expiries cluster within a few days of each other. */
+function axisDate(iso: string | undefined | null) {
+  if (!iso) return '—';
+  return parseLocalDate(iso).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+  });
+}
 function daysFromToday(iso?: string | null): number | null {
   if (!iso) return null;
   const [y, m, d] = iso.slice(0, 10).split('-').map(Number);
@@ -872,7 +884,7 @@ function DetailHero({
                 fontWeight: 800,
                 lineHeight: 0.9,
                 letterSpacing: '-0.04em',
-                marginTop: 4,
+                marginTop: 6,
                 background: 'linear-gradient(135deg, var(--brand-blue-1), var(--accent-hi))',
                 WebkitBackgroundClip: 'text',
                 WebkitTextFillColor: 'transparent',
@@ -892,9 +904,13 @@ function DetailHero({
                 %
               </span>
             </div>
+            {/* The 64px headline above uses lineHeight 0.9 which clips
+                its descender area, so an 8px margin reads as ~2px of
+                visible gap. Bump to 18px for a properly composed price-
+                range line that doesn't hug the headline. */}
             <div
               className="mono tnum"
-              style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 8 }}
+              style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 18 }}
             >
               <span style={{ color: 'var(--down)' }}>${lower.toFixed(2)}</span>
               {' · '}
@@ -1740,7 +1756,7 @@ function TermFan({ rows, spot }: { rows: TermRow[]; spot: number }) {
                 fontWeight={active ? 600 : 500}
                 pointerEvents="none"
               >
-                {shortDate(r.expiration)}
+                {axisDate(r.expiration)}
               </text>
               <text
                 x={cx}
@@ -2046,9 +2062,15 @@ function HistoryBlock({ history }: { history: HistoryPoint[] }) {
         </div>
       </div>
 
+      {/* Wrap the chart in a relative container so the hover tooltip can
+          anchor to the chart itself, regardless of whether the EPS strip
+          below renders. (Earlier, the tooltip lived inside the EPS strip
+          and was double-gated on EPS data, so for most tickers hover did
+          nothing.) */}
+      <div style={{ position: 'relative', marginTop: 10 }}>
       <svg
         viewBox={`0 0 ${W} ${H}`}
-        style={{ width: '100%', height: 'auto', marginTop: 10 }}
+        style={{ width: '100%', height: 'auto' }}
       >
         {/* Alternating column bands give the chart visual rhythm,
             especially important when the implied bands are missing and
@@ -2221,6 +2243,85 @@ function HistoryBlock({ history }: { history: HistoryPoint[] }) {
         })}
       </svg>
 
+      {/* Always-on hover tooltip pinned to the chart's top-right.
+          Renders whenever the cursor is over any column, with the
+          realized move as the headline and an EPS section appended only
+          when fundamentals data is available for that quarter. */}
+      {hovered_ && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 8,
+            right: 8,
+            background: 'var(--bg-3)',
+            border: '1px solid var(--line-2)',
+            padding: '8px 12px',
+            borderRadius: 8,
+            fontSize: 11,
+            color: 'var(--ink-2)',
+            whiteSpace: 'nowrap',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            pointerEvents: 'none',
+            boxShadow: '0 12px 36px rgba(0,0,0,.5)',
+          }}
+        >
+          <div>
+            <div
+              style={{
+                fontSize: 9.5,
+                letterSpacing: '0.14em',
+                textTransform: 'uppercase',
+                color: 'var(--ink-4)',
+              }}
+            >
+              {hovered_.q}
+            </div>
+            <div
+              className="serif tnum"
+              style={{
+                fontSize: 16,
+                color: hovered_.actual >= 0 ? 'var(--up)' : 'var(--down)',
+                marginTop: 2,
+              }}
+            >
+              {hovered_.actual >= 0 ? '+' : ''}
+              {(hovered_.actual * 100).toFixed(1)}%
+            </div>
+            <div
+              className="mono tnum"
+              style={{ fontSize: 9.5, color: 'var(--ink-4)', marginTop: 2 }}
+            >
+              realized
+            </div>
+          </div>
+          {hovered_.epsSurprise != null && (
+            <>
+              <div
+                style={{ width: 1, alignSelf: 'stretch', background: 'var(--line)' }}
+              />
+              <div className="mono tnum" style={{ fontSize: 10.5 }}>
+                <div style={{ color: 'var(--ink-3)' }}>
+                  EPS {hovered_.epsActual?.toFixed(2) ?? '–'} vs{' '}
+                  {hovered_.epsEstimate?.toFixed(2) ?? '–'}
+                </div>
+                <div
+                  style={{
+                    color: hovered_.epsSurprise >= 0 ? 'var(--up)' : 'var(--down)',
+                    marginTop: 2,
+                  }}
+                >
+                  {hovered_.epsSurprise >= 0 ? '+' : ''}
+                  {(hovered_.epsSurprise * 100).toFixed(1)}% surprise
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+      </div>
+
       {/* EPS surprise strip (hidden when no fundamentals data) */}
       {hasEps && (
         <div style={{ marginTop: 14, position: 'relative' }}>
@@ -2272,62 +2373,6 @@ function HistoryBlock({ history }: { history: HistoryPoint[] }) {
               );
             })}
           </svg>
-          {hovered_ && hovered_.epsSurprise != null && (
-            <div
-              style={{
-                position: 'absolute',
-                top: -2,
-                right: 0,
-                background: 'var(--bg-3)',
-                border: '1px solid var(--line-2)',
-                padding: '8px 12px',
-                borderRadius: 8,
-                fontSize: 11,
-                color: 'var(--ink-2)',
-                whiteSpace: 'nowrap',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 12,
-                pointerEvents: 'none',
-              }}
-            >
-              <div>
-                <div
-                  style={{
-                    fontSize: 9.5,
-                    letterSpacing: '0.14em',
-                    textTransform: 'uppercase',
-                    color: 'var(--ink-4)',
-                  }}
-                >
-                  {hovered_.q}
-                </div>
-                <div
-                  className="serif tnum"
-                  style={{ fontSize: 16, color: 'var(--ink)', marginTop: 2 }}
-                >
-                  {hovered_.actual >= 0 ? '+' : ''}
-                  {(hovered_.actual * 100).toFixed(1)}%
-                </div>
-              </div>
-              <div style={{ width: 1, alignSelf: 'stretch', background: 'var(--line)' }} />
-              <div className="mono tnum" style={{ fontSize: 10.5 }}>
-                <div style={{ color: 'var(--ink-3)' }}>
-                  EPS {hovered_.epsActual?.toFixed(2) ?? '–'} vs{' '}
-                  {hovered_.epsEstimate?.toFixed(2) ?? '–'}
-                </div>
-                <div
-                  style={{
-                    color: hovered_.epsSurprise >= 0 ? 'var(--up)' : 'var(--down)',
-                    marginTop: 2,
-                  }}
-                >
-                  {hovered_.epsSurprise >= 0 ? '+' : ''}
-                  {(hovered_.epsSurprise * 100).toFixed(1)}% surprise
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       )}
 
@@ -2480,7 +2525,7 @@ function GreeksPanel({ rows }: { rows: TermRow[] }) {
                         gap: 8,
                       }}
                     >
-                      {shortDate(r.expiration)}
+                      {axisDate(r.expiration)}
                       {r.isEarnings && (
                         <span
                           className="qv-pill warm"

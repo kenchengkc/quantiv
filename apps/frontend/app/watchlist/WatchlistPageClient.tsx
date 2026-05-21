@@ -599,10 +599,10 @@ export default function WatchlistPage() {
             className="serif qv-m-h1"
             style={{
               margin: 0,
-              fontSize: 56,
+              fontSize: 52,
               fontWeight: 800,
               letterSpacing: '-0.03em',
-              lineHeight: 0.95,
+              lineHeight: 0.98,
               textTransform: 'uppercase',
             }}
           >
