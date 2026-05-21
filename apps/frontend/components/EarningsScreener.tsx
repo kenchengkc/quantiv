@@ -1105,29 +1105,63 @@ export default function EarningsScreener() {
             </h1>
             <div
               style={{
-                marginTop: 14,
-                fontSize: 13,
-                color: 'var(--ink-3)',
-                maxWidth: 560,
-                lineHeight: 1.5,
+                marginTop: 18,
+                fontSize: 16,
+                color: 'var(--ink-2)',
+                maxWidth: 660,
+                lineHeight: 1.55,
+                letterSpacing: '-0.005em',
               }}
             >
-              Every earnings name on one page. What options are pricing, how it
-              stacks against recent history and the ML model, and where IV sits
-              in its 52-week range.
+              Every earnings name on one page. See what options are pricing,
+              how it stacks up against recent history and the ML model, and
+              where IV sits in its 52-week range.
             </div>
           </div>
+          {/* Right-hand stacked callout (matches the design's panel):
+              big serif count → small caps "names · filtered" → mono
+              as-of date underneath. Replaces the single-line "N names ·
+              as of YYYY-MM-DD" caption that was previously here. */}
           <div
-            className="mono tnum"
             style={{
-              fontSize: 11,
-              color: 'var(--ink-4)',
-              letterSpacing: '0.08em',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'flex-end',
+              gap: 4,
               whiteSpace: 'nowrap',
             }}
           >
-            {sorted.length} {sorted.length === 1 ? 'name' : 'names'}
-            {manifest?.as_of_date ? ` · as of ${manifest.as_of_date}` : ''}
+            <div
+              className="serif tnum"
+              style={{
+                fontSize: 32,
+                fontWeight: 700,
+                letterSpacing: '-0.02em',
+                color: 'var(--ink)',
+                lineHeight: 1,
+              }}
+            >
+              {sorted.length}
+            </div>
+            <div
+              style={{
+                fontSize: 10,
+                letterSpacing: '0.18em',
+                textTransform: 'uppercase',
+                color: 'var(--ink-3)',
+                fontWeight: 600,
+              }}
+            >
+              {sorted.length === 1 ? 'name' : 'names'} · filtered
+            </div>
+            {manifest?.as_of_date && (
+              <div
+                className="mono tnum"
+                style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 6 }}
+              >
+                As of {manifest.as_of_date}
+              </div>
+            )}
           </div>
         </div>
       </div>
