@@ -1,9 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { forwardRef, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Info } from 'lucide-react';
+import { TableVirtuoso } from 'react-virtuoso';
 import { companyName } from '@/lib/companyNames';
 import { useEnsureCompanyNames } from '@/lib/useCompanyNames';
 import { useTickerHover } from '@/components/TickerHoverCard';
@@ -1495,38 +1496,13 @@ export default function EarningsScreener() {
         </div>
       )}
 
-      {!error && (
-      <div
-        role={showSkeleton ? 'status' : undefined}
-        aria-busy={showSkeleton || undefined}
-        aria-label={showSkeleton ? 'Loading screener' : undefined}
-        className="qv-m-table-wrap"
-        style={{ overflowX: 'auto', marginTop: 8, WebkitOverflowScrolling: 'touch' }}
-      >
-        <table
-          style={{
-            // table-layout: fixed pins each column to the colgroup width
-            // below regardless of content. Without this the auto layout
-            // re-derives column widths from the visible rows on every
-            // filter change — so switching to AMC (which drops most
-            // long-name rows) shrank the Name + Edge columns by a few
-            // px each, and every cell to the right slid left.
-            tableLayout: 'fixed',
-            borderCollapse: 'collapse',
-            // Base font size for the table. Individual cells override
-            // this when they want a different weight or tone (e.g.
-            // ticker symbol is 15.5px serif; Hist edge / Edge cells
-            // bump to 13.5px bold when the value is "hot").
-            fontSize: 13,
-            // Sum of the colgroup widths below; the wrapper's
-            // overflow-x: auto scrolls when the viewport is narrower.
-            width: 1480,
-          }}
-        >
-          {/* Explicit column widths so the layout doesn't re-flow when
-              filters narrow the visible row set. Numbers are tuned to
-              fit the widest realistic cell content (e.g. "−197%" in
-              Hist edge, "$1,243.21" in Spot for high-priced names). */}
+      {/* Colgroup shared between the skeleton table and the virtualized
+          data table. table-layout: fixed honors these widths regardless
+          of cell content, which is what kills the filter-toggle column
+          shift bug. Total table width = 1480px; the wrapper supports
+          horizontal scroll for narrow viewports. */}
+      {(() => {
+        const colGroup = (
           <colgroup>
             <col style={{ width: 200 }} /> {/* Name */}
             <col style={{ width: 64 }} />  {/* Date */}
@@ -1547,269 +1523,376 @@ export default function EarningsScreener() {
             <col style={{ width: 100 }} /> {/* $ Straddle */}
             <col style={{ width: 70 }} />  {/* Opt DTE */}
           </colgroup>
-          <thead>
-            <tr style={{ borderBottom: '1px solid var(--line)' }}>
-              {/* Pin the Name column to a stable minimum width. With
-                  table-layout: auto, column width tracks the widest row
-                  content — different filter subsets (Cheap IV, Big
-                  movers) happen to drop the longest company names, so
-                  the column would shrink and every column to its right
-                  would slide left. Pinning Name at 220px holds that
-                  edge in place; the other columns are fixed-width or
-                  carry tabular-nums content that doesn't vary. */}
-              <th
-                className="qv-m-sticky-cell mono"
-                style={{
-                  textAlign: 'left',
-                  padding: '14px 12px',
-                  fontSize: 10.5,
-                  color: 'var(--ink-3)',
-                  letterSpacing: '0.18em',
-                  textTransform: 'uppercase',
-                  fontWeight: 600,
-                  width: 220,
-                  minWidth: 220,
-                }}
-              >
-                Name
-              </th>
-              {th('date', 'Date', 'Reporting date for the upcoming earnings event.')}
-              {th('dte', 'DTE', 'Calendar days from today until the earnings print.')}
-              <th
-                className="mono"
-                style={{
-                  textAlign: 'left',
-                  padding: '14px 12px',
-                  fontSize: 10.5,
-                  color: 'var(--ink-3)',
-                  letterSpacing: '0.18em',
-                  textTransform: 'uppercase',
-                  fontWeight: 600,
-                }}
-              >
-                Session
-              </th>
-              {th('straddle', 'Straddle EM', 'One-day move priced by the print-expiry ATM straddle.')}
-              {th('hist_avg', 'Hist 4Q avg', 'Mean absolute close-to-close move over the last 4 prints.')}
-              {th('hist_edge', 'Hist edge', '(Straddle EM − hist 4Q avg) / hist 4Q avg. Positive = richer.')}
-              {th('ml', 'ML EM', 'LightGBM median expected absolute one-day move on print.')}
-              {th('edge', 'Edge (vs ML)', 'Straddle EM minus ML EM in percentage points.')}
-              {th('band', 'P90−P10', "Width of model's 80% prediction interval. Tighter = more confident.")}
-              {th('iv', 'ATM IV', 'Annualized front-month at-the-money implied volatility.')}
-              {th('iv_rank', 'IV Rank', "Percentile of today's ATM IV in its trailing 52-week range.")}
-              {th('iv_crush', 'IV crush', '(Front IV − next-expiry IV) / front IV. Higher = more crush.')}
-              {th('skew', 'Skew', 'ATM call IV minus ATM put IV. Positive = calls richer than puts.')}
-              <th
-                className="mono"
+        );
+
+        const tableStyles: React.CSSProperties = {
+          tableLayout: 'fixed',
+          borderCollapse: 'collapse',
+          fontSize: 13,
+          width: 1480,
+        };
+
+        // Both the skeleton + the virtuoso table want the same header
+        // markup. The skeleton renders it as a plain <thead>; virtuoso
+        // gets it via fixedHeaderContent (still a <tr> inside thead).
+        const renderHeaderCells = () => (
+          <>
+            <th
+              className="qv-m-sticky-cell mono"
+              style={{
+                textAlign: 'left',
+                padding: '14px 12px',
+                fontSize: 10.5,
+                color: 'var(--ink-3)',
+                letterSpacing: '0.18em',
+                textTransform: 'uppercase',
+                fontWeight: 600,
+                width: 220,
+                minWidth: 220,
+                // Solid bg so the sticky thead doesn't show table rows
+                // bleeding through when the body scrolls underneath.
+                background: 'var(--bg)',
+              }}
+            >
+              Name
+            </th>
+            {th('date', 'Date', 'Reporting date for the upcoming earnings event.')}
+            {th('dte', 'DTE', 'Calendar days from today until the earnings print.')}
+            <th
+              className="mono"
+              style={{
+                textAlign: 'left',
+                padding: '14px 12px',
+                fontSize: 10.5,
+                color: 'var(--ink-3)',
+                letterSpacing: '0.18em',
+                textTransform: 'uppercase',
+                fontWeight: 600,
+              }}
+            >
+              Session
+            </th>
+            {th('straddle', 'Straddle EM', 'One-day move priced by the print-expiry ATM straddle.')}
+            {th('hist_avg', 'Hist 4Q avg', 'Mean absolute close-to-close move over the last 4 prints.')}
+            {th('hist_edge', 'Hist edge', '(Straddle EM − hist 4Q avg) / hist 4Q avg. Positive = richer.')}
+            {th('ml', 'ML EM', 'LightGBM median expected absolute one-day move on print.')}
+            {th('edge', 'Edge (vs ML)', 'Straddle EM minus ML EM in percentage points.')}
+            {th('band', 'P90−P10', "Width of model's 80% prediction interval. Tighter = more confident.")}
+            {th('iv', 'ATM IV', 'Annualized front-month at-the-money implied volatility.')}
+            {th('iv_rank', 'IV Rank', "Percentile of today's ATM IV in its trailing 52-week range.")}
+            {th('iv_crush', 'IV crush', '(Front IV − next-expiry IV) / front IV. Higher = more crush.')}
+            {th('skew', 'Skew', 'ATM call IV minus ATM put IV. Positive = calls richer than puts.')}
+            <th
+              className="mono"
+              style={{
+                textAlign: 'right',
+                padding: '14px 12px',
+                fontSize: 10.5,
+                color: 'var(--ink-3)',
+                letterSpacing: '0.18em',
+                textTransform: 'uppercase',
+                fontWeight: 600,
+                width: 84,
+                minWidth: 84,
+              }}
+            >
+              1d %
+            </th>
+            {th('spot', 'Spot', 'Latest underlying share price at the snapshot.', 88)}
+            <th className="mono" style={{ textAlign: 'right', padding: '14px 12px', fontSize: 10.5, color: 'var(--ink-3)', letterSpacing: '0.18em', textTransform: 'uppercase', fontWeight: 600 }}>
+              $ Straddle
+            </th>
+            <th className="mono" style={{ textAlign: 'right', padding: '14px 12px', fontSize: 10.5, color: 'var(--ink-3)', letterSpacing: '0.18em', textTransform: 'uppercase', fontWeight: 600 }}>
+              Opt DTE
+            </th>
+          </>
+        );
+
+        // Body cells for a single visible row. Returned as a fragment so
+        // virtuoso can drop it inside its own auto-generated <tr>.
+        const renderRowCells = (ev: ScreenerEvent, rowIndex: number) => {
+          const e = edgePct(ev);
+          const bw = band80(ev);
+          const tick = live[ev.ticker];
+          const quotePending = liveRequested.has(ev.ticker) && tick === undefined;
+          const quoteDelay = (rowIndex % 12) * 35;
+          const chg = tick?.changePct;
+          const flat = chg != null && Math.round(chg * 10000) / 10000 === 0;
+          const up = !flat && (chg ?? 0) >= 0;
+          const chgColor = flat ? 'var(--ink-4)' : up ? 'var(--up)' : 'var(--down)';
+          const chgText =
+            chg == null
+              ? '—'
+              : `${flat ? '–' : up ? '▲' : '▼'} ${(Math.abs(chg) * 100).toFixed(2)}%`;
+          const liveSpot = tick?.price ?? ev.spot_price ?? null;
+          return (
+            <>
+              <NameCell ev={ev} />
+              <td className="mono tnum" style={{ textAlign: 'right', padding: '16px 14px', color: 'var(--ink-2)' }}>
+                {shortDate(ev.earnings_date)}
+              </td>
+              <td className="mono tnum" style={{ textAlign: 'right', padding: '16px 14px', color: 'var(--ink-2)' }}>
+                {ev.lead_time_days ?? '—'}
+              </td>
+              <td style={{ padding: '16px 14px' }}>
+                {(() => {
+                  const t = timingShort(ev.timing);
+                  const tone =
+                    t === 'BMO'
+                      ? 'var(--flag)'
+                      : t === 'AMC'
+                        ? 'var(--accent-hi)'
+                        : 'var(--ink-4)';
+                  const bg =
+                    t === 'BMO'
+                      ? 'color-mix(in oklab, var(--flag) 15%, transparent)'
+                      : t === 'AMC'
+                        ? 'color-mix(in oklab, var(--accent) 18%, transparent)'
+                        : 'color-mix(in oklab, var(--bg-3) 70%, transparent)';
+                  return (
+                    <span
+                      className="mono"
+                      style={{
+                        display: 'inline-block',
+                        fontSize: 10.5,
+                        letterSpacing: '0.12em',
+                        padding: '3px 8px',
+                        borderRadius: 4,
+                        fontWeight: 600,
+                        color: tone,
+                        background: bg,
+                      }}
+                    >
+                      {t}
+                    </span>
+                  );
+                })()}
+              </td>
+              <td style={{ padding: '16px 14px' }}>
+                <MoveBar value={ev.em_straddle_pct} max={maxStraddle} />
+              </td>
+              <td className="mono tnum" style={{ textAlign: 'right', padding: '16px 14px', color: 'var(--ink-2)' }}>
+                {pct1(ev.hist_move_avg_4q)}
+              </td>
+              {(() => {
+                const hEdge = histEdge(ev);
+                const hot = hEdge != null && Math.abs(hEdge) >= 0.20;
+                const tone = hEdge == null
+                  ? 'var(--ink-3)'
+                  : hEdge > 0
+                    ? 'var(--down)'
+                    : 'var(--up)';
+                return (
+                  <td className="mono tnum" style={{
+                    textAlign: 'right', padding: '16px 14px',
+                    color: tone,
+                    fontWeight: hot ? 600 : 400,
+                  }}>
+                    {hEdge == null ? '—' : `${hEdge > 0 ? '+' : ''}${(hEdge * 100).toFixed(0)}%`}
+                  </td>
+                );
+              })()}
+              <td className="mono tnum" style={{ textAlign: 'right', padding: '16px 14px' }}>
+                {pct1(ev.em_ml_pct)}
+              </td>
+              <td
+                className="mono tnum"
                 style={{
                   textAlign: 'right',
-                  padding: '14px 12px',
-                  fontSize: 10.5,
-                  color: 'var(--ink-3)',
-                  letterSpacing: '0.18em',
-                  textTransform: 'uppercase',
-                  fontWeight: 600,
-                  width: 84,
-                  minWidth: 84,
+                  padding: '16px 14px',
+                  color: 'var(--ink)',
+                  fontWeight: e != null && Math.abs(e) >= 0.008 ? 600 : 400,
                 }}
               >
-                1d %
-              </th>
-              {th('spot', 'Spot', 'Latest underlying share price at the snapshot.', 88)}
-              <th className="mono" style={{ textAlign: 'right', padding: '14px 12px', fontSize: 10.5, color: 'var(--ink-3)', letterSpacing: '0.18em', textTransform: 'uppercase', fontWeight: 600 }}>
-                $ Straddle
-              </th>
-              <th className="mono" style={{ textAlign: 'right', padding: '14px 12px', fontSize: 10.5, color: 'var(--ink-3)', letterSpacing: '0.18em', textTransform: 'uppercase', fontWeight: 600 }}>
-                Opt DTE
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {showSkeleton &&
-              // Waterfall: 12 cascading rows, 75ms stagger each. Looks
-              // similar to the earnings-calendar grid skeleton but
-              // stretched horizontally — one full ticker per row.
-              Array.from({ length: 12 }).map((_, i) => (
-                <ScreenerSkeletonRow key={`sk-${i}`} delayMs={i * 75} />
-              ))}
-            {contentReady && sorted.map((ev, rowIndex) => {
-              const e = edgePct(ev);
-              const bw = band80(ev);
-              const tick = live[ev.ticker];
-              const quotePending = liveRequested.has(ev.ticker) && tick === undefined;
-              const quoteDelay = (rowIndex % 12) * 35;
-              const chg = tick?.changePct;
-              const flat = chg != null && Math.round(chg * 10000) / 10000 === 0;
-              const up = !flat && (chg ?? 0) >= 0;
-              const chgColor = flat ? 'var(--ink-4)' : up ? 'var(--up)' : 'var(--down)';
-              const chgText = chg == null
-                ? '—'
-                : `${flat ? '–' : up ? '▲' : '▼'} ${(Math.abs(chg) * 100).toFixed(2)}%`;
-              const liveSpot = tick?.price ?? ev.spot_price ?? null;
+                {e == null ? '—' : pct1(e)}
+              </td>
+              <td className="mono tnum" style={{ textAlign: 'right', padding: '16px 14px', color: 'var(--ink-2)' }}>
+                {bw == null ? '—' : pct1(bw)}
+              </td>
+              <td className="mono tnum" style={{ textAlign: 'right', padding: '16px 14px' }}>
+                {ivPct(ev.atm_iv)}
+              </td>
+              <td style={{ textAlign: 'right', padding: '16px 14px' }}>
+                <IvRankBar rank={ev.iv_rank} />
+              </td>
+              <td className="mono tnum" style={{ textAlign: 'right', padding: '16px 14px', color: 'var(--ink-2)' }}>
+                {pct1(ev.iv_crush_pct)}
+              </td>
+              <td className="mono tnum" style={{ textAlign: 'right', padding: '16px 14px', color: 'var(--ink-2)' }}>
+                {num(ev.skew_atm, 3)}
+              </td>
+              <td
+                className="mono tnum"
+                style={{
+                  textAlign: 'right',
+                  padding: '16px 14px',
+                  color: chgColor,
+                  fontSize: 11,
+                  width: 84,
+                  minWidth: 84,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                <span style={{ display: 'inline-flex', justifyContent: 'flex-end', alignItems: 'center', width: 70 }}>
+                  {quotePending ? (
+                    <QuoteSkeleton width={58} delayMs={quoteDelay} />
+                  ) : (
+                    <span style={{ animation: 'earnings-grid-fade-in 160ms ease-out' }}>
+                      {chgText}
+                    </span>
+                  )}
+                </span>
+              </td>
+              <td
+                className="mono tnum"
+                style={{
+                  textAlign: 'right',
+                  padding: '16px 14px',
+                  width: 88,
+                  minWidth: 88,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                <span style={{ display: 'inline-flex', justifyContent: 'flex-end', alignItems: 'center', width: 74 }}>
+                  {quotePending ? (
+                    <QuoteSkeleton width={62} delayMs={quoteDelay + 20} />
+                  ) : (
+                    <span style={{ animation: 'earnings-grid-fade-in 160ms ease-out' }}>
+                      {liveSpot != null ? `$${num(liveSpot, 2)}` : '—'}
+                    </span>
+                  )}
+                </span>
+              </td>
+              <td className="mono tnum" style={{ textAlign: 'right', padding: '16px 14px', color: 'var(--ink-2)' }}>
+                {ev.em_straddle_abs != null ? `$${num(ev.em_straddle_abs, 2)}` : '—'}
+              </td>
+              <td className="mono tnum" style={{ textAlign: 'right', padding: '16px 14px', color: 'var(--ink-3)' }}>
+                {ev.days_to_expiry ?? '—'}
+              </td>
+            </>
+          );
+        };
 
-              return (
-                <tr
-                  key={`${ev.ticker}-${ev.earnings_date}`}
-                  style={{
-                    borderBottom: '1px solid var(--line)',
-                    transition: 'background 120ms ease',
-                  }}
-                  onMouseEnter={(el) => (el.currentTarget.style.background = 'var(--bg-2)')}
-                  onMouseLeave={(el) => (el.currentTarget.style.background = 'transparent')}
-                >
-                  <NameCell ev={ev} />
-                  <td className="mono tnum" style={{ textAlign: 'right', padding: '16px 14px', color: 'var(--ink-2)' }}>
-                    {shortDate(ev.earnings_date)}
-                  </td>
-                  <td className="mono tnum" style={{ textAlign: 'right', padding: '16px 14px', color: 'var(--ink-2)' }}>
-                    {ev.lead_time_days ?? '—'}
-                  </td>
-                  <td style={{ padding: '16px 14px' }}>
-                    {(() => {
-                      const t = timingShort(ev.timing);
-                      const tone =
-                        t === 'BMO'
-                          ? 'var(--flag)'
-                          : t === 'AMC'
-                            ? 'var(--accent-hi)'
-                            : 'var(--ink-4)';
-                      const bg =
-                        t === 'BMO'
-                          ? 'color-mix(in oklab, var(--flag) 15%, transparent)'
-                          : t === 'AMC'
-                            ? 'color-mix(in oklab, var(--accent) 18%, transparent)'
-                            : 'color-mix(in oklab, var(--bg-3) 70%, transparent)';
-                      return (
-                        <span
-                          className="mono"
-                          style={{
-                            display: 'inline-block',
-                            fontSize: 10.5,
-                            letterSpacing: '0.12em',
-                            padding: '3px 8px',
-                            borderRadius: 4,
-                            fontWeight: 600,
-                            color: tone,
-                            background: bg,
-                          }}
-                        >
-                          {t}
-                        </span>
-                      );
-                    })()}
-                  </td>
-                  <td style={{ padding: '16px 14px' }}>
-                    <MoveBar value={ev.em_straddle_pct} max={maxStraddle} />
-                  </td>
-                  <td className="mono tnum" style={{ textAlign: 'right', padding: '16px 14px', color: 'var(--ink-2)' }}>
-                    {pct1(ev.hist_move_avg_4q)}
-                  </td>
-                  {(() => {
-                    const hEdge = histEdge(ev);
-                    const hot = hEdge != null && Math.abs(hEdge) >= 0.20;
-                    const tone = hEdge == null
-                      ? 'var(--ink-3)'
-                      : hEdge > 0 ? 'var(--down)' : 'var(--up)';
+        if (error) return null;
+
+        // STATE 1 · Loading skeleton. Plain (non-virtualized) table so
+        // the cascading row animations land in the correct DOM order.
+        if (showSkeleton) {
+          return (
+            <div
+              role="status"
+              aria-busy
+              aria-label="Loading screener"
+              className="qv-m-table-wrap"
+              style={{ overflowX: 'auto', marginTop: 8, WebkitOverflowScrolling: 'touch' }}
+            >
+              <table style={tableStyles}>
+                {colGroup}
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--line)' }}>
+                    {renderHeaderCells()}
+                  </tr>
+                </thead>
+                <tbody>
+                  {Array.from({ length: 12 }).map((_, i) => (
+                    <ScreenerSkeletonRow key={`sk-${i}`} delayMs={i * 75} />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          );
+        }
+
+        // STATE 2 · Empty result. No virtuoso, just a single-line note.
+        if (sorted.length === 0) {
+          return (
+            <div style={{ padding: '48px 0', color: 'var(--ink-3)', fontSize: 13 }}>
+              No rows match these filters. Try clearing ticker / S&amp;P / ML-only, or lowering min spot.
+            </div>
+          );
+        }
+
+        // STATE 3 · Virtualized data table (react-virtuoso).
+        // useWindowScroll keeps the page's natural scroll behaviour
+        // (browser back/forward scroll restoration just works) while
+        // virtuoso unmounts off-screen rows so we only ever have ~15
+        // visible <tr>s in the DOM, regardless of total result size.
+        // Total table width 1480px; the wrapper handles horizontal
+        // scrolling. Sticky-Name column survives because we set
+        // position: sticky inline on the cell, not on the row.
+        return (
+          <div
+            className="qv-m-table-wrap"
+            style={{ overflowX: 'auto', marginTop: 8, WebkitOverflowScrolling: 'touch' }}
+          >
+            <TableVirtuoso
+              useWindowScroll
+              data={sorted}
+              computeItemKey={(_, ev) => `${ev.ticker}-${ev.earnings_date}`}
+              style={{ width: 1480 }}
+              components={{
+                // Inject the colgroup right after the <table> opening
+                // tag, before virtuoso's auto-generated thead/tbody.
+                Table: forwardRef<HTMLTableElement, React.HTMLAttributes<HTMLTableElement>>(
+                  function VirtuosoTable({ style, children, ...rest }, ref) {
                     return (
-                      <td className="mono tnum" style={{
-                        textAlign: 'right', padding: '16px 14px',
-                        color: tone,
-                        fontWeight: hot ? 600 : 400,
-                      }}>
-                        {hEdge == null ? '—' : `${hEdge > 0 ? '+' : ''}${(hEdge * 100).toFixed(0)}%`}
-                      </td>
+                      <table ref={ref} {...rest} style={{ ...tableStyles, ...style }}>
+                        {colGroup}
+                        {children}
+                      </table>
                     );
-                  })()}
-                  <td className="mono tnum" style={{ textAlign: 'right', padding: '16px 14px' }}>
-                    {pct1(ev.em_ml_pct)}
-                  </td>
-                  <td
-                    className="mono tnum"
+                  },
+                ),
+                // Sticky header parked just below the topbar (64px tall).
+                // Solid bg so virtualized rows don't bleed through the
+                // gap between the topbar and the table head.
+                TableHead: forwardRef<HTMLTableSectionElement, React.HTMLAttributes<HTMLTableSectionElement>>(
+                  function VirtuosoHead({ style, children, ...rest }, ref) {
+                    return (
+                      <thead
+                        ref={ref}
+                        {...rest}
+                        style={{
+                          ...style,
+                          position: 'sticky',
+                          top: 64,
+                          zIndex: 10,
+                          background: 'var(--bg)',
+                        }}
+                      >
+                        {children}
+                      </thead>
+                    );
+                  },
+                ),
+                // Row hover wash — same effect as before, just hoisted
+                // into a single component override so each itemContent
+                // returns only cells.
+                TableRow: ({ children, style, ...rest }: React.HTMLAttributes<HTMLTableRowElement>) => (
+                  <tr
+                    {...rest}
                     style={{
-                      textAlign: 'right',
-                      padding: '16px 14px',
-                      color: 'var(--ink)',
-                      fontWeight: e != null && Math.abs(e) >= 0.008 ? 600 : 400,
+                      ...style,
+                      borderBottom: '1px solid var(--line)',
+                      transition: 'background 120ms ease',
                     }}
+                    onMouseEnter={(el) => (el.currentTarget.style.background = 'var(--bg-2)')}
+                    onMouseLeave={(el) => (el.currentTarget.style.background = 'transparent')}
                   >
-                    {e == null ? '—' : pct1(e)}
-                  </td>
-                  <td className="mono tnum" style={{ textAlign: 'right', padding: '16px 14px', color: 'var(--ink-2)' }}>
-                    {bw == null ? '—' : pct1(bw)}
-                  </td>
-                  <td className="mono tnum" style={{ textAlign: 'right', padding: '16px 14px' }}>
-                    {ivPct(ev.atm_iv)}
-                  </td>
-                  <td style={{ textAlign: 'right', padding: '16px 14px' }}>
-                    <IvRankBar rank={ev.iv_rank} />
-                  </td>
-                  <td className="mono tnum" style={{ textAlign: 'right', padding: '16px 14px', color: 'var(--ink-2)' }}>
-                    {pct1(ev.iv_crush_pct)}
-                  </td>
-                  <td className="mono tnum" style={{ textAlign: 'right', padding: '16px 14px', color: 'var(--ink-2)' }}>
-                    {num(ev.skew_atm, 3)}
-                  </td>
-                  <td
-                    className="mono tnum"
-                    style={{
-                      textAlign: 'right',
-                      padding: '16px 14px',
-                      color: chgColor,
-                      fontSize: 11,
-                      width: 84,
-                      minWidth: 84,
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    <span style={{ display: 'inline-flex', justifyContent: 'flex-end', alignItems: 'center', width: 70 }}>
-                      {quotePending ? (
-                        <QuoteSkeleton width={58} delayMs={quoteDelay} />
-                      ) : (
-                        <span style={{ animation: 'earnings-grid-fade-in 160ms ease-out' }}>
-                          {chgText}
-                        </span>
-                      )}
-                    </span>
-                  </td>
-                  <td
-                    className="mono tnum"
-                    style={{
-                      textAlign: 'right',
-                      padding: '16px 14px',
-                      width: 88,
-                      minWidth: 88,
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    <span style={{ display: 'inline-flex', justifyContent: 'flex-end', alignItems: 'center', width: 74 }}>
-                      {quotePending ? (
-                        <QuoteSkeleton width={62} delayMs={quoteDelay + 20} />
-                      ) : (
-                        <span style={{ animation: 'earnings-grid-fade-in 160ms ease-out' }}>
-                          {liveSpot != null ? `$${num(liveSpot, 2)}` : '—'}
-                        </span>
-                      )}
-                    </span>
-                  </td>
-                  <td className="mono tnum" style={{ textAlign: 'right', padding: '16px 14px', color: 'var(--ink-2)' }}>
-                    {ev.em_straddle_abs != null ? `$${num(ev.em_straddle_abs, 2)}` : '—'}
-                  </td>
-                  <td className="mono tnum" style={{ textAlign: 'right', padding: '16px 14px', color: 'var(--ink-3)' }}>
-                    {ev.days_to_expiry ?? '—'}
-                  </td>
+                    {children}
+                  </tr>
+                ),
+              }}
+              fixedHeaderContent={() => (
+                <tr style={{ borderBottom: '1px solid var(--line)' }}>
+                  {renderHeaderCells()}
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-      )}
-
-      {contentReady && sorted.length === 0 && (
-        <div style={{ padding: '48px 0', color: 'var(--ink-3)', fontSize: 13 }}>
-          No rows match these filters. Try clearing ticker / S&amp;P / ML-only, or lowering min spot.
-        </div>
-      )}
+              )}
+              itemContent={(index, ev) => renderRowCells(ev, index)}
+            />
+          </div>
+        );
+      })()}
 
       {contentReady && sorted.length > 0 && (
         <div

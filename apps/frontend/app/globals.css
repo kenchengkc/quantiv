@@ -421,10 +421,27 @@
    only the properties that need to change on small screens. */
 
 .qv-m-table-wrap {
-  /* Default: just allow horizontal scroll. Sticky-cell behavior is only
-     activated on mobile so it doesn't interfere with desktop layout. */
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+}
+
+/* Sticky-first-column for horizontally-scrolling tables (Screener,
+   Greeks panel). Applies on both desktop and mobile now that the
+   screener table is virtualized + 1480px wide — without this the
+   Name column scrolls out of view when the user swipes right to see
+   Hist edge / IV Rank / Spot etc. Mobile-only tweaks layer on top
+   inside the media query below. */
+.qv-m-sticky-cell {
+  position: sticky;
+  left: 0;
+  z-index: 5;
+  background: var(--bg);
+  /* Soft shadow on the right edge to signal "more content sits under
+     the sticky column" when the body is scrolled. */
+  box-shadow: 6px 0 12px -8px rgba(0, 0, 0, 0.55);
+}
+tr:hover .qv-m-sticky-cell {
+  background: color-mix(in oklab, var(--bg-2) 92%, transparent);
 }
 
 /* Default-hide on desktop, show on mobile. Counterpart to .qv-m-hide. */
@@ -479,28 +496,13 @@
     font-size: 24px !important;
   }
 
-  /* Sticky-first-column inside a horizontally scrolling table. The first
-     <td>/<th> of each row picks up `.qv-m-sticky-cell`; the table wrapper
-     gets `.qv-m-table-wrap`. We DON'T strip min-width on the table — the
-     whole point of the sticky cell is that the table stays wider than the
-     viewport and the user swipes the trailing columns into view. */
+  /* Mobile-specific clamp for the sticky Name column so the right-hand
+     columns have more room to peek into the narrow viewport before
+     swipe. The base sticky behavior is defined above the media query. */
   .qv-m-sticky-cell {
-    position: sticky !important;
-    left: 0;
-    z-index: 5;
-    /* Mask scrolled cells with a solid background. Bg matches the page so
-       the sticky cell reads as the same surface as the surrounding body. */
-    background: var(--bg) !important;
-    box-shadow: 6px 0 12px -8px rgba(0, 0, 0, 0.55);
-    /* Force the Name column tighter on mobile so the right-hand columns
-       have more room to peek into the viewport before swipe. */
     max-width: 188px;
     min-width: auto !important;
     width: auto !important;
-  }
-  /* When the hovered row tints itself, keep the sticky cell tinted too. */
-  tr:hover .qv-m-sticky-cell {
-    background: color-mix(in oklab, var(--bg-2) 92%, transparent) !important;
   }
 
   /* Hero glyph fits its hero column on mobile. */
