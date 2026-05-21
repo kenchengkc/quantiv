@@ -553,7 +553,7 @@ export default function WatchlistPage() {
       {/* Header */}
       <div
         style={{
-          padding: '24px 0 20px',
+          padding: '24px 0 14px',
           borderBottom: '1px solid var(--line)',
           display: 'flex',
           alignItems: 'flex-end',
@@ -599,10 +599,10 @@ export default function WatchlistPage() {
             className="serif qv-m-h1"
             style={{
               margin: 0,
-              fontSize: 64,
+              fontSize: 48,
               fontWeight: 800,
-              letterSpacing: '-0.035em',
-              lineHeight: 0.92,
+              letterSpacing: '-0.03em',
+              lineHeight: 0.95,
               textTransform: 'uppercase',
             }}
           >
