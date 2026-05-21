@@ -684,10 +684,10 @@ function WeekHeader({
             className="serif qv-m-h1"
             style={{
               margin: 0,
-              fontSize: 56,
+              fontSize: 52,
               fontWeight: 800,
               letterSpacing: '-0.03em',
-              lineHeight: 0.95,
+              lineHeight: 0.98,
               color: 'var(--ink)',
               textWrap: 'balance',
               textTransform: 'uppercase',
@@ -695,6 +695,17 @@ function WeekHeader({
           >
             {windowLabel}
           </h1>
+          <div
+            style={{
+              marginTop: 14,
+              fontSize: 13,
+              color: 'var(--ink-3)',
+              maxWidth: 520,
+              lineHeight: 1.5,
+            }}
+          >
+            Tracking what options markets expect · and what the market actually delivers.
+          </div>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>

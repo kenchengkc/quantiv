@@ -459,9 +459,10 @@ function Pipeline() {
                 x={cx}
                 y="55"
                 textAnchor="middle"
-                fontSize="11"
-                fontFamily="JetBrains Mono"
-                fontWeight="700"
+                fontSize="12"
+                fontFamily="Mulish, Nunito Sans, sans-serif"
+                fontWeight="800"
+                letterSpacing="0.04em"
                 fill={s.tone}
               >
                 {s.kicker}
