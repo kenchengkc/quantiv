@@ -907,7 +907,7 @@ function DetailHero({
               cursor: 'pointer',
             }}
           >
-            <ChevronLeft size={12} /> Earnings calendar
+            <ChevronLeft size={12} /> Earnings Calendar
           </button>
         </div>
 
@@ -997,7 +997,7 @@ function DetailHero({
           <div
             style={{
               borderTop: '1px solid color-mix(in oklab, var(--line) 60%, transparent)',
-              paddingTop: 14,
+              paddingTop: 18,
             }}
           >
             <div
@@ -1019,9 +1019,9 @@ function DetailHero({
                 // range line below, this gives the gradient number room
                 // to breathe instead of being clipped at the bottom.
                 fontWeight: 800,
-                lineHeight: 1.0,
+                lineHeight: 1.06,
                 letterSpacing: '-0.04em',
-                marginTop: 6,
+                marginTop: 12,
                 background: 'linear-gradient(135deg, var(--brand-blue-1), var(--accent-hi))',
                 WebkitBackgroundClip: 'text',
                 WebkitTextFillColor: 'transparent',
@@ -1045,7 +1045,7 @@ function DetailHero({
                 element, not a sub-line glued to the gradient headline. */}
             <div
               className="mono tnum"
-              style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 22 }}
+              style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 30 }}
             >
               <span style={{ color: 'var(--down)' }}>${lower.toFixed(2)}</span>
               {' · '}
@@ -1806,7 +1806,7 @@ function TermFan({ rows, spot }: { rows: TermRow[]; spot: number }) {
               y={y(v)}
               textAnchor="end"
               dominantBaseline="central"
-              fontSize="13"
+              fontSize="10"
               fontFamily="ui-monospace, monospace"
               fill="var(--ink-3)"
             >
@@ -1885,7 +1885,7 @@ function TermFan({ rows, spot }: { rows: TermRow[]; spot: number }) {
                 x={cx}
                 y={H - M.bottom + 20}
                 textAnchor="middle"
-                fontSize="12.5"
+                fontSize="9.5"
                 fontFamily="ui-monospace, monospace"
                 fill={active ? 'var(--ink)' : 'var(--ink-2)'}
                 fontWeight={active ? 600 : 500}
@@ -1897,7 +1897,7 @@ function TermFan({ rows, spot }: { rows: TermRow[]; spot: number }) {
                 x={cx}
                 y={H - M.bottom + 36}
                 textAnchor="middle"
-                fontSize="11"
+                fontSize="8.5"
                 fontFamily="ui-monospace, monospace"
                 fill="var(--ink-4)"
                 pointerEvents="none"
@@ -1916,7 +1916,7 @@ function TermFan({ rows, spot }: { rows: TermRow[]; spot: number }) {
                 x={x(last.dte) + 12}
                 y={y(spot * (1 + last.emPct))}
                 dominantBaseline="central"
-                fontSize="13"
+                fontSize="10.5"
                 fontFamily="ui-monospace, monospace"
                 fontWeight="700"
                 fill="var(--up)"
@@ -1927,7 +1927,7 @@ function TermFan({ rows, spot }: { rows: TermRow[]; spot: number }) {
                 x={x(last.dte) + 12}
                 y={y(spot * (1 - last.emPct))}
                 dominantBaseline="central"
-                fontSize="13"
+                fontSize="10.5"
                 fontFamily="ui-monospace, monospace"
                 fontWeight="700"
                 fill="var(--down)"
@@ -1941,10 +1941,21 @@ function TermFan({ rows, spot }: { rows: TermRow[]; spot: number }) {
         {hovered != null &&
           (() => {
             const r = rows[hovered];
-            const tx = Math.min(x(r.dte) + 16, W - M.right - 200);
+            const tooltipW = 170;
+            const anchorX = x(r.dte);
+            const midY = (y(spot * (1 + r.emPct)) + y(spot * (1 - r.emPct))) / 2;
+            const tx = Math.max(
+              M.left + 4,
+              Math.min(
+                anchorX > W - M.right - tooltipW - 24
+                  ? anchorX - tooltipW - 14
+                  : anchorX + 14,
+                W - M.right - tooltipW,
+              ),
+            );
             const ty = Math.max(
               M.top + 8,
-              (y(spot * (1 + r.emPct)) + y(spot * (1 - r.emPct))) / 2 - 64,
+              Math.min(midY - 54, H - M.bottom - 96),
             );
             const lines: Array<[string, string]> = [
               ['DTE', `${r.dte}d`],
@@ -1952,23 +1963,23 @@ function TermFan({ rows, spot }: { rows: TermRow[]; spot: number }) {
               ['EM', `±${(r.emPct * 100).toFixed(2)}%`],
               ['Straddle', `$${r.straddle.toFixed(2)}`],
             ];
-            const lineH = 17;
+            const lineH = 14.5;
             return (
               <g pointerEvents="none">
                 <rect
                   x={tx}
                   y={ty}
-                  width={196}
-                  height={26 + lines.length * lineH}
-                  rx={10}
+                  width={tooltipW}
+                  height={24 + lines.length * lineH}
+                  rx={8}
                   fill="var(--bg-3)"
                   stroke="var(--line-2)"
                   strokeWidth={1}
                 />
                 <text
                   x={tx + 14}
-                  y={ty + 22}
-                  fontSize="13"
+                  y={ty + 19}
+                  fontSize="11"
                   fontFamily="Mulish, sans-serif"
                   fontWeight="700"
                   fill="var(--ink)"
@@ -1980,18 +1991,18 @@ function TermFan({ rows, spot }: { rows: TermRow[]; spot: number }) {
                   <g key={k}>
                     <text
                       x={tx + 14}
-                      y={ty + 44 + i * lineH}
-                      fontSize="12"
+                      y={ty + 38 + i * lineH}
+                      fontSize="9.5"
                       fill="var(--ink-3)"
                       fontFamily="sans-serif"
                     >
                       {k}
                     </text>
                     <text
-                      x={tx + 182}
-                      y={ty + 44 + i * lineH}
+                      x={tx + tooltipW - 14}
+                      y={ty + 38 + i * lineH}
                       textAnchor="end"
-                      fontSize="12"
+                      fontSize="10"
                       fill="var(--ink)"
                       fontFamily="ui-monospace, monospace"
                       fontWeight="600"
@@ -2268,7 +2279,7 @@ function HistoryBlock({ history }: { history: HistoryPoint[] }) {
           y={y(max) + 4}
           textAnchor="end"
           fill="var(--ink-3)"
-          fontSize="12"
+          fontSize="9.5"
           fontFamily="JetBrains Mono"
         >
           +{(max * 100).toFixed(0)}%
@@ -2278,7 +2289,7 @@ function HistoryBlock({ history }: { history: HistoryPoint[] }) {
           y={y(-max) + 4}
           textAnchor="end"
           fill="var(--ink-3)"
-          fontSize="12"
+          fontSize="9.5"
           fontFamily="JetBrains Mono"
         >
           −{(max * 100).toFixed(0)}%
@@ -2288,7 +2299,7 @@ function HistoryBlock({ history }: { history: HistoryPoint[] }) {
           y={H / 2 + 4}
           textAnchor="end"
           fill="var(--ink-3)"
-          fontSize="12"
+          fontSize="9.5"
           fontFamily="JetBrains Mono"
         >
           0%
@@ -2367,7 +2378,7 @@ function HistoryBlock({ history }: { history: HistoryPoint[] }) {
                 y={H - 10}
                 textAnchor="middle"
                 fill={active ? 'var(--ink)' : 'var(--ink-2)'}
-                fontSize="12"
+                fontSize="10"
                 fontFamily="JetBrains Mono"
                 fontWeight={active ? 700 : 500}
               >
@@ -2378,35 +2389,35 @@ function HistoryBlock({ history }: { history: HistoryPoint[] }) {
         })}
       </svg>
 
-      {/* Always-on hover tooltip pinned to the chart's top-right.
-          Renders whenever the cursor is over any column, with the
-          realized move as the headline and an EPS section appended only
-          when fundamentals data is available for that quarter. */}
-      {hovered_ && (
-        <div
-          style={{
-            position: 'absolute',
-            top: 8,
-            right: 8,
-            background: 'var(--bg-3)',
-            border: '1px solid var(--line-2)',
-            padding: '8px 12px',
-            borderRadius: 8,
-            fontSize: 11,
-            color: 'var(--ink-2)',
-            whiteSpace: 'nowrap',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 12,
-            pointerEvents: 'none',
-            boxShadow: '0 12px 36px rgba(0,0,0,.5)',
-          }}
-        >
-          <div>
+      {hovered_ && hovered != null && (() => {
+        const cx = P + colW * hovered + colW / 2;
+        const cy = y(hovered_.actual);
+        const placeRight = cx < W * 0.64;
+        return (
+          <div
+            style={{
+              position: 'absolute',
+              left: `${(cx / W) * 100}%`,
+              top: `${Math.max(16, Math.min(82, (cy / H) * 100))}%`,
+              transform: placeRight
+                ? 'translate(12px, -50%)'
+                : 'translate(calc(-100% - 12px), -50%)',
+              width: 172,
+              background: 'var(--bg-3)',
+              border: '1px solid var(--line-2)',
+              padding: '7px 9px',
+              borderRadius: 8,
+              fontSize: 9.5,
+              lineHeight: 1.35,
+              color: 'var(--ink-2)',
+              pointerEvents: 'none',
+              boxShadow: '0 12px 36px rgba(0,0,0,.5)',
+            }}
+          >
             <div
               style={{
-                fontSize: 9.5,
-                letterSpacing: '0.14em',
+                fontSize: 8.5,
+                letterSpacing: '0.12em',
                 textTransform: 'uppercase',
                 color: 'var(--ink-4)',
               }}
@@ -2416,7 +2427,7 @@ function HistoryBlock({ history }: { history: HistoryPoint[] }) {
             <div
               className="serif tnum"
               style={{
-                fontSize: 16,
+                fontSize: 13,
                 color: hovered_.actual >= 0 ? 'var(--up)' : 'var(--down)',
                 marginTop: 2,
               }}
@@ -2426,17 +2437,20 @@ function HistoryBlock({ history }: { history: HistoryPoint[] }) {
             </div>
             <div
               className="mono tnum"
-              style={{ fontSize: 9.5, color: 'var(--ink-4)', marginTop: 2 }}
+              style={{ fontSize: 8.5, color: 'var(--ink-4)', marginTop: 1 }}
             >
               realized
             </div>
-          </div>
-          {hovered_.epsSurprise != null && (
-            <>
+            {hovered_.epsSurprise != null && (
               <div
-                style={{ width: 1, alignSelf: 'stretch', background: 'var(--line)' }}
-              />
-              <div className="mono tnum" style={{ fontSize: 10.5 }}>
+                className="mono tnum"
+                style={{
+                  borderTop: '1px solid var(--line)',
+                  marginTop: 6,
+                  paddingTop: 5,
+                  fontSize: 9,
+                }}
+              >
                 <div style={{ color: 'var(--ink-3)' }}>
                   EPS {hovered_.epsActual?.toFixed(2) ?? '–'} vs{' '}
                   {hovered_.epsEstimate?.toFixed(2) ?? '–'}
@@ -2451,10 +2465,10 @@ function HistoryBlock({ history }: { history: HistoryPoint[] }) {
                   {(hovered_.epsSurprise * 100).toFixed(1)}% surprise
                 </div>
               </div>
-            </>
-          )}
-        </div>
-      )}
+            )}
+          </div>
+        );
+      })()}
       </div>
 
       {/* EPS surprise strip (hidden when no fundamentals data) */}
@@ -3011,7 +3025,7 @@ export default function SymbolPage() {
           className="chip"
           style={{ border: 'none', color: 'var(--ink-3)', paddingLeft: 0, cursor: 'pointer' }}
         >
-          <ChevronLeft size={14} /> Return
+          <ChevronLeft size={14} /> Earnings Calendar
         </button>
 
         {/* Header: logo + ticker + company name + live quote (when

@@ -1596,7 +1596,8 @@ export default function EarningsScreener() {
 
         const tableStyles: React.CSSProperties = {
           tableLayout: 'fixed',
-          borderCollapse: 'collapse',
+          borderCollapse: 'separate',
+          borderSpacing: 0,
           fontSize: 13,
           width: tableWidth,
         };
