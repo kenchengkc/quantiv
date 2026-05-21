@@ -4,21 +4,120 @@ import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import katex from 'katex';
 
+const ABOUT_PAGE_SETTLE_DELAY_MS = 360;
+const COUNT_UP_DURATION_MS = 2600;
+
+function prefersReducedMotion() {
+  return (
+    typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  );
+}
+
+function waitForWindowLoad() {
+  if (typeof window === 'undefined' || typeof document === 'undefined') {
+    return Promise.resolve();
+  }
+  if (document.readyState === 'complete') {
+    return Promise.resolve();
+  }
+  return new Promise<void>((resolve) => {
+    window.addEventListener('load', () => resolve(), { once: true });
+  });
+}
+
+function waitForFonts() {
+  if (typeof document === 'undefined' || !('fonts' in document)) {
+    return Promise.resolve();
+  }
+  return document.fonts.ready.then(() => undefined).catch(() => undefined);
+}
+
+function waitForImage(img: HTMLImageElement) {
+  const decode = () =>
+    img.decode?.().then(() => undefined).catch(() => undefined) ?? Promise.resolve();
+
+  if (img.complete) {
+    return decode();
+  }
+
+  return new Promise<void>((resolve) => {
+    const done = () => {
+      img.removeEventListener('load', done);
+      img.removeEventListener('error', done);
+      resolve();
+    };
+    img.addEventListener('load', done, { once: true });
+    img.addEventListener('error', done, { once: true });
+  }).then(decode);
+}
+
+function waitForImages(container: HTMLElement | null) {
+  if (!container) {
+    return Promise.resolve();
+  }
+
+  const images = Array.from(container.querySelectorAll('img'));
+  return Promise.all(images.map(waitForImage)).then(() => undefined);
+}
+
+function usePageSettled(
+  containerRef: React.RefObject<HTMLElement | null>,
+  delayMs = ABOUT_PAGE_SETTLE_DELAY_MS,
+) {
+  const [settled, setSettled] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    let frame: number | null = null;
+    let timeout: number | null = null;
+
+    const finish = () => {
+      if (cancelled) return;
+
+      const delay = prefersReducedMotion() ? 0 : delayMs;
+      frame = window.requestAnimationFrame(() => {
+        timeout = window.setTimeout(() => {
+          if (!cancelled) setSettled(true);
+        }, delay);
+      });
+    };
+
+    Promise.all([waitForWindowLoad(), waitForFonts()])
+      .then(() => waitForImages(containerRef.current))
+      .then(finish)
+      .catch(finish);
+
+    return () => {
+      cancelled = true;
+      if (frame !== null) window.cancelAnimationFrame(frame);
+      if (timeout !== null) window.clearTimeout(timeout);
+    };
+  }, [containerRef, delayMs]);
+
+  return settled;
+}
+
 // ──────────────────────────────────────────────────────────────────────────
 // Reveal-on-scroll wrapper
 // ──────────────────────────────────────────────────────────────────────────
 function Reveal({
   children,
   delay = 0,
+  enabled = true,
   style,
 }: {
   children: React.ReactNode;
   delay?: number;
+  enabled?: boolean;
   style?: React.CSSProperties;
 }) {
   const ref = useRef<HTMLDivElement | null>(null);
   const [shown, setShown] = useState(false);
   useEffect(() => {
+    if (!enabled || shown) return;
+
     const el = ref.current;
     if (!el) return;
     if (typeof IntersectionObserver === 'undefined') {
@@ -39,7 +138,7 @@ function Reveal({
     );
     io.observe(el);
     return () => io.disconnect();
-  }, []);
+  }, [enabled, shown]);
   return (
     <div
       ref={ref}
@@ -56,13 +155,15 @@ function Reveal({
 // ──────────────────────────────────────────────────────────────────────────
 function CountUp({
   value,
-  duration = 1400,
+  duration = COUNT_UP_DURATION_MS,
+  enabled = true,
   suffix = '',
   decimals = 0,
   prefix = '',
 }: {
   value: number;
   duration?: number;
+  enabled?: boolean;
   suffix?: string;
   decimals?: number;
   prefix?: string;
@@ -70,27 +171,41 @@ function CountUp({
   const [current, setCurrent] = useState(0);
   const ref = useRef<HTMLSpanElement | null>(null);
   useEffect(() => {
+    if (!enabled) {
+      setCurrent(0);
+      return;
+    }
+
     const el = ref.current;
     if (!el) return;
-    if (typeof IntersectionObserver === 'undefined') {
+    if (prefersReducedMotion() || typeof IntersectionObserver === 'undefined') {
       setCurrent(value);
       return;
     }
+
     let started = false;
+    let frame: number | null = null;
+
+    const startAnimation = () => {
+      const start = performance.now();
+      const tick = (t: number) => {
+        const elapsed = t - start;
+        const p = Math.min(1, elapsed / duration);
+        const eased = 1 - Math.pow(1 - p, 3);
+        setCurrent(value * eased);
+        if (p < 1) {
+          frame = requestAnimationFrame(tick);
+        }
+      };
+      frame = requestAnimationFrame(tick);
+    };
+
     const io = new IntersectionObserver(
       (entries) => {
         for (const e of entries) {
           if (e.isIntersecting && !started) {
             started = true;
-            const start = performance.now();
-            const tick = (t: number) => {
-              const elapsed = t - start;
-              const p = Math.min(1, elapsed / duration);
-              const eased = 1 - Math.pow(1 - p, 3);
-              setCurrent(value * eased);
-              if (p < 1) requestAnimationFrame(tick);
-            };
-            requestAnimationFrame(tick);
+            startAnimation();
             io.disconnect();
             break;
           }
@@ -99,8 +214,11 @@ function CountUp({
       { threshold: 0.4 },
     );
     io.observe(el);
-    return () => io.disconnect();
-  }, [value, duration]);
+    return () => {
+      io.disconnect();
+      if (frame !== null) cancelAnimationFrame(frame);
+    };
+  }, [enabled, value, duration]);
   return (
     <span ref={ref} className="serif tnum">
       {prefix}
@@ -115,9 +233,11 @@ function CountUp({
 // slit opens → tail clips in left-to-right). Plays once when the hero
 // scrolls into view. CSS lives in globals.css under .quantiv-hero-q*.
 // ──────────────────────────────────────────────────────────────────────────
-function HeroGlyph() {
+function HeroGlyph({ enabled = true }: { enabled?: boolean }) {
   const ref = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
+    if (!enabled) return;
+
     const el = ref.current;
     if (!el) return;
     if (typeof IntersectionObserver === 'undefined') {
@@ -138,7 +258,7 @@ function HeroGlyph() {
     );
     io.observe(el);
     return () => io.disconnect();
-  }, []);
+  }, [enabled]);
   return (
     <div ref={ref} className="quantiv-hero-q" aria-hidden="true">
       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -635,6 +755,9 @@ function FormulaCard({
 // Main About
 // ──────────────────────────────────────────────────────────────────────────
 export default function AboutPageClient() {
+  const pageRef = useRef<HTMLDivElement | null>(null);
+  const pageSettled = usePageSettled(pageRef);
+
   // Anchored to actual repo facts:
   //  · names tracked: ≈ S&P 500 + active Russell + popular names
   //  · chains snapped per week: ~500 names × 4 expiries × 5 trading days
@@ -650,9 +773,13 @@ export default function AboutPageClient() {
   ];
 
   return (
-    <div className="qv-m-pad" style={{ maxWidth: 980, margin: '0 auto', padding: '0 28px 80px' }}>
+    <div
+      ref={pageRef}
+      className="qv-m-pad"
+      style={{ maxWidth: 980, margin: '0 auto', padding: '0 28px 80px' }}
+    >
       {/* Hero */}
-      <Reveal>
+      <Reveal enabled={pageSettled}>
         <div
           className="qv-m-stack qv-about-hero"
           style={{
@@ -736,13 +863,13 @@ export default function AboutPageClient() {
             </p>
           </div>
           <div style={{ justifySelf: 'end' }}>
-            <HeroGlyph />
+            <HeroGlyph enabled={pageSettled} />
           </div>
         </div>
       </Reveal>
 
       {/* Live stats row */}
-      <Reveal delay={60}>
+      <Reveal enabled={pageSettled} delay={60}>
         <div
           className="qv-m-2col qv-about-stats"
           style={{
@@ -782,7 +909,13 @@ export default function AboutPageClient() {
                   lineHeight: 1,
                 }}
               >
-                <CountUp value={s.v} suffix={s.suf} decimals={s.dec} />
+                <CountUp
+                  enabled={pageSettled}
+                  value={s.v}
+                  suffix={s.suf}
+                  decimals={s.dec}
+                  duration={COUNT_UP_DURATION_MS + i * 240}
+                />
               </div>
               <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 6 }}>{s.label}</div>
             </div>
@@ -791,7 +924,7 @@ export default function AboutPageClient() {
       </Reveal>
 
       {/* What we measure · three lenses with mini visualizations */}
-      <Reveal delay={100}>
+      <Reveal enabled={pageSettled} delay={100}>
         <div style={{ padding: '44px 0 16px' }}>
           <div
             style={{
@@ -915,7 +1048,7 @@ export default function AboutPageClient() {
       </Reveal>
 
       {/* Models & math · formulas + plain-English notes */}
-      <Reveal delay={120}>
+      <Reveal enabled={pageSettled} delay={120}>
         <div
           style={{
             padding: '44px 0 8px',
@@ -1035,7 +1168,7 @@ export default function AboutPageClient() {
       </Reveal>
 
       {/* Pipeline */}
-      <Reveal delay={160}>
+      <Reveal enabled={pageSettled} delay={160}>
         <div
           style={{
             padding: '44px 0 8px',
@@ -1075,7 +1208,7 @@ export default function AboutPageClient() {
       </Reveal>
 
       {/* House note */}
-      <Reveal delay={200}>
+      <Reveal enabled={pageSettled} delay={200}>
         <div
           className="qv-m-stack qv-about-quote"
           style={{
@@ -1137,7 +1270,7 @@ export default function AboutPageClient() {
       </Reveal>
 
       {/* Footer */}
-      <Reveal delay={240}>
+      <Reveal enabled={pageSettled} delay={240}>
         <div
           style={{
             marginTop: 44,
@@ -1210,7 +1343,7 @@ export default function AboutPageClient() {
       </Reveal>
 
       {/* Disclaimer */}
-      <Reveal delay={280}>
+      <Reveal enabled={pageSettled} delay={280}>
         <div
           style={{
             marginTop: 22,
