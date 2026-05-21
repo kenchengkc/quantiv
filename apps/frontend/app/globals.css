@@ -438,8 +438,13 @@
 .qv-m-sticky-cell {
   position: sticky;
   left: 0;
-  z-index: 5;
+  z-index: 8;
   background: var(--bg);
+  background-clip: padding-box;
+  transform: translateZ(0);
+  will-change: transform;
+  backface-visibility: hidden;
+  isolation: isolate;
   /* Soft shadow on the right edge to signal "more content sits under
      the sticky column" when the body is scrolled. */
   box-shadow: 6px 0 12px -8px rgba(0, 0, 0, 0.55);
