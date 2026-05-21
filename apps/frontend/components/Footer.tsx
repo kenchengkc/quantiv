@@ -3,6 +3,7 @@ import Link from 'next/link';
 export function Footer() {
   return (
     <footer
+      className="qv-m-pad"
       style={{
         borderTop: '1px solid var(--line)',
         marginTop: 40,
@@ -11,6 +12,7 @@ export function Footer() {
       }}
     >
       <div
+        className="qv-footer-row"
         style={{
           maxWidth: 1240,
           margin: '0 auto',
@@ -30,12 +32,14 @@ export function Footer() {
           />
         </Link>
         <div
+          className="qv-footer-links"
           style={{
             display: 'flex',
             gap: 22,
             fontSize: 11.5,
             color: 'var(--ink-4)',
             letterSpacing: '0.04em',
+            flexWrap: 'wrap',
           }}
         >
           <Link href="/about" style={{ color: 'inherit' }}>

@@ -478,6 +478,7 @@ function Pipeline() {
       </svg>
 
       <div
+        className="qv-m-2col"
         style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
@@ -665,10 +666,11 @@ export default function AboutPageClient() {
   ];
 
   return (
-    <div style={{ maxWidth: 980, margin: '0 auto', padding: '0 28px 80px' }}>
+    <div className="qv-m-pad" style={{ maxWidth: 980, margin: '0 auto', padding: '0 28px 80px' }}>
       {/* Hero */}
       <Reveal>
         <div
+          className="qv-m-stack qv-about-hero"
           style={{
             padding: '44px 0 32px',
             display: 'grid',
@@ -697,7 +699,7 @@ export default function AboutPageClient() {
               <span>Quantiv</span>
             </div>
             <h1
-              className="serif"
+              className="serif qv-m-h-hero"
               style={{
                 margin: 0,
                 fontSize: 76,
@@ -747,6 +749,7 @@ export default function AboutPageClient() {
       {/* Live stats row */}
       <Reveal delay={60}>
         <div
+          className="qv-m-2col qv-about-stats"
           style={{
             borderTop: '1px solid var(--line)',
             borderBottom: '1px solid var(--line)',
@@ -822,6 +825,7 @@ export default function AboutPageClient() {
           </h2>
         </div>
         <div
+          className="qv-m-stack"
           style={{
             marginTop: 16,
             display: 'grid',
@@ -966,6 +970,7 @@ export default function AboutPageClient() {
         </div>
 
         <div
+          className="qv-m-stack"
           style={{
             marginTop: 18,
             display: 'grid',
@@ -1077,6 +1082,7 @@ export default function AboutPageClient() {
       {/* House note */}
       <Reveal delay={200}>
         <div
+          className="qv-m-stack qv-about-quote"
           style={{
             marginTop: 40,
             borderRadius: 18,

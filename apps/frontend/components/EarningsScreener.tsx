@@ -233,7 +233,7 @@ function ScreenerLogo({ ticker, size = 26 }: { ticker: string; size?: number }) 
 function NameCell({ ev }: { ev: ScreenerEvent }) {
   const hover = useTickerHover(ev.ticker);
   return (
-    <td style={{ padding: '10px 8px' }} {...hover}>
+    <td className="qv-m-sticky-cell" style={{ padding: '10px 8px' }} {...hover}>
       <Link
         href={`/${ev.ticker}`}
         style={{
@@ -349,6 +349,9 @@ function SortHeader({
         onFocus={onEnter}
         onBlur={onLeave}
         className="mono"
+        // Same fontWeight in both states so the column header doesn't
+        // widen when you sort-toggle it, which would shift every column
+        // to its right by a pixel or two.
         style={{
           background: 'transparent',
           border: 'none',
@@ -357,7 +360,7 @@ function SortHeader({
           letterSpacing: '0.18em',
           textTransform: 'uppercase',
           color: active ? 'var(--ink)' : 'var(--ink-3)',
-          fontWeight: active ? 700 : 600,
+          fontWeight: 700,
           padding: 0,
           display: 'inline-flex',
           alignItems: 'center',
@@ -545,7 +548,7 @@ function ScreenerSkeletonRow({ delayMs }: { delayMs: number }) {
   return (
     <tr style={{ borderBottom: '1px solid var(--line)' }}>
       {/* Name: logo + ticker + company + method tag */}
-      <td style={{ padding: '10px 8px' }}>
+      <td className="qv-m-sticky-cell" style={{ padding: '10px 8px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ ...bar(0, 26, 26, 6), display: 'inline-block', flexShrink: 0 }} />
           <span style={{ display: 'inline-block', minWidth: 0 }}>
@@ -1027,7 +1030,12 @@ export default function EarningsScreener() {
 
   return (
     <div>
-      <div style={{ padding: '24px 0 18px' }}>
+      {/* Header — mirrors the Earnings + Watchlist header rhythm exactly:
+          padding 24/20, bottom border, 10px kicker, 56px serif h1, small
+          mono callout on the right. The old 15px description paragraph
+          was dropped — the column headers + insight cards convey the
+          same info without competing with the headline. */}
+      <div style={{ padding: '24px 0 20px', borderBottom: '1px solid var(--line)' }}>
         <div
           style={{
             display: 'flex',
@@ -1050,7 +1058,7 @@ export default function EarningsScreener() {
               Options · Earnings
             </div>
             <h1
-              className="serif"
+              className="serif qv-m-h1"
               style={{
                 margin: 0,
                 fontSize: 56,
@@ -1077,19 +1085,6 @@ export default function EarningsScreener() {
             {manifest?.as_of_date ? ` · as of ${manifest.as_of_date}` : ''}
           </div>
         </div>
-        <p
-          style={{
-            margin: '14px 0 0',
-            fontSize: 15,
-            color: 'var(--ink-2)',
-            maxWidth: 720,
-            lineHeight: 1.55,
-          }}
-        >
-          Every earnings name on one page. See what options are pricing, how it
-          stacks up against recent history and the ML model, and where IV sits
-          in its 52-week range.
-        </p>
       </div>
 
       {/* Insight cards — four cards summarizing the visible universe.
@@ -1097,10 +1092,12 @@ export default function EarningsScreener() {
           of the universe, and a one-line definition. */}
       {contentReady && summary && (
         <div
+          className="qv-m-2col"
           style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(4, 1fr)',
             gap: 14,
+            marginTop: 18,
           }}
         >
           {([
@@ -1110,10 +1107,8 @@ export default function EarningsScreener() {
               ratio: summary.rich / Math.max(1, sorted.length),
               isPct: false,
               tone: 'var(--down)',
-              kicker: 'Hist edge',
               label: 'Rich vs history',
-              desc:
-                'Implied move at least 20% above last-4Q realized. Often a sell candidate.',
+              desc: 'Implied move ≥ 20% above last-4Q realized. Often a sell candidate.',
             },
             {
               key: 'cheap',
@@ -1121,10 +1116,8 @@ export default function EarningsScreener() {
               ratio: summary.cheap / Math.max(1, sorted.length),
               isPct: false,
               tone: 'var(--up)',
-              kicker: 'IV rank',
               label: 'Cheap implied vol',
-              desc:
-                'ATM IV in the bottom 30% of its 52-week range. Often a buy candidate.',
+              desc: 'ATM IV in the bottom 30% of its 52-week range. Often a buy candidate.',
             },
             {
               key: 'big',
@@ -1132,7 +1125,6 @@ export default function EarningsScreener() {
               ratio: summary.big / Math.max(1, sorted.length),
               isPct: false,
               tone: 'var(--brand-blue-1)',
-              kicker: 'Straddle EM',
               label: 'Big movers',
               desc: 'Straddle pricing a ≥ 10% one-day move on print.',
             },
@@ -1142,9 +1134,8 @@ export default function EarningsScreener() {
                 summary.avgIv != null
                   ? `${(summary.avgIv * 100).toFixed(1)}%`
                   : '–',
-              // Position the bar fill at where the avg sits between the
-              // visible universe's min and max IV. A flat universe (or a
-              // single name) parks the marker at the midpoint.
+              // Bar shows where the average ATM IV sits between the
+              // visible universe's min and max. Flat universe → midpoint.
               ratio:
                 summary.avgIv != null && summary.minIv != null && summary.maxIv != null
                   ? summary.maxIv === summary.minIv
@@ -1154,18 +1145,13 @@ export default function EarningsScreener() {
                   : 0,
               isPct: true,
               tone: 'var(--flag)',
-              kicker: 'ATM IV',
-              label: 'Average vol',
-              desc:
-                'Front-month implied volatility across the universe, annualized.',
-              caption:
-                summary.minIv != null && summary.maxIv != null
-                  ? `Range across universe: ${(summary.minIv * 100).toFixed(1)}% – ${(summary.maxIv * 100).toFixed(1)}%`
-                  : null,
+              label: 'Average ATM IV',
+              desc: 'Front-month implied volatility across the universe, annualized.',
             },
           ] as const).map((k) => (
             <div
               key={k.key}
+              className="qv-screener-insight"
               style={{
                 position: 'relative',
                 overflow: 'hidden',
@@ -1180,17 +1166,19 @@ export default function EarningsScreener() {
                 minHeight: 178,
               }}
             >
+              {/* Top line: caps tracked, accent-colored. This is the
+                  card's category label — replaces the old separate
+                  kicker + serif label which were redundant. */}
               <div
                 style={{
-                  fontSize: 10,
+                  fontSize: 10.5,
                   letterSpacing: '0.18em',
                   textTransform: 'uppercase',
                   color: k.tone,
                   fontWeight: 700,
-                  opacity: 0.85,
                 }}
               >
-                {k.kicker}
+                {k.label}
               </div>
               <div
                 className="serif tnum"
@@ -1200,7 +1188,7 @@ export default function EarningsScreener() {
                   letterSpacing: '-0.035em',
                   color: 'var(--ink)',
                   lineHeight: 0.95,
-                  marginTop: 10,
+                  marginTop: 12,
                 }}
               >
                 {k.count}
@@ -1218,56 +1206,37 @@ export default function EarningsScreener() {
                   </span>
                 )}
               </div>
-              <div style={{ marginTop: 12, marginBottom: 12 }}>
+              {/* Ratio bar — visual only. The old "27% of universe"
+                  caption was redundant with what the bar already shows. */}
+              <div
+                style={{
+                  height: 4,
+                  borderRadius: 2,
+                  background: 'color-mix(in oklab, var(--bg-3) 70%, transparent)',
+                  overflow: 'hidden',
+                  marginTop: 14,
+                }}
+              >
                 <div
                   style={{
-                    height: 4,
+                    width: `${k.ratio * 100}%`,
+                    height: '100%',
+                    background: k.tone,
+                    boxShadow: `0 0 8px color-mix(in oklab, ${k.tone} 50%, transparent)`,
                     borderRadius: 2,
-                    background: 'color-mix(in oklab, var(--bg-3) 70%, transparent)',
-                    overflow: 'hidden',
                   }}
-                >
-                  <div
-                    style={{
-                      width: `${k.ratio * 100}%`,
-                      height: '100%',
-                      background: k.tone,
-                      boxShadow: `0 0 8px color-mix(in oklab, ${k.tone} 50%, transparent)`,
-                      borderRadius: 2,
-                    }}
-                  />
-                </div>
-                <div
-                  className="mono tnum"
-                  style={{ fontSize: 10.5, color: 'var(--ink-3)', marginTop: 4 }}
-                >
-                  {'caption' in k && k.caption
-                    ? k.caption
-                    : `${(k.ratio * 100).toFixed(0)}% of universe`}
-                </div>
+                />
               </div>
-              <div style={{ marginTop: 'auto' }}>
-                <div
-                  className="serif"
-                  style={{
-                    fontSize: 15,
-                    fontWeight: 700,
-                    color: 'var(--ink)',
-                    letterSpacing: '-0.005em',
-                  }}
-                >
-                  {k.label}
-                </div>
-                <div
-                  style={{
-                    fontSize: 11.5,
-                    color: 'var(--ink-3)',
-                    marginTop: 4,
-                    lineHeight: 1.45,
-                  }}
-                >
-                  {k.desc}
-                </div>
+              <div
+                style={{
+                  marginTop: 'auto',
+                  paddingTop: 12,
+                  fontSize: 12,
+                  color: 'var(--ink-3)',
+                  lineHeight: 1.5,
+                }}
+              >
+                {k.desc}
               </div>
             </div>
           ))}
@@ -1372,6 +1341,12 @@ export default function EarningsScreener() {
                 type="button"
                 title={tip}
                 onClick={() => setParam({ preset: active ? null : key })}
+                // Holding fontWeight constant at 600 across active + inactive
+                // states so toggling a chip doesn't reflow its neighbors:
+                // bolder text is wider, which used to shove the chips to
+                // the left of the one you tapped sideways by a few pixels.
+                // The active state is now communicated entirely through
+                // border, background, and color.
                 style={{
                   padding: '7px 12px',
                   borderRadius: 999,
@@ -1382,7 +1357,7 @@ export default function EarningsScreener() {
                   color: active ? 'var(--accent)' : 'var(--ink-2)',
                   fontSize: 11.5,
                   letterSpacing: '0.04em',
-                  fontWeight: active ? 600 : 500,
+                  fontWeight: 600,
                   cursor: 'pointer',
                   transition: 'border-color 140ms ease, background 140ms ease, color 140ms ease',
                   whiteSpace: 'nowrap',
@@ -1412,6 +1387,7 @@ export default function EarningsScreener() {
         role={showSkeleton ? 'status' : undefined}
         aria-busy={showSkeleton || undefined}
         aria-label={showSkeleton ? 'Loading screener' : undefined}
+        className="qv-m-table-wrap"
         style={{ overflowX: 'auto', marginTop: 8, WebkitOverflowScrolling: 'touch' }}
       >
         <table
@@ -1433,6 +1409,7 @@ export default function EarningsScreener() {
                   edge in place; the other columns are fixed-width or
                   carry tabular-nums content that doesn't vary. */}
               <th
+                className="qv-m-sticky-cell"
                 style={{
                   textAlign: 'left',
                   padding: '10px 8px',
