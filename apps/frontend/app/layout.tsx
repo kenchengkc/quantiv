@@ -56,6 +56,24 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       }}
     >
       <html lang="en">
+        <head>
+          {/* Load fonts via <link> rather than @import inside globals.css —
+              Tailwind's compiled output places its preflight rules before
+              the @import, which makes browsers silently ignore the @import
+              (per CSS spec, @import must precede every other rule). The
+              symptom: Mulish was never actually loading, so the SCREENER h1
+              fell back to Nunito Sans and rendered ~5% wider than the design. */}
+          <link rel="preconnect" href="https://fonts.googleapis.com" />
+          <link
+            rel="preconnect"
+            href="https://fonts.gstatic.com"
+            crossOrigin="anonymous"
+          />
+          <link
+            rel="stylesheet"
+            href="https://fonts.googleapis.com/css2?family=Mulish:wght@300;400;500;600;700;800;900&family=Nunito+Sans:opsz,wght@6..12,300;6..12,400;6..12,500;6..12,600&family=JetBrains+Mono:wght@300;400;500;600&display=swap"
+          />
+        </head>
         <body>
           <Providers>
             <ErrorBoundary>

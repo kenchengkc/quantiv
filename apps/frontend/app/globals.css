@@ -2,7 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Mulish:wght@300;400;500;600;700;800;900&family=Nunito+Sans:opsz,wght@6..12,300;6..12,400;6..12,500;6..12,600&family=JetBrains+Mono:wght@300;400;500;600&display=swap');
+/* Google Fonts (Mulish, Nunito Sans, JetBrains Mono) are loaded via <link>
+   in app/layout.tsx, not @import here — Tailwind's compiled output moves
+   @tailwind preflight rules above this file's @imports, which causes
+   browsers to ignore them (CSS spec: @import must precede every other
+   rule). KaTeX has no fonts to fetch from a CDN, so its @import stays. */
 @import 'katex/dist/katex.min.css';
 
 /* Palette tuned to the Quantiv logo: pure black page backgrounds, pure white
@@ -10,15 +14,15 @@
  * the Q. Hue 248 = the logo blue's true hue in OKLCH. */
 :root {
   --bg:        #000000;
-  --bg-2:      oklch(0.17 0.004 250);
-  --bg-3:      oklch(0.21 0.004 250);
-  --line:      oklch(0.28 0.005 250);
-  --line-2:    oklch(0.36 0.006 250);
-  --ink:       oklch(0.98 0 0);          /* pure white, like the wordmark */
-  --ink-2:     oklch(0.83 0.003 250);
-  --ink-3:     oklch(0.63 0.004 250);
-  --ink-4:     oklch(0.48 0.004 250);
-  --paper:     oklch(0.97 0 0);
+  --bg-2:      oklch(0.13 0 0);
+  --bg-3:      oklch(0.17 0 0);
+  --line:      oklch(0.24 0 0);
+  --line-2:    oklch(0.34 0 0);
+  --ink:       oklch(0.99 0 0);          /* pure white, like the wordmark */
+  --ink-2:     oklch(0.88 0 0);
+  --ink-3:     oklch(0.74 0 0);
+  --ink-4:     oklch(0.60 0 0);
+  --paper:     oklch(0.96 0.012 80);
   --accent:    oklch(0.66 0.18 248);     /* logo wave blue (~#1E90FF) */
   --accent-2:  oklch(0.52 0.18 248);
   --accent-hi: oklch(0.74 0.16 240);
