@@ -406,3 +406,221 @@
   .quantiv-hero-q-slit { display: none; }
   .quantiv-hero-q-tail-clip { opacity: 1; clip-path: none; }
 }
+
+/* ─── Mobile (≤ 640px) ──────────────────────────────────────────────────
+   Opt-in class hooks so pages can declare their responsive intent
+   without rewriting every inline style. Naming convention:
+     .qv-m-stack    → collapse a horizontal grid into one column
+     .qv-m-2col     → collapse 3/4/5-up grids to 2 columns
+     .qv-m-pad      → tighten gutter from 28px → 16px
+     .qv-m-h1       → scale a page-level h1 down from 56 → 38
+     .qv-m-h-hero   → scale About hero h1 (76) and similar down
+     .qv-m-hide     → hide an element on mobile
+     .qv-m-table    → enable sticky-first-column horizontal scroll
+   These cooperate with the existing inline-style sizes by overriding
+   only the properties that need to change on small screens. */
+
+.qv-m-table-wrap {
+  /* Default: just allow horizontal scroll. Sticky-cell behavior is only
+     activated on mobile so it doesn't interfere with desktop layout. */
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Default-hide on desktop, show on mobile. Counterpart to .qv-m-hide. */
+.qv-d-hide {
+  display: none;
+}
+@media (max-width: 640px) {
+  .qv-d-hide {
+    display: revert;
+  }
+}
+
+@media (max-width: 640px) {
+  /* Page gutters */
+  .qv-m-pad {
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+  }
+
+  /* Stack any grid to a single column */
+  .qv-m-stack {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Collapse 3/4/5-up grids to two columns */
+  .qv-m-2col {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  /* Hide on mobile only */
+  .qv-m-hide {
+    display: none !important;
+  }
+
+  /* Page-level headlines */
+  .qv-m-h1 {
+    font-size: 38px !important;
+    letter-spacing: -0.025em !important;
+    line-height: 0.98 !important;
+  }
+  .qv-m-h-hero {
+    font-size: 48px !important;
+    letter-spacing: -0.03em !important;
+    line-height: 0.92 !important;
+  }
+  .qv-m-h-display {
+    /* For the big gradient EM number in the detail hero. */
+    font-size: 44px !important;
+  }
+  .qv-m-h-section {
+    /* For h2 section headings (28-36px → 24px). */
+    font-size: 24px !important;
+  }
+
+  /* Sticky-first-column inside a horizontally scrolling table. The first
+     <td>/<th> of each row picks up `.qv-m-sticky-cell`; the table wrapper
+     gets `.qv-m-table-wrap`. We DON'T strip min-width on the table — the
+     whole point of the sticky cell is that the table stays wider than the
+     viewport and the user swipes the trailing columns into view. */
+  .qv-m-sticky-cell {
+    position: sticky !important;
+    left: 0;
+    z-index: 5;
+    /* Mask scrolled cells with a solid background. Bg matches the page so
+       the sticky cell reads as the same surface as the surrounding body. */
+    background: var(--bg) !important;
+    box-shadow: 6px 0 12px -8px rgba(0, 0, 0, 0.55);
+    /* Force the Name column tighter on mobile so the right-hand columns
+       have more room to peek into the viewport before swipe. */
+    max-width: 188px;
+    min-width: auto !important;
+    width: auto !important;
+  }
+  /* When the hovered row tints itself, keep the sticky cell tinted too. */
+  tr:hover .qv-m-sticky-cell {
+    background: color-mix(in oklab, var(--bg-2) 92%, transparent) !important;
+  }
+
+  /* Hero glyph fits its hero column on mobile. */
+  .quantiv-hero-q {
+    width: 168px !important;
+  }
+
+  /* Topbar tweaks. The banner image shrinks; NavSearch input compresses
+     so there's room for the hamburger on the right. */
+  .qv-topbar-brand img {
+    height: 28px !important;
+  }
+  .qv-topbar-brand {
+    margin-right: 4px;
+  }
+  /* The NavSearch input is the only direct <input> inside the topbar; give
+     it a narrower width so the bar still fits on a 360px viewport. */
+  header input[placeholder="Jump to ticker"] {
+    width: 130px !important;
+  }
+
+  /* Footer — stack the brand and link strip on top of each other so the
+     three small links don't look like a strung-out single line. */
+  .qv-footer-row {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 14px !important;
+  }
+  .qv-footer-links {
+    gap: 12px !important;
+    font-size: 11px !important;
+  }
+
+  /* Earnings calendar — when the 5-day grid stacks vertically, the
+     between-column right-borders become useless. Replace them with a
+     bottom rule between days so the visual rhythm survives. */
+  .qv-calendar-day {
+    border-right: none !important;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 6px;
+  }
+  .qv-calendar-day:last-child {
+    border-bottom: none;
+  }
+
+  /* Watchlist — drop the drag handle, both 1fr spacers, and the Reports
+     column (date + timing) so the row collapses to 5 critical cells:
+     logo · name · price+change · EM ±% · actions. Subgrid LI children
+     inherit the new template automatically. */
+  ul[data-wl-grid="true"] {
+    grid-template-columns: 40px minmax(0, 1fr) auto auto auto !important;
+    column-gap: 10px !important;
+  }
+  ul[data-wl-grid="true"] > li {
+    padding: 12px 4px !important;
+    min-height: 70px !important;
+  }
+  .qv-wl-cell-drag,
+  .qv-wl-spacer,
+  .qv-wl-cell-reports {
+    display: none !important;
+  }
+
+  /* Screener insight cards — tighten the 56px serif count + paddings so
+     two cards per row fit a 360px viewport without horizontal scrolling.
+     The numeric figure stays prominent but stops dominating. */
+  .qv-screener-insight {
+    padding: 14px 14px 16px !important;
+    min-height: 0 !important;
+  }
+  .qv-screener-insight .serif.tnum {
+    font-size: 38px !important;
+  }
+
+  /* About page — the 4-up stats row keeps its column border-left, which
+     orphans the bottom-row cells. Strip the left rule when we collapse to
+     2 columns and add a thin row divider instead. The hero quote-mark
+     glyph (120px) shrinks so the disclaimer text doesn't get crowded
+     when the layout stacks. */
+  .qv-about-stats > div {
+    border-left: none !important;
+    padding: 12px 14px !important;
+  }
+  .qv-about-stats > div + div {
+    border-top: 1px solid var(--line);
+  }
+  .qv-about-stats > div:nth-child(2) {
+    border-top: none;
+  }
+  .qv-about-quote {
+    padding: 22px 20px !important;
+    gap: 14px !important;
+  }
+  .qv-about-quote > div:first-child {
+    font-size: 72px !important;
+  }
+
+  /* Ticker detail — hero card paddings tighten and the right column drops
+     its vertical divider since the two halves are now stacked. */
+  .qv-detail-hero {
+    padding: 18px 18px !important;
+  }
+  .qv-detail-hero-grid {
+    gap: 18px !important;
+  }
+  .qv-detail-hero-right {
+    border-left: none !important;
+    padding-left: 0 !important;
+    border-top: 1px solid color-mix(in oklab, var(--line) 60%, transparent);
+    padding-top: 18px !important;
+  }
+  /* Hero ticker symbol (46 → 36), countdown (56 → 40), EM headline
+     (64 → 44). The spot price stays at 36 — already mobile-friendly. */
+  .qv-detail-symbol {
+    font-size: 36px !important;
+  }
+  .qv-detail-countdown {
+    font-size: 40px !important;
+  }
+  .qv-detail-em {
+    font-size: 44px !important;
+  }
+}

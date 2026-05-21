@@ -31,6 +31,14 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
 };
 
+// Explicit mobile viewport — Next.js 15 expects this in its own export so
+// the meta tag isn't mistakenly cached as static metadata across themes.
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
+};
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <ClerkProvider
