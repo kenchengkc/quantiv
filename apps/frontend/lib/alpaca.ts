@@ -99,6 +99,83 @@ function isFresh(timestamp: string | undefined, nowMs: number): boolean {
   return nowMs - t <= MAX_TICK_STALENESS_MS;
 }
 
+/** Compact intraday bar shape consumed by the hero sparkline. We only
+ *  ship close (`c`) + timestamp (`t`); open/high/low aren't needed to
+ *  draw a single-line spark, and dropping them halves the JSON size
+ *  shipped to the browser. */
+export type IntradayBar = { t: string; c: number };
+
+export type IntradayPayload = {
+  bars: IntradayBar[];
+  /** Prior session's daily close — used to compute the session % move
+   *  if the first regular-hours bar isn't yet present (pre-market). */
+  previousClose: number | null;
+  /** UTC ISO of the most recent bar; lets the client decide whether the
+   *  cached payload is "live enough" to skip a refetch. */
+  asOf: string | null;
+};
+
+/** Fetch ~78 5-minute IEX bars covering the most recent regular-hours
+ *  session (plus pre/post-market when available on the Basic plan).
+ *  Time range: yesterday 00:00 ET → now, which guarantees we capture
+ *  both the previous day's close and today's session.
+ *
+ *  Docs: https://docs.alpaca.markets/reference/stockbars-1 */
+export async function fetchIntradayBars(
+  symbol: string,
+  timeframe: '1Min' | '5Min' | '15Min' = '5Min',
+): Promise<IntradayPayload> {
+  // Pull two trading days of bars so the chart has yesterday's close
+  // plus today's session. Alpaca rejects start dates more than ~15
+  // minutes in the future, so we anchor on `now` and walk back 48h.
+  const end = new Date();
+  const start = new Date(end.getTime() - 48 * 60 * 60 * 1000);
+  const params = new URLSearchParams({
+    timeframe,
+    start: start.toISOString(),
+    end: end.toISOString(),
+    feed: 'iex',
+    adjustment: 'raw',
+    limit: '500',
+  });
+  const data = (await alpacaFetch(
+    `/v2/stocks/${encodeURIComponent(symbol)}/bars?${params.toString()}`,
+  )) as { bars?: Array<{ t: string; o: number; h: number; l: number; c: number; v: number }> };
+
+  const rawBars = Array.isArray(data?.bars) ? data.bars : [];
+  if (rawBars.length === 0) {
+    return { bars: [], previousClose: null, asOf: null };
+  }
+
+  // Split into "today" and "previous session" by ET calendar date so we
+  // can extract previousClose as the last bar of the prior session. The
+  // chart shows only today's bars to keep the line readable.
+  const etDate = (iso: string) =>
+    new Date(iso).toLocaleDateString('en-US', {
+      timeZone: 'America/New_York',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+  const todayKey = etDate(end.toISOString());
+  const todaysBars = rawBars.filter((b) => etDate(b.t) === todayKey);
+  const priorBars = rawBars.filter((b) => etDate(b.t) !== todayKey);
+  const previousClose =
+    priorBars.length > 0 ? priorBars[priorBars.length - 1].c : null;
+
+  // Fall back to the most recent bars when today's session hasn't
+  // started yet (e.g. pre-market opens but no IEX prints yet).
+  const bars = (todaysBars.length > 0 ? todaysBars : rawBars.slice(-78)).map(
+    (b) => ({ t: b.t, c: b.c }),
+  );
+
+  return {
+    bars,
+    previousClose,
+    asOf: bars.length > 0 ? bars[bars.length - 1].t : null,
+  };
+}
+
 /** Fetch the latest extended-hours snapshot for up to ~100 symbols in
  *  one call. Returns a partial map — symbols with no fresh data are
  *  absent. Uses the `iex` feed (free Basic plan).
