@@ -215,11 +215,13 @@ function TickerRow({
       <div style={{ minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, minWidth: 0 }}>
           <span
+            className="serif"
             style={{
-              fontWeight: 600,
+              fontWeight: 800,
               color: 'var(--ink)',
-              fontSize: 12.5,
-              letterSpacing: '0.01em',
+              fontSize: 13,
+              letterSpacing: '-0.01em',
+              textTransform: 'uppercase',
               flexShrink: 0,
             }}
           >
@@ -227,8 +229,8 @@ function TickerRow({
           </span>
           <span
             style={{
-              color: 'var(--ink-4)',
-              fontSize: 10.5,
+              color: 'var(--ink-3)',
+              fontSize: 11,
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',
@@ -634,6 +636,21 @@ function WeekHeader({
               minHeight: 22,
             }}
           >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/brand/QuantivIcon.png"
+              alt=""
+              width={18}
+              height={18}
+              style={{
+                display: 'inline-block',
+                objectFit: 'contain',
+                // PNG has a solid black background (no alpha). Screen-blend
+                // it onto the page so only the ring + tail survive against
+                // the dark background.
+                mixBlendMode: 'screen',
+              }}
+            />
             <span>Earnings Week</span>
             <span
               title="US equity regular session is 09:30–16:00 ET. After the close, quotes may still update for a short time while data feeds settle."

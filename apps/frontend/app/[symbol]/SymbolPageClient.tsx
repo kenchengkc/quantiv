@@ -110,6 +110,21 @@ interface LivePrice {
   marketOpen: boolean;
 }
 
+type IntradaySource = 'alpaca_iex' | 'finnhub' | 'unavailable';
+
+interface IntradayPoint {
+  timestamp: string;
+  price: number;
+  volume?: number | null;
+}
+
+interface IntradaySeries {
+  source: IntradaySource;
+  date: string | null;
+  updated: string | null;
+  data: IntradayPoint[];
+}
+
 function logoUrl(t: string) {
   return `https://assets.parqet.com/logos/symbol/${t}?format=png`;
 }
@@ -139,6 +154,70 @@ function timingText(t?: string | null) {
   if (k === 'bmo' || k === 'before_market_open' || k === 'before_open') return 'Before open';
   if (k === 'amc' || k === 'after_market_close' || k === 'after_close') return 'After close';
   return null;
+}
+
+type EarningsHistoryRow = NonNullable<SymbolDetail['earnings_history']>[number];
+
+function quarterNumber(q?: string | null): number | null {
+  const m = /^Q([1-4])$/i.exec((q ?? '').trim());
+  return m ? Number(m[1]) : null;
+}
+
+function fullYear(year?: number | string | null): number | null {
+  if (year == null) return null;
+  const n = typeof year === 'number' ? year : Number(year);
+  if (!Number.isFinite(n)) return null;
+  return n < 100 ? 2000 + n : n;
+}
+
+function quarterFromRow(row?: EarningsHistoryRow | null): { q: number; year: number } | null {
+  if (!row) return null;
+
+  const fiscalQ = quarterNumber(row.fiscal_q);
+  const fiscalYear = fullYear(row.fiscal_year);
+  if (fiscalQ && fiscalYear) return { q: fiscalQ, year: fiscalYear };
+
+  const m = /Q([1-4])\s*(\d{2,4})/i.exec(row.q ?? '');
+  if (!m) return null;
+  return { q: Number(m[1]), year: fullYear(m[2]) ?? 2000 + Number(m[2]) };
+}
+
+function incrementQuarter(q: { q: number; year: number }): { q: number; year: number } {
+  if (q.q >= 4) return { q: 1, year: q.year + 1 };
+  return { q: q.q + 1, year: q.year };
+}
+
+function formatQuarterLabel(q: { q: number; year: number }): string {
+  return `Q${q.q} ${q.year}`;
+}
+
+function eventLabelFor(data: SymbolDetail, earningsDate: string | null): string {
+  const history = data.earnings_history ?? [];
+  const eventDate = earningsDate?.slice(0, 10) ?? null;
+
+  if (eventDate) {
+    const exact = history.find((row) => row.date.slice(0, 10) === eventDate);
+    const exactQuarter = quarterFromRow(exact);
+    if (exactQuarter) return `${formatQuarterLabel(exactQuarter)} Earnings`;
+  }
+
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const future = history
+    .filter((row) => parseLocalDate(row.date).getTime() >= today)
+    .sort((a, b) => parseLocalDate(a.date).getTime() - parseLocalDate(b.date).getTime())
+    .find((row) => quarterFromRow(row));
+  const futureQuarter = quarterFromRow(future);
+  if (futureQuarter) return `${formatQuarterLabel(futureQuarter)} Earnings`;
+
+  const latestBeforeEvent = history
+    .filter((row) => !eventDate || row.date.slice(0, 10) < eventDate)
+    .sort((a, b) => parseLocalDate(b.date).getTime() - parseLocalDate(a.date).getTime())
+    .find((row) => quarterFromRow(row));
+  const previousQuarter = quarterFromRow(latestBeforeEvent);
+  if (previousQuarter) return `${formatQuarterLabel(incrementQuarter(previousQuarter))} Earnings`;
+
+  return 'Upcoming earnings';
 }
 
 /** One-line summary of where the spot price came from. Distinguishes
@@ -497,33 +576,64 @@ function KpiCard({
 }
 
 // ---------- Hero sparkline ----------
-function HeroSpark({ ticker, up }: { ticker: string; up: boolean }) {
-  // Deterministic, ticker-seeded sparkline so the hero has motion even
-  // before we have real intraday quotes. Replace with the live intraday
-  // series when the build pipeline starts persisting them.
+function HeroSpark({
+  ticker,
+  points,
+  up,
+}: {
+  ticker: string;
+  points: IntradayPoint[];
+  up: boolean;
+}) {
+  const gradientId = `hero-spark-fill-${ticker.replace(/[^A-Za-z0-9]/g, '-')}`;
   const pts = useMemo(() => {
-    let seed = 0;
-    for (let i = 0; i < ticker.length; i++) seed = (seed * 31 + ticker.charCodeAt(i)) >>> 0;
-    const rand = () => {
-      seed = (seed * 1664525 + 1013904223) >>> 0;
-      return seed / 0xffffffff;
-    };
-    const n = 80;
-    const arr: { x: number; y: number }[] = [];
-    let v = 0.5;
-    let trend = (rand() - 0.5) * 0.005;
-    for (let i = 0; i < n; i++) {
-      v += trend + (rand() - 0.5) * 0.04;
-      if (i % 12 === 0) trend = (rand() - 0.5) * 0.006;
-      v = Math.max(0.05, Math.min(0.95, v));
-      arr.push({ x: i / (n - 1), y: 1 - v });
-    }
-    return arr;
-  }, [ticker]);
+    const clean = points
+      .filter((p) => Number.isFinite(p.price) && p.price > 0)
+      .sort((a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp));
+    if (clean.length < 2) return [];
+    const prices = clean.map((p) => p.price);
+    const min = Math.min(...prices);
+    const max = Math.max(...prices);
+    const span = max - min || Math.max(max * 0.002, 0.01);
+    const pad = span * 0.08;
+    const lo = min - pad;
+    const hi = max + pad;
+    return clean.map((p, i) => ({
+      x: i / (clean.length - 1),
+      y: 1 - (p.price - lo) / (hi - lo),
+    }));
+  }, [points]);
+
+  if (pts.length < 2) {
+    const stroke = up ? 'var(--up)' : 'var(--down)';
+    return (
+      <svg
+        viewBox="0 0 100 36"
+        preserveAspectRatio="none"
+        width="100%"
+        height="36"
+        style={{ overflow: 'visible' }}
+        aria-hidden="true"
+      >
+        <path
+          d="M0,18 L100,18"
+          stroke={stroke}
+          strokeOpacity="0.35"
+          strokeWidth="0.8"
+          strokeDasharray="2 3"
+          fill="none"
+          vectorEffect="non-scaling-stroke"
+        />
+      </svg>
+    );
+  }
+
   const d = pts.map((p, i) => `${i ? 'L' : 'M'}${p.x * 100},${p.y * 36}`).join(' ');
   const area =
     'M 0 36 ' + pts.map((p) => `L ${p.x * 100},${p.y * 36}`).join(' ') + ' L 100 36 Z';
-  const stroke = up ? 'var(--up)' : 'var(--down)';
+  const firstPrice = points[0]?.price ?? 0;
+  const lastPrice = points[points.length - 1]?.price ?? firstPrice;
+  const stroke = lastPrice >= firstPrice ? 'var(--up)' : 'var(--down)';
   return (
     <svg
       viewBox="0 0 100 36"
@@ -533,12 +643,12 @@ function HeroSpark({ ticker, up }: { ticker: string; up: boolean }) {
       style={{ overflow: 'visible' }}
     >
       <defs>
-        <linearGradient id="hero-spark-fill" x1="0" x2="0" y1="0" y2="1">
+        <linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1">
           <stop offset="0%" stopColor={stroke} stopOpacity="0.32" />
           <stop offset="100%" stopColor={stroke} stopOpacity="0" />
         </linearGradient>
       </defs>
-      <path d={area} fill="url(#hero-spark-fill)" />
+      <path d={area} fill={`url(#${gradientId})`} />
       <path
         d={d}
         stroke={stroke}
@@ -563,6 +673,7 @@ function DetailHero({
   earningsDate,
   earningsTiming,
   eventLabel,
+  intradayPoints,
   quoteLabel,
   onBack,
   onToast,
@@ -578,6 +689,7 @@ function DetailHero({
   earningsDate: string | null;
   earningsTiming: string | null;
   eventLabel: string;
+  intradayPoints: IntradayPoint[];
   quoteLabel: string;
   onBack: () => void;
   onToast: (msg: string) => void;
@@ -707,7 +819,7 @@ function DetailHero({
           </div>
 
           <div style={{ flex: 1, minHeight: 50 }}>
-            <HeroSpark ticker={symbol} up={!flat && up} />
+            <HeroSpark ticker={symbol} points={intradayPoints} up={!flat && up} />
             <div
               style={{
                 marginTop: 6,
@@ -719,7 +831,7 @@ function DetailHero({
                 textTransform: 'uppercase',
               }}
             >
-              <span>1D session</span>
+              <span>{intradayPoints.length >= 2 ? '1D session' : '1D quote'}</span>
               <span className="mono tnum">
                 {sessionPct >= 0 ? '+' : ''}
                 {(sessionPct * 100).toFixed(2)}%
@@ -2028,6 +2140,23 @@ function HistoryBlock({ history }: { history: HistoryPoint[] }) {
         viewBox={`0 0 ${W} ${H}`}
         style={{ width: '100%', height: 'auto', marginTop: 10 }}
       >
+        {/* Alternating column bands give the chart visual rhythm,
+            especially important when the implied bands are missing and
+            the only marks are realized dots floating on the zero line. */}
+        {history.map((_, i) =>
+          i % 2 === 1 ? (
+            <rect
+              key={`band-${i}`}
+              x={P + colW * i}
+              y={0}
+              width={colW}
+              height={H - 22}
+              fill="var(--ink)"
+              opacity={0.018}
+            />
+          ) : null,
+        )}
+
         <line x1={P} x2={W - P} y1={H / 2} y2={H / 2} stroke="var(--line)" />
         <line
           x1={P}
@@ -2047,6 +2176,26 @@ function HistoryBlock({ history }: { history: HistoryPoint[] }) {
           strokeDasharray="2 4"
           opacity={0.5}
         />
+
+        {/* Faint trajectory line connecting realized dots — only when
+            implied bands are absent, so the chart still feels composed
+            in the no-options-history case. */}
+        {!hasImplied && history.length > 1 && (
+          <path
+            d={history
+              .map((h, i) => {
+                const cx = P + colW * i + colW / 2;
+                const cy = y(h.actual);
+                return `${i === 0 ? 'M' : 'L'} ${cx} ${cy}`;
+              })
+              .join(' ')}
+            stroke="var(--ink-4)"
+            strokeWidth="1"
+            strokeDasharray="3 4"
+            fill="none"
+            opacity={0.6}
+          />
+        )}
         <text
           x={P - 10}
           y={y(max) + 4}
@@ -2140,7 +2289,9 @@ function HistoryBlock({ history }: { history: HistoryPoint[] }) {
               <circle
                 cx={cx}
                 cy={y(actualDecimal)}
-                r={active ? 4.6 : 3.8}
+                // Larger dots when no implied bands so the realized
+                // marker reads as the chart's primary signal.
+                r={active ? (hasImplied ? 4.6 : 5.4) : hasImplied ? 3.8 : 4.6}
                 fill={moveColor}
                 style={{ transition: 'r 160ms ease' }}
               />
@@ -2574,6 +2725,7 @@ export default function SymbolPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [live, setLive] = useState<LivePrice | null>(null);
+  const [intraday, setIntraday] = useState<IntradaySeries | null>(null);
   const [toast, setToast] = useState<{ msg: string; key: number } | null>(null);
 
   useEffect(() => {
@@ -2677,6 +2829,47 @@ export default function SymbolPage() {
     return () => {
       cancelled = true;
       if (timer) clearTimeout(timer);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
+    };
+  }, [symbol]);
+
+  useEffect(() => {
+    if (!symbol) return;
+    setIntraday(null);
+    let cancelled = false;
+    let timer: ReturnType<typeof setInterval> | null = null;
+
+    const fetchOnce = async () => {
+      try {
+        const res = await fetch(`/api/stocks/intraday?symbol=${symbol}`, { cache: 'no-store' });
+        if (!res.ok) return;
+        const json = (await res.json()) as IntradaySeries;
+        if (!cancelled) setIntraday(json);
+      } catch {
+        if (!cancelled) {
+          setIntraday({
+            source: 'unavailable',
+            date: null,
+            updated: null,
+            data: [],
+          });
+        }
+      }
+    };
+
+    void fetchOnce();
+    timer = setInterval(() => void fetchOnce(), 60_000);
+
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && !cancelled) void fetchOnce();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+
+    return () => {
+      cancelled = true;
+      if (timer) clearInterval(timer);
       document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('focus', onVisible);
     };
@@ -2831,26 +3024,7 @@ export default function SymbolPage() {
   const earningsDate = em?.earnings_date ?? data.next_earnings ?? null;
   const earningsTiming = timingText(em?.timing ?? data.next_earnings_timing);
   const daysLeft = daysFromToday(earningsDate);
-  const eventLabel = (() => {
-    // Try to derive next quarter from the most recent history item.
-    const hist = data.earnings_history ?? [];
-    const last = hist[hist.length - 1];
-    if (last?.q) {
-      const m = /Q([1-4])\s*(\d{2,4})/.exec(last.q);
-      if (m) {
-        let qn = Number(m[1]);
-        let yr = Number(m[2]);
-        if (yr < 100) yr += 2000;
-        qn += 1;
-        if (qn > 4) {
-          qn = 1;
-          yr += 1;
-        }
-        return `Q${qn} ${yr} Earnings`;
-      }
-    }
-    return 'Upcoming earnings';
-  })();
+  const eventLabel = eventLabelFor(data, earningsDate);
 
   const quantiles =
     em?.p10 != null && em?.p50 != null && em?.p90 != null
@@ -2886,6 +3060,7 @@ export default function SymbolPage() {
           earningsDate={earningsDate}
           earningsTiming={earningsTiming}
           eventLabel={eventLabel}
+          intradayPoints={intraday?.data ?? []}
           quoteLabel={quoteSourceLabel(live, symbol, data.as_of_date)}
           onBack={() => {
             if (window.history.length > 1) router.back();

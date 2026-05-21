@@ -563,6 +563,9 @@ export default function WatchlistPage() {
         }}
       >
         <div>
+          {/* Same 22px height reserve as the Earnings kicker so the H1
+              starts at the same y across all three nav pages, regardless
+              of whether the MarketStatusBadge is currently rendered. */}
           <div
             style={{
               fontSize: 10,
@@ -574,8 +577,21 @@ export default function WatchlistPage() {
               alignItems: 'center',
               gap: 8,
               flexWrap: 'wrap',
+              minHeight: 22,
             }}
           >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/brand/QuantivIcon.png"
+              alt=""
+              width={18}
+              height={18}
+              style={{
+                display: 'inline-block',
+                objectFit: 'contain',
+                mixBlendMode: 'screen',
+              }}
+            />
             <span>Your list</span>
             <MarketStatusBadge marketOpen={marketOpen} />
           </div>

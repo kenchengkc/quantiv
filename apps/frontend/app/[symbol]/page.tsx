@@ -46,15 +46,31 @@ function titleNameFor(symbol: string): string {
   return symbol;
 }
 
+function descriptionFor(symbol: string, name: string): string {
+  const label = name === symbol ? symbol : `${name} (${symbol})`;
+
+  if (!hasSymbolPayload(symbol)) {
+    return `Check quote status and options-data coverage for ${label} on Quantiv.`;
+  }
+
+  return `Track ${label} earnings timing, expected move, options-implied range, volatility context, and historical earnings moves.`;
+}
+
 export async function generateMetadata({ params }: SymbolPageProps): Promise<Metadata> {
   const { symbol: rawSymbol } = await params;
   const symbol = normalizeSymbol(rawSymbol);
   if (!isKnownSymbol(symbol)) notFound();
 
   const name = titleNameFor(symbol);
+  const description = descriptionFor(symbol, name);
 
   return {
     title: name === symbol ? symbol : `${name} (${symbol})`,
+    description,
+    openGraph: {
+      title: name === symbol ? symbol : `${name} (${symbol})`,
+      description,
+    },
   };
 }
 
