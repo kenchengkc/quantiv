@@ -866,7 +866,12 @@ function DetailHero({
                 textTransform: 'uppercase',
               }}
             >
-              <span>1D session · IEX</span>
+              {/* IEX system hours span pre-market through after-hours
+                  (08:00–17:00 ET on Alpaca's Basic plan), so the
+                  sparkline isn't just regular session — call that out
+                  in the caption so the user knows what window they're
+                  looking at. */}
+              <span>IEX · pre + post · 08:00–17:00 ET</span>
               <span
                 className="mono tnum"
                 style={{
@@ -1009,8 +1014,12 @@ function DetailHero({
               className="serif tnum qv-detail-em"
               style={{
                 fontSize: 64,
+                // Bumped from 0.9 to 1.0 so the headline carries its own
+                // proper line-box. Combined with the marginTop on the
+                // range line below, this gives the gradient number room
+                // to breathe instead of being clipped at the bottom.
                 fontWeight: 800,
-                lineHeight: 0.9,
+                lineHeight: 1.0,
                 letterSpacing: '-0.04em',
                 marginTop: 6,
                 background: 'linear-gradient(135deg, var(--brand-blue-1), var(--accent-hi))',
@@ -1032,13 +1041,11 @@ function DetailHero({
                 %
               </span>
             </div>
-            {/* The 64px headline above uses lineHeight 0.9 which clips
-                its descender area, so an 8px margin reads as ~2px of
-                visible gap. Bump to 18px for a properly composed price-
-                range line that doesn't hug the headline. */}
+            {/* Generous gap so the price-range line is clearly its own
+                element, not a sub-line glued to the gradient headline. */}
             <div
               className="mono tnum"
-              style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 18 }}
+              style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 22 }}
             >
               <span style={{ color: 'var(--down)' }}>${lower.toFixed(2)}</span>
               {' · '}
