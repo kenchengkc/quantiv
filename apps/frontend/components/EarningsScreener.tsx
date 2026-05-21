@@ -1092,16 +1092,29 @@ export default function EarningsScreener() {
               className="serif qv-m-h1"
               style={{
                 margin: 0,
-                fontSize: 56,
+                fontSize: 64,
                 fontWeight: 800,
-                letterSpacing: '-0.03em',
-                lineHeight: 0.95,
+                letterSpacing: '-0.035em',
+                lineHeight: 0.92,
                 color: 'var(--ink)',
                 textTransform: 'uppercase',
               }}
             >
               Screener
             </h1>
+            <div
+              style={{
+                marginTop: 14,
+                fontSize: 13,
+                color: 'var(--ink-3)',
+                maxWidth: 560,
+                lineHeight: 1.5,
+              }}
+            >
+              Every earnings name on one page. What options are pricing, how it
+              stacks against recent history and the ML model, and where IV sits
+              in its 52-week range.
+            </div>
           </div>
           <div
             className="mono tnum"
@@ -1492,17 +1505,48 @@ export default function EarningsScreener() {
       >
         <table
           style={{
-            width: '100%',
+            // table-layout: fixed pins each column to the colgroup width
+            // below regardless of content. Without this the auto layout
+            // re-derives column widths from the visible rows on every
+            // filter change — so switching to AMC (which drops most
+            // long-name rows) shrank the Name + Edge columns by a few
+            // px each, and every cell to the right slid left.
+            tableLayout: 'fixed',
             borderCollapse: 'collapse',
-            // Base font size for the table — slightly bolder/denser than
-            // the 12px we had before. Individual cells override this when
-            // they want a different weight or tone (e.g. ticker symbol is
-            // 15px serif; Hist edge / Edge cells bump to 13.5px bold when
-            // the value is "hot").
+            // Base font size for the table. Individual cells override
+            // this when they want a different weight or tone (e.g.
+            // ticker symbol is 15.5px serif; Hist edge / Edge cells
+            // bump to 13.5px bold when the value is "hot").
             fontSize: 13,
-            minWidth: 1040,
+            // Sum of the colgroup widths below; the wrapper's
+            // overflow-x: auto scrolls when the viewport is narrower.
+            width: 1480,
           }}
         >
+          {/* Explicit column widths so the layout doesn't re-flow when
+              filters narrow the visible row set. Numbers are tuned to
+              fit the widest realistic cell content (e.g. "−197%" in
+              Hist edge, "$1,243.21" in Spot for high-priced names). */}
+          <colgroup>
+            <col style={{ width: 200 }} /> {/* Name */}
+            <col style={{ width: 64 }} />  {/* Date */}
+            <col style={{ width: 50 }} />  {/* DTE */}
+            <col style={{ width: 72 }} />  {/* Session */}
+            <col style={{ width: 130 }} /> {/* Straddle EM (with bar) */}
+            <col style={{ width: 88 }} />  {/* Hist 4Q avg */}
+            <col style={{ width: 88 }} />  {/* Hist edge */}
+            <col style={{ width: 80 }} />  {/* ML EM */}
+            <col style={{ width: 96 }} />  {/* Edge (vs ML) */}
+            <col style={{ width: 88 }} />  {/* P90−P10 */}
+            <col style={{ width: 80 }} />  {/* ATM IV */}
+            <col style={{ width: 110 }} /> {/* IV Rank (with bar) */}
+            <col style={{ width: 84 }} />  {/* IV crush */}
+            <col style={{ width: 68 }} />  {/* Skew */}
+            <col style={{ width: 82 }} />  {/* 1d % */}
+            <col style={{ width: 90 }} />  {/* Spot */}
+            <col style={{ width: 100 }} /> {/* $ Straddle */}
+            <col style={{ width: 70 }} />  {/* Opt DTE */}
+          </colgroup>
           <thead>
             <tr style={{ borderBottom: '1px solid var(--line)' }}>
               {/* Pin the Name column to a stable minimum width. With
