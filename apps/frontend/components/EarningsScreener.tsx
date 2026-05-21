@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { Info } from 'lucide-react';
 import { companyName } from '@/lib/companyNames';
 import { useEnsureCompanyNames } from '@/lib/useCompanyNames';
 import { useTickerHover } from '@/components/TickerHoverCard';
@@ -233,58 +234,67 @@ function ScreenerLogo({ ticker, size = 26 }: { ticker: string; size?: number }) 
 function NameCell({ ev }: { ev: ScreenerEvent }) {
   const hover = useTickerHover(ev.ticker);
   return (
-    <td className="qv-m-sticky-cell" style={{ padding: '10px 8px' }} {...hover}>
+    <td className="qv-m-sticky-cell" style={{ padding: '16px 14px' }} {...hover}>
       <Link
         href={`/${ev.ticker}`}
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: 10,
+          gap: 12,
           textDecoration: 'none',
           color: 'var(--ink)',
         }}
       >
-        <ScreenerLogo ticker={ev.ticker} size={26} />
+        <ScreenerLogo ticker={ev.ticker} size={32} />
         <div style={{ minWidth: 0 }}>
-          <div
-            className="serif"
-            style={{
-              fontWeight: 700,
-              color: 'var(--ink)',
-              fontSize: 14,
-              letterSpacing: '-0.005em',
-            }}
-          >
-            {ev.ticker}
+          {/* Ticker + ML pill inline. ML rows ride on a small brand-blue
+              pill next to the symbol so it reads as a one-line label
+              rather than a third row below the company name. */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span
+              className="serif"
+              style={{
+                fontWeight: 800,
+                color: 'var(--ink)',
+                fontSize: 15.5,
+                letterSpacing: '-0.01em',
+                textTransform: 'uppercase',
+              }}
+            >
+              {ev.ticker}
+            </span>
+            {ev.em_method === 'ml_lightgbm' && (
+              <span
+                style={{
+                  fontSize: 8.5,
+                  letterSpacing: '0.14em',
+                  textTransform: 'uppercase',
+                  padding: '2px 6px',
+                  borderRadius: 999,
+                  fontWeight: 700,
+                  background:
+                    'color-mix(in oklab, var(--brand-blue-1) 18%, transparent)',
+                  color: 'var(--brand-blue-1)',
+                }}
+                title="LightGBM ensemble forecast available for this name"
+              >
+                ML
+              </span>
+            )}
           </div>
           <div
             title={companyName(ev.ticker)}
             style={{
-              fontSize: 10.5,
-              color: 'var(--ink-4)',
-              marginTop: 1,
-              maxWidth: 160,
+              fontSize: 11.5,
+              color: 'var(--ink-3)',
+              marginTop: 2,
+              maxWidth: 180,
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',
             }}
           >
             {companyName(ev.ticker)}
-          </div>
-          <div
-            className="mono"
-            style={{
-              fontSize: 9,
-              color:
-                ev.em_method === 'ml_lightgbm'
-                  ? 'var(--accent)'
-                  : 'var(--ink-4)',
-              marginTop: 2,
-              letterSpacing: '0.08em',
-              textTransform: 'uppercase',
-            }}
-          >
-            {ev.em_method === 'ml_lightgbm' ? 'ML forecast' : 'Options baseline'}
           </div>
         </div>
       </Link>
@@ -538,7 +548,7 @@ function ScreenerSkeletonRow({ delayMs }: { delayMs: number }) {
       animationDelay: `${delayMs + extra}ms`,
     }) as const;
   const cell = (extra: number, w: number, h: number, align: 'left' | 'right' = 'right') => (
-    <td style={{ padding: '10px 8px', textAlign: align }}>
+    <td style={{ padding: '16px 14px', textAlign: align }}>
       <span
         aria-hidden
         style={{ display: 'inline-block', ...bar(extra, w, h, 999) }}
@@ -548,7 +558,7 @@ function ScreenerSkeletonRow({ delayMs }: { delayMs: number }) {
   return (
     <tr style={{ borderBottom: '1px solid var(--line)' }}>
       {/* Name: logo + ticker + company + method tag */}
-      <td className="qv-m-sticky-cell" style={{ padding: '10px 8px' }}>
+      <td className="qv-m-sticky-cell" style={{ padding: '16px 14px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ ...bar(0, 26, 26, 6), display: 'inline-block', flexShrink: 0 }} />
           <span style={{ display: 'inline-block', minWidth: 0 }}>
@@ -560,11 +570,11 @@ function ScreenerSkeletonRow({ delayMs }: { delayMs: number }) {
       </td>
       {cell(10, 38, 10)}   {/* Date */}
       {cell(15, 24, 10)}   {/* DTE */}
-      <td style={{ padding: '10px 8px' }}>
+      <td style={{ padding: '16px 14px' }}>
         <span aria-hidden style={{ display: 'inline-block', ...bar(20, 26, 10, 999) }} />
       </td>
       {/* Straddle EM — wider, mimics text + bar block */}
-      <td style={{ padding: '10px 8px' }}>
+      <td style={{ padding: '16px 14px' }}>
         <span
           aria-hidden
           style={{
@@ -585,7 +595,7 @@ function ScreenerSkeletonRow({ delayMs }: { delayMs: number }) {
       {cell(60, 44, 10)}   {/* P90−P10 */}
       {cell(65, 44, 10)}   {/* ATM IV */}
       {/* IV Rank — bar + small number */}
-      <td style={{ padding: '10px 8px', textAlign: 'right' }}>
+      <td style={{ padding: '16px 14px', textAlign: 'right' }}>
         <span
           aria-hidden
           style={{
@@ -1046,6 +1056,11 @@ export default function EarningsScreener() {
           }}
         >
           <div style={{ minWidth: 0 }}>
+            {/* The kicker reserves the same 22px height that the
+                Earnings header does for its MARKET CLOSED badge. Without
+                this, "SCREENER" sits ~10px higher in the band than the
+                date headline on the calendar — the kickers look the
+                same but stack with different heights. */}
             <div
               style={{
                 fontSize: 10,
@@ -1053,9 +1068,25 @@ export default function EarningsScreener() {
                 textTransform: 'uppercase',
                 color: 'var(--ink-3)',
                 marginBottom: 6,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                minHeight: 22,
               }}
             >
-              Options · Earnings
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/brand/QuantivIcon.png"
+                alt=""
+                width={18}
+                height={18}
+                style={{
+                  display: 'inline-block',
+                  objectFit: 'contain',
+                  mixBlendMode: 'screen',
+                }}
+              />
+              <span>Options · Earnings</span>
             </div>
             <h1
               className="serif qv-m-h1"
@@ -1107,8 +1138,9 @@ export default function EarningsScreener() {
               ratio: summary.rich / Math.max(1, sorted.length),
               isPct: false,
               tone: 'var(--down)',
+              kicker: 'Hist edge',
               label: 'Rich vs history',
-              desc: 'Implied move ≥ 20% above last-4Q realized. Often a sell candidate.',
+              desc: 'Implied move at least 20% above last-4Q realized. Often a sell candidate.',
             },
             {
               key: 'cheap',
@@ -1116,6 +1148,7 @@ export default function EarningsScreener() {
               ratio: summary.cheap / Math.max(1, sorted.length),
               isPct: false,
               tone: 'var(--up)',
+              kicker: 'IV rank',
               label: 'Cheap implied vol',
               desc: 'ATM IV in the bottom 30% of its 52-week range. Often a buy candidate.',
             },
@@ -1125,6 +1158,7 @@ export default function EarningsScreener() {
               ratio: summary.big / Math.max(1, sorted.length),
               isPct: false,
               tone: 'var(--brand-blue-1)',
+              kicker: 'Straddle EM',
               label: 'Big movers',
               desc: 'Straddle pricing a ≥ 10% one-day move on print.',
             },
@@ -1145,7 +1179,8 @@ export default function EarningsScreener() {
                   : 0,
               isPct: true,
               tone: 'var(--flag)',
-              label: 'Average ATM IV',
+              kicker: 'ATM IV',
+              label: 'Average vol',
               desc: 'Front-month implied volatility across the universe, annualized.',
             },
           ] as const).map((k) => (
@@ -1166,20 +1201,20 @@ export default function EarningsScreener() {
                 minHeight: 178,
               }}
             >
-              {/* Top line: caps tracked, accent-colored. This is the
-                  card's category label — replaces the old separate
-                  kicker + serif label which were redundant. */}
+              {/* Top: small caps kicker in the card's accent color. */}
               <div
                 style={{
-                  fontSize: 10.5,
+                  fontSize: 10,
                   letterSpacing: '0.18em',
                   textTransform: 'uppercase',
                   color: k.tone,
                   fontWeight: 700,
+                  opacity: 0.9,
                 }}
               >
-                {k.label}
+                {k.kicker}
               </div>
+              {/* Middle: big serif count + /denominator. */}
               <div
                 className="serif tnum"
                 style={{
@@ -1188,7 +1223,7 @@ export default function EarningsScreener() {
                   letterSpacing: '-0.035em',
                   color: 'var(--ink)',
                   lineHeight: 0.95,
-                  marginTop: 12,
+                  marginTop: 10,
                 }}
               >
                 {k.count}
@@ -1206,8 +1241,7 @@ export default function EarningsScreener() {
                   </span>
                 )}
               </div>
-              {/* Ratio bar — visual only. The old "27% of universe"
-                  caption was redundant with what the bar already shows. */}
+              {/* Ratio bar — visual only. */}
               <div
                 style={{
                   height: 4,
@@ -1227,21 +1261,62 @@ export default function EarningsScreener() {
                   }}
                 />
               </div>
-              <div
-                style={{
-                  marginTop: 'auto',
-                  paddingTop: 12,
-                  fontSize: 12,
-                  color: 'var(--ink-3)',
-                  lineHeight: 1.5,
-                }}
-              >
-                {k.desc}
+              {/* Bottom: serif label (white) + description (gray). */}
+              <div style={{ marginTop: 'auto', paddingTop: 14 }}>
+                <div
+                  className="serif"
+                  style={{
+                    fontSize: 15,
+                    fontWeight: 700,
+                    color: 'var(--ink)',
+                    letterSpacing: '-0.005em',
+                  }}
+                >
+                  {k.label}
+                </div>
+                <div
+                  style={{
+                    fontSize: 11.5,
+                    color: 'var(--ink-3)',
+                    marginTop: 4,
+                    lineHeight: 1.45,
+                  }}
+                >
+                  {k.desc}
+                </div>
               </div>
             </div>
           ))}
         </div>
       )}
+
+      {/* Same italic info line treatment used on the Earnings calendar
+          (FilterInfo). The copy is intentionally about navigation, not
+          about what each KPI card means — the cards already carry their
+          own definitions. */}
+      <div
+        style={{
+          padding: '14px 0 0',
+          display: 'flex',
+        }}
+      >
+        <span
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            color: 'var(--ink-3)',
+            fontSize: 11.5,
+            fontStyle: 'italic',
+          }}
+        >
+          <Info size={13} />
+          <span>
+            Sortable table of every upcoming earnings print; stack filters and
+            a preset to narrow the universe.
+          </span>
+        </span>
+      </div>
 
       <div
         style={{
@@ -1249,7 +1324,7 @@ export default function EarningsScreener() {
           flexWrap: 'wrap',
           gap: 12,
           alignItems: 'center',
-          padding: '16px 0',
+          padding: '14px 0 16px',
           borderBottom: '1px solid var(--line)',
         }}
       >
@@ -1268,22 +1343,22 @@ export default function EarningsScreener() {
             fontSize: 12,
           }}
         />
-        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--ink-2)' }}>
-          <input
-            type="checkbox"
-            checked={sp500Only}
-            onChange={(e) => setParam({ sp500: e.target.checked ? '1' : null })}
-          />
+        <button
+          type="button"
+          className="chip"
+          aria-pressed={sp500Only}
+          onClick={() => setParam({ sp500: sp500Only ? null : '1' })}
+        >
           S&amp;P 500
-        </label>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--ink-2)' }}>
-          <input
-            type="checkbox"
-            checked={mlOnly}
-            onChange={(e) => setParam({ ml: e.target.checked ? '1' : null })}
-          />
+        </button>
+        <button
+          type="button"
+          className="chip"
+          aria-pressed={mlOnly}
+          onClick={() => setParam({ ml: mlOnly ? null : '1' })}
+        >
           ML rows only
-        </label>
+        </button>
         <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--ink-2)' }}>
           Min spot
           <input
@@ -1307,32 +1382,57 @@ export default function EarningsScreener() {
             }}
           />
         </label>
-        <select
-          value={timing}
-          onChange={(e) =>
-            setParam({ timing: e.target.value === 'all' ? null : e.target.value })
-          }
+        <div
+          role="group"
+          aria-label="Earnings session"
           style={{
-            padding: '8px 10px',
-            borderRadius: 8,
+            display: 'inline-flex',
             border: '1px solid var(--line)',
-            background: 'var(--bg-2)',
-            color: 'var(--ink)',
-            fontSize: 12,
+            borderRadius: 8,
+            overflow: 'hidden',
           }}
         >
-          <option value="all">All sessions</option>
-          <option value="bmo">BMO only</option>
-          <option value="amc">AMC only</option>
-        </select>
+          {(
+            [
+              ['all', 'All'],
+              ['bmo', 'BMO'],
+              ['amc', 'AMC'],
+            ] as const
+          ).map(([key, label], i) => {
+            const active = timing === key;
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setParam({ timing: key === 'all' ? null : key })}
+                aria-pressed={active}
+                // fontWeight stays constant across active/inactive so the
+                // segment widths don't reflow when the user taps a label.
+                style={{
+                  padding: '6px 14px',
+                  fontSize: 11.5,
+                  letterSpacing: '0.04em',
+                  fontWeight: 600,
+                  background: active ? 'var(--ink)' : 'transparent',
+                  color: active ? 'var(--bg)' : 'var(--ink-2)',
+                  borderRight: i < 2 ? '1px solid var(--line)' : 'none',
+                  cursor: 'pointer',
+                  transition: 'background 140ms ease, color 140ms ease',
+                }}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
 
         {/* Preset chips — common options-trader intents one click away */}
         <div style={{ display: 'flex', gap: 6, marginLeft: 'auto', flexWrap: 'wrap' }}>
           {([
             ['rich_vol',   'Rich vs hist',   'Implied move ≥ 20% above last-4Q realized average'],
-            ['cheap_vol',  'Cheap IV',       'IV Rank ≤ 30% — options trading near 52-week lows'],
+            ['cheap_vol',  'Cheap IV',       'IV Rank ≤ 30%; options trading near 52-week lows'],
             ['big_movers', 'Big movers',     'Implied move ≥ 10%'],
-            ['confident',  'Tight bands',    'P90−P10 ≤ 8% — model is highly confident'],
+            ['confident',  'Tight bands',    'P90−P10 ≤ 8%; model is highly confident'],
           ] as [string, string, string][]).map(([key, label, tip]) => {
             const active = preset === key;
             return (
@@ -1394,7 +1494,12 @@ export default function EarningsScreener() {
           style={{
             width: '100%',
             borderCollapse: 'collapse',
-            fontSize: 12,
+            // Base font size for the table — slightly bolder/denser than
+            // the 12px we had before. Individual cells override this when
+            // they want a different weight or tone (e.g. ticker symbol is
+            // 15px serif; Hist edge / Edge cells bump to 13.5px bold when
+            // the value is "hot").
+            fontSize: 13,
             minWidth: 1040,
           }}
         >
@@ -1409,14 +1514,15 @@ export default function EarningsScreener() {
                   edge in place; the other columns are fixed-width or
                   carry tabular-nums content that doesn't vary. */}
               <th
-                className="qv-m-sticky-cell"
+                className="qv-m-sticky-cell mono"
                 style={{
                   textAlign: 'left',
-                  padding: '10px 8px',
-                  fontSize: 10,
+                  padding: '14px 12px',
+                  fontSize: 10.5,
                   color: 'var(--ink-3)',
-                  letterSpacing: '0.14em',
+                  letterSpacing: '0.18em',
                   textTransform: 'uppercase',
+                  fontWeight: 600,
                   width: 220,
                   minWidth: 220,
                 }}
@@ -1425,7 +1531,18 @@ export default function EarningsScreener() {
               </th>
               {th('date', 'Date', 'Reporting date for the upcoming earnings event.')}
               {th('dte', 'DTE', 'Calendar days from today until the earnings print.')}
-              <th style={{ textAlign: 'left', padding: '10px 8px', fontSize: 10, color: 'var(--ink-3)', letterSpacing: '0.14em', textTransform: 'uppercase' }}>
+              <th
+                className="mono"
+                style={{
+                  textAlign: 'left',
+                  padding: '14px 12px',
+                  fontSize: 10.5,
+                  color: 'var(--ink-3)',
+                  letterSpacing: '0.18em',
+                  textTransform: 'uppercase',
+                  fontWeight: 600,
+                }}
+              >
                 Session
               </th>
               {th('straddle', 'Straddle EM', 'One-day move priced by the print-expiry ATM straddle.')}
@@ -1439,13 +1556,15 @@ export default function EarningsScreener() {
               {th('iv_crush', 'IV crush', '(Front IV − next-expiry IV) / front IV. Higher = more crush.')}
               {th('skew', 'Skew', 'ATM call IV minus ATM put IV. Positive = calls richer than puts.')}
               <th
+                className="mono"
                 style={{
                   textAlign: 'right',
-                  padding: '10px 8px',
-                  fontSize: 10,
+                  padding: '14px 12px',
+                  fontSize: 10.5,
                   color: 'var(--ink-3)',
-                  letterSpacing: '0.14em',
+                  letterSpacing: '0.18em',
                   textTransform: 'uppercase',
+                  fontWeight: 600,
                   width: 84,
                   minWidth: 84,
                 }}
@@ -1453,10 +1572,10 @@ export default function EarningsScreener() {
                 1d %
               </th>
               {th('spot', 'Spot', 'Latest underlying share price at the snapshot.', 88)}
-              <th style={{ textAlign: 'right', padding: '10px 8px', fontSize: 10, color: 'var(--ink-3)', letterSpacing: '0.14em', textTransform: 'uppercase' }}>
+              <th className="mono" style={{ textAlign: 'right', padding: '14px 12px', fontSize: 10.5, color: 'var(--ink-3)', letterSpacing: '0.18em', textTransform: 'uppercase', fontWeight: 600 }}>
                 $ Straddle
               </th>
-              <th style={{ textAlign: 'right', padding: '10px 8px', fontSize: 10, color: 'var(--ink-3)', letterSpacing: '0.14em', textTransform: 'uppercase' }}>
+              <th className="mono" style={{ textAlign: 'right', padding: '14px 12px', fontSize: 10.5, color: 'var(--ink-3)', letterSpacing: '0.18em', textTransform: 'uppercase', fontWeight: 600 }}>
                 Opt DTE
               </th>
             </tr>
@@ -1495,19 +1614,50 @@ export default function EarningsScreener() {
                   onMouseLeave={(el) => (el.currentTarget.style.background = 'transparent')}
                 >
                   <NameCell ev={ev} />
-                  <td className="mono tnum" style={{ textAlign: 'right', padding: '10px 8px', color: 'var(--ink-2)' }}>
+                  <td className="mono tnum" style={{ textAlign: 'right', padding: '16px 14px', color: 'var(--ink-2)' }}>
                     {shortDate(ev.earnings_date)}
                   </td>
-                  <td className="mono tnum" style={{ textAlign: 'right', padding: '10px 8px', color: 'var(--ink-2)' }}>
+                  <td className="mono tnum" style={{ textAlign: 'right', padding: '16px 14px', color: 'var(--ink-2)' }}>
                     {ev.lead_time_days ?? '—'}
                   </td>
-                  <td className="mono" style={{ padding: '10px 8px', color: 'var(--ink-3)', fontSize: 11 }}>
-                    {timingShort(ev.timing)}
+                  <td style={{ padding: '16px 14px' }}>
+                    {(() => {
+                      const t = timingShort(ev.timing);
+                      const tone =
+                        t === 'BMO'
+                          ? 'var(--flag)'
+                          : t === 'AMC'
+                            ? 'var(--accent-hi)'
+                            : 'var(--ink-4)';
+                      const bg =
+                        t === 'BMO'
+                          ? 'color-mix(in oklab, var(--flag) 15%, transparent)'
+                          : t === 'AMC'
+                            ? 'color-mix(in oklab, var(--accent) 18%, transparent)'
+                            : 'color-mix(in oklab, var(--bg-3) 70%, transparent)';
+                      return (
+                        <span
+                          className="mono"
+                          style={{
+                            display: 'inline-block',
+                            fontSize: 10.5,
+                            letterSpacing: '0.12em',
+                            padding: '3px 8px',
+                            borderRadius: 4,
+                            fontWeight: 600,
+                            color: tone,
+                            background: bg,
+                          }}
+                        >
+                          {t}
+                        </span>
+                      );
+                    })()}
                   </td>
-                  <td style={{ padding: '10px 8px' }}>
+                  <td style={{ padding: '16px 14px' }}>
                     <MoveBar value={ev.em_straddle_pct} max={maxStraddle} />
                   </td>
-                  <td className="mono tnum" style={{ textAlign: 'right', padding: '10px 8px', color: 'var(--ink-2)' }}>
+                  <td className="mono tnum" style={{ textAlign: 'right', padding: '16px 14px', color: 'var(--ink-2)' }}>
                     {pct1(ev.hist_move_avg_4q)}
                   </td>
                   {(() => {
@@ -1518,7 +1668,7 @@ export default function EarningsScreener() {
                       : hEdge > 0 ? 'var(--down)' : 'var(--up)';
                     return (
                       <td className="mono tnum" style={{
-                        textAlign: 'right', padding: '10px 8px',
+                        textAlign: 'right', padding: '16px 14px',
                         color: tone,
                         fontWeight: hot ? 600 : 400,
                       }}>
@@ -1526,40 +1676,40 @@ export default function EarningsScreener() {
                       </td>
                     );
                   })()}
-                  <td className="mono tnum" style={{ textAlign: 'right', padding: '10px 8px' }}>
+                  <td className="mono tnum" style={{ textAlign: 'right', padding: '16px 14px' }}>
                     {pct1(ev.em_ml_pct)}
                   </td>
                   <td
                     className="mono tnum"
                     style={{
                       textAlign: 'right',
-                      padding: '10px 8px',
+                      padding: '16px 14px',
                       color: 'var(--ink)',
                       fontWeight: e != null && Math.abs(e) >= 0.008 ? 600 : 400,
                     }}
                   >
                     {e == null ? '—' : pct1(e)}
                   </td>
-                  <td className="mono tnum" style={{ textAlign: 'right', padding: '10px 8px', color: 'var(--ink-2)' }}>
+                  <td className="mono tnum" style={{ textAlign: 'right', padding: '16px 14px', color: 'var(--ink-2)' }}>
                     {bw == null ? '—' : pct1(bw)}
                   </td>
-                  <td className="mono tnum" style={{ textAlign: 'right', padding: '10px 8px' }}>
+                  <td className="mono tnum" style={{ textAlign: 'right', padding: '16px 14px' }}>
                     {ivPct(ev.atm_iv)}
                   </td>
-                  <td style={{ textAlign: 'right', padding: '10px 8px' }}>
+                  <td style={{ textAlign: 'right', padding: '16px 14px' }}>
                     <IvRankBar rank={ev.iv_rank} />
                   </td>
-                  <td className="mono tnum" style={{ textAlign: 'right', padding: '10px 8px', color: 'var(--ink-2)' }}>
+                  <td className="mono tnum" style={{ textAlign: 'right', padding: '16px 14px', color: 'var(--ink-2)' }}>
                     {pct1(ev.iv_crush_pct)}
                   </td>
-                  <td className="mono tnum" style={{ textAlign: 'right', padding: '10px 8px', color: 'var(--ink-2)' }}>
+                  <td className="mono tnum" style={{ textAlign: 'right', padding: '16px 14px', color: 'var(--ink-2)' }}>
                     {num(ev.skew_atm, 3)}
                   </td>
                   <td
                     className="mono tnum"
                     style={{
                       textAlign: 'right',
-                      padding: '10px 8px',
+                      padding: '16px 14px',
                       color: chgColor,
                       fontSize: 11,
                       width: 84,
@@ -1581,7 +1731,7 @@ export default function EarningsScreener() {
                     className="mono tnum"
                     style={{
                       textAlign: 'right',
-                      padding: '10px 8px',
+                      padding: '16px 14px',
                       width: 88,
                       minWidth: 88,
                       whiteSpace: 'nowrap',
@@ -1597,10 +1747,10 @@ export default function EarningsScreener() {
                       )}
                     </span>
                   </td>
-                  <td className="mono tnum" style={{ textAlign: 'right', padding: '10px 8px', color: 'var(--ink-2)' }}>
+                  <td className="mono tnum" style={{ textAlign: 'right', padding: '16px 14px', color: 'var(--ink-2)' }}>
                     {ev.em_straddle_abs != null ? `$${num(ev.em_straddle_abs, 2)}` : '—'}
                   </td>
-                  <td className="mono tnum" style={{ textAlign: 'right', padding: '10px 8px', color: 'var(--ink-3)' }}>
+                  <td className="mono tnum" style={{ textAlign: 'right', padding: '16px 14px', color: 'var(--ink-3)' }}>
                     {ev.days_to_expiry ?? '—'}
                   </td>
                 </tr>

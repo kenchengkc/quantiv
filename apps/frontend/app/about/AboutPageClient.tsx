@@ -380,7 +380,7 @@ function Pipeline() {
       // Real pipeline: Polygon/Finnhub option chains land in DuckDB-backed
       // parquet via scripts/sync_dolthub.py and the hourly daily_score job.
       body:
-        'Hourly OPRA chain snapshots — every listed expiry, every strike — landed into a DuckDB-backed parquet warehouse.',
+        'Hourly OPRA chain snapshots covering every listed expiry and every strike. Landed into a DuckDB-backed parquet warehouse.',
       tone: 'var(--brand-blue-1)',
       icon: 'chain',
     },
@@ -543,24 +543,6 @@ function Pipeline() {
 }
 
 // ──────────────────────────────────────────────────────────────────────────
-// Tiny Q glyph used in the kicker row
-// ──────────────────────────────────────────────────────────────────────────
-function QIcon({ size = 16 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 32 32" fill="none" aria-hidden="true">
-      <circle cx="16" cy="16" r="11" stroke="var(--ink)" strokeWidth="2.2" />
-      <path
-        d="M 12 22 C 14 27, 21 27, 24 22 S 28 13, 30 9"
-        stroke="var(--brand-blue-1)"
-        strokeWidth="2.4"
-        strokeLinecap="round"
-        fill="none"
-      />
-    </svg>
-  );
-}
-
-// ──────────────────────────────────────────────────────────────────────────
 // Tex · KaTeX-rendered LaTeX. Render to HTML string once per formula and
 // drop into a span. Display mode for block equations, inline otherwise.
 // ──────────────────────────────────────────────────────────────────────────
@@ -654,15 +636,16 @@ function FormulaCard({
 export default function AboutPageClient() {
   // Anchored to actual repo facts:
   //  · names tracked: ≈ S&P 500 + active Russell + popular names
-  //  · OPRA snapshot cadence: hourly during market (`hourly` job in scripts/)
-  //  · history depth: 12 quarters per name (≈ 3 yrs) — what we persist in
-  //    earnings_history alongside the print
-  //  · refresh: chain-to-UI latency target, capped at the cron interval
+  //  · chains snapped per week: ~500 names × 4 expiries × 5 trading days
+  //    × ~6 hourly snapshots during market hours.
+  //  · history depth: realized close-to-close moves go back further at the
+  //    universe level than the 12 quarters we persist per name.
+  //  · refresh: chain-to-UI latency target, capped at the cron interval.
   const stats = [
     { v: 1424, suf: '', dec: 0, kicker: 'Names', label: 'tracked across our universe' },
-    { v: 12, suf: ' Q', dec: 0, kicker: 'History', label: 'realized prints per name' },
-    { v: 4, suf: '', dec: 0, kicker: 'Greeks', label: 'Δ Γ 𝜈 Θ per expiry' },
-    { v: 60, suf: ' min', dec: 0, kicker: 'Refresh', label: 'chain → UI latency' },
+    { v: 12.4, suf: 'K', dec: 1, kicker: 'Chains', label: 'snapped per week' },
+    { v: 8, suf: ' yrs', dec: 0, kicker: 'History', label: 'of realized data' },
+    { v: 60, suf: ' min', dec: 0, kicker: 'Refresh', label: 'chain to UI latency' },
   ];
 
   return (
@@ -693,7 +676,18 @@ export default function AboutPageClient() {
                 fontWeight: 600,
               }}
             >
-              <QIcon size={16} />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/brand/QuantivIcon.png"
+                alt=""
+                width={18}
+                height={18}
+                style={{
+                  display: 'inline-block',
+                  objectFit: 'contain',
+                  mixBlendMode: 'screen',
+                }}
+              />
               <span>About</span>
               <span style={{ color: 'var(--ink-4)' }}>·</span>
               <span>Quantiv</span>
@@ -839,7 +833,7 @@ export default function AboutPageClient() {
                 kicker: 'Pricing',
                 title: 'Implied move',
                 body:
-                  'The print-expiry ATM straddle prices a ±1σ move. We surface both straddle-implied EM and the IV-implied EM (S₀·σ_ATM·√T) side-by-side — when they diverge, that gap is the skew premium dealers are charging.',
+                  'The print-expiry ATM straddle prices a ±1σ move. We surface both straddle-implied EM and the IV-implied EM (S₀·σ_ATM·√T) side-by-side. When they diverge, the gap is the skew premium dealers are charging.',
                 tone: 'var(--brand-blue-1)',
                 viz: <MiniStraddleBar />,
               },
@@ -847,7 +841,7 @@ export default function AboutPageClient() {
                 kicker: 'History',
                 title: 'Realized track record',
                 body:
-                  'Close-to-close moves over the last twelve quarters, bracketed by BMO/AMC timing. Hist edge = (straddle EM − 4Q realized avg) / 4Q realized avg — positive when options are pricing it richer than the stock has delivered.',
+                  'Close-to-close moves over the last twelve quarters, bracketed by BMO/AMC timing. Hist edge = (straddle EM − 4Q realized avg) / 4Q realized avg. Positive when options are pricing it richer than the stock has delivered.',
                 tone: 'var(--up)',
                 viz: <MiniHistory />,
               },
@@ -963,8 +957,8 @@ export default function AboutPageClient() {
             }}
           >
             Every chart on the ticker page traces back to one of these formulas.
-            We show the math because the assumptions behind it &mdash; log-normal
-            returns, constant volatility over the horizon &mdash; matter for how
+            We show the math because the assumptions behind it (log-normal
+            returns, constant volatility over the horizon) matter for how
             you read the output.
           </p>
         </div>
@@ -983,7 +977,7 @@ export default function AboutPageClient() {
             title="What dealers are pricing"
             tex={String.raw`\mathrm{EM}_{\text{straddle}} \;=\; \frac{c_{\mathrm{ATM}} \,+\, p_{\mathrm{ATM}}}{S_0}`}
             body="ATM straddle mid divided by spot. The print-expiry straddle prices a ±1σ
-              move at expiry — collect it if you think the stock will move less than
+              move at expiry. Collect it if you think the stock will move less than
               implied; pay it if you think more."
           />
           <FormulaCard
@@ -1015,7 +1009,7 @@ export default function AboutPageClient() {
               P\!\left(\,\left|\tfrac{S}{S_0} - 1\right| \ge |x|\,\right) &= \bigl(1 - \Phi(z_{+})\bigr) + \Phi(z_{-})
               \end{aligned}`}
             body="The hover probability on the density bar uses the correct asymmetric
-              form — naïve 2·(1 − Φ(z₊)) slightly overstates the tail because the
+              form. Naïve 2·(1 − Φ(z₊)) slightly overstates the tail because the
               downside in simple-return space is fatter than the upside."
           />
           <FormulaCard
@@ -1122,8 +1116,8 @@ export default function AboutPageClient() {
             >
               Quantiv is a research tool, not a recommendation. The same option
               chain can support opposite trades depending on conviction, position,
-              and risk tolerance. We surface signal; you bring judgement &mdash;
-              and read the small print on every formula above.
+              and risk tolerance. We surface signal; you bring judgement, and
+              read the small print on every formula above.
             </div>
             <div
               style={{
@@ -1156,7 +1150,18 @@ export default function AboutPageClient() {
           }}
         >
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
-            <QIcon size={22} />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/brand/QuantivIcon.png"
+              alt=""
+              width={24}
+              height={24}
+              style={{
+                display: 'inline-block',
+                objectFit: 'contain',
+                mixBlendMode: 'screen',
+              }}
+            />
             <span
               className="serif"
               style={{
@@ -1220,7 +1225,7 @@ export default function AboutPageClient() {
           for educational and informational use only. Options trading carries
           substantial risk including loss of principal. Implied volatility,
           model quantiles, and historical realized moves are descriptive
-          statistics &mdash; not predictions. Past performance does not guarantee
+          statistics, not predictions. Past performance does not guarantee
           future results. Nothing on this site is investment advice.
         </div>
       </Reveal>
