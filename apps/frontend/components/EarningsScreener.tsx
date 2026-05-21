@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { forwardRef, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Info } from 'lucide-react';
-import { TableVirtuoso } from 'react-virtuoso';
+import { TableVirtuoso, type TableComponents } from 'react-virtuoso';
 import { companyName } from '@/lib/companyNames';
 import { useEnsureCompanyNames } from '@/lib/useCompanyNames';
 import { useTickerHover } from '@/components/TickerHoverCard';
@@ -117,6 +117,7 @@ function num(v: number | null | undefined, digits = 2) {
 const MIN_LOADING_MS = 600;
 const INITIAL_QUOTE_WAIT_MS = 3_200;
 const LOGO_PRELOAD_TIMEOUT_MS = 4_000;
+const SCREENER_NAME_COL_WIDTH = 280;
 
 function logoUrl(t: string) {
   return `https://assets.parqet.com/logos/symbol/${t}?format=png`;
@@ -235,23 +236,35 @@ function ScreenerLogo({ ticker, size = 26 }: { ticker: string; size?: number }) 
 function NameCell({ ev }: { ev: ScreenerEvent }) {
   const hover = useTickerHover(ev.ticker);
   return (
-    <td className="qv-m-sticky-cell" style={{ padding: '16px 14px' }} {...hover}>
+    <td
+      className="qv-m-sticky-cell"
+      style={{
+        padding: '16px 14px',
+        width: SCREENER_NAME_COL_WIDTH,
+        minWidth: SCREENER_NAME_COL_WIDTH,
+        maxWidth: SCREENER_NAME_COL_WIDTH,
+      }}
+      {...hover}
+    >
       <Link
         href={`/${ev.ticker}`}
         style={{
           display: 'flex',
           alignItems: 'center',
           gap: 12,
+          width: '100%',
+          minWidth: 0,
+          overflow: 'hidden',
           textDecoration: 'none',
           color: 'var(--ink)',
         }}
       >
         <ScreenerLogo ticker={ev.ticker} size={32} />
-        <div style={{ minWidth: 0 }}>
+        <div style={{ minWidth: 0, flex: '1 1 auto', overflow: 'hidden' }}>
           {/* Ticker + ML pill inline. ML rows ride on a small brand-blue
               pill next to the symbol so it reads as a one-line label
               rather than a third row below the company name. */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
             <span
               className="serif"
               style={{
@@ -289,7 +302,7 @@ function NameCell({ ev }: { ev: ScreenerEvent }) {
               fontSize: 11.5,
               color: 'var(--ink-3)',
               marginTop: 2,
-              maxWidth: 180,
+              maxWidth: '100%',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',
@@ -1046,7 +1059,7 @@ export default function EarningsScreener() {
           mono callout on the right. The old 15px description paragraph
           was dropped — the column headers + insight cards convey the
           same info without competing with the headline. */}
-      <div style={{ padding: '24px 0 20px', borderBottom: '1px solid var(--line)' }}>
+      <div style={{ padding: '24px 0 8px' }}>
         <div
           style={{
             display: 'flex',
@@ -1132,6 +1145,7 @@ export default function EarningsScreener() {
             }}
           >
             <div
+              data-testid="screener-filtered-count"
               className="serif tnum"
               style={{
                 fontSize: 32,
@@ -1176,7 +1190,7 @@ export default function EarningsScreener() {
             display: 'grid',
             gridTemplateColumns: 'repeat(4, 1fr)',
             gap: 14,
-            marginTop: 18,
+            marginTop: 10,
           }}
         >
           {([
@@ -1533,29 +1547,50 @@ export default function EarningsScreener() {
       {/* Colgroup shared between the skeleton table and the virtualized
           data table. table-layout: fixed honors these widths regardless
           of cell content, which is what kills the filter-toggle column
-          shift bug. Total table width = 1480px; the wrapper supports
-          horizontal scroll for narrow viewports. */}
+          shift bug. The wrapper supports horizontal scroll for narrow
+          viewports. */}
       {(() => {
+        const col = {
+          name: SCREENER_NAME_COL_WIDTH,
+          date: 72,
+          dte: 58,
+          session: 84,
+          straddle: 150,
+          histAvg: 116,
+          histEdge: 110,
+          ml: 84,
+          edge: 128,
+          band: 104,
+          iv: 96,
+          ivRank: 124,
+          ivCrush: 108,
+          skew: 76,
+          dayChange: 92,
+          spot: 104,
+          straddleAbs: 112,
+          optDte: 82,
+        } as const;
+        const tableWidth = Object.values(col).reduce((sum, width) => sum + width, 0);
         const colGroup = (
           <colgroup>
-            <col style={{ width: 200 }} /> {/* Name */}
-            <col style={{ width: 64 }} />  {/* Date */}
-            <col style={{ width: 50 }} />  {/* DTE */}
-            <col style={{ width: 72 }} />  {/* Session */}
-            <col style={{ width: 130 }} /> {/* Straddle EM (with bar) */}
-            <col style={{ width: 88 }} />  {/* Hist 4Q avg */}
-            <col style={{ width: 88 }} />  {/* Hist edge */}
-            <col style={{ width: 80 }} />  {/* ML EM */}
-            <col style={{ width: 96 }} />  {/* Edge (vs ML) */}
-            <col style={{ width: 88 }} />  {/* P90−P10 */}
-            <col style={{ width: 80 }} />  {/* ATM IV */}
-            <col style={{ width: 110 }} /> {/* IV Rank (with bar) */}
-            <col style={{ width: 84 }} />  {/* IV crush */}
-            <col style={{ width: 68 }} />  {/* Skew */}
-            <col style={{ width: 82 }} />  {/* 1d % */}
-            <col style={{ width: 90 }} />  {/* Spot */}
-            <col style={{ width: 100 }} /> {/* $ Straddle */}
-            <col style={{ width: 70 }} />  {/* Opt DTE */}
+            <col style={{ width: col.name }} />        {/* Name */}
+            <col style={{ width: col.date }} />        {/* Date */}
+            <col style={{ width: col.dte }} />         {/* DTE */}
+            <col style={{ width: col.session }} />     {/* Session */}
+            <col style={{ width: col.straddle }} />    {/* Straddle EM (with bar) */}
+            <col style={{ width: col.histAvg }} />     {/* Hist 4Q avg */}
+            <col style={{ width: col.histEdge }} />    {/* Hist edge */}
+            <col style={{ width: col.ml }} />          {/* ML EM */}
+            <col style={{ width: col.edge }} />        {/* Edge (vs ML) */}
+            <col style={{ width: col.band }} />        {/* P90−P10 */}
+            <col style={{ width: col.iv }} />          {/* ATM IV */}
+            <col style={{ width: col.ivRank }} />      {/* IV Rank (with bar) */}
+            <col style={{ width: col.ivCrush }} />     {/* IV crush */}
+            <col style={{ width: col.skew }} />        {/* Skew */}
+            <col style={{ width: col.dayChange }} />   {/* 1d % */}
+            <col style={{ width: col.spot }} />        {/* Spot */}
+            <col style={{ width: col.straddleAbs }} /> {/* $ Straddle */}
+            <col style={{ width: col.optDte }} />      {/* Opt DTE */}
           </colgroup>
         );
 
@@ -1563,7 +1598,7 @@ export default function EarningsScreener() {
           tableLayout: 'fixed',
           borderCollapse: 'collapse',
           fontSize: 13,
-          width: 1480,
+          width: tableWidth,
         };
 
         // Both the skeleton + the virtuoso table want the same header
@@ -1581,8 +1616,8 @@ export default function EarningsScreener() {
                 letterSpacing: '0.18em',
                 textTransform: 'uppercase',
                 fontWeight: 600,
-                width: 220,
-                minWidth: 220,
+                width: col.name,
+                minWidth: col.name,
                 // Solid bg so the sticky thead doesn't show table rows
                 // bleeding through when the body scrolls underneath.
                 background: 'var(--bg)',
@@ -1626,13 +1661,13 @@ export default function EarningsScreener() {
                 letterSpacing: '0.18em',
                 textTransform: 'uppercase',
                 fontWeight: 600,
-                width: 84,
-                minWidth: 84,
+                width: col.dayChange,
+                minWidth: col.dayChange,
               }}
             >
               1d %
             </th>
-            {th('spot', 'Spot', 'Latest underlying share price at the snapshot.', 88)}
+            {th('spot', 'Spot', 'Latest underlying share price at the snapshot.', col.spot)}
             <th className="mono" style={{ textAlign: 'right', padding: '14px 12px', fontSize: 10.5, color: 'var(--ink-3)', letterSpacing: '0.18em', textTransform: 'uppercase', fontWeight: 600 }}>
               $ Straddle
             </th>
@@ -1762,8 +1797,8 @@ export default function EarningsScreener() {
                   padding: '16px 14px',
                   color: chgColor,
                   fontSize: 11,
-                  width: 84,
-                  minWidth: 84,
+                  width: col.dayChange,
+                  minWidth: col.dayChange,
                   whiteSpace: 'nowrap',
                 }}
               >
@@ -1782,8 +1817,8 @@ export default function EarningsScreener() {
                 style={{
                   textAlign: 'right',
                   padding: '16px 14px',
-                  width: 88,
-                  minWidth: 88,
+                  width: col.spot,
+                  minWidth: col.spot,
                   whiteSpace: 'nowrap',
                 }}
               >
@@ -1818,7 +1853,7 @@ export default function EarningsScreener() {
               aria-busy
               aria-label="Loading screener"
               className="qv-m-table-wrap"
-              style={{ overflowX: 'auto', marginTop: 8, WebkitOverflowScrolling: 'touch' }}
+              style={{ overflowX: 'auto', marginTop: 0, WebkitOverflowScrolling: 'touch' }}
             >
               <table style={tableStyles}>
                 {colGroup}
@@ -1851,72 +1886,71 @@ export default function EarningsScreener() {
         // (browser back/forward scroll restoration just works) while
         // virtuoso unmounts off-screen rows so we only ever have ~15
         // visible <tr>s in the DOM, regardless of total result size.
-        // Total table width 1480px; the wrapper handles horizontal
+        // The wrapper handles horizontal
         // scrolling. Sticky-Name column survives because we set
         // position: sticky inline on the cell, not on the row.
+        const virtuosoComponents = {
+          // Inject the colgroup right after the <table> opening
+          // tag, before virtuoso's auto-generated thead/tbody.
+          Table: forwardRef<HTMLTableElement, React.HTMLAttributes<HTMLTableElement>>(
+            function VirtuosoTable({ style, children, ...rest }, ref) {
+              return (
+                <table ref={ref} {...rest} style={{ ...tableStyles, ...style }}>
+                  {colGroup}
+                  {children}
+                </table>
+              );
+            },
+          ),
+          // Keep Virtuoso's own sticky header positioning. Overriding
+          // `top` here creates a blank 64px band before the header.
+          TableHead: forwardRef<HTMLTableSectionElement, React.HTMLAttributes<HTMLTableSectionElement>>(
+            function VirtuosoHead({ style, children, ...rest }, ref) {
+              return (
+                <thead
+                  ref={ref}
+                  {...rest}
+                  style={{
+                    ...style,
+                    zIndex: 10,
+                    background: 'var(--bg)',
+                  }}
+                >
+                  {children}
+                </thead>
+              );
+            },
+          ),
+          // Row hover wash — same effect as before, just hoisted
+          // into a single component override so each itemContent
+          // returns only cells.
+          TableRow: ({ children, style, ...rest }: React.HTMLAttributes<HTMLTableRowElement>) => (
+            <tr
+              {...rest}
+              style={{
+                ...style,
+                borderBottom: '1px solid var(--line)',
+                transition: 'background 120ms ease',
+              }}
+              onMouseEnter={(el) => (el.currentTarget.style.background = 'var(--bg-2)')}
+              onMouseLeave={(el) => (el.currentTarget.style.background = 'transparent')}
+            >
+              {children}
+            </tr>
+          ),
+        } as unknown as TableComponents<ScreenerEvent>;
+
         return (
           <div
             className="qv-m-table-wrap"
-            style={{ overflowX: 'auto', marginTop: 8, WebkitOverflowScrolling: 'touch' }}
+            style={{ overflowX: 'auto', marginTop: 0, WebkitOverflowScrolling: 'touch' }}
           >
             <TableVirtuoso
               useWindowScroll
               data={sorted}
               computeItemKey={(_, ev) => `${ev.ticker}-${ev.earnings_date}`}
-              style={{ width: 1480 }}
-              components={{
-                // Inject the colgroup right after the <table> opening
-                // tag, before virtuoso's auto-generated thead/tbody.
-                Table: forwardRef<HTMLTableElement, React.HTMLAttributes<HTMLTableElement>>(
-                  function VirtuosoTable({ style, children, ...rest }, ref) {
-                    return (
-                      <table ref={ref} {...rest} style={{ ...tableStyles, ...style }}>
-                        {colGroup}
-                        {children}
-                      </table>
-                    );
-                  },
-                ),
-                // Sticky header parked just below the topbar (64px tall).
-                // Solid bg so virtualized rows don't bleed through the
-                // gap between the topbar and the table head.
-                TableHead: forwardRef<HTMLTableSectionElement, React.HTMLAttributes<HTMLTableSectionElement>>(
-                  function VirtuosoHead({ style, children, ...rest }, ref) {
-                    return (
-                      <thead
-                        ref={ref}
-                        {...rest}
-                        style={{
-                          ...style,
-                          position: 'sticky',
-                          top: 64,
-                          zIndex: 10,
-                          background: 'var(--bg)',
-                        }}
-                      >
-                        {children}
-                      </thead>
-                    );
-                  },
-                ),
-                // Row hover wash — same effect as before, just hoisted
-                // into a single component override so each itemContent
-                // returns only cells.
-                TableRow: ({ children, style, ...rest }: React.HTMLAttributes<HTMLTableRowElement>) => (
-                  <tr
-                    {...rest}
-                    style={{
-                      ...style,
-                      borderBottom: '1px solid var(--line)',
-                      transition: 'background 120ms ease',
-                    }}
-                    onMouseEnter={(el) => (el.currentTarget.style.background = 'var(--bg-2)')}
-                    onMouseLeave={(el) => (el.currentTarget.style.background = 'transparent')}
-                  >
-                    {children}
-                  </tr>
-                ),
-              }}
+              style={{ width: tableWidth }}
+              components={virtuosoComponents}
               fixedHeaderContent={() => (
                 <tr style={{ borderBottom: '1px solid var(--line)' }}>
                   {renderHeaderCells()}
