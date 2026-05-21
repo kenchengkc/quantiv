@@ -572,6 +572,102 @@ function KpiCard({
   );
 }
 
+// ---------- Hero sparkline ----------
+//
+// Renders the 1D price curve under the ticker symbol + spot price. Draws
+// the real Alpaca IEX 5-min bars when available; falls back to a tiny
+// deterministic seeded squiggle while the fetch is in flight (or when
+// the API hands back an empty payload, e.g. for tickers that don't
+// trade on IEX or on weekends with no data yet).
+type SparkBar = { t: string; c: number };
+
+function buildSeededFallback(ticker: string): { x: number; y: number }[] {
+  // Cheap deterministic random-walk so each ticker has a stable
+  // placeholder while the live data is loading. NOT real data —
+  // gets replaced as soon as the API responds.
+  let seed = 0;
+  for (let i = 0; i < ticker.length; i++) seed = (seed * 31 + ticker.charCodeAt(i)) >>> 0;
+  const rand = () => {
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    return seed / 0xffffffff;
+  };
+  const n = 80;
+  const arr: { x: number; y: number }[] = [];
+  let v = 0.5;
+  let trend = (rand() - 0.5) * 0.005;
+  for (let i = 0; i < n; i++) {
+    v += trend + (rand() - 0.5) * 0.04;
+    if (i % 12 === 0) trend = (rand() - 0.5) * 0.006;
+    v = Math.max(0.05, Math.min(0.95, v));
+    arr.push({ x: i / (n - 1), y: 1 - v });
+  }
+  return arr;
+}
+
+function HeroSpark({
+  ticker,
+  up,
+  bars,
+}: {
+  ticker: string;
+  up: boolean;
+  bars: SparkBar[] | null;
+}) {
+  const pts = useMemo(() => {
+    if (bars && bars.length >= 2) {
+      // Normalize real bars to 0..1 on both axes.
+      const closes = bars.map((b) => b.c);
+      const lo = Math.min(...closes);
+      const hi = Math.max(...closes);
+      const span = hi - lo || 1;
+      const n = bars.length;
+      return bars.map((b, i) => ({
+        x: n === 1 ? 0.5 : i / (n - 1),
+        // Invert so lower price → lower on screen (SVG y grows down).
+        y: 1 - (b.c - lo) / span,
+      }));
+    }
+    return buildSeededFallback(ticker);
+  }, [bars, ticker]);
+
+  const d = pts.map((p, i) => `${i ? 'L' : 'M'}${p.x * 100},${p.y * 36}`).join(' ');
+  const area =
+    'M 0 36 ' + pts.map((p) => `L ${p.x * 100},${p.y * 36}`).join(' ') + ' L 100 36 Z';
+  const stroke = up ? 'var(--up)' : 'var(--down)';
+  const isReal = !!bars && bars.length >= 2;
+  return (
+    <svg
+      viewBox="0 0 100 36"
+      preserveAspectRatio="none"
+      width="100%"
+      height="36"
+      style={{
+        overflow: 'visible',
+        // Faint placeholder shimmer while we're showing the seeded
+        // fallback. Drops to full opacity once real bars land.
+        opacity: isReal ? 1 : 0.45,
+        transition: 'opacity 220ms ease',
+      }}
+      aria-label={isReal ? `${ticker} 1D intraday chart` : `${ticker} placeholder chart`}
+    >
+      <defs>
+        <linearGradient id={`spark-fill-${ticker}`} x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stopColor={stroke} stopOpacity="0.32" />
+          <stop offset="100%" stopColor={stroke} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <path d={area} fill={`url(#spark-fill-${ticker})`} />
+      <path
+        d={d}
+        stroke={stroke}
+        strokeWidth="0.8"
+        fill="none"
+        vectorEffect="non-scaling-stroke"
+      />
+    </svg>
+  );
+}
+
 // ---------- Detail hero (gradient split card) ----------
 function DetailHero({
   ticker,
@@ -586,6 +682,8 @@ function DetailHero({
   earningsTiming,
   eventLabel,
   quoteLabel,
+  intradayBars,
+  intradaySessionPct,
   onBack,
   onToast,
 }: {
@@ -601,6 +699,14 @@ function DetailHero({
   earningsTiming: string | null;
   eventLabel: string;
   quoteLabel: string;
+  /** Real 5-min IEX bars for the 1D sparkline. `null` while loading or
+   *  when the API returns no data — the chart falls back to a low-
+   *  opacity deterministic placeholder in that case. */
+  intradayBars: SparkBar[] | null;
+  /** Real session % computed from bars (firstBar.c → lastBar.c).
+   *  `null` when bars aren't available, in which case the consumer
+   *  falls back to spot vs. prevClose. */
+  intradaySessionPct: number | null;
   onBack: () => void;
   onToast: (msg: string) => void;
 }) {
@@ -608,7 +714,17 @@ function DetailHero({
     Math.round(change * 100) / 100 === 0 &&
     Math.round(changePct * 10000) / 10000 === 0;
   const up = !flat && change >= 0;
-  const sessionPct = prevClose != null && prevClose > 0 ? spot / prevClose - 1 : changePct;
+  // Prefer the real session % from intraday bars when we have them; fall
+  // back to the spot-vs-prevClose calculation while bars are loading.
+  const sessionPct =
+    intradaySessionPct != null
+      ? intradaySessionPct
+      : prevClose != null && prevClose > 0
+        ? spot / prevClose - 1
+        : changePct;
+  // The sparkline color tracks the session direction. If we have real
+  // bars, use those; otherwise use the live change.
+  const sparkUp = intradaySessionPct != null ? intradaySessionPct >= 0 : up;
   const lower = spot * (1 - emPct);
   const upper = spot * (1 + emPct);
   const earningsLine = (() => {
@@ -728,11 +844,13 @@ function DetailHero({
             </span>
           </div>
 
-          <div
-            style={{
-              minHeight: 0,
-            }}
-          >
+          <div style={{ minHeight: 0 }}>
+            {/* Real 1D intraday sparkline (Alpaca IEX 5-min bars). Sits
+                above the small caption row so the chart reads as a
+                visual answer to the session % printed beneath it. */}
+            <div style={{ height: 42, marginBottom: 4 }}>
+              <HeroSpark ticker={symbol} up={sparkUp} bars={intradayBars} />
+            </div>
             <div
               style={{
                 width: '100%',
@@ -740,7 +858,7 @@ function DetailHero({
                 justifyContent: 'space-between',
                 gap: 16,
                 flexWrap: 'wrap',
-                paddingTop: 10,
+                paddingTop: 8,
                 borderTop: '1px solid color-mix(in oklab, var(--line) 70%, transparent)',
                 fontSize: 10,
                 color: 'var(--ink-4)',
@@ -748,8 +866,18 @@ function DetailHero({
                 textTransform: 'uppercase',
               }}
             >
-              <span>Quote move vs. previous close</span>
-              <span className="mono tnum">
+              <span>1D session · IEX</span>
+              <span
+                className="mono tnum"
+                style={{
+                  color:
+                    sessionPct === 0
+                      ? 'var(--ink-4)'
+                      : sessionPct > 0
+                        ? 'var(--up)'
+                        : 'var(--down)',
+                }}
+              >
                 {sessionPct >= 0 ? '+' : ''}
                 {(sessionPct * 100).toFixed(2)}%
               </span>
@@ -2681,6 +2809,56 @@ export default function SymbolPage() {
   const [loading, setLoading] = useState(true);
   const [live, setLive] = useState<LivePrice | null>(null);
   const [toast, setToast] = useState<{ msg: string; key: number } | null>(null);
+  // Intraday sparkline state. Bars come from /api/stocks/intraday which
+  // wraps Alpaca's IEX feed; we cache aggressively server-side and
+  // refresh once a minute client-side during the regular session.
+  const [intraday, setIntraday] = useState<{
+    bars: { t: string; c: number }[];
+    previousClose: number | null;
+  } | null>(null);
+
+  // Fetch intraday bars + auto-refresh every 60s during regular hours
+  // so the sparkline stays in sync with the live price tick above it.
+  // The endpoint caches at the edge for 30s, so polling is cheap.
+  useEffect(() => {
+    if (!symbol) return;
+    let cancelled = false;
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+    const load = async () => {
+      try {
+        const res = await fetch(`/api/stocks/intraday?symbol=${symbol}`, {
+          cache: 'no-store',
+        });
+        if (!res.ok || cancelled) return;
+        const json = (await res.json()) as {
+          bars?: { t: string; c: number }[];
+          previousClose?: number | null;
+        };
+        if (cancelled) return;
+        setIntraday({
+          bars: Array.isArray(json.bars) ? json.bars : [],
+          previousClose: json.previousClose ?? null,
+        });
+      } catch {
+        /* swallow — DetailHero falls back to the seeded placeholder */
+      }
+    };
+    void load();
+    // Poll once a minute; only active while the tab is visible to avoid
+    // burning quota on backgrounded pages.
+    intervalId = setInterval(() => {
+      if (document.visibilityState === 'visible') void load();
+    }, 60_000);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void load();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      cancelled = true;
+      if (intervalId) clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [symbol]);
 
   useEffect(() => {
     if (!symbol) return;
@@ -2965,7 +3143,11 @@ export default function SymbolPage() {
           ticker={companyName(symbol)}
           symbol={symbol}
           spot={spot}
-          prevClose={live?.previousClose ?? null}
+          // Prefer the previousClose embedded with the intraday payload
+          // when present (Alpaca prior-session close), since the live
+          // batch-price endpoint may not have a prevClose for tickers
+          // outside its main universe.
+          prevClose={intraday?.previousClose ?? live?.previousClose ?? null}
           change={change}
           changePct={changePct}
           emPct={straddlePct}
@@ -2974,6 +3156,16 @@ export default function SymbolPage() {
           earningsTiming={earningsTiming}
           eventLabel={eventLabel}
           quoteLabel={quoteSourceLabel(live, symbol, data.as_of_date)}
+          intradayBars={intraday?.bars && intraday.bars.length >= 2 ? intraday.bars : null}
+          // Real session %: first→last close on today's IEX bars.
+          intradaySessionPct={(() => {
+            const bars = intraday?.bars;
+            if (!bars || bars.length < 2) return null;
+            const first = bars[0].c;
+            const last = bars[bars.length - 1].c;
+            if (!first || !last) return null;
+            return last / first - 1;
+          })()}
           onBack={() => {
             if (window.history.length > 1) router.back();
             else router.push('/');
