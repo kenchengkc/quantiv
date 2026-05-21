@@ -251,8 +251,17 @@ jobs:
           git add -f data/earnings_calendar.csv data/market_caps.json
           # Snapshot + diff log are gitignored under /data/ but need to
           # persist across CI runs so tomorrow's build can diff against
-          # today. -f force-includes them past the gitignore.
-          git add -f data/popular_snapshot.json data/popular_changes.jsonl
+          # today. -f force-includes them past the gitignore. We loop
+          # with [ -f ... ] guards so a missing file (e.g. the changes
+          # log on the very first run, before any diff entries land)
+          # doesn't tank the commit step with a pathspec error.
+          for f in data/popular_snapshot.json data/popular_changes.jsonl; do
+            if [ -f "$f" ]; then
+              git add -f "$f"
+            else
+              echo "skipping $f (not present)"
+            fi
+          done
           if git diff --staged --quiet; then
             echo "No changes to commit"
           else

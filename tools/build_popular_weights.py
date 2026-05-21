@@ -371,6 +371,16 @@ def main() -> int:
     prev_as_of = prev_snapshot.get("as_of") if prev_snapshot else None
     diff = compute_diff(today_ranks, prev_snapshot)
     print_diff_summary(diff, prev_as_of)
+
+    # Ensure the changes log file exists before the CI workflow tries to
+    # `git add -f` it. Without this, the very first run (where
+    # prev_snapshot is None and we skip append_changes) leaves the file
+    # absent, and the commit step fails with
+    #   fatal: pathspec 'data/popular_changes.jsonl' did not match any files
+    # The empty file is harmless: subsequent runs append real diff lines.
+    CHANGES_PATH.parent.mkdir(parents=True, exist_ok=True)
+    CHANGES_PATH.touch(exist_ok=True)
+
     if prev_snapshot is not None:
         append_changes(
             diff,
