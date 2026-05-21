@@ -110,21 +110,6 @@ interface LivePrice {
   marketOpen: boolean;
 }
 
-type IntradaySource = 'alpaca_iex' | 'finnhub' | 'unavailable';
-
-interface IntradayPoint {
-  timestamp: string;
-  price: number;
-  volume?: number | null;
-}
-
-interface IntradaySeries {
-  source: IntradaySource;
-  date: string | null;
-  updated: string | null;
-  data: IntradayPoint[];
-}
-
 function logoUrl(t: string) {
   return `https://assets.parqet.com/logos/symbol/${t}?format=png`;
 }
@@ -575,91 +560,6 @@ function KpiCard({
   );
 }
 
-// ---------- Hero sparkline ----------
-function HeroSpark({
-  ticker,
-  points,
-  up,
-}: {
-  ticker: string;
-  points: IntradayPoint[];
-  up: boolean;
-}) {
-  const gradientId = `hero-spark-fill-${ticker.replace(/[^A-Za-z0-9]/g, '-')}`;
-  const pts = useMemo(() => {
-    const clean = points
-      .filter((p) => Number.isFinite(p.price) && p.price > 0)
-      .sort((a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp));
-    if (clean.length < 2) return [];
-    const prices = clean.map((p) => p.price);
-    const min = Math.min(...prices);
-    const max = Math.max(...prices);
-    const span = max - min || Math.max(max * 0.002, 0.01);
-    const pad = span * 0.08;
-    const lo = min - pad;
-    const hi = max + pad;
-    return clean.map((p, i) => ({
-      x: i / (clean.length - 1),
-      y: 1 - (p.price - lo) / (hi - lo),
-    }));
-  }, [points]);
-
-  if (pts.length < 2) {
-    const stroke = up ? 'var(--up)' : 'var(--down)';
-    return (
-      <svg
-        viewBox="0 0 100 36"
-        preserveAspectRatio="none"
-        width="100%"
-        height="36"
-        style={{ overflow: 'visible' }}
-        aria-hidden="true"
-      >
-        <path
-          d="M0,18 L100,18"
-          stroke={stroke}
-          strokeOpacity="0.35"
-          strokeWidth="0.8"
-          strokeDasharray="2 3"
-          fill="none"
-          vectorEffect="non-scaling-stroke"
-        />
-      </svg>
-    );
-  }
-
-  const d = pts.map((p, i) => `${i ? 'L' : 'M'}${p.x * 100},${p.y * 36}`).join(' ');
-  const area =
-    'M 0 36 ' + pts.map((p) => `L ${p.x * 100},${p.y * 36}`).join(' ') + ' L 100 36 Z';
-  const firstPrice = points[0]?.price ?? 0;
-  const lastPrice = points[points.length - 1]?.price ?? firstPrice;
-  const stroke = lastPrice >= firstPrice ? 'var(--up)' : 'var(--down)';
-  return (
-    <svg
-      viewBox="0 0 100 36"
-      preserveAspectRatio="none"
-      width="100%"
-      height="36"
-      style={{ overflow: 'visible' }}
-    >
-      <defs>
-        <linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%" stopColor={stroke} stopOpacity="0.32" />
-          <stop offset="100%" stopColor={stroke} stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <path d={area} fill={`url(#${gradientId})`} />
-      <path
-        d={d}
-        stroke={stroke}
-        strokeWidth="0.8"
-        fill="none"
-        vectorEffect="non-scaling-stroke"
-      />
-    </svg>
-  );
-}
-
 // ---------- Detail hero (gradient split card) ----------
 function DetailHero({
   ticker,
@@ -673,7 +573,6 @@ function DetailHero({
   earningsDate,
   earningsTiming,
   eventLabel,
-  intradayPoints,
   quoteLabel,
   onBack,
   onToast,
@@ -689,7 +588,6 @@ function DetailHero({
   earningsDate: string | null;
   earningsTiming: string | null;
   eventLabel: string;
-  intradayPoints: IntradayPoint[];
   quoteLabel: string;
   onBack: () => void;
   onToast: (msg: string) => void;
@@ -818,20 +716,27 @@ function DetailHero({
             </span>
           </div>
 
-          <div style={{ flex: 1, minHeight: 50 }}>
-            <HeroSpark ticker={symbol} points={intradayPoints} up={!flat && up} />
+          <div
+            style={{
+              minHeight: 0,
+            }}
+          >
             <div
               style={{
-                marginTop: 6,
+                width: '100%',
                 display: 'flex',
                 justifyContent: 'space-between',
+                gap: 16,
+                flexWrap: 'wrap',
+                paddingTop: 10,
+                borderTop: '1px solid color-mix(in oklab, var(--line) 70%, transparent)',
                 fontSize: 10,
                 color: 'var(--ink-4)',
                 letterSpacing: '0.08em',
                 textTransform: 'uppercase',
               }}
             >
-              <span>{intradayPoints.length >= 2 ? '1D session' : '1D quote'}</span>
+              <span>Quote move vs. previous close</span>
               <span className="mono tnum">
                 {sessionPct >= 0 ? '+' : ''}
                 {(sessionPct * 100).toFixed(2)}%
@@ -843,6 +748,7 @@ function DetailHero({
             onClick={onBack}
             style={{
               alignSelf: 'flex-start',
+              marginTop: 'auto',
               padding: '6px 12px',
               border: '1px solid var(--line)',
               borderRadius: 999,
@@ -902,10 +808,13 @@ function DetailHero({
                 <div
                   className="serif tnum qv-detail-countdown"
                   style={{
+                    display: 'flex',
+                    alignItems: 'flex-end',
+                    gap: 8,
                     fontSize: 56,
                     fontWeight: 800,
-                    lineHeight: 0.9,
-                    letterSpacing: '-0.04em',
+                    lineHeight: 1,
+                    letterSpacing: 0,
                     marginTop: 4,
                     background:
                       'linear-gradient(180deg, var(--ink) 0%, color-mix(in oklab, var(--ink) 60%, var(--brand-blue-1)) 100%)',
@@ -919,8 +828,9 @@ function DetailHero({
                     style={{
                       fontSize: 18,
                       color: 'var(--ink-3)',
-                      marginLeft: 6,
                       fontWeight: 500,
+                      lineHeight: 1.1,
+                      marginBottom: 6,
                       WebkitTextFillColor: 'var(--ink-3)',
                     }}
                   >
@@ -2725,7 +2635,6 @@ export default function SymbolPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [live, setLive] = useState<LivePrice | null>(null);
-  const [intraday, setIntraday] = useState<IntradaySeries | null>(null);
   const [toast, setToast] = useState<{ msg: string; key: number } | null>(null);
 
   useEffect(() => {
@@ -2829,47 +2738,6 @@ export default function SymbolPage() {
     return () => {
       cancelled = true;
       if (timer) clearTimeout(timer);
-      document.removeEventListener('visibilitychange', onVisible);
-      window.removeEventListener('focus', onVisible);
-    };
-  }, [symbol]);
-
-  useEffect(() => {
-    if (!symbol) return;
-    setIntraday(null);
-    let cancelled = false;
-    let timer: ReturnType<typeof setInterval> | null = null;
-
-    const fetchOnce = async () => {
-      try {
-        const res = await fetch(`/api/stocks/intraday?symbol=${symbol}`, { cache: 'no-store' });
-        if (!res.ok) return;
-        const json = (await res.json()) as IntradaySeries;
-        if (!cancelled) setIntraday(json);
-      } catch {
-        if (!cancelled) {
-          setIntraday({
-            source: 'unavailable',
-            date: null,
-            updated: null,
-            data: [],
-          });
-        }
-      }
-    };
-
-    void fetchOnce();
-    timer = setInterval(() => void fetchOnce(), 60_000);
-
-    const onVisible = () => {
-      if (document.visibilityState === 'visible' && !cancelled) void fetchOnce();
-    };
-    document.addEventListener('visibilitychange', onVisible);
-    window.addEventListener('focus', onVisible);
-
-    return () => {
-      cancelled = true;
-      if (timer) clearInterval(timer);
       document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('focus', onVisible);
     };
@@ -3060,7 +2928,6 @@ export default function SymbolPage() {
           earningsDate={earningsDate}
           earningsTiming={earningsTiming}
           eventLabel={eventLabel}
-          intradayPoints={intraday?.data ?? []}
           quoteLabel={quoteSourceLabel(live, symbol, data.as_of_date)}
           onBack={() => {
             if (window.history.length > 1) router.back();
