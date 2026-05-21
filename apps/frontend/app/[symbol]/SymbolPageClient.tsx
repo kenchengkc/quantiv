@@ -601,8 +601,9 @@ function DetailHero({
     return `${dayLabel}${timing}`;
   })();
   return (
-    <div className="qv-card-hi" style={{ padding: '26px 28px', marginTop: 18 }}>
+    <div className="qv-card-hi qv-detail-hero" style={{ padding: '26px 28px', marginTop: 18 }}>
       <div
+        className="qv-m-stack qv-detail-hero-grid"
         style={{
           display: 'grid',
           gridTemplateColumns: 'minmax(0, 1.1fr) minmax(0, 1fr)',
@@ -628,7 +629,7 @@ function DetailHero({
                 {ticker}
               </div>
               <div
-                className="serif"
+                className="serif qv-detail-symbol"
                 style={{
                   fontSize: 46,
                   fontWeight: 800,
@@ -748,6 +749,7 @@ function DetailHero({
         </div>
 
         <div
+          className="qv-detail-hero-right"
           style={{
             borderLeft: '1px solid color-mix(in oklab, var(--line) 60%, transparent)',
             paddingLeft: 28,
@@ -786,7 +788,7 @@ function DetailHero({
                   Reports in
                 </div>
                 <div
-                  className="serif tnum"
+                  className="serif tnum qv-detail-countdown"
                   style={{
                     fontSize: 56,
                     fontWeight: 800,
@@ -842,7 +844,7 @@ function DetailHero({
               Options-implied move
             </div>
             <div
-              className="serif tnum"
+              className="serif tnum qv-detail-em"
               style={{
                 fontSize: 64,
                 fontWeight: 800,
@@ -2360,7 +2362,7 @@ function GreeksPanel({ rows }: { rows: TermRow[] }) {
         </div>
       </div>
 
-      <div style={{ overflowX: 'auto' }}>
+      <div className="qv-m-table-wrap" style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 640 }}>
           <thead>
             <tr style={{ borderBottom: '1px solid var(--line)' }}>
@@ -2368,6 +2370,7 @@ function GreeksPanel({ rows }: { rows: TermRow[] }) {
                 (h, i) => (
                   <th
                     key={h}
+                    className={i === 0 ? 'qv-m-sticky-cell' : undefined}
                     style={{
                       textAlign: i === 0 ? 'left' : 'right',
                       padding: '10px 12px',
@@ -2404,7 +2407,7 @@ function GreeksPanel({ rows }: { rows: TermRow[] }) {
                     e.currentTarget.style.background = baseBg;
                   }}
                 >
-                  <td style={{ padding: '12px 12px' }}>
+                  <td className="qv-m-sticky-cell" style={{ padding: '12px 12px' }}>
                     <div
                       className="serif"
                       style={{
@@ -2867,7 +2870,7 @@ export default function SymbolPage() {
   const historySeries = buildHistorySeries(data.earnings_history);
 
   return (
-    <div style={{ maxWidth: 1100, margin: '0 auto', padding: '0 28px 80px' }}>
+    <div className="qv-m-pad" style={{ maxWidth: 1100, margin: '0 auto', padding: '0 28px 80px' }}>
       {toast && <Toast key={toast.key} message={toast.msg} onDone={() => setToast(null)} />}
 
       <Reveal as="div" style={{ marginTop: 8 }}>
@@ -2896,6 +2899,7 @@ export default function SymbolPage() {
       {em && (
         <Reveal delay={80}>
           <div
+            className="qv-m-2col"
             style={{
               marginTop: 22,
               display: 'grid',
@@ -2996,6 +3000,7 @@ export default function SymbolPage() {
       {(quantiles != null || termRows.length > 0) && (
         <Reveal delay={160}>
           <div
+            className="qv-m-stack"
             style={{
               marginTop: 18,
               display: 'grid',

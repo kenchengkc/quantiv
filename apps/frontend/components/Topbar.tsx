@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
-import { Search, ChevronRight } from 'lucide-react';
+import { Search, ChevronRight, Menu, X } from 'lucide-react';
 import { SignedIn, SignedOut, UserButton } from '@clerk/nextjs';
 
 const NAV = [
@@ -227,6 +227,24 @@ function NavSearch() {
 export function Topbar() {
   const pathname = usePathname();
   const now = useClock();
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  // Close the mobile sheet whenever the route changes so tapping a nav
+  // item drops the user on the new page without an open overlay.
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
+
+  // Lock background scroll while the mobile menu sheet is open so the
+  // page underneath doesn't move when fingers slide on the panel.
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [mobileOpen]);
 
   const activeHref = (() => {
     const known = new Set(NAV.map((n) => n.href));
@@ -259,6 +277,7 @@ export function Topbar() {
       }}
     >
       <div
+        className="qv-m-pad"
         style={{
           maxWidth: 1240,
           margin: '0 auto',
@@ -268,7 +287,7 @@ export function Topbar() {
           gap: 18,
         }}
       >
-        <Link href="/" aria-label="Quantiv home" className="flex items-center">
+        <Link href="/" aria-label="Quantiv home" className="flex items-center qv-topbar-brand">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/brand/QuantivColorBanner.png"
@@ -278,6 +297,7 @@ export function Topbar() {
         </Link>
 
         <nav
+          className="qv-m-hide"
           style={{
             display: 'flex',
             gap: 4,
@@ -325,15 +345,16 @@ export function Topbar() {
 
         <div style={{ flex: 1 }} />
 
-        <div className="mono tnum" style={{ fontSize: 11, color: 'var(--ink-4)' }}>
+        <div className="mono tnum qv-m-hide" style={{ fontSize: 11, color: 'var(--ink-4)' }}>
           {time} EDT
         </div>
         <NavSearch />
-        <span className="kbd">⌘K</span>
+        <span className="kbd qv-m-hide">⌘K</span>
 
         <SignedOut>
           <Link
             href="/sign-in"
+            className="qv-m-hide"
             style={{
               fontSize: 12,
               color: 'var(--ink-2)',
@@ -355,12 +376,121 @@ export function Topbar() {
           </Link>
         </SignedOut>
         <SignedIn>
-          <UserButton
-            afterSignOutUrl="/"
-            appearance={{ elements: { avatarBox: { width: 28, height: 28 } } }}
-          />
+          <span className="qv-m-hide" style={{ display: 'inline-flex' }}>
+            <UserButton
+              afterSignOutUrl="/"
+              appearance={{ elements: { avatarBox: { width: 28, height: 28 } } }}
+            />
+          </span>
         </SignedIn>
+
+        {/* Mobile-only hamburger toggle. Hidden on ≥ 641px via .qv-d-hide. */}
+        <button
+          type="button"
+          aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
+          aria-expanded={mobileOpen}
+          onClick={() => setMobileOpen((v) => !v)}
+          className="qv-d-hide"
+          style={{
+            width: 36,
+            height: 36,
+            display: 'grid',
+            placeItems: 'center',
+            borderRadius: 8,
+            border: '1px solid var(--line)',
+            background: 'transparent',
+            color: 'var(--ink-2)',
+            cursor: 'pointer',
+          }}
+        >
+          {mobileOpen ? <X size={18} /> : <Menu size={18} />}
+        </button>
       </div>
+
+      {/* Mobile dropdown sheet. Renders below the header band; tap a nav
+          item or outside to dismiss. */}
+      {mobileOpen && (
+        <div
+          className="qv-d-hide"
+          style={{
+            borderTop: '1px solid var(--line)',
+            background: 'var(--bg)',
+            padding: '8px 16px 18px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 2,
+          }}
+        >
+          {NAV.map((n) => {
+            const active = n.href === activeHref;
+            return (
+              <Link
+                key={n.href}
+                href={n.href}
+                onClick={() => setMobileOpen(false)}
+                aria-current={active ? 'page' : undefined}
+                style={{
+                  padding: '14px 4px',
+                  fontSize: 16,
+                  fontWeight: active ? 700 : 500,
+                  color: active ? 'var(--ink)' : 'var(--ink-2)',
+                  letterSpacing: '-0.005em',
+                  borderBottom: '1px solid var(--line)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <span>{n.label}</span>
+                {active && (
+                  <span
+                    style={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: 999,
+                      background: 'var(--accent)',
+                    }}
+                  />
+                )}
+              </Link>
+            );
+          })}
+          <div
+            style={{
+              marginTop: 14,
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: 12,
+            }}
+          >
+            <span className="mono tnum" style={{ fontSize: 11, color: 'var(--ink-4)' }}>
+              {time} EDT
+            </span>
+            <SignedOut>
+              <Link
+                href="/sign-in"
+                onClick={() => setMobileOpen(false)}
+                style={{
+                  fontSize: 13,
+                  color: 'var(--ink-2)',
+                  padding: '8px 16px',
+                  border: '1px solid var(--line)',
+                  borderRadius: 999,
+                }}
+              >
+                Sign in
+              </Link>
+            </SignedOut>
+            <SignedIn>
+              <UserButton
+                afterSignOutUrl="/"
+                appearance={{ elements: { avatarBox: { width: 32, height: 32 } } }}
+              />
+            </SignedIn>
+          </div>
+        </div>
+      )}
     </header>
   );
 }

@@ -535,6 +535,7 @@ function CalendarGridSkeleton({
       role="status"
       aria-live="polite"
       aria-busy="true"
+      className="qv-m-stack qv-calendar-grid"
       style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
@@ -544,6 +545,7 @@ function CalendarGridSkeleton({
       {days.map((d, i) => (
         <div
           key={d.toISOString()}
+          className="qv-calendar-day"
           style={{
             borderRight: i < 4 ? '1px solid var(--line)' : 'none',
           }}
@@ -662,7 +664,7 @@ function WeekHeader({
             </span>
           </div>
           <h1
-            className="serif"
+            className="serif qv-m-h1"
             style={{
               margin: 0,
               fontSize: 56,
@@ -1128,6 +1130,7 @@ export default function EarningsGrid() {
 
         {contentReady && data && (
           <div
+            className="qv-m-stack qv-calendar-grid"
             style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
@@ -1140,6 +1143,7 @@ export default function EarningsGrid() {
             {days.map((d, i) => (
               <div
                 key={d.toISOString()}
+                className="qv-calendar-day"
                 style={{
                   borderRight: i < 4 ? '1px solid var(--line)' : 'none',
                 }}

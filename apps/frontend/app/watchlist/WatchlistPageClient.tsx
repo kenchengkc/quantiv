@@ -322,6 +322,9 @@ function WatchlistLoadingRows() {
         rowGap: 0,
         columnGap: 16,
       }}
+      // Class hook so the mobile media query in globals.css can re-template
+      // the columns without us threading a state down here.
+      data-wl-grid="true"
     >
       {Array.from({ length: 4 }).map((_, i) => (
         <li
@@ -338,21 +341,21 @@ function WatchlistLoadingRows() {
             boxSizing: 'border-box',
           }}
         >
-          <span style={bar(i * 35, 16, 16)} />
+          <span className="qv-wl-cell-drag" style={bar(i * 35, 16, 16)} />
           <span style={bar(i * 35 + 15, 40, 40, 8)} />
           <span style={{ display: 'grid', gap: 7 }}>
             <span style={bar(i * 35 + 25, 74, 18)} />
             <span style={bar(i * 35 + 45, 'min(180px, 80%)', 13)} />
           </span>
           {/* 1fr spacer — empty cell that floats the price toward the row's center. */}
-          <span aria-hidden />
+          <span aria-hidden className="qv-wl-spacer" />
           <span style={{ display: 'grid', gap: 6, justifyItems: 'start' }}>
             <span style={bar(i * 35 + 35, 76, 18, 999)} />
             <span style={bar(i * 35 + 55, 112, 12, 999)} />
           </span>
           {/* 1fr spacer between price and reports — completes the centering. */}
-          <span aria-hidden />
-          <span style={{ display: 'grid', gap: 5 }}>
+          <span aria-hidden className="qv-wl-spacer" />
+          <span className="qv-wl-cell-reports" style={{ display: 'grid', gap: 5 }}>
             <span style={bar(i * 35 + 45, 62, 13)} />
             <span style={bar(i * 35 + 65, 128, 17)} />
             <span style={bar(i * 35 + 85, 86, 16)} />
@@ -546,7 +549,7 @@ export default function WatchlistPage() {
   const total = hydrated ? tickers.length : 0;
 
   return (
-    <div style={{ maxWidth: 960, margin: '0 auto', padding: '0 28px 60px' }}>
+    <div className="qv-m-pad" style={{ maxWidth: 960, margin: '0 auto', padding: '0 28px 60px' }}>
       {/* Header */}
       <div
         style={{
@@ -577,7 +580,7 @@ export default function WatchlistPage() {
             <MarketStatusBadge marketOpen={marketOpen} />
           </div>
           <h1
-            className="serif"
+            className="serif qv-m-h1"
             style={{
               margin: 0,
               fontSize: 56,
@@ -615,6 +618,7 @@ export default function WatchlistPage() {
             rowGap: 0,
             columnGap: 16,
           }}
+          data-wl-grid="true"
         >
           {tickers.map((t, i) => {
             const sum = summaries[t];
@@ -693,6 +697,7 @@ export default function WatchlistPage() {
               >
                 <span
                   aria-hidden
+                  className="qv-wl-cell-drag"
                   style={{
                     display: 'inline-flex',
                     color: 'var(--ink-4)',
@@ -742,7 +747,7 @@ export default function WatchlistPage() {
                 </Link>
 
                 {/* 1fr spacer — pushes price toward the row's center. */}
-                <span aria-hidden />
+                <span aria-hidden className="qv-wl-spacer" />
 
                 <div
                   style={{
@@ -805,9 +810,9 @@ export default function WatchlistPage() {
                 </div>
 
                 {/* 1fr spacer — keeps Reports + EM + Actions anchored right. */}
-                <span aria-hidden />
+                <span aria-hidden className="qv-wl-spacer" />
 
-                <div style={{ width: 168, minHeight: 51 }}>
+                <div className="qv-wl-cell-reports" style={{ width: 168, minHeight: 51 }}>
                   <div
                     style={{
                       height: 14,
