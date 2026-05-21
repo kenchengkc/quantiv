@@ -1106,10 +1106,10 @@ export default function EarningsScreener() {
               className="serif qv-m-h1"
               style={{
                 margin: 0,
-                fontSize: 64,
+                fontSize: 48,
                 fontWeight: 800,
-                letterSpacing: '-0.035em',
-                lineHeight: 0.92,
+                letterSpacing: '-0.03em',
+                lineHeight: 0.95,
                 color: 'var(--ink)',
                 textTransform: 'uppercase',
               }}
@@ -1168,22 +1168,59 @@ export default function EarningsScreener() {
             >
               {sorted.length === 1 ? 'name' : 'names'} · filtered
             </div>
-            {manifest?.as_of_date && (
-              <div
-                className="mono tnum"
-                style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 6 }}
-              >
-                As of {manifest.as_of_date}
-              </div>
-            )}
+            {/* Always rendered so the right panel reserves height for the
+                As-of line. Using visibility (not conditional render) prevents
+                the count above from jittering upward when the manifest lands. */}
+            <div
+              className="mono tnum"
+              aria-hidden={!manifest?.as_of_date}
+              style={{
+                fontSize: 11,
+                color: 'var(--ink-4)',
+                marginTop: 6,
+                visibility: manifest?.as_of_date ? 'visible' : 'hidden',
+              }}
+            >
+              As of {manifest?.as_of_date ?? '0000-00-00'}
+            </div>
           </div>
         </div>
       </div>
 
       {/* Insight cards — four cards summarizing the visible universe.
           Each shows the count of names meeting a criterion, the ratio
-          of the universe, and a one-line definition. */}
-      {contentReady && summary && (
+          of the universe, and a one-line definition. Renders skeleton
+          placeholders during loading so the info line below doesn't
+          jump up under the header subtext, then shift down when the
+          real cards mount. */}
+      {!(contentReady && summary) ? (
+        <div
+          className="qv-m-2col"
+          aria-hidden
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(4, 1fr)',
+            gap: 14,
+            marginTop: 10,
+          }}
+        >
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div
+              key={i}
+              className="qv-screener-insight"
+              style={{
+                borderRadius: 14,
+                border: '1px solid var(--line)',
+                background: 'var(--bg-2)',
+                minHeight: 178,
+                animation: 'earnings-grid-pulse 1.4s ease-in-out infinite',
+                animationDelay: `${i * 90}ms`,
+                opacity: 0.55,
+              }}
+            />
+          ))}
+        </div>
+      ) : (
         <div
           className="qv-m-2col"
           style={{
