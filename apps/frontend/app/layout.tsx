@@ -1,5 +1,6 @@
 import './globals.css';
 import type { Metadata } from 'next';
+import { JetBrains_Mono, Mulish, Nunito_Sans } from 'next/font/google';
 import { ClerkProvider } from '@clerk/nextjs';
 import { Providers } from './providers';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
@@ -9,6 +10,33 @@ import { Splash } from '@/components/Splash';
 import { TickerHoverHost } from '@/components/TickerHoverCard';
 import { Analytics } from '@vercel/analytics/next';
 import { SpeedInsights } from '@vercel/speed-insights/next';
+
+// Self-host the three typefaces through next/font/google. This sidesteps
+// the @import ordering bug we used to work around with a <link> in <head>:
+// next/font writes its own preload + font-face rules into Next's <head>
+// stream, so there's no @import for Tailwind to reorder past, and the
+// browser never sees a third-party fonts.googleapis.com request. Each
+// family exposes a CSS variable that globals.css consumes by name.
+const mulish = Mulish({
+  subsets: ['latin'],
+  weight: ['300', '400', '500', '600', '700', '800', '900'],
+  variable: '--font-mulish',
+  display: 'swap',
+});
+
+const nunitoSans = Nunito_Sans({
+  subsets: ['latin'],
+  weight: ['300', '400', '500', '600'],
+  variable: '--font-nunito-sans',
+  display: 'swap',
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ['latin'],
+  weight: ['300', '400', '500', '600'],
+  variable: '--font-jetbrains-mono',
+  display: 'swap',
+});
 
 export const metadata: Metadata = {
   title: {
@@ -55,26 +83,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         },
       }}
     >
-      <html lang="en" style={{ backgroundColor: '#000000', colorScheme: 'dark' }}>
+      <html
+        lang="en"
+        className={`${mulish.variable} ${nunitoSans.variable} ${jetbrainsMono.variable}`}
+        style={{ backgroundColor: '#000000', colorScheme: 'dark' }}
+      >
         <head>
-          {/* Load fonts via <link> rather than @import inside globals.css —
-              Tailwind's compiled output places its preflight rules before
-              the @import, which makes browsers silently ignore the @import
-              (per CSS spec, @import must precede every other rule). The
-              symptom: Mulish was never actually loading, so the SCREENER h1
-              fell back to Nunito Sans and rendered ~5% wider than the design. */}
-          <link rel="preconnect" href="https://fonts.googleapis.com" />
-          <link
-            rel="preconnect"
-            href="https://fonts.gstatic.com"
-            crossOrigin="anonymous"
-          />
           <link rel="preload" as="image" href="/brand/QuantivSplashQClosed.png" />
           <link rel="preload" as="image" href="/brand/QuantivSplashTail.png" />
-          <link
-            rel="stylesheet"
-            href="https://fonts.googleapis.com/css2?family=Mulish:wght@300;400;500;600;700;800;900&family=Nunito+Sans:opsz,wght@6..12,300;6..12,400;6..12,500;6..12,600&family=JetBrains+Mono:wght@300;400;500;600&display=swap"
-          />
         </head>
         <body style={{ backgroundColor: '#000000' }}>
           <Providers>

@@ -2300,7 +2300,7 @@ function HistoryBlock({ history }: { history: HistoryPoint[] }) {
           textAnchor="end"
           fill="var(--ink-3)"
           fontSize="7"
-          fontFamily="JetBrains Mono"
+          style={{ fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
         >
           +{(max * 100).toFixed(0)}%
         </text>
@@ -2310,7 +2310,7 @@ function HistoryBlock({ history }: { history: HistoryPoint[] }) {
           textAnchor="end"
           fill="var(--ink-3)"
           fontSize="7"
-          fontFamily="JetBrains Mono"
+          style={{ fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
         >
           −{(max * 100).toFixed(0)}%
         </text>
@@ -2320,7 +2320,7 @@ function HistoryBlock({ history }: { history: HistoryPoint[] }) {
           textAnchor="end"
           fill="var(--ink-3)"
           fontSize="7"
-          fontFamily="JetBrains Mono"
+          style={{ fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
         >
           0%
         </text>
@@ -2399,7 +2399,7 @@ function HistoryBlock({ history }: { history: HistoryPoint[] }) {
                 textAnchor="middle"
                 fill={active ? 'var(--ink)' : 'var(--ink-2)'}
                 fontSize="7.5"
-                fontFamily="JetBrains Mono"
+                style={{ fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
                 fontWeight={active ? 700 : 500}
               >
                 {h.q}
