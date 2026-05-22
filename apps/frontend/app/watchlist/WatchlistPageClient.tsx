@@ -553,7 +553,7 @@ export default function WatchlistPage() {
       {/* Header */}
       <div
         style={{
-          padding: '24px 0 14px',
+          padding: '24px 0 20px',
           borderBottom: '1px solid var(--line)',
           display: 'flex',
           alignItems: 'flex-end',
@@ -608,6 +608,18 @@ export default function WatchlistPage() {
           >
             Watchlist
           </h1>
+          <div
+            style={{
+              marginTop: 18,
+              fontSize: 16,
+              color: 'var(--ink-2)',
+              maxWidth: 660,
+              lineHeight: 1.55,
+              letterSpacing: '-0.005em',
+            }}
+          >
+            The tickers you’re tracking — live quotes and the next earnings print at a glance.
+          </div>
         </div>
         <div
           className="mono tnum"
