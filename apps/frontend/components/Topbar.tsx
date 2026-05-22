@@ -151,31 +151,46 @@ function NavSearch() {
   };
 
   return (
-    <div ref={wrapRef} className="relative">
-      <form onSubmit={(e) => { e.preventDefault(); go(query); }} className="relative">
+    <div ref={wrapRef} className="relative" style={{ display: 'flex', alignItems: 'center' }}>
+      <form
+        onSubmit={(e) => { e.preventDefault(); go(query); }}
+        className="relative"
+        style={{ display: 'flex', alignItems: 'center', height: 34 }}
+      >
         <Search
           size={13}
           className="absolute left-[10px] top-1/2 -translate-y-1/2"
-          style={{ color: 'var(--ink-4)' }}
+          style={{ color: 'var(--ink-3)' }}
         />
         <input
           ref={inputRef}
           value={query}
           onChange={(e) => setQuery(e.target.value.toUpperCase())}
           placeholder="Jump to ticker"
-          className="outline-none transition-colors"
+          className="qv-ticker-search-input outline-none transition-colors"
           style={{
-            background: 'transparent',
-            border: '1px solid var(--line)',
+            display: 'block',
+            height: 34,
+            lineHeight: '34px',
+            background: 'color-mix(in oklab, var(--bg-2) 88%, transparent)',
+            border: '1px solid var(--line-2)',
+            boxShadow: 'inset 0 0 0 1px color-mix(in oklab, var(--ink) 4%, transparent)',
             color: 'var(--ink)',
-            padding: '6px 12px 6px 30px',
+            caretColor: 'var(--ink)',
+            padding: '0 12px 0 30px',
             borderRadius: 999,
             fontSize: 12,
-            width: 180,
+            width: 188,
             fontFamily: 'inherit',
           }}
-          onFocus={(e) => (e.currentTarget.style.borderColor = 'var(--line-2)')}
-          onBlur={(e) => (e.currentTarget.style.borderColor = 'var(--line)')}
+          onFocus={(e) => {
+            e.currentTarget.style.borderColor = 'var(--accent)';
+            e.currentTarget.style.boxShadow = '0 0 0 2px color-mix(in oklab, var(--accent) 18%, transparent)';
+          }}
+          onBlur={(e) => {
+            e.currentTarget.style.borderColor = 'var(--line-2)';
+            e.currentTarget.style.boxShadow = 'inset 0 0 0 1px color-mix(in oklab, var(--ink) 4%, transparent)';
+          }}
         />
       </form>
       {isOpen && suggestions.length > 0 && (
@@ -207,7 +222,7 @@ function NavSearch() {
                   flex: 1,
                   minWidth: 0,
                   fontSize: 13,
-                  color: 'var(--ink)',
+                  color: 'var(--ink-2)',
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
                   whiteSpace: 'nowrap',

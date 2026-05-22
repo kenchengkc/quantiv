@@ -218,7 +218,7 @@ function TickerRow({
             className="serif"
             style={{
               fontWeight: 800,
-              color: 'var(--ink)',
+              color: 'var(--ink-2)',
               fontSize: 13,
               letterSpacing: '-0.01em',
               textTransform: 'uppercase',
@@ -259,7 +259,7 @@ function TickerRow({
         style={{
           fontSize: 14,
           fontWeight: 600,
-          color: 'var(--ink)',
+          color: 'var(--ink-2)',
           flexShrink: 0,
           whiteSpace: 'nowrap',
         }}
@@ -304,7 +304,7 @@ function Group({
           alignItems: 'center',
           gap: 7,
           padding: '7px 11px 7px 9px',
-          color: 'var(--ink)',
+          color: 'var(--ink-2)',
           fontSize: 11,
           fontWeight: 700,
           letterSpacing: '0.14em',
@@ -785,7 +785,7 @@ function WeekHeader({
         </div>
         <FilterInfo filter={filter} />
         <div style={{ flex: 1 }} />
-        <div style={{ position: 'relative' }}>
+        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', height: 34 }}>
           <Search
             size={13}
             style={{
@@ -793,26 +793,37 @@ function WeekHeader({
               left: 10,
               top: '50%',
               transform: 'translateY(-50%)',
-              color: 'var(--ink-4)',
+              color: 'var(--ink-3)',
             }}
           />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value.toUpperCase())}
             placeholder="Jump to ticker"
-            className="outline-none"
+            className="qv-ticker-search-input outline-none"
             style={{
-              background: 'transparent',
-              border: '1px solid var(--line)',
+              display: 'block',
+              height: 34,
+              lineHeight: '34px',
+              background: 'color-mix(in oklab, var(--bg-2) 88%, transparent)',
+              border: '1px solid var(--line-2)',
+              boxShadow: 'inset 0 0 0 1px color-mix(in oklab, var(--ink) 4%, transparent)',
               color: 'var(--ink)',
-              padding: '6px 12px 6px 30px',
+              caretColor: 'var(--ink)',
+              padding: '0 12px 0 30px',
               borderRadius: 999,
               fontSize: 12,
-              width: 180,
+              width: 188,
               fontFamily: 'inherit',
             }}
-            onFocus={(e) => (e.currentTarget.style.borderColor = 'var(--line-2)')}
-            onBlur={(e) => (e.currentTarget.style.borderColor = 'var(--line)')}
+            onFocus={(e) => {
+              e.currentTarget.style.borderColor = 'var(--accent)';
+              e.currentTarget.style.boxShadow = '0 0 0 2px color-mix(in oklab, var(--accent) 18%, transparent)';
+            }}
+            onBlur={(e) => {
+              e.currentTarget.style.borderColor = 'var(--line-2)';
+              e.currentTarget.style.boxShadow = 'inset 0 0 0 1px color-mix(in oklab, var(--ink) 4%, transparent)';
+            }}
           />
         </div>
       </div>
