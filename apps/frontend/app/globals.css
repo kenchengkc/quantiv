@@ -341,11 +341,21 @@
   /* Hold the assembled mark in place while the wave finishes drawing,
      then a quick anticipation dip, then the launch to ~10× scale.
      Hold ends at 82% (= ~1908ms of 2327ms), dip at 88% (= ~2048ms),
-     final scale at 100% — same relative burst window as before. */
-  0%   { transform: scale(1); }
-  82%  { transform: scale(1); }
-  88%  { transform: scale(0.94); }
-  100% { transform: scale(10); }
+     final scale at 100% — same relative burst window as before.
+
+     The translate(1.5%, 1%) on every keyframe nudges the mark
+     down-and-right by ~6.6px / ~4.4px (at the 440px box) so the full
+     Q glyph (ring + tail) sits at the viewport's optical center.
+     The source PNGs have the glyph placed slightly upper-left of the
+     4096×4096 canvas center because the tail consumes more empty
+     space on the right; without the nudge, the assembled Q reads as
+     biased toward the upper-left of the screen. Percentages here are
+     relative to the mark's pre-scale box, so the translate stays a
+     fixed visible offset throughout the 1× → 10× burst. */
+  0%   { transform: translate(1.5%, 1%) scale(1); }
+  82%  { transform: translate(1.5%, 1%) scale(1); }
+  88%  { transform: translate(1.5%, 1%) scale(0.94); }
+  100% { transform: translate(1.5%, 1%) scale(10); }
 }
 
 @keyframes quantiv-splash-fade {
