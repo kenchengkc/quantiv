@@ -1708,6 +1708,49 @@ export default function EarningsScreener() {
               </button>
             );
           })}
+          {(q !== '' ||
+            sp500Only ||
+            mlOnly ||
+            minSpotRaw != null ||
+            timing !== 'all' ||
+            preset != null ||
+            sortKey !== 'hist_edge' ||
+            sortDir !== 'desc') && (
+            <button
+              type="button"
+              title="Clear ticker search, filters, presets, and sort"
+              onClick={() =>
+                router.replace('/screener', { scroll: false })
+              }
+              style={{
+                padding: '7px 12px',
+                borderRadius: 999,
+                border: '1px solid var(--line)',
+                background: 'transparent',
+                color: 'var(--ink-3)',
+                fontSize: 11.5,
+                letterSpacing: '0.04em',
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition:
+                  'border-color 140ms ease, background 140ms ease, color 140ms ease',
+                whiteSpace: 'nowrap',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = 'var(--line-2)';
+                e.currentTarget.style.color = 'var(--ink)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = 'var(--line)';
+                e.currentTarget.style.color = 'var(--ink-3)';
+              }}
+            >
+              Reset
+            </button>
+          )}
         </div>
       </div>
 
