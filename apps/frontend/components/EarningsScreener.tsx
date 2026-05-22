@@ -392,7 +392,18 @@ function SortHeader({
         }}
       >
         {label}
-        <span style={{ opacity: active ? 1 : 0.25, fontSize: 9 }}>
+        <span
+          style={{
+            // Inactive arrows used to sit at opacity 0.25 + 9px, which made
+            // them nearly invisible against the column kicker and hid the
+            // fact that columns were sortable. Bumping opacity + size so
+            // the affordance reads from a normal viewing distance without
+            // shouting; active sort still pops via full opacity.
+            opacity: active ? 1 : 0.6,
+            fontSize: 10,
+            color: active ? 'var(--ink)' : 'var(--ink-2)',
+          }}
+        >
           {active ? (dir === 'desc' ? '▼' : '▲') : '▼'}
         </span>
       </button>
@@ -438,6 +449,113 @@ function SortHeader({
         </div>
       )}
     </th>
+  );
+}
+
+/** Inline filter label paired with a delayed (~600ms) hover tooltip,
+ *  mirroring the SortHeader hint card so filter chips/inputs (Min spot,
+ *  etc.) can carry the same plain-English explanation surface. The
+ *  label itself shows a subtle dotted underline + Info icon so users
+ *  know there is help available without forcing them to hunt for it. */
+function FilterHint({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint: string;
+  children?: React.ReactNode;
+}) {
+  const [show, setShow] = useState(false);
+  const timerRef = useRef<number | null>(null);
+
+  const clearTimer = () => {
+    if (timerRef.current !== null) {
+      window.clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+  };
+  const onEnter = () => {
+    clearTimer();
+    timerRef.current = window.setTimeout(() => setShow(true), 600);
+  };
+  const onLeave = () => {
+    clearTimer();
+    setShow(false);
+  };
+  useEffect(() => () => clearTimer(), []);
+
+  return (
+    <span
+      onMouseEnter={onEnter}
+      onMouseLeave={onLeave}
+      onFocus={onEnter}
+      onBlur={onLeave}
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 4,
+        position: 'relative',
+        cursor: 'help',
+      }}
+    >
+      <span
+        style={{
+          textDecoration: 'underline dotted',
+          textDecorationColor: 'var(--ink-4)',
+          textUnderlineOffset: 3,
+        }}
+      >
+        {children ?? label}
+      </span>
+      <Info
+        size={11}
+        aria-hidden
+        style={{ color: 'var(--ink-4)', flexShrink: 0 }}
+      />
+      {show && (
+        <div
+          role="tooltip"
+          style={{
+            position: 'absolute',
+            left: 0,
+            top: 'calc(100% + 6px)',
+            zIndex: 50,
+            padding: '8px 12px',
+            background: 'linear-gradient(180deg, var(--bg-3), var(--bg-2))',
+            border: '1px solid var(--line-2)',
+            borderRadius: 8,
+            boxShadow: '0 12px 32px rgba(0,0,0,0.55)',
+            maxWidth: 280,
+            minWidth: 200,
+            fontSize: 11.5,
+            lineHeight: 1.4,
+            color: 'var(--ink-2)',
+            textAlign: 'left',
+            letterSpacing: 0,
+            textTransform: 'none',
+            whiteSpace: 'normal',
+            fontWeight: 400,
+            animation: 'qv-hover-pop 160ms cubic-bezier(.2,.8,.3,1) both',
+            pointerEvents: 'none',
+          }}
+        >
+          <div
+            style={{
+              fontSize: 9.5,
+              letterSpacing: '0.16em',
+              textTransform: 'uppercase',
+              color: 'var(--brand-blue-1)',
+              fontWeight: 700,
+              marginBottom: 4,
+            }}
+          >
+            {label}
+          </div>
+          {hint}
+        </div>
+      )}
+    </span>
   );
 }
 
@@ -1212,7 +1330,12 @@ export default function EarningsScreener() {
                 borderRadius: 14,
                 border: '1px solid var(--line)',
                 background: 'var(--bg-2)',
-                minHeight: 178,
+                // Matches the real cards' rendered height. The cards have
+                // a 56px serif count plus a 2-line description, so real
+                // height lands around 210px even with minHeight: 178.
+                // Locking both to the same value keeps the info line +
+                // table below from jumping when the cards swap in.
+                minHeight: 210,
                 animation: 'earnings-grid-pulse 1.4s ease-in-out infinite',
                 animationDelay: `${i * 90}ms`,
                 opacity: 0.55,
@@ -1297,7 +1420,9 @@ export default function EarningsScreener() {
                 padding: '18px 20px 20px',
                 display: 'flex',
                 flexDirection: 'column',
-                minHeight: 178,
+                // Matches the loading-state skeleton minHeight so the
+                // page below doesn't shift when real cards swap in.
+                minHeight: 210,
               }}
             >
               {/* Top: small caps kicker in the card's accent color. */}
@@ -1460,7 +1585,10 @@ export default function EarningsScreener() {
           ML rows only
         </button>
         <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--ink-2)' }}>
-          Min spot
+          <FilterHint
+            label="Min spot"
+            hint="Minimum underlying share price, in dollars. Tickers trading below this are hidden so the table doesn't get flooded with low-priced names where the options data is thinner and quotes can be noisy. Default is $15."
+          />
           <input
             type="number"
             min={1}
