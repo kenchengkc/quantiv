@@ -1207,7 +1207,7 @@ export default function AboutPageClient() {
         </div>
       </Reveal>
 
-      {/* House note */}
+      {/* Closing note */}
       <Reveal enabled={pageSettled} delay={200}>
         <div
           className="qv-m-stack qv-about-quote"
@@ -1253,18 +1253,6 @@ export default function AboutPageClient() {
               and risk tolerance. We surface signal; you bring judgement, and
               read the small print on every formula above.
             </div>
-            <div
-              style={{
-                marginTop: 12,
-                fontSize: 11,
-                color: 'var(--ink-3)',
-                letterSpacing: '0.18em',
-                textTransform: 'uppercase',
-                fontWeight: 600,
-              }}
-            >
-              House note · LightGBM ensemble v3
-            </div>
           </div>
         </div>
       </Reveal>
@@ -1307,19 +1295,19 @@ export default function AboutPageClient() {
             >
               Quantiv
             </span>
-            <span
-              style={{
-                fontSize: 11,
-                color: 'var(--ink-4)',
-                letterSpacing: '0.06em',
-                marginLeft: 6,
-              }}
-            >
-              · LightGBM ensemble v3
-            </span>
           </div>
           <Link
             href="/"
+            onClick={() => {
+              // App-Router's default scroll-to-top can land the user
+              // mid-page when the source route was scrolled (this CTA
+              // lives near the bottom of /about). Queueing a manual
+              // scroll for the next tick forces the calendar to land
+              // at its title.
+              if (typeof window !== 'undefined') {
+                setTimeout(() => window.scrollTo({ top: 0, left: 0 }), 0);
+              }
+            }}
             style={{
               padding: '11px 20px',
               borderRadius: 999,
@@ -1336,7 +1324,7 @@ export default function AboutPageClient() {
               transition: 'background 140ms ease',
             }}
           >
-            Open the calendar
+            Open the Earnings Calendar
             <span style={{ fontSize: 14 }}>→</span>
           </Link>
         </div>
