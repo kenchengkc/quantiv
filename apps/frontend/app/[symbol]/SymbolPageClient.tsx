@@ -1181,7 +1181,7 @@ function InteractiveBar({
         style={{
           display: 'flex',
           justifyContent: 'space-between',
-          fontSize: 10,
+          fontSize: 11,
           color: 'var(--ink-4)',
           letterSpacing: '0.1em',
           textTransform: 'uppercase',
@@ -1303,7 +1303,7 @@ function InteractiveBar({
             left: `${spotX}%`,
             bottom: 0,
             transform: 'translateX(-50%)',
-            fontSize: 10,
+            fontSize: 11,
             color: 'var(--ink-2)',
             letterSpacing: '0.1em',
             textTransform: 'uppercase',
@@ -1320,7 +1320,7 @@ function InteractiveBar({
             top: 52,
             left: `${emLow}%`,
             transform: 'translateX(-50%)',
-            fontSize: 11,
+            fontSize: 12,
             color: 'var(--down)',
             fontWeight: 600,
           }}
@@ -1334,7 +1334,7 @@ function InteractiveBar({
             top: 52,
             left: `${emHigh}%`,
             transform: 'translateX(-50%)',
-            fontSize: 11,
+            fontSize: 12,
             color: 'var(--up)',
             fontWeight: 600,
           }}
@@ -1421,7 +1421,7 @@ function InteractiveBar({
           justifyContent: 'space-between',
           alignItems: 'center',
           marginTop: 16,
-          fontSize: 11,
+          fontSize: 12,
           color: 'var(--ink-3)',
         }}
       >
@@ -1518,13 +1518,13 @@ function QuantileBand({
           >
             Forecast distribution
           </h3>
-          <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 4 }}>
+          <div style={{ fontSize: 13, color: 'var(--ink-3)', marginTop: 4 }}>
             LightGBM ensemble · range of plausible absolute moves on print day
           </div>
         </div>
         <div
           className="mono tnum"
-          style={{ textAlign: 'right', fontSize: 11, color: 'var(--ink-3)' }}
+          style={{ textAlign: 'right', fontSize: 12, color: 'var(--ink-3)' }}
         >
           <div>
             Median <span style={{ color: 'var(--ink-2)' }}>±{(q.p50 * 100).toFixed(1)}%</span>
@@ -1638,7 +1638,7 @@ function QuantileBand({
           <div key={label}>
             <div
               style={{
-                fontSize: 9.5,
+                fontSize: 10.5,
                 letterSpacing: '0.18em',
                 textTransform: 'uppercase',
                 color: 'var(--ink-4)',
@@ -1660,7 +1660,7 @@ function QuantileBand({
             </div>
             <div
               className="mono tnum"
-              style={{ fontSize: 10, color: 'var(--ink-4)', marginTop: 2 }}
+              style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 2 }}
             >
               ${(spot * (1 - val)).toFixed(0)}–${(spot * (1 + val)).toFixed(0)}
             </div>
@@ -1816,11 +1816,11 @@ function TermFan({ rows, spot }: { rows: TermRow[]; spot: number }) {
           >
             Implied range across expiries
           </h3>
-          <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 4 }}>
+          <div style={{ fontSize: 13, color: 'var(--ink-3)', marginTop: 4 }}>
             Spot × (1 ± EM) at each expiry. Hover an expiry for details.
           </div>
         </div>
-        <div className="mono tnum" style={{ fontSize: 10.5, color: 'var(--ink-4)' }}>
+        <div className="mono tnum" style={{ fontSize: 11.5, color: 'var(--ink-4)' }}>
           {rows.length} {rows.length === 1 ? 'expiry' : 'expiries'}
         </div>
       </div>
@@ -1861,7 +1861,7 @@ function TermFan({ rows, spot }: { rows: TermRow[]; spot: number }) {
               y={y(v)}
               textAnchor="end"
               dominantBaseline="central"
-              fontSize={px(10.5)}
+              fontSize={px(11.5)}
               fontFamily="ui-monospace, monospace"
               fill="var(--ink-3)"
             >
@@ -1940,7 +1940,7 @@ function TermFan({ rows, spot }: { rows: TermRow[]; spot: number }) {
                 x={cx}
                 y={H - M.bottom + px(18)}
                 textAnchor="middle"
-                fontSize={px(10.5)}
+                fontSize={px(11.5)}
                 fontFamily="ui-monospace, monospace"
                 fill={active ? 'var(--ink)' : 'var(--ink-2)'}
                 fontWeight={active ? 600 : 500}
@@ -1952,7 +1952,7 @@ function TermFan({ rows, spot }: { rows: TermRow[]; spot: number }) {
                 x={cx}
                 y={H - M.bottom + px(32)}
                 textAnchor="middle"
-                fontSize={px(9)}
+                fontSize={px(10)}
                 fontFamily="ui-monospace, monospace"
                 fill="var(--ink-4)"
                 pointerEvents="none"
@@ -2240,7 +2240,7 @@ function HistoryBlock({ history }: { history: HistoryPoint[] }) {
               : 'Realized moves · last '}
             {history.length} {history.length === 1 ? 'quarter' : 'quarters'}
           </h3>
-          <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 4 }}>
+          <div style={{ fontSize: 13, color: 'var(--ink-3)', marginTop: 4 }}>
             {hasImplied
               ? 'Realized moves overlaid on what options priced going in.'
               : 'Close-to-close moves; implied range pending historical option chains.'}
@@ -2248,7 +2248,7 @@ function HistoryBlock({ history }: { history: HistoryPoint[] }) {
         </div>
         <div
           className="mono tnum"
-          style={{ fontSize: 11, color: 'var(--ink-3)', textAlign: 'right', lineHeight: 1.6 }}
+          style={{ fontSize: 12, color: 'var(--ink-3)', textAlign: 'right', lineHeight: 1.6 }}
         >
           {hasImplied && (
             <div>
@@ -2340,7 +2340,7 @@ function HistoryBlock({ history }: { history: HistoryPoint[] }) {
           y={y(max) + 3}
           textAnchor="end"
           fill="var(--ink-3)"
-          fontSize="7"
+          fontSize="8"
           style={{ fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
         >
           +{(max * 100).toFixed(0)}%
@@ -2350,7 +2350,7 @@ function HistoryBlock({ history }: { history: HistoryPoint[] }) {
           y={y(-max) + 3}
           textAnchor="end"
           fill="var(--ink-3)"
-          fontSize="7"
+          fontSize="8"
           style={{ fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
         >
           −{(max * 100).toFixed(0)}%
@@ -2360,7 +2360,7 @@ function HistoryBlock({ history }: { history: HistoryPoint[] }) {
           y={H / 2 + 3}
           textAnchor="end"
           fill="var(--ink-3)"
-          fontSize="7"
+          fontSize="8"
           style={{ fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
         >
           0%
@@ -2439,7 +2439,7 @@ function HistoryBlock({ history }: { history: HistoryPoint[] }) {
                 y={H - 8}
                 textAnchor="middle"
                 fill={active ? 'var(--ink)' : 'var(--ink-2)'}
-                fontSize="7.5"
+                fontSize="8.5"
                 style={{ fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
                 fontWeight={active ? 700 : 500}
               >
@@ -2539,7 +2539,7 @@ function HistoryBlock({ history }: { history: HistoryPoint[] }) {
             style={{
               display: 'flex',
               justifyContent: 'space-between',
-              fontSize: 10,
+              fontSize: 11,
               color: 'var(--ink-3)',
               letterSpacing: '0.14em',
               textTransform: 'uppercase',
@@ -2591,7 +2591,7 @@ function HistoryBlock({ history }: { history: HistoryPoint[] }) {
           marginTop: 14,
           display: 'flex',
           gap: 18,
-          fontSize: 11,
+          fontSize: 12,
           color: 'var(--ink-3)',
           flexWrap: 'wrap',
         }}
@@ -2672,7 +2672,7 @@ function GreeksPanel({ rows }: { rows: TermRow[] }) {
           >
             Greeks by expiry
           </h3>
-          <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 4 }}>
+          <div style={{ fontSize: 13, color: 'var(--ink-3)', marginTop: 4 }}>
             ATM call · delta hedge ratios, sensitivity to vol and time.
           </div>
         </div>
@@ -2690,7 +2690,7 @@ function GreeksPanel({ rows }: { rows: TermRow[] }) {
                     style={{
                       textAlign: i === 0 ? 'left' : 'right',
                       padding: '10px 12px',
-                      fontSize: 9.5,
+                      fontSize: 10.5,
                       letterSpacing: '0.16em',
                       textTransform: 'uppercase',
                       color: 'var(--ink-3)',
@@ -2748,7 +2748,7 @@ function GreeksPanel({ rows }: { rows: TermRow[] }) {
                     <div
                       className="mono"
                       style={{
-                        fontSize: 10,
+                        fontSize: 11,
                         color: 'var(--ink-4)',
                         marginTop: 2,
                         letterSpacing: '0.08em',
@@ -3340,7 +3340,7 @@ export default function SymbolPage() {
                 >
                   Probability density around spot
                 </h3>
-                <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 4 }}>
+                <div style={{ fontSize: 13, color: 'var(--ink-3)', marginTop: 4 }}>
                   Log-normal model with ATM IV {(atmIV * 100).toFixed(1)}% over {dte} days.
                   Range ${(spot * (1 - straddlePct)).toFixed(2)}–${(spot * (1 + straddlePct)).toFixed(2)}.
                 </div>
