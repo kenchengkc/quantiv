@@ -1,7 +1,24 @@
 'use client';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useState } from 'react';
+import { usePathname } from 'next/navigation';
+import { useEffect, useRef, useState } from 'react';
+
+// Records the previous in-app pathname into sessionStorage so deep pages
+// (like the ticker detail view) can label their back button with the actual
+// origin — "Screener" vs "Watchlist" vs the default "Earnings Calendar".
+function PrevRouteTracker() {
+  const pathname = usePathname();
+  const prevRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (prevRef.current && prevRef.current !== pathname) {
+      window.sessionStorage.setItem('quantiv:prevRoute', prevRef.current);
+    }
+    prevRef.current = pathname;
+  }, [pathname]);
+  return null;
+}
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
@@ -19,6 +36,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
+      <PrevRouteTracker />
       {children}
     </QueryClientProvider>
   );
