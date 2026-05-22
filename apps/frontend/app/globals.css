@@ -108,6 +108,11 @@
     border-radius: 4px;
     color: var(--ink-3);
   }
+
+  .qv-ticker-search-input::placeholder {
+    color: var(--ink-3);
+    opacity: 1;
+  }
 }
 
 @keyframes splash-ring {
@@ -164,10 +169,12 @@
     color-mix(in oklab, var(--bg-2) 60%, transparent));
   border: 1px solid var(--line);
   border-radius: 14px;
+  color: var(--ink-2);
   padding: 18px 20px;
   transition: border-color 200ms ease, transform 200ms ease, box-shadow 200ms ease;
 }
 .qv-card:hover { border-color: var(--line-2); }
+.qv-card :where(h1, h2, h3, h4) { color: var(--ink); }
 
 .qv-card-hi {
   background:
@@ -215,12 +222,15 @@
   display: grid;
   place-items: center;
   background: #000000;
-  /* Hold the black backdrop opaque almost to the end, then dissolve in
-     sync with the mark's zoom-forward to reveal the dashboard underneath. */
-  animation: quantiv-splash-fade 2327ms ease-in-out forwards;
   /* Disable interactions while the splash is up so a fast click doesn't
      register on the dashboard before it's revealed. */
   pointer-events: auto;
+}
+
+.quantiv-splash--play {
+  /* Hold the black backdrop opaque almost to the end, then dissolve in
+     sync with the mark's zoom-forward to reveal the dashboard underneath. */
+  animation: quantiv-splash-fade 2327ms ease-in-out forwards;
 }
 
 .quantiv-splash-mark {
