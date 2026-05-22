@@ -1199,7 +1199,7 @@ export default function EarningsScreener() {
                 letterSpacing: '0.18em',
                 textTransform: 'uppercase',
                 color: 'var(--ink-3)',
-                marginBottom: 6,
+                marginBottom: 14,
                 display: 'flex',
                 alignItems: 'center',
                 gap: 8,
@@ -1224,10 +1224,10 @@ export default function EarningsScreener() {
               className="serif qv-m-h1"
               style={{
                 margin: 0,
-                fontSize: 48,
+                fontSize: 56,
                 fontWeight: 800,
-                letterSpacing: '-0.03em',
-                lineHeight: 0.95,
+                letterSpacing: '-0.032em',
+                lineHeight: 0.94,
                 color: 'var(--ink)',
                 textTransform: 'uppercase',
               }}
@@ -1236,7 +1236,7 @@ export default function EarningsScreener() {
             </h1>
             <div
               style={{
-                marginTop: 18,
+                marginTop: 14,
                 fontSize: 16,
                 color: 'var(--ink-2)',
                 maxWidth: 660,
