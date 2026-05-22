@@ -1199,7 +1199,12 @@ export default function EarningsScreener() {
                 letterSpacing: '0.18em',
                 textTransform: 'uppercase',
                 color: 'var(--ink-3)',
-                marginBottom: 14,
+                // Bumped from 14 → 18 so the kicker doesn't feel cramped
+                // under the larger 61px SCREENER headline. The Calendar
+                // and Watchlist h1s sit at 56 with their original 14/14
+                // spacing; only this page's spacing widens to match the
+                // bigger headline.
+                marginBottom: 18,
                 display: 'flex',
                 alignItems: 'center',
                 gap: 8,
@@ -1224,7 +1229,7 @@ export default function EarningsScreener() {
               className="serif qv-m-h1"
               style={{
                 margin: 0,
-                fontSize: 56,
+                fontSize: 61,
                 fontWeight: 800,
                 letterSpacing: '-0.032em',
                 lineHeight: 0.94,
@@ -1236,7 +1241,10 @@ export default function EarningsScreener() {
             </h1>
             <div
               style={{
-                marginTop: 14,
+                // Mirrors the kicker's 18px gap above the h1 so the
+                // larger SCREENER title has equal breathing room above
+                // and below.
+                marginTop: 18,
                 fontSize: 16,
                 color: 'var(--ink-2)',
                 maxWidth: 660,
@@ -1586,7 +1594,7 @@ export default function EarningsScreener() {
         </button>
         <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--ink-2)' }}>
           <FilterHint
-            label="Min spot"
+            label="Min spot ($)"
             hint="Hide tickers trading below this share price. Filters out low-priced names where options data is thinner and quotes can be noisy."
           />
           <input

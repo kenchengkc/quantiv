@@ -155,6 +155,7 @@ function Reveal({
 // ──────────────────────────────────────────────────────────────────────────
 function CountUp({
   value,
+  from = 0,
   duration = COUNT_UP_DURATION_MS,
   enabled = true,
   suffix = '',
@@ -162,17 +163,21 @@ function CountUp({
   prefix = '',
 }: {
   value: number;
+  // Optional starting value. Defaults to 0 (count up). Passing a value
+  // larger than `value` produces a count-down — used by the Refresh stat
+  // to read as a latency dropping toward 60.
+  from?: number;
   duration?: number;
   enabled?: boolean;
   suffix?: string;
   decimals?: number;
   prefix?: string;
 }) {
-  const [current, setCurrent] = useState(0);
+  const [current, setCurrent] = useState(from);
   const ref = useRef<HTMLSpanElement | null>(null);
   useEffect(() => {
     if (!enabled) {
-      setCurrent(0);
+      setCurrent(from);
       return;
     }
 
@@ -192,7 +197,7 @@ function CountUp({
         const elapsed = t - start;
         const p = Math.min(1, elapsed / duration);
         const eased = 1 - Math.pow(1 - p, 3);
-        setCurrent(value * eased);
+        setCurrent(from + (value - from) * eased);
         if (p < 1) {
           frame = requestAnimationFrame(tick);
         }
@@ -218,7 +223,7 @@ function CountUp({
       io.disconnect();
       if (frame !== null) cancelAnimationFrame(frame);
     };
-  }, [enabled, value, duration]);
+  }, [enabled, value, from, duration]);
   return (
     <span ref={ref} className="serif tnum">
       {prefix}
@@ -766,10 +771,13 @@ export default function AboutPageClient() {
   //    universe level than the 12 quarters we persist per name.
   //  · refresh: chain-to-UI latency target, capped at the cron interval.
   const stats = [
-    { v: 1424, suf: '', dec: 0, kicker: 'Names', label: 'tracked across our universe' },
-    { v: 12.4, suf: 'K', dec: 1, kicker: 'Chains', label: 'snapped per week' },
-    { v: 8, suf: ' yrs', dec: 0, kicker: 'History', label: 'of realized data' },
-    { v: 60, suf: ' min', dec: 0, kicker: 'Refresh', label: 'chain to UI latency' },
+    { v: 1424, from: 0,    suf: '', dec: 0, kicker: 'Names', label: 'tracked across our universe' },
+    { v: 12.4, from: 0,    suf: 'K', dec: 1, kicker: 'Chains', label: 'snapped per week' },
+    { v: 8,    from: 0,    suf: ' yrs', dec: 0, kicker: 'History', label: 'of realized data' },
+    // Counts DOWN from a one-day-in-minutes (1440) ceiling toward the
+    // 60-minute target so the stat reads as latency collapsing, not
+    // climbing — conveys "fast" rather than "growing."
+    { v: 60,   from: 1440, suf: ' min', dec: 0, kicker: 'Refresh', label: 'chain to UI latency' },
   ];
 
   return (
@@ -912,6 +920,7 @@ export default function AboutPageClient() {
                 <CountUp
                   enabled={pageSettled}
                   value={s.v}
+                  from={s.from}
                   suffix={s.suf}
                   decimals={s.dec}
                   duration={COUNT_UP_DURATION_MS + i * 240}
