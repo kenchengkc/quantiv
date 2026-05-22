@@ -37,7 +37,7 @@ export function Footer() {
             display: 'flex',
             gap: 22,
             fontSize: 11.5,
-            color: 'var(--ink-4)',
+            color: 'var(--ink-3)',
             letterSpacing: '0.04em',
             flexWrap: 'wrap',
           }}

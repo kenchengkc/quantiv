@@ -459,7 +459,7 @@ function MoveBar({ value, max }: { value: number | null | undefined; max: number
     >
       <span
         className="mono tnum"
-        style={{ fontSize: 11.5, color: 'var(--ink)', minWidth: 44, textAlign: 'right' }}
+        style={{ fontSize: 11.5, color: 'var(--ink-2)', minWidth: 44, textAlign: 'right' }}
       >
         {pct1(value)}
       </span>
@@ -582,8 +582,8 @@ function ScreenerSkeletonRow({ delayMs }: { delayMs: number }) {
           </span>
         </div>
       </td>
-      {cell(10, 38, 10)}   {/* Date */}
-      {cell(15, 24, 10)}   {/* DTE */}
+      {cell(10, 38, 10)}
+      {cell(15, 24, 10)}
       <td style={{ padding: '16px 14px' }}>
         <span aria-hidden style={{ display: 'inline-block', ...bar(20, 26, 10, 999) }} />
       </td>
@@ -602,12 +602,12 @@ function ScreenerSkeletonRow({ delayMs }: { delayMs: number }) {
           <span style={{ display: 'inline-block', ...bar(35, 56, 6, 3) }} />
         </span>
       </td>
-      {cell(40, 40, 10)}   {/* Hist 4Q avg */}
-      {cell(45, 32, 10)}   {/* Hist edge */}
-      {cell(50, 40, 10)}   {/* ML EM */}
-      {cell(55, 36, 10)}   {/* Edge */}
-      {cell(60, 44, 10)}   {/* P90−P10 */}
-      {cell(65, 44, 10)}   {/* ATM IV */}
+      {cell(40, 40, 10)}
+      {cell(45, 32, 10)}
+      {cell(50, 40, 10)}
+      {cell(55, 36, 10)}
+      {cell(60, 44, 10)}
+      {cell(65, 44, 10)}
       {/* IV Rank — bar + small number */}
       <td style={{ padding: '16px 14px', textAlign: 'right' }}>
         <span
@@ -623,12 +623,12 @@ function ScreenerSkeletonRow({ delayMs }: { delayMs: number }) {
           <span style={{ display: 'inline-block', ...bar(72, 26, 10, 999) }} />
         </span>
       </td>
-      {cell(75, 40, 10)}   {/* IV crush */}
-      {cell(80, 30, 10)}   {/* Skew */}
-      {cell(85, 54, 10)}   {/* 1d % */}
-      {cell(90, 58, 10)}   {/* Spot */}
-      {cell(95, 48, 10)}   {/* $ Straddle */}
-      {cell(100, 24, 10)}  {/* Opt DTE */}
+      {cell(75, 40, 10)}
+      {cell(80, 30, 10)}
+      {cell(85, 54, 10)}
+      {cell(90, 58, 10)}
+      {cell(95, 48, 10)}
+      {cell(100, 24, 10)}
     </tr>
   );
 }
@@ -1438,7 +1438,8 @@ export default function EarningsScreener() {
             borderRadius: 8,
             border: '1px solid var(--line)',
             background: 'var(--bg-2)',
-            color: 'var(--ink)',
+            color: 'var(--ink-2)',
+            caretColor: 'var(--ink)',
             fontSize: 12,
           }}
         />
@@ -1476,7 +1477,8 @@ export default function EarningsScreener() {
               borderRadius: 8,
               border: '1px solid var(--line)',
               background: 'var(--bg-2)',
-              color: 'var(--ink)',
+              color: 'var(--ink-2)',
+              caretColor: 'var(--ink)',
               fontSize: 12,
             }}
           />
@@ -1610,24 +1612,24 @@ export default function EarningsScreener() {
         const tableWidth = Object.values(col).reduce((sum, width) => sum + width, 0);
         const colGroup = (
           <colgroup>
-            <col style={{ width: col.name }} />        {/* Name */}
-            <col style={{ width: col.date }} />        {/* Date */}
-            <col style={{ width: col.dte }} />         {/* DTE */}
-            <col style={{ width: col.session }} />     {/* Session */}
-            <col style={{ width: col.straddle }} />    {/* Straddle EM (with bar) */}
-            <col style={{ width: col.histAvg }} />     {/* Hist 4Q avg */}
-            <col style={{ width: col.histEdge }} />    {/* Hist edge */}
-            <col style={{ width: col.ml }} />          {/* ML EM */}
-            <col style={{ width: col.edge }} />        {/* Edge (vs ML) */}
-            <col style={{ width: col.band }} />        {/* P90−P10 */}
-            <col style={{ width: col.iv }} />          {/* ATM IV */}
-            <col style={{ width: col.ivRank }} />      {/* IV Rank (with bar) */}
-            <col style={{ width: col.ivCrush }} />     {/* IV crush */}
-            <col style={{ width: col.skew }} />        {/* Skew */}
-            <col style={{ width: col.dayChange }} />   {/* 1d % */}
-            <col style={{ width: col.spot }} />        {/* Spot */}
-            <col style={{ width: col.straddleAbs }} /> {/* $ Straddle */}
-            <col style={{ width: col.optDte }} />      {/* Opt DTE */}
+            <col style={{ width: col.name }} />
+            <col style={{ width: col.date }} />
+            <col style={{ width: col.dte }} />
+            <col style={{ width: col.session }} />
+            <col style={{ width: col.straddle }} />
+            <col style={{ width: col.histAvg }} />
+            <col style={{ width: col.histEdge }} />
+            <col style={{ width: col.ml }} />
+            <col style={{ width: col.edge }} />
+            <col style={{ width: col.band }} />
+            <col style={{ width: col.iv }} />
+            <col style={{ width: col.ivRank }} />
+            <col style={{ width: col.ivCrush }} />
+            <col style={{ width: col.skew }} />
+            <col style={{ width: col.dayChange }} />
+            <col style={{ width: col.spot }} />
+            <col style={{ width: col.straddleAbs }} />
+            <col style={{ width: col.optDte }} />
           </colgroup>
         );
 
@@ -1636,6 +1638,7 @@ export default function EarningsScreener() {
           borderCollapse: 'separate',
           borderSpacing: 0,
           fontSize: 13,
+          color: 'var(--ink-2)',
           width: tableWidth,
         };
 
@@ -1807,7 +1810,10 @@ export default function EarningsScreener() {
                 style={{
                   textAlign: 'right',
                   padding: '16px 14px',
-                  color: 'var(--ink)',
+                  color:
+                    e != null && Math.abs(e) >= 0.008
+                      ? 'var(--ink)'
+                      : 'var(--ink-2)',
                   fontWeight: e != null && Math.abs(e) >= 0.008 ? 600 : 400,
                 }}
               >

@@ -751,7 +751,7 @@ export default function WatchlistPage() {
                   <div
                     style={{
                       fontSize: 11,
-                      color: 'var(--ink-4)',
+                      color: 'var(--ink-3)',
                       marginTop: 2,
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
@@ -926,7 +926,7 @@ export default function WatchlistPage() {
           style={{
             marginTop: 24,
             fontSize: 11,
-            color: 'var(--ink-4)',
+            color: 'var(--ink-3)',
             display: 'flex',
             justifyContent: 'space-between',
             flexWrap: 'wrap',

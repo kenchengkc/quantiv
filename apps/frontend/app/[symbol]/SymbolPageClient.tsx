@@ -464,7 +464,7 @@ function Toast({ message, onDone }: { message: string; onDone: () => void }) {
         alignItems: 'center',
         gap: 10,
         fontSize: 12.5,
-        color: 'var(--ink)',
+        color: 'var(--ink-2)',
         boxShadow: '0 16px 48px rgba(0,0,0,.5)',
         animation: leaving
           ? 'toast-out 280ms ease forwards'
@@ -1502,7 +1502,7 @@ function QuantileBand({
           style={{ textAlign: 'right', fontSize: 11, color: 'var(--ink-3)' }}
         >
           <div>
-            Median <span style={{ color: 'var(--ink)' }}>±{(q.p50 * 100).toFixed(1)}%</span>
+            Median <span style={{ color: 'var(--ink-2)' }}>±{(q.p50 * 100).toFixed(1)}%</span>
           </div>
           <div style={{ marginTop: 2 }}>
             80% band{' '}
@@ -2192,7 +2192,7 @@ function HistoryBlock({ history }: { history: HistoryPoint[] }) {
           {hasImplied && (
             <div>
               Beat implied{' '}
-              <span style={{ color: 'var(--ink)' }}>
+              <span style={{ color: 'var(--ink-2)' }}>
                 {beatImplied}/{history.length}
               </span>
             </div>
