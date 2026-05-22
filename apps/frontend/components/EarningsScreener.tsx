@@ -1587,7 +1587,7 @@ export default function EarningsScreener() {
         <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--ink-2)' }}>
           <FilterHint
             label="Min spot"
-            hint="Minimum underlying share price, in dollars. Tickers trading below this are hidden so the table doesn't get flooded with low-priced names where the options data is thinner and quotes can be noisy. Default is $15."
+            hint="Hide tickers trading below this share price. Filters out low-priced names where options data is thinner and quotes can be noisy."
           />
           <input
             type="number"
