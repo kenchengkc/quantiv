@@ -672,7 +672,13 @@ function HeroSpark({
 // Pill button used in the DetailHero left column. Mirrors the qv-card hover
 // treatment (border lifts from --line → --line-2, content brightens) so it
 // reads as interactive alongside the cards below it.
-function BackToCalendarButton({ onClick }: { onClick: () => void }) {
+function BackToCalendarButton({
+  onClick,
+  label,
+}: {
+  onClick: () => void;
+  label: string;
+}) {
   const [hover, setHover] = useState(false);
   return (
     <button
@@ -702,9 +708,29 @@ function BackToCalendarButton({ onClick }: { onClick: () => void }) {
           'background 160ms ease, color 160ms ease, border-color 160ms ease',
       }}
     >
-      <ChevronLeft size={14} /> Earnings Calendar
+      <ChevronLeft size={14} /> {label}
     </button>
   );
+}
+
+// Reads the previous in-app pathname (recorded by PrevRouteTracker in
+// providers.tsx) and maps it to a back-button label + landing path. The
+// path is only consulted as a fallback when the browser has no history
+// entry to pop — the click handler still prefers router.back() so the
+// scroll position and URL params on /screener are preserved.
+function usePrevAppLocation(): { label: string; path: string } {
+  const [loc, setLoc] = useState<{ label: string; path: string }>({
+    label: 'Earnings Calendar',
+    path: '/',
+  });
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const prev = window.sessionStorage.getItem('quantiv:prevRoute');
+    if (prev === '/screener') setLoc({ label: 'Screener', path: '/screener' });
+    else if (prev === '/watchlist') setLoc({ label: 'Watchlist', path: '/watchlist' });
+    else setLoc({ label: 'Earnings Calendar', path: '/' });
+  }, []);
+  return loc;
 }
 
 // ---------- Detail hero (gradient split card) ----------
@@ -724,6 +750,7 @@ function DetailHero({
   intradayBars,
   intradaySessionPct,
   onBack,
+  backLabel,
   onToast,
 }: {
   ticker: string;
@@ -747,6 +774,7 @@ function DetailHero({
    *  falls back to spot vs. prevClose. */
   intradaySessionPct: number | null;
   onBack: () => void;
+  backLabel: string;
   onToast: (msg: string) => void;
 }) {
   const flat =
@@ -928,7 +956,7 @@ function DetailHero({
             </div>
           </div>
 
-          <BackToCalendarButton onClick={onBack} />
+          <BackToCalendarButton onClick={onBack} label={backLabel} />
         </div>
 
         <div
@@ -2885,6 +2913,7 @@ export default function SymbolPage() {
   const params = useParams();
   const router = useRouter();
   const symbol = (params.symbol as string)?.toUpperCase();
+  const prevLoc = usePrevAppLocation();
 
   const [data, setData] = useState<SymbolDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -3081,12 +3110,12 @@ export default function SymbolPage() {
         <button
           onClick={() => {
             if (window.history.length > 1) router.back();
-            else router.push('/');
+            else router.push(prevLoc.path);
           }}
           className="chip"
           style={{ border: 'none', color: 'var(--ink-3)', paddingLeft: 0, cursor: 'pointer' }}
         >
-          <ChevronLeft size={14} /> Earnings Calendar
+          <ChevronLeft size={14} /> {prevLoc.label}
         </button>
 
         {/* Header: logo + ticker + company name + live quote (when
@@ -3250,8 +3279,9 @@ export default function SymbolPage() {
           })()}
           onBack={() => {
             if (window.history.length > 1) router.back();
-            else router.push('/');
+            else router.push(prevLoc.path);
           }}
+          backLabel={prevLoc.label}
           onToast={showToast}
         />
       </Reveal>
