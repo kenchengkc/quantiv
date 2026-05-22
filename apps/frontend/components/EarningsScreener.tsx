@@ -1199,10 +1199,9 @@ export default function EarningsScreener() {
                 letterSpacing: '0.18em',
                 textTransform: 'uppercase',
                 color: 'var(--ink-3)',
-                // 20px above the h1 — sits between the original 14
-                // (Calendar/Watchlist) and the 24 that 72px needed.
-                // Tuned to the current 64px SCREENER title.
-                marginBottom: 20,
+                // 22px above the h1 — between the 20 used at 64px and
+                // the 24 used at 72px. Tuned to the current 68px title.
+                marginBottom: 22,
                 display: 'flex',
                 alignItems: 'center',
                 gap: 8,
@@ -1227,14 +1226,13 @@ export default function EarningsScreener() {
               className="serif qv-m-h1"
               style={{
                 margin: 0,
-                // 64px — distinctly bigger than the 56 used on Calendar
-                // and Watchlist, but not display-headline-territory.
-                // letterSpacing/lineHeight nudged tighter than the
-                // 56-equivalents because optical tracking starts to
-                // feel loose past ~60px.
-                fontSize: 64,
+                // 68px — sits between the 64 that read as not enough and
+                // the 72 that read as too much. letterSpacing tightened
+                // a touch past the 64-equivalent because tracking
+                // continues to feel loose as the size climbs.
+                fontSize: 68,
                 fontWeight: 800,
-                letterSpacing: '-0.033em',
+                letterSpacing: '-0.034em',
                 lineHeight: 0.93,
                 color: 'var(--ink)',
                 textTransform: 'uppercase',
@@ -1244,9 +1242,9 @@ export default function EarningsScreener() {
             </h1>
             <div
               style={{
-                // Mirrors the kicker's 20px gap so the title has equal
+                // Mirrors the kicker's 22px gap so the title has equal
                 // breathing room above and below.
-                marginTop: 20,
+                marginTop: 22,
                 fontSize: 16,
                 color: 'var(--ink-2)',
                 maxWidth: 660,
