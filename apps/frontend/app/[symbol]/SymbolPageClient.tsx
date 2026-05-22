@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ChevronLeft } from 'lucide-react';
 import { SignedIn, SignedOut, SignInButton } from '@clerk/nextjs';
@@ -1497,7 +1497,12 @@ function QuantileBand({
           justifyContent: 'space-between',
           alignItems: 'flex-start',
           gap: 16,
-          marginBottom: 14,
+          // Was 14, which left no room for the STRADDLE callout that sits
+          // at `top: -22` above the bar. The callout was punching up into
+          // the "LightGBM ensemble · range of plausible absolute moves on
+          // print day" line. 32 leaves a clear ~10px gap below the
+          // callout's top edge.
+          marginBottom: 32,
         }}
       >
         <div>
@@ -1720,6 +1725,32 @@ function buildTermRows(
 function TermFan({ rows, spot }: { rows: TermRow[]; spot: number }) {
   const [hovered, setHovered] = useState<number | null>(null);
 
+  // Measure the SVG's rendered width so axis/label/tooltip sizes can be
+  // expressed in target screen pixels instead of viewBox units. Without
+  // this, the chart's text shrinks dramatically in the 2-col layout (when
+  // QuantileBand is rendered alongside, the container drops from ~1000px
+  // to ~498px wide, scaling 720-unit text by 0.69×) and explodes in the
+  // 1-col layout. useLayoutEffect runs before the browser paints, so the
+  // corrected chartScale is in place for the first user-visible frame.
+  // A ResizeObserver keeps it in sync on window resize / layout-column
+  // flips (e.g. when QuantileBand mounts/unmounts). The W = 720 viewBox
+  // width is constant for the chart's geometry; it has to be re-declared
+  // here because the const below sits after the early-return.
+  const svgRef = useRef<SVGSVGElement>(null);
+  const [chartScale, setChartScale] = useState(1);
+  useLayoutEffect(() => {
+    const el = svgRef.current;
+    if (!el) return;
+    const update = () => {
+      const rect = el.getBoundingClientRect();
+      if (rect.width > 0) setChartScale(rect.width / 720);
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   if (rows.length === 0) return null;
   const maxDte = Math.max(...rows.map((r) => r.dte), 1);
   const maxPrice = Math.max(...rows.map((r) => spot * (1 + r.emPct)));
@@ -1733,6 +1764,9 @@ function TermFan({ rows, spot }: { rows: TermRow[]; spot: number }) {
   const M = { top: 16, right: 96, bottom: 48, left: 72 };
   const innerW = W - M.left - M.right;
   const innerH = H - M.top - M.bottom;
+  // Screen-px → viewBox units. Always returns a finite number so a 0
+  // initial scale (before measurement) doesn't propagate NaN into the DOM.
+  const px = (screenPx: number) => screenPx / (chartScale || 1);
   const x = (dte: number) => M.left + (dte / maxDte) * innerW;
   const y = (p: number) =>
     M.top + innerH - ((p - yMin) / (yMax - yMin)) * innerH;
@@ -1792,6 +1826,7 @@ function TermFan({ rows, spot }: { rows: TermRow[]; spot: number }) {
       </div>
 
       <svg
+        ref={svgRef}
         viewBox={`0 0 ${W} ${H}`}
         style={{ width: '100%', height: 'auto', display: 'block', marginTop: 10 }}
       >
@@ -1826,7 +1861,7 @@ function TermFan({ rows, spot }: { rows: TermRow[]; spot: number }) {
               y={y(v)}
               textAnchor="end"
               dominantBaseline="central"
-              fontSize="7.5"
+              fontSize={px(10.5)}
               fontFamily="ui-monospace, monospace"
               fill="var(--ink-3)"
             >
@@ -1903,9 +1938,9 @@ function TermFan({ rows, spot }: { rows: TermRow[]; spot: number }) {
               />
               <text
                 x={cx}
-                y={H - M.bottom + 16}
+                y={H - M.bottom + px(18)}
                 textAnchor="middle"
-                fontSize="7"
+                fontSize={px(10.5)}
                 fontFamily="ui-monospace, monospace"
                 fill={active ? 'var(--ink)' : 'var(--ink-2)'}
                 fontWeight={active ? 600 : 500}
@@ -1915,9 +1950,9 @@ function TermFan({ rows, spot }: { rows: TermRow[]; spot: number }) {
               </text>
               <text
                 x={cx}
-                y={H - M.bottom + 28}
+                y={H - M.bottom + px(32)}
                 textAnchor="middle"
-                fontSize="6"
+                fontSize={px(9)}
                 fontFamily="ui-monospace, monospace"
                 fill="var(--ink-4)"
                 pointerEvents="none"
@@ -1936,7 +1971,7 @@ function TermFan({ rows, spot }: { rows: TermRow[]; spot: number }) {
                 x={x(last.dte) + 10}
                 y={y(spot * (1 + last.emPct))}
                 dominantBaseline="central"
-                fontSize="8"
+                fontSize={px(12)}
                 fontFamily="ui-monospace, monospace"
                 fontWeight="700"
                 fill="var(--up)"
@@ -1947,7 +1982,7 @@ function TermFan({ rows, spot }: { rows: TermRow[]; spot: number }) {
                 x={x(last.dte) + 10}
                 y={y(spot * (1 - last.emPct))}
                 dominantBaseline="central"
-                fontSize="8"
+                fontSize={px(12)}
                 fontFamily="ui-monospace, monospace"
                 fontWeight="700"
                 fill="var(--down)"
@@ -1961,7 +1996,20 @@ function TermFan({ rows, spot }: { rows: TermRow[]; spot: number }) {
         {hovered != null &&
           (() => {
             const r = rows[hovered];
-            const tooltipW = 170;
+            // Tooltip box dimensions in target screen pixels, converted to
+            // viewBox units via px() so the box reads the same size whether
+            // the chart is at 498px (2-col) or 1004px (1-col) wide.
+            const tooltipW = px(200);
+            const padX = px(12);
+            const padTop = px(18);
+            const lineH = px(15);
+            const lines: Array<[string, string]> = [
+              ['DTE', `${r.dte}d`],
+              ['ATM IV', `${(r.iv * 100).toFixed(2)}%`],
+              ['EM', `±${(r.emPct * 100).toFixed(2)}%`],
+              ['Straddle', `$${r.straddle.toFixed(2)}`],
+            ];
+            const tooltipH = padTop + px(8) + lines.length * lineH;
             const anchorX = x(r.dte);
             const midY = (y(spot * (1 + r.emPct)) + y(spot * (1 - r.emPct))) / 2;
             const tx = Math.max(
@@ -1975,31 +2023,24 @@ function TermFan({ rows, spot }: { rows: TermRow[]; spot: number }) {
             );
             const ty = Math.max(
               M.top + 8,
-              Math.min(midY - 54, H - M.bottom - 96),
+              Math.min(midY - tooltipH / 2, H - M.bottom - tooltipH - 4),
             );
-            const lines: Array<[string, string]> = [
-              ['DTE', `${r.dte}d`],
-              ['ATM IV', `${(r.iv * 100).toFixed(2)}%`],
-              ['EM', `±${(r.emPct * 100).toFixed(2)}%`],
-              ['Straddle', `$${r.straddle.toFixed(2)}`],
-            ];
-            const lineH = 14.5;
             return (
               <g pointerEvents="none">
                 <rect
                   x={tx}
                   y={ty}
                   width={tooltipW}
-                  height={24 + lines.length * lineH}
-                  rx={8}
+                  height={tooltipH}
+                  rx={px(8)}
                   fill="var(--bg-3)"
                   stroke="var(--line-2)"
                   strokeWidth={1}
                 />
                 <text
-                  x={tx + 14}
-                  y={ty + 19}
-                  fontSize="11"
+                  x={tx + padX}
+                  y={ty + padTop}
+                  fontSize={px(12)}
                   fontFamily="Mulish, sans-serif"
                   fontWeight="700"
                   fill="var(--ink)"
@@ -2010,19 +2051,19 @@ function TermFan({ rows, spot }: { rows: TermRow[]; spot: number }) {
                 {lines.map(([k, v], i) => (
                   <g key={k}>
                     <text
-                      x={tx + 14}
-                      y={ty + 38 + i * lineH}
-                      fontSize="9.5"
+                      x={tx + padX}
+                      y={ty + padTop + px(18) + i * lineH}
+                      fontSize={px(10.5)}
                       fill="var(--ink-3)"
                       fontFamily="sans-serif"
                     >
                       {k}
                     </text>
                     <text
-                      x={tx + tooltipW - 14}
-                      y={ty + 38 + i * lineH}
+                      x={tx + tooltipW - padX}
+                      y={ty + padTop + px(18) + i * lineH}
                       textAnchor="end"
-                      fontSize="10"
+                      fontSize={px(11)}
                       fill="var(--ink)"
                       fontFamily="ui-monospace, monospace"
                       fontWeight="600"
