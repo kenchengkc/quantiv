@@ -668,6 +668,45 @@ function HeroSpark({
   );
 }
 
+// ---------- Back-to-calendar button ----------
+// Pill button used in the DetailHero left column. Mirrors the qv-card hover
+// treatment (border lifts from --line → --line-2, content brightens) so it
+// reads as interactive alongside the cards below it.
+function BackToCalendarButton({ onClick }: { onClick: () => void }) {
+  const [hover, setHover] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      onFocus={() => setHover(true)}
+      onBlur={() => setHover(false)}
+      style={{
+        alignSelf: 'flex-start',
+        marginTop: 'auto',
+        padding: '8px 16px',
+        border: `1px solid ${hover ? 'var(--line-2)' : 'var(--line)'}`,
+        borderRadius: 999,
+        fontSize: 12,
+        letterSpacing: '0.08em',
+        color: hover ? 'var(--ink)' : 'var(--ink-3)',
+        background: hover
+          ? 'color-mix(in oklab, var(--bg-3) 55%, transparent)'
+          : 'transparent',
+        display: 'inline-flex',
+        gap: 7,
+        alignItems: 'center',
+        cursor: 'pointer',
+        transition:
+          'background 160ms ease, color 160ms ease, border-color 160ms ease',
+      }}
+    >
+      <ChevronLeft size={14} /> Earnings Calendar
+    </button>
+  );
+}
+
 // ---------- Detail hero (gradient split card) ----------
 function DetailHero({
   ticker,
@@ -889,26 +928,7 @@ function DetailHero({
             </div>
           </div>
 
-          <button
-            onClick={onBack}
-            style={{
-              alignSelf: 'flex-start',
-              marginTop: 'auto',
-              padding: '6px 12px',
-              border: '1px solid var(--line)',
-              borderRadius: 999,
-              fontSize: 11,
-              letterSpacing: '0.08em',
-              color: 'var(--ink-3)',
-              display: 'inline-flex',
-              gap: 6,
-              alignItems: 'center',
-              background: 'transparent',
-              cursor: 'pointer',
-            }}
-          >
-            <ChevronLeft size={12} /> Earnings Calendar
-          </button>
+          <BackToCalendarButton onClick={onBack} />
         </div>
 
         <div
@@ -1806,7 +1826,7 @@ function TermFan({ rows, spot }: { rows: TermRow[]; spot: number }) {
               y={y(v)}
               textAnchor="end"
               dominantBaseline="central"
-              fontSize="10"
+              fontSize="7.5"
               fontFamily="ui-monospace, monospace"
               fill="var(--ink-3)"
             >
@@ -1883,9 +1903,9 @@ function TermFan({ rows, spot }: { rows: TermRow[]; spot: number }) {
               />
               <text
                 x={cx}
-                y={H - M.bottom + 20}
+                y={H - M.bottom + 16}
                 textAnchor="middle"
-                fontSize="9.5"
+                fontSize="7"
                 fontFamily="ui-monospace, monospace"
                 fill={active ? 'var(--ink)' : 'var(--ink-2)'}
                 fontWeight={active ? 600 : 500}
@@ -1895,9 +1915,9 @@ function TermFan({ rows, spot }: { rows: TermRow[]; spot: number }) {
               </text>
               <text
                 x={cx}
-                y={H - M.bottom + 36}
+                y={H - M.bottom + 28}
                 textAnchor="middle"
-                fontSize="8.5"
+                fontSize="6"
                 fontFamily="ui-monospace, monospace"
                 fill="var(--ink-4)"
                 pointerEvents="none"
@@ -1913,10 +1933,10 @@ function TermFan({ rows, spot }: { rows: TermRow[]; spot: number }) {
           return (
             <g>
               <text
-                x={x(last.dte) + 12}
+                x={x(last.dte) + 10}
                 y={y(spot * (1 + last.emPct))}
                 dominantBaseline="central"
-                fontSize="10.5"
+                fontSize="8"
                 fontFamily="ui-monospace, monospace"
                 fontWeight="700"
                 fill="var(--up)"
@@ -1924,10 +1944,10 @@ function TermFan({ rows, spot }: { rows: TermRow[]; spot: number }) {
                 ${(spot * (1 + last.emPct)).toFixed(0)}
               </text>
               <text
-                x={x(last.dte) + 12}
+                x={x(last.dte) + 10}
                 y={y(spot * (1 - last.emPct))}
                 dominantBaseline="central"
-                fontSize="10.5"
+                fontSize="8"
                 fontFamily="ui-monospace, monospace"
                 fontWeight="700"
                 fill="var(--down)"
@@ -2275,31 +2295,31 @@ function HistoryBlock({ history }: { history: HistoryPoint[] }) {
           />
         )}
         <text
-          x={P - 10}
-          y={y(max) + 4}
+          x={P - 8}
+          y={y(max) + 3}
           textAnchor="end"
           fill="var(--ink-3)"
-          fontSize="9.5"
+          fontSize="7"
           fontFamily="JetBrains Mono"
         >
           +{(max * 100).toFixed(0)}%
         </text>
         <text
-          x={P - 10}
-          y={y(-max) + 4}
+          x={P - 8}
+          y={y(-max) + 3}
           textAnchor="end"
           fill="var(--ink-3)"
-          fontSize="9.5"
+          fontSize="7"
           fontFamily="JetBrains Mono"
         >
           −{(max * 100).toFixed(0)}%
         </text>
         <text
-          x={P - 10}
-          y={H / 2 + 4}
+          x={P - 8}
+          y={H / 2 + 3}
           textAnchor="end"
           fill="var(--ink-3)"
-          fontSize="9.5"
+          fontSize="7"
           fontFamily="JetBrains Mono"
         >
           0%
@@ -2375,10 +2395,10 @@ function HistoryBlock({ history }: { history: HistoryPoint[] }) {
               />
               <text
                 x={cx}
-                y={H - 10}
+                y={H - 8}
                 textAnchor="middle"
                 fill={active ? 'var(--ink)' : 'var(--ink-2)'}
-                fontSize="10"
+                fontSize="7.5"
                 fontFamily="JetBrains Mono"
                 fontWeight={active ? 700 : 500}
               >
