@@ -1084,7 +1084,10 @@ export default function AboutPageClient() {
           <p
             style={{
               margin: '14px 0 0',
-              maxWidth: 660,
+              // Widened from 660 → 820 so the right edge sits close to
+              // the formula-card row below it, without letting body
+              // copy run past ~115 characters per line.
+              maxWidth: 820,
               fontSize: 14,
               color: 'var(--ink-3)',
               lineHeight: 1.6,
