@@ -1199,12 +1199,11 @@ export default function EarningsScreener() {
                 letterSpacing: '0.18em',
                 textTransform: 'uppercase',
                 color: 'var(--ink-3)',
-                // Bumped from 14 → 18 so the kicker doesn't feel cramped
-                // under the larger 61px SCREENER headline. The Calendar
-                // and Watchlist h1s sit at 56 with their original 14/14
-                // spacing; only this page's spacing widens to match the
-                // bigger headline.
-                marginBottom: 18,
+                // Widened to 24 so the kicker has display-headline-scale
+                // breathing room under the 72px SCREENER title. Calendar
+                // and Watchlist h1s sit at 56 and keep their 14/14
+                // spacing — this is a Screener-specific adjustment.
+                marginBottom: 24,
                 display: 'flex',
                 alignItems: 'center',
                 gap: 8,
@@ -1229,10 +1228,14 @@ export default function EarningsScreener() {
               className="serif qv-m-h1"
               style={{
                 margin: 0,
-                fontSize: 61,
+                // 72px display headline — the largest h1 on any of the
+                // nav pages. letterSpacing tightened a touch and
+                // lineHeight nudged to 0.92 because tracking/leading
+                // optimized for ~56px starts to feel loose at this size.
+                fontSize: 72,
                 fontWeight: 800,
-                letterSpacing: '-0.032em',
-                lineHeight: 0.94,
+                letterSpacing: '-0.035em',
+                lineHeight: 0.92,
                 color: 'var(--ink)',
                 textTransform: 'uppercase',
               }}
@@ -1241,10 +1244,10 @@ export default function EarningsScreener() {
             </h1>
             <div
               style={{
-                // Mirrors the kicker's 18px gap above the h1 so the
+                // Mirrors the kicker's 24px gap above the h1 so the
                 // larger SCREENER title has equal breathing room above
                 // and below.
-                marginTop: 18,
+                marginTop: 24,
                 fontSize: 16,
                 color: 'var(--ink-2)',
                 maxWidth: 660,
