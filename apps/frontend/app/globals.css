@@ -2,11 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Google Fonts (Mulish, Nunito Sans, JetBrains Mono) are loaded via <link>
-   in app/layout.tsx, not @import here — Tailwind's compiled output moves
-   @tailwind preflight rules above this file's @imports, which causes
-   browsers to ignore them (CSS spec: @import must precede every other
-   rule). KaTeX has no fonts to fetch from a CDN, so its @import stays. */
+/* Mulish, Nunito Sans, and JetBrains Mono are self-hosted via next/font/google
+   in app/layout.tsx, which exposes them as CSS variables on <html>
+   (--font-mulish, --font-nunito-sans, --font-jetbrains-mono). The rules
+   below reference those variables, so no third-party CDN request is made
+   at runtime. KaTeX has no fonts to fetch from a CDN, so its @import stays. */
 @import 'katex/dist/katex.min.css';
 
 /* Palette tuned to the Quantiv logo: pure black page backgrounds, pure white
@@ -50,7 +50,7 @@
     overflow-y: scroll;
   }
   body {
-    font-family: 'Nunito Sans', ui-sans-serif, system-ui, sans-serif;
+    font-family: var(--font-nunito-sans), ui-sans-serif, system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     font-size: 14px;
     line-height: 1.45;
@@ -63,12 +63,12 @@
 
 @layer components {
   .serif {
-    font-family: 'Mulish', 'Nunito Sans', ui-sans-serif, sans-serif;
+    font-family: var(--font-mulish), var(--font-nunito-sans), ui-sans-serif, sans-serif;
     font-feature-settings: 'ss01';
     letter-spacing: -0.01em;
   }
   .mono {
-    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-family: var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
     font-feature-settings: 'tnum', 'zero';
   }
   .tnum { font-variant-numeric: tabular-nums; }
@@ -100,7 +100,7 @@
   .chip:disabled { opacity: 0.3; cursor: not-allowed; }
 
   .kbd {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-jetbrains-mono), monospace;
     font-size: 10.5px;
     border: 1px solid var(--line);
     border-bottom-width: 2px;
