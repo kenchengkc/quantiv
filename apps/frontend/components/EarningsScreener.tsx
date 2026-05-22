@@ -1199,9 +1199,9 @@ export default function EarningsScreener() {
                 letterSpacing: '0.18em',
                 textTransform: 'uppercase',
                 color: 'var(--ink-3)',
-                // 22px above the h1 — between the 20 used at 64px and
-                // the 24 used at 72px. Tuned to the current 68px title.
-                marginBottom: 22,
+                // 21px — midpoint of the 20 (at 64px) and 22 (at 68px)
+                // spacing scales, tuned to the current 66px title.
+                marginBottom: 21,
                 display: 'flex',
                 alignItems: 'center',
                 gap: 8,
@@ -1226,13 +1226,11 @@ export default function EarningsScreener() {
               className="serif qv-m-h1"
               style={{
                 margin: 0,
-                // 68px — sits between the 64 that read as not enough and
-                // the 72 that read as too much. letterSpacing tightened
-                // a touch past the 64-equivalent because tracking
-                // continues to feel loose as the size climbs.
-                fontSize: 68,
+                // 66px — middle of the 64 that read as too small and
+                // the 68 that read as too big.
+                fontSize: 66,
                 fontWeight: 800,
-                letterSpacing: '-0.034em',
+                letterSpacing: '-0.033em',
                 lineHeight: 0.93,
                 color: 'var(--ink)',
                 textTransform: 'uppercase',
@@ -1242,9 +1240,9 @@ export default function EarningsScreener() {
             </h1>
             <div
               style={{
-                // Mirrors the kicker's 22px gap so the title has equal
+                // Mirrors the kicker's 21px gap so the title has equal
                 // breathing room above and below.
-                marginTop: 22,
+                marginTop: 21,
                 fontSize: 16,
                 color: 'var(--ink-2)',
                 maxWidth: 660,
