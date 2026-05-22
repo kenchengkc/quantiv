@@ -618,7 +618,7 @@ export default function WatchlistPage() {
               letterSpacing: '-0.005em',
             }}
           >
-            The tickers you’re tracking — live quotes and the next earnings print at a glance.
+            The tickers you’re tracking, with live quotes and the next earnings print at a glance.
           </div>
         </div>
         <div
