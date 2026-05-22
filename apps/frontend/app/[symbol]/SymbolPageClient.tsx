@@ -563,7 +563,7 @@ function KpiCard({
       {sub && (
         <div
           className="mono tnum"
-          style={{ fontSize: 10.5, color: 'var(--ink-4)', marginTop: 4 }}
+          style={{ fontSize: 12.5, color: 'var(--ink-4)', marginTop: 4 }}
         >
           {sub}
         </div>
