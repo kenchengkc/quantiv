@@ -1,0 +1,47 @@
+{
+  "horizon": 1,
+  "metrics": {
+    "train_mae": 0.02003171764979264,
+    "val_mae": 0.019798889533545992,
+    "train_rmse": 0.030337380872970447,
+    "val_rmse": 0.030981752104798973
+  },
+  "feature_importance": {
+    "symbol_encoded": "0",
+    "horizon": "0",
+    "earnings_month": "0",
+    "earnings_weekday": "0",
+    "underlying_price": "2",
+    "log_price": "4",
+    "log_market_cap": "0",
+    "atm_straddle_price": "1",
+    "atm_straddle_pct": "2",
+    "atm_iv": "0",
+    "atm_delta": "0",
+    "atm_gamma": "1",
+    "atm_theta": "0",
+    "atm_vega": "0",
+    "skew_25d": "0",
+    "total_volume": "104",
+    "pc_volume_ratio": "1",
+    "volume_oi_ratio": "0",
+    "iv_term_slope": "0",
+    "tte_earnings": "0"
+  },
+  "hyperparameters": {
+    "num_leaves": 300,
+    "learning_rate": 0.1458130044526199,
+    "feature_fraction": 0.5589504632381777,
+    "bagging_fraction": 0.6048694246789167,
+    "bagging_freq": 7,
+    "min_child_samples": 16,
+    "reg_alpha": 0.7974475856348597,
+    "reg_lambda": 5.024491882655805,
+    "objective": "regression",
+    "metric": "mae",
+    "boosting_type": "gbdt",
+    "random_state": 42,
+    "verbose": -1
+  },
+  "trained_at": "2025-10-06T08:00:04.477883"
+}
