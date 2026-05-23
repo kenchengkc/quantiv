@@ -65,8 +65,10 @@ blob-report/
 # Always ignore raw downloads
 scripts/data/
 
-# ML Models & Training Artifacts
-models/
+# ML Models & Training Artifacts (joblib/pickle dirs — not apps/backend/models schemas)
+data/models/
+apps/ml/models/
+apps/backend/data/models/
 *.pkl
 *.joblib
 *.model

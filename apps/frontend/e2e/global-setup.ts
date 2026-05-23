@@ -9,10 +9,13 @@ import { clerkSetup } from '@clerk/testing/playwright';
 // production. Test sign-ins create real Clerk session records.
 async function globalSetup() {
   if (!process.env.CLERK_SECRET_KEY || !process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) {
-    throw new Error(
-      'E2E setup is missing CLERK_SECRET_KEY and/or NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY. ' +
-        'Copy .env.test.local.example to .env.test.local and fill in the dev-instance keys.',
+    console.warn(
+      '[e2e] CLERK_SECRET_KEY and/or NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY not set — ' +
+        'skipping clerkSetup(). Public specs (screener, fonts) still run; authenticated ' +
+        'specs (watchlist) skip individually. For local auth specs, copy ' +
+        '.env.test.local.example → .env.test.local and fill in dev-instance keys.',
     );
+    return;
   }
   await clerkSetup();
 }
