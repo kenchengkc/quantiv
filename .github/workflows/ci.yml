@@ -8,14 +8,14 @@ on:
 
 jobs:
   frontend:
-    name: Frontend (lint, type-check, build)
+    name: Frontend (lint, type-check, build, vitest)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 20
           cache: npm
 
       - run: npm ci
@@ -31,19 +31,67 @@ jobs:
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
-  backend:
-    name: Backend (lint, syntax)
+      # Vitest covers component / unit tests. The script exits 0 even when
+      # the suite is empty (no specs match), so this is a no-op safety
+      # gate today and a real gate once specs land in apps/frontend/**.
+      - run: npm run test --workspace=apps/frontend -- --run
+
+  e2e:
+    name: Frontend (Playwright)
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/backend
+    needs: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+        working-directory: apps/frontend
+
+      - run: npm run test:e2e --workspace=apps/frontend
+        env:
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.E2E_CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.E2E_CLERK_SECRET_KEY }}
+          # E2E_USER_* are the credentials the Playwright globalSetup uses
+          # to mint a Clerk session. Set only if you actually run the
+          # signed-in specs (watchlist) in CI; public specs work without.
+          E2E_USER_EMAIL: ${{ secrets.E2E_USER_EMAIL }}
+          E2E_USER_PASSWORD: ${{ secrets.E2E_USER_PASSWORD }}
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: apps/frontend/playwright-report
+          retention-days: 7
+
+  backend:
+    name: Backend (ruff, pytest)
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
 
-      - run: pip install ruff
-      - run: ruff check .
-      - run: python -c "import ast, pathlib; [ast.parse(f.read_text()) for f in pathlib.Path('.').rglob('*.py')]"
+      - run: pip install -r apps/backend/requirements.txt
+      # apps/ml is consumed by apps/backend.services.ml_service. Install
+      # it editable so the package layout is honored — no sys.path hacks.
+      - run: pip install -e apps/ml
+      - run: pip install ruff pytest
+
+      - run: ruff check apps/backend apps/ml
+      - run: pytest apps/backend/tests -q
+        env:
+          # The backend tests stub Postgres/Redis/DuckDB lifespan
+          # initialization, but `_validate_env()` still checks shape. The
+          # values below satisfy the validator without being real.
+          DATA_BACKEND: duckdb
+          DUCKDB_PATH: ":memory:"
+          DATABASE_URL: postgres://ci@localhost:5432/ci

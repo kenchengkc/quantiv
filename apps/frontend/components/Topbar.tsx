@@ -305,7 +305,7 @@ export function Topbar() {
         <Link href="/" aria-label="Quantiv home" className="flex items-center qv-topbar-brand">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/brand/QuantivColorBanner.png"
+            src="/brand/QuantivColorBanner.webp"
             alt="Quantiv"
             style={{ height: 40, width: 'auto', display: 'block' }}
           />

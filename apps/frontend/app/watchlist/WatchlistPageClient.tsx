@@ -582,7 +582,7 @@ export default function WatchlistPage() {
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/brand/QuantivIcon.png"
+              src="/brand/QuantivIcon.webp"
               alt=""
               width={18}
               height={18}

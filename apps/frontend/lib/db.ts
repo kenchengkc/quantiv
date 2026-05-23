@@ -3,6 +3,11 @@ import { neon, type NeonQueryFunction } from '@neondatabase/serverless';
 // Lazy-init so `next build`'s page-data collection doesn't blow up on a
 // missing DATABASE_URL. The handlers that use this are all dynamic, so this
 // only runs at request time on a real deploy.
+//
+// Schema migrations live in scripts/migrate.mjs and run as a one-time CI
+// step before the deploy lands — NOT inside route handlers. Putting DDL
+// in the request path adds first-cold-instance latency and requires
+// production credentials to carry CREATE privileges.
 let _sql: NeonQueryFunction<false, false> | null = null;
 
 function getSql(): NeonQueryFunction<false, false> {
@@ -22,29 +27,3 @@ export const sql: NeonQueryFunction<false, false> = ((
 ) => {
   return getSql()(strings, ...values);
 }) as NeonQueryFunction<false, false>;
-
-let schemaReady: Promise<void> | null = null;
-
-export function ensureSchema(): Promise<void> {
-  if (!schemaReady) {
-    schemaReady = (async () => {
-      await sql`
-        CREATE TABLE IF NOT EXISTS watchlist (
-          user_id    TEXT        NOT NULL,
-          symbol     TEXT        NOT NULL,
-          position   INTEGER     NOT NULL DEFAULT 0,
-          added_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
-          PRIMARY KEY (user_id, symbol)
-        )
-      `;
-      await sql`
-        CREATE INDEX IF NOT EXISTS watchlist_user_pos_idx
-        ON watchlist (user_id, position)
-      `;
-    })().catch((err) => {
-      schemaReady = null;
-      throw err;
-    });
-  }
-  return schemaReady;
-}

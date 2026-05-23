@@ -236,16 +236,28 @@ async function fetchQuote(symbol: string, apiKey: string): Promise<Tick | null> 
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
+// Constant-time string compare to avoid timing-leak side channels.
+function safeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
 export async function GET(req: NextRequest) {
   const required = process.env.CRON_SECRET;
   if (!required) {
     return NextResponse.json({ error: 'CRON_SECRET not configured' }, { status: 500 });
   }
+  // Bearer only — query secrets leak through proxy logs, browser history,
+  // and access logs. The Cloudflare Worker already sets the Authorization
+  // header; the `?secret=` fallback was a temporary debugging affordance.
   const auth = req.headers.get('authorization') ?? '';
+  const expected = `Bearer ${required}`;
+  if (!safeEqual(auth, expected)) {
+    return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  }
   const reqUrl = new URL(req.url);
-  const param = reqUrl.searchParams.get('secret');
-  const ok = auth === `Bearer ${required}` || param === required;
-  if (!ok) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   // Three refresh modes:
   //   • regular     — Finnhub rotating cursor (09:25–16:45 ET)
