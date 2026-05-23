@@ -15,7 +15,7 @@ See [`.github/workflows/daily-refresh.yml`](../.github/workflows/daily-refresh.y
 | `setup_duckdb_from_parquet.py` | Recreate DuckDB views | `data:views`, nightly |
 | `check_duckdb_freshness.py` | CI gate before scoring | Nightly |
 | `daily_score.py` | ML forecasts for upcoming earnings | `ml:score`, nightly |
-| `import_recent_to_postgres.py` | Push latest forecast rows to Neon | Nightly |
+| `import_recent_to_postgres.py` | Push latest forecast rows to Neon (`--full` in CI) | Nightly |
 | `data_healthcheck.py` | Local data quality checks | `ml:validate` |
 | `csv_to_parquet.py` | CSV → Parquet | `data:csv-parquet` |
 | `csv_to_parquet_volhist.py` | Vol history CSV → Parquet | Manual |
