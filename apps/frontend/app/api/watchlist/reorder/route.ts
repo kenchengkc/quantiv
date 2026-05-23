@@ -3,8 +3,22 @@ import { auth } from '@clerk/nextjs/server';
 import { sql, ensureSchema } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 const SYMBOL_RE = /^[A-Z][A-Z.\-]{0,9}$/;
+const PRIVATE_NO_STORE = {
+  'Cache-Control': 'private, no-store, max-age=0, must-revalidate',
+};
+
+function json(body: unknown, init?: ResponseInit) {
+  return NextResponse.json(body, {
+    ...init,
+    headers: {
+      ...PRIVATE_NO_STORE,
+      ...(init?.headers ?? {}),
+    },
+  });
+}
 
 // Full-list replace: client sends the new ordering; we upsert positions in
 // one round-trip using a VALUES table. Dropped symbols are deleted so the
@@ -12,12 +26,12 @@ const SYMBOL_RE = /^[A-Z][A-Z.\-]{0,9}$/;
 export async function PUT(req: NextRequest) {
   const { userId } = await auth();
   if (!userId) {
-    return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+    return json({ error: 'unauthorized' }, { status: 401 });
   }
   const body = (await req.json().catch(() => null)) as { symbols?: unknown } | null;
   const raw = Array.isArray(body?.symbols) ? (body!.symbols as unknown[]) : null;
   if (!raw) {
-    return NextResponse.json({ error: 'symbols[] required' }, { status: 400 });
+    return json({ error: 'symbols[] required' }, { status: 400 });
   }
   const symbols = Array.from(
     new Set(
@@ -32,7 +46,7 @@ export async function PUT(req: NextRequest) {
 
   if (symbols.length === 0) {
     await sql`DELETE FROM watchlist WHERE user_id = ${userId}`;
-    return NextResponse.json({ symbols: [] });
+    return json({ symbols: [] });
   }
 
   // Update positions for the provided ordering and drop anything not in it.
@@ -50,5 +64,5 @@ export async function PUT(req: NextRequest) {
     WHERE user_id = ${userId}
       AND symbol <> ALL(${symbols}::text[])
   `;
-  return NextResponse.json({ symbols });
+  return json({ symbols });
 }

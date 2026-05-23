@@ -246,7 +246,7 @@ Vercel builds `apps/frontend` (`vercel.json`). The app reads static JSON from `a
 - The dashboard does not call FastAPI for every page — it uses generated JSON.
 - Spot quotes on Next.js use Finnhub + Upstash Redis caching, not a per-ticker Polygon route; Polygon remains optional on the FastAPI side.
 - Earnings dates and timing (BMO / AMC / DMH) come from DoltHub for historicals and Finnhub for the rolling near-term window; Finnhub wins deterministically on the upcoming overlap to avoid double-projecting the same quarter.
-- The dashboard's **Popular** filter is a curated weight table at `apps/frontend/lib/popular.ts` thresholded at `>= 76` — not a live blend of options volume / market cap / news flow despite what the UI tooltip suggests. Watchlist / search use the separate S&P 500 list in `lib/data/sp500-constituents.json`.
+- The dashboard's **Popular** filter is a generated weight table at `apps/frontend/lib/popular.ts` thresholded at `>= 76`, based on a rank blend of 90-day dollar volume and market cap. Watchlist / search use the separate S&P 500 list in `lib/data/sp500-constituents.json`.
 
 ## Documentation
 

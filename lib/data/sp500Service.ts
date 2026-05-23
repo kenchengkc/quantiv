@@ -1,12 +1,7 @@
 /**
  * S&P 500 Data Service
- * Provides canonical and optionally refreshed S&P 500 company data.
+ * Provides canonical S&P 500 company data from the committed JSON snapshot.
  */
-
-// Dynamic S&P 500 list refresh interval (24h)
-const DYNAMIC_SP500_TTL_MS = 24 * 60 * 60 * 1000;
-// FMP endpoint for current S&P 500 constituents
-const FMP_SP500_URL = 'https://financialmodelingprep.com/api/v3/sp500_constituent';
 
 // S&P 500 companies data
 export interface SP500Company {
@@ -80,10 +75,6 @@ const SP500_COMPANIES: SP500Company[] = [
 class SP500DataService {
   private static instance: SP500DataService;
   private companies: Map<string, SP500Company> = new Map();
-  // Dynamic cache for up-to-date S&P 500 list (server-only)
-  private dynamicCompaniesCache: SP500Company[] | null = null;
-  private dynamicFetchedAt = 0;
-  private isFetchingDynamic = false;
 
   private constructor() {
     // Initialize companies map
@@ -99,84 +90,9 @@ class SP500DataService {
     return SP500DataService.instance;
   }
 
-  /**
-   * Server-only: fetch current S&P 500 constituents from FMP
-   */
-  private async fetchDynamicCompanies(): Promise<SP500Company[]> {
-    try {
-      if (typeof window !== 'undefined') {
-        // Do not fetch on client
-        return [];
-      }
-
-      const apiKey = process.env.FMP_API_KEY;
-      if (!apiKey) return [];
-
-      const url = `${FMP_SP500_URL}?apikey=${apiKey}`;
-      const resp = await fetch(
-        url,
-        { next: { revalidate: 60 * 60 } } as RequestInit & { next: { revalidate: number } }
-      );
-      if (!resp.ok) return [];
-      const data = await resp.json();
-
-      if (!Array.isArray(data)) return [];
-
-      // Map FMP fields to our shape; industry/exchange may be unknown here.
-      // Names are normalized so dynamic data picks up the same display
-      // rules as the static SP500_COMPANIES list (no "(The)" suffix, etc.).
-      const mapped: SP500Company[] = data
-        .filter((d: any) => typeof d?.symbol === 'string' && d.symbol.length > 0)
-        .map((d: any) => ({
-          symbol: d.symbol.toUpperCase(),
-          name: normalizeDisplayName(
-            (d.name || d.companyName || d.symbol).toString(),
-          ),
-          sector: (d.sector || 'Unknown').toString(),
-          industry: (d.subSector || 'Unknown').toString(),
-          exchange: 'NYSE',
-        }));
-
-      return mapped;
-    } catch (err) {
-      console.warn('[sp500Service] dynamic S&P 500 fetch failed:', err);
-      return [];
-    }
-  }
-
-  private async getDynamicCompanies(): Promise<SP500Company[] | null> {
-    const now = Date.now();
-    if (this.dynamicCompaniesCache && (now - this.dynamicFetchedAt) < DYNAMIC_SP500_TTL_MS) {
-      return this.dynamicCompaniesCache;
-    }
-
-    if (this.isFetchingDynamic) return this.dynamicCompaniesCache;
-
-    this.isFetchingDynamic = true;
-    try {
-      const companies = await this.fetchDynamicCompanies();
-      if (companies.length > 0) {
-        this.dynamicCompaniesCache = companies;
-        this.dynamicFetchedAt = now;
-        // Also seed the map for quick lookup
-        companies.forEach((c) => this.companies.set(c.symbol, c));
-        return companies;
-      }
-      return this.dynamicCompaniesCache; // could be null or previous value
-    } finally {
-      this.isFetchingDynamic = false;
-    }
-  }
-
   // Get all S&P 500 companies
   public getAllCompanies(): SP500Company[] {
     return SP500_COMPANIES;
-  }
-
-  // Async variant using dynamic list with fallback to static subset
-  public async getAllCompaniesAsync(): Promise<SP500Company[]> {
-    const dynamic = await this.getDynamicCompanies();
-    return dynamic && dynamic.length > 0 ? dynamic : SP500_COMPANIES;
   }
 
   // Get company by symbol
@@ -232,33 +148,6 @@ class SP500DataService {
       .map(result => result.company);
   }
 
-  // Async variant using dynamic list with fallback
-  public async searchCompaniesAsync(query: string, limit: number = 10): Promise<SP500Company[]> {
-    const list = await this.getAllCompaniesAsync();
-    const upperQuery = query.toUpperCase();
-    const results: { company: SP500Company; score: number }[] = [];
-
-    for (const company of list) {
-      let score = 0;
-      if (company.symbol === upperQuery) score = 1000;
-      else if (company.symbol.startsWith(upperQuery)) score = 900;
-      else if (company.symbol.includes(upperQuery)) score = 800;
-      else if (company.name.toLowerCase().startsWith(query.toLowerCase())) score = 700;
-      else if (company.name.toLowerCase().includes(query.toLowerCase())) score = 600;
-      else if (company.sector.toLowerCase().includes(query.toLowerCase())) score = 500;
-      else if (company.industry.toLowerCase().includes(query.toLowerCase())) score = 400;
-      if (score > 0) results.push({ company, score });
-    }
-
-    return results
-      .sort((a, b) => b.score - a.score)
-      .slice(0, limit)
-      // Apply normalization on output too as a safety net — if a stale
-      // singleton or upstream caller bypassed the import-time normalization,
-      // the search response still gets clean names.
-      .map((r) => ({ ...r.company, name: normalizeDisplayName(r.company.name) }));
-  }
-
   // Get popular/most traded stocks
   public getPopularStocks(): SP500Company[] {
     const popularSymbols = [
@@ -271,30 +160,12 @@ class SP500DataService {
       .filter(company => company !== undefined) as SP500Company[];
   }
 
-  // Async variant using dynamic list with fallback
-  public async getPopularStocksAsync(): Promise<SP500Company[]> {
-    const list = await this.getAllCompaniesAsync();
-    const popularSymbols = [
-      'SPY', 'QQQ', 'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 
-      'NVDA', 'NFLX', 'JPM', 'V', 'UNH', 'HD', 'PG', 'JNJ', 'BAC', 'XOM'
-    ];
-    const map = new Map(list.map(c => [c.symbol, c] as const));
-    return popularSymbols.map(s => map.get(s)).filter(Boolean) as SP500Company[];
-  }
-
   // Get companies by sector
   public getCompaniesBySector(sector: string): SP500Company[] {
     return SP500_COMPANIES.filter(company => 
       company.sector.toLowerCase() === sector.toLowerCase()
     );
   }
-
-  // Async variant using dynamic list with fallback
-  public async getCompaniesBySectorAsync(sector: string): Promise<SP500Company[]> {
-    const list = await this.getAllCompaniesAsync();
-    return list.filter(c => c.sector.toLowerCase() === sector.toLowerCase());
-  }
-
 }
 
 // Export singleton instance
@@ -311,17 +182,4 @@ export function searchSP500Companies(query: string, limit?: number): SP500Compan
 
 export function getPopularSP500Stocks(): SP500Company[] {
   return sp500DataService.getPopularStocks();
-}
-
-// Async utilities that prefer dynamic list
-export async function getAllSP500CompaniesAsync(): Promise<SP500Company[]> {
-  return await sp500DataService.getAllCompaniesAsync();
-}
-
-export async function searchSP500CompaniesAsync(query: string, limit?: number): Promise<SP500Company[]> {
-  return await sp500DataService.searchCompaniesAsync(query, limit);
-}
-
-export async function getPopularSP500StocksAsync(): Promise<SP500Company[]> {
-  return await sp500DataService.getPopularStocksAsync();
 }
