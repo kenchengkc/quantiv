@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { companyName } from '@/lib/companyNames';
+import { TickerLogo } from '@/components/TickerLogo';
 
 const TICKER_HOVER_DELAY_MS = 900;
 
@@ -58,20 +59,14 @@ export function useTickerHover(ticker: string) {
   return { onMouseEnter, onMouseMove, onMouseLeave };
 }
 
-function logoUrl(t: string) {
-  return `https://assets.parqet.com/logos/symbol/${t}?format=png`;
-}
-
 /** Mount once at the App root. Listens for show/hide events and renders a
  *  small floating card pinned to the cursor position at the time it appeared. */
 export function TickerHoverHost() {
   const [state, setState] = useState<ShowDetail | null>(null);
-  const [logoErr, setLogoErr] = useState(false);
 
   useEffect(() => {
     function onShow(e: Event) {
       const detail = (e as CustomEvent<ShowDetail>).detail;
-      setLogoErr(false);
       setState(detail);
     }
     function onHide() { setState(null); }
@@ -117,40 +112,17 @@ export function TickerHoverHost() {
         animation: 'qv-hover-pop 180ms cubic-bezier(.2,.8,.3,1) both',
       }}
     >
-      {logoErr ? (
-        <div
-          className="serif"
-          style={{
-            width: 40,
-            height: 40,
-            borderRadius: 6,
-            background: 'var(--bg-3)',
-            border: '1px solid var(--line)',
-            display: 'grid',
-            placeItems: 'center',
-            color: 'var(--ink-2)',
-            fontSize: 13,
-            fontWeight: 700,
-          }}
-        >
-          {state.ticker.slice(0, 3)}
-        </div>
-      ) : (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={logoUrl(state.ticker)}
-          alt={state.ticker}
-          onError={() => setLogoErr(true)}
-          style={{
-            width: 40,
-            height: 40,
-            borderRadius: 6,
-            objectFit: 'cover',
-            background: 'var(--paper)',
-            border: '1px solid var(--line)',
-          }}
-        />
-      )}
+      <TickerLogo
+        ticker={state.ticker}
+        size={40}
+        radius={6}
+        loading="eager"
+        fallbackStyle={{
+          fontSize: 13,
+          fontWeight: 700,
+          letterSpacing: 0,
+        }}
+      />
       <div style={{ minWidth: 0, flex: 1 }}>
         <div
           className="serif"

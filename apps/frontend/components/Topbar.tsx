@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { Search, ChevronRight, Menu, X } from 'lucide-react';
 import { SignedIn, SignedOut, UserButton } from '@clerk/nextjs';
+import { TickerLogo } from '@/components/TickerLogo';
 
 const NAV = [
   { href: '/', label: 'Earnings Calendar' },
@@ -47,58 +48,6 @@ function useClock() {
   }, []);
   return now;
 }
-
-/* eslint-disable @next/next/no-img-element */
-/** Tiny ticker logo for the search-suggestions dropdown. HTML width/
- *  height attributes reserve the box before bytes arrive so suggestions
- *  don't reflow as logos stream in. Falls back to a 3-letter monogram. */
-function SearchResultLogo({ ticker, size = 24 }: { ticker: string; size?: number }) {
-  const [err, setErr] = useState(false);
-  if (err) {
-    return (
-      <span
-        aria-hidden
-        className="serif"
-        style={{
-          width: size,
-          height: size,
-          flexShrink: 0,
-          borderRadius: 6,
-          background: 'var(--bg-3)',
-          border: '1px solid var(--line)',
-          display: 'grid',
-          placeItems: 'center',
-          color: 'var(--ink-2)',
-          fontSize: Math.max(9, size * 0.34),
-          fontWeight: 600,
-          letterSpacing: '0.02em',
-        }}
-      >
-        {ticker.slice(0, 3)}
-      </span>
-    );
-  }
-  return (
-    <img
-      src={`https://assets.parqet.com/logos/symbol/${ticker}?format=png`}
-      alt=""
-      width={size}
-      height={size}
-      onError={() => setErr(true)}
-      style={{
-        width: size,
-        height: size,
-        flexShrink: 0,
-        borderRadius: 6,
-        objectFit: 'cover',
-        background: 'var(--paper)',
-        border: '1px solid var(--line)',
-        display: 'block',
-      }}
-    />
-  );
-}
-/* eslint-enable @next/next/no-img-element */
 
 function NavSearch() {
   const [query, setQuery] = useState('');
@@ -216,7 +165,13 @@ function NavSearch() {
               onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-3)')}
               onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
             >
-              <SearchResultLogo ticker={item.symbol} />
+              <TickerLogo
+                ticker={item.symbol}
+                size={24}
+                alt=""
+                radius={6}
+                loading="eager"
+              />
               <span
                 style={{
                   flex: 1,

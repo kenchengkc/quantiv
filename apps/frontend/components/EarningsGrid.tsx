@@ -9,6 +9,11 @@ import { companyName } from '@/lib/companyNames';
 import { useEnsureCompanyNames } from '@/lib/useCompanyNames';
 import { useTickerHover } from '@/components/TickerHoverCard';
 import { CalendarGridSkeleton } from '@/components/EarningsGridSkeleton';
+import {
+  hasTickerLogoState,
+  preloadTickerLogos,
+  TickerLogo,
+} from '@/components/TickerLogo';
 import sp500Constituents from '../../../lib/data/sp500-constituents.json';
 
 // Full S&P 500 (503 constituents incl. dual-class). Used for the "S&P 500"
@@ -76,109 +81,6 @@ function timingKey(t?: string) {
   if (k === 'dmh' || k === 'during_market_hours' || k === 'during_market_hour') return 'dmh' as const;
   return 'unknown' as const;
 }
-function logoUrl(t: string) {
-  return `https://assets.parqet.com/logos/symbol/${t}?format=png`;
-}
-
-type LogoLoadState = 'loaded' | 'failed';
-
-const logoStateCache = new Map<string, LogoLoadState>();
-const logoPromiseCache = new Map<string, Promise<LogoLoadState>>();
-
-function preloadLogo(ticker: string): Promise<LogoLoadState> {
-  const cached = logoStateCache.get(ticker);
-  if (cached) return Promise.resolve(cached);
-
-  const existing = logoPromiseCache.get(ticker);
-  if (existing) return existing;
-
-  if (typeof window === 'undefined') return Promise.resolve('failed');
-
-  const promise = new Promise<LogoLoadState>((resolve) => {
-    const img = new window.Image();
-    let settled = false;
-    let timeoutId: number | null = null;
-
-    const finish = (state: LogoLoadState) => {
-      if (settled) return;
-      settled = true;
-      if (timeoutId !== null) window.clearTimeout(timeoutId);
-      logoStateCache.set(ticker, state);
-      resolve(state);
-    };
-
-    timeoutId = window.setTimeout(() => finish('failed'), LOGO_PRELOAD_TIMEOUT_MS);
-    img.decoding = 'async';
-    img.onload = () => {
-      const decode = typeof img.decode === 'function'
-        ? img.decode().catch(() => undefined)
-        : Promise.resolve();
-      void decode.then(() => finish('loaded'));
-    };
-    img.onerror = () => finish('failed');
-    img.src = logoUrl(ticker);
-
-    if (img.complete) {
-      finish(img.naturalWidth > 0 ? 'loaded' : 'failed');
-    }
-  });
-
-  logoPromiseCache.set(ticker, promise);
-  return promise;
-}
-
-/* eslint-disable @next/next/no-img-element */
-function Logo({ ticker, size = 24 }: { ticker: string; size?: number }) {
-  const [err, setErr] = useState(() => logoStateCache.get(ticker) === 'failed');
-  const s = { width: size, height: size };
-
-  useEffect(() => {
-    setErr(logoStateCache.get(ticker) === 'failed');
-  }, [ticker]);
-
-  if (err) {
-    return (
-      <div
-        className="serif"
-        style={{
-          ...s,
-          borderRadius: 6,
-          background: 'var(--bg-3)',
-          border: '1px solid var(--line)',
-          display: 'grid',
-          placeItems: 'center',
-          color: 'var(--ink-2)',
-          fontSize: Math.max(9, size * 0.34),
-          fontWeight: 600,
-          letterSpacing: '0.02em',
-        }}
-      >
-        {ticker.slice(0, 3)}
-      </div>
-    );
-  }
-  return (
-    <img
-      src={logoUrl(ticker)}
-      alt={ticker}
-      loading="eager"
-      onLoad={() => logoStateCache.set(ticker, 'loaded')}
-      onError={() => {
-        logoStateCache.set(ticker, 'failed');
-        setErr(true);
-      }}
-      style={{
-        ...s,
-        borderRadius: 6,
-        objectFit: 'cover',
-        background: 'var(--paper)',
-        border: '1px solid var(--line)',
-      }}
-    />
-  );
-}
-/* eslint-enable @next/next/no-img-element */
-
 function TickerRow({
   ev,
   live,
@@ -221,7 +123,7 @@ function TickerRow({
         hover.onMouseLeave();
       }}
     >
-      <Logo ticker={ev.ticker} size={24} />
+      <TickerLogo ticker={ev.ticker} size={24} radius={6} loading="eager" />
       <div style={{ minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, minWidth: 0 }}>
           <span
@@ -978,7 +880,7 @@ export default function EarningsGrid() {
     }
 
     const tickers = allTickerKey ? allTickerKey.split('|') : [];
-    const uncached = tickers.filter((ticker) => !logoStateCache.has(ticker));
+    const uncached = tickers.filter((ticker) => !hasTickerLogoState(ticker));
     if (uncached.length === 0) {
       setLogosReadyKey(weekStartIso);
       return;
@@ -986,7 +888,7 @@ export default function EarningsGrid() {
 
     let cancelled = false;
     setLogosReadyKey(null);
-    void Promise.all(uncached.map(preloadLogo)).then(() => {
+    void preloadTickerLogos(uncached, LOGO_PRELOAD_TIMEOUT_MS).then(() => {
       if (!cancelled) setLogosReadyKey(weekStartIso);
     });
 

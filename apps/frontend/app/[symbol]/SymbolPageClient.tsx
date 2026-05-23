@@ -9,6 +9,7 @@ import { listingExchangeLabel } from '@/lib/listingExchanges';
 import { useEnsureCompanyNames } from '@/lib/useCompanyNames';
 import { useEnsureListingExchanges } from '@/lib/useListingExchanges';
 import { useWatchlist } from '@/lib/watchlist';
+import { TickerLogo } from '@/components/TickerLogo';
 
 interface Straddle {
   expiration: string;
@@ -110,9 +111,6 @@ interface LivePrice {
   marketOpen: boolean;
 }
 
-function logoUrl(t: string) {
-  return `https://assets.parqet.com/logos/symbol/${t}?format=png`;
-}
 function parseLocalDate(iso: string): Date {
   const [y, m, d] = iso.slice(0, 10).split('-').map(Number);
   return new Date(y, (m ?? 1) - 1, d ?? 1);
@@ -251,47 +249,6 @@ function erf(x: number) {
 }
 function normCDF(z: number) {
   return 0.5 * (1 + erf(z / Math.SQRT2));
-}
-
-// ---------- Logo ----------
-function Logo({ ticker, size = 60 }: { ticker: string; size?: number }) {
-  const [err, setErr] = useState(false);
-  const s = { width: size, height: size };
-  if (err) {
-    return (
-      <div
-        className="serif"
-        style={{
-          ...s,
-          borderRadius: 10,
-          background: 'var(--bg-3)',
-          border: '1px solid var(--line)',
-          display: 'grid',
-          placeItems: 'center',
-          color: 'var(--ink-2)',
-          fontSize: Math.max(14, size * 0.32),
-          fontWeight: 700,
-        }}
-      >
-        {ticker.slice(0, 3)}
-      </div>
-    );
-  }
-  // eslint-disable-next-line @next/next/no-img-element
-  return (
-    <img
-      src={logoUrl(ticker)}
-      alt={ticker}
-      onError={() => setErr(true)}
-      style={{
-        ...s,
-        borderRadius: 10,
-        objectFit: 'cover',
-        background: 'var(--paper)',
-        border: '1px solid var(--line)',
-      }}
-    />
-  );
 }
 
 // ---------- Watchlist + Toast ----------
@@ -818,7 +775,17 @@ function DetailHero({
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            <Logo ticker={symbol} size={56} />
+            <TickerLogo
+              ticker={symbol}
+              size={56}
+              radius={10}
+              loading="eager"
+              fallbackStyle={{
+                fontSize: Math.max(14, 56 * 0.32),
+                fontWeight: 700,
+                letterSpacing: 0,
+              }}
+            />
             <div style={{ minWidth: 0 }}>
               <div
                 style={{
@@ -3131,7 +3098,17 @@ export default function SymbolPage() {
             borderBottom: '1px solid var(--line)',
           }}
         >
-          <Logo ticker={symbol} size={60} />
+          <TickerLogo
+            ticker={symbol}
+            size={60}
+            radius={10}
+            loading="eager"
+            fallbackStyle={{
+              fontSize: Math.max(14, 60 * 0.32),
+              fontWeight: 700,
+              letterSpacing: 0,
+            }}
+          />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div
               className="serif"
