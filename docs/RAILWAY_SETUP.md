@@ -22,10 +22,21 @@ Before you start, have these handy:
 
 1. Railway dashboard → **New Project** → **Deploy from GitHub repo** → pick
    this repo.
-2. Railway detects [`railway.toml`](../railway.toml) automatically and
-   builds [`apps/backend/Dockerfile`](../apps/backend/Dockerfile) from the
-   repo root. No additional build config is needed.
-3. After the first deploy lands (it will fail the healthcheck — that's
+2. Railway may auto-detect **`@quantiv/frontend`** from the npm workspace in
+   [`package.json`](../package.json). That service is for Vercel — **delete it**
+   or ignore it. The backend is a separate Python/Docker service, not an npm
+   workspace.
+3. Add a service for the backend:
+   - **Empty Service** → **Settings** → **Source** → connect this repo, **or**
+   - If Railway created a generic service from the repo, open it and set:
+     - **Settings → Build → Builder**: Dockerfile
+     - **Dockerfile path**: `apps/backend/Dockerfile`
+     - **Root directory**: `/` (repo root — required so the Dockerfile can
+       `COPY apps/ml` and `COPY apps/backend`)
+   Railway reads [`railway.toml`](../railway.toml) when the service is wired to
+   the repo root; the Dockerfile path and start command there match the
+   settings above.
+4. After the first deploy lands (it will fail the healthcheck — that's
    expected until env + volume are set), open the service settings.
 
 ## 2. Attach a persistent volume
