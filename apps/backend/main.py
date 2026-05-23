@@ -24,6 +24,7 @@ from dotenv import load_dotenv
 from services.ml_service import MLService
 from backends import PostgresBackend, DuckDBBackend, HybridBackend, DataBackend
 from routers.em import router as em_router, init_router as init_em_router
+from routers.ml_predict import router as ml_predict_router, init_router as init_ml_predict_router
 
 # Configure structured logging
 logger = structlog.get_logger()
@@ -216,6 +217,12 @@ async def lifespan(app: FastAPI):
         "db_pool": db_pool, "duckdb_conn": duckdb_conn,
         "DATA_BACKEND_MODE": DATA_BACKEND_MODE,
     })
+    # Phase 1 re-inference router. Only needs Postgres (for the feature
+    # snapshot) + Upstash (for the response cache).
+    init_ml_predict_router({
+        "db_pool": db_pool,
+        "redis_client": redis_client,
+    })
 
     yield
 
@@ -276,6 +283,7 @@ async def verify_admin_key(api_key: Optional[str] = Security(_api_key_header)) -
 # Include routers
 # ---------------------------------------------------------------------------
 app.include_router(em_router)
+app.include_router(ml_predict_router)
 
 # ---------------------------------------------------------------------------
 # Admin endpoint (kept in main so it can reference verify_admin_key directly)

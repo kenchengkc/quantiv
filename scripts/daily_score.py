@@ -50,20 +50,50 @@ def load_models(models_dir: Path) -> Dict[int, dict]:
         if not model_path.exists():
             continue
 
+        # Model joblib is a dict {model, calibrator, hyperparameters, feature_names, ...}.
+        # Unwrap the actual estimator so score() can call .predict(). Older metadata
+        # JSONs included a `feature_cols` field, but the post-2025-Q4 retrain dropped
+        # it — use the joblib's `feature_names` as the source of truth and only fall
+        # back to the metadata's `feature_importance` keys for very old artifacts.
+        model_data = joblib.load(model_path)
+        if isinstance(model_data, dict):
+            estimator = model_data.get("model")
+            calibrator = model_data.get("calibrator")
+            joblib_features = list(model_data.get("feature_names") or [])
+        else:
+            estimator = model_data
+            calibrator = None
+            joblib_features = list(getattr(estimator, "feature_name_", []) or [])
+
+        feature_cols = (
+            joblib_features
+            or list((meta.get("feature_importance") or {}).keys())
+            or meta.get("feature_cols")
+        )
+        if estimator is None or not feature_cols:
+            logger.warning(f"T-{horizon} model unusable (no estimator or feature schema) — skipping")
+            continue
+
         entry = {
-            "model": joblib.load(model_path),
+            "model": estimator,
+            "calibrator": calibrator,
             "metadata": meta,
-            "feature_cols": meta["feature_cols"],
+            "feature_cols": feature_cols,
             "residual_std": meta.get("residual_std", 0.03),
             "quantile_models": {},
         }
 
-        # Load quantile models if available
+        # Load quantile models if available. Same wrap pattern as the point
+        # model — joblib payload may be a dict or a raw estimator.
         quantiles = meta.get("quantiles", [0.10, 0.25, 0.50, 0.75, 0.90])
         for alpha in quantiles:
             q_path = models_dir / f"lgbm_T{horizon}_q{int(alpha*100):02d}.joblib"
-            if q_path.exists():
-                entry["quantile_models"][alpha] = joblib.load(q_path)
+            if not q_path.exists():
+                continue
+            q_payload = joblib.load(q_path)
+            q_estimator = q_payload.get("model") if isinstance(q_payload, dict) else q_payload
+            if q_estimator is not None:
+                entry["quantile_models"][alpha] = q_estimator
 
         models[horizon] = entry
         q_str = f" + {len(entry['quantile_models'])} quantile" if entry["quantile_models"] else ""
@@ -272,6 +302,15 @@ def score(df: pd.DataFrame, models: Dict[int, dict]) -> pd.DataFrame:
 
         X = hdf[feature_cols].replace([np.inf, -np.inf], np.nan)
 
+        # Persist the exact feature vector used at scoring time so the
+        # /api/ml/predict route can re-run inference later with a live spot
+        # substituted in. Stored as a JSON string per row → loaded into a
+        # JSONB column by scripts/import_recent_to_postgres.py. NaN values
+        # become null in JSON, which the route's spot-substitution helper
+        # then re-fills against the joblib feature schema.
+        feature_records = X.to_dict(orient="records")
+        hdf["feature_vector"] = [json.dumps(row, default=str) for row in feature_records]
+
         # Point prediction
         pred = m["model"].predict(X)
         hdf["em_ml_pct"] = pred
@@ -322,6 +361,10 @@ def save_forecasts(df: pd.DataFrame, data_dir: Path):
         "hist_move_avg_4q", "hist_straddle_accuracy",
         "iv_rv_ratio_20d", "parkinson_rv_20d", "vol_of_vol_20d",
         "scored_at",
+        # Feature vector used at scoring time — consumed by the API's
+        # re-inference path. JSON string in the Parquet so DuckDB and
+        # Pandas readers don't have to know the schema.
+        "feature_vector",
     ]
     out = df[[c for c in out_cols if c in df.columns]].copy()
 

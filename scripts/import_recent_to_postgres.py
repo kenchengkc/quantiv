@@ -32,6 +32,7 @@ Schema notes:
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
 from datetime import date, timedelta
@@ -80,7 +81,14 @@ COLUMNS = [
     "parkinson_rv_20d",
     "vol_of_vol_20d",
     "scored_at",
+    "feature_vector",
 ]
+
+# JSONB columns get a psycopg2 adapter wrapper at insert time. Listed
+# separately because the value is a JSON string in the Parquet and we
+# need to pass it through psycopg2.extras.Json so PG doesn't try to
+# cast a Python string to JSONB literally.
+JSONB_COLUMNS = {"feature_vector"}
 
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS em_forecasts (
@@ -109,8 +117,12 @@ CREATE TABLE IF NOT EXISTS em_forecasts (
     parkinson_rv_20d       DOUBLE PRECISION,
     vol_of_vol_20d         DOUBLE PRECISION,
     scored_at              TIMESTAMPTZ,
+    feature_vector         JSONB,
     PRIMARY KEY (act_symbol, earnings_date, snapshot_date, model_horizon)
 );
+-- feature_vector may be missing on rows written by an older daily_score
+-- run; the API treats NULL as "re-inference unavailable for this snapshot".
+ALTER TABLE em_forecasts ADD COLUMN IF NOT EXISTS feature_vector JSONB;
 CREATE INDEX IF NOT EXISTS em_forecasts_symbol_date_idx
     ON em_forecasts (act_symbol, earnings_date);
 CREATE INDEX IF NOT EXISTS em_forecasts_snapshot_idx
@@ -135,6 +147,11 @@ def pick_parquet(explicit: str | None) -> Path:
 
 def load_and_filter(parquet_path: Path, days: int, full: bool) -> pd.DataFrame:
     df = pd.read_parquet(parquet_path)
+    # `feature_vector` is the only column allowed to be missing — older
+    # daily_score runs (pre-Phase 1) didn't emit it. Backfill with NULL so
+    # the existing schema gate still catches truly broken Parquet files.
+    if "feature_vector" not in df.columns:
+        df["feature_vector"] = None
     missing = [c for c in COLUMNS if c not in df.columns]
     if missing:
         raise SystemExit(
@@ -171,7 +188,32 @@ def upsert(conn, df: pd.DataFrame) -> int:
         f"DO UPDATE SET {set_clause}"
     )
 
-    rows = list(df.itertuples(index=False, name=None))
+    # Wrap JSONB column values in psycopg2's Json adapter so the JSON
+    # string is sent as a JSONB literal rather than a quoted text blob.
+    json_idx = [i for i, c in enumerate(COLUMNS) if c in JSONB_COLUMNS]
+    raw_rows = list(df.itertuples(index=False, name=None))
+    rows = []
+    for row in raw_rows:
+        if not json_idx:
+            rows.append(row)
+            continue
+        row_list = list(row)
+        for i in json_idx:
+            value = row_list[i]
+            if value is None:
+                continue
+            # daily_score writes a JSON string; Json() wants a Python object,
+            # so parse first. Empty/invalid → NULL rather than crashing the
+            # batch on one bad row.
+            if isinstance(value, str):
+                try:
+                    parsed = json.loads(value)
+                except (ValueError, TypeError):
+                    parsed = None
+            else:
+                parsed = value
+            row_list[i] = psycopg2.extras.Json(parsed) if parsed is not None else None
+        rows.append(tuple(row_list))
     with conn.cursor() as cur:
         psycopg2.extras.execute_batch(cur, sql, rows, page_size=500)
     return len(rows)
