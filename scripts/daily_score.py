@@ -20,15 +20,31 @@ Usage:
 
 import argparse
 import json
+import math
 import os
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List
+from typing import Any, Dict, List
 
 import duckdb
 import joblib
 import numpy as np
 import pandas as pd
+
+
+def _sanitize_for_json(value: Any) -> Any:
+    """Recursively replace non-finite floats with None so the result is
+    strict-JSON safe. We can't rely on pandas' `.where(..., None)` because
+    float64 columns coerce the None back to NaN — we have to walk the dict
+    tree after `to_dict()` instead.
+    """
+    if isinstance(value, float):
+        return value if math.isfinite(value) else None
+    if isinstance(value, dict):
+        return {k: _sanitize_for_json(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_sanitize_for_json(v) for v in value]
+    return value
 
 import logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -307,15 +323,15 @@ def score(df: pd.DataFrame, models: Dict[int, dict]) -> pd.DataFrame:
         # substituted in. Stored as a JSON string per row → loaded into a
         # JSONB column by scripts/import_recent_to_postgres.py.
         #
-        # NaN handling: replace with None *before* json.dumps and use
-        # allow_nan=False so any leak crashes loud rather than emitting
-        # the JSON5-ish literal `NaN` token that Postgres JSONB rejects
-        # (see scripts/import_recent_to_postgres.py for the symmetric
-        # sanitize on the way in). The route treats null as "feature
-        # missing" and falls back to the joblib feature schema.
-        feature_records = X.where(pd.notna(X), None).to_dict(orient="records")
+        # NaN/Inf handling: walk each record dict via _sanitize_for_json to
+        # replace non-finite floats with None before json.dumps. pandas'
+        # `.where(..., None)` doesn't work here — float64 columns coerce
+        # None back to NaN. allow_nan=False then crashes loud on any leak
+        # rather than emitting the JSON5-ish `NaN` token that Postgres
+        # JSONB rejects.
+        feature_records = X.to_dict(orient="records")
         hdf["feature_vector"] = [
-            json.dumps(row, default=str, allow_nan=False)
+            json.dumps(_sanitize_for_json(row), default=str, allow_nan=False)
             for row in feature_records
         ]
 
