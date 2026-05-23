@@ -67,7 +67,6 @@ scripts/data/
 
 # ML Models & Training Artifacts (joblib/pickle dirs — not apps/backend/models schemas)
 data/models/
-apps/ml/models/
 apps/backend/data/models/
 *.pkl
 *.joblib
@@ -75,6 +74,17 @@ apps/backend/data/models/
 *.h5
 *.pt
 *.pth
+
+# Exception: the serving models in apps/ml/models/ ship with the repo
+# so the Railway image (and CI pytest) has them available. They're
+# small (~300 KB total for all 6 LightGBM Boosters + metadata + bias
+# curves) and stable across the daily-refresh cycle — only retrains
+# rewrite them. The broad `*.joblib` rule above still ignores stray
+# training outputs anywhere else.
+!apps/ml/models/
+!apps/ml/models/*.joblib
+!apps/ml/models/*.json
+!apps/ml/data/bias_curves.parquet
 
 # DuckDB cache and temp files
 duckdb-cache/

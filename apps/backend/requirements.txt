@@ -17,7 +17,11 @@ sqlalchemy>=2.0.0
 
 # Data processing
 pandas>=2.1.0
-numpy>=1.24.0
+# Pin numpy<2 to match apps/ml/pyproject.toml. The trained LightGBM
+# models pickle sklearn 1.4.2 internals that don't load under numpy 2's
+# ABI, so a mixed install leaves pandas with one numpy and the model
+# unpickle path with another → segfault-adjacent crash before /health.
+numpy>=1.24.0,<2
 duckdb>=1.0.0
 
 # Rate limiting
