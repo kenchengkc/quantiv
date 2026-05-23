@@ -1,6 +1,6 @@
 # Quantiv 📈
 
-> Options-implied expected moves around earnings: a Next.js dashboard over prebuilt JSON, optional FastAPI APIs, and a Python data + ML path (DuckDB / Parquet / LightGBM).
+> Options-implied expected moves around earnings: a Next.js dashboard over prebuilt JSON, optional FastAPI on Railway, and a Python data + ML pipeline (DuckDB / Parquet / LightGBM).
 
 ![License](https://img.shields.io/badge/license-GPL--3.0-blue.svg)
 ![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?logo=typescript&logoColor=white)
@@ -9,33 +9,51 @@
 ![DuckDB](https://img.shields.io/badge/DuckDB-FFF000?logo=duckdb&logoColor=black)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-316192?logo=postgresql&logoColor=white)
 
-Quantiv is a monorepo for **researching and displaying** expected moves into earnings: weekly calendar, per-symbol detail (straddle vs IV-based move, expiries when data exists), optional **watchlist** and **Clerk** auth, and **Finnhub + Upstash** live quotes (`/api/stocks/batch-price`, cron in `workers/refresh-prices`). Earnings data is a blend of a **DoltHub** historical baseline and a **Finnhub** near-term overlay merged into a git-tracked `data/earnings_calendar.csv`, gated nightly by `scripts/check_earnings_calendar_integrity.py`. Static JSON under `apps/frontend/public` is produced by `tools/build_frontend_data.py` so the UI can ship on **Vercel** without hitting FastAPI on every navigation. Optional **FastAPI** (`apps/backend`) adds expected-move / history / ML HTTP endpoints over **Postgres, DuckDB, or hybrid**, with **Redis** cache and optional **Polygon** for live context on some routes.
+Quantiv is a monorepo for **researching and displaying** expected moves into earnings: weekly calendar, per-symbol detail (straddle vs IV-based move, expiries when data exists), optional **watchlist** with **Clerk** auth, and **Finnhub + Upstash** live quotes. Earnings data blends a **DoltHub** historical baseline with a **Finnhub** near-term overlay in git-tracked `data/earnings_calendar.csv`, gated nightly by `scripts/check_earnings_calendar_integrity.py`. The UI ships on **Vercel** using static JSON from `tools/build_frontend_data.py` — no FastAPI call on every navigation. Optional **FastAPI** on **Railway** adds expected-move / ML HTTP APIs over **Postgres, DuckDB, or hybrid** with **Redis** and optional **Polygon**.
 
 > Research and educational use only — not financial advice.
 
 ## What the app does
 
-- **Dashboard** — Last / this / next / +2 weeks; group by day and BMO / AMC / other; filters (popular, S&P 500, movers, all); links to symbol pages.
-- **Symbol pages** — Next earnings, timing, quotes, headline EM; straddle vs IV; by expiry when available; driven by generated JSON + live batch-price.
-- **APIs (frontend)** — Search, batch quotes, watchlist routes when configured, `/api/cron/refresh-prices` (Bearer `CRON_SECRET`). Backend route list: `apps/backend/routers/em.py` (e.g. `/health`, `/api/expected-move`, `/em/*`, `/api/ml/*`, admin refresh).
+- **Dashboard** — Last / this / next / +2 weeks; filters (popular, S&P 500, movers); links to symbol pages.
+- **Symbol pages** — Next earnings, timing, quotes, headline EM; straddle vs IV; per-expiry when data exists.
+- **Screener** — Virtualized table with live quote overlay when Upstash is configured.
+- **APIs (Vercel)** — Search, batch quotes, watchlist (Clerk + Neon), `/api/cron/refresh-prices` (Bearer `CRON_SECRET`).
+- **APIs (Railway, optional)** — `/health`, `/api/expected-move`, `/em/*`, `/api/ml/*` — see `apps/backend/routers/em.py`.
+
+## Hosting
+
+| Platform | Role | Config |
+|----------|------|--------|
+| **Vercel** | Next.js UI + API routes + static JSON in `apps/frontend/public` | [`vercel.json`](vercel.json) |
+| **Neon** | Postgres — watchlist, cron cursor, optional `em_forecasts` rows | `DATABASE_URL` on Vercel (+ Railway if hybrid) |
+| **Upstash** | Quote cache (`quote:{symbol}`) via REST on Vercel, TCP on Railway | `UPSTASH_*` / `REDIS_URL` |
+| **Cloudflare Worker** | Market-hours cron → Vercel refresh-prices | [`workers/refresh-prices/`](workers/refresh-prices/README.md) |
+| **Cloudflare R2** | Parquet + models blob store (not in git) | [`scripts/r2_*.sh`](scripts/r2_setup.md) |
+| **GitHub Actions** | Nightly data refresh + PR CI | [`.github/workflows/`](.github/workflows/) |
+| **Railway** (optional) | FastAPI Docker image + `/data` volume | [`railway.toml`](railway.toml), [`docs/RAILWAY_SETUP.md`](docs/RAILWAY_SETUP.md) |
+
+**DNS:** `usequantiv.com` → Vercel (nameservers `ns*.vercel-dns.com`). `api.usequantiv.com` → Railway CNAME. See Railway setup doc for Vercel DNS records.
+
+**Note:** `BACKEND_URL` / `BACKEND_SHARED_SECRET` on Vercel are planned for a server-side proxy to Railway; the live site today uses static JSON + Vercel API routes.
 
 ## Architecture
 
 ```mermaid
 flowchart TB
   subgraph sources["Upstream data"]
-    DH["DoltHub - options, earnings, OHLCV, vol history"]
-    FH_E["Finnhub - earnings calendar overlay"]
-    FRED["FRED - VIX daily CSV"]
-    SEC["SEC EDGAR - ticker registry"]
+    DH["DoltHub"]
+    FH_E["Finnhub earnings"]
+    FRED["FRED VIX"]
+    SEC["SEC EDGAR"]
   end
 
-  subgraph sync["Python sync layer"]
+  subgraph sync["Python sync"]
     SD[sync_dolthub.py]
     SFE[sync_finnhub_earnings.py]
     SV[sync_vix.py]
-    BTN[build_ticker_names.mjs]
     GATE[check_earnings_calendar_integrity.py]
+    BTN[build_ticker_names.mjs]
   end
 
   DH --> SD
@@ -43,10 +61,10 @@ flowchart TB
   FRED --> SV
   SEC --> BTN
 
-  subgraph artifacts["Local artifacts"]
-    EC["data/earnings_calendar.csv (git-tracked)"]
-    PQ["Parquet under data/ (R2-backed)"]
-    DUCK[(DuckDB quantiv.duckdb)]
+  subgraph artifacts["Artifacts"]
+    EC["data/earnings_calendar.csv"]
+    PQ["Parquet under data/"]
+    DUCK[(DuckDB)]
   end
 
   SD --> EC
@@ -55,202 +73,205 @@ flowchart TB
   SD --> PQ
   SV --> PQ
 
-  subgraph ci["Scheduled refresh optional"]
+  subgraph ci["CI + R2"]
     R2[(Cloudflare R2)]
-    GHA[GitHub Actions daily-refresh]
-    RTN[GitHub Actions refresh-ticker-names quarterly]
+    GHA[daily-refresh.yml]
   end
 
-  R2 -->|rclone pull| PQ
-  PQ -->|rclone push after sync| R2
+  R2 <-->|rclone| PQ
   GHA --> SD
   GHA --> SFE
-  GHA --> SV
   GHA --> GATE
   GHA --> R2
-  RTN --> BTN
 
   PQ --> VIEWS[setup_duckdb_from_parquet.py]
   EC --> VIEWS
   VIEWS --> DUCK
 
-  subgraph ml["ML path"]
-    LGBM[LightGBM models in models/]
+  subgraph ml["ML"]
+    LGBM["apps/ml/models/*.joblib"]
     SCORE[daily_score.py]
   end
 
   LGBM --> SCORE
   DUCK --> SCORE
+  SCORE --> PGIMP[import_recent_to_postgres.py]
+  PGIMP --> Neon[(Neon Postgres)]
 
   DUCK --> BUILD[build_frontend_data.py]
   SCORE --> BUILD
-  BUILD --> PUB["Static JSON in apps/frontend/public (weekly, weeks/manifest+*, symbols/*, screener)"]
+  BUILD --> PUB["apps/frontend/public/*.json"]
   BTN --> PUB
 
-  subgraph deploy["Hosting"]
+  subgraph deploy["Edge"]
     VERCEL[Next.js on Vercel]
+    RAIL[Railway FastAPI optional]
   end
 
   PUB --> VERCEL
-  GHA -->|commit and push public JSON + earnings_calendar.csv| PUB
+  GHA -->|commit JSON + CSV| PUB
+  R2 --> RAIL
 
-  subgraph quotes["Dashboard quotes"]
-    CF[Cloudflare Worker cron]
-    CRON["Next.js /api/cron/refresh-prices"]
-    FH[Finnhub]
-    UPR[(Upstash Redis)]
+  subgraph quotes["Live quotes"]
+    CF[Cloudflare Worker]
+    CRON["/api/cron/refresh-prices"]
+    UPR[(Upstash)]
     BATCH["/api/stocks/batch-price"]
   end
 
   CF --> CRON
-  CRON --> FH
   CRON --> UPR
   UPR --> BATCH
   BATCH --> VERCEL
-
-  subgraph api["Optional API"]
-    FAST[FastAPI in apps/backend]
-    PG[(Postgres)]
-    REDIS[(Redis)]
-    POLY[Polygon optional]
-  end
-
-  DUCK --> FAST
-  PG --> FAST
-  REDIS --> FAST
-  POLY --> FAST
 ```
 
-**Nightly path:** [.github/workflows/daily-refresh.yml](.github/workflows/daily-refresh.yml) (cron `0 11 * * *` = 07:00 ET) pulls Parquet + models from R2, runs `sync_dolthub.py` (options / earnings / ohlcv / volhist), overlays near-term earnings via `sync_finnhub_earnings.py` when `FINNHUB_API_KEY` is set (Sundays do a full-universe sweep), runs the **integrity gate** (`scripts/check_earnings_calendar_integrity.py`) — if it trips, the commit step is skipped to avoid shipping a regressed CSV — pushes Parquet back to R2, rebuilds DuckDB views, runs `check_duckdb_freshness.py`, `daily_score.py --days-ahead 21`, regenerates `apps/frontend/public/{weekly,weeks/*,symbols/*,screener}.json`, commits `apps/frontend/public/` + `data/earnings_calendar.csv`, and pushes so Vercel redeploys. Weekly LightGBM retrain runs on the same workflow at `0 12 * * 0` (Sun 12:00 UTC). Forecast parquet under `data/forecasts` stays out of git.
+### Nightly pipeline ([`daily-refresh.yml`](.github/workflows/daily-refresh.yml))
 
-**Quarterly path:** [.github/workflows/refresh-ticker-names.yml](.github/workflows/refresh-ticker-names.yml) (cron `0 6 1 */3 *`) pulls SEC EDGAR registries via `scripts/build_ticker_names.mjs`, writes `apps/frontend/public/ticker-names.json` + `ticker-exchanges.json`, and commits.
+Cron `0 11 * * *` (07:00 ET): pull R2 → DoltHub sync → Finnhub overlay → **integrity gate** → push Parquet → DuckDB views → freshness check → `daily_score` → `import_recent_to_postgres` → `pull_market_caps` → `build_popular_weights` → `build_frontend_data` → commit `apps/frontend/public/` + `data/earnings_calendar.csv` → Vercel redeploy.
+
+Sunday `0 12 * * 0`: optional LightGBM retrain (`feature_engineering_v3` + `model_trainer_v3`) → push models to R2.
+
+### Quarterly ([`refresh-ticker-names.yml`](.github/workflows/refresh-ticker-names.yml))
+
+SEC EDGAR → `ticker-names.json` + `ticker-exchanges.json`.
 
 ## Tech stack
 
 | Area | Notes |
 |------|--------|
-| **Frontend** | Next.js 15 App Router, React 18, TypeScript, Tailwind, Zod, TanStack Query, Clerk when enabled |
-| **Backend** | FastAPI, Pydantic, asyncpg, DuckDB, Redis, HTTPX, SlowAPI, structlog |
-| **Data / ML** | Python 3.11 in CI, pandas / PyArrow / Parquet, DuckDB, LightGBM + sklearn stack in `apps/ml/requirements.txt` |
-| **Infra** | Docker Compose, Vercel, optional R2 + rclone (`scripts/r2_*.sh`), GitHub Actions (`ci.yml`, `daily-refresh.yml`, `refresh-ticker-names.yml`), Cloudflare Worker in `workers/refresh-prices` |
+| **Frontend** | Next.js 15 App Router, React 18, TypeScript, Tailwind, TanStack Query (watchlist), Clerk |
+| **Backend** | FastAPI, asyncpg, DuckDB, Redis, structlog — [`apps/backend/Dockerfile`](apps/backend/Dockerfile) |
+| **Data / ML** | Python 3.11, Parquet, DuckDB, LightGBM in [`apps/ml/`](apps/ml/) |
+| **Infra** | Docker Compose (local), Vercel, Railway, R2, GitHub Actions, Cloudflare Worker |
 
 ## Project structure
 
 ```text
 quantiv/
 ├── apps/
-│   ├── frontend/          # Next.js 15 UI, API routes, public JSON artifacts
-│   ├── backend/           # FastAPI, routers, data backends, Dockerfile
-│   └── ml/                # feature_engineering_v3, model_trainer_v3, training assets
-├── config/                # .env.local / .env.production (see .env.example at repo root)
-├── data/                  # Parquet, DuckDB, inputs; earnings_calendar.csv is git-tracked
+│   ├── frontend/          # Next.js UI, API routes, public JSON
+│   ├── backend/           # FastAPI, routers, backends/, models/ (Pydantic)
+│   └── ml/                # Features, training, models/*.joblib
+├── config/                # .env.local / .env.production (gitignored)
+├── data/                  # Parquet, DuckDB; earnings_calendar.csv tracked
+├── docs/                  # Architecture, Railway, performance, plans
 ├── infrastructure/        # docker-compose, database helpers
-├── lib/                   # Shared TS + bundled data (e.g. S&P 500 list)
-├── models/                # Trained artifacts when present (also synced to R2)
-├── scripts/               # sync_dolthub, sync_finnhub_earnings, sync_vix, DuckDB setup,
-│                          # daily_score, walk_forward, R2, healthchecks + integrity gate
-├── tools/                 # build_frontend_data, build_earnings_events, patch_timing,
-│                          # math_baseline (EM helpers)
-├── workers/               # Cron → Vercel refresh-prices (Wrangler secrets)
-├── .github/workflows/     # ci.yml, daily-refresh.yml, refresh-ticker-names.yml
-├── package.json           # npm workspaces + data / ML script aliases
-├── requirements.txt       # Python deps for CI / scripts
-└── vercel.json
+├── lib/                   # Shared TS + sp500-constituents.json
+├── scripts/               # Sync, scoring, R2, integrity gate
+├── tools/                 # build_frontend_data, popular weights, market caps
+├── workers/refresh-prices/  # Cron → Vercel quote refresh
+├── railway.toml           # Railway Docker deploy (no startCommand — use Dockerfile CMD)
+├── vercel.json
+└── package.json           # npm workspaces (apps/frontend)
 ```
 
 ## Prerequisites
 
-- Node 18+, npm  
-- Python 3.11 recommended  
-- Docker + Compose if you use the bundled stack  
-- Local `data/` (or sync from DoltHub) to build dashboard JSON  
-- Optional: Finnhub + Upstash + `CRON_SECRET` (+ `DATABASE_URL` for cron cursor) for hosted quotes; Polygon / Postgres / Redis for FastAPI modes — see [.env.example](.env.example)
+- Node 20+, npm  
+- Python 3.11  
+- Docker (optional, local stack)  
+- Local `data/` or R2 pull to build dashboard JSON  
+- Optional: Finnhub, Upstash, `CRON_SECRET`, Neon `DATABASE_URL`, Clerk keys — see [`.env.example`](.env.example)
 
 ## Environment
 
-Next.js (`apps/frontend/next.config.js`) and FastAPI (`apps/backend/main.py`) load **`config/.env.local`** in dev (and `config/.env.production` when `NODE_ENV` / `ENVIRONMENT` is production). Hosts inject vars in prod.
+Next.js and FastAPI load **`config/.env.local`** in dev ([`apps/frontend/next.config.js`](apps/frontend/next.config.js), [`apps/backend/main.py`](apps/backend/main.py)). Production vars go in **Vercel**, **Railway**, and **Wrangler** dashboards.
 
 ```bash
 cp .env.example config/.env.local
 ```
 
-Variables are documented inline in [.env.example](.env.example) (URLs, Clerk, Finnhub/Upstash, `DATA_BACKEND`, DuckDB paths, Postgres, `REDIS_URL`, `ADMIN_API_KEY`, etc.). The Cloudflare Worker uses **Wrangler secrets** (`REFRESH_URL`, `CRON_SECRET`) — see `workers/refresh-prices/README.md`.
+Host-specific tables: [`.env.example`](.env.example). Railway walkthrough: [`docs/RAILWAY_SETUP.md`](docs/RAILWAY_SETUP.md).
 
 ## Quick start (dashboard)
 
 ```bash
 npm install
-python -m venv .venv && source .venv/bin/activate   # optional
-pip install -r requirements.txt                   # and/or apps/backend + apps/ml requirements
-npm run data:frontend                             # after data + DuckDB exist
-npm run dev                                       # http://localhost:3000
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+# After data/ + DuckDB exist:
+npm run data:frontend
+npm run dev                    # http://localhost:3000
 ```
 
-Expected artifacts include `apps/frontend/public/weekly.json`, `weeks/*.json`, `weeks/manifest.json`, and `symbols/*.json`. If they are missing, run the **Data workflow** below.
+Artifacts: `apps/frontend/public/{weekly.json,weeks/*,symbols/*,screener.json}`. Missing files → follow **Data workflow** below.
 
 ## Data workflow
 
-1. **DoltHub sync** — `npm run data:sync` (options); add `--earnings`, `--ohlcv`, `--volhist`; full ranges with `npm run data:sync-full -- --start-date … --end-date …`. VIX: `python scripts/sync_vix.py` (not on the default npm sync alias).
-2. **Finnhub overlay** — `npm run data:earnings:finnhub -- --symbols AAPL,MSFT` (or `--all-recent` to sweep the universe, respecting Finnhub's 60 calls/min cap via the built-in `CallBudget` and `--delay`). Merges into `data/earnings_calendar.csv` non-destructively, preserving DoltHub historicals.
-3. **Integrity check** — `python scripts/check_earnings_calendar_integrity.py` compares the working CSV against HEAD and trips guardrails on row drops, vanished tickers, US-only vanished events in past 30d / next 60d, with a ±14d date-drift rescue and a foreign-symbol exclusion. CI runs this before any auto-commit; pass `--warn-only` to override.
-4. **DuckDB views** — `npm run data:views` (`scripts/setup_duckdb_from_parquet.py`).
-5. **Frontend JSON** — `npm run data:frontend` → `apps/frontend/public`.
+1. **DoltHub** — `npm run data:sync` (+ `--earnings`, `--ohlcv`, `--volhist`; full: `data:sync-full`)
+2. **Finnhub overlay** — `npm run data:earnings:finnhub`
+3. **Integrity** — `python scripts/check_earnings_calendar_integrity.py` (CI blocks commit on failure)
+4. **DuckDB views** — `npm run data:views`
+5. **Score** — `npm run ml:score`
+6. **Frontend JSON** — `npm run data:frontend`
 
-## Backend & Docker
+Details: [`scripts/README.md`](scripts/README.md), [`tools/README.md`](tools/README.md).
 
-```bash
-npm run dev:backend          # or: cd apps/backend && python main.py
-# http://localhost:8000/docs   http://localhost:8000/health
-```
-
-Set `DATA_BACKEND` to `duckdb`, `postgres`, or `hybrid` and configure `DUCKDB_PATH` / `DATABASE_URL` / discrete Postgres vars and `REDIS_URL` as needed.
+## Backend (local or Railway)
 
 ```bash
-npm run docker:up            # infrastructure/docker/docker-compose.yml
-npm run docker:down
+npm run dev:backend            # http://localhost:8000/docs
 ```
 
-Compose profiles exist for frontend dev and ML batch — see comments in the compose file.
+`DATA_BACKEND`: `duckdb` | `postgres` | `hybrid`. Local: `./data` paths. Railway: `/data` volume — [`docs/RAILWAY_SETUP.md`](docs/RAILWAY_SETUP.md).
+
+```bash
+npm run docker:up              # infrastructure/docker/docker-compose.yml
+```
 
 ## ML
 
 ```bash
-npm run ml:features      # apps/ml/feature_engineering_v3.py
-npm run ml:train         # apps/ml/model_trainer_v3.py
-npm run ml:walk-forward  # scripts/walk_forward.py
-npm run ml:score         # scripts/daily_score.py
-npm run ml:validate      # scripts/data_healthcheck.py --local
+npm run ml:features
+npm run ml:train
+npm run ml:walk-forward
+npm run ml:score
+npm run ml:validate
 ```
 
-Training / scoring details: [scripts/README.md](scripts/README.md).
+Artifacts: `apps/ml/models/`, synced to R2 `data/models/` in CI.
 
-## npm scripts (high level)
+## npm scripts
 
 | Group | Commands |
 |-------|----------|
-| Frontend | `dev`, `build`, `lint`, `type-check`, `test` (workspace `apps/frontend`) |
+| Frontend | `dev`, `build`, `lint`, `type-check`, `test`, `test:e2e` |
 | Backend | `dev:backend` |
 | Docker | `docker:up`, `docker:down` |
 | Data | `data:sync`, `data:sync-full`, `data:earnings`, `data:earnings:finnhub`, `data:ohlcv`, `data:csv-parquet`, `data:views`, `data:frontend` |
 | ML | `ml:features`, `ml:train`, `ml:walk-forward`, `ml:score`, `ml:validate` |
 
-See root **package.json** for the exact command lines.
+## Performance
 
-## Deployment
+First loads on **screener** and **calendar** can feel slow because the UI waits for logo preloads, live batch quotes (up to ~3.2s), and a minimum skeleton delay — not because `screener.json` is huge (~132 KB). Symbol pages ship a large client bundle (~3.4k lines) and re-fetch ticker metadata on the client.
 
-Vercel builds `apps/frontend` (`vercel.json`). The app reads static JSON from `apps/frontend/public` (committed or produced by `build_frontend_data`). CI can refresh that tree nightly and push to `main`; heavy Parquet/models can live on **R2** instead of git.
+Full audit and fix priority: [**docs/PERFORMANCE.md**](docs/PERFORMANCE.md).
 
-## Accuracy
+## CI
 
-- Headline EM in the UI is mainly straddle / IV-baseline unless ML fields are wired into the same artifacts.
-- The dashboard does not call FastAPI for every page — it uses generated JSON.
-- Spot quotes on Next.js use Finnhub + Upstash Redis caching, not a per-ticker Polygon route; Polygon remains optional on the FastAPI side.
-- Earnings dates and timing (BMO / AMC / DMH) come from DoltHub for historicals and Finnhub for the rolling near-term window; Finnhub wins deterministically on the upcoming overlap to avoid double-projecting the same quarter.
-- The dashboard's **Popular** filter is a generated weight table at `apps/frontend/lib/popular.ts` thresholded at `>= 76`, based on a rank blend of 90-day dollar volume and market cap. Watchlist / search use the separate S&P 500 list in `lib/data/sp500-constituents.json`.
+| Workflow | Trigger |
+|----------|---------|
+| [`ci.yml`](.github/workflows/ci.yml) | PR / push to `main` — lint, build, pytest, Playwright (needs Clerk E2E secrets for auth specs) |
+| [`daily-refresh.yml`](.github/workflows/daily-refresh.yml) | Nightly + weekly retrain |
+| [`refresh-ticker-names.yml`](.github/workflows/refresh-ticker-names.yml) | Quarterly |
+
+## Accuracy & data sources
+
+- Headline EM in the UI is mainly straddle / IV-baseline unless ML fields are in the static JSON.
+- Browsing uses generated JSON, not Railway, unless a future `BACKEND_URL` proxy is added.
+- Quotes: Finnhub + Upstash on Vercel; Polygon optional on FastAPI.
+- **Popular** filter uses weights from `tools/build_popular_weights.py` (threshold in `apps/frontend/lib/popular.ts`).
 
 ## Documentation
 
-Longer design / ML write-ups: [docs/README.md](docs/README.md) (index of `docs/*.md`). ML MVP2 archive: [docs/ML_MVP2.md](docs/ML_MVP2.md).
+| Doc | Topic |
+|-----|--------|
+| [docs/README.md](docs/README.md) | Full index |
+| [docs/RAILWAY_SETUP.md](docs/RAILWAY_SETUP.md) | FastAPI on Railway |
+| [docs/duckdb_architecture.md](docs/duckdb_architecture.md) | DuckDB / hybrid backend |
+| [docs/PERFORMANCE.md](docs/PERFORMANCE.md) | Frontend load times |
+| [docs/EXTENDED_HOURS_AND_OPTIONS_DATA_PLAN.md](docs/EXTENDED_HOURS_AND_OPTIONS_DATA_PLAN.md) | Quote / options provider roadmap |
+| [docs/archive/](docs/archive/) | Oct 2025 ML write-ups (historical) |
 
 ## License
 
