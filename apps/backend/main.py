@@ -171,11 +171,12 @@ async def lifespan(app: FastAPI):
         duck_path = os.getenv("DUCKDB_PATH", "./quantiv.duckdb")
         logger.info("Connecting to DuckDB", path=duck_path)
         duckdb_conn = duckdb.connect(duck_path, read_only=False)
-        try:
-            duckdb_conn.execute("INSTALL parquet")
-            duckdb_conn.execute("LOAD parquet")
-        except Exception:
-            pass
+        # parquet support is built into duckdb >= 0.9, so no INSTALL/LOAD
+        # needed. The explicit INSTALL parquet + LOAD parquet calls that
+        # used to live here triggered "ImportError: cannot load module
+        # more than once per process" on Railway because the wheel's
+        # bundled extension would attempt a second register against the
+        # already-registered builtin.
         _ensure_duckdb_em_view(duckdb_conn, os.getenv("DATA_DIR", "./data"))
         duck_ready = True
 

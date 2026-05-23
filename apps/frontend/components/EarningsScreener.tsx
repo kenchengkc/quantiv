@@ -108,17 +108,64 @@ function num(v: number | null | undefined, digits = 2) {
   return v.toFixed(digits);
 }
 
+// ── Loading-gate timings ─────────────────────────────────────────────────
+// MIN_LOADING_MS prevents the skeleton from flashing on a fast cache hit.
+// INITIAL_QUOTE_WAIT_MS bounds how long we wait for the live-quote batch
+// before unblocking the row render (rows show bundle spot + "—" 1d % if
+// the quote API is slow). LOGO_PRELOAD_TIMEOUT_MS keeps a single
+// failed/slow logo from holding up the whole page.
+const MIN_LOADING_MS = 600;
+const INITIAL_QUOTE_WAIT_MS = 3_200;
+const LOGO_PRELOAD_TIMEOUT_MS = 4_000;
 const SCREENER_NAME_COL_WIDTH = 280;
 
 function logoUrl(t: string) {
   return `https://assets.parqet.com/logos/symbol/${t}?format=png`;
 }
 
-// Module-level logo state cache. ScreenerLogo updates it on
-// img.onLoad/onError so subsequent renders pick the right initial state
-// (typographic fallback vs <img>) without re-attempting a failed URL.
+// Module-level logo caches. Shared across renders so a ticker preloaded
+// once doesn't have to be fetched a second time when the user filters,
+// sorts, or navigates back to the page in the same session.
 type LogoLoadState = 'loaded' | 'failed';
 const logoStateCache = new Map<string, LogoLoadState>();
+const logoPromiseCache = new Map<string, Promise<LogoLoadState>>();
+
+function preloadLogo(ticker: string): Promise<LogoLoadState> {
+  const cached = logoStateCache.get(ticker);
+  if (cached) return Promise.resolve(cached);
+  const existing = logoPromiseCache.get(ticker);
+  if (existing) return existing;
+  if (typeof window === 'undefined') return Promise.resolve('failed');
+
+  const promise = new Promise<LogoLoadState>((resolve) => {
+    const img = new window.Image();
+    let settled = false;
+    let timeoutId: number | null = null;
+    const finish = (state: LogoLoadState) => {
+      if (settled) return;
+      settled = true;
+      if (timeoutId !== null) window.clearTimeout(timeoutId);
+      logoStateCache.set(ticker, state);
+      resolve(state);
+    };
+    timeoutId = window.setTimeout(() => finish('failed'), LOGO_PRELOAD_TIMEOUT_MS);
+    img.decoding = 'async';
+    img.onload = () => {
+      const decode =
+        typeof img.decode === 'function'
+          ? img.decode().catch(() => undefined)
+          : Promise.resolve();
+      void decode.then(() => finish('loaded'));
+    };
+    img.onerror = () => finish('failed');
+    img.src = logoUrl(ticker);
+    if (img.complete) {
+      finish(img.naturalWidth > 0 ? 'loaded' : 'failed');
+    }
+  });
+  logoPromiseCache.set(ticker, promise);
+  return promise;
+}
 
 /* eslint-disable @next/next/no-img-element */
 /** Inline ticker logo using the parqet asset CDN with a typographic
@@ -773,6 +820,15 @@ export default function EarningsScreener() {
   const [error, setError] = useState<string | null>(null);
   const [live, setLive] = useState<Record<string, LiveTick>>({});
 
+  // Three independent gates that together unblock the real table.
+  // Each defaults to false and flips true asynchronously:
+  //   logosReady — every logo in the bundle has preloaded (or failed cleanly)
+  //   quotesReady — first live-quote batch returned, or fallback timer fired
+  //   minLoadingDone — minimum skeleton hold elapsed (kills sub-second flash)
+  const [logosReady, setLogosReady] = useState(false);
+  const [quotesReady, setQuotesReady] = useState(false);
+  const [minLoadingDone, setMinLoadingDone] = useState(false);
+
   const q = (searchParams.get('q') ?? '').trim().toUpperCase();
   const sp500Only = searchParams.get('sp500') === '1';
   const minSpotRaw = searchParams.get('minSpot');
@@ -860,6 +916,39 @@ export default function EarningsScreener() {
       cancelled = true;
     };
   }, []);
+
+  // Min-loading hold — guarantees the skeleton shows at least
+  // MIN_LOADING_MS so a cached fetch doesn't strobe through it.
+  useEffect(() => {
+    const t = window.setTimeout(() => setMinLoadingDone(true), MIN_LOADING_MS);
+    return () => window.clearTimeout(t);
+  }, []);
+
+  // Preload every logo in the bundle so the actual <img> render hits a
+  // warm browser cache and never reflow-shifts a row. Keyed on `events`
+  // (the full set) rather than `sorted` so filter / sort changes don't
+  // trigger a redundant preload pass.
+  useEffect(() => {
+    if (loading || error) return;
+    if (events.length === 0) {
+      setLogosReady(true);
+      return;
+    }
+    const tickers = Array.from(new Set(events.map((e) => e.ticker)));
+    const uncached = tickers.filter((t) => !logoStateCache.has(t));
+    if (uncached.length === 0) {
+      setLogosReady(true);
+      return;
+    }
+    let cancelled = false;
+    setLogosReady(false);
+    void Promise.all(uncached.map(preloadLogo)).then(() => {
+      if (!cancelled) setLogosReady(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [events, loading, error]);
 
   const filtered = useMemo(() => {
     return events.filter((ev) => {
@@ -982,6 +1071,19 @@ export default function EarningsScreener() {
     if (syms.length === 0) return;
     const cap = syms.slice(0, 400);
     let cancelled = false;
+    // Fallback: unblock the page even if the quote API is slow / down.
+    let initialReadyTimer: ReturnType<typeof setTimeout> | null = setTimeout(
+      () => setQuotesReady(true),
+      INITIAL_QUOTE_WAIT_MS,
+    );
+    const markQuotesReady = () => {
+      if (cancelled) return;
+      if (initialReadyTimer) {
+        clearTimeout(initialReadyTimer);
+        initialReadyTimer = null;
+      }
+      setQuotesReady(true);
+    };
     const fetchOnce = async () => {
       try {
         const res = await fetch(`/api/stocks/batch-price?symbols=${cap.join(',')}`, {
@@ -1005,6 +1107,7 @@ export default function EarningsScreener() {
           }
           return next;
         });
+        markQuotesReady();
       } catch {
         setLive((prev) => {
           const next = { ...prev };
@@ -1013,6 +1116,7 @@ export default function EarningsScreener() {
           }
           return next;
         });
+        markQuotesReady();
       }
     };
     void fetchOnce();
@@ -1023,6 +1127,7 @@ export default function EarningsScreener() {
     window.addEventListener('focus', onVis);
     return () => {
       cancelled = true;
+      if (initialReadyTimer) clearTimeout(initialReadyTimer);
       document.removeEventListener('visibilitychange', onVis);
       window.removeEventListener('focus', onVis);
     };
@@ -1061,11 +1166,13 @@ export default function EarningsScreener() {
   // Real rows + KPI strip only unblock once *every* gate is green: data
   // fetched, logos cached, initial quotes back (or timer expired), and
   // the min skeleton hold elapsed. Until then, render the waterfall.
-  // The screener is "ready" as soon as the bundle JSON arrives. Logos
-  // and live quotes fill in in place — the ScreenerLogo falls back to a
-  // typographic monogram while its <img> loads; live quote cells render
-  // a "—" placeholder until the first batch-price poll returns.
-  const contentReady = !loading && !error;
+  // All three gates have to clear before the real table renders. The
+  // skeleton stays up until the bundle JSON is fetched, all logos have
+  // preloaded (or timed out), the first live-quote batch is back (or the
+  // wait-bound fired), and the min-loading hold has elapsed. Trades a
+  // slower first paint for a more "ready" look.
+  const contentReady =
+    !loading && !error && logosReady && quotesReady && minLoadingDone;
   const showSkeleton = !error && !contentReady;
 
   return (
