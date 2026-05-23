@@ -8,7 +8,8 @@
 # To wire a Railway service to this repo:
 #   1. Railway dashboard → New Service → Deploy from GitHub repo
 #   2. Pick this repo; Railway auto-detects railway.toml
-#   3. Add a Volume mounted at /data
+#   3. Add a Volume mounted at /data (project canvas → ⌘K → Create Volume,
+#      or `railway volume add --mount-path /data` — not under Service Settings)
 #   4. Set env vars (see docs/RAILWAY_SETUP.md)
 #   5. Configure custom domain → CNAME api.usequantiv.com
 
@@ -17,15 +18,14 @@ builder = "DOCKERFILE"
 dockerfilePath = "apps/backend/Dockerfile"
 
 [deploy]
-# Railway sets PORT; uvicorn binds to it.
-startCommand = "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"
+# No startCommand — use Dockerfile CMD. Railway does not expand ${PORT:-8000}
+# in startCommand, so uvicorn would get a literal port string and crash.
 healthcheckPath = "/health"
 healthcheckTimeout = 30
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 10
 
-# Volume mount inside the service. Created in the Railway dashboard
-# (Settings → Volumes) and attached to this service. Lazy R2 pulls
-# populate it on first request per (symbol, horizon).
+# Volume mount inside the service. Create in the Railway dashboard via the
+# project canvas (⌘K → Create Volume) or CLI — not Service Settings.
 [[deploy.volumes]]
 mountPath = "/data"

@@ -59,8 +59,7 @@ jobs:
           # E2E_USER_* are the credentials the Playwright globalSetup uses
           # to mint a Clerk session. Set only if you actually run the
           # signed-in specs (watchlist) in CI; public specs work without.
-          E2E_USER_EMAIL: ${{ secrets.E2E_USER_EMAIL }}
-          E2E_USER_PASSWORD: ${{ secrets.E2E_USER_PASSWORD }}
+          E2E_CLERK_USER_EMAIL: ${{ secrets.E2E_CLERK_USER_EMAIL }}
 
       - uses: actions/upload-artifact@v4
         if: failure()
