@@ -9,8 +9,10 @@ the full forecast universe rather than scoring on demand.
 
 Usage:
     DATABASE_URL=postgres://... python scripts/import_recent_to_postgres.py
-    # Only the last N days of snapshot rows, default 1:
-    python scripts/import_recent_to_postgres.py --days 1
+    # Nightly CI imports the whole file (--full). For manual runs, --days
+    # filters on chain snapshot_date; use --days 7+ or --full so you don't
+    # drop rows whose snapshot is more than 1d old:
+    python scripts/import_recent_to_postgres.py --full
     # Force re-import everything in the newest Parquet (ignore --days):
     python scripts/import_recent_to_postgres.py --full
     # Pick a specific Parquet file (defaults to newest forecasts_*.parquet):
@@ -244,8 +246,9 @@ def upsert(conn, df: pd.DataFrame) -> int:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--days", type=int, default=1,
-                    help="Import snapshots from the last N days (default 1)")
+    ap.add_argument("--days", type=int, default=7,
+                    help="When not using --full: keep rows with snapshot_date >= today-N "
+                         "(chain date, not Parquet write date). Nightly CI uses --full.")
     ap.add_argument("--full", action="store_true",
                     help="Ignore --days; import every row in the Parquet")
     ap.add_argument("--file", default=None,
