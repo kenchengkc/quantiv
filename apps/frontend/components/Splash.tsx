@@ -10,8 +10,8 @@ const TOTAL_MS = 2327;
 const READY_HOLD_MS = 280;
 const MAX_ASSET_WAIT_MS = 900;
 const SPLASH_ASSETS = [
-  '/brand/QuantivSplashQClosed.png',
-  '/brand/QuantivSplashTail.png',
+  '/brand/QuantivSplashQClosed.webp',
+  '/brand/QuantivSplashTail.webp',
 ];
 
 function wait(ms: number) {
@@ -101,7 +101,7 @@ export function Splash() {
         <div className="quantiv-splash-mark" aria-hidden="true">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/brand/QuantivSplashQClosed.png"
+            src="/brand/QuantivSplashQClosed.webp"
             alt=""
             className="quantiv-splash-layer quantiv-splash-closed-ring"
             draggable={false}
@@ -110,7 +110,7 @@ export function Splash() {
           <div className="quantiv-splash-tail-clip">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/brand/QuantivSplashTail.png"
+              src="/brand/QuantivSplashTail.webp"
               alt=""
               className="quantiv-splash-layer"
               draggable={false}

@@ -35,9 +35,13 @@ type Filter = 'popular' | 'sp500' | 'movers' | 'all';
 
 const MIN_OFFSET = -1;
 const MAX_OFFSET = 2;
-const MIN_GRID_LOADING_MS = 750;
-const INITIAL_QUOTE_WAIT_MS = 3_200;
-const LOGO_PRELOAD_TIMEOUT_MS = 4_000;
+// No skeleton-hold / logo-preload / quote-wait gates anymore: we render
+// rows as soon as the week JSON arrives. Logos fade in via <img> onload
+// with a typographic fallback; quotes populate as the batch-price poll
+// returns; nothing blocks the calendar from being interactive on first
+// paint. The previous waterfall of MIN_GRID_LOADING_MS + INITIAL_QUOTE_
+// WAIT_MS + LOGO_PRELOAD_TIMEOUT_MS added up to 3+ seconds of "ready but
+// hidden" in the worst case and made the dashboard feel sluggish.
 const OFFSETS: { v: number; l: string }[] = [
   { v: -1, l: 'Last week' },
   { v: 0, l: 'This week' },
@@ -73,50 +77,11 @@ function logoUrl(t: string) {
 
 type LogoLoadState = 'loaded' | 'failed';
 
+// Shared across all rows so once a logo has been resolved (or failed) for a
+// given ticker, subsequent renders pick the right initial state without a
+// new network request. The Logo component below updates this cache on
+// img.onLoad / img.onError.
 const logoStateCache = new Map<string, LogoLoadState>();
-const logoPromiseCache = new Map<string, Promise<LogoLoadState>>();
-
-function preloadLogo(ticker: string): Promise<LogoLoadState> {
-  const cached = logoStateCache.get(ticker);
-  if (cached) return Promise.resolve(cached);
-
-  const existing = logoPromiseCache.get(ticker);
-  if (existing) return existing;
-
-  if (typeof window === 'undefined') return Promise.resolve('failed');
-
-  const promise = new Promise<LogoLoadState>((resolve) => {
-    const img = new window.Image();
-    let settled = false;
-    let timeoutId: number | null = null;
-
-    const finish = (state: LogoLoadState) => {
-      if (settled) return;
-      settled = true;
-      if (timeoutId !== null) window.clearTimeout(timeoutId);
-      logoStateCache.set(ticker, state);
-      resolve(state);
-    };
-
-    timeoutId = window.setTimeout(() => finish('failed'), LOGO_PRELOAD_TIMEOUT_MS);
-    img.decoding = 'async';
-    img.onload = () => {
-      const decode = typeof img.decode === 'function'
-        ? img.decode().catch(() => undefined)
-        : Promise.resolve();
-      void decode.then(() => finish('loaded'));
-    };
-    img.onerror = () => finish('failed');
-    img.src = logoUrl(ticker);
-
-    if (img.complete) {
-      finish(img.naturalWidth > 0 ? 'loaded' : 'failed');
-    }
-  });
-
-  logoPromiseCache.set(ticker, promise);
-  return promise;
-}
 
 /* eslint-disable @next/next/no-img-element */
 function Logo({ ticker, size = 24 }: { ticker: string; size?: number }) {
@@ -511,14 +476,14 @@ function WeekHeader({
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/brand/QuantivIcon.png"
+              src="/brand/QuantivIcon.webp"
               alt=""
               width={18}
               height={18}
               style={{
                 display: 'inline-block',
                 objectFit: 'contain',
-                // PNG has a solid black background (no alpha). Screen-blend
+                // Brand asset has a solid black background. Screen-blend
                 // it onto the page so only the ring + tail survive against
                 // the dark background.
                 mixBlendMode: 'screen',
@@ -744,9 +709,6 @@ export default function EarningsGrid() {
   const [error, setError] = useState<string | null>(null);
   const [live, setLive] = useState<LiveMap>({});
   const [marketOpen, setMarketOpen] = useState<boolean>(true);
-  const [minLoadingDoneWeek, setMinLoadingDoneWeek] = useState<string | null>(null);
-  const [quotesReadyWeek, setQuotesReadyWeek] = useState<string | null>(null);
-  const [logosReadyKey, setLogosReadyKey] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const thisMonday = useMemo(() => mondayOf(new Date()), []);
@@ -755,14 +717,6 @@ export default function EarningsGrid() {
     d.setDate(d.getDate() + 7 * offset);
     return isoDay(d);
   }, [thisMonday, offset]);
-
-  useEffect(() => {
-    setMinLoadingDoneWeek(null);
-    const timeoutId = window.setTimeout(() => {
-      setMinLoadingDoneWeek(weekStartIso);
-    }, MIN_GRID_LOADING_MS);
-    return () => window.clearTimeout(timeoutId);
-  }, [weekStartIso]);
 
   const fetchWeek = useCallback(
     async (iso: string) => {
@@ -799,36 +753,15 @@ export default function EarningsGrid() {
 
   useEffect(() => {
     const dataWeek = data?.window?.start?.slice(0, 10) ?? null;
-    if (!data || dataWeek !== weekStartIso) {
-      setQuotesReadyWeek(null);
-      return;
-    }
-    if (data.events.length === 0) {
-      setQuotesReadyWeek(weekStartIso);
-      return;
-    }
+    if (!data || dataWeek !== weekStartIso) return;
+    if (data.events.length === 0) return;
 
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
-    let initialReadyTimer: ReturnType<typeof setTimeout> | null = null;
-    // No cap — MGET handles hundreds of symbols in a single round-trip.
-    // The 200 cap was a leftover from per-symbol GETs that's now only a
-    // bug: the busy days at the back of the week were dropped.
     const symbols = Array.from(new Set(data.events.map((e) => e.ticker)));
 
     let lastMarketOpen = true;
     let lastQuoteRefreshActive = true;
-    const markQuotesReady = () => {
-      if (cancelled) return;
-      if (initialReadyTimer) {
-        clearTimeout(initialReadyTimer);
-        initialReadyTimer = null;
-      }
-      setQuotesReadyWeek(weekStartIso);
-    };
-
-    setQuotesReadyWeek(null);
-    initialReadyTimer = setTimeout(markQuotesReady, INITIAL_QUOTE_WAIT_MS);
 
     const fetchOnce = async (): Promise<{ pending: number; marketOpen: boolean; quoteRefreshActive: boolean }> => {
       try {
@@ -869,9 +802,11 @@ export default function EarningsGrid() {
       }
     };
 
-    // Phase 1: aggressive polling until the first paint is fully populated.
+    // Phase 1: fast poll until the cron has caught any cold-cache symbols.
     // Phase 2: gentle 30s loop while market is open. When closed, drop to a
     // very slow 5-min heartbeat — quotes are frozen anyway, no need to spin.
+    // The rows already render with whatever's available; this just keeps
+    // them refreshing in the background.
     const fastPoll = async (attempt = 0) => {
       if (cancelled) return;
       const { pending, quoteRefreshActive: refreshOn } = await fetchOnce();
@@ -879,7 +814,6 @@ export default function EarningsGrid() {
         const delay = attempt < 10 ? 2_000 : 8_000;
         timer = setTimeout(() => fastPoll(attempt + 1), delay);
       } else {
-        markQuotesReady();
         const slowLoop = () => {
           if (cancelled) return;
           // 30s while Finnhub refresh window (incl. post-close settlement), 5min otherwise.
@@ -907,7 +841,6 @@ export default function EarningsGrid() {
     return () => {
       cancelled = true;
       if (timer) clearTimeout(timer);
-      if (initialReadyTimer) clearTimeout(initialReadyTimer);
       document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('focus', onVisible);
     };
@@ -955,40 +888,6 @@ export default function EarningsGrid() {
     return list;
   }, [data, filter, search]);
 
-  // Preload logos for the entire week's events, not just the currently
-  // visible filter slice. Keying readiness on the week (not the filter)
-  // means switching Popular ↔ S&P 500 ↔ Movers ↔ All is instant — no
-  // skeleton flash, no second preload pass when a filter exposes tickers
-  // that weren't in the previous slice.
-  const allTickerKey = useMemo(() => {
-    if (!data) return '';
-    return Array.from(new Set(data.events.map((e) => e.ticker))).join('|');
-  }, [data]);
-
-  useEffect(() => {
-    if (!weekReady) {
-      setLogosReadyKey(null);
-      return;
-    }
-
-    const tickers = allTickerKey ? allTickerKey.split('|') : [];
-    const uncached = tickers.filter((ticker) => !logoStateCache.has(ticker));
-    if (uncached.length === 0) {
-      setLogosReadyKey(weekStartIso);
-      return;
-    }
-
-    let cancelled = false;
-    setLogosReadyKey(null);
-    void Promise.all(uncached.map(preloadLogo)).then(() => {
-      if (!cancelled) setLogosReadyKey(weekStartIso);
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [allTickerKey, weekReady, weekStartIso]);
-
   const eventsByDay = useMemo(() => {
     return days.map((day) => {
       const iso = isoDay(day);
@@ -1001,11 +900,11 @@ export default function EarningsGrid() {
   }, [days, filteredEvents]);
 
   const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
-  const contentReady =
-    weekReady &&
-    minLoadingDoneWeek === weekStartIso &&
-    quotesReadyWeek === weekStartIso &&
-    logosReadyKey === weekStartIso;
+  // The calendar grid is "ready" as soon as the week's JSON arrives. Quote
+  // values and logos populate in place: `live` starts empty and fills in
+  // over the first ~2s of polling; the Logo component falls back to a
+  // typographic monogram while its <img> resolves.
+  const contentReady = weekReady;
   const showSkeleton = !error && !contentReady;
 
   return (

@@ -268,7 +268,7 @@ function HeroGlyph({ enabled = true }: { enabled?: boolean }) {
     <div ref={ref} className="quantiv-hero-q" aria-hidden="true">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src="/brand/QuantivSplashQClosed.png"
+        src="/brand/QuantivSplashQClosed.webp"
         alt=""
         className="quantiv-hero-q-layer quantiv-hero-q-ring"
         draggable={false}
@@ -277,7 +277,7 @@ function HeroGlyph({ enabled = true }: { enabled?: boolean }) {
       <div className="quantiv-hero-q-tail-clip">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="/brand/QuantivSplashTail.png"
+          src="/brand/QuantivSplashTail.webp"
           alt=""
           className="quantiv-hero-q-layer"
           draggable={false}
@@ -814,7 +814,7 @@ export default function AboutPageClient() {
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src="/brand/QuantivIcon.png"
+                src="/brand/QuantivIcon.webp"
                 alt=""
                 width={18}
                 height={18}
@@ -1286,7 +1286,7 @@ export default function AboutPageClient() {
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/brand/QuantivIcon.png"
+              src="/brand/QuantivIcon.webp"
               alt=""
               width={24}
               height={24}
