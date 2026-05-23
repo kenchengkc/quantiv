@@ -62,20 +62,32 @@ def _ensure_duckdb_em_view(conn: duckdb.DuckDBPyConnection, data_dir: str):
     the API serves the same numbers as the nightly batch. Falls back to the
     legacy single-file `em_forecasts.parquet` for older deploys.
 
-    Raises if no Parquet file exists — silently logging a warning made every
-    ML endpoint return empty rows with no visible failure, which is exactly
-    the class of bug we just fixed elsewhere (em_forecasts vs
-    em_forecasts_view view-name mismatch).
+    On a fresh Railway volume (or any deploy that hasn't pulled R2 yet),
+    the forecasts directory is empty. In that case we log a warning and
+    skip view creation rather than crashing startup. The first time
+    `tools/build_frontend_data.py` or the Phase 2 lazy-fetch helper drops
+    a parquet here, callers can re-invoke this function (or restart the
+    service) to wire the view up.
+
+    Until then, downstream queries against `em_forecasts` will fail with
+    "Catalog Error: view does not exist" — that's by design. The
+    alternative (a silently-empty view) hid an em_forecasts vs
+    em_forecasts_view rename bug for months.
     """
     forecasts_dir = Path(data_dir) / "forecasts"
     candidates = sorted(forecasts_dir.glob("forecasts_*.parquet"), reverse=True)
     legacy = forecasts_dir / "em_forecasts.parquet"
     target = candidates[0] if candidates else (legacy if legacy.exists() else None)
     if target is None:
-        raise FileNotFoundError(
-            f"No forecasts Parquet found in {forecasts_dir}. "
-            "Run `python scripts/daily_score.py` (or pull data/forecasts/ from R2) before starting."
+        logger.warning(
+            "em_forecasts parquet not found — skipping view creation",
+            forecasts_dir=str(forecasts_dir),
+            remediation=(
+                "Pull data/forecasts/ from R2, run scripts/daily_score.py, "
+                "or wait for the Phase 2 lazy-fetch helper to populate it."
+            ),
         )
+        return
     parquet_path = str(target.resolve())
     conn.execute(
         f"CREATE OR REPLACE VIEW em_forecasts AS SELECT * FROM read_parquet('{parquet_path}')"
