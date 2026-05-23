@@ -3,10 +3,8 @@
 ML Serving Pipeline - Combines Math Baseline + ML Predictions
 Generates live expected move forecasts with confidence bands
 """
-import os
-import sys
 from pathlib import Path
-from datetime import datetime, timedelta, date
+from datetime import datetime, date
 import pandas as pd
 import numpy as np
 import duckdb

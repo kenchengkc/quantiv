@@ -151,6 +151,14 @@ jobs:
       - name: Score upcoming earnings
         run: python scripts/daily_score.py --days-ahead 21
 
+      - name: Import recent forecasts to Neon Postgres
+        # Pushes the newest forecast snapshot into the em_forecasts table
+        # the Railway-hosted FastAPI backend reads from. The script is a
+        # no-op when DATABASE_URL is unset (forks / preview branches).
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: python -u scripts/import_recent_to_postgres.py --days 1
+
       - name: Pull market caps (weekly cache)
         # Refresh data/market_caps.json from Finnhub /stock/profile2 for
         # the top 500 tickers by dollar volume. Script is a no-op if the
