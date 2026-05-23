@@ -13,6 +13,12 @@ const BASE_URL = process.env.E2E_BASE_URL ?? `http://localhost:${PORT}`;
 
 export default defineConfig({
   testDir: './e2e',
+  // font-compare.spec.ts and font-loaded.spec.ts are developer-only
+  // visual diffs against a static design mockup hosted on
+  // localhost:8088. They are NOT runnable in CI — the design server
+  // doesn't exist there. Use `playwright.font.config.ts` to run them
+  // explicitly when you have the mockup served locally.
+  testIgnore: ['font-compare.spec.ts', 'font-loaded.spec.ts'],
   // clerkSetup() lives here — runs once before any test, exchanges the dev
   // publishable + secret keys for a Clerk Testing Token that bypasses bot
   // detection so signIn() can mint sessions.
