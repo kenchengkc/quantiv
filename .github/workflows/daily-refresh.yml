@@ -4,7 +4,7 @@ name: Daily data refresh
 #   1. Pull parquet + models from Cloudflare R2
 #   2. sync_dolthub — pull the latest options_chain / earnings / ohlcv rows
 #      then overlay near-term earnings from Finnhub when FINNHUB_API_KEY exists
-#   3. Push changed parquet back to R2
+#   3. Push parquet/models to R2, then after daily_score push forecasts/
 #   4. setup_duckdb → daily_score → build_frontend_data
 #   5. Commit JSON + push → Vercel auto-deploys
 #
@@ -134,10 +134,11 @@ jobs:
       - name: Sync VIX (FRED)
         run: python scripts/sync_vix.py
 
-      - name: Push updated data to R2
+      # Parquet + models only — forecasts are written later by daily_score.
+      - name: Push parquet and models to R2
         env:
           R2_BUCKET: ${{ secrets.R2_BUCKET }}
-        run: bash scripts/r2_push.sh
+        run: bash scripts/r2_push.sh --skip-forecasts
 
       - name: Rebuild DuckDB views
         run: python scripts/setup_duckdb_from_parquet.py
@@ -157,7 +158,16 @@ jobs:
         # no-op when DATABASE_URL is unset (forks / preview branches).
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        run: python -u scripts/import_recent_to_postgres.py --days 1
+        # Import the whole nightly Parquet — rows use chain snapshot_date
+        # (often 1–25d before earnings), not "today", so --days 1 kept ~2 rows.
+        run: python -u scripts/import_recent_to_postgres.py --full
+
+      - name: Push forecasts to R2
+        # daily_score runs after the first r2_push — without this step new
+        # forecasts_YYYY-MM-DD.parquet never leaves the runner (May 2026 bug).
+        env:
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+        run: bash scripts/r2_push.sh --forecasts-only
 
       - name: Pull market caps (weekly cache)
         # Refresh data/market_caps.json from Finnhub /stock/profile2 for
