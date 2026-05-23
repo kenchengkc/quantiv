@@ -88,10 +88,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         className={`${mulish.variable} ${nunitoSans.variable} ${jetbrainsMono.variable}`}
         style={{ backgroundColor: '#000000', colorScheme: 'dark' }}
       >
-        <head>
-          <link rel="preload" as="image" href="/brand/QuantivSplashQClosed.png" />
-          <link rel="preload" as="image" href="/brand/QuantivSplashTail.png" />
-        </head>
         <body style={{ backgroundColor: '#000000' }}>
           <Providers>
             <ErrorBoundary>

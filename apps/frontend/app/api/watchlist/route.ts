@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { sql, ensureSchema } from '@/lib/db';
+import { sql } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -27,7 +27,6 @@ export async function GET() {
   if (!userId) {
     return json({ error: 'unauthorized' }, { status: 401 });
   }
-  await ensureSchema();
   const rows = (await sql`
     SELECT symbol, position
     FROM watchlist
@@ -47,7 +46,6 @@ export async function POST(req: NextRequest) {
   if (!symbol || !SYMBOL_RE.test(symbol)) {
     return json({ error: 'invalid symbol' }, { status: 400 });
   }
-  await ensureSchema();
   const [{ next_pos }] = (await sql`
     SELECT COALESCE(MAX(position), -1) + 1 AS next_pos
     FROM watchlist

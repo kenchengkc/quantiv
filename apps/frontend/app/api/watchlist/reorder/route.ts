@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { sql, ensureSchema } from '@/lib/db';
+import { sql } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -41,8 +41,6 @@ export async function PUT(req: NextRequest) {
         .filter((s) => SYMBOL_RE.test(s)),
     ),
   ).slice(0, 500);
-
-  await ensureSchema();
 
   if (symbols.length === 0) {
     await sql`DELETE FROM watchlist WHERE user_id = ${userId}`;

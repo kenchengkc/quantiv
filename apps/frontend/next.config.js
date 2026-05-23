@@ -69,11 +69,20 @@ const nextConfig = {
           },
         ],
       },
-      // ticker-names.json refreshes quarterly (SEC EDGAR + GitHub
-      // Actions cron) — cache it harder than the daily-data JSON.
-      // 1h fresh / 24h stale-while-revalidate is plenty.
+      // ticker-names.json + ticker-exchanges.json refresh quarterly
+      // (SEC EDGAR + GitHub Actions cron) — cache them harder than the
+      // daily-data JSON. 1h fresh / 24h stale-while-revalidate is plenty.
       {
         source: '/ticker-names.json',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=3600, s-maxage=3600, stale-while-revalidate=86400',
+          },
+        ],
+      },
+      {
+        source: '/ticker-exchanges.json',
         headers: [
           {
             key: 'Cache-Control',

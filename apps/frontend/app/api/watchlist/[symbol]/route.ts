@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { sql, ensureSchema } from '@/lib/db';
+import { sql } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -33,7 +33,6 @@ export async function DELETE(
   if (!SYMBOL_RE.test(symbol)) {
     return json({ error: 'invalid symbol' }, { status: 400 });
   }
-  await ensureSchema();
   await sql`
     DELETE FROM watchlist
     WHERE user_id = ${userId} AND symbol = ${symbol}

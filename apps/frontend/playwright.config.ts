@@ -20,7 +20,12 @@ export default defineConfig({
   fullyParallel: false,            // sign-in serializes against Clerk's rate limits
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  // Always serial. Tests sign in through Clerk and share sessionStorage
+  // keys (e.g. quantiv:prevRoute, quantiv:splash:played) that collide
+  // when multiple workers race the same browser context. Local default
+  // of `undefined` lets Playwright auto-scale to N workers and produced
+  // 8/9 spec failures under parallel runs.
+  workers: 1,
   reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : 'list',
   use: {
     baseURL: BASE_URL,

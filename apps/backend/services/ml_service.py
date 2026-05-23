@@ -4,17 +4,18 @@ ML Service for loading and serving expected move predictions.
 Integrates ML MVP2 multi-horizon models with bias curve conditioning.
 """
 
-import sys
 import json
-from pathlib import Path
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 import duckdb
 import structlog
 
-# Add parent directory to path for ml module imports
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-
+# `ml` is the package shipped by apps/ml (see apps/ml/pyproject.toml).
+# In CI and Railway it's installed via `pip install -e apps/ml`. The
+# previous sys.path hack assumed `apps/ml/serving_pipeline.py` was
+# importable from the repo root, which broke whenever the backend
+# Dockerfile didn't COPY apps/ml/ alongside apps/backend/.
 try:
     from ml.serving_pipeline import MLServingPipeline
     ML_PIPELINE_AVAILABLE = True
@@ -84,7 +85,7 @@ class MLService:
         try:
             result = self.conn.execute("""
                 SELECT DISTINCT act_symbol 
-                FROM em_forecasts_view 
+                FROM em_forecasts 
                 ORDER BY act_symbol
             """).fetchall()
             return [row[0] for row in result]
@@ -171,7 +172,7 @@ class MLService:
                     features_used,
                     confidence,
                     created_at
-                FROM em_forecasts_view 
+                FROM em_forecasts 
                 WHERE act_symbol = ? 
                   AND earnings_date = ?
                 ORDER BY created_at DESC
@@ -212,7 +213,7 @@ class MLService:
         try:
             result = self.conn.execute("""
                 SELECT earnings_date
-                FROM em_forecasts_view
+                FROM em_forecasts
                 WHERE act_symbol = ?
                   AND earnings_date >= CURRENT_DATE
                 ORDER BY earnings_date ASC
@@ -222,7 +223,7 @@ class MLService:
             if not result:
                 result = self.conn.execute("""
                     SELECT earnings_date
-                    FROM em_forecasts_view
+                    FROM em_forecasts
                     WHERE act_symbol = ?
                     ORDER BY earnings_date DESC
                     LIMIT 1
@@ -269,7 +270,7 @@ class MLService:
                     model_type,
                     confidence,
                     created_at
-                FROM em_forecasts_view 
+                FROM em_forecasts 
                 WHERE earnings_date >= CURRENT_DATE 
                   AND earnings_date <= ?
                 ORDER BY earnings_date ASC, act_symbol ASC
@@ -337,7 +338,7 @@ class MLService:
         try:
             if self.conn:
                 forecast_count = self.conn.execute("""
-                    SELECT COUNT(*) FROM em_forecasts_view 
+                    SELECT COUNT(*) FROM em_forecasts 
                     WHERE earnings_date >= CURRENT_DATE
                 """).fetchone()[0]
                 info['upcoming_forecasts'] = forecast_count

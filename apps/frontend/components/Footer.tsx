@@ -26,8 +26,10 @@ export function Footer() {
         <Link href="/" aria-label="Quantiv home" style={{ display: 'inline-flex' }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/brand/QuantivBWBanner.png"
+            src="/brand/QuantivBWBanner.webp"
             alt="Quantiv"
+            loading="lazy"
+            decoding="async"
             style={{ height: 22, width: 'auto', display: 'block', opacity: 0.8 }}
           />
         </Link>
