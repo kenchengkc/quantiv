@@ -1,0 +1,31 @@
+# Railway service config for the Quantiv FastAPI backend.
+#
+# This file lives at the repo root so Railway sees the full monorepo
+# build context. The backend's Dockerfile lives at apps/backend/Dockerfile
+# and is responsible for installing apps/ml as an editable package
+# alongside the backend deps.
+#
+# To wire a Railway service to this repo:
+#   1. Railway dashboard → New Service → Deploy from GitHub repo
+#   2. Pick this repo; Railway auto-detects railway.toml
+#   3. Add a Volume mounted at /data
+#   4. Set env vars (see docs/RAILWAY_SETUP.md)
+#   5. Configure custom domain → CNAME api.usequantiv.com
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "apps/backend/Dockerfile"
+
+[deploy]
+# Railway sets PORT; uvicorn binds to it.
+startCommand = "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"
+healthcheckPath = "/health"
+healthcheckTimeout = 30
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10
+
+# Volume mount inside the service. Created in the Railway dashboard
+# (Settings → Volumes) and attached to this service. Lazy R2 pulls
+# populate it on first request per (symbol, horizon).
+[[deploy.volumes]]
+mountPath = "/data"
