@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import sys
 from datetime import date, timedelta
@@ -172,6 +173,24 @@ def load_and_filter(parquet_path: Path, days: int, full: bool) -> pd.DataFrame:
     return df.astype(object).where(df.notna(), None)
 
 
+def _sanitize_json_nan(value):
+    """Recursively replace non-finite floats (NaN, +/-Inf) with None.
+
+    Postgres JSONB doesn't accept the JSON5-style `NaN` / `Infinity` tokens
+    that Python's json module emits by default, so any feature that landed
+    as a float NaN in the source Parquet would otherwise crash the upsert
+    with `invalid input syntax for type json`. We strip them out before
+    handing the dict to psycopg2.extras.Json.
+    """
+    if isinstance(value, float):
+        return value if math.isfinite(value) else None
+    if isinstance(value, dict):
+        return {k: _sanitize_json_nan(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_sanitize_json_nan(v) for v in value]
+    return value
+
+
 def upsert(conn, df: pd.DataFrame) -> int:
     if df.empty:
         return 0
@@ -204,7 +223,9 @@ def upsert(conn, df: pd.DataFrame) -> int:
                 continue
             # daily_score writes a JSON string; Json() wants a Python object,
             # so parse first. Empty/invalid → NULL rather than crashing the
-            # batch on one bad row.
+            # batch on one bad row. Strip NaN/Infinity floats post-parse —
+            # Postgres JSONB rejects them and older parquets (pre-Phase 1b)
+            # baked them in via Python json's default allow_nan=True.
             if isinstance(value, str):
                 try:
                     parsed = json.loads(value)
@@ -212,6 +233,8 @@ def upsert(conn, df: pd.DataFrame) -> int:
                     parsed = None
             else:
                 parsed = value
+            if parsed is not None:
+                parsed = _sanitize_json_nan(parsed)
             row_list[i] = psycopg2.extras.Json(parsed) if parsed is not None else None
         rows.append(tuple(row_list))
     with conn.cursor() as cur:

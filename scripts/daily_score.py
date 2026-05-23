@@ -305,11 +305,19 @@ def score(df: pd.DataFrame, models: Dict[int, dict]) -> pd.DataFrame:
         # Persist the exact feature vector used at scoring time so the
         # /api/ml/predict route can re-run inference later with a live spot
         # substituted in. Stored as a JSON string per row → loaded into a
-        # JSONB column by scripts/import_recent_to_postgres.py. NaN values
-        # become null in JSON, which the route's spot-substitution helper
-        # then re-fills against the joblib feature schema.
-        feature_records = X.to_dict(orient="records")
-        hdf["feature_vector"] = [json.dumps(row, default=str) for row in feature_records]
+        # JSONB column by scripts/import_recent_to_postgres.py.
+        #
+        # NaN handling: replace with None *before* json.dumps and use
+        # allow_nan=False so any leak crashes loud rather than emitting
+        # the JSON5-ish literal `NaN` token that Postgres JSONB rejects
+        # (see scripts/import_recent_to_postgres.py for the symmetric
+        # sanitize on the way in). The route treats null as "feature
+        # missing" and falls back to the joblib feature schema.
+        feature_records = X.where(pd.notna(X), None).to_dict(orient="records")
+        hdf["feature_vector"] = [
+            json.dumps(row, default=str, allow_nan=False)
+            for row in feature_records
+        ]
 
         # Point prediction
         pred = m["model"].predict(X)
