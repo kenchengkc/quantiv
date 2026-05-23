@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 export const dynamic = 'force-dynamic';
 import { z } from 'zod';
-import { searchStocksAsync } from '@/lib/data/stocks';
+import { searchStocks } from '@/lib/data/stocks';
 
 // Validate query params
 const QuerySchema = z.object({
@@ -12,7 +12,7 @@ const QuerySchema = z.object({
     .transform((v) => (v ? Math.min(20, Math.max(1, parseInt(v))) : 10)),
 });
 
-export async function GET(request: NextRequest) {
+export function GET(request: NextRequest) {
   try {
     const url = new URL(request.url);
     const q = url.searchParams.get('q') ?? '';
@@ -33,8 +33,7 @@ export async function GET(request: NextRequest) {
 
     const { q: query, limit: lim } = parsed.data;
 
-    // Use dynamic S&P 500 list when available (server-only fetch), fallback to static subset
-    const results = await searchStocksAsync(query, lim);
+    const results = searchStocks(query, lim);
 
     return NextResponse.json(
       {

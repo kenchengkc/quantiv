@@ -2978,7 +2978,7 @@ export default function SymbolPage() {
       setLoading(true);
       setError(null);
       try {
-        const res = await fetch(`/symbols/${symbol}.json`, { cache: 'no-store' });
+        const res = await fetch(`/symbols/${symbol}.json`);
         if (!res.ok) throw new Error(`No local data for ${symbol}`);
         const json = (await res.json()) as SymbolDetail;
         if (!cancelled) setData(json);

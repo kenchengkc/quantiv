@@ -8,6 +8,7 @@ import { POPULAR_WEIGHT } from '@/lib/popular';
 import { companyName } from '@/lib/companyNames';
 import { useEnsureCompanyNames } from '@/lib/useCompanyNames';
 import { useTickerHover } from '@/components/TickerHoverCard';
+import { CalendarGridSkeleton } from '@/components/EarningsGridSkeleton';
 import sp500Constituents from '../../../lib/data/sp500-constituents.json';
 
 // Full S&P 500 (503 constituents incl. dual-class). Used for the "S&P 500"
@@ -435,137 +436,9 @@ function DayBlock({
   );
 }
 
-function SkeletonRow({ delayMs }: { delayMs: number }) {
-  const bar = (extra: number, h: number, w: string | number, r = 5) => ({
-    height: h,
-    borderRadius: r,
-    background: 'var(--bg-3)',
-    width: typeof w === 'number' ? w : w,
-    flexShrink: 0 as const,
-    animation: 'earnings-grid-pulse 1.1s ease-in-out infinite',
-    animationDelay: `${delayMs + extra}ms`,
-  });
-  return (
-    <div
-      style={{
-        padding: '8px 10px',
-        display: 'flex',
-        gap: 8,
-        alignItems: 'center',
-      }}
-    >
-      <div style={bar(0, 24, 24, 6)} />
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={bar(20, 10, '68%')} />
-        <div style={{ ...bar(40, 8, '42%', 4), marginTop: 6 }} />
-      </div>
-      <div style={bar(10, 12, 44, 4)} />
-    </div>
-  );
-}
-
-function DayColumnSkeleton({
-  dateLabel,
-  label,
-  isToday,
-}: {
-  dateLabel: string;
-  label: string;
-  isToday: boolean;
-}) {
-  return (
-    <div style={{ minWidth: 0 }}>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'baseline',
-          gap: 10,
-          padding: '0 10px 14px',
-          marginBottom: 4,
-        }}
-      >
-        <div
-          className="serif"
-          style={{
-            fontSize: 32,
-            lineHeight: 1,
-            fontWeight: 800,
-            color: isToday ? 'var(--ink)' : 'var(--ink-2)',
-            letterSpacing: '-0.03em',
-          }}
-        >
-          {dateLabel}
-        </div>
-        <div style={{ flex: 1 }}>
-          <div
-            style={{
-              fontSize: 11,
-              letterSpacing: '0.14em',
-              textTransform: 'uppercase',
-              color: isToday ? 'var(--accent)' : 'var(--ink-3)',
-              fontWeight: 500,
-            }}
-          >
-            {label}
-            {isToday && ' · Today'}
-          </div>
-          <div
-            className="mono tnum"
-            style={{ fontSize: 10.5, color: 'var(--ink-4)', marginTop: 2 }}
-          >
-            Loading…
-          </div>
-        </div>
-      </div>
-      {[0, 1, 2, 3, 4].map((i) => (
-        <SkeletonRow key={i} delayMs={i * 70} />
-      ))}
-    </div>
-  );
-}
-
-function CalendarGridSkeleton({
-  days,
-  today,
-}: {
-  days: Date[];
-  today: Date;
-}) {
-  const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
-  return (
-    <div
-      role="status"
-      aria-live="polite"
-      aria-busy="true"
-      className="qv-m-stack qv-calendar-grid"
-      style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
-        marginTop: 20,
-      }}
-    >
-      {days.map((d, i) => (
-        <div
-          key={d.toISOString()}
-          className="qv-calendar-day"
-          style={{
-            borderRight: i < 4 ? '1px solid var(--line)' : 'none',
-          }}
-        >
-          <DayColumnSkeleton
-            dateLabel={String(d.getDate())}
-            label={dayNames[i]}
-            isToday={d.getTime() === today.getTime()}
-          />
-        </div>
-      ))}
-    </div>
-  );
-}
-
 function FilterInfo({ filter }: { filter: Filter }) {
   const msg = {
-    popular: 'Ranked by a blend of options volume, market cap, and recent news flow.',
+    popular: 'Ranked by a 70/30 blend of 90-day dollar volume and market cap.',
     sp500: 'S&P 500 constituents only.',
     movers: 'Tickers whose implied move is ≥ 10% this week.',
     all: 'Every confirmed earnings report in our calendar.',
@@ -766,7 +639,7 @@ function WeekHeader({
         <div style={{ display: 'flex', gap: 6 }}>
           {(
             [
-              { key: 'popular', label: 'Popular', tip: 'Top ~50 by options volume & market cap.' },
+              { key: 'popular', label: 'Popular', tip: 'Weight >= 76 from 90-day dollar volume and market cap.' },
               { key: 'sp500', label: 'S&P 500', tip: 'S&P 500 constituents only.' },
               { key: 'movers', label: 'Big movers', tip: 'Expected move ≥ 10% this week.' },
               { key: 'all', label: 'All', tip: 'Every confirmed earnings report.' },
@@ -897,7 +770,7 @@ export default function EarningsGrid() {
         Boolean,
       ) as string[];
       for (const url of urls) {
-        const res = await fetch(url, { cache: 'no-store' });
+        const res = await fetch(url);
         if (res.ok) return (await res.json()) as WeeklyData;
       }
       throw new Error(`no data for ${iso}`);

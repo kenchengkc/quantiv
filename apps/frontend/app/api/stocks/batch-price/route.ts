@@ -24,6 +24,12 @@ const FRESH_TTL_MS = 60_000;
 // fresh data is being written (weekends, cron downtime, dropped tickers).
 const STALE_TTL_MS = 7 * 24 * 60 * 60_000;
 const CONCURRENCY = 10;
+const BATCH_PRICE_HEADERS = {
+  // Shared quote data is already normalized through Upstash; this tiny edge
+  // window only absorbs bursts without letting live prices sit stale for a
+  // full minute like the former blanket /api rule did.
+  'Cache-Control': 'public, max-age=0, s-maxage=5, stale-while-revalidate=10',
+};
 
 type Tick = {
   symbol: string;
@@ -245,7 +251,10 @@ export async function GET(req: NextRequest) {
   ).slice(0, 1000);   // generous ceiling — MGET + filter regex are O(n), nothing slow about it
 
   if (symbols.length === 0) {
-    return NextResponse.json({ error: 'symbols required' }, { status: 400 });
+    return NextResponse.json(
+      { error: 'symbols required' },
+      { status: 400, headers: BATCH_PRICE_HEADERS },
+    );
   }
 
   const apiKey = process.env.FINNHUB_API_KEY;
@@ -335,13 +344,16 @@ export async function GET(req: NextRequest) {
     topSource = 'mixed';
   }
 
-  return NextResponse.json({
-    updated: latestAt ? new Date(latestAt).toISOString() : null,
-    source: topSource,
-    session,
-    marketOpen,
-    quoteRefreshActive,
-    pending,
-    data,
-  });
+  return NextResponse.json(
+    {
+      updated: latestAt ? new Date(latestAt).toISOString() : null,
+      source: topSource,
+      session,
+      marketOpen,
+      quoteRefreshActive,
+      pending,
+      data,
+    },
+    { headers: BATCH_PRICE_HEADERS },
+  );
 }
