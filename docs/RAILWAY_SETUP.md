@@ -10,11 +10,12 @@ Before you start, have these handy:
 - Cloudflare R2 account ID + an API token with read access to the `quantiv`
   bucket. **The secret access key cannot be recovered — if you've lost it,
   generate a new token at Cloudflare → R2 → Manage API tokens.**
-- The Upstash Redis TCP URL (different from the REST URL the frontend uses).
-  Get it from Upstash → Details → "TLS-Endpoint" — looks like
-  `rediss://default:<password>@<host>:6379`.
-- A generated HMAC key: `openssl rand -hex 32` — save it; you'll paste it
-  into both Railway and Vercel.
+- The Upstash Redis **TCP** URL (not the REST URL the frontend uses).
+  Upstash → Details → "TLS-Endpoint" — `rediss://default:<password>@<host>:6379`.
+- Optional: `ADMIN_API_KEY` (`openssl rand -hex 16`) for cache-bust admin route.
+
+`BACKEND_SHARED_SECRET` is optional until the Vercel→Railway proxy ships (see
+[README.md](../README.md)).
 
 ---
 
@@ -24,111 +25,102 @@ Before you start, have these handy:
    this repo.
 2. Railway may auto-detect **`@quantiv/frontend`** from the npm workspace in
    [`package.json`](../package.json). That service is for Vercel — **delete it**
-   or ignore it. The backend is a separate Python/Docker service, not an npm
-   workspace.
+   or ignore it. The backend is a separate Python/Docker service.
 3. Add a service for the backend:
-   - **Empty Service** → **Settings** → **Source** → connect this repo, **or**
-   - If Railway created a generic service from the repo, open it and set:
-     - **Settings → Build → Builder**: Dockerfile
-     - **Dockerfile path**: `apps/backend/Dockerfile`
-     - **Root directory**: `/` (repo root — required so the Dockerfile can
-       `COPY apps/ml` and `COPY apps/backend`)
-   Railway reads [`railway.toml`](../railway.toml) when the service is wired to
-   the repo root; the Dockerfile path and start command there match the
-   settings above.
-4. After the first deploy lands (it will fail the healthcheck — that's
-   expected until env + volume are set), open the service settings.
+   - **Empty Service** → connect this repo, **or**
+   - Set **Builder**: Dockerfile, **Dockerfile path**: `apps/backend/Dockerfile`,
+     **Root directory**: `/` (repo root — required for `COPY apps/ml`).
+4. [`railway.toml`](../railway.toml) must **not** set `startCommand` — Railway
+   does not expand `${PORT:-8000}` in `startCommand`; use the Dockerfile `CMD`
+   (`sh -c` + uvicorn) instead.
+
+---
 
 ## 2. Attach a persistent volume
 
-1. Service → **Settings** → **Volumes** → **+ New Volume**.
-2. Mount path: `/data`.
-3. Size: 5 GB is plenty for the LightGBM models + the rolling Parquet
-   window. The lazy R2 fetcher only pulls files when first requested.
+Railway volumes are **not** under Service → Settings. On the **project canvas**:
+
+1. **⌘K** / **Ctrl+K** → **Create Volume**, or right-click the canvas → **Create Volume**.
+2. Attach to the **backend** service.
+3. **Mount path**: `/data`.
+
+Or CLI: `railway volume add --mount-path /data`
+
+---
 
 ## 3. Set environment variables
 
-Service → **Variables** → add these. Anything marked `secret` should be
-generated/copied; never commit them.
+Service → **Variables**:
 
 | Variable | Value | Notes |
 |---|---|---|
-| `DATA_BACKEND` | `hybrid` | Postgres + DuckDB, per Path B. |
-| `DUCKDB_PATH` | `/data/quantiv.duckdb` | Lives on the mounted volume. |
-| `DATA_DIR` | `/data` | Root for `/data/forecasts/*.parquet` + `/data/models/*.joblib`. |
-| `DATABASE_URL` | `postgres://...` | Same Neon URL the watchlist uses. |
-| `REDIS_URL` | `rediss://default:...@...upstash.io:6379` | TCP, not REST. |
-| `BACKEND_SHARED_SECRET` | `<openssl rand -hex 32>` | secret · same value in Vercel. |
-| `R2_ACCOUNT_ID` | `<Cloudflare R2 account ID>` | |
-| `R2_ACCESS_KEY_ID` | `<R2 token access key>` | secret |
-| `R2_SECRET_ACCESS_KEY` | `<R2 token secret>` | secret · regenerate if lost. |
-| `R2_BUCKET` | `quantiv` | Whatever bucket holds your parquet + models. |
-| `FRONTEND_URL` | `https://usequantiv.com` | Adds to CORS allow-list. |
-| `ADMIN_API_KEY` | `<openssl rand -hex 16>` | secret · for `/api/admin/*`. |
-| `ENVIRONMENT` | `production` | Switches FastAPI off debug. |
+| `DATA_BACKEND` | `hybrid` | Postgres + DuckDB |
+| `DATA_DIR` | `/data` | Not `./data` |
+| `DUCKDB_PATH` | `/data/quantiv.duckdb` | On the volume |
+| `DATABASE_URL` | `postgres://...` | Same Neon URL as Vercel |
+| `REDIS_URL` | `rediss://default:...@...upstash.io:6379` | TCP, not REST |
+| `R2_ACCOUNT_ID` | Cloudflare account ID | |
+| `R2_ACCESS_KEY_ID` | R2 token | secret |
+| `R2_SECRET_ACCESS_KEY` | R2 token | secret |
+| `R2_BUCKET` | `quantiv` | |
+| `FRONTEND_URL` | `https://usequantiv.com` | CORS |
+| `ADMIN_API_KEY` | `openssl rand -hex 16` | optional |
+| `ENVIRONMENT` | `production` | |
+| `POLYGON_API_KEY` | … | optional live context |
 
-Optional but recommended:
-- `POLYGON_API_KEY` — enables live-context expansion on `/api/expected-move`.
-  Leave unset to skip; the route still works without it.
+Do **not** put `NEXT_PUBLIC_*`, `POSTGRES_HOST=localhost`, or `ENABLE_ALPACA_*` here — those belong on Vercel.
 
-## 4. Configure a custom domain (optional but recommended)
+---
 
-Service → **Settings** → **Networking** → **Generate Domain** gives you
-something like `quantiv-backend.up.railway.app`. To use `api.usequantiv.com`
-instead:
+## 4. Public networking & domains
 
-1. Click **Custom Domain** → enter `api.usequantiv.com`.
-2. Railway shows a CNAME target — point your DNS at it.
-3. Wait for the cert to issue (~1 min). The healthcheck on `/health`
-   passes automatically once env + volume are ready.
+1. **Networking** → enable public HTTP.
+2. **Generate Domain** → target port **8000** (or match the `PORT` variable Railway injects; see logs for `Uvicorn running on ...:XXXX`).
+3. Test: `curl https://YOUR-SERVICE.up.railway.app/health`
+4. **Custom domain** `api.usequantiv.com` → add CNAME + TXT in **Vercel DNS**
+   (domain uses `ns*.vercel-dns.com`). See Railway’s DNS panel for values.
+
+---
 
 ## 5. Verify
 
-After the next deploy lands:
-
 ```bash
 curl https://api.usequantiv.com/health
-# Should return: {"status":"healthy","timestamp":"...","services":{...}}
+# {"status":"healthy"|"degraded", ...}
 ```
 
-If `services.postgres` or `services.duckdb` reports `unhealthy`, the env
-vars in step 3 are wrong. The Railway logs (`railway logs`) will show the
-specific connection error.
+`degraded` (e.g. redis or missing forecasts) is still your app responding — not Railway’s 502/404 JSON.
 
-## 6. Wire Vercel to call this service
+Check logs for `Uvicorn running on` and `Services initialized`.
 
-In the Vercel project settings → **Environment Variables**, add:
+---
+
+## 6. Wire Vercel (when proxy exists)
 
 | Variable | Value |
 |---|---|
 | `BACKEND_URL` | `https://api.usequantiv.com` |
-| `BACKEND_SHARED_SECRET` | Same value as Railway. |
+| `BACKEND_SHARED_SECRET` | Same as Railway (future) |
 
-These two env vars are read by the Next.js proxy route added in Phase 3 of
-the backend build. Without `BACKEND_URL`, the proxy falls back to
-the nightly static JSON (the same graceful-degradation path the route uses
-when Railway is cold).
+Today the site uses static JSON without this proxy.
 
-## 7. Schedule the pre-warm cron
+---
 
-The Cloudflare Worker at `workers/refresh-prices` will get a small addition
-in Phase 5 to ping `https://api.usequantiv.com/health` every 5 minutes
-during market hours. No action needed on your side until then — the worker
-already deploys via `wrangler publish`.
+## Troubleshooting
+
+| Symptom | Fix |
+|---------|-----|
+| `404 Application not found` | No healthy deploy; wrong service; domain on frontend service |
+| `502 Application failed to respond` | Port mismatch — set Networking target port = `PORT` from logs; check crash logs |
+| Healthcheck failed / uvicorn crash | Remove `startCommand` from `railway.toml`; redeploy |
+| `hybrid` startup error | Set `DATABASE_URL`; use `/data` not `./data` |
+| Empty forecasts | Expected on fresh volume — pull R2 or run `daily_score`; startup no longer hard-fails |
 
 ---
 
 ## Sanity checklist
 
-After everything is wired:
-
-- [ ] `curl https://api.usequantiv.com/health` returns 200.
-- [ ] Railway logs show `Ensured DuckDB em_forecasts view` on startup
-      (the lazy R2 fetch ran and resolved the latest forecasts).
-- [ ] `psql $DATABASE_URL -c "SELECT COUNT(*) FROM em_forecasts"` shows
-      ~4–5k rows (one nightly snapshot worth).
-- [ ] `BACKEND_URL` env var set in Vercel.
-- [ ] `BACKEND_SHARED_SECRET` matches between Railway and Vercel.
-
-Once those four are green, ping me — I'll start Phase 1 (the
-`/api/ml/predict` route + Upstash-backed caching + lazy model loading).
+- [ ] `curl https://api.usequantiv.com/health` returns app JSON (not Railway error envelope).
+- [ ] Volume mounted at `/data`; env paths use `/data/...`.
+- [ ] `DATABASE_URL` + `REDIS_URL` set.
+- [ ] Vercel DNS: CNAME `api` → Railway target.
