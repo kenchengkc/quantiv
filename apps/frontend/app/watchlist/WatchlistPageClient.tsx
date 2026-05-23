@@ -415,7 +415,7 @@ export default function WatchlistPage() {
       await Promise.all(
         missing.map(async (t) => {
           try {
-            const res = await fetch(`/symbols/${t}.json`, { cache: 'no-store' });
+            const res = await fetch(`/symbols/${t}.json`);
             if (!res.ok) return;
             const json = (await res.json()) as SymbolSummary;
             if (!cancelled) setSummaries((s) => ({ ...s, [t]: json }));

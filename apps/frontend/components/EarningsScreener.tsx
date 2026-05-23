@@ -866,7 +866,7 @@ export default function EarningsScreener() {
     // rewriting a static .json to an HTML page; even after the matcher fix,
     // we don't want one bad payload to take the whole screener down.
     async function fetchJson<T>(url: string): Promise<T | null> {
-      const r = await fetch(url, { cache: 'no-store' });
+      const r = await fetch(url);
       if (!r.ok) return null;
       const ct = r.headers.get('content-type') ?? '';
       if (!ct.includes('json')) return null;

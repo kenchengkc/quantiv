@@ -4,9 +4,6 @@ import {
   getAllSP500Companies, 
   searchSP500Companies, 
   getPopularSP500Stocks, 
-  getAllSP500CompaniesAsync,
-  searchSP500CompaniesAsync,
-  getPopularSP500StocksAsync,
   type SP500Company 
 } from './sp500Service';
 
@@ -40,22 +37,6 @@ export function searchStocks(query: string, limit: number = 10): Stock[] {
 // Get popular stocks using S&P 500 data
 export function getPopularStocks(): Stock[] {
   return getPopularSP500Stocks().map(convertSP500ToStock);
-}
-
-// Async variants that use dynamic S&P 500 list when available (server-only fetch)
-export async function getAllStocksAsync(): Promise<Stock[]> {
-  const companies = await getAllSP500CompaniesAsync();
-  return companies.map(convertSP500ToStock);
-}
-
-export async function searchStocksAsync(query: string, limit: number = 10): Promise<Stock[]> {
-  const companies = await searchSP500CompaniesAsync(query, limit);
-  return companies.map(convertSP500ToStock);
-}
-
-export async function getPopularStocksAsync(): Promise<Stock[]> {
-  const companies = await getPopularSP500StocksAsync();
-  return companies.map(convertSP500ToStock);
 }
 
 // Legacy export for backward compatibility - now uses real S&P 500 data

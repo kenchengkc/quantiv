@@ -21,15 +21,6 @@ try {
 const nextConfig = {
   async headers() {
     return [
-      {
-        source: '/api/:path*',
-        headers: [
-          {
-            key: 'Cache-Control',
-            value: 's-maxage=60, stale-while-revalidate=120',
-          },
-        ],
-      },
       // Static data JSON shipped from /public — built once by
       // tools/build_frontend_data.py during the daily refresh, then
       // unchanged for ~24h. Aggressive CDN caching means returning
