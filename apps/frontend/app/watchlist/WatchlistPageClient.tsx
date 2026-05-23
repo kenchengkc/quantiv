@@ -6,6 +6,7 @@ import { GripVertical, X, Plus, ChevronUp, ChevronDown, Check } from 'lucide-rea
 import { companyName } from '@/lib/companyNames';
 import { useEnsureCompanyNames } from '@/lib/useCompanyNames';
 import { useWatchlist } from '@/lib/watchlist';
+import { TickerLogo } from '@/components/TickerLogo';
 
 type SymbolSummary = {
   symbol: string;
@@ -109,47 +110,6 @@ function QuoteSkeleton({ width = 72, delayMs = 0 }: { width?: number; delayMs?: 
         background: 'var(--bg-3)',
         animation: 'earnings-grid-pulse 1.1s ease-in-out infinite',
         animationDelay: `${delayMs}ms`,
-      }}
-    />
-  );
-}
-
-function Logo({ ticker, size = 36 }: { ticker: string; size?: number }) {
-  const [err, setErr] = useState(false);
-  if (err) {
-    return (
-      <div
-        className="serif"
-        style={{
-          width: size,
-          height: size,
-          borderRadius: 8,
-          background: 'var(--bg-3)',
-          border: '1px solid var(--line)',
-          display: 'grid',
-          placeItems: 'center',
-          color: 'var(--ink-2)',
-          fontSize: Math.max(10, size * 0.32),
-          fontWeight: 700,
-        }}
-      >
-        {ticker.slice(0, 3)}
-      </div>
-    );
-  }
-  // eslint-disable-next-line @next/next/no-img-element
-  return (
-    <img
-      src={`https://assets.parqet.com/logos/symbol/${ticker}?format=png`}
-      alt={ticker}
-      onError={() => setErr(true)}
-      style={{
-        width: size,
-        height: size,
-        borderRadius: 8,
-        objectFit: 'cover',
-        background: 'var(--paper)',
-        border: '1px solid var(--line)',
       }}
     />
   );
@@ -740,7 +700,17 @@ export default function WatchlistPage() {
                   style={{ display: 'inline-flex' }}
                   onDragStart={(e) => e.preventDefault()}
                 >
-                  <Logo ticker={t} size={40} />
+                  <TickerLogo
+                    ticker={t}
+                    size={40}
+                    radius={8}
+                    loading="eager"
+                    fallbackStyle={{
+                      fontSize: Math.max(10, 40 * 0.32),
+                      fontWeight: 700,
+                      letterSpacing: 0,
+                    }}
+                  />
                 </Link>
 
                 <Link

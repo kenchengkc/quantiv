@@ -8,6 +8,11 @@ import { TableVirtuoso, type TableComponents } from 'react-virtuoso';
 import { companyName } from '@/lib/companyNames';
 import { useEnsureCompanyNames } from '@/lib/useCompanyNames';
 import { useTickerHover } from '@/components/TickerHoverCard';
+import {
+  hasTickerLogoState,
+  preloadTickerLogos,
+  TickerLogo,
+} from '@/components/TickerLogo';
 import sp500Constituents from '../../../lib/data/sp500-constituents.json';
 
 const SP500_SET = new Set(
@@ -119,117 +124,6 @@ const INITIAL_QUOTE_WAIT_MS = 3_200;
 const LOGO_PRELOAD_TIMEOUT_MS = 4_000;
 const SCREENER_NAME_COL_WIDTH = 280;
 
-function logoUrl(t: string) {
-  return `https://assets.parqet.com/logos/symbol/${t}?format=png`;
-}
-
-// Module-level logo caches. Shared across renders so a ticker preloaded
-// once doesn't have to be fetched a second time when the user filters,
-// sorts, or navigates back to the page in the same session.
-type LogoLoadState = 'loaded' | 'failed';
-const logoStateCache = new Map<string, LogoLoadState>();
-const logoPromiseCache = new Map<string, Promise<LogoLoadState>>();
-
-function preloadLogo(ticker: string): Promise<LogoLoadState> {
-  const cached = logoStateCache.get(ticker);
-  if (cached) return Promise.resolve(cached);
-  const existing = logoPromiseCache.get(ticker);
-  if (existing) return existing;
-  if (typeof window === 'undefined') return Promise.resolve('failed');
-
-  const promise = new Promise<LogoLoadState>((resolve) => {
-    const img = new window.Image();
-    let settled = false;
-    let timeoutId: number | null = null;
-    const finish = (state: LogoLoadState) => {
-      if (settled) return;
-      settled = true;
-      if (timeoutId !== null) window.clearTimeout(timeoutId);
-      logoStateCache.set(ticker, state);
-      resolve(state);
-    };
-    timeoutId = window.setTimeout(() => finish('failed'), LOGO_PRELOAD_TIMEOUT_MS);
-    img.decoding = 'async';
-    img.onload = () => {
-      const decode =
-        typeof img.decode === 'function'
-          ? img.decode().catch(() => undefined)
-          : Promise.resolve();
-      void decode.then(() => finish('loaded'));
-    };
-    img.onerror = () => finish('failed');
-    img.src = logoUrl(ticker);
-    if (img.complete) {
-      finish(img.naturalWidth > 0 ? 'loaded' : 'failed');
-    }
-  });
-  logoPromiseCache.set(ticker, promise);
-  return promise;
-}
-
-/* eslint-disable @next/next/no-img-element */
-/** Inline ticker logo using the parqet asset CDN with a typographic
- *  fallback. Reads from the shared module cache and sets HTML
- *  `width`/`height` attributes (not just CSS) so the browser reserves
- *  the exact bounding box before any image bytes arrive — kills the
- *  logo-load jitter that used to shift each row left → right. */
-function ScreenerLogo({ ticker, size = 26 }: { ticker: string; size?: number }) {
-  const [err, setErr] = useState(() => logoStateCache.get(ticker) === 'failed');
-
-  useEffect(() => {
-    setErr(logoStateCache.get(ticker) === 'failed');
-  }, [ticker]);
-
-  if (err) {
-    return (
-      <div
-        className="serif"
-        style={{
-          width: size,
-          height: size,
-          flexShrink: 0,
-          borderRadius: 6,
-          background: 'var(--bg-3)',
-          border: '1px solid var(--line)',
-          display: 'grid',
-          placeItems: 'center',
-          color: 'var(--ink-2)',
-          fontSize: Math.max(9, size * 0.34),
-          fontWeight: 600,
-          letterSpacing: '0.02em',
-        }}
-      >
-        {ticker.slice(0, 3)}
-      </div>
-    );
-  }
-  return (
-    <img
-      src={logoUrl(ticker)}
-      alt={ticker}
-      width={size}
-      height={size}
-      loading="eager"
-      onLoad={() => logoStateCache.set(ticker, 'loaded')}
-      onError={() => {
-        logoStateCache.set(ticker, 'failed');
-        setErr(true);
-      }}
-      style={{
-        width: size,
-        height: size,
-        flexShrink: 0,
-        borderRadius: 6,
-        objectFit: 'cover',
-        background: 'var(--paper)',
-        border: '1px solid var(--line)',
-        display: 'block',
-      }}
-    />
-  );
-}
-/* eslint-enable @next/next/no-img-element */
-
 /** Name cell for a screener row. Owns its own hover handlers so the
  *  shared ticker hover-card only fires when the cursor is over the
  *  logo / ticker / company-name area, not the entire row. */
@@ -259,7 +153,7 @@ function NameCell({ ev }: { ev: ScreenerEvent }) {
           color: 'var(--ink)',
         }}
       >
-        <ScreenerLogo ticker={ev.ticker} size={32} />
+        <TickerLogo ticker={ev.ticker} size={32} radius={6} loading="eager" />
         <div style={{ minWidth: 0, flex: '1 1 auto', overflow: 'hidden' }}>
           {/* Ticker + ML pill inline. ML rows ride on a small brand-blue
               pill next to the symbol so it reads as a one-line label
@@ -935,14 +829,14 @@ export default function EarningsScreener() {
       return;
     }
     const tickers = Array.from(new Set(events.map((e) => e.ticker)));
-    const uncached = tickers.filter((t) => !logoStateCache.has(t));
+    const uncached = tickers.filter((ticker) => !hasTickerLogoState(ticker));
     if (uncached.length === 0) {
       setLogosReady(true);
       return;
     }
     let cancelled = false;
     setLogosReady(false);
-    void Promise.all(uncached.map(preloadLogo)).then(() => {
+    void preloadTickerLogos(uncached, LOGO_PRELOAD_TIMEOUT_MS).then(() => {
       if (!cancelled) setLogosReady(true);
     });
     return () => {
