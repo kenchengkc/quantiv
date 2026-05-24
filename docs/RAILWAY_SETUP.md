@@ -14,8 +14,9 @@ Before you start, have these handy:
   Upstash → Details → "TLS-Endpoint" — `rediss://default:<password>@<host>:6379`.
 - Optional: `ADMIN_API_KEY` (`openssl rand -hex 16`) for cache-bust admin route.
 
-`BACKEND_SHARED_SECRET` is optional until the Vercel→Railway proxy ships (see
-[README.md](../README.md)).
+Set `BACKEND_SHARED_SECRET` to match Vercel (see [HMAC_PROXY.md](HMAC_PROXY.md)).
+When set, direct public calls to `/api/ml/predict` return **401** without a
+signature — only the Vercel proxy can call those routes.
 
 ---
 
@@ -95,14 +96,15 @@ Check logs for `Uvicorn running on` and `Services initialized`.
 
 ---
 
-## 6. Wire Vercel (when proxy exists)
+## 6. Wire Vercel (HMAC proxy)
 
-| Variable | Value |
-|---|---|
-| `BACKEND_URL` | `https://api.usequantiv.com` |
-| `BACKEND_SHARED_SECRET` | Same as Railway (future) |
+| Variable | Where | Value |
+|---|---|---|
+| `BACKEND_URL` | Vercel | `https://api.usequantiv.com` |
+| `BACKEND_SHARED_SECRET` | Vercel **and** Railway | Same value (`openssl rand -hex 32`) |
 
-Today the site uses static JSON without this proxy.
+Browser entrypoint: `POST https://usequantiv.com/api/ml/predict` (not Railway directly).
+Details: [HMAC_PROXY.md](HMAC_PROXY.md).
 
 ---
 
