@@ -38,6 +38,7 @@
     background: var(--bg);
     color: var(--ink);
     font-feature-settings: 'ss01';
+    overflow-x: clip;
   }
   /* Reserve space for the vertical scrollbar so centered layouts don’t
      jump horizontally when content height changes (e.g. dashboard ↔ watchlist
@@ -54,6 +55,11 @@
     -webkit-font-smoothing: antialiased;
     font-size: 14px;
     line-height: 1.45;
+  }
+  @supports not (overflow: clip) {
+    html, body {
+      overflow-x: hidden;
+    }
   }
   ::selection { background: color-mix(in oklab, var(--accent) 40%, transparent); }
   ::-webkit-scrollbar { height: 10px; width: 10px; }

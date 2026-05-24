@@ -167,6 +167,16 @@ function normalizeQuantiles(
   };
 }
 
+function livePredictionUnavailableMessage(status: number | null): string {
+  if (status === 404) {
+    return 'No fresh feature snapshot is available for this event yet.';
+  }
+  if (status === 400 || status === 422) {
+    return 'This snapshot is not supported by the live model.';
+  }
+  return 'Live prediction is unavailable right now.';
+}
+
 function parseLocalDate(iso: string): Date {
   const [y, m, d] = iso.slice(0, 10).split('-').map(Number);
   return new Date(y, (m ?? 1) - 1, d ?? 1);
@@ -3241,17 +3251,11 @@ export default function SymbolPage() {
       });
       const json = await res.json().catch(() => null);
       if (!res.ok) {
-        const message =
-          typeof json?.error === 'string'
-            ? json.error
-            : typeof json?.detail === 'string'
-              ? json.detail
-              : `Live prediction unavailable (${res.status})`;
         setLivePrediction({
           status: 'unavailable',
           key: livePredictionRequest.key,
           response: null,
-          error: message,
+          error: livePredictionUnavailableMessage(res.status),
           updatedAt: Date.now(),
         });
         return;
@@ -3268,7 +3272,7 @@ export default function SymbolPage() {
         status: 'unavailable',
         key: livePredictionRequest.key,
         response: null,
-        error: err instanceof Error ? err.message : 'Live prediction unavailable',
+        error: livePredictionUnavailableMessage(null),
         updatedAt: Date.now(),
       });
     } finally {
