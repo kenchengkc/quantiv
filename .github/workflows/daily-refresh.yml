@@ -9,9 +9,10 @@ name: Daily data refresh
 #   5. Commit JSON + push → Vercel auto-deploys
 #
 # Weekly ML retrain (cron `0 12 * * 0` — Sunday 12:00 UTC):
-#   Pull R2 → DuckDB → feature_engineering_v3 → model_trainer_v3 → push models
-#   (no DoltHub sync; assumes nightly runs keep R2 fresh. Models land in R2 for
-#   daily_score on the next nightly pull.)
+#   Pull R2 → DuckDB → feature_engineering_v3 → model_trainer_v3 → score with
+#   new models → push models/forecasts. It opts into pulling the earnings
+#   calendar from R2 because the Sunday daily refresh can finish and push its
+#   refreshed calendar after the weekly workflow was already queued.
 #
 # Designed for public repo (unlimited free runner minutes). Runtime per run
 # ≈ 15–25 min dominated by build_frontend_data + DuckDB parquet scans.
@@ -333,6 +334,7 @@ jobs:
       - name: Pull data from R2
         env:
           R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          R2_PULL_EARNINGS: "1"
         run: bash scripts/r2_pull.sh
 
       - name: Rebuild DuckDB views
@@ -367,6 +369,7 @@ jobs:
         run: bash scripts/r2_push.sh
 
       - name: Sync Railway serving models
+        id: sync-railway-models
         # Hot-load the freshly trained model bundle onto Railway's /data
         # volume so /api/ml/predict can serve it without waiting for a
         # Docker rebuild. Skips cleanly when the admin secret is absent
@@ -377,6 +380,7 @@ jobs:
         run: |
           if [ -z "$ADMIN_API_KEY" ]; then
             echo "ADMIN_API_KEY secret not set; skipping Railway model sync."
+            echo "synced=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           python - <<'PY'
@@ -412,3 +416,13 @@ jobs:
               payload = {"raw": body}
           print("Railway model sync response:", json.dumps(payload, sort_keys=True))
           PY
+          echo "synced=true" >> "$GITHUB_OUTPUT"
+
+      - name: Import retrain forecasts to Neon Postgres
+        # Only import weekly forecasts when Railway has hot-loaded the same
+        # freshly trained models. Otherwise the next daily refresh will import
+        # after the deployment/model-sync path catches up.
+        if: steps.sync-railway-models.outputs.synced == 'true'
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: python -u scripts/import_recent_to_postgres.py --full

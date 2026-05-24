@@ -43,6 +43,8 @@ push_forecasts() {
 push_small_files() {
   [ -f "$DATA_DIR/earnings_calendar.csv" ] && \
     rclone copy "$DATA_DIR/earnings_calendar.csv" "$REMOTE/"
+  [ -f "$DATA_DIR/earnings_calendar.parquet" ] && \
+    rclone copy "$DATA_DIR/earnings_calendar.parquet" "$REMOTE/"
   [ -f "$DATA_DIR/bias_curves.parquet" ] && \
     rclone copy "$DATA_DIR/bias_curves.parquet" "$REMOTE/"
 }
