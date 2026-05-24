@@ -9,7 +9,7 @@ checks stay open.
 | Piece | Path |
 |-------|------|
 | Vercel client | [`apps/frontend/lib/backendProxy.ts`](../apps/frontend/lib/backendProxy.ts) |
-| Next.js route (example) | [`apps/frontend/app/api/ml/predict/route.ts`](../apps/frontend/app/api/ml/predict/route.ts) |
+| Next.js routes | [`apps/frontend/app/api/ml/predict/route.ts`](../apps/frontend/app/api/ml/predict/route.ts), `/coverage`, `/batch-predict` |
 | FastAPI middleware | [`apps/backend/middleware/hmac_auth.py`](../apps/backend/middleware/hmac_auth.py) |
 
 ## Signature contract
@@ -57,19 +57,30 @@ openssl rand -hex 32
 
 Do **not** expose `BACKEND_SHARED_SECRET` to the browser or `NEXT_PUBLIC_*`.
 
-## User-facing flow (`/api/ml/predict`)
+## User-facing flow (`/api/ml/*`)
 
 ```text
-Browser  →  POST /api/ml/predict  →  Vercel (signs + forwards)
+Browser  →  POST /api/ml/...  →  Vercel (signs + forwards)
                                       ↓
-                               Railway /api/ml/predict
+                               Railway /api/ml/...
 ```
 
-Vercel route behaviour:
+`/api/ml/predict` route behaviour:
 
 1. If `BACKEND_URL` or secret missing → **nightly fallback** from `public/symbols/{SYM}.json`.
 2. Railway **4xx** → returned to client (e.g. no feature snapshot).
 3. Railway **5xx / timeout** → nightly fallback with `source: "nightly_fallback"`.
+
+`/api/ml/batch-predict` falls back per item when the backend is unavailable.
+`/api/ml/coverage` returns a 503 when the backend proxy is not configured.
+
+Current proxied endpoints:
+
+| Browser path | Railway path | Purpose |
+|--------------|--------------|---------|
+| `POST /api/ml/predict` | `POST /api/ml/predict` | Single-symbol live re-score |
+| `POST /api/ml/batch-predict` | `POST /api/ml/batch-predict` | Per-item batch re-score; partial failures are returned per item |
+| `POST /api/ml/coverage` | `POST /api/ml/coverage` | Feature-vector coverage totals and symbol/event horizon availability |
 
 ## Local development
 
