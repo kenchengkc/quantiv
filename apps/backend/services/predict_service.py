@@ -27,7 +27,6 @@ from threading import Lock
 from typing import Any, Dict, List, Optional
 
 import joblib
-import numpy as np
 import pandas as pd
 
 logger = logging.getLogger(__name__)
@@ -135,22 +134,30 @@ def _substitute_spot(
     feature_vector: Dict[str, float],
     live_spot: float,
 ) -> Dict[str, float]:
-    """Return a copy of feature_vector with the two spot-derived features
-    swapped in. Other 18 features stay at their snapshot values.
+    """Return a copy of feature_vector with the spot-derived features
+    swapped in. Schema-flexible — the v3 production models use `log_spot`,
+    the older MVP1 models used `underlying_price` + `log_price`. We update
+    whichever keys exist in the vector so a stray schema swap (R2 retrain
+    landing different names) doesn't silently no-op the override.
 
-    The model was trained with `underlying_price = spot at snapshot` and
-    `log_price = log(spot at snapshot)`, so we have to keep those two in
-    lock-step. Everything else (IV, Greeks, term slope, surprise history)
-    is anchored to the nightly chain and not affected by an intraday move.
+    Everything else (IV, Greeks, term slope, surprise history) is anchored
+    to the nightly chain and unaffected by an intraday move.
     """
     if live_spot is None or not (live_spot > 0):
-        # Defensive: a non-positive spot would NaN out log_price and the
+        # Defensive: a non-positive spot would NaN out log values and the
         # predict call would emit NaN. Skip the substitution and serve the
         # snapshot's own value.
         return dict(feature_vector)
     out = dict(feature_vector)
-    out["underlying_price"] = float(live_spot)
-    out["log_price"] = float(math.log(max(live_spot, 1.0)))
+    log_spot = float(math.log(max(live_spot, 1.0)))
+    # MVP1 schema names
+    if "underlying_price" in out:
+        out["underlying_price"] = float(live_spot)
+    if "log_price" in out:
+        out["log_price"] = log_spot
+    # v3 schema name
+    if "log_spot" in out:
+        out["log_spot"] = log_spot
     return out
 
 
@@ -159,10 +166,15 @@ def _build_X(
     feature_names: List[str],
 ) -> pd.DataFrame:
     """Project the dict onto the model's expected feature order. Missing
-    keys (older snapshots, schema drift) become NaN — LightGBM tolerates
-    NaN as "missing" by default."""
-    row = {name: feature_vector.get(name, np.nan) for name in feature_names}
-    return pd.DataFrame([row], columns=feature_names)
+    keys (older snapshots, schema drift) and Python None values both
+    become NaN — LightGBM tolerates NaN as "missing" but rejects pandas
+    `object` dtypes (which is what a column with `None` defaults to).
+    `pd.to_numeric(..., errors='coerce')` forces float and substitutes
+    NaN for anything non-numeric.
+    """
+    row = {name: feature_vector.get(name) for name in feature_names}
+    df = pd.DataFrame([row], columns=feature_names)
+    return df.apply(pd.to_numeric, errors="coerce")
 
 
 # ─── Predict ─────────────────────────────────────────────────────────────

@@ -53,19 +53,57 @@ def _import():
 
 def _synthetic_feature_vector(feature_names):
     """Build a roughly realistic feature vector. Values are arbitrary but
-    of the right magnitude so the model returns a finite prediction."""
+    of the right magnitude so the model returns a finite prediction.
+
+    Covers both the v3 schema (`log_spot`, `straddle_pct`, `iv_rank`, …)
+    and the older MVP1 schema (`underlying_price`, `log_price`, `atm_*`)
+    so this fixture works whichever model the repo currently ships. Only
+    the keys that exist in `feature_names` survive into the resulting
+    vector projection inside predict().
+    """
     base = {name: 0.0 for name in feature_names}
     base.update({
-        "symbol_encoded": 1.0,
-        "horizon": 7,
+        # Shared
         "earnings_month": 5,
+        "earnings_dow": 2,
         "earnings_weekday": 2,
+        "timing_amc": 1.0,
+        "timing_bmo": 0.0,
+        # MVP1 spot features
         "underlying_price": 100.0,
         "log_price": math.log(100.0),
+        # v3 spot feature
+        "log_spot": math.log(100.0),
+        # Volatility / option features (v3)
+        "atm_iv": 0.4,
+        "straddle_pct": 0.05,
+        "em_iv_pct": 0.04,
+        "iv_crush_pct": 0.1,
+        "event_move_implied": 0.03,
+        "event_vol_fraction": 0.5,
+        "iv_rv_ratio_20d": 1.5,
+        "iv_rv_ratio_60d": 1.4,
+        "iv_cc_rv_ratio_20d": 1.3,
+        "rv_term_ratio": 1.0,
+        "vol_of_vol_20d": 0.04,
+        "parkinson_rv_10d": 0.35,
+        "parkinson_rv_20d": 0.34,
+        "parkinson_rv_60d": 0.32,
+        "cc_rv_10d": 0.4,
+        "cc_rv_20d": 0.42,
+        "iv_rank": 0.5,
+        "hv_rank": 0.5,
+        "iv_mom_week": 0.0,
+        "iv_mom_month": 0.0,
+        "vix_current": 18.0,
+        "vix_change_30d": 0.0,
+        "vix_pct_252d": 0.5,
+        "spy_drift_60d": 0.01,
+        "tlt_spy_ratio_30d": 0.4,
+        # MVP1 option features
         "log_market_cap": math.log(1e11),
         "atm_straddle_price": 5.0,
         "atm_straddle_pct": 0.05,
-        "atm_iv": 0.4,
         "atm_delta": 0.5,
         "atm_gamma": 0.02,
         "atm_theta": -0.05,
@@ -76,6 +114,20 @@ def _synthetic_feature_vector(feature_names):
         "volume_oi_ratio": 0.4,
         "iv_term_slope": 0.01,
         "tte_earnings": 7.0,
+        # Historical (v3)
+        "hist_move_avg_4q": 0.07,
+        "hist_move_avg_8q": 0.07,
+        "hist_move_med_4q": 0.05,
+        "hist_move_med_8q": 0.05,
+        "hist_move_std_4q": 0.04,
+        "hist_event_count": 8,
+        "hist_straddle_accuracy": 0.6,
+        # Other (v3)
+        "drift_5d": 0.0,
+        "dte": 7,
+        "horizon": 7,
+        "symbol_encoded": 1.0,
+        "volume_ratio_20d": 1.0,
     })
     return base
 
@@ -86,7 +138,10 @@ def test_bundle_loads_for_each_horizon():
     for h in [1, 2, 3, 7, 14, 21]:
         bundle = ps.get_bundle(h)
         assert bundle is not None, f"missing T-{h} bundle"
-        assert len(bundle.feature_names) == 20
+        # v3 models have ~40 features, MVP1 had 20 — accept either rather
+        # than pinning to a specific schema version. The schema-flexible
+        # _substitute_spot covers both.
+        assert len(bundle.feature_names) > 0
         assert bundle.estimator is not None
 
 
@@ -96,7 +151,8 @@ def test_bundle_missing_horizon_returns_none():
     assert ps.get_bundle(999) is None
 
 
-def test_substitute_spot_overrides_two_features():
+def test_substitute_spot_overrides_mvp1_features():
+    """MVP1 trained models use underlying_price + log_price."""
     ps = _import()
     fv = {"underlying_price": 100.0, "log_price": math.log(100), "atm_iv": 0.4}
     out = ps._substitute_spot(fv, 150.0)
@@ -108,11 +164,38 @@ def test_substitute_spot_overrides_two_features():
     assert fv["underlying_price"] == 100.0
 
 
+def test_substitute_spot_overrides_v3_log_spot():
+    """v3 production models use log_spot (no underlying_price feature)."""
+    ps = _import()
+    fv = {"log_spot": math.log(100), "atm_iv": 0.4, "straddle_pct": 0.05}
+    out = ps._substitute_spot(fv, 150.0)
+    assert out["log_spot"] == pytest.approx(math.log(150.0))
+    # Schema is v3 so no underlying_price/log_price should be invented.
+    assert "underlying_price" not in out
+    assert "log_price" not in out
+
+
+def test_substitute_spot_handles_both_schemas_simultaneously():
+    """Defensive: a vector that somehow has both schema's spot keys gets
+    both updated. Avoids a partial update silently leaving one stale."""
+    ps = _import()
+    fv = {
+        "underlying_price": 100.0,
+        "log_price": math.log(100),
+        "log_spot": math.log(100),
+    }
+    out = ps._substitute_spot(fv, 200.0)
+    assert out["underlying_price"] == 200.0
+    assert out["log_price"] == pytest.approx(math.log(200.0))
+    assert out["log_spot"] == pytest.approx(math.log(200.0))
+
+
 def test_substitute_spot_ignores_nonpositive():
     ps = _import()
-    fv = {"underlying_price": 100.0, "log_price": math.log(100)}
+    fv = {"underlying_price": 100.0, "log_price": math.log(100), "log_spot": math.log(100)}
     assert ps._substitute_spot(fv, 0)["underlying_price"] == 100.0
     assert ps._substitute_spot(fv, -5)["underlying_price"] == 100.0
+    assert ps._substitute_spot(fv, 0)["log_spot"] == pytest.approx(math.log(100))
 
 
 @requires_models
