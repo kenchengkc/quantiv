@@ -35,7 +35,7 @@ Quantiv is a monorepo for **researching and displaying** expected moves into ear
 
 **DNS:** `usequantiv.com` → Vercel (nameservers `ns*.vercel-dns.com`). `api.usequantiv.com` → Railway CNAME. See Railway setup doc for Vercel DNS records.
 
-**Note:** `BACKEND_URL` / `BACKEND_SHARED_SECRET` on Vercel are planned for a server-side proxy to Railway; the live site today uses static JSON + Vercel API routes.
+**Note:** Live ML re-inference uses the HMAC proxy (`BACKEND_URL` + `BACKEND_SHARED_SECRET` on Vercel → Railway). See [docs/HMAC_PROXY.md](docs/HMAC_PROXY.md). Dashboard browsing still uses static JSON when the proxy is not configured.
 
 ## Architecture
 
