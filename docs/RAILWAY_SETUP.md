@@ -12,7 +12,9 @@ Before you start, have these handy:
   generate a new token at Cloudflare → R2 → Manage API tokens.**
 - The Upstash Redis **TCP** URL (not the REST URL the frontend uses).
   Upstash → Details → "TLS-Endpoint" — `rediss://default:<password>@<host>:6379`.
-- Optional: `ADMIN_API_KEY` (`openssl rand -hex 16`) for cache-bust admin route.
+- Optional: `ADMIN_API_KEY` (`openssl rand -hex 16`) for cache-bust/admin routes.
+  Add the same value as a GitHub Actions secret if you want the weekly model
+  retrain workflow to hot-sync fresh R2 models onto Railway automatically.
 
 Set `BACKEND_SHARED_SECRET` to match Vercel (see [HMAC_PROXY.md](HMAC_PROXY.md)).
 When set, direct public calls to `/api/ml/predict` return **401** without a
@@ -66,6 +68,7 @@ Service → **Variables**:
 | `R2_BUCKET` | `quantiv` | |
 | `FRONTEND_URL` | `https://usequantiv.com` | CORS |
 | `ADMIN_API_KEY` | `openssl rand -hex 16` | optional |
+| `BACKEND_SHARED_SECRET` | `openssl rand -hex 32` | must match Vercel |
 | `ENVIRONMENT` | `production` | |
 | `POLYGON_API_KEY` | … | optional live context |
 
@@ -105,6 +108,13 @@ Check logs for `Uvicorn running on` and `Services initialized`.
 
 Browser entrypoint: `POST https://usequantiv.com/api/ml/predict` (not Railway directly).
 Details: [HMAC_PROXY.md](HMAC_PROXY.md).
+
+For weekly model hot-sync, set these GitHub Actions secrets:
+
+| Secret | Value |
+|---|---|
+| `ADMIN_API_KEY` | Same as Railway `ADMIN_API_KEY` |
+| `RAILWAY_BACKEND_URL` | Optional; defaults to `https://api.usequantiv.com` |
 
 ---
 

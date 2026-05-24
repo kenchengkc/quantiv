@@ -100,3 +100,83 @@ class MLPredictResponse(BaseModel):
         description="'live' = backend ran the model; 'cached' = served from Upstash within TTL.",
     )
     served_at: datetime
+
+
+class MLCoverageRequest(BaseModel):
+    """Coverage/introspection request for the persisted feature snapshots."""
+
+    symbol: Optional[str] = Field(
+        None,
+        min_length=1,
+        max_length=10,
+        description="Optional ticker to inspect for event-level availability.",
+    )
+    earnings_date: Optional[date] = Field(
+        None,
+        description="Optional event date to pair with symbol.",
+    )
+    fresh_window_days: int = Field(
+        7,
+        ge=1,
+        le=60,
+        description="Snapshot freshness window used for fresh coverage counts.",
+    )
+
+
+class MLCoverageHorizonRow(BaseModel):
+    horizon_days: int
+    total_rows: int
+    fresh_rows: int
+    fresh_symbols: int
+    fresh_events: int
+    earliest_snapshot: Optional[date] = None
+    latest_snapshot: Optional[date] = None
+
+
+class MLAvailableHorizon(BaseModel):
+    horizon_days: int
+    earnings_date: date
+    snapshot_date: date
+    snapshot_age_days: int
+    spot_price: Optional[float] = None
+
+
+class MLCoverageResponse(BaseModel):
+    total_feature_rows: int
+    fresh_window_days: int
+    fresh_distinct_symbols: int
+    fresh_distinct_events: int
+    rows_by_horizon: List[MLCoverageHorizonRow]
+    symbol: Optional[str] = None
+    earnings_date: Optional[date] = None
+    available_horizons: List[MLAvailableHorizon] = Field(default_factory=list)
+    checked_at: datetime
+
+
+class MLBatchPredictRequest(BaseModel):
+    """Batch wrapper around MLPredictRequest.
+
+    Responses are per item; one unavailable symbol should not fail the
+    whole batch because coverage is intentionally sparse today.
+    """
+
+    items: List[MLPredictRequest] = Field(..., min_length=1, max_length=100)
+    allow_partial: bool = Field(
+        True,
+        description="Accepted for client intent; route always returns per-item results.",
+    )
+
+
+class MLBatchPredictItemResponse(BaseModel):
+    ok: bool
+    symbol: str
+    horizon_days: int
+    earnings_date: Optional[date] = None
+    response: Optional[MLPredictResponse] = None
+    error_status: Optional[int] = None
+    error: Optional[str] = None
+
+
+class MLBatchPredictResponse(BaseModel):
+    items: List[MLBatchPredictItemResponse]
+    served_at: datetime

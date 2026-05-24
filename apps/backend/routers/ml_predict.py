@@ -23,7 +23,17 @@ from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, HTTPException
 
-from models import MLPredictRequest, MLPredictResponse
+from models import (
+    MLAvailableHorizon,
+    MLBatchPredictItemResponse,
+    MLBatchPredictRequest,
+    MLBatchPredictResponse,
+    MLCoverageHorizonRow,
+    MLCoverageRequest,
+    MLCoverageResponse,
+    MLPredictRequest,
+    MLPredictResponse,
+)
 from services import predict_service
 
 logger = logging.getLogger(__name__)
@@ -87,8 +97,7 @@ async def _cached_set(key: str, payload: Dict[str, Any]) -> None:
         logger.warning("Redis SETEX failed for %s: %s", key, exc)
 
 
-@router.post("/api/ml/predict", response_model=MLPredictResponse)
-async def predict_endpoint(req: MLPredictRequest) -> MLPredictResponse:
+async def _predict_response(req: MLPredictRequest) -> MLPredictResponse:
     if req.horizon_days not in VALID_HORIZONS:
         raise HTTPException(
             status_code=400,
@@ -153,3 +162,150 @@ async def predict_endpoint(req: MLPredictRequest) -> MLPredictResponse:
     # serves the cached response without re-running the model.
     await _cached_set(cache_key, response.model_dump(mode="json"))
     return response
+
+
+@router.post("/api/ml/predict", response_model=MLPredictResponse)
+async def predict_endpoint(req: MLPredictRequest) -> MLPredictResponse:
+    return await _predict_response(req)
+
+
+@router.post("/api/ml/batch-predict", response_model=MLBatchPredictResponse)
+async def batch_predict_endpoint(req: MLBatchPredictRequest) -> MLBatchPredictResponse:
+    items = []
+    for item in req.items:
+        try:
+            response = await _predict_response(item)
+            items.append(
+                MLBatchPredictItemResponse(
+                    ok=True,
+                    symbol=item.symbol.upper(),
+                    horizon_days=item.horizon_days,
+                    earnings_date=item.earnings_date,
+                    response=response,
+                )
+            )
+        except HTTPException as exc:
+            detail = exc.detail if isinstance(exc.detail, str) else json.dumps(exc.detail, default=str)
+            items.append(
+                MLBatchPredictItemResponse(
+                    ok=False,
+                    symbol=item.symbol.upper(),
+                    horizon_days=item.horizon_days,
+                    earnings_date=item.earnings_date,
+                    error_status=exc.status_code,
+                    error=detail,
+                )
+            )
+
+    return MLBatchPredictResponse(
+        items=items,
+        served_at=datetime.now(timezone.utc),
+    )
+
+
+@router.post("/api/ml/coverage", response_model=MLCoverageResponse)
+async def coverage_endpoint(req: MLCoverageRequest) -> MLCoverageResponse:
+    pool = _pool()
+    if pool is None:
+        raise HTTPException(status_code=503, detail="Postgres pool not available")
+
+    window = req.fresh_window_days
+    symbol = req.symbol.upper() if req.symbol else None
+
+    async with pool.acquire() as conn:
+        totals = await conn.fetchrow(
+            """
+            SELECT
+              COUNT(*)::int AS total_feature_rows,
+              COUNT(DISTINCT act_symbol) FILTER (
+                WHERE snapshot_date >= CURRENT_DATE - ($1 || ' days')::interval
+              )::int AS fresh_distinct_symbols,
+              COUNT(DISTINCT (act_symbol, earnings_date)) FILTER (
+                WHERE snapshot_date >= CURRENT_DATE - ($1 || ' days')::interval
+              )::int AS fresh_distinct_events
+            FROM em_forecasts
+            WHERE feature_vector IS NOT NULL
+            """,
+            str(window),
+        )
+        by_horizon = await conn.fetch(
+            """
+            SELECT
+              model_horizon::int AS horizon_days,
+              COUNT(*)::int AS total_rows,
+              COUNT(*) FILTER (
+                WHERE snapshot_date >= CURRENT_DATE - ($1 || ' days')::interval
+              )::int AS fresh_rows,
+              COUNT(DISTINCT act_symbol) FILTER (
+                WHERE snapshot_date >= CURRENT_DATE - ($1 || ' days')::interval
+              )::int AS fresh_symbols,
+              COUNT(DISTINCT (act_symbol, earnings_date)) FILTER (
+                WHERE snapshot_date >= CURRENT_DATE - ($1 || ' days')::interval
+              )::int AS fresh_events,
+              MIN(snapshot_date) AS earliest_snapshot,
+              MAX(snapshot_date) AS latest_snapshot
+            FROM em_forecasts
+            WHERE feature_vector IS NOT NULL
+            GROUP BY model_horizon
+            ORDER BY model_horizon
+            """,
+            str(window),
+        )
+
+        available = []
+        if symbol is not None:
+            params = [symbol]
+            where = """
+                WHERE act_symbol = $1
+                  AND feature_vector IS NOT NULL
+            """
+            if req.earnings_date is not None:
+                params.append(req.earnings_date)
+                where += " AND earnings_date = $2"
+            rows = await conn.fetch(
+                f"""
+                SELECT
+                  model_horizon::int AS horizon_days,
+                  earnings_date,
+                  snapshot_date,
+                  (CURRENT_DATE - snapshot_date)::int AS snapshot_age_days,
+                  spot_price
+                FROM em_forecasts
+                {where}
+                ORDER BY earnings_date DESC, model_horizon
+                """,
+                *params,
+            )
+            available = [
+                MLAvailableHorizon(
+                    horizon_days=row["horizon_days"],
+                    earnings_date=row["earnings_date"],
+                    snapshot_date=row["snapshot_date"],
+                    snapshot_age_days=row["snapshot_age_days"],
+                    spot_price=float(row["spot_price"]) if row["spot_price"] is not None else None,
+                )
+                for row in rows
+            ]
+
+    return MLCoverageResponse(
+        total_feature_rows=totals["total_feature_rows"] if totals else 0,
+        fresh_window_days=window,
+        fresh_distinct_symbols=totals["fresh_distinct_symbols"] if totals else 0,
+        fresh_distinct_events=totals["fresh_distinct_events"] if totals else 0,
+        rows_by_horizon=[
+            MLCoverageHorizonRow(
+                horizon_days=row["horizon_days"],
+                total_rows=row["total_rows"],
+                fresh_rows=row["fresh_rows"],
+                fresh_symbols=row["fresh_symbols"],
+                fresh_events=row["fresh_events"],
+                earliest_snapshot=row["earliest_snapshot"],
+                latest_snapshot=row["latest_snapshot"],
+            )
+            for row in by_horizon
+        ],
+        symbol=symbol,
+        earnings_date=req.earnings_date,
+        available_horizons=available,
+        checked_at=datetime.now(timezone.utc),
+    )

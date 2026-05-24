@@ -365,3 +365,50 @@ jobs:
         env:
           R2_BUCKET: ${{ secrets.R2_BUCKET }}
         run: bash scripts/r2_push.sh
+
+      - name: Sync Railway serving models
+        # Hot-load the freshly trained model bundle onto Railway's /data
+        # volume so /api/ml/predict can serve it without waiting for a
+        # Docker rebuild. Skips cleanly when the admin secret is absent
+        # (forks / local mirrors).
+        env:
+          RAILWAY_BACKEND_URL: ${{ secrets.RAILWAY_BACKEND_URL }}
+          ADMIN_API_KEY: ${{ secrets.ADMIN_API_KEY }}
+        run: |
+          if [ -z "$ADMIN_API_KEY" ]; then
+            echo "ADMIN_API_KEY secret not set; skipping Railway model sync."
+            exit 0
+          fi
+          python - <<'PY'
+          import json
+          import os
+          import urllib.error
+          import urllib.request
+
+          url = os.environ.get("RAILWAY_BACKEND_URL") or "https://api.usequantiv.com"
+          url = url.rstrip("/") + "/api/admin/sync-models"
+          req = urllib.request.Request(
+              url,
+              data=b"{}",
+              method="POST",
+              headers={
+                  "Content-Type": "application/json",
+                  "X-API-Key": os.environ["ADMIN_API_KEY"],
+              },
+          )
+          try:
+              with urllib.request.urlopen(req, timeout=60) as res:
+                  body = res.read().decode("utf-8")
+          except urllib.error.HTTPError as exc:
+              print(f"Railway sync failed with HTTP {exc.code}: {exc.read().decode('utf-8')}")
+              raise SystemExit(1)
+          except Exception as exc:
+              print(f"Railway sync failed: {exc}")
+              raise SystemExit(1)
+
+          try:
+              payload = json.loads(body)
+          except json.JSONDecodeError:
+              payload = {"raw": body}
+          print("Railway model sync response:", json.dumps(payload, sort_keys=True))
+          PY
