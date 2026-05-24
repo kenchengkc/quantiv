@@ -20,16 +20,20 @@ Usage:
 
 import argparse
 import json
+import logging
 import math
 import os
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 import duckdb
 import joblib
 import numpy as np
 import pandas as pd
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+logger = logging.getLogger(__name__)
 
 
 def _sanitize_for_json(value: Any) -> Any:
@@ -45,10 +49,6 @@ def _sanitize_for_json(value: Any) -> Any:
     if isinstance(value, (list, tuple)):
         return [_sanitize_for_json(v) for v in value]
     return value
-
-import logging
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
-logger = logging.getLogger(__name__)
 
 
 def get_data_dir() -> Path:
@@ -204,7 +204,10 @@ def get_upcoming_features(conn: duckdb.DuckDBPyConnection, days_ahead: int) -> p
         JOIN upcoming u ON u.act_symbol = sf.act_symbol
             AND sf.date < u.earnings_date
             AND (u.earnings_date - sf.date) BETWEEN 1 AND 25
-            AND sf.expiration >= u.earnings_date
+            AND (
+                (LOWER(COALESCE(u.timing, '')) = 'amc' AND sf.expiration > u.earnings_date)
+                OR (LOWER(COALESCE(u.timing, '')) != 'amc' AND sf.expiration >= u.earnings_date)
+            )
         LEFT JOIN v_straddle_features back
             ON back.act_symbol = sf.act_symbol
             AND back.date = sf.date
@@ -213,7 +216,7 @@ def get_upcoming_features(conn: duckdb.DuckDBPyConnection, days_ahead: int) -> p
             AND back.atm_iv > 0
         QUALIFY ROW_NUMBER() OVER (
             PARTITION BY sf.act_symbol, sf.date, u.earnings_date
-            ORDER BY back.dte ASC
+            ORDER BY sf.expiration ASC, back.dte ASC
         ) = 1
     )
 
@@ -280,6 +283,10 @@ def get_upcoming_features(conn: duckdb.DuckDBPyConnection, days_ahead: int) -> p
         ON sf.act_symbol = u.act_symbol
         AND sf.date < u.earnings_date
         AND (u.earnings_date - sf.date) BETWEEN 1 AND 25
+        AND (
+            (LOWER(COALESCE(u.timing, '')) = 'amc' AND sf.expiration > u.earnings_date)
+            OR (LOWER(COALESCE(u.timing, '')) != 'amc' AND sf.expiration >= u.earnings_date)
+        )
     LEFT JOIN v_realized_vol rv
         ON rv.act_symbol = sf.act_symbol AND rv.date = sf.date
     LEFT JOIN event_vol ev
@@ -290,6 +297,10 @@ def get_upcoming_features(conn: duckdb.DuckDBPyConnection, days_ahead: int) -> p
         ON ts.act_symbol = u.act_symbol
         AND ts.earnings_date = u.earnings_date
     WHERE sf.atm_iv > 0 AND sf.atm_strike > 0
+    QUALIFY ROW_NUMBER() OVER (
+        PARTITION BY sf.act_symbol, sf.date, u.earnings_date
+        ORDER BY sf.expiration ASC
+    ) = 1
     ORDER BY u.earnings_date, sf.act_symbol, lead_days
     """
     return conn.execute(sql).fetchdf()
@@ -391,6 +402,19 @@ def save_forecasts(df: pd.DataFrame, data_dir: Path):
         "feature_vector",
     ]
     out = df[[c for c in out_cols if c in df.columns]].copy()
+    serving_key_cols = ["act_symbol", "earnings_date", "snapshot_date", "model_horizon"]
+    if all(c in out.columns for c in serving_key_cols):
+        duplicate_mask = out.duplicated(serving_key_cols, keep=False)
+        if duplicate_mask.any():
+            duplicate_rows = int(duplicate_mask.sum())
+            unique_keys = int(out.loc[duplicate_mask, serving_key_cols].drop_duplicates().shape[0])
+            logger.warning(
+                "Forecast output has %d rows sharing %d serving keys; "
+                "keeping the first event-covering expiry per key",
+                duplicate_rows,
+                unique_keys,
+            )
+            out = out.drop_duplicates(serving_key_cols, keep="first")
 
     # Parquet
     forecast_dir = data_dir / "forecasts"
