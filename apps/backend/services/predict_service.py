@@ -213,13 +213,16 @@ def predict(
     X = _build_X(substituted, bundle.feature_names)
 
     em_pct = float(bundle.estimator.predict(X)[0])
-    if bundle.calibrator is not None:
-        try:
-            em_pct = float(bundle.calibrator.predict([em_pct])[0])
-        except Exception:
-            # Calibrator may be sklearn version-skew incompatible. Predict still
-            # works — log once per process and continue uncalibrated.
-            logger.warning("Calibrator predict failed for T-%s; serving raw", horizon)
+    # Calibration is intentionally skipped to match scripts/daily_score.py,
+    # which writes raw model output to em_forecasts.em_ml_pct. Applying it
+    # here would cause the live /api/ml/predict number to drift away from
+    # the static-JSON value shown in the calendar / ticker page. The bundled
+    # IsotonicRegression calibrators were also pickled under sklearn 1.4.2;
+    # the runtime is 1.8+, so even when the call succeeds it triggers
+    # InconsistentVersionWarning and may produce subtly wrong outputs. Once
+    # the v3 models get retrained on the current sklearn, we can turn
+    # calibration on in BOTH the nightly batch and this route.
+    _ = bundle.calibrator  # keep loaded so we can ship it again later
 
     quantiles: Dict[int, float] = {}
     for q, q_est in bundle.quantile_estimators.items():
