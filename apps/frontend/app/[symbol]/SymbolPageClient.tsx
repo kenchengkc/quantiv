@@ -48,6 +48,7 @@ interface ExpectedMove {
   em_ml_abs?: number | null;
   correction_factor?: number | null;
   model_horizon?: number | null;
+  ml_snapshot_date?: string | null;
   p10?: number | null;
   p25?: number | null;
   p50?: number | null;
@@ -109,6 +110,61 @@ interface LivePrice {
   source: 'finnhub' | 'alpaca_iex' | 'mixed' | 'unavailable';
   session?: 'premarket' | 'regular' | 'afterhours' | 'closed';
   marketOpen: boolean;
+}
+
+type PredictionMode = 'snapshot' | 'live';
+type LivePredictionStatus = 'idle' | 'loading' | 'ready' | 'unavailable';
+
+interface LivePredictionResponse {
+  symbol: string;
+  horizon_days: number;
+  em_ml_pct: number;
+  em_ml_abs: number;
+  quantiles: Record<string, number>;
+  spot_used: number;
+  feature_snapshot_date: string | null;
+  earnings_date: string | null;
+  source: 'live' | 'cached' | 'nightly_fallback';
+  fallback_kind?: 'static_ml' | 'straddle';
+  fallback_reason?: string;
+  served_at: string;
+}
+
+interface LivePredictionState {
+  status: LivePredictionStatus;
+  key: string | null;
+  response: LivePredictionResponse | null;
+  error: string | null;
+  updatedAt: number;
+}
+
+const EMPTY_LIVE_PREDICTION: LivePredictionState = {
+  status: 'idle',
+  key: null,
+  response: null,
+  error: null,
+  updatedAt: 0,
+};
+
+function normalizeQuantiles(
+  quantiles: Record<string, number> | null | undefined,
+): { p10: number; p25: number; p50: number; p75: number; p90: number } | null {
+  if (!quantiles) return null;
+  const p10 = quantiles['10'];
+  const p50 = quantiles['50'];
+  const p90 = quantiles['90'];
+  if (![p10, p50, p90].every((v) => typeof v === 'number' && Number.isFinite(v))) {
+    return null;
+  }
+  const p25 = quantiles['25'];
+  const p75 = quantiles['75'];
+  return {
+    p10,
+    p25: typeof p25 === 'number' && Number.isFinite(p25) ? p25 : p10,
+    p50,
+    p75: typeof p75 === 'number' && Number.isFinite(p75) ? p75 : p90,
+    p90,
+  };
 }
 
 function parseLocalDate(iso: string): Date {
@@ -1470,10 +1526,24 @@ function QuantileBand({
   q,
   straddleAbs,
   spot,
+  mode,
+  onModeChange,
+  liveDisabled,
+  liveStatus,
+  pointPct,
+  modelMeta,
+  unavailableReason,
 }: {
   q: { p10: number; p25: number; p50: number; p75: number; p90: number };
   straddleAbs: number;
   spot: number;
+  mode: PredictionMode;
+  onModeChange: (mode: PredictionMode) => void;
+  liveDisabled: boolean;
+  liveStatus: LivePredictionStatus;
+  pointPct: number | null;
+  modelMeta: string;
+  unavailableReason: string | null;
 }) {
   const max = Math.max(q.p90, straddleAbs) * 1.08;
   const pct = (v: number) => `${Math.min(100, (v / max) * 100)}%`;
@@ -1501,7 +1571,9 @@ function QuantileBand({
         }}
       >
         <div>
-          <span className="qv-pill warm">ML model</span>
+          <span className="qv-pill warm">
+            {mode === 'live' && liveStatus === 'ready' ? 'Live re-score' : 'ML model'}
+          </span>
           <h3
             className="serif"
             style={{
@@ -1514,21 +1586,79 @@ function QuantileBand({
             Forecast distribution
           </h3>
           <div style={{ fontSize: 14, color: 'var(--ink-3)', marginTop: 4 }}>
-            LightGBM ensemble · range of plausible absolute moves on print day
+            {modelMeta}
           </div>
+          {mode === 'live' && liveStatus === 'unavailable' && unavailableReason && (
+            <div style={{ fontSize: 12, color: 'var(--ink-4)', marginTop: 6 }}>
+              Live unavailable · showing snapshot. {unavailableReason}
+            </div>
+          )}
         </div>
-        <div
-          className="mono tnum"
-          style={{ textAlign: 'right', fontSize: 13, color: 'var(--ink-3)' }}
-        >
-          <div>
-            Median <span style={{ color: 'var(--ink-2)' }}>±{(q.p50 * 100).toFixed(1)}%</span>
+        <div style={{ display: 'grid', justifyItems: 'end', gap: 10 }}>
+          <div
+            role="tablist"
+            aria-label="Forecast source"
+            style={{
+              display: 'inline-grid',
+              gridTemplateColumns: '1fr 1fr',
+              minWidth: 164,
+              padding: 3,
+              borderRadius: 8,
+              border: '1px solid var(--line)',
+              background: 'var(--bg-2)',
+            }}
+          >
+            {(['snapshot', 'live'] as PredictionMode[]).map((item) => {
+              const active = mode === item;
+              const disabled = item === 'live' && liveDisabled;
+              return (
+                <button
+                  key={item}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  disabled={disabled}
+                  onClick={() => onModeChange(item)}
+                  title={disabled ? 'No model horizon is available for this snapshot' : undefined}
+                  style={{
+                    minHeight: 28,
+                    border: 'none',
+                    borderRadius: 6,
+                    background: active ? 'var(--bg-3)' : 'transparent',
+                    color: disabled
+                      ? 'var(--ink-4)'
+                      : active
+                        ? 'var(--ink)'
+                        : 'var(--ink-3)',
+                    fontSize: 12,
+                    fontWeight: active ? 700 : 500,
+                    cursor: disabled ? 'not-allowed' : 'pointer',
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  {item === 'snapshot' ? 'Snapshot' : liveStatus === 'loading' ? 'Live…' : 'Live'}
+                </button>
+              );
+            })}
           </div>
-          <div style={{ marginTop: 2 }}>
-            80% band{' '}
-            <span style={{ color: 'var(--ink-2)' }}>
-              {(q.p10 * 100).toFixed(1)}–{(q.p90 * 100).toFixed(1)}%
-            </span>
+          <div
+            className="mono tnum"
+            style={{ textAlign: 'right', fontSize: 13, color: 'var(--ink-3)' }}
+          >
+            {pointPct != null && (
+              <div>
+                Point <span style={{ color: 'var(--ink-2)' }}>±{(pointPct * 100).toFixed(1)}%</span>
+              </div>
+            )}
+            <div style={{ marginTop: pointPct != null ? 2 : 0 }}>
+              Median <span style={{ color: 'var(--ink-2)' }}>±{(q.p50 * 100).toFixed(1)}%</span>
+            </div>
+            <div style={{ marginTop: 2 }}>
+              80% band{' '}
+              <span style={{ color: 'var(--ink-2)' }}>
+                {(q.p10 * 100).toFixed(1)}–{(q.p90 * 100).toFixed(1)}%
+              </span>
+            </div>
           </div>
         </div>
       </div>
@@ -2886,7 +3016,12 @@ export default function SymbolPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [live, setLive] = useState<LivePrice | null>(null);
+  const [predictionMode, setPredictionMode] = useState<PredictionMode>('snapshot');
+  const [livePrediction, setLivePrediction] =
+    useState<LivePredictionState>(EMPTY_LIVE_PREDICTION);
   const [toast, setToast] = useState<{ msg: string; key: number } | null>(null);
+  const lastPredictionFetchAtRef = useRef(0);
+  const inFlightPredictionKeyRef = useRef<string | null>(null);
   // Intraday sparkline state. Bars come from /api/stocks/intraday which
   // wraps Alpaca's IEX feed; we cache aggressively server-side and
   // refresh once a minute client-side during the regular session.
@@ -3043,6 +3178,120 @@ export default function SymbolPage() {
       window.removeEventListener('focus', onVisible);
     };
   }, [symbol]);
+
+  useEffect(() => {
+    setPredictionMode('snapshot');
+    setLivePrediction(EMPTY_LIVE_PREDICTION);
+    lastPredictionFetchAtRef.current = 0;
+    inFlightPredictionKeyRef.current = null;
+  }, [symbol]);
+
+  const livePredictionRequest = useMemo(() => {
+    const em = data?.expected_move;
+    const horizon = em?.model_horizon;
+    const earningsDate = em?.earnings_date ?? data?.next_earnings ?? null;
+    const price = live?.price ?? data?.spot_price ?? null;
+    if (!symbol || !data || !em || !horizon || !earningsDate || !price || price <= 0) {
+      return null;
+    }
+    if (![1, 2, 3, 7, 14, 21].includes(horizon)) return null;
+    const roundedSpot = Math.round(price * 10) / 10;
+    const eventDate = earningsDate.slice(0, 10);
+    return {
+      key: `${symbol}:${eventDate}:T${horizon}:${roundedSpot.toFixed(1)}`,
+      body: {
+        symbol,
+        horizon_days: horizon,
+        spot_override: roundedSpot,
+        earnings_date: eventDate,
+      },
+    };
+  }, [data, live?.price, symbol]);
+
+  const loadLivePrediction = useCallback(async (force = false) => {
+    if (!livePredictionRequest) return;
+    const now = Date.now();
+    if (
+      !force &&
+      livePrediction.key === livePredictionRequest.key &&
+      livePrediction.status === 'ready' &&
+      now - livePrediction.updatedAt < 30_000
+    ) {
+      return;
+    }
+    if (!force && now - lastPredictionFetchAtRef.current < 30_000) return;
+    if (inFlightPredictionKeyRef.current === livePredictionRequest.key) return;
+
+    inFlightPredictionKeyRef.current = livePredictionRequest.key;
+    lastPredictionFetchAtRef.current = now;
+    setLivePrediction((prev) => ({
+      status: 'loading',
+      key: livePredictionRequest.key,
+      response: prev.key === livePredictionRequest.key ? prev.response : null,
+      error: null,
+      updatedAt: prev.updatedAt,
+    }));
+
+    try {
+      const res = await fetch('/api/ml/predict', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(livePredictionRequest.body),
+        cache: 'no-store',
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) {
+        const message =
+          typeof json?.error === 'string'
+            ? json.error
+            : typeof json?.detail === 'string'
+              ? json.detail
+              : `Live prediction unavailable (${res.status})`;
+        setLivePrediction({
+          status: 'unavailable',
+          key: livePredictionRequest.key,
+          response: null,
+          error: message,
+          updatedAt: Date.now(),
+        });
+        return;
+      }
+      setLivePrediction({
+        status: 'ready',
+        key: livePredictionRequest.key,
+        response: json as LivePredictionResponse,
+        error: null,
+        updatedAt: Date.now(),
+      });
+    } catch (err) {
+      setLivePrediction({
+        status: 'unavailable',
+        key: livePredictionRequest.key,
+        response: null,
+        error: err instanceof Error ? err.message : 'Live prediction unavailable',
+        updatedAt: Date.now(),
+      });
+    } finally {
+      inFlightPredictionKeyRef.current = null;
+    }
+  }, [livePrediction.key, livePrediction.status, livePrediction.updatedAt, livePredictionRequest]);
+
+  useEffect(() => {
+    if (predictionMode === 'live') void loadLivePrediction();
+  }, [loadLivePrediction, predictionMode]);
+
+  useEffect(() => {
+    if (predictionMode !== 'live') return;
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void loadLivePrediction();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
+    };
+  }, [loadLivePrediction, predictionMode]);
 
   const showToast = useCallback((msg: string) => {
     setToast({ msg, key: Date.now() });
@@ -3205,7 +3454,7 @@ export default function SymbolPage() {
   const daysLeft = daysFromToday(earningsDate);
   const eventLabel = eventLabelFor(data, earningsDate);
 
-  const quantiles =
+  const snapshotQuantiles =
     em?.p10 != null && em?.p50 != null && em?.p90 != null
       ? {
           p10: em.p10,
@@ -3214,6 +3463,31 @@ export default function SymbolPage() {
           p75: em.p75 ?? em.p90,
           p90: em.p90,
         }
+      : null;
+  const liveQuantiles =
+    livePrediction.status === 'ready'
+      ? normalizeQuantiles(livePrediction.response?.quantiles)
+      : null;
+  const showingLivePrediction =
+    predictionMode === 'live' &&
+    livePrediction.status === 'ready' &&
+    livePrediction.response != null;
+  const quantiles = showingLivePrediction && liveQuantiles ? liveQuantiles : snapshotQuantiles;
+  const activePredictionPct = showingLivePrediction
+    ? livePrediction.response?.em_ml_pct ?? null
+    : em?.em_ml_pct ?? null;
+  const quantileMeta = showingLivePrediction
+    ? livePrediction.response?.source === 'nightly_fallback'
+      ? 'Static nightly fallback · live backend unavailable'
+      : `Re-scored with latest stock price; options snapshot from ${
+          livePrediction.response?.feature_snapshot_date ?? 'nightly snapshot'
+        }.`
+    : em?.ml_snapshot_date
+      ? `Nightly LightGBM snapshot from ${em.ml_snapshot_date}.`
+      : 'LightGBM ensemble · range of plausible absolute moves on print day';
+  const liveUnavailableReason =
+    predictionMode === 'live' && livePrediction.status === 'unavailable'
+      ? livePrediction.error
       : null;
 
   const termRows = buildTermRows(
@@ -3378,7 +3652,18 @@ export default function SymbolPage() {
             }}
           >
             {quantiles != null && (
-              <QuantileBand q={quantiles} straddleAbs={straddlePct} spot={spot} />
+              <QuantileBand
+                q={quantiles}
+                straddleAbs={straddlePct}
+                spot={spot}
+                mode={predictionMode}
+                onModeChange={setPredictionMode}
+                liveDisabled={livePredictionRequest == null}
+                liveStatus={livePrediction.status}
+                pointPct={activePredictionPct}
+                modelMeta={quantileMeta}
+                unavailableReason={liveUnavailableReason}
+              />
             )}
             {termRows.length > 0 && <TermFan rows={termRows} spot={spot} />}
           </div>
