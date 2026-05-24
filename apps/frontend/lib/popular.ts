@@ -6,7 +6,7 @@
 // ADRs (TSM, HDB) can't dominate via log(mcap), high-flow penny semis
 // (AXTI, CLS) can't ride a small-base log(dv) gain into the top.
 // Filtered to v_earnings tickers; top 200 mapped to weights 76..100.
-// Last generated: 2026-05-23; market-cap coverage: 400/400.
+// Last generated: 2026-05-24; market-cap coverage: 400/400.
 
 export const POPULAR_WEIGHT: Record<string, number> = {
   "NVDA": 100,
@@ -122,10 +122,10 @@ export const POPULAR_WEIGHT: Record<string, number> = {
   "ADBE": 93,
   "SYK": 93,
   "CVS": 93,
-  "DHR": 93,
   "MO": 93,
-  "LOW": 93,
+  "DHR": 93,
   "NVS": 93,
+  "LOW": 93,
   "BHP": 93,
   "CB": 93,
   "BMY": 93,
@@ -282,13 +282,13 @@ export const POPULAR_WEIGHT: Record<string, number> = {
   "ALL": 84,
   "PYPL": 84,
   "EA": 84,
-  "SATS": 84,
   "AFL": 84,
+  "SATS": 84,
   "CMG": 83,
   "CTVA": 83,
   "STM": 83,
-  "ASTS": 83,
   "ALAB": 83,
+  "ASTS": 83,
   "PSA": 83,
   "EW": 83,
   "XEL": 83,
@@ -323,8 +323,8 @@ export const POPULAR_WEIGHT: Record<string, number> = {
   "KGC": 81,
   "AU": 81,
   "IDXX": 81,
-  "RDDT": 81,
   "MSCI": 81,
+  "RDDT": 81,
   "NTR": 81,
   "DHI": 81,
   "UAL": 81,
@@ -338,8 +338,8 @@ export const POPULAR_WEIGHT: Record<string, number> = {
   "KDP": 80,
   "STT": 80,
   "ROP": 80,
-  "PCG": 80,
   "ALNY": 80,
+  "PCG": 80,
   "VMC": 80,
   "KMB": 80,
   "JBL": 80,
@@ -361,8 +361,8 @@ export const POPULAR_WEIGHT: Record<string, number> = {
   "MDB": 79,
   "RVMD": 79,
   "CPNG": 79,
-  "FISV": 79,
   "TKO": 79,
+  "FISV": 79,
   "MLM": 79,
   "VEEV": 79,
   "SOFI": 79,
