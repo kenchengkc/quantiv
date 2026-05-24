@@ -22,6 +22,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from dotenv import load_dotenv
 from services.ml_service import MLService
+from services import predict_service, r2_models
 from backends import PostgresBackend, DuckDBBackend, HybridBackend, DataBackend
 from routers.em import router as em_router, init_router as init_em_router
 from routers.ml_predict import router as ml_predict_router, init_router as init_ml_predict_router
@@ -208,6 +209,29 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning("Failed to initialize ML service", error=str(e))
 
+    # -- Pull serving models from R2 onto the mounted volume -------------
+    # The weekly retrain in daily-refresh.yml writes fresh joblibs to R2.
+    # Without this sync, every Railway deploy after a retrain serves the
+    # baked-in models from the last Docker build until a new image is
+    # pushed. The volume copy persists across restarts so subsequent boots
+    # only download files that R2 has touched since.
+    if r2_models.configured():
+        models_volume = Path(os.getenv("DATA_DIR", "./data")) / "models"
+        try:
+            n = r2_models.sync_models_from_r2(models_volume)
+            if n > 0 or any(models_volume.glob("lgbm_T*.joblib")):
+                os.environ["ML_MODELS_DIR"] = str(models_volume)
+                predict_service.reset_cache()
+                logger.info(
+                    "ML models resolved via volume", path=str(models_volume), synced=n,
+                )
+            else:
+                logger.info("R2 sync wrote 0 files and volume is empty; using baked-in models")
+        except Exception as e:
+            logger.warning("R2 model sync errored; using baked-in models", error=str(e))
+    else:
+        logger.info("R2 not configured; using image-baked models")
+
     logger.info("✅ Services initialized", backend=DATA_BACKEND_MODE, postgres=pg_ready, duckdb=duck_ready, ml_ready=ml_service is not None)
 
     # Wire up router shared state
@@ -261,6 +285,14 @@ if custom_domain:
 app.add_middleware(CORSMiddleware, allow_origins=allowed_origins, allow_credentials=True,
                    allow_methods=["*"], allow_headers=["*"])
 
+# HMAC middleware: reject any non-/health request that doesn't carry a
+# valid X-Quantiv-Signature derived from BACKEND_SHARED_SECRET. The
+# Next.js proxy in apps/frontend/lib/backendProxy.ts mints the header.
+# Skipped automatically if the env var isn't set, so `python main.py`
+# locally still works without a secret.
+from middleware.hmac_auth import HmacAuthMiddleware  # noqa: E402
+app.add_middleware(HmacAuthMiddleware)
+
 # Rate limiting — 60 requests/minute per IP (generous for 5-10 users)
 limiter = Limiter(key_func=get_remote_address, default_limits=["60/minute"])
 app.state.limiter = limiter
@@ -303,6 +335,29 @@ async def refresh_forecasts(background_tasks: BackgroundTasks, _key: str = Depen
             logger.error("Cache clear failed", error=str(e))
     background_tasks.add_task(refresh_task)
     return {"message": "Forecast refresh initiated"}
+
+
+@app.post("/api/admin/sync-models")
+async def sync_models(_key: str = Depends(verify_admin_key)):
+    """Force-pull the latest LightGBM models from R2 onto the volume,
+    then reset the in-process model cache so subsequent predictions use
+    the new files. Run this after the Sunday retrain lands fresh models
+    in R2 — avoids waiting for the next Railway deploy.
+
+    Returns the number of files actually written (size-mismatched) and
+    the path predict_service is now reading from.
+    """
+    if not r2_models.configured():
+        raise HTTPException(status_code=503, detail="R2 is not configured on this instance")
+    models_volume = Path(os.getenv("DATA_DIR", "./data")) / "models"
+    n = r2_models.sync_models_from_r2(models_volume)
+    if any(models_volume.glob("lgbm_T*.joblib")):
+        os.environ["ML_MODELS_DIR"] = str(models_volume)
+    predict_service.reset_cache()
+    return {
+        "files_written": n,
+        "models_dir": os.environ.get("ML_MODELS_DIR", "/app/apps/ml/models"),
+    }
 
 if __name__ == "__main__":
     import uvicorn
