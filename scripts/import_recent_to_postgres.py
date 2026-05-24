@@ -87,6 +87,13 @@ COLUMNS = [
     "feature_vector",
 ]
 
+PRIMARY_KEY_COLUMNS = [
+    "act_symbol",
+    "earnings_date",
+    "snapshot_date",
+    "model_horizon",
+]
+
 # JSONB columns get a psycopg2 adapter wrapper at insert time. Listed
 # separately because the value is a JSON string in the Parquet and we
 # need to pass it through psycopg2.extras.Json so PG doesn't try to
@@ -171,6 +178,20 @@ def load_and_filter(parquet_path: Path, days: int, full: bool) -> pd.DataFrame:
         cutoff = date.today() - timedelta(days=days)
         df = df[df["snapshot_date"] >= cutoff]
 
+    duplicate_mask = df.duplicated(PRIMARY_KEY_COLUMNS, keep=False)
+    if duplicate_mask.any():
+        duplicate_rows = int(duplicate_mask.sum())
+        duplicate_keys = int(
+            df.loc[duplicate_mask, PRIMARY_KEY_COLUMNS].drop_duplicates().shape[0]
+        )
+        print(
+            "import_recent_to_postgres: warning: "
+            f"{duplicate_rows} rows share {duplicate_keys} primary keys; "
+            "deduping before upsert",
+            file=sys.stderr,
+        )
+        df = df.drop_duplicates(PRIMARY_KEY_COLUMNS, keep="first")
+
     # Replace pandas NaN/NaT with Python None for psycopg2's adapter.
     return df.astype(object).where(df.notna(), None)
 
@@ -198,9 +219,7 @@ def upsert(conn, df: pd.DataFrame) -> int:
         return 0
     cols = ", ".join(COLUMNS)
     placeholders = ", ".join(["%s"] * len(COLUMNS))
-    update_cols = [c for c in COLUMNS if c not in (
-        "act_symbol", "earnings_date", "snapshot_date", "model_horizon",
-    )]
+    update_cols = [c for c in COLUMNS if c not in PRIMARY_KEY_COLUMNS]
     set_clause = ", ".join(f"{c} = EXCLUDED.{c}" for c in update_cols)
 
     sql = (

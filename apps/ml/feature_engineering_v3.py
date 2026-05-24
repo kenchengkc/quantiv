@@ -358,7 +358,10 @@ def extract_training_data(conn: duckdb.DuckDBPyConnection,
             ON e.act_symbol = sf.act_symbol
             AND sf.date < e.earnings_date
             AND (e.earnings_date - sf.date) BETWEEN 1 AND 25
-            AND sf.expiration >= e.earnings_date
+            AND (
+                (LOWER(COALESCE(e.timing, '')) = 'amc' AND sf.expiration > e.earnings_date)
+                OR (LOWER(COALESCE(e.timing, '')) != 'amc' AND sf.expiration >= e.earnings_date)
+            )
         LEFT JOIN v_straddle_features back
             ON back.act_symbol = sf.act_symbol
             AND back.date = sf.date
@@ -367,7 +370,7 @@ def extract_training_data(conn: duckdb.DuckDBPyConnection,
             AND back.atm_iv > 0
         QUALIFY ROW_NUMBER() OVER (
             PARTITION BY sf.act_symbol, sf.date, e.earnings_date
-            ORDER BY back.dte ASC
+            ORDER BY sf.expiration ASC, back.dte ASC
         ) = 1
     ),
 
@@ -493,6 +496,10 @@ def extract_training_data(conn: duckdb.DuckDBPyConnection,
             ON sf.act_symbol = e.act_symbol
             AND sf.date < e.earnings_date
             AND (e.earnings_date - sf.date) BETWEEN 1 AND 25
+            AND (
+                (LOWER(COALESCE(e.timing, '')) = 'amc' AND sf.expiration > e.earnings_date)
+                OR (LOWER(COALESCE(e.timing, '')) != 'amc' AND sf.expiration >= e.earnings_date)
+            )
         JOIN realized r
             ON r.act_symbol = e.act_symbol
             AND r.earnings_date = e.earnings_date
@@ -512,6 +519,10 @@ def extract_training_data(conn: duckdb.DuckDBPyConnection,
         LEFT JOIN macro mc
             ON mc.date = sf.date
         WHERE sf.atm_iv > 0 AND sf.atm_strike > 0
+        QUALIFY ROW_NUMBER() OVER (
+            PARTITION BY sf.act_symbol, sf.date, e.earnings_date
+            ORDER BY sf.expiration ASC
+        ) = 1
     )
 
     SELECT * FROM snapshots

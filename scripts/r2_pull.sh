@@ -28,16 +28,14 @@ rclone sync "$REMOTE/forecasts" "$DATA_DIR/forecasts" \
 
 # Small files
 #
-# Note: earnings_calendar.csv is intentionally NOT pulled from R2.
-# It's git-canonical (committed at the end of each successful CI run
-# via `git add -f data/earnings_calendar.csv`), so the checkout already
-# contains the authoritative version. Pulling from R2 here would
-# silently overwrite manual git commits with whatever the last CI run
-# pushed — which masked a real bug on 2026-05-19 where a user's local
-# Finnhub sweep + universe trim were committed to git but invisible
-# to CI because R2 hadn't been updated. r2_push.sh still uploads the
-# CSV as a backup / fast-pull source for local devs.
-# rclone copy "$REMOTE/earnings_calendar.csv" "$DATA_DIR/" 2>/dev/null || true
+# By default, earnings_calendar.csv remains git-canonical. Weekly retrain
+# can opt into R2 via R2_PULL_EARNINGS=1 because that run may be queued before
+# the daily refresh auto-commit lands, but should train/score against the
+# just-refreshed calendar that daily pushed to R2.
+if [ "${R2_PULL_EARNINGS:-0}" = "1" ]; then
+  rclone copy "$REMOTE/earnings_calendar.csv"     "$DATA_DIR/" 2>/dev/null || true
+  rclone copy "$REMOTE/earnings_calendar.parquet" "$DATA_DIR/" 2>/dev/null || true
+fi
 rclone copy "$REMOTE/bias_curves.parquet"   "$DATA_DIR/" 2>/dev/null || true
 
 echo "✅ Pull complete"
