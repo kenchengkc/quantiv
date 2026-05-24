@@ -3267,7 +3267,7 @@ export default function SymbolPage() {
         error: null,
         updatedAt: Date.now(),
       });
-    } catch (err) {
+    } catch {
       setLivePrediction({
         status: 'unavailable',
         key: livePredictionRequest.key,
