@@ -9,7 +9,7 @@ checks stay open.
 | Piece | Path |
 |-------|------|
 | Vercel client | [`apps/frontend/lib/backendProxy.ts`](../apps/frontend/lib/backendProxy.ts) |
-| Next.js routes | [`apps/frontend/app/api/ml/predict/route.ts`](../apps/frontend/app/api/ml/predict/route.ts), `/coverage`, `/batch-predict` |
+| Next.js routes | [`apps/frontend/app/api/ml/predict/route.ts`](../apps/frontend/app/api/ml/predict/route.ts), `/coverage`, `/batch-predict`, `/status` |
 | FastAPI middleware | [`apps/backend/middleware/hmac_auth.py`](../apps/backend/middleware/hmac_auth.py) |
 
 ## Signature contract
@@ -73,6 +73,7 @@ Browser  →  POST /api/ml/...  →  Vercel (signs + forwards)
 
 `/api/ml/batch-predict` falls back per item when the backend is unavailable.
 `/api/ml/coverage` returns a 503 when the backend proxy is not configured.
+`/api/ml/status` returns model/data/runtime metadata for operational checks.
 
 Current proxied endpoints:
 
@@ -81,6 +82,7 @@ Current proxied endpoints:
 | `POST /api/ml/predict` | `POST /api/ml/predict` | Single-symbol live re-score |
 | `POST /api/ml/batch-predict` | `POST /api/ml/batch-predict` | Per-item batch re-score; partial failures are returned per item |
 | `POST /api/ml/coverage` | `POST /api/ml/coverage` | Feature-vector coverage totals and symbol/event horizon availability |
+| `POST /api/ml/status` | `POST /api/ml/status` | ML model inventory, feature data freshness, and runtime dependency status |
 
 ## Local development
 

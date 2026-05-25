@@ -100,6 +100,30 @@ class MLPredictResponse(BaseModel):
         description="'live' = backend ran the model; 'cached' = served from Upstash within TTL.",
     )
     served_at: datetime
+    snapshot_age_days: Optional[int] = Field(
+        None,
+        description="Age in calendar days of the feature snapshot used for re-scoring.",
+    )
+    forecast_scored_at: Optional[datetime] = Field(
+        None,
+        description="Timestamp from the nightly/weekly scoring run that wrote this feature row.",
+    )
+    model_version: Optional[str] = Field(
+        None,
+        description="Version string from the LightGBM model metadata.",
+    )
+    model_trained_at: Optional[datetime] = Field(
+        None,
+        description="Training timestamp from the model metadata, when available.",
+    )
+    model_loaded_at: Optional[datetime] = Field(
+        None,
+        description="When this backend process loaded the model bundle.",
+    )
+    feature_schema_hash: Optional[str] = Field(
+        None,
+        description="SHA-256 hash of the model feature order used for inference.",
+    )
 
 
 class MLCoverageRequest(BaseModel):
@@ -180,3 +204,60 @@ class MLBatchPredictItemResponse(BaseModel):
 class MLBatchPredictResponse(BaseModel):
     items: List[MLBatchPredictItemResponse]
     served_at: datetime
+
+
+class MLStatusRequest(BaseModel):
+    fresh_window_days: int = Field(
+        7,
+        ge=1,
+        le=60,
+        description="Snapshot freshness window used for data coverage counts.",
+    )
+
+
+class MLStatusModelRow(BaseModel):
+    horizon_days: int
+    point_model_exists: bool
+    quantile_model_count: int
+    feature_count: Optional[int] = None
+    feature_schema_hash: Optional[str] = None
+    model_version: Optional[str] = None
+    trained_at: Optional[datetime] = None
+    val_mae: Optional[float] = None
+    loaded: bool = False
+    loaded_at: Optional[datetime] = None
+    model_mtime: Optional[datetime] = None
+    metadata_mtime: Optional[datetime] = None
+
+
+class MLStatusDataRow(BaseModel):
+    total_feature_rows: int
+    fresh_feature_rows: int
+    fresh_distinct_symbols: int
+    fresh_distinct_events: int
+    latest_snapshot_date: Optional[date] = None
+    latest_scored_at: Optional[datetime] = None
+
+
+class MLStatusHorizonRow(BaseModel):
+    horizon_days: int
+    total_feature_rows: int
+    fresh_feature_rows: int
+    latest_snapshot_date: Optional[date] = None
+    latest_scored_at: Optional[datetime] = None
+
+
+class MLStatusResponse(BaseModel):
+    ok: bool
+    status: str
+    checked_at: datetime
+    fresh_window_days: int
+    max_snapshot_age_days: int
+    models_dir: str
+    available_model_horizons: List[int]
+    loaded_model_horizons: List[int]
+    redis_available: bool
+    postgres_available: bool
+    data: Optional[MLStatusDataRow] = None
+    rows_by_horizon: List[MLStatusHorizonRow] = Field(default_factory=list)
+    models: List[MLStatusModelRow] = Field(default_factory=list)

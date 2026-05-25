@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { GripVertical, X, Plus, ChevronUp, ChevronDown, Check } from 'lucide-react';
 import { companyName } from '@/lib/companyNames';
@@ -15,6 +15,15 @@ type SymbolSummary = {
     earnings_date?: string;
     straddle_pct: number | null;
     iv_pct: number | null;
+    em_ml_pct?: number | null;
+    em_ml_abs?: number | null;
+    model_horizon?: number | null;
+    ml_snapshot_date?: string | null;
+    p10?: number | null;
+    p25?: number | null;
+    p50?: number | null;
+    p75?: number | null;
+    p90?: number | null;
     dte: number;
     timing?: string;
     lead_time_days?: number;
@@ -24,6 +33,37 @@ type SymbolSummary = {
 };
 
 type Tick = { price: number | null; change: number | null; changePct: number | null };
+
+type WatchlistMlResponse = {
+  symbol: string;
+  horizon_days: number;
+  em_ml_pct: number;
+  em_ml_abs: number;
+  quantiles: Record<string, number>;
+  spot_used: number;
+  feature_snapshot_date: string | null;
+  earnings_date: string | null;
+  source: 'live' | 'cached' | 'nightly_fallback';
+  fallback_kind?: 'static_ml' | 'straddle';
+  fallback_reason?: string;
+  served_at: string;
+  snapshot_age_days?: number | null;
+};
+
+type WatchlistMlState = {
+  key: string;
+  status: 'loading' | 'ready' | 'unavailable';
+  response: WatchlistMlResponse | null;
+  error?: string | null;
+};
+
+type WatchlistMlCandidate = {
+  key: string;
+  symbol: string;
+  horizon: number;
+  earningsDate: string;
+  spot: number;
+};
 
 // Column order, left → right:
 //   drag · logo · name · [1.5fr] · price · [1fr] · reports · expected-move · actions
@@ -64,6 +104,19 @@ function timingText(t?: string | null) {
   if (k === 'bmo' || k === 'before_market_open' || k === 'before_open') return 'Before open';
   if (k === 'amc' || k === 'after_market_close' || k === 'after_close') return 'After close';
   return null;
+}
+
+function liveMlLabel(
+  liveState: WatchlistMlState | undefined,
+  hasStaticMl: boolean,
+  hasMathMove: boolean,
+): string {
+  if (liveState?.status === 'ready') {
+    return liveState.response?.source === 'nightly_fallback' ? 'Snapshot ML' : 'Live ML';
+  }
+  if (hasStaticMl) return 'Snapshot ML';
+  if (hasMathMove) return 'Straddle';
+  return '';
 }
 
 function MarketStatusBadge({ marketOpen }: { marketOpen: boolean | null }) {
@@ -336,6 +389,8 @@ export default function WatchlistPage() {
   const { symbols: tickers, isLoaded: hydrated, remove: removeOne, reorder: reorderAll } = useWatchlist();
   const [summaries, setSummaries] = useState<Record<string, SymbolSummary>>({});
   const [live, setLive] = useState<Record<string, Tick>>({});
+  const [liveMl, setLiveMl] = useState<Record<string, WatchlistMlState>>({});
+  const mlFetchRef = useRef<{ key: string; at: number }>({ key: '', at: 0 });
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [overIdx, setOverIdx] = useState<number | null>(null);
   // Ticker awaiting delete confirmation — X click arms it, ✓ click confirms.
@@ -372,18 +427,24 @@ export default function WatchlistPage() {
     let cancelled = false;
     (async () => {
       const missing = tickers.filter((t) => !(t in summaries));
-      await Promise.all(
-        missing.map(async (t) => {
+      const loaded = await Promise.all(
+        missing.map(async (t): Promise<[string, SymbolSummary] | null> => {
           try {
             const res = await fetch(`/symbols/${t}.json`);
-            if (!res.ok) return;
+            if (!res.ok) return null;
             const json = (await res.json()) as SymbolSummary;
-            if (!cancelled) setSummaries((s) => ({ ...s, [t]: json }));
+            return [t, json];
           } catch {
-            /* ignore */
+            return null;
           }
         }),
       );
+      if (!cancelled) {
+        const entries = loaded.filter((item): item is [string, SymbolSummary] => item !== null);
+        if (entries.length > 0) {
+          setSummaries((s) => ({ ...s, ...Object.fromEntries(entries) }));
+        }
+      }
     })();
     return () => {
       cancelled = true;
@@ -492,6 +553,124 @@ export default function WatchlistPage() {
       window.removeEventListener('focus', onVisible);
     };
   }, [tickers, hydrated]);
+
+  const mlCandidates = useMemo<WatchlistMlCandidate[]>(() => {
+    if (!hydrated || tickers.length === 0) return [];
+    const out: WatchlistMlCandidate[] = [];
+    for (const symbol of tickers) {
+      const summary = summaries[symbol];
+      const em = summary?.expected_move;
+      const horizon = em?.model_horizon;
+      const earningsDate = em?.earnings_date ?? summary?.next_earnings ?? null;
+      const liveSpot = live[symbol]?.price;
+      const spot = liveSpot != null && liveSpot > 0 ? liveSpot : summary?.spot_price ?? null;
+      if (!horizon || !earningsDate || spot == null || spot <= 0) continue;
+      const roundedSpot = Math.round(spot * 10) / 10;
+      out.push({
+        key: `${symbol}:${earningsDate}:T${horizon}:${roundedSpot.toFixed(1)}`,
+        symbol,
+        horizon,
+        earningsDate,
+        spot: roundedSpot,
+      });
+      if (out.length >= 100) break;
+    }
+    return out;
+  }, [hydrated, live, summaries, tickers]);
+
+  useEffect(() => {
+    if (!hydrated || mlCandidates.length === 0) return;
+    const batchKey = mlCandidates.map((item) => item.key).join('|');
+    const now = Date.now();
+    if (batchKey === mlFetchRef.current.key && now - mlFetchRef.current.at < 30_000) return;
+    if (now - mlFetchRef.current.at < 30_000) return;
+
+    let cancelled = false;
+    mlFetchRef.current = { key: batchKey, at: now };
+    setLiveMl((prev) => {
+      const next = { ...prev };
+      for (const item of mlCandidates) {
+        const current = next[item.symbol];
+        if (current?.key === item.key && current.status === 'ready') continue;
+        next[item.symbol] = {
+          key: item.key,
+          status: 'loading',
+          response: current?.key === item.key ? current.response : null,
+          error: null,
+        };
+      }
+      return next;
+    });
+
+    (async () => {
+      try {
+        const res = await fetch('/api/ml/batch-predict', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          cache: 'no-store',
+          body: JSON.stringify({
+            allow_partial: true,
+            items: mlCandidates.map((item) => ({
+              symbol: item.symbol,
+              horizon_days: item.horizon,
+              spot_override: item.spot,
+              earnings_date: item.earningsDate,
+            })),
+          }),
+        });
+        if (!res.ok) throw new Error(`batch-predict ${res.status}`);
+        const json = (await res.json()) as {
+          items?: {
+            ok: boolean;
+            symbol: string;
+            response?: WatchlistMlResponse | null;
+            error?: string | null;
+          }[];
+        };
+        if (cancelled) return;
+        const bySymbol = new Map(mlCandidates.map((item) => [item.symbol, item]));
+        setLiveMl((prev) => {
+          const next = { ...prev };
+          for (const item of json.items ?? []) {
+            const candidate = bySymbol.get(item.symbol);
+            if (!candidate) continue;
+            next[item.symbol] = item.ok && item.response
+              ? {
+                  key: candidate.key,
+                  status: 'ready',
+                  response: item.response,
+                  error: null,
+                }
+              : {
+                  key: candidate.key,
+                  status: 'unavailable',
+                  response: null,
+                  error: item.error ?? null,
+                };
+          }
+          return next;
+        });
+      } catch {
+        if (cancelled) return;
+        setLiveMl((prev) => {
+          const next = { ...prev };
+          for (const item of mlCandidates) {
+            next[item.symbol] = {
+              key: item.key,
+              status: 'unavailable',
+              response: null,
+              error: null,
+            };
+          }
+          return next;
+        });
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [hydrated, mlCandidates]);
 
   const remove = useCallback((t: string) => removeOne(t), [removeOne]);
 
@@ -611,7 +790,6 @@ export default function WatchlistPage() {
           {tickers.map((t, i) => {
             const sum = summaries[t];
             const em = sum?.expected_move;
-            const movePct = em?.straddle_pct ?? em?.iv_pct ?? null;
             const earningsIso = em?.earnings_date ?? sum?.next_earnings ?? null;
             const earningsLabel = shortDate(earningsIso);
             const timing = timingText(em?.timing ?? sum?.next_earnings_timing);
@@ -629,6 +807,13 @@ export default function WatchlistPage() {
             // Prefer live Finnhub price when available; fall back to the
             // snapshot only after the live quote request has resolved.
             const spot = quotePending ? null : tick?.price ?? sum?.spot_price ?? null;
+            const mlCandidate = mlCandidates.find((item) => item.symbol === t);
+            const mlState = liveMl[t]?.key === mlCandidate?.key ? liveMl[t] : undefined;
+            const liveMlPct = mlState?.status === 'ready' ? mlState.response?.em_ml_pct ?? null : null;
+            const staticMlPct = em?.em_ml_pct ?? null;
+            const mathMovePct = em?.straddle_pct ?? em?.iv_pct ?? null;
+            const movePct = liveMlPct ?? staticMlPct ?? mathMovePct;
+            const moveLabel = liveMlLabel(mlState, staticMlPct !== null, mathMovePct !== null);
             const up = tickPctR !== null && !tickFlat && tickPctR >= 0;
             const quoteColor = tickPctR === null
               ? 'var(--ink-4)'
@@ -857,28 +1042,55 @@ export default function WatchlistPage() {
                 </div>
 
                 <div
-                  className="serif tnum"
                   style={{
-                    height: 24,
-                    lineHeight: '24px',
-                    fontSize: 20,
-                    fontWeight: 700,
-                    color: 'var(--ink)',
                     width: 92,
-                    textAlign: 'left',
-                    whiteSpace: 'nowrap',
+                    minHeight: 42,
+                    display: 'grid',
+                    alignContent: 'center',
+                    justifyItems: 'start',
+                    gap: 2,
                   }}
                 >
-                  {movePct !== null ? (
-                    <>
-                      ±{(movePct * 100).toFixed(1)}
-                      <span style={{ fontSize: 11, color: 'var(--ink-3)', marginLeft: 1 }}>
-                        %
-                      </span>
-                    </>
-                  ) : (
-                    <span style={{ fontSize: 12, color: 'var(--ink-4)' }}>—</span>
-                  )}
+                  <div
+                    className="serif tnum"
+                    style={{
+                      height: 24,
+                      lineHeight: '24px',
+                      fontSize: 20,
+                      fontWeight: 700,
+                      color: 'var(--ink)',
+                      textAlign: 'left',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {movePct !== null ? (
+                      <>
+                        ±{(movePct * 100).toFixed(1)}
+                        <span style={{ fontSize: 11, color: 'var(--ink-3)', marginLeft: 1 }}>
+                          %
+                        </span>
+                      </>
+                    ) : (
+                      <span style={{ fontSize: 12, color: 'var(--ink-4)' }}>—</span>
+                    )}
+                  </div>
+                  <div
+                    aria-hidden={!moveLabel}
+                    style={{
+                      height: 14,
+                      lineHeight: '14px',
+                      fontSize: 9,
+                      letterSpacing: '0.08em',
+                      textTransform: 'uppercase',
+                      color: mlState?.status === 'ready' && mlState.response?.source !== 'nightly_fallback'
+                        ? 'var(--accent)'
+                        : 'var(--ink-4)',
+                      visibility: moveLabel ? 'visible' : 'hidden',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {moveLabel || 'Snapshot ML'}
+                  </div>
                 </div>
 
                 <RowActions
