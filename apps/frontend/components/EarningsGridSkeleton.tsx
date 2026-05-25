@@ -153,12 +153,192 @@ export function getCurrentCalendarSkeletonDates(offset = 0) {
   return { days, today };
 }
 
+function formatWindowLabel(days: Date[]) {
+  const start = days[0];
+  const end = days[4];
+  if (!start || !end) return 'Earnings Week';
+
+  const month = (d: Date) => d.toLocaleDateString('en-US', { month: 'long' });
+  const sameMonth = start.getMonth() === end.getMonth();
+  return sameMonth
+    ? `${month(start)} ${start.getDate()} - ${end.getDate()}, ${start.getFullYear()}`
+    : `${month(start)} ${start.getDate()} - ${month(end)} ${end.getDate()}, ${start.getFullYear()}`;
+}
+
+function EarningsGridHeaderFallback({ days }: { days: Date[] }) {
+  const windowLabel = formatWindowLabel(days);
+
+  return (
+    <div style={{ padding: '24px 0 20px', borderBottom: '1px solid var(--line)' }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-end',
+          gap: 24,
+          flexWrap: 'wrap',
+        }}
+      >
+        <div style={{ maxWidth: 560, minWidth: 0 }}>
+          <div
+            style={{
+              fontSize: 10,
+              letterSpacing: '0.18em',
+              textTransform: 'uppercase',
+              color: 'var(--ink-3)',
+              marginBottom: 14,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              flexWrap: 'wrap',
+              minHeight: 22,
+            }}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/brand/QuantivIcon.webp"
+              alt=""
+              width={18}
+              height={18}
+              style={{
+                display: 'inline-block',
+                objectFit: 'contain',
+                mixBlendMode: 'screen',
+              }}
+            />
+            <span>Earnings Week</span>
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                padding: '2px 8px',
+                borderRadius: 999,
+                border: '1px solid var(--line)',
+                background: 'var(--bg-2)',
+                color: 'var(--ink-3)',
+                letterSpacing: '0.08em',
+                fontSize: 9.5,
+                visibility: 'hidden',
+              }}
+              aria-hidden="true"
+            >
+              <span style={{
+                width: 6, height: 6, borderRadius: 999,
+                background: 'var(--ink-4)',
+              }} />
+              MARKET CLOSED · LAST CLOSE
+            </span>
+          </div>
+          <h1
+            className="serif qv-m-h1"
+            style={{
+              margin: 0,
+              fontSize: 56,
+              fontWeight: 800,
+              letterSpacing: '-0.032em',
+              lineHeight: 0.94,
+              color: 'var(--ink)',
+              textWrap: 'balance',
+              textTransform: 'uppercase',
+            }}
+          >
+            {windowLabel}
+          </h1>
+          <div
+            style={{
+              marginTop: 14,
+              fontSize: 16,
+              color: 'var(--ink-2)',
+              maxWidth: 660,
+              lineHeight: 1.55,
+              letterSpacing: '-0.005em',
+            }}
+          >
+            Tracking what options markets expect and what the market actually delivers.
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 2 }} aria-hidden="true">
+          {['‹', 'Last week', 'This week', 'Next week', 'In two weeks', '›'].map((label) => (
+            <span
+              key={label}
+              className="chip"
+              style={{
+                fontSize: label.length === 1 ? 14 : 11,
+                width: label.length === 1 ? 32 : undefined,
+                padding: label.length === 1 ? 0 : undefined,
+                justifyContent: 'center',
+                opacity: 0.72,
+              }}
+            >
+              {label}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      <div
+        style={{
+          marginTop: 28,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 16,
+          flexWrap: 'wrap',
+        }}
+      >
+        <div
+          style={{
+            color: 'var(--ink-3)',
+            fontSize: 11,
+            letterSpacing: '0.14em',
+            textTransform: 'uppercase',
+          }}
+        >
+          Show
+        </div>
+        <div style={{ display: 'flex', gap: 6 }} aria-hidden="true">
+          {['Popular', 'S&P 500', 'Big movers', 'All'].map((label) => (
+            <span key={label} className="chip" style={{ fontSize: 11, opacity: 0.72 }}>
+              {label}
+            </span>
+          ))}
+        </div>
+        <span
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            color: 'var(--ink-3)',
+            fontSize: 11.5,
+            fontStyle: 'italic',
+          }}
+        >
+          Ranked by a 70/30 blend of 90-day dollar volume and market cap.
+        </span>
+        <div style={{ flex: 1 }} />
+        <div
+          style={{
+            height: 34,
+            width: 188,
+            borderRadius: 999,
+            border: '1px solid var(--line-2)',
+            background: 'color-mix(in oklab, var(--bg-2) 88%, transparent)',
+          }}
+          aria-hidden="true"
+        />
+      </div>
+    </div>
+  );
+}
+
 export function EarningsGridFallback({ offset = 0 }: { offset?: number }) {
   const { days, today } = getCurrentCalendarSkeletonDates(offset);
 
   return (
     <>
-      <div style={{ minHeight: 'min(560px, 62vh)' }}>
+      <EarningsGridHeaderFallback days={days} />
+      <div className="qv-calendar-shell">
         <CalendarGridSkeleton days={days} today={today} />
       </div>
       <div
