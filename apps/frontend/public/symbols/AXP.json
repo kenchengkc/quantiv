@@ -9,7 +9,8 @@
     "atm_iv": 0.2682,
     "straddle_abs": 13.125,
     "straddle_pct": 0.042,
-    "iv_pct": 0.052526
+    "iv_pct": 0.052526,
+    "timing": "before_market_open"
   },
   "straddle_features": [
     {
@@ -82,6 +83,21 @@
     }
   ],
   "earnings_history": [
+    {
+      "date": "2026-07-24",
+      "timing": "before_market_open",
+      "q": "Q2 26",
+      "fiscal_year": 2026,
+      "fiscal_q": "Q2",
+      "actual": null,
+      "implied": null,
+      "eps_actual": null,
+      "eps_estimate": 4.4328,
+      "eps_surprise_pct": null,
+      "revenue_actual": null,
+      "revenue_estimate": 19833649396.0,
+      "rev_surprise_pct": null
+    },
     {
       "date": "2026-04-23",
       "timing": "before_market_open",
@@ -246,24 +262,9 @@
       "revenue_actual": null,
       "revenue_estimate": null,
       "rev_surprise_pct": null
-    },
-    {
-      "date": "2023-07-21",
-      "timing": "before_market_open",
-      "q": "Q3 23",
-      "fiscal_year": 2023,
-      "fiscal_q": "Q3",
-      "actual": -0.038902,
-      "implied": null,
-      "eps_actual": null,
-      "eps_estimate": null,
-      "eps_surprise_pct": null,
-      "revenue_actual": null,
-      "revenue_estimate": null,
-      "rev_surprise_pct": null
     }
   ],
-  "next_earnings": null,
+  "next_earnings": "2026-07-24",
   "vol_regime": {
     "iv_current": 0.2761,
     "iv_rank": 0.28836,
@@ -273,5 +274,6 @@
     "hv_rank": 0.075078,
     "iv_mom_week": -0.0017,
     "iv_mom_month": null
-  }
+  },
+  "next_earnings_timing": "before_market_open"
 }
