@@ -128,6 +128,12 @@ interface LivePredictionResponse {
   fallback_kind?: 'static_ml' | 'straddle';
   fallback_reason?: string;
   served_at: string;
+  snapshot_age_days?: number | null;
+  forecast_scored_at?: string | null;
+  model_version?: string | null;
+  model_trained_at?: string | null;
+  model_loaded_at?: string | null;
+  feature_schema_hash?: string | null;
 }
 
 interface LivePredictionState {
