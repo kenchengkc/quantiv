@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { BackendProxyError, backendProxyConfigured, proxyJsonPost } from '@/lib/backendProxy';
+import { requireMlStatusAdmin } from '@/lib/mlStatusAdmin';
 import { NO_STORE } from '../_shared';
 
 export const dynamic = 'force-dynamic';
@@ -11,6 +12,14 @@ const StatusRequestSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
+  const access = await requireMlStatusAdmin();
+  if (!access.ok) {
+    return NextResponse.json(
+      { error: access.status === 401 ? 'unauthorized' : 'forbidden' },
+      { status: access.status, headers: NO_STORE },
+    );
+  }
+
   const body = await req.json().catch(() => ({}));
   const parsed = StatusRequestSchema.safeParse(body);
   if (!parsed.success) {
