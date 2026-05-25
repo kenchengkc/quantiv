@@ -111,7 +111,10 @@ workflow counts (`source_rows`, duplicate drops, upserted rows, horizon
 counts) against the backend's live feature-vector totals.
 
 The same status payload is rendered at `https://usequantiv.com/ml-status`
-for a browser-friendly operational view.
+for a browser-friendly operational view. Both the page and
+`/api/ml/status` require Clerk sign-in plus an email listed in the Vercel
+server env var `ML_STATUS_ADMIN_EMAILS` (comma-separated). `ADMIN_EMAILS`
+is accepted as a fallback.
 
 ---
 

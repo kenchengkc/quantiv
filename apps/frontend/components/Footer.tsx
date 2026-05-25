@@ -47,9 +47,6 @@ export function Footer() {
           <Link href="/about" style={{ color: 'inherit' }}>
             About
           </Link>
-          <Link href="/ml-status" style={{ color: 'inherit' }}>
-            ML Status
-          </Link>
           <span>© {new Date().getFullYear()} Quantiv</span>
           <span>Educational use only · Not investment advice</span>
         </div>
