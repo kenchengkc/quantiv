@@ -162,7 +162,16 @@ class MLAvailableHorizon(BaseModel):
     earnings_date: date
     snapshot_date: date
     snapshot_age_days: int
+    live_eligible: bool = Field(
+        ...,
+        description="True when this snapshot is recent enough for /api/ml/predict.",
+    )
+    unavailable_reason: Optional[str] = Field(
+        None,
+        description="Machine-readable reason when live_eligible is false.",
+    )
     spot_price: Optional[float] = None
+    forecast_scored_at: Optional[datetime] = None
 
 
 class MLCoverageResponse(BaseModel):
@@ -247,6 +256,23 @@ class MLStatusHorizonRow(BaseModel):
     latest_scored_at: Optional[datetime] = None
 
 
+class MLStatusImportRow(BaseModel):
+    parquet_file: str
+    imported_at: datetime
+    import_mode: str
+    source_rows: int
+    selected_rows: int
+    duplicate_rows: int
+    duplicate_keys: int
+    rows_upserted: int
+    feature_vector_rows: int
+    distinct_symbols: int
+    distinct_events: int
+    min_snapshot_date: Optional[date] = None
+    max_snapshot_date: Optional[date] = None
+    horizons: Dict[str, int] = Field(default_factory=dict)
+
+
 class MLStatusResponse(BaseModel):
     ok: bool
     status: str
@@ -260,4 +286,5 @@ class MLStatusResponse(BaseModel):
     postgres_available: bool
     data: Optional[MLStatusDataRow] = None
     rows_by_horizon: List[MLStatusHorizonRow] = Field(default_factory=list)
+    latest_import: Optional[MLStatusImportRow] = None
     models: List[MLStatusModelRow] = Field(default_factory=list)

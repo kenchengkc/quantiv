@@ -219,8 +219,10 @@ export function Topbar() {
   const activeHref = (() => {
     const known = new Set(NAV.map((n) => n.href));
     if (pathname && known.has(pathname)) return pathname;
-    // Unknown routes (e.g. ticker detail `/AAPL`) fall back to Earnings.
-    return '/';
+    // Ticker detail routes (e.g. `/AAPL`) fall back to Earnings. Utility
+    // routes such as `/ml-status` should not highlight a primary nav item.
+    if (pathname && /^\/[A-Z0-9.\-]{1,6}$/.test(pathname)) return '/';
+    return '';
   })();
 
   const time = now

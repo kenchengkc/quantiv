@@ -38,6 +38,7 @@ import json
 import math
 import os
 import sys
+from dataclasses import dataclass
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -100,6 +101,14 @@ PRIMARY_KEY_COLUMNS = [
 # cast a Python string to JSONB literally.
 JSONB_COLUMNS = {"feature_vector"}
 
+
+@dataclass
+class ImportStats:
+    source_rows: int
+    selected_rows: int
+    duplicate_rows: int
+    duplicate_keys: int
+
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS em_forecasts (
     act_symbol             TEXT NOT NULL,
@@ -137,6 +146,26 @@ CREATE INDEX IF NOT EXISTS em_forecasts_symbol_date_idx
     ON em_forecasts (act_symbol, earnings_date);
 CREATE INDEX IF NOT EXISTS em_forecasts_snapshot_idx
     ON em_forecasts (snapshot_date DESC);
+
+CREATE TABLE IF NOT EXISTS em_forecast_imports (
+    id                    BIGSERIAL PRIMARY KEY,
+    parquet_file          TEXT NOT NULL,
+    imported_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    import_mode           TEXT NOT NULL,
+    source_rows           INTEGER NOT NULL,
+    selected_rows         INTEGER NOT NULL,
+    duplicate_rows        INTEGER NOT NULL DEFAULT 0,
+    duplicate_keys        INTEGER NOT NULL DEFAULT 0,
+    rows_upserted         INTEGER NOT NULL,
+    feature_vector_rows   INTEGER NOT NULL,
+    distinct_symbols      INTEGER NOT NULL,
+    distinct_events       INTEGER NOT NULL,
+    min_snapshot_date     DATE,
+    max_snapshot_date     DATE,
+    horizons              JSONB NOT NULL DEFAULT '{}'::jsonb
+);
+CREATE INDEX IF NOT EXISTS em_forecast_imports_imported_at_idx
+    ON em_forecast_imports (imported_at DESC);
 """
 
 
@@ -155,8 +184,9 @@ def pick_parquet(explicit: str | None) -> Path:
     return candidates[-1]
 
 
-def load_and_filter(parquet_path: Path, days: int, full: bool) -> pd.DataFrame:
+def load_and_filter(parquet_path: Path, days: int, full: bool) -> tuple[pd.DataFrame, ImportStats]:
     df = pd.read_parquet(parquet_path)
+    source_rows = len(df)
     # `feature_vector` is the only column allowed to be missing — older
     # daily_score runs (pre-Phase 1) didn't emit it. Backfill with NULL so
     # the existing schema gate still catches truly broken Parquet files.
@@ -178,6 +208,9 @@ def load_and_filter(parquet_path: Path, days: int, full: bool) -> pd.DataFrame:
         cutoff = date.today() - timedelta(days=days)
         df = df[df["snapshot_date"] >= cutoff]
 
+    selected_rows = len(df)
+    duplicate_rows = 0
+    duplicate_keys = 0
     duplicate_mask = df.duplicated(PRIMARY_KEY_COLUMNS, keep=False)
     if duplicate_mask.any():
         duplicate_rows = int(duplicate_mask.sum())
@@ -193,7 +226,13 @@ def load_and_filter(parquet_path: Path, days: int, full: bool) -> pd.DataFrame:
         df = df.drop_duplicates(PRIMARY_KEY_COLUMNS, keep="first")
 
     # Replace pandas NaN/NaT with Python None for psycopg2's adapter.
-    return df.astype(object).where(df.notna(), None)
+    out = df.astype(object).where(df.notna(), None)
+    return out, ImportStats(
+        source_rows=source_rows,
+        selected_rows=selected_rows,
+        duplicate_rows=duplicate_rows,
+        duplicate_keys=duplicate_keys,
+    )
 
 
 def _sanitize_json_nan(value):
@@ -263,6 +302,89 @@ def upsert(conn, df: pd.DataFrame) -> int:
     return len(rows)
 
 
+def _horizon_counts(df: pd.DataFrame) -> dict[str, int]:
+    if df.empty or "model_horizon" not in df.columns:
+        return {}
+    counts = df["model_horizon"].value_counts(dropna=True).sort_index()
+    return {str(int(horizon)): int(count) for horizon, count in counts.items()}
+
+
+def _feature_vector_count(df: pd.DataFrame) -> int:
+    if df.empty or "feature_vector" not in df.columns:
+        return 0
+    return int(df["feature_vector"].notna().sum())
+
+
+def record_import(
+    conn,
+    parquet_path: Path,
+    import_mode: str,
+    stats: ImportStats,
+    df: pd.DataFrame,
+    rows_upserted: int,
+) -> None:
+    """Persist import metadata so production status can explain coverage.
+
+    This is intentionally separate from the serving table. If a workflow
+    generated 424 rows but the live backend reports fewer feature rows,
+    `/api/ml/status` can now show which Parquet file this database last
+    ingested and how many rows survived filtering/deduplication.
+    """
+    if df.empty:
+        min_snapshot = None
+        max_snapshot = None
+        distinct_symbols = 0
+        distinct_events = 0
+    else:
+        min_snapshot = df["snapshot_date"].min()
+        max_snapshot = df["snapshot_date"].max()
+        distinct_symbols = int(df["act_symbol"].nunique(dropna=True))
+        distinct_events = int(
+            df[["act_symbol", "earnings_date"]]
+            .dropna()
+            .drop_duplicates()
+            .shape[0]
+        )
+
+    sql = """
+        INSERT INTO em_forecast_imports (
+            parquet_file,
+            import_mode,
+            source_rows,
+            selected_rows,
+            duplicate_rows,
+            duplicate_keys,
+            rows_upserted,
+            feature_vector_rows,
+            distinct_symbols,
+            distinct_events,
+            min_snapshot_date,
+            max_snapshot_date,
+            horizons
+        )
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+    """
+    with conn.cursor() as cur:
+        cur.execute(
+            sql,
+            (
+                parquet_path.name,
+                import_mode,
+                stats.source_rows,
+                stats.selected_rows,
+                stats.duplicate_rows,
+                stats.duplicate_keys,
+                rows_upserted,
+                _feature_vector_count(df),
+                distinct_symbols,
+                distinct_events,
+                min_snapshot,
+                max_snapshot,
+                psycopg2.extras.Json(_horizon_counts(df)),
+            ),
+        )
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--days", type=int, default=7,
@@ -283,9 +405,10 @@ def main() -> int:
         return 0
 
     parquet_path = pick_parquet(args.file)
-    df = load_and_filter(parquet_path, args.days, args.full)
+    df, stats = load_and_filter(parquet_path, args.days, args.full)
+    import_mode = "full" if args.full else f"days:{args.days}"
     print(f"import_recent_to_postgres: {parquet_path.name} → {len(df)} rows "
-          f"({'full' if args.full else f'last {args.days}d'})")
+          f"({import_mode})")
 
     conn = psycopg2.connect(url)
     try:
@@ -294,6 +417,8 @@ def main() -> int:
                 cur.execute(SCHEMA_SQL)
         with conn:
             count = upsert(conn, df)
+        with conn:
+            record_import(conn, parquet_path, import_mode, stats, df, count)
         print(f"import_recent_to_postgres: upserted {count} rows")
     finally:
         conn.close()

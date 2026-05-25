@@ -13,6 +13,15 @@ try {
   if (fs.existsSync(envPath)) {
     dotenv.config({ path: envPath });
   }
+  // Local dev/test envs often keep Clerk dev-instance keys under E2E_*
+  // names so they are not confused with production Vercel variables.
+  // Clerk's Next runtime still expects the standard names.
+  if (!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && process.env.E2E_CLERK_PUBLISHABLE_KEY) {
+    process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY = process.env.E2E_CLERK_PUBLISHABLE_KEY;
+  }
+  if (!process.env.CLERK_SECRET_KEY && process.env.E2E_CLERK_SECRET_KEY) {
+    process.env.CLERK_SECRET_KEY = process.env.E2E_CLERK_SECRET_KEY;
+  }
 } catch (_) {
   // dotenv not available in production build — env vars come from Vercel
 }

@@ -73,7 +73,10 @@ Browser  →  POST /api/ml/...  →  Vercel (signs + forwards)
 
 `/api/ml/batch-predict` falls back per item when the backend is unavailable.
 `/api/ml/coverage` returns a 503 when the backend proxy is not configured.
-`/api/ml/status` returns model/data/runtime metadata for operational checks.
+`/api/ml/status` returns model/data/runtime metadata for operational checks,
+including the latest `em_forecast_imports` audit row when the database has
+been imported by the current importer. The browser page at `/ml-status`
+renders this payload for quick production diagnostics.
 
 Current proxied endpoints:
 
@@ -82,7 +85,7 @@ Current proxied endpoints:
 | `POST /api/ml/predict` | `POST /api/ml/predict` | Single-symbol live re-score |
 | `POST /api/ml/batch-predict` | `POST /api/ml/batch-predict` | Per-item batch re-score; partial failures are returned per item |
 | `POST /api/ml/coverage` | `POST /api/ml/coverage` | Feature-vector coverage totals and symbol/event horizon availability |
-| `POST /api/ml/status` | `POST /api/ml/status` | ML model inventory, feature data freshness, and runtime dependency status |
+| `POST /api/ml/status` | `POST /api/ml/status` | ML model inventory, feature data freshness, latest import metadata, and runtime dependency status |
 
 ## Local development
 
