@@ -284,6 +284,7 @@ export function Topbar() {
               <Link
                 key={n.href}
                 href={n.href}
+                prefetch={n.href === '/watchlist' ? false : undefined}
                 aria-pressed={active}
                 style={{
                   position: 'relative',
@@ -317,44 +318,63 @@ export function Topbar() {
 
         <div style={{ flex: 1 }} />
 
-        <div className="mono tnum qv-m-hide" style={{ fontSize: 11, color: 'var(--ink-4)' }}>
-          {time} EDT
+        <div
+          className="mono tnum qv-m-hide"
+          style={{
+            fontSize: 11,
+            color: 'var(--ink-4)',
+            minWidth: 148,
+            textAlign: 'right',
+            visibility: time ? 'visible' : 'hidden',
+          }}
+          aria-hidden={!time}
+        >
+          {time || 'Mon, May 25, 00:00'} EDT
         </div>
         <NavSearch />
         <span className="kbd qv-m-hide">⌘K</span>
 
-        <SignedOut>
-          <Link
-            href="/sign-in"
-            className="qv-m-hide"
-            style={{
-              fontSize: 12,
-              color: 'var(--ink-2)',
-              padding: '6px 14px',
-              border: '1px solid var(--line)',
-              borderRadius: 999,
-              transition: 'border-color 140ms ease, color 140ms ease',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = 'var(--line-2)';
-              e.currentTarget.style.color = 'var(--ink)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = 'var(--line)';
-              e.currentTarget.style.color = 'var(--ink-2)';
-            }}
-          >
-            Sign in
-          </Link>
-        </SignedOut>
-        <SignedIn>
-          <span className="qv-m-hide" style={{ display: 'inline-flex' }}>
-            <UserButton
-              afterSignOutUrl="/"
-              appearance={{ elements: { avatarBox: { width: 28, height: 28 } } }}
-            />
-          </span>
-        </SignedIn>
+        <div
+          className="qv-m-hide"
+          style={{
+            width: 84,
+            minWidth: 84,
+            display: 'flex',
+            justifyContent: 'flex-end',
+          }}
+        >
+          <SignedOut>
+            <Link
+              href="/sign-in"
+              style={{
+                fontSize: 12,
+                color: 'var(--ink-2)',
+                padding: '6px 14px',
+                border: '1px solid var(--line)',
+                borderRadius: 999,
+                transition: 'border-color 140ms ease, color 140ms ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = 'var(--line-2)';
+                e.currentTarget.style.color = 'var(--ink)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = 'var(--line)';
+                e.currentTarget.style.color = 'var(--ink-2)';
+              }}
+            >
+              Sign in
+            </Link>
+          </SignedOut>
+          <SignedIn>
+            <span style={{ display: 'inline-flex' }}>
+              <UserButton
+                afterSignOutUrl="/"
+                appearance={{ elements: { avatarBox: { width: 28, height: 28 } } }}
+              />
+            </span>
+          </SignedIn>
+        </div>
 
         {/* Mobile-only hamburger toggle. Hidden on ≥ 641px via .qv-d-hide. */}
         <button
@@ -399,6 +419,7 @@ export function Topbar() {
               <Link
                 key={n.href}
                 href={n.href}
+                prefetch={n.href === '/watchlist' ? false : undefined}
                 onClick={() => setMobileOpen(false)}
                 aria-current={active ? 'page' : undefined}
                 style={{

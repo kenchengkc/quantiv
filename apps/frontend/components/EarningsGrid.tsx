@@ -949,9 +949,9 @@ export default function EarningsGrid() {
         </div>
       )}
 
-      {/* Fixed min-height keeps document height closer between skeleton and a
-          busy week so the layout doesn’t jump when the scrollbar would toggle. */}
-      <div style={{ minHeight: 'min(560px, 62vh)' }}>
+      {/* Fixed shell height keeps the Suspense fallback, in-component
+          skeleton, and loaded calendar at the same document position. */}
+      <div className="qv-calendar-shell">
         {showSkeleton && !error && <CalendarGridSkeleton days={days} today={today} />}
 
         {contentReady && data && (
