@@ -216,6 +216,8 @@ def test_predict_returns_finite_with_synthetic_features():
     assert result.em_ml_abs == pytest.approx(result.em_ml_pct * 110.0, rel=1e-9)
     assert result.feature_snapshot_date == "2026-05-22"
     assert result.horizon == 7
+    assert result.feature_schema_hash
+    assert result.model_loaded_at is not None
 
 
 @requires_models
@@ -247,3 +249,4 @@ def test_predict_handles_missing_feature_keys():
     )
     assert result is not None
     assert math.isfinite(result.em_ml_pct)
+    assert result.feature_schema_hash

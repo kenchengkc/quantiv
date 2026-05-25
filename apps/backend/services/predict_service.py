@@ -17,6 +17,8 @@ parquet on Railway — the persisted `feature_vector` is the snapshot.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 import math
 import os
@@ -54,10 +56,51 @@ class _ModelBundle:
     calibrator: Any                          # optional isotonic calibrator
     feature_names: List[str]                 # exact column order the model wants
     quantile_estimators: Dict[int, Any]      # {10: model, 25: model, ...}
+    loaded_at: datetime
+    model_version: Optional[str]
+    model_trained_at: Optional[datetime]
+    feature_schema_hash: str
+    val_mae: Optional[float]
 
 
 _BUNDLE_CACHE: Dict[int, _ModelBundle] = {}
 _BUNDLE_LOCK = Lock()
+
+
+def _feature_schema_hash(feature_names: List[str]) -> str:
+    """Stable fingerprint for the exact model feature order."""
+    payload = "\n".join(feature_names)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _parse_datetime(value: Any) -> Optional[datetime]:
+    if isinstance(value, datetime):
+        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+    if not isinstance(value, str) or not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+
+
+def _metadata_for_horizon(models_dir: Path, horizon: int) -> Dict[str, Any]:
+    meta_path = models_dir / f"metadata_T{horizon}.json"
+    if not meta_path.exists():
+        return {}
+    try:
+        return json.loads(meta_path.read_text())
+    except (OSError, ValueError, TypeError):
+        logger.warning("Failed to read model metadata at %s", meta_path)
+        return {}
+
+
+def _mtime(path: Path) -> Optional[datetime]:
+    try:
+        return datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc)
+    except OSError:
+        return None
 
 
 def _unwrap(payload: Any) -> tuple[Any, Any, List[str]]:
@@ -97,6 +140,7 @@ def get_bundle(horizon: int) -> Optional[_ModelBundle]:
         if estimator is None or not feature_names:
             logger.error("T-%s model is unusable (no estimator/feature_names)", horizon)
             return None
+        metadata = _metadata_for_horizon(models_dir, horizon)
 
         quantile_estimators: Dict[int, Any] = {}
         for q in _QUANTILES:
@@ -112,6 +156,11 @@ def get_bundle(horizon: int) -> Optional[_ModelBundle]:
             calibrator=calibrator,
             feature_names=feature_names,
             quantile_estimators=quantile_estimators,
+            loaded_at=datetime.now(timezone.utc),
+            model_version=metadata.get("version"),
+            model_trained_at=_parse_datetime(metadata.get("trained_at")),
+            feature_schema_hash=_feature_schema_hash(feature_names),
+            val_mae=float(metadata["val_mae"]) if metadata.get("val_mae") is not None else None,
         )
         _BUNDLE_CACHE[horizon] = bundle
         logger.info(
@@ -125,6 +174,69 @@ def reset_cache() -> None:
     """For tests. Drops the loaded-model cache."""
     with _BUNDLE_LOCK:
         _BUNDLE_CACHE.clear()
+
+
+def loaded_horizons() -> List[int]:
+    return sorted(_BUNDLE_CACHE)
+
+
+def model_inventory() -> List[Dict[str, Any]]:
+    """Return file/metadata status for all model horizons without forcing
+    LightGBM joblib loads. Used by `/api/ml/status` so health checks stay
+    cheap and don't mutate the model cache.
+    """
+    models_dir = _models_dir()
+    horizons = set()
+    for path in models_dir.glob("lgbm_T*.joblib"):
+        suffix = path.stem.replace("lgbm_T", "")
+        if suffix.isdigit():
+            horizons.add(int(suffix))
+    for path in models_dir.glob("metadata_T*.json"):
+        suffix = path.stem.replace("metadata_T", "")
+        if suffix.isdigit():
+            horizons.add(int(suffix))
+
+    rows: List[Dict[str, Any]] = []
+    for horizon in sorted(horizons):
+        point_path = models_dir / f"lgbm_T{horizon}.joblib"
+        meta_path = models_dir / f"metadata_T{horizon}.json"
+        metadata = _metadata_for_horizon(models_dir, horizon)
+        feature_names = list(metadata.get("feature_cols") or [])
+        cached = _BUNDLE_CACHE.get(horizon)
+        if cached is not None:
+            feature_names = cached.feature_names
+        quantile_count = sum(
+            1 for q in _QUANTILES if (models_dir / f"lgbm_T{horizon}_q{q:02d}.joblib").exists()
+        )
+        rows.append({
+            "horizon_days": horizon,
+            "point_model_exists": point_path.exists(),
+            "quantile_model_count": quantile_count,
+            "feature_count": len(feature_names) if feature_names else None,
+            "feature_schema_hash": (
+                cached.feature_schema_hash
+                if cached is not None
+                else (_feature_schema_hash(feature_names) if feature_names else None)
+            ),
+            "model_version": (
+                cached.model_version if cached is not None else metadata.get("version")
+            ),
+            "trained_at": (
+                cached.model_trained_at
+                if cached is not None
+                else _parse_datetime(metadata.get("trained_at"))
+            ),
+            "val_mae": (
+                cached.val_mae
+                if cached is not None
+                else (float(metadata["val_mae"]) if metadata.get("val_mae") is not None else None)
+            ),
+            "loaded": cached is not None,
+            "loaded_at": cached.loaded_at if cached is not None else None,
+            "model_mtime": _mtime(point_path),
+            "metadata_mtime": _mtime(meta_path),
+        })
+    return rows
 
 
 # ─── Feature substitution ────────────────────────────────────────────────
@@ -188,6 +300,10 @@ class PredictionResult:
     feature_snapshot_date: str    # YYYY-MM-DD ISO
     spot_used: float
     horizon: int
+    model_version: Optional[str]
+    model_trained_at: Optional[datetime]
+    model_loaded_at: datetime
+    feature_schema_hash: str
 
 
 def predict(
@@ -239,6 +355,10 @@ def predict(
         feature_snapshot_date=snapshot_date.isoformat(),
         spot_used=float(spot_used or 0.0),
         horizon=horizon,
+        model_version=bundle.model_version,
+        model_trained_at=bundle.model_trained_at,
+        model_loaded_at=bundle.loaded_at,
+        feature_schema_hash=bundle.feature_schema_hash,
     )
 
 
@@ -264,7 +384,13 @@ async def fetch_latest_feature_snapshot(
     Shape: {snapshot_date, earnings_date, feature_vector: dict, spot_at_snapshot}.
     """
     base = """
-        SELECT snapshot_date, earnings_date, feature_vector, spot_price
+        SELECT
+          snapshot_date,
+          earnings_date,
+          feature_vector,
+          spot_price,
+          scored_at,
+          (CURRENT_DATE - snapshot_date)::int AS snapshot_age_days
         FROM em_forecasts
         WHERE act_symbol = $1
           AND model_horizon = $2
@@ -297,6 +423,8 @@ async def fetch_latest_feature_snapshot(
         "earnings_date": row["earnings_date"],
         "feature_vector": feature_vector,
         "spot_at_snapshot": float(row["spot_price"]) if row["spot_price"] is not None else None,
+        "forecast_scored_at": row["scored_at"],
+        "snapshot_age_days": row["snapshot_age_days"],
     }
 
 

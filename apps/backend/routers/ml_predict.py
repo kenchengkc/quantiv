@@ -33,6 +33,11 @@ from models import (
     MLCoverageResponse,
     MLPredictRequest,
     MLPredictResponse,
+    MLStatusDataRow,
+    MLStatusHorizonRow,
+    MLStatusModelRow,
+    MLStatusRequest,
+    MLStatusResponse,
 )
 from services import predict_service
 
@@ -156,6 +161,12 @@ async def _predict_response(req: MLPredictRequest) -> MLPredictResponse:
         earnings_date=snapshot.get("earnings_date"),
         source="live",
         served_at=datetime.now(timezone.utc),
+        snapshot_age_days=snapshot.get("snapshot_age_days"),
+        forecast_scored_at=snapshot.get("forecast_scored_at"),
+        model_version=result.model_version,
+        model_trained_at=result.model_trained_at,
+        model_loaded_at=result.model_loaded_at,
+        feature_schema_hash=result.feature_schema_hash,
     )
 
     # Mirror into Upstash so the next caller (and any backend instance)
@@ -308,4 +319,121 @@ async def coverage_endpoint(req: MLCoverageRequest) -> MLCoverageResponse:
         earnings_date=req.earnings_date,
         available_horizons=available,
         checked_at=datetime.now(timezone.utc),
+    )
+
+
+async def _redis_available() -> bool:
+    redis = _redis()
+    if redis is None:
+        return False
+    try:
+        pong = await redis.ping()
+    except Exception as exc:
+        logger.warning("Redis PING failed during ML status check: %s", exc)
+        return False
+    return bool(pong)
+
+
+@router.post("/api/ml/status", response_model=MLStatusResponse)
+async def status_endpoint(req: MLStatusRequest) -> MLStatusResponse:
+    """Operational status for the re-inference path.
+
+    This answers whether the backend has model files, whether a model bundle
+    has been loaded in this process, and whether the feature-vector table has
+    fresh rows. It intentionally avoids returning database credentials or
+    branch names because the route is proxied to browser-accessible Vercel
+    API paths.
+    """
+    pool = _pool()
+    window = req.fresh_window_days
+
+    data = None
+    by_horizon = []
+    if pool is not None:
+        async with pool.acquire() as conn:
+            totals = await conn.fetchrow(
+                """
+                SELECT
+                  COUNT(*)::int AS total_feature_rows,
+                  COUNT(*) FILTER (
+                    WHERE snapshot_date >= CURRENT_DATE - ($1 || ' days')::interval
+                  )::int AS fresh_feature_rows,
+                  COUNT(DISTINCT act_symbol) FILTER (
+                    WHERE snapshot_date >= CURRENT_DATE - ($1 || ' days')::interval
+                  )::int AS fresh_distinct_symbols,
+                  COUNT(DISTINCT (act_symbol, earnings_date)) FILTER (
+                    WHERE snapshot_date >= CURRENT_DATE - ($1 || ' days')::interval
+                  )::int AS fresh_distinct_events,
+                  MAX(snapshot_date) AS latest_snapshot_date,
+                  MAX(scored_at) AS latest_scored_at
+                FROM em_forecasts
+                WHERE feature_vector IS NOT NULL
+                """,
+                str(window),
+            )
+            rows = await conn.fetch(
+                """
+                SELECT
+                  model_horizon::int AS horizon_days,
+                  COUNT(*)::int AS total_feature_rows,
+                  COUNT(*) FILTER (
+                    WHERE snapshot_date >= CURRENT_DATE - ($1 || ' days')::interval
+                  )::int AS fresh_feature_rows,
+                  MAX(snapshot_date) AS latest_snapshot_date,
+                  MAX(scored_at) AS latest_scored_at
+                FROM em_forecasts
+                WHERE feature_vector IS NOT NULL
+                GROUP BY model_horizon
+                ORDER BY model_horizon
+                """,
+                str(window),
+            )
+        if totals is not None:
+            data = MLStatusDataRow(
+                total_feature_rows=totals["total_feature_rows"],
+                fresh_feature_rows=totals["fresh_feature_rows"],
+                fresh_distinct_symbols=totals["fresh_distinct_symbols"],
+                fresh_distinct_events=totals["fresh_distinct_events"],
+                latest_snapshot_date=totals["latest_snapshot_date"],
+                latest_scored_at=totals["latest_scored_at"],
+            )
+        by_horizon = [
+            MLStatusHorizonRow(
+                horizon_days=row["horizon_days"],
+                total_feature_rows=row["total_feature_rows"],
+                fresh_feature_rows=row["fresh_feature_rows"],
+                latest_snapshot_date=row["latest_snapshot_date"],
+                latest_scored_at=row["latest_scored_at"],
+            )
+            for row in rows
+        ]
+
+    model_rows = [
+        MLStatusModelRow(**row)
+        for row in predict_service.model_inventory()
+    ]
+    available_model_horizons = [
+        row.horizon_days for row in model_rows if row.point_model_exists
+    ]
+    loaded_model_horizons = predict_service.loaded_horizons()
+    postgres_available = pool is not None
+    redis_available = await _redis_available()
+    ok = postgres_available and bool(available_model_horizons)
+    if data is not None:
+        ok = ok and data.total_feature_rows > 0
+
+    return MLStatusResponse(
+        ok=ok,
+        status="ok" if ok else "degraded",
+        checked_at=datetime.now(timezone.utc),
+        fresh_window_days=window,
+        max_snapshot_age_days=predict_service.MAX_SNAPSHOT_AGE_DAYS,
+        models_dir=str(predict_service._models_dir()),
+        available_model_horizons=available_model_horizons,
+        loaded_model_horizons=loaded_model_horizons,
+        redis_available=redis_available,
+        postgres_available=postgres_available,
+        data=data,
+        rows_by_horizon=by_horizon,
+        models=model_rows,
     )
