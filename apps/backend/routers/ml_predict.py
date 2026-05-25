@@ -35,6 +35,7 @@ from models import (
     MLPredictResponse,
     MLStatusDataRow,
     MLStatusHorizonRow,
+    MLStatusImportRow,
     MLStatusModelRow,
     MLStatusRequest,
     MLStatusResponse,
@@ -58,6 +59,18 @@ def _pool():
 
 def _redis():
     return _state.get("redis_client")
+
+
+def _json_object(value: Any) -> Dict[str, Any]:
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+        except (ValueError, TypeError):
+            return {}
+        return parsed if isinstance(parsed, dict) else {}
+    return {}
 
 
 VALID_HORIZONS = {1, 2, 3, 7, 14, 21}
@@ -280,7 +293,8 @@ async def coverage_endpoint(req: MLCoverageRequest) -> MLCoverageResponse:
                   earnings_date,
                   snapshot_date,
                   (CURRENT_DATE - snapshot_date)::int AS snapshot_age_days,
-                  spot_price
+                  spot_price,
+                  scored_at
                 FROM em_forecasts
                 {where}
                 ORDER BY earnings_date DESC, model_horizon
@@ -293,7 +307,16 @@ async def coverage_endpoint(req: MLCoverageRequest) -> MLCoverageResponse:
                     earnings_date=row["earnings_date"],
                     snapshot_date=row["snapshot_date"],
                     snapshot_age_days=row["snapshot_age_days"],
+                    live_eligible=(
+                        row["snapshot_age_days"] <= predict_service.MAX_SNAPSHOT_AGE_DAYS
+                    ),
+                    unavailable_reason=(
+                        None
+                        if row["snapshot_age_days"] <= predict_service.MAX_SNAPSHOT_AGE_DAYS
+                        else "snapshot_stale"
+                    ),
                     spot_price=float(row["spot_price"]) if row["spot_price"] is not None else None,
+                    forecast_scored_at=row["scored_at"],
                 )
                 for row in rows
             ]
@@ -349,6 +372,7 @@ async def status_endpoint(req: MLStatusRequest) -> MLStatusResponse:
 
     data = None
     by_horizon = []
+    latest_import = None
     if pool is not None:
         async with pool.acquire() as conn:
             totals = await conn.fetchrow(
@@ -388,6 +412,32 @@ async def status_endpoint(req: MLStatusRequest) -> MLStatusResponse:
                 """,
                 str(window),
             )
+            import_table_exists = await conn.fetchval(
+                "SELECT to_regclass('public.em_forecast_imports') IS NOT NULL"
+            )
+            if import_table_exists:
+                latest_import = await conn.fetchrow(
+                    """
+                    SELECT
+                      parquet_file,
+                      imported_at,
+                      import_mode,
+                      source_rows,
+                      selected_rows,
+                      duplicate_rows,
+                      duplicate_keys,
+                      rows_upserted,
+                      feature_vector_rows,
+                      distinct_symbols,
+                      distinct_events,
+                      min_snapshot_date,
+                      max_snapshot_date,
+                      horizons
+                    FROM em_forecast_imports
+                    ORDER BY imported_at DESC
+                    LIMIT 1
+                    """
+                )
         if totals is not None:
             data = MLStatusDataRow(
                 total_feature_rows=totals["total_feature_rows"],
@@ -407,6 +457,26 @@ async def status_endpoint(req: MLStatusRequest) -> MLStatusResponse:
             )
             for row in rows
         ]
+    latest_import_row = (
+        MLStatusImportRow(
+            parquet_file=latest_import["parquet_file"],
+            imported_at=latest_import["imported_at"],
+            import_mode=latest_import["import_mode"],
+            source_rows=latest_import["source_rows"],
+            selected_rows=latest_import["selected_rows"],
+            duplicate_rows=latest_import["duplicate_rows"],
+            duplicate_keys=latest_import["duplicate_keys"],
+            rows_upserted=latest_import["rows_upserted"],
+            feature_vector_rows=latest_import["feature_vector_rows"],
+            distinct_symbols=latest_import["distinct_symbols"],
+            distinct_events=latest_import["distinct_events"],
+            min_snapshot_date=latest_import["min_snapshot_date"],
+            max_snapshot_date=latest_import["max_snapshot_date"],
+            horizons=_json_object(latest_import["horizons"]),
+        )
+        if latest_import is not None
+        else None
+    )
 
     model_rows = [
         MLStatusModelRow(**row)
@@ -435,5 +505,6 @@ async def status_endpoint(req: MLStatusRequest) -> MLStatusResponse:
         postgres_available=postgres_available,
         data=data,
         rows_by_horizon=by_horizon,
+        latest_import=latest_import_row,
         models=model_rows,
     )
