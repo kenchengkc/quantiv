@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { notFound } from 'next/navigation';
 import { companyName, stripLegalSuffix } from '@/lib/companyNames';
@@ -18,11 +18,25 @@ function normalizeSymbol(raw: string | undefined): string {
 }
 
 function hasSymbolPayload(symbol: string): boolean {
+  return symbolPayloadPath(symbol) !== null;
+}
+
+function symbolPayloadPath(symbol: string): string | null {
   const candidates = [
     join(process.cwd(), 'apps', 'frontend', 'public', 'symbols', `${symbol}.json`),
     join(process.cwd(), 'public', 'symbols', `${symbol}.json`),
   ];
-  return candidates.some((path) => existsSync(path));
+  return candidates.find((path) => existsSync(path)) ?? null;
+}
+
+function readSymbolPayload(symbol: string): unknown | null {
+  const path = symbolPayloadPath(symbol);
+  if (!path) return null;
+  try {
+    return JSON.parse(readFileSync(path, 'utf8')) as unknown;
+  } catch {
+    return null;
+  }
 }
 
 function isKnownSymbol(symbol: string): boolean {
@@ -76,7 +90,8 @@ export async function generateMetadata({ params }: SymbolPageProps): Promise<Met
 
 export default async function SymbolPage({ params }: SymbolPageProps) {
   const { symbol: rawSymbol } = await params;
-  if (!isKnownSymbol(normalizeSymbol(rawSymbol))) notFound();
+  const symbol = normalizeSymbol(rawSymbol);
+  if (!isKnownSymbol(symbol)) notFound();
 
-  return <SymbolPageClient />;
+  return <SymbolPageClient initialSymbol={symbol} initialData={readSymbolPayload(symbol)} />;
 }
