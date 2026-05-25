@@ -463,6 +463,10 @@
   min-height: 960px;
 }
 
+.qv-symbol-page-shell {
+  min-height: 1120px;
+}
+
 /* Sticky-first-column for horizontally-scrolling tables (Screener,
    Greeks panel). Applies on both desktop and mobile now that the
    screener table is virtualized + 1480px wide — without this the
@@ -515,6 +519,10 @@ tr:hover .qv-m-sticky-cell {
 
   .qv-screener-table-shell {
     min-height: 920px;
+  }
+
+  .qv-symbol-page-shell {
+    min-height: 1500px;
   }
 
   /* Collapse 3/4/5-up grids to two columns */
