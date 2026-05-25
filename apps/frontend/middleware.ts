@@ -5,7 +5,7 @@ import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 // Clerk's dev-mode handshake rewrites the request to a `/clerk_<id>` URL
 // which then falls through to [symbol] and returns HTML instead of JSON.
 // Each API route calls `auth()` itself and returns a proper JSON 401.
-const isProtected = createRouteMatcher(['/watchlist(.*)', '/ml-status(.*)']);
+const isProtected = createRouteMatcher(['/watchlist(.*)']);
 
 export default clerkMiddleware(async (auth, req) => {
   if (isProtected(req)) {
