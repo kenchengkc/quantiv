@@ -144,6 +144,175 @@ interface LivePredictionState {
   updatedAt: number;
 }
 
+function SkeletonBlock({
+  width = '100%',
+  height,
+  radius = 6,
+}: {
+  width?: string | number;
+  height: number;
+  radius?: number;
+}) {
+  return (
+    <div
+      aria-hidden="true"
+      style={{
+        width,
+        height,
+        borderRadius: radius,
+        background: 'var(--bg-3)',
+        animation: 'earnings-grid-pulse 1.2s ease-in-out infinite',
+      }}
+    />
+  );
+}
+
+function SymbolPageLoading({ symbol }: { symbol: string }) {
+  const name = companyName(symbol);
+
+  return (
+    <div className="qv-m-pad qv-symbol-page-shell" style={{ maxWidth: 1100, margin: '0 auto', padding: '0 28px 80px' }}>
+      <div className="qv-card-hi qv-detail-hero" style={{ padding: '26px 28px', marginTop: 18 }}>
+        <div
+          className="qv-m-stack qv-detail-hero-grid"
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'minmax(0, 1.1fr) minmax(0, 1fr)',
+            gap: 32,
+            alignItems: 'stretch',
+          }}
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 18, minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+              <SkeletonBlock width={56} height={56} radius={10} />
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div
+                  style={{
+                    fontSize: 11,
+                    letterSpacing: '0.16em',
+                    textTransform: 'uppercase',
+                    color: 'var(--ink-3)',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {name}
+                </div>
+                <div
+                  className="serif qv-detail-symbol"
+                  style={{
+                    fontSize: 46,
+                    fontWeight: 800,
+                    letterSpacing: '-0.03em',
+                    lineHeight: 0.92,
+                    color: 'var(--ink)',
+                    textTransform: 'uppercase',
+                    marginTop: 4,
+                  }}
+                >
+                  {symbol}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 14, flexWrap: 'wrap' }}>
+              <SkeletonBlock width={128} height={42} radius={7} />
+              <SkeletonBlock width={118} height={15} />
+              <SkeletonBlock width={156} height={12} />
+            </div>
+
+            <div>
+              <SkeletonBlock height={42} radius={8} />
+              <div
+                style={{
+                  marginTop: 12,
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  gap: 16,
+                  paddingTop: 8,
+                  borderTop: '1px solid color-mix(in oklab, var(--line) 70%, transparent)',
+                }}
+              >
+                <SkeletonBlock width={214} height={12} />
+                <SkeletonBlock width={60} height={12} />
+              </div>
+            </div>
+
+            <SkeletonBlock width={168} height={34} radius={999} />
+          </div>
+
+          <div
+            className="qv-detail-hero-right"
+            style={{
+              borderLeft: '1px solid color-mix(in oklab, var(--line) 60%, transparent)',
+              paddingLeft: 28,
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              gap: 20,
+              minWidth: 0,
+            }}
+          >
+            <div>
+              <SkeletonBlock width={154} height={28} radius={999} />
+              <div style={{ marginTop: 18 }}>
+                <SkeletonBlock width={82} height={12} />
+                <div style={{ marginTop: 8 }}>
+                  <SkeletonBlock width={148} height={62} radius={8} />
+                </div>
+                <div style={{ marginTop: 12 }}>
+                  <SkeletonBlock width={132} height={13} />
+                </div>
+              </div>
+            </div>
+            <div
+              style={{
+                borderTop: '1px solid color-mix(in oklab, var(--line) 60%, transparent)',
+                paddingTop: 18,
+              }}
+            >
+              <SkeletonBlock width={168} height={12} />
+              <div style={{ marginTop: 14 }}>
+                <SkeletonBlock width={194} height={72} radius={10} />
+              </div>
+              <div style={{ marginTop: 30 }}>
+                <SkeletonBlock width={210} height={14} />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div
+        className="qv-m-2col"
+        style={{
+          marginTop: 22,
+          display: 'grid',
+          gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+          gap: 14,
+        }}
+      >
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="qv-card-hi" style={{ minHeight: 132, padding: '18px 18px' }}>
+            <SkeletonBlock width="48%" height={12} />
+            <div style={{ marginTop: 18 }}>
+              <SkeletonBlock width="72%" height={38} radius={8} />
+            </div>
+            <div style={{ marginTop: 20 }}>
+              <SkeletonBlock width="100%" height={12} />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ marginTop: 24 }}>
+        <SkeletonBlock height={360} radius={8} />
+      </div>
+    </div>
+  );
+}
+
 const EMPTY_LIVE_PREDICTION: LivePredictionState = {
   status: 'idle',
   key: null,
@@ -3308,11 +3477,7 @@ export default function SymbolPage() {
   }, []);
 
   if (loading) {
-    return (
-      <div style={{ maxWidth: 960, margin: '0 auto', padding: '80px 28px', textAlign: 'center' }}>
-        <div style={{ color: 'var(--ink-3)', fontSize: 13 }}>Loading {symbol}…</div>
-      </div>
-    );
+    return <SymbolPageLoading symbol={symbol} />;
   }
 
   if (error || !data) {
@@ -3507,7 +3672,7 @@ export default function SymbolPage() {
   const historySeries = buildHistorySeries(data.earnings_history);
 
   return (
-    <div className="qv-m-pad" style={{ maxWidth: 1100, margin: '0 auto', padding: '0 28px 80px' }}>
+    <div className="qv-m-pad qv-symbol-page-shell" style={{ maxWidth: 1100, margin: '0 auto', padding: '0 28px 80px' }}>
       {toast && <Toast key={toast.key} message={toast.msg} onDone={() => setToast(null)} />}
 
       <Reveal as="div" style={{ marginTop: 8 }}>
