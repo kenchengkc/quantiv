@@ -455,6 +455,14 @@
   -webkit-overflow-scrolling: touch;
 }
 
+.qv-calendar-shell {
+  min-height: clamp(640px, 72vh, 900px);
+}
+
+.qv-screener-table-shell {
+  min-height: 960px;
+}
+
 /* Sticky-first-column for horizontally-scrolling tables (Screener,
    Greeks panel). Applies on both desktop and mobile now that the
    screener table is virtualized + 1480px wide — without this the
@@ -499,6 +507,14 @@ tr:hover .qv-m-sticky-cell {
   /* Stack any grid to a single column */
   .qv-m-stack {
     grid-template-columns: 1fr !important;
+  }
+
+  .qv-calendar-shell {
+    min-height: clamp(1180px, 148vh, 1500px);
+  }
+
+  .qv-screener-table-shell {
+    min-height: 920px;
   }
 
   /* Collapse 3/4/5-up grids to two columns */
@@ -607,6 +623,9 @@ tr:hover .qv-m-sticky-cell {
   .qv-screener-insight {
     padding: 14px 14px 16px !important;
     min-height: 0 !important;
+  }
+  .qv-screener-insight-skeleton {
+    min-height: 144px !important;
   }
   .qv-screener-insight .serif.tnum {
     font-size: 38px !important;

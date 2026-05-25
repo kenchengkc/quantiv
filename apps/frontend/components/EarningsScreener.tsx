@@ -1176,6 +1176,8 @@ export default function EarningsScreener() {
                 letterSpacing: '-0.02em',
                 color: 'var(--ink)',
                 lineHeight: 1,
+                minWidth: 56,
+                textAlign: 'right',
               }}
             >
               {sorted.length}
@@ -1230,7 +1232,7 @@ export default function EarningsScreener() {
           {Array.from({ length: 4 }).map((_, i) => (
             <div
               key={i}
-              className="qv-screener-insight"
+              className="qv-screener-insight qv-screener-insight-skeleton"
               style={{
                 borderRadius: 14,
                 border: '1px solid var(--line)',
@@ -1972,7 +1974,7 @@ export default function EarningsScreener() {
               role="status"
               aria-busy
               aria-label="Loading screener"
-              className="qv-m-table-wrap"
+              className="qv-m-table-wrap qv-screener-table-shell"
               style={{ overflowX: 'auto', marginTop: 0, WebkitOverflowScrolling: 'touch' }}
             >
               <table style={tableStyles}>
@@ -2062,7 +2064,7 @@ export default function EarningsScreener() {
 
         return (
           <div
-            className="qv-m-table-wrap"
+            className="qv-m-table-wrap qv-screener-table-shell"
             style={{ overflowX: 'auto', marginTop: 0, WebkitOverflowScrolling: 'touch' }}
           >
             <TableVirtuoso
