@@ -2,7 +2,8 @@ import { clerkSetup } from '@clerk/testing/playwright';
 
 // Runs once before any spec. Reads NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY and
 // CLERK_SECRET_KEY from the environment (loaded by playwright.config.ts
-// from .env.test.local) and exchanges them for a Clerk Testing Token,
+// from .env.test.local / config/.env.local, with E2E_CLERK_* fallbacks)
+// and exchanges them for a Clerk Testing Token,
 // which is then attached to every signIn() call automatically.
 //
 // CRITICAL: point these env vars at a Clerk *development* instance, not

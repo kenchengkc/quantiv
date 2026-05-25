@@ -67,12 +67,38 @@ class _CoverageConn:
                 "snapshot_date": date(2026, 5, 20),
                 "snapshot_age_days": 4,
                 "spot_price": 180.10,
+                "scored_at": datetime(2026, 5, 24, tzinfo=timezone.utc),
+            },
+            {
+                "horizon_days": 14,
+                "earnings_date": date(2026, 5, 27),
+                "snapshot_date": date(2026, 5, 10),
+                "snapshot_age_days": 14,
+                "spot_price": 175.00,
+                "scored_at": datetime(2026, 5, 24, tzinfo=timezone.utc),
             }
         ]
 
 
 class _StatusConn:
-    async def fetchrow(self, *_args):
+    async def fetchrow(self, query, *_args):
+        if "FROM em_forecast_imports" in query:
+            return {
+                "parquet_file": "forecasts_2026-05-24.parquet",
+                "imported_at": datetime(2026, 5, 24, 1, 2, 3, tzinfo=timezone.utc),
+                "import_mode": "full",
+                "source_rows": 424,
+                "selected_rows": 424,
+                "duplicate_rows": 20,
+                "duplicate_keys": 10,
+                "rows_upserted": 414,
+                "feature_vector_rows": 414,
+                "distinct_symbols": 180,
+                "distinct_events": 190,
+                "min_snapshot_date": date(2026, 5, 12),
+                "max_snapshot_date": date(2026, 5, 24),
+                "horizons": {"7": 100, "14": 140, "21": 174},
+            }
         return {
             "total_feature_rows": 168,
             "fresh_feature_rows": 100,
@@ -93,6 +119,9 @@ class _StatusConn:
             }
         ]
 
+    async def fetchval(self, *_args):
+        return True
+
 
 @pytest.mark.asyncio
 async def test_coverage_endpoint_returns_totals_and_event_availability():
@@ -108,6 +137,13 @@ async def test_coverage_endpoint_returns_totals_and_event_availability():
     assert response.rows_by_horizon[0].fresh_events == 42
     assert response.symbol == "CRM"
     assert response.available_horizons[0].snapshot_age_days == 4
+    assert response.available_horizons[0].live_eligible is True
+    assert response.available_horizons[0].unavailable_reason is None
+    assert response.available_horizons[0].forecast_scored_at == datetime(
+        2026, 5, 24, tzinfo=timezone.utc
+    )
+    assert response.available_horizons[1].live_eligible is False
+    assert response.available_horizons[1].unavailable_reason == "snapshot_stale"
 
 
 @pytest.mark.asyncio
@@ -177,6 +213,11 @@ async def test_status_endpoint_returns_model_and_data_metadata(monkeypatch):
     assert response.data is not None
     assert response.data.total_feature_rows == 168
     assert response.rows_by_horizon[0].fresh_feature_rows == 46
+    assert response.latest_import is not None
+    assert response.latest_import.parquet_file == "forecasts_2026-05-24.parquet"
+    assert response.latest_import.source_rows == 424
+    assert response.latest_import.rows_upserted == 414
+    assert response.latest_import.horizons["21"] == 174
     assert response.available_model_horizons == [7]
     assert response.loaded_model_horizons == [7]
     assert response.models[0].feature_schema_hash == "abc123"

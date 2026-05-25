@@ -7,6 +7,19 @@ import path from 'node:path';
 import dotenv from 'dotenv';
 dotenv.config({ path: path.resolve(__dirname, '.env.test.local'), override: false });
 dotenv.config({ path: path.resolve(__dirname, '.env.local'), override: false });
+dotenv.config({ path: path.resolve(__dirname, '..', '..', 'config', '.env.local'), override: false });
+
+const CLERK_PUBLISHABLE_KEY =
+  process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ??
+  process.env.E2E_CLERK_PUBLISHABLE_KEY ??
+  '';
+const CLERK_SECRET =
+  process.env.CLERK_SECRET_KEY ??
+  process.env.E2E_CLERK_SECRET_KEY ??
+  '';
+
+process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY = CLERK_PUBLISHABLE_KEY;
+process.env.CLERK_SECRET_KEY = CLERK_SECRET;
 
 const PORT = Number(process.env.E2E_PORT ?? 3000);
 const BASE_URL = process.env.E2E_BASE_URL ?? `http://localhost:${PORT}`;
@@ -50,9 +63,8 @@ export default defineConfig({
     timeout: 120_000,
     // Pass through the Clerk publishable key the app needs at runtime.
     env: {
-      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:
-        process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ?? '',
-      CLERK_SECRET_KEY: process.env.CLERK_SECRET_KEY ?? '',
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: CLERK_PUBLISHABLE_KEY,
+      CLERK_SECRET_KEY: CLERK_SECRET,
     },
   },
 });

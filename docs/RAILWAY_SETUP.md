@@ -97,6 +97,22 @@ curl https://api.usequantiv.com/health
 
 Check logs for `Uvicorn running on` and `Services initialized`.
 
+For ML serving diagnostics, call the signed Vercel route:
+
+```bash
+curl -X POST https://usequantiv.com/api/ml/status \
+  -H 'Content-Type: application/json' \
+  -d '{"fresh_window_days":7}'
+```
+
+The response includes `latest_import` when Neon has received a forecast
+import from `scripts/import_recent_to_postgres.py`. Use that to reconcile
+workflow counts (`source_rows`, duplicate drops, upserted rows, horizon
+counts) against the backend's live feature-vector totals.
+
+The same status payload is rendered at `https://usequantiv.com/ml-status`
+for a browser-friendly operational view.
+
 ---
 
 ## 6. Wire Vercel (HMAC proxy)
