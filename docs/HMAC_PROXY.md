@@ -75,8 +75,9 @@ Browser  →  POST /api/ml/...  →  Vercel (signs + forwards)
 `/api/ml/coverage` returns a 503 when the backend proxy is not configured.
 `/api/ml/status` returns model/data/runtime metadata for operational checks,
 including the latest `em_forecast_imports` audit row when the database has
-been imported by the current importer. The browser page at `/ml-status`
-renders this payload for quick production diagnostics.
+been imported by the current importer. This route and the browser page at
+`/ml-status` require Clerk sign-in plus an email in `ML_STATUS_ADMIN_EMAILS`
+or `ADMIN_EMAILS`.
 
 Current proxied endpoints:
 
