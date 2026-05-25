@@ -342,6 +342,16 @@ function normalizeQuantiles(
   };
 }
 
+function initialSymbolDetail(value: unknown, symbol: string): SymbolDetail | null {
+  if (!value || typeof value !== 'object') return null;
+  const detail = value as Partial<SymbolDetail>;
+  if (typeof detail.symbol !== 'string') return null;
+  if (detail.symbol.toUpperCase() !== symbol) return null;
+  if (typeof detail.as_of_date !== 'string') return null;
+  if (!Array.isArray(detail.straddle_features)) return null;
+  return detail as SymbolDetail;
+}
+
 function livePredictionUnavailableMessage(status: number | null): string {
   if (status === 404) {
     return 'No fresh feature snapshot is available for this event yet.';
@@ -3129,14 +3139,13 @@ function GreeksPanel({ rows }: { rows: TermRow[] }) {
 // ---------- Small bits ----------
 
 
-/** A scroll-triggered fade-up wrapper. The first render mounts the element
- *  as hidden (opacity 0, translated down); an IntersectionObserver flips
- *  the `in` class once it enters the viewport, animating into place via
- *  the global `.reveal` CSS transition. */
+/** Lightweight section wrapper. Detail pages used to mount sections hidden
+ *  and reveal them after IntersectionObserver ran, which caused a visible
+ *  one-frame "hero only" flash on ticker-page loads. Keep the same callsite
+ *  shape, but render visible from the first paint. */
 function Reveal({
   children,
   as = 'section',
-  delay = 0,
   style,
   className,
 }: {
@@ -3146,47 +3155,29 @@ function Reveal({
   style?: React.CSSProperties;
   className?: string;
 }) {
-  const ref = useRef<HTMLElement | null>(null);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    if (typeof IntersectionObserver === 'undefined') {
-      el.classList.add('in');
-      return;
-    }
-    const io = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) {
-            el.classList.add('in');
-            io.disconnect();
-            break;
-          }
-        }
-      },
-      { rootMargin: '-40px 0px -40px 0px' },
-    );
-    io.observe(el);
-    return () => io.disconnect();
-  }, []);
-  const cls = `reveal${className ? ' ' + className : ''}`;
-  const mergedStyle: React.CSSProperties = delay ? { transitionDelay: `${delay}ms`, ...style } : style ?? {};
+  const cls = `reveal in${className ? ' ' + className : ''}`;
   if (as === 'div') {
     return (
-      <div ref={ref as React.RefObject<HTMLDivElement>} className={cls} style={mergedStyle}>
+      <div className={cls} style={style}>
         {children}
       </div>
     );
   }
   return (
-    <section ref={ref as React.RefObject<HTMLElement>} className={cls} style={mergedStyle}>
+    <section className={cls} style={style}>
       {children}
     </section>
   );
 }
 
 // ---------- Page ----------
-export default function SymbolPage() {
+export default function SymbolPage({
+  initialData = null,
+  initialSymbol,
+}: {
+  initialData?: unknown;
+  initialSymbol?: string;
+}) {
   // Triggers EDGAR ticker-names fetch + re-render so the header company
   // name resolves even when the symbol isn't in the S&P 500 or curated map.
   useEnsureCompanyNames();
@@ -3194,12 +3185,13 @@ export default function SymbolPage() {
 
   const params = useParams();
   const router = useRouter();
-  const symbol = (params.symbol as string)?.toUpperCase();
+  const symbol = (initialSymbol ?? (params.symbol as string) ?? '').toUpperCase();
   const prevLoc = usePrevAppLocation();
+  const seededData = initialSymbolDetail(initialData, symbol);
 
-  const [data, setData] = useState<SymbolDetail | null>(null);
+  const [data, setData] = useState<SymbolDetail | null>(() => seededData);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => seededData === null);
   const [live, setLive] = useState<LivePrice | null>(null);
   const [predictionMode, setPredictionMode] = useState<PredictionMode>('snapshot');
   const [livePrediction, setLivePrediction] =
@@ -3260,6 +3252,14 @@ export default function SymbolPage() {
 
   useEffect(() => {
     if (!symbol) return;
+    const seeded = initialSymbolDetail(initialData, symbol);
+    if (seeded) {
+      setData(seeded);
+      setError(null);
+      setLoading(false);
+      return;
+    }
+
     let cancelled = false;
     (async () => {
       setLoading(true);
@@ -3278,7 +3278,7 @@ export default function SymbolPage() {
     return () => {
       cancelled = true;
     };
-  }, [symbol]);
+  }, [initialData, symbol]);
 
   useEffect(() => {
     if (!symbol) return;
