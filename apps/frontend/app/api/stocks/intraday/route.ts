@@ -122,7 +122,14 @@ export async function GET(req: NextRequest) {
     // surfacing a 500. We don't log the full error to the response
     // body because Alpaca error text occasionally includes secrets.
     return NextResponse.json(
-      { bars: [], previousClose: null, asOf: null, error: 'upstream' },
+      {
+        bars: [],
+        previousClose: null,
+        asOf: null,
+        sessionDate: null,
+        isCurrentSession: false,
+        error: 'upstream',
+      },
       { status: 200 },
     );
   }

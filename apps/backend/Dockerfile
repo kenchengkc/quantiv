@@ -46,8 +46,11 @@ RUN pip install -e /app/apps/ml
 # 3) Backend code last (changes most often).
 COPY apps/backend /app/apps/backend
 # lib/ holds the SP500 JSON shared between Next.js + the backend's sync
-# scripts. Not currently imported at runtime but cheap to include.
+# scripts. The quote worker also reads frontend public week files and generated
+# market holidays so it can rank earnings reporters without calling Vercel.
 COPY lib /app/lib
+COPY apps/frontend/public /app/apps/frontend/public
+COPY apps/frontend/lib/marketHolidays.generated.ts /app/apps/frontend/lib/marketHolidays.generated.ts
 
 WORKDIR /app/apps/backend
 

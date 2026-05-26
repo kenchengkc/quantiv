@@ -236,6 +236,13 @@ async function fetchQuote(symbol: string, apiKey: string): Promise<Tick | null> 
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
+function regularPollingHandledByRailway(): boolean {
+  return (
+    process.env.QUOTE_REFRESH_PROVIDER === 'railway' ||
+    process.env.DISABLE_VERCEL_REGULAR_QUOTE_REFRESH === '1'
+  );
+}
+
 // Constant-time string compare to avoid timing-leak side channels.
 function safeEqual(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
@@ -298,6 +305,17 @@ export async function GET(req: NextRequest) {
   const extendedEnabled = process.env.ENABLE_ALPACA_EXTENDED_QUOTES === '1';
   if ((kind === 'premarket' || kind === 'afterhours') && !extendedEnabled) {
     if (kind === 'afterhours' && isQuoteRefreshWindowET()) {
+      if (regularPollingHandledByRailway()) {
+        return NextResponse.json({
+          universe: 0,
+          fetched: 0,
+          window: kind,
+          skipped: 'extended_quotes_disabled',
+          regularSettle: {
+            skipped: 'regular_quotes_handled_by_railway',
+          },
+        });
+      }
       const ready = redisOrError();
       if ('response' in ready) return ready.response;
       const regularSettle = await runRegularHours(ready.redis);
@@ -330,6 +348,9 @@ export async function GET(req: NextRequest) {
 
   if (kind === 'premarket' || kind === 'afterhours') {
     if (kind === 'afterhours' && isQuoteRefreshWindowET()) {
+      if (regularPollingHandledByRailway()) {
+        return runExtendedHours(kind, redis);
+      }
       // Preserve the original full-universe Finnhub settle pass during
       // 16:00-16:45 ET, but exclude today's AMC reporters so fresh Alpaca
       // extended-hours writes cannot be overwritten by stale Finnhub ticks.
@@ -351,6 +372,14 @@ export async function GET(req: NextRequest) {
       );
     }
     return runExtendedHours(kind, redis);
+  }
+  if (regularPollingHandledByRailway()) {
+    return NextResponse.json({
+      window: 'regular',
+      universe: 0,
+      fetched: 0,
+      skipped: 'regular_quotes_handled_by_railway',
+    });
   }
   return runRegularHours(redis);
 }

@@ -60,6 +60,36 @@ class _CoverageConn:
                     "latest_snapshot": date(2026, 5, 21),
                 }
             ]
+        if "has_feature_vector" in query:
+            return [
+                {
+                    "horizon_days": 7,
+                    "earnings_date": date(2026, 5, 27),
+                    "snapshot_date": date(2026, 5, 20),
+                    "snapshot_age_days": 4,
+                    "spot_price": 180.10,
+                    "scored_at": datetime(2026, 5, 24, tzinfo=timezone.utc),
+                    "has_feature_vector": True,
+                },
+                {
+                    "horizon_days": 14,
+                    "earnings_date": date(2026, 5, 27),
+                    "snapshot_date": date(2026, 5, 10),
+                    "snapshot_age_days": 14,
+                    "spot_price": 175.00,
+                    "scored_at": datetime(2026, 5, 24, tzinfo=timezone.utc),
+                    "has_feature_vector": True,
+                },
+                {
+                    "horizon_days": 21,
+                    "earnings_date": date(2026, 5, 27),
+                    "snapshot_date": date(2026, 5, 6),
+                    "snapshot_age_days": 18,
+                    "spot_price": 172.00,
+                    "scored_at": datetime(2026, 5, 24, tzinfo=timezone.utc),
+                    "has_feature_vector": False,
+                },
+            ]
         return [
             {
                 "horizon_days": 7,
@@ -144,6 +174,14 @@ async def test_coverage_endpoint_returns_totals_and_event_availability():
     )
     assert response.available_horizons[1].live_eligible is False
     assert response.available_horizons[1].unavailable_reason == "snapshot_stale"
+    assert response.supported_horizons == [1, 2, 3, 7, 14, 21]
+    by_horizon = {row.horizon_days: row for row in response.event_horizon_statuses}
+    assert by_horizon[1].live_eligible is False
+    assert by_horizon[1].unavailable_reason == "no_snapshot"
+    assert by_horizon[7].live_eligible is True
+    assert by_horizon[7].unavailable_reason is None
+    assert by_horizon[14].unavailable_reason == "snapshot_stale"
+    assert by_horizon[21].unavailable_reason == "missing_feature_vector"
 
 
 @pytest.mark.asyncio
@@ -218,8 +256,14 @@ async def test_status_endpoint_returns_model_and_data_metadata(monkeypatch):
     assert response.latest_import.source_rows == 424
     assert response.latest_import.rows_upserted == 414
     assert response.latest_import.horizons["21"] == 174
+    assert response.supported_horizons == [1, 2, 3, 7, 14, 21]
     assert response.available_model_horizons == [7]
     assert response.loaded_model_horizons == [7]
+    assert response.missing_model_horizons == [1, 2, 3, 14, 21]
+    assert response.missing_fresh_horizons == [1, 2, 3, 14, 21]
+    assert response.coverage_gaps[0].unavailable_reason == "model_missing"
+    assert response.coverage_gaps[3].horizon_days == 7
+    assert response.coverage_gaps[3].unavailable_reason is None
     assert response.models[0].feature_schema_hash == "abc123"
     assert response.redis_available is False
 

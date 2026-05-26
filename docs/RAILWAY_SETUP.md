@@ -71,8 +71,44 @@ Service → **Variables**:
 | `BACKEND_SHARED_SECRET` | `openssl rand -hex 32` | must match Vercel |
 | `ENVIRONMENT` | `production` | |
 | `POLYGON_API_KEY` | … | optional live context |
+| `FINNHUB_API_KEY` | … | required for the quote worker service only |
 
 Do **not** put `NEXT_PUBLIC_*`, `POSTGRES_HOST=localhost`, or `ENABLE_ALPACA_*` here — those belong on Vercel.
+
+### Optional: Railway regular-hours quote worker
+
+For fresher regular-hours stock prices, run a second Railway service from the
+same repo/image and override the start command to:
+
+```bash
+python workers/quote_worker.py
+```
+
+Use the same Dockerfile (`apps/backend/Dockerfile`) and the same `REDIS_URL`,
+`DATABASE_URL`, `FINNHUB_API_KEY`, `FRONTEND_URL`, and `ENVIRONMENT=production`
+variables. The worker writes the same `quote:{SYMBOL}` Redis cache records that
+the Vercel cron route writes, so the frontend read path stays unchanged.
+
+Optional worker tuning:
+
+| Variable | Default | Notes |
+|---|---:|---|
+| `QUOTE_WORKER_REST_PER_MIN` | `55` | Finnhub REST `/quote` calls per minute. Keep below the free-plan `60/min` ceiling. |
+| `QUOTE_WORKER_WS_SYMBOLS` | `50` | Finnhub WebSocket subscriptions for top interest-ranked symbols. Free plan allows 50. |
+| `QUOTE_WORKER_ENABLE_WEBSOCKET` | `1` | Set `0` to run REST-only. |
+| `QUOTE_WORKER_UNIVERSE_REFRESH_S` | `300` | Rebuild watchlist/earnings/interest ranking interval. |
+| `QUOTE_WORKER_WS_REFRESH_S` | `120` | Reconnect/resubscribe interval for the current top-50 set. |
+
+Once the worker is healthy, set this on Vercel production:
+
+| Variable | Value | Effect |
+|---|---|---|
+| `QUOTE_REFRESH_PROVIDER` | `railway` | Makes `/api/cron/refresh-prices?window=regular` return a no-op so Vercel stops doing regular-hours Finnhub polling. Premarket/after-hours Alpaca reporter refreshes still run. |
+
+The worker writes a heartbeat to Redis key `quote:worker:status` with counts,
+top universe size, and last REST/WebSocket symbols. If this heartbeat goes
+stale, unset `QUOTE_REFRESH_PROVIDER` or set it back to `vercel` on Vercel to
+fail back to the old cron route.
 
 ---
 
@@ -108,7 +144,10 @@ curl -X POST https://usequantiv.com/api/ml/status \
 The response includes `latest_import` when Neon has received a forecast
 import from `scripts/import_recent_to_postgres.py`. Use that to reconcile
 workflow counts (`source_rows`, duplicate drops, upserted rows, horizon
-counts) against the backend's live feature-vector totals.
+counts) against the backend's live feature-vector totals. It also includes
+`supported_horizons`, `missing_fresh_horizons`, `missing_model_horizons`, and
+`coverage_gaps` so absent T1/T2/T3-style coverage is visible instead of
+looking like a backend outage.
 
 The same status payload is rendered at `https://usequantiv.com/ml-status`
 for a browser-friendly operational view. Both the page and

@@ -980,7 +980,7 @@ export default function EarningsScreener() {
     };
     const fetchOnce = async () => {
       try {
-        const res = await fetch(`/api/stocks/batch-price?symbols=${cap.join(',')}`, {
+        const res = await fetch(`/api/stocks/batch-price?symbols=${cap.join(',')}&context=screener`, {
           cache: 'no-store',
         });
         if (!res.ok || cancelled) return;
