@@ -48,6 +48,7 @@ export type SymbolJson = {
   as_of_date?: string;
   expected_move?: {
     earnings_date?: string | null;
+    straddle_abs?: number | null;
     straddle_pct?: number | null;
     iv_pct?: number | null;
     em_ml_pct?: number | null;
@@ -122,16 +123,26 @@ export function buildNightlyFallbackPayload(
   req: PredictRequestBody,
   nightly: SymbolJson | null,
   fallbackReason: string,
-): NightlyFallbackPayload {
+): NightlyFallbackPayload | null {
   const sym = req.symbol;
   const expectedMove = nightly?.expected_move;
   const spot = req.spot_override ?? nightly?.spot_price ?? 0;
-  const staticMlPct = finite(expectedMove?.em_ml_pct) ? expectedMove.em_ml_pct : null;
-  const straddlePct = finite(expectedMove?.straddle_pct) ? expectedMove.straddle_pct : null;
-  const pct = staticMlPct ?? straddlePct ?? 0;
-  const fallbackKind: NightlyFallbackKind = staticMlPct !== null ? 'static_ml' : 'straddle';
   const staticMlAbs = finite(expectedMove?.em_ml_abs) ? expectedMove.em_ml_abs : null;
-  const emAbs = spot > 0 ? pct * spot : staticMlAbs ?? 0;
+  const straddleAbs = finite(expectedMove?.straddle_abs) ? expectedMove.straddle_abs : null;
+  const staticMlPct = finite(expectedMove?.em_ml_pct)
+    ? expectedMove.em_ml_pct
+    : staticMlAbs !== null && spot > 0
+      ? staticMlAbs / spot
+      : null;
+  const straddlePct = finite(expectedMove?.straddle_pct)
+    ? expectedMove.straddle_pct
+    : straddleAbs !== null && spot > 0
+      ? straddleAbs / spot
+      : null;
+  const pct = staticMlPct ?? straddlePct;
+  if (pct === null) return null;
+  const fallbackKind: NightlyFallbackKind = staticMlPct !== null ? 'static_ml' : 'straddle';
+  const emAbs = spot > 0 ? pct * spot : staticMlAbs ?? straddleAbs ?? 0;
   const quantiles = fallbackKind === 'static_ml'
     ? quantilesFromExpectedMove(expectedMove)
     : {};
@@ -159,8 +170,25 @@ export function nightlyFallbackResponse(
   req: PredictRequestBody,
   fallbackReason: string,
 ): Response {
+  const payload = buildNightlyFallbackPayload(
+    req,
+    loadSymbolJson(req.symbol),
+    fallbackReason,
+  );
+  if (!payload) {
+    return Response.json(
+      {
+        error: 'nightly fallback unavailable',
+        symbol: req.symbol,
+        horizon_days: req.horizon_days,
+        earnings_date: req.earnings_date ?? null,
+        fallback_reason: fallbackReason,
+      },
+      { status: 503, headers: NO_STORE },
+    );
+  }
   return Response.json(
-    buildNightlyFallbackPayload(req, loadSymbolJson(req.symbol), fallbackReason),
+    payload,
     { headers: NO_STORE },
   );
 }

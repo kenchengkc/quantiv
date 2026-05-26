@@ -29,6 +29,8 @@ describe('ML nightly fallback payload', () => {
       'backend_unavailable',
     );
 
+    expect(payload).not.toBeNull();
+    if (!payload) return;
     expect(payload.source).toBe('nightly_fallback');
     expect(payload.fallback_kind).toBe('static_ml');
     expect(payload.fallback_reason).toBe('backend_unavailable');
@@ -57,9 +59,27 @@ describe('ML nightly fallback payload', () => {
       'backend_proxy_not_configured',
     );
 
+    expect(payload).not.toBeNull();
+    if (!payload) return;
     expect(payload.fallback_kind).toBe('straddle');
     expect(payload.em_ml_pct).toBe(0.08);
     expect(payload.em_ml_abs).toBe(4);
     expect(payload.quantiles).toEqual({});
+  });
+
+  it('returns unavailable instead of inventing a zero move', () => {
+    const payload = buildNightlyFallbackPayload(
+      { symbol: 'EMPTY', horizon_days: 7, spot_override: 50 },
+      {
+        spot_price: 50,
+        as_of_date: '2026-05-22',
+        expected_move: {
+          earnings_date: '2026-05-29',
+        },
+      },
+      'backend_unavailable',
+    );
+
+    expect(payload).toBeNull();
   });
 });

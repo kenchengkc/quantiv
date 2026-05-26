@@ -48,6 +48,7 @@ type Cached = {
   tick: Tick;
   source?: Source;
   session?: Session;
+  transport?: 'rest' | 'websocket';
 };
 
 const memCache = new Map<string, Cached>();
@@ -154,6 +155,56 @@ async function readCacheBatch(symbols: string[]): Promise<Map<string, Cached | n
   return result;
 }
 
+type InterestContext = 'symbol' | 'watchlist' | 'earnings' | 'screener' | 'batch';
+
+function interestContext(raw: string | null): InterestContext {
+  if (
+    raw === 'symbol' ||
+    raw === 'watchlist' ||
+    raw === 'earnings' ||
+    raw === 'screener'
+  ) {
+    return raw;
+  }
+  return 'batch';
+}
+
+function interestIncrement(context: InterestContext): number {
+  switch (context) {
+    case 'symbol':
+      return 30;
+    case 'watchlist':
+      return 18;
+    case 'earnings':
+      return 10;
+    case 'screener':
+      return 6;
+    default:
+      return 3;
+  }
+}
+
+async function recordQuoteInterest(
+  symbols: string[],
+  context: InterestContext,
+): Promise<void> {
+  if (process.env.QUOTE_INTEREST_TRACKING === '0') return;
+  const redis = getRedis();
+  if (!redis || symbols.length === 0) return;
+  try {
+    const inc = interestIncrement(context);
+    const score = Math.floor(Date.now() / 1000) + inc * 60;
+    const pipeline = redis.pipeline();
+    for (const symbol of symbols.slice(0, 100)) {
+      pipeline.zadd('quote:interest', { score, member: symbol });
+    }
+    pipeline.expire('quote:interest', 2 * 60 * 60);
+    await pipeline.exec();
+  } catch {
+    // Best-effort signal for the Railway quote worker; never block prices.
+  }
+}
+
 const nullTick = (symbol: string): Tick => ({
   symbol,
   price: null,
@@ -191,6 +242,8 @@ export async function GET(req: NextRequest) {
     );
   }
 
+  await recordQuoteInterest(symbols, interestContext(url.searchParams.get('context')));
+
   const cache = await readCacheBatch(symbols);
 
   const marketOpen = isNyseRegularSessionET();
@@ -220,6 +273,7 @@ export async function GET(req: NextRequest) {
       ...enrichTick({ ...entry.tick, symbol: entry.tick.symbol || s }),
       source: src,
       session: entry.session ?? 'regular',
+      transport: entry.transport ?? null,
     };
   });
 
