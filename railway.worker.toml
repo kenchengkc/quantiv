@@ -1,0 +1,16 @@
+# Railway service config for the regular-hours quote worker.
+#
+# Use this as the config file path for the second Railway service:
+#   /railway.worker.toml
+#
+# It intentionally has no healthcheckPath because this service is a
+# long-running background worker, not an HTTP server.
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "apps/backend/Dockerfile"
+
+[deploy]
+startCommand = "python workers/quote_worker.py"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10
