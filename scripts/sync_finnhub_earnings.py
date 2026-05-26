@@ -30,6 +30,8 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import requests
 
+from provider_market_hours import block_finnhub_reserved_window
+
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_DATA_DIR = REPO_ROOT / "data"
@@ -609,6 +611,11 @@ def main() -> int:
         action="store_true",
         help="Exit 0 instead of failing when FINNHUB_API_KEY is missing (useful in CI until the secret is added).",
     )
+    parser.add_argument(
+        "--allow-market-hours",
+        action="store_true",
+        help="Allow non-price Finnhub calls during the 09:25-16:45 ET quote refresh window.",
+    )
     args = parser.parse_args()
 
     mutually_exclusive = sum(bool(x) for x in (args.symbol, args.symbols, args.all_recent))
@@ -628,6 +635,7 @@ def main() -> int:
             return 0
         print(f"✗ {msg}", file=sys.stderr)
         return 1
+    block_finnhub_reserved_window(args.allow_market_hours)
 
     data_dir = args.data_dir or default_data_dir()
     existing = load_existing(data_dir)
