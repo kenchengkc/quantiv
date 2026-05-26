@@ -740,7 +740,7 @@ export default function EarningsGrid() {
 
     const fetchOnce = async (): Promise<{ pending: number; marketOpen: boolean; quoteRefreshActive: boolean }> => {
       try {
-        const res = await fetch(`/api/stocks/batch-price?symbols=${symbols.join(',')}`, {
+        const res = await fetch(`/api/stocks/batch-price?symbols=${symbols.join(',')}&context=earnings`, {
           cache: 'no-store',
         });
         if (!res.ok) {

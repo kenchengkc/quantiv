@@ -21,6 +21,8 @@
 //
 // Docs: https://docs.alpaca.markets/reference/stocksnapshots-1
 
+import { etDateIso } from './marketHours';
+
 const BASE_URL = 'https://data.alpaca.markets';
 
 /** Refuse to mark a tick "live" if its source timestamp is older than
@@ -113,6 +115,12 @@ export type IntradayPayload = {
   /** UTC ISO of the most recent bar; lets the client decide whether the
    *  cached payload is "live enough" to skip a refetch. */
   asOf: string | null;
+  /** ET date represented by `bars`. On weekends/holidays this is the
+   *  latest session with IEX bars, not today's closed-market date. */
+  sessionDate: string | null;
+  /** True when `bars` belong to today's ET date. False means the chart is
+   *  intentionally showing the latest prior session. */
+  isCurrentSession: boolean;
 };
 
 /** Fetch ~78 5-minute IEX bars covering the most recent regular-hours
@@ -144,28 +152,30 @@ export async function fetchIntradayBars(
 
   const rawBars = Array.isArray(data?.bars) ? data.bars : [];
   if (rawBars.length === 0) {
-    return { bars: [], previousClose: null, asOf: null };
+    return {
+      bars: [],
+      previousClose: null,
+      asOf: null,
+      sessionDate: null,
+      isCurrentSession: false,
+    };
   }
 
-  // Split into "today" and "previous session" by ET calendar date so we
-  // can extract previousClose as the last bar of the prior session. The
-  // chart shows only today's bars to keep the line readable.
-  const etDate = (iso: string) =>
-    new Date(iso).toLocaleDateString('en-US', {
-      timeZone: 'America/New_York',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    });
-  const todayKey = etDate(end.toISOString());
-  const todaysBars = rawBars.filter((b) => etDate(b.t) === todayKey);
-  const priorBars = rawBars.filter((b) => etDate(b.t) !== todayKey);
+  const sortedBars = [...rawBars].sort((a, b) => Date.parse(a.t) - Date.parse(b.t));
+  const etDate = (iso: string) => etDateIso(new Date(iso));
+  const todayKey = etDateIso(end);
+  const availableDates = Array.from(new Set(sortedBars.map((b) => etDate(b.t)))).sort();
+  const sessionDate = availableDates.includes(todayKey)
+    ? todayKey
+    : availableDates[availableDates.length - 1];
+  const sessionRawBars = sortedBars.filter((b) => etDate(b.t) === sessionDate);
+  const priorBars = sortedBars.filter((b) => etDate(b.t) < sessionDate);
   const previousClose =
     priorBars.length > 0 ? priorBars[priorBars.length - 1].c : null;
 
-  // Fall back to the most recent bars when today's session hasn't
-  // started yet (e.g. pre-market opens but no IEX prints yet).
-  const bars = (todaysBars.length > 0 ? todaysBars : rawBars.slice(-78)).map(
+  // Show one ET session at a time. On a market holiday or weekend this is
+  // the latest prior session with bars, which the UI labels explicitly.
+  const bars = sessionRawBars.slice(-78).map(
     (b) => ({ t: b.t, c: b.c }),
   );
 
@@ -173,6 +183,8 @@ export async function fetchIntradayBars(
     bars,
     previousClose,
     asOf: bars.length > 0 ? bars[bars.length - 1].t : null,
+    sessionDate,
+    isCurrentSession: sessionDate === todayKey,
   };
 }
 

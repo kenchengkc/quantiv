@@ -75,7 +75,7 @@ type WatchlistMlCandidate = {
 // explicit empty cells (one per spacer) so grid auto-placement keeps
 // later columns aligned.
 const WATCHLIST_ROW_GRID =
-  '18px 40px auto 1.5fr 132px 1fr 168px 92px 116px';
+  '30px 40px auto 1.5fr 132px 1fr 168px 92px 116px';
 
 
 function parseLocalDate(iso: string): Date {
@@ -354,7 +354,7 @@ function WatchlistLoadingRows() {
             boxSizing: 'border-box',
           }}
         >
-          <span className="qv-wl-cell-drag" style={bar(i * 35, 16, 16)} />
+          <span className="qv-wl-cell-drag" style={bar(i * 35, 22, 20)} />
           <span style={bar(i * 35 + 15, 40, 40, 8)} />
           <span style={{ display: 'grid', gap: 7 }}>
             <span style={bar(i * 35 + 25, 74, 18)} />
@@ -464,7 +464,7 @@ export default function WatchlistPage() {
     const fetchOnce = async (): Promise<{ pending: number; open: boolean; quoteRefreshActive: boolean }> => {
       try {
         const res = await fetch(
-          `/api/stocks/batch-price?symbols=${tickers.join(',')}`,
+          `/api/stocks/batch-price?symbols=${tickers.join(',')}&context=watchlist`,
           { cache: 'no-store' },
         );
         if (!res.ok) {
@@ -871,12 +871,24 @@ export default function WatchlistPage() {
                 <span
                   aria-hidden
                   className="qv-wl-cell-drag"
+                  title="Drag to reorder"
                   style={{
+                    width: 30,
+                    height: 40,
                     display: 'inline-flex',
-                    color: 'var(--ink-4)',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: 7,
+                    color: isDragging ? 'var(--accent)' : 'var(--ink-3)',
+                    background: isDragging
+                      ? 'color-mix(in oklab, var(--accent) 14%, transparent)'
+                      : 'color-mix(in oklab, var(--bg-3) 44%, transparent)',
+                    border: '1px solid var(--line)',
+                    opacity: isDragging ? 1 : 0.88,
+                    cursor: 'grab',
                   }}
                 >
-                  <GripVertical size={16} />
+                  <GripVertical size={22} strokeWidth={2.3} />
                 </span>
 
                 <Link

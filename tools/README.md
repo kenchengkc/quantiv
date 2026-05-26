@@ -8,7 +8,7 @@ or locally via `npm run data:frontend` (which calls `build_frontend_data.py`).
 |--------|---------|-----|
 | `build_frontend_data.py` | Writes `apps/frontend/public/{weekly,weeks,symbols,screener}.json` | Nightly |
 | `build_popular_weights.py` | Regenerates popular-ticker weights consumed by the screener filter | Nightly |
-| `pull_market_caps.py` | Finnhub market-cap snapshot for ranking / display | Nightly |
+| `pull_market_caps.py` | Finnhub market-cap snapshot for ranking / display; merges top-profile logos into `ticker-logos.json` | Nightly |
 | `build_earnings_events.py` | Legacy/helper earnings event builder — run manually if needed | No |
 | `patch_timing.py` | One-off timing patches on calendar data | Manual |
 | `math_baseline.py` | EM baseline math experiments | Manual |

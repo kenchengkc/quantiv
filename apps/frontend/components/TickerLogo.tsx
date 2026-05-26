@@ -2,12 +2,14 @@
 
 /* eslint-disable @next/next/no-img-element */
 
-import { type CSSProperties, useEffect, useState } from 'react';
+import { type CSSProperties, useEffect, useMemo, useState } from 'react';
+import tickerLogoData from '@/public/ticker-logos.json';
 
 export type TickerLogoLoadState = 'loaded' | 'failed';
 
 const DEFAULT_TIMEOUT_MS = 4_000;
 const logoStateCache = new Map<string, TickerLogoLoadState>();
+const logoUrlCache = new Map<string, string>();
 const logoPromiseCache = new Map<string, Promise<TickerLogoLoadState>>();
 
 function normalizeTicker(ticker: string) {
@@ -16,6 +18,20 @@ function normalizeTicker(ticker: string) {
 
 export function tickerLogoUrl(ticker: string) {
   return `https://assets.parqet.com/logos/symbol/${normalizeTicker(ticker)}?format=png`;
+}
+
+function cachedFinnhubLogoUrl(ticker: string): string | null {
+  const logos = (tickerLogoData as { logos?: Record<string, unknown> }).logos ?? {};
+  const url = logos[normalizeTicker(ticker)];
+  return typeof url === 'string' && /^https?:\/\//.test(url) ? url : null;
+}
+
+export function tickerLogoUrls(ticker: string) {
+  const normalized = normalizeTicker(ticker);
+  const urls = [tickerLogoUrl(normalized)];
+  const finnhubUrl = cachedFinnhubLogoUrl(normalized);
+  if (finnhubUrl && !urls.includes(finnhubUrl)) urls.push(finnhubUrl);
+  return urls;
 }
 
 export function getTickerLogoState(ticker: string): TickerLogoLoadState | undefined {
@@ -27,7 +43,24 @@ export function hasTickerLogoState(ticker: string) {
 }
 
 export function setTickerLogoState(ticker: string, state: TickerLogoLoadState) {
-  logoStateCache.set(normalizeTicker(ticker), state);
+  const normalized = normalizeTicker(ticker);
+  if (state === 'loaded') {
+    setTickerLogoLoaded(normalized, tickerLogoUrl(normalized));
+  } else {
+    setTickerLogoFailed(normalized);
+  }
+}
+
+function setTickerLogoLoaded(ticker: string, url: string) {
+  const normalized = normalizeTicker(ticker);
+  logoStateCache.set(normalized, 'loaded');
+  logoUrlCache.set(normalized, url);
+}
+
+function setTickerLogoFailed(ticker: string) {
+  const normalized = normalizeTicker(ticker);
+  logoStateCache.set(normalized, 'failed');
+  logoUrlCache.delete(normalized);
 }
 
 export function preloadTickerLogo(
@@ -43,34 +76,59 @@ export function preloadTickerLogo(
 
   if (typeof window === 'undefined') return Promise.resolve('failed');
 
+  const urls = tickerLogoUrls(normalized);
   const promise = new Promise<TickerLogoLoadState>((resolve) => {
-    const img = new window.Image();
     let settled = false;
     let timeoutId: number | null = null;
-
+    let index = 0;
     const finish = (state: TickerLogoLoadState) => {
       if (settled) return;
       settled = true;
       if (timeoutId !== null) window.clearTimeout(timeoutId);
-      logoStateCache.set(normalized, state);
+      if (state === 'failed') setTickerLogoFailed(normalized);
       resolve(state);
     };
 
-    timeoutId = window.setTimeout(() => finish('failed'), timeoutMs);
-    img.decoding = 'async';
-    img.onload = () => {
-      const decode =
-        typeof img.decode === 'function'
-          ? img.decode().catch(() => undefined)
-          : Promise.resolve();
-      void decode.then(() => finish('loaded'));
-    };
-    img.onerror = () => finish('failed');
-    img.src = tickerLogoUrl(normalized);
+    const tryNext = () => {
+      if (settled) return;
+      const url = urls[index];
+      if (!url) {
+        finish('failed');
+        return;
+      }
+      const img = new window.Image();
+      img.decoding = 'async';
+      img.onload = () => {
+        const loadedUrl = url;
+        const decode =
+          typeof img.decode === 'function'
+            ? img.decode().catch(() => undefined)
+            : Promise.resolve();
+        void decode.then(() => {
+          if (settled) return;
+          setTickerLogoLoaded(normalized, loadedUrl);
+          finish('loaded');
+        });
+      };
+      img.onerror = () => {
+        index += 1;
+        tryNext();
+      };
+      img.src = url;
 
-    if (img.complete) {
-      finish(img.naturalWidth > 0 ? 'loaded' : 'failed');
-    }
+      if (img.complete) {
+        if (img.naturalWidth > 0) {
+          setTickerLogoLoaded(normalized, url);
+          finish('loaded');
+        } else {
+          index += 1;
+          tryNext();
+        }
+      }
+    };
+
+    timeoutId = window.setTimeout(() => finish('failed'), timeoutMs);
+    tryNext();
   });
 
   logoPromiseCache.set(normalized, promise);
@@ -108,13 +166,20 @@ export function TickerLogo({
   fallbackStyle,
 }: TickerLogoProps) {
   const normalized = normalizeTicker(ticker);
+  const urls = useMemo(() => tickerLogoUrls(normalized), [normalized]);
   const [failed, setFailed] = useState(
     () => getTickerLogoState(normalized) === 'failed',
   );
+  const [srcIndex, setSrcIndex] = useState(() => {
+    const loadedUrl = logoUrlCache.get(normalized);
+    return loadedUrl ? Math.max(0, urls.indexOf(loadedUrl)) : 0;
+  });
 
   useEffect(() => {
     setFailed(getTickerLogoState(normalized) === 'failed');
-  }, [normalized]);
+    const loadedUrl = logoUrlCache.get(normalized);
+    setSrcIndex(loadedUrl ? Math.max(0, urls.indexOf(loadedUrl)) : 0);
+  }, [normalized, urls]);
 
   const baseStyle: CSSProperties = {
     width: size,
@@ -151,7 +216,7 @@ export function TickerLogo({
 
   return (
     <img
-      src={tickerLogoUrl(normalized)}
+      src={urls[srcIndex] ?? tickerLogoUrl(normalized)}
       alt={accessibleAlt}
       width={size}
       height={size}
@@ -159,11 +224,16 @@ export function TickerLogo({
       decoding="async"
       className={className}
       onLoad={() => {
-        setTickerLogoState(normalized, 'loaded');
+        setTickerLogoLoaded(normalized, urls[srcIndex] ?? tickerLogoUrl(normalized));
         setFailed(false);
       }}
       onError={() => {
-        setTickerLogoState(normalized, 'failed');
+        const nextIndex = srcIndex + 1;
+        if (nextIndex < urls.length) {
+          setSrcIndex(nextIndex);
+          return;
+        }
+        setTickerLogoFailed(normalized);
         setFailed(true);
       }}
       style={{

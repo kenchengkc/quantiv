@@ -258,6 +258,41 @@ cd apps/backend && uvicorn main:app --reload
 
 ## Questions Answered
 
+---
+
+## 2026 Provider Enrichment Targets
+
+The production ML path should not fabricate missing market data. Current
+enrichment priorities are:
+
+1. `scripts/sync_fmp_earnings.py` overlays Financial Modeling Prep EPS/revenue
+   actuals and estimates into `data/earnings_calendar.csv`. This complements
+   Finnhub because the FMP earnings calendar carries revenue fields directly;
+   Finnhub `/stock/earnings` is useful for EPS-surprise validation but its free
+   tier is limited to the last four quarters. The FMP script is update-only by
+   default so provider date disagreements do not create duplicate events. The
+   current FMP route is already call-efficient: it requests calendar date
+   windows, split into 31-day chunks, so the default 90-day near-term overlay is
+   about three calls rather than one call per ticker.
+2. `tools/pull_market_caps.py` now reuses Finnhub `/stock/profile2` responses
+   to write `apps/frontend/public/ticker-logos.json`. The browser uses that
+   cached map only as a logo fallback after Parqet fails.
+3. `scripts/sync_finnhub_market_holidays.py` refreshes
+   `apps/frontend/lib/marketHolidays.generated.ts` from Finnhub
+   `/stock/market-holiday`, so the quote refresh window no longer relies on
+   hand-maintained holiday constants.
+4. `scripts/probe_alphavantage_voi.py` checks Alpha Vantage historical
+   volume-to-open-interest ratio coverage and entitlement. Alpha Vantage's V/OI
+   routes are symbol-scoped, so the probe persists results in
+   `data/alpha_vantage_voi_probe.json`, spends a small daily call budget, skips
+   symbol/function pairs checked recently, and resumes the priority queue on the
+   next run. Do not add V/OI to UI or ML features until the probe shows useful
+   historical coverage for the covered earnings universe.
+
+Non-price Finnhub scripts refuse to run during the 09:25-16:45 ET quote refresh
+window unless `--allow-market-hours` is passed. This keeps the Finnhub quota
+reserved for stock price polling during market hours.
+
 **Q: What data is being used for validation?**  
 A: Currently 20% of 2023-2024 H1 data (in-sample, not ideal)
 

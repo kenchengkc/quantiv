@@ -31,8 +31,10 @@ from models import (
     MLCoverageHorizonRow,
     MLCoverageRequest,
     MLCoverageResponse,
+    MLEventHorizonStatus,
     MLPredictRequest,
     MLPredictResponse,
+    MLStatusCoverageGapRow,
     MLStatusDataRow,
     MLStatusHorizonRow,
     MLStatusImportRow,
@@ -75,6 +77,10 @@ def _json_object(value: Any) -> Dict[str, Any]:
 
 VALID_HORIZONS = {1, 2, 3, 7, 14, 21}
 RESPONSE_TTL_SECONDS = 30
+
+
+def _supported_horizons() -> list[int]:
+    return sorted(VALID_HORIZONS)
 
 
 def _cache_key(req: MLPredictRequest) -> str:
@@ -277,6 +283,7 @@ async def coverage_endpoint(req: MLCoverageRequest) -> MLCoverageResponse:
         )
 
         available = []
+        event_rows = []
         if symbol is not None:
             params = [symbol]
             where = """
@@ -321,11 +328,73 @@ async def coverage_endpoint(req: MLCoverageRequest) -> MLCoverageResponse:
                 for row in rows
             ]
 
+            if req.earnings_date is not None:
+                event_rows = await conn.fetch(
+                    """
+                    SELECT DISTINCT ON (model_horizon)
+                      model_horizon::int AS horizon_days,
+                      earnings_date,
+                      snapshot_date,
+                      (CURRENT_DATE - snapshot_date)::int AS snapshot_age_days,
+                      spot_price,
+                      scored_at,
+                      (feature_vector IS NOT NULL) AS has_feature_vector
+                    FROM em_forecasts
+                    WHERE act_symbol = $1
+                      AND earnings_date = $2
+                    ORDER BY model_horizon, (feature_vector IS NOT NULL) DESC, snapshot_date DESC
+                    """,
+                    symbol,
+                    req.earnings_date,
+                )
+
+    event_status_rows = {int(row["horizon_days"]): row for row in event_rows}
+    event_horizon_statuses = []
+    if symbol is not None and req.earnings_date is not None:
+        for horizon in _supported_horizons():
+            row = event_status_rows.get(horizon)
+            if row is None:
+                event_horizon_statuses.append(
+                    MLEventHorizonStatus(
+                        horizon_days=horizon,
+                        earnings_date=req.earnings_date,
+                        live_eligible=False,
+                        unavailable_reason="no_snapshot",
+                    )
+                )
+                continue
+
+            snapshot_age_days = row["snapshot_age_days"]
+            has_feature_vector = bool(row["has_feature_vector"])
+            is_fresh = (
+                snapshot_age_days is not None
+                and snapshot_age_days <= predict_service.MAX_SNAPSHOT_AGE_DAYS
+            )
+            live_eligible = has_feature_vector and is_fresh
+            reason = None
+            if not has_feature_vector:
+                reason = "missing_feature_vector"
+            elif not is_fresh:
+                reason = "snapshot_stale"
+            event_horizon_statuses.append(
+                MLEventHorizonStatus(
+                    horizon_days=horizon,
+                    earnings_date=row["earnings_date"],
+                    snapshot_date=row["snapshot_date"],
+                    snapshot_age_days=snapshot_age_days,
+                    live_eligible=live_eligible,
+                    unavailable_reason=reason,
+                    spot_price=float(row["spot_price"]) if row["spot_price"] is not None else None,
+                    forecast_scored_at=row["scored_at"],
+                )
+            )
+
     return MLCoverageResponse(
         total_feature_rows=totals["total_feature_rows"] if totals else 0,
         fresh_window_days=window,
         fresh_distinct_symbols=totals["fresh_distinct_symbols"] if totals else 0,
         fresh_distinct_events=totals["fresh_distinct_events"] if totals else 0,
+        supported_horizons=_supported_horizons(),
         rows_by_horizon=[
             MLCoverageHorizonRow(
                 horizon_days=row["horizon_days"],
@@ -341,6 +410,7 @@ async def coverage_endpoint(req: MLCoverageRequest) -> MLCoverageResponse:
         symbol=symbol,
         earnings_date=req.earnings_date,
         available_horizons=available,
+        event_horizon_statuses=event_horizon_statuses,
         checked_at=datetime.now(timezone.utc),
     )
 
@@ -492,6 +562,40 @@ async def status_endpoint(req: MLStatusRequest) -> MLStatusResponse:
     if data is not None:
         ok = ok and data.total_feature_rows > 0
 
+    horizon_rows_by_day = {row.horizon_days: row for row in by_horizon}
+    available_model_set = set(available_model_horizons)
+    coverage_gaps = []
+    for horizon in _supported_horizons():
+        row = horizon_rows_by_day.get(horizon)
+        total_feature_rows = row.total_feature_rows if row else 0
+        fresh_feature_rows = row.fresh_feature_rows if row else 0
+        model_available = horizon in available_model_set
+        reason = None
+        if not model_available:
+            reason = "model_missing"
+        elif total_feature_rows <= 0:
+            reason = "no_feature_rows"
+        elif fresh_feature_rows <= 0:
+            reason = "no_fresh_feature_rows"
+        coverage_gaps.append(
+            MLStatusCoverageGapRow(
+                horizon_days=horizon,
+                model_available=model_available,
+                has_any_feature_rows=total_feature_rows > 0,
+                has_fresh_feature_rows=fresh_feature_rows > 0,
+                total_feature_rows=total_feature_rows,
+                fresh_feature_rows=fresh_feature_rows,
+                unavailable_reason=reason,
+            )
+        )
+
+    missing_model_horizons = [
+        horizon for horizon in _supported_horizons() if horizon not in available_model_set
+    ]
+    missing_fresh_horizons = [
+        row.horizon_days for row in coverage_gaps if not row.has_fresh_feature_rows
+    ]
+
     return MLStatusResponse(
         ok=ok,
         status="ok" if ok else "degraded",
@@ -499,12 +603,16 @@ async def status_endpoint(req: MLStatusRequest) -> MLStatusResponse:
         fresh_window_days=window,
         max_snapshot_age_days=predict_service.MAX_SNAPSHOT_AGE_DAYS,
         models_dir=str(predict_service._models_dir()),
+        supported_horizons=_supported_horizons(),
         available_model_horizons=available_model_horizons,
         loaded_model_horizons=loaded_model_horizons,
+        missing_model_horizons=missing_model_horizons,
+        missing_fresh_horizons=missing_fresh_horizons,
         redis_available=redis_available,
         postgres_available=postgres_available,
         data=data,
         rows_by_horizon=by_horizon,
+        coverage_gaps=coverage_gaps,
         latest_import=latest_import_row,
         models=model_rows,
     )

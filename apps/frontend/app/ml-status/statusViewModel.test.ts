@@ -3,6 +3,7 @@ import {
   classifyStatus,
   freshCoverageRatio,
   importRowDelta,
+  sortedCoverageGaps,
   sortedImportHorizons,
   sortedModelRows,
   type MlStatusResponse,
@@ -15,8 +16,11 @@ const baseStatus: MlStatusResponse = {
   fresh_window_days: 7,
   max_snapshot_age_days: 7,
   models_dir: '/data/models',
+  supported_horizons: [1, 2, 3, 7, 14, 21],
   available_model_horizons: [7, 14],
   loaded_model_horizons: [7],
+  missing_model_horizons: [1, 2, 3, 21],
+  missing_fresh_horizons: [1, 2, 3, 21],
   redis_available: true,
   postgres_available: true,
   data: {
@@ -28,6 +32,26 @@ const baseStatus: MlStatusResponse = {
     latest_scored_at: '2026-05-24T01:00:00Z',
   },
   rows_by_horizon: [],
+  coverage_gaps: [
+    {
+      horizon_days: 14,
+      model_available: true,
+      has_any_feature_rows: true,
+      has_fresh_feature_rows: true,
+      total_feature_rows: 140,
+      fresh_feature_rows: 88,
+      unavailable_reason: null,
+    },
+    {
+      horizon_days: 1,
+      model_available: false,
+      has_any_feature_rows: false,
+      has_fresh_feature_rows: false,
+      total_feature_rows: 0,
+      fresh_feature_rows: 0,
+      unavailable_reason: 'model_missing',
+    },
+  ],
   latest_import: {
     parquet_file: 'forecasts_2026-05-24.parquet',
     imported_at: '2026-05-24T01:10:00Z',
@@ -90,6 +114,7 @@ describe('ML status view model', () => {
 
   it('sorts model and import horizons numerically', () => {
     expect(sortedModelRows(baseStatus.models).map((row) => row.horizon_days)).toEqual([7, 14]);
+    expect(sortedCoverageGaps(baseStatus.coverage_gaps).map((row) => row.horizon_days)).toEqual([1, 14]);
     expect(sortedImportHorizons(baseStatus.latest_import)).toEqual([
       ['7', 100],
       ['14', 140],

@@ -15,6 +15,16 @@ export type MlStatusHorizonRow = {
   latest_scored_at: string | null;
 };
 
+export type MlStatusCoverageGapRow = {
+  horizon_days: number;
+  model_available: boolean;
+  has_any_feature_rows: boolean;
+  has_fresh_feature_rows: boolean;
+  total_feature_rows: number;
+  fresh_feature_rows: number;
+  unavailable_reason: string | null;
+};
+
 export type MlStatusImportRow = {
   parquet_file: string;
   imported_at: string;
@@ -54,12 +64,16 @@ export type MlStatusResponse = {
   fresh_window_days: number;
   max_snapshot_age_days: number;
   models_dir: string;
+  supported_horizons?: number[];
   available_model_horizons: number[];
   loaded_model_horizons: number[];
+  missing_model_horizons?: number[];
+  missing_fresh_horizons?: number[];
   redis_available: boolean;
   postgres_available: boolean;
   data: MlStatusDataRow | null;
   rows_by_horizon: MlStatusHorizonRow[];
+  coverage_gaps?: MlStatusCoverageGapRow[];
   latest_import: MlStatusImportRow | null;
   models: MlStatusModelRow[];
 };
@@ -110,6 +124,10 @@ export function importRowDelta(latestImport: MlStatusImportRow | null): number |
 }
 
 export function sortedHorizonRows(rows: MlStatusHorizonRow[]): MlStatusHorizonRow[] {
+  return [...rows].sort((a, b) => a.horizon_days - b.horizon_days);
+}
+
+export function sortedCoverageGaps(rows: MlStatusCoverageGapRow[] = []): MlStatusCoverageGapRow[] {
   return [...rows].sort((a, b) => a.horizon_days - b.horizon_days);
 }
 

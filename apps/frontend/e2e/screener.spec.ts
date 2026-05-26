@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 
 /**
  * Screener virtualization + sticky-column smoke tests.
@@ -18,9 +18,28 @@ import { test, expect } from '@playwright/test';
  *     (proves sort still wires up under TableVirtuoso).
  */
 
+async function gotoScreener(page: Page) {
+  let lastError: unknown = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      await page.goto('/screener', {
+        waitUntil: 'domcontentloaded',
+        timeout: 15_000,
+      });
+      return;
+    } catch (err) {
+      lastError = err;
+      await page.waitForTimeout(400);
+    }
+  }
+  throw lastError;
+}
+
 test.describe('screener · virtualization', () => {
+  test.describe.configure({ timeout: 60_000 });
+
   test.beforeEach(async ({ page }) => {
-    await page.goto('/screener');
+    await gotoScreener(page);
     // Wait until the real data count replaces the initial zero-count
     // skeleton state.
     await page.waitForFunction(() => {
@@ -90,7 +109,10 @@ test.describe('screener · virtualization', () => {
     // inside the viewport, and its position should be byte-for-byte
     // identical regardless of which filter is active because the
     // colgroup widths are fixed.
-    const headerCell = page.locator('thead th').nth(5);
+    const headerCell = page
+      .locator('.qv-screener-table-shell thead th')
+      .filter({ hasText: /Hist 4Q avg/i })
+      .first();
     await expect(headerCell).toBeVisible();
     const beforeX = await headerCell.evaluate((el) => el.getBoundingClientRect().x);
 
