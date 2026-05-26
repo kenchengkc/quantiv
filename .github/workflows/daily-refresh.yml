@@ -29,6 +29,15 @@ on:
         description: "Run earnings_calendar integrity gate in --warn-only mode (commit even if guardrails trip). Use for legitimate large changes like a one-time universe cleanup."
         type: boolean
         default: false
+      finnhub_profile_refresh:
+        description: "Finnhub profile/logo sweep. auto runs missing-only on Saturdays; full refetches every ticker for maintenance."
+        type: choice
+        options:
+          - auto
+          - missing-only
+          - full
+          - skip
+        default: auto
 
 concurrency:
   group: daily-refresh
@@ -97,6 +106,37 @@ jobs:
         env:
           FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
         run: python scripts/sync_finnhub_earnings.py --allow-missing-key
+
+      - name: Overlay EPS and revenue from FMP
+        # Complements Finnhub's date/timing overlay with richer EPS/revenue
+        # actual and estimate coverage. Runs at 07:00 ET, before the Finnhub
+        # live quote polling window begins.
+        env:
+          FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
+        run: python scripts/sync_fmp_earnings.py --allow-missing-key
+
+      - name: Probe Alpha Vantage V/OI coverage
+        # Low-priority options enrichment audit. Free tier is small, so this
+        # advances a persistent queue slowly and skips symbols checked recently.
+        # The output is informational only; the app and ML path do not consume
+        # V/OI until coverage is proven useful.
+        env:
+          ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
+        run: |
+          python scripts/probe_alphavantage_voi.py \
+            --allow-missing-key \
+            --universe priority \
+            --max-calls 20 \
+            --delay 15 \
+            --refresh-after-days 30
+
+      - name: Refresh cached US market holidays
+        # Non-price Finnhub call. This workflow runs before regular quote
+        # polling starts; the script also refuses to run during the live quote
+        # refresh window unless explicitly overridden.
+        env:
+          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+        run: python scripts/sync_finnhub_market_holidays.py --allow-missing-key
 
       - name: Sunday full-universe Finnhub sweep
         # Walks every ticker that reported in the last 2 years (~6,600
@@ -266,7 +306,7 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name  "Quantiv bot"
-          git add apps/frontend/public apps/frontend/lib/popular.ts
+          git add apps/frontend/public apps/frontend/lib/popular.ts apps/frontend/lib/marketHolidays.generated.ts
           git add -f data/earnings_calendar.csv data/market_caps.json
           # Snapshot + diff log are gitignored under /data/ but need to
           # persist across CI runs so tomorrow's build can diff against
@@ -274,7 +314,7 @@ jobs:
           # with [ -f ... ] guards so a missing file (e.g. the changes
           # log on the very first run, before any diff entries land)
           # doesn't tank the commit step with a pathspec error.
-          for f in data/popular_snapshot.json data/popular_changes.jsonl; do
+          for f in data/popular_snapshot.json data/popular_changes.jsonl data/fmp_earnings_metadata.json data/alpha_vantage_voi_probe.json; do
             if [ -f "$f" ]; then
               git add -f "$f"
             else
@@ -285,6 +325,88 @@ jobs:
             echo "No changes to commit"
           else
             git commit -m "daily refresh $(date -u +%Y-%m-%d)"
+            git push origin main
+          fi
+
+  finnhub-profile-sweep:
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'schedule' && github.event.schedule == '0 11 * * *')
+    runs-on: ubuntu-latest
+    needs: refresh
+    timeout-minutes: 240
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install Python dependencies
+        run: pip install requests
+
+      - name: Pull latest main after daily refresh commit
+        run: |
+          git fetch origin main
+          git checkout main
+          git pull --ff-only origin main
+
+      - name: Weekly Finnhub profile/logo sweep
+        # Runs separately from the main refresh job so the first long-tail
+        # missing-only backfill cannot consume the normal data-refresh timeout.
+        # Saturday UTC avoids weekday quote polling and the Sunday full-universe
+        # earnings sweep. Manual workflow_dispatch can force missing-only or
+        # full maintenance refreshes.
+        env:
+          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+          PROFILE_REFRESH: ${{ github.event.inputs.finnhub_profile_refresh || 'auto' }}
+        run: |
+          set -euo pipefail
+          MODE="$PROFILE_REFRESH"
+          ARGS=""
+          case "$MODE" in
+            auto)
+              DOW=$(date -u +%u)  # 1=Mon … 6=Sat … 7=Sun
+              if [ "$DOW" != "6" ]; then
+                echo "Profile sweep auto mode only runs on Saturday UTC (today=$DOW); skipping."
+                exit 0
+              fi
+              ARGS="--missing-only"
+              ;;
+            missing-only)
+              ARGS="--missing-only --force"
+              ;;
+            full)
+              ARGS="--full --force"
+              ;;
+            skip)
+              echo "Profile sweep skipped by workflow input."
+              exit 0
+              ;;
+            *)
+              echo "Unknown finnhub_profile_refresh mode: $MODE" >&2
+              exit 2
+              ;;
+          esac
+          python -u scripts/sync_finnhub_profiles.py \
+            --allow-missing-key \
+            --universe earnings \
+            $ARGS
+
+      - name: Commit + push Finnhub profile/logo cache
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name  "Quantiv bot"
+          git add apps/frontend/public/ticker-logos.json
+          if git diff --staged --quiet; then
+            echo "No Finnhub profile/logo cache changes to commit"
+          else
+            git commit -m "refresh Finnhub profile logos $(date -u +%Y-%m-%d)"
             git push origin main
           fi
 

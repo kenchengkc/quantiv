@@ -10,7 +10,10 @@ See [`.github/workflows/daily-refresh.yml`](../.github/workflows/daily-refresh.y
 |--------|---------|----------|
 | `sync_dolthub.py` | Options, earnings, OHLCV, vol history from DoltHub | `data:sync*`, nightly |
 | `sync_finnhub_earnings.py` | Near-term earnings overlay into `data/earnings_calendar.csv` | `data:earnings:finnhub`, nightly |
+| `sync_fmp_earnings.py` | Date-window FMP EPS/revenue overlay into `data/earnings_calendar.csv` | `data:earnings:fmp`, nightly |
+| `sync_finnhub_profiles.py` | Market-hours-guarded Finnhub profile/logo cache for `ticker-logos.json` | `data:profiles:finnhub`, weekly/manual |
 | `sync_vix.py` | FRED VIX → Parquet | Nightly |
+| `probe_alphavantage_voi.py` | Persistent multi-day Alpha Vantage V/OI entitlement and coverage audit | `data:probe:alphavantage-voi`, nightly |
 | `check_earnings_calendar_integrity.py` | Guardrails before committing calendar CSV | Nightly (blocks commit on failure) |
 | `setup_duckdb_from_parquet.py` | Recreate DuckDB views | `data:views`, nightly |
 | `check_duckdb_freshness.py` | CI gate before scoring | Nightly |

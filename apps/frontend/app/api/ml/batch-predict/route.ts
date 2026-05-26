@@ -4,6 +4,7 @@ import { BackendProxyError, backendProxyConfigured, proxyJsonPost } from '@/lib/
 import {
   NO_STORE,
   PredictRequestSchema,
+  type PredictRequestBody,
   buildNightlyFallbackPayload,
   loadSymbolJson,
 } from '../_shared';
@@ -15,6 +16,34 @@ const BatchPredictRequestSchema = z.object({
   items: z.array(PredictRequestSchema).min(1).max(100),
   allow_partial: z.boolean().optional().default(true),
 });
+
+function buildFallbackItem(
+  item: PredictRequestBody,
+  fallbackReason: string,
+) {
+  const response = buildNightlyFallbackPayload(
+    item,
+    loadSymbolJson(item.symbol),
+    fallbackReason,
+  );
+  if (!response) {
+    return {
+      ok: false,
+      symbol: item.symbol,
+      horizon_days: item.horizon_days,
+      earnings_date: item.earnings_date ?? null,
+      error: 'nightly fallback unavailable',
+      fallback_reason: fallbackReason,
+    };
+  }
+  return {
+    ok: true,
+    symbol: item.symbol,
+    horizon_days: item.horizon_days,
+    earnings_date: item.earnings_date ?? null,
+    response,
+  };
+}
 
 export async function POST(req: NextRequest) {
   let body: unknown;
@@ -35,17 +64,9 @@ export async function POST(req: NextRequest) {
   if (!backendProxyConfigured()) {
     return NextResponse.json(
       {
-        items: parsed.data.items.map((item) => ({
-          ok: true,
-          symbol: item.symbol,
-          horizon_days: item.horizon_days,
-          earnings_date: item.earnings_date ?? null,
-          response: buildNightlyFallbackPayload(
-            item,
-            loadSymbolJson(item.symbol),
-            'backend_proxy_not_configured',
-          ),
-        })),
+        items: parsed.data.items.map((item) =>
+          buildFallbackItem(item, 'backend_proxy_not_configured'),
+        ),
         served_at: new Date().toISOString(),
       },
       { headers: NO_STORE },
@@ -66,17 +87,9 @@ export async function POST(req: NextRequest) {
     }
     return NextResponse.json(
       {
-        items: parsed.data.items.map((item) => ({
-          ok: true,
-          symbol: item.symbol,
-          horizon_days: item.horizon_days,
-          earnings_date: item.earnings_date ?? null,
-          response: buildNightlyFallbackPayload(
-            item,
-            loadSymbolJson(item.symbol),
-            'backend_unavailable',
-          ),
-        })),
+        items: parsed.data.items.map((item) =>
+          buildFallbackItem(item, 'backend_unavailable'),
+        ),
         served_at: new Date().toISOString(),
       },
       { headers: NO_STORE },

@@ -22,15 +22,19 @@ import json
 import os
 import sys
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 
 import duckdb
 import requests
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.append(str(REPO_ROOT / "scripts"))
+from provider_market_hours import block_finnhub_reserved_window  # noqa: E402
+
 DB_PATH = REPO_ROOT / "data" / "quantiv.duckdb"
 CACHE_PATH = REPO_ROOT / "data" / "market_caps.json"
+LOGO_CACHE_PATH = REPO_ROOT / "apps" / "frontend" / "public" / "ticker-logos.json"
 
 TOP_N = 500
 MAX_AGE_DAYS = 7
@@ -112,10 +116,10 @@ def cache_age_days() -> float | None:
         return None
 
 
-def fetch_mcap(
+def fetch_profile(
     symbol: str, token: str, fx: dict[str, float]
-) -> tuple[float | None, str | None]:
-    """Return (market_cap_usd_millions, currency) or (None, None) on failure.
+) -> tuple[float | None, str | None, str | None]:
+    """Return (market_cap_usd_millions, currency, logo_url) on failure.
 
     Finnhub returns marketCapitalization in the company's reporting
     currency. We convert to USD using the live `fx` dict fetched at
@@ -138,19 +142,59 @@ def fetch_mcap(
             time.sleep(5 * (attempt + 1))
             continue
         if not resp.ok:
-            return None, None
+            return None, None, None
         body = resp.json()
+        logo = body.get("logo")
+        logo_url = logo.strip() if isinstance(logo, str) and logo.strip() else None
         mcap = body.get("marketCapitalization")
         currency = (body.get("currency") or "USD").strip().upper()
         if mcap is None:
-            return None, currency
+            return None, currency, logo_url
         try:
             mcap_local = float(mcap)
         except (TypeError, ValueError):
-            return None, currency
+            return None, currency, logo_url
         rate = fx.get(currency, 1.0)
-        return mcap_local * rate, currency
-    return None, None
+        return mcap_local * rate, currency, logo_url
+    return None, None, None
+
+
+def write_logo_cache(logos: dict[str, str]) -> None:
+    LOGO_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    existing_logos: dict[str, str] = {}
+    existing_profiles: dict[str, object] = {}
+    profile_sweep_at: str | None = None
+    if LOGO_CACHE_PATH.exists():
+        try:
+            existing = json.loads(LOGO_CACHE_PATH.read_text())
+            profile_sweep_at_raw = existing.get("profile_sweep_at")
+            if isinstance(profile_sweep_at_raw, str) and profile_sweep_at_raw:
+                profile_sweep_at = profile_sweep_at_raw
+            existing_logos = {
+                k: v
+                for k, v in dict(existing.get("logos", {})).items()
+                if isinstance(k, str) and isinstance(v, str) and v.startswith("http")
+            }
+            existing_profiles = {
+                k: v
+                for k, v in dict(existing.get("profiles", {})).items()
+                if isinstance(k, str) and isinstance(v, dict)
+            }
+        except Exception:
+            existing_logos = {}
+            existing_profiles = {}
+    merged_logos = {**existing_logos, **logos}
+    payload = {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "source": "finnhub /stock/profile2",
+        "ticker_count": len(merged_logos),
+        "profile_count": len(existing_profiles),
+        "logos": dict(sorted(merged_logos.items())),
+        "profiles": dict(sorted(existing_profiles.items())),
+    }
+    if profile_sweep_at:
+        payload["profile_sweep_at"] = profile_sweep_at
+    LOGO_CACHE_PATH.write_text(json.dumps(payload, indent=2) + "\n")
 
 
 def main() -> int:
@@ -167,12 +211,34 @@ def main() -> int:
         action="store_true",
         help="Exit cleanly if FINNHUB_API_KEY is missing (for CI runs without secrets).",
     )
+    parser.add_argument(
+        "--allow-market-hours",
+        action="store_true",
+        help="Allow non-price Finnhub calls during the 09:25-16:45 ET quote refresh window.",
+    )
     args = parser.parse_args()
 
     age = cache_age_days()
     if age is not None and age < MAX_AGE_DAYS and not args.force:
-        print(f"✅ Cache age {age:.1f}d < {MAX_AGE_DAYS}d — skipping fetch")
-        return 0
+        try:
+            cached = json.loads(CACHE_PATH.read_text())
+            cached_logos = {
+                k: v for k, v in dict(cached.get("logos", {})).items()
+                if isinstance(k, str) and isinstance(v, str) and v.startswith("http")
+            }
+        except Exception:
+            cached_logos = {}
+        if cached_logos:
+            write_logo_cache(cached_logos)
+            print(
+                f"✅ Cache age {age:.1f}d < {MAX_AGE_DAYS}d — "
+                f"skipping fetch, refreshed {LOGO_CACHE_PATH.relative_to(REPO_ROOT)}"
+            )
+            return 0
+        print(
+            f"Cache age {age:.1f}d < {MAX_AGE_DAYS}d but no logo cache is present; "
+            "refreshing profile2 data once."
+        )
 
     load_local_env()
     token = os.getenv("FINNHUB_API_KEY")
@@ -183,6 +249,7 @@ def main() -> int:
             return 0
         print(f"✗ {msg}", file=sys.stderr)
         return 1
+    block_finnhub_reserved_window(args.allow_market_hours)
 
     if not DB_PATH.exists():
         print(f"❌ DuckDB not found at {DB_PATH}", file=sys.stderr)
@@ -211,11 +278,18 @@ def main() -> int:
 
     # Preserve prior cache entries so partial failures don't lose data.
     caps: dict[str, float] = {}
+    logos: dict[str, str] = {}
     if CACHE_PATH.exists():
         try:
-            caps = dict(json.loads(CACHE_PATH.read_text()).get("market_caps", {}))
+            prior = json.loads(CACHE_PATH.read_text())
+            caps = dict(prior.get("market_caps", {}))
+            logos = {
+                k: v for k, v in dict(prior.get("logos", {})).items()
+                if isinstance(k, str) and isinstance(v, str) and v.startswith("http")
+            }
         except Exception:
             caps = {}
+            logos = {}
 
     print("Fetching live FX rates...")
     fx = fetch_fx_rates()
@@ -232,7 +306,7 @@ def main() -> int:
                 f"non_usd={non_usd_count} skipped={skipped}",
                 flush=True,
             )
-        mcap_usd, currency = fetch_mcap(sym, token, fx)
+        mcap_usd, currency, logo_url = fetch_profile(sym, token, fx)
         if mcap_usd is not None and mcap_usd > 0:
             caps[sym] = mcap_usd
             fetched += 1
@@ -242,6 +316,8 @@ def main() -> int:
                     unknown_currencies[currency] = unknown_currencies.get(currency, 0) + 1
         else:
             skipped += 1
+        if logo_url:
+            logos[sym] = logo_url
         time.sleep(REQUEST_DELAY)
 
     if unknown_currencies:
@@ -265,13 +341,16 @@ def main() -> int:
             "dollar volume)."
         ),
         "market_caps": dict(sorted(caps.items())),
+        "logos": dict(sorted(logos.items())),
     }
     CACHE_PATH.write_text(json.dumps(payload, indent=2))
+    write_logo_cache(logos)
     print(
         f"✅ Wrote {len(caps):,} market caps "
         f"({fetched} fresh, {skipped} skipped) → "
         f"{CACHE_PATH.relative_to(REPO_ROOT)}"
     )
+    print(f"✅ Wrote {len(logos):,} logos → {LOGO_CACHE_PATH.relative_to(REPO_ROOT)}")
     return 0
 
 

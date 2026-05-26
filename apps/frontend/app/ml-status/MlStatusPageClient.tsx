@@ -17,9 +17,11 @@ import {
   freshCoverageRatio,
   importRowDelta,
   pct,
+  sortedCoverageGaps,
   sortedHorizonRows,
   sortedImportHorizons,
   sortedModelRows,
+  type MlStatusCoverageGapRow,
   type MlStatusImportRow,
   type MlStatusModelRow,
   type MlStatusResponse,
@@ -380,6 +382,22 @@ function ModelStatusPill({ model }: { model: MlStatusModelRow }) {
   return <Pill tone="neutral">On disk</Pill>;
 }
 
+function coverageReasonLabel(reason: string | null): string {
+  if (!reason) return 'Ready';
+  if (reason === 'model_missing') return 'Model missing';
+  if (reason === 'no_feature_rows') return 'No feature rows';
+  if (reason === 'no_fresh_feature_rows') return 'Stale only';
+  return reason.replace(/_/g, ' ');
+}
+
+function CoverageGapPill({ row }: { row: MlStatusCoverageGapRow }) {
+  if (!row.unavailable_reason) return <Pill tone="up">Ready</Pill>;
+  if (row.unavailable_reason === 'no_fresh_feature_rows') {
+    return <Pill tone="warn">{coverageReasonLabel(row.unavailable_reason)}</Pill>;
+  }
+  return <Pill tone="down">{coverageReasonLabel(row.unavailable_reason)}</Pill>;
+}
+
 export default function MlStatusPageClient() {
   const [state, setState] = useState<LoadState>(EMPTY_STATE);
 
@@ -446,6 +464,12 @@ export default function MlStatusPageClient() {
     () => sortedHorizonRows(payload?.rows_by_horizon ?? []),
     [payload?.rows_by_horizon],
   );
+  const coverageGapRows = useMemo(
+    () => sortedCoverageGaps(payload?.coverage_gaps ?? []),
+    [payload?.coverage_gaps],
+  );
+  const missingFreshHorizons = payload?.missing_fresh_horizons
+    ?? coverageGapRows.filter((row) => !row.has_fresh_feature_rows).map((row) => row.horizon_days);
   const modelRows = useMemo(
     () => sortedModelRows(payload?.models ?? []),
     [payload?.models],
@@ -572,6 +596,12 @@ export default function MlStatusPageClient() {
           sub={payload ? `${compactNumber(payload.loaded_model_horizons.length)} loaded` : undefined}
         />
         <Metric
+          label="Fresh gaps"
+          value={payload ? compactNumber(missingFreshHorizons.length) : '—'}
+          sub={missingFreshHorizons.length > 0 ? missingFreshHorizons.map((horizon) => `T${horizon}`).join(', ') : 'All supported horizons'}
+          tone={missingFreshHorizons.length > 0 ? 'warn' : 'up'}
+        />
+        <Metric
           label="Runtime"
           value={payload?.postgres_available ? 'Postgres' : 'No DB'}
           sub={payload?.redis_available ? 'Redis cache online' : 'Redis unavailable'}
@@ -583,6 +613,31 @@ export default function MlStatusPageClient() {
           sub={formatDateTime(payload?.data?.latest_scored_at)}
         />
       </div>
+
+      <Section
+        title="Coverage Targets"
+        icon={<AlertTriangle size={18} />}
+        aside={payload?.supported_horizons ? (
+          <Pill tone="accent">
+            Supported {payload.supported_horizons.map((horizon) => `T${horizon}`).join(' ')}
+          </Pill>
+        ) : undefined}
+      >
+        <DataTable columns={['Horizon', 'Status', 'Model', 'Fresh rows', 'Total rows', 'Reason']}>
+          {coverageGapRows.length === 0 ? (
+            <tr><Td muted>—</Td><Td muted>—</Td><Td muted>—</Td><Td muted>—</Td><Td muted>—</Td><Td muted>—</Td></tr>
+          ) : coverageGapRows.map((row) => (
+            <tr key={row.horizon_days}>
+              <Td><span className="mono">T{row.horizon_days}</span></Td>
+              <Td><CoverageGapPill row={row} /></Td>
+              <Td muted>{row.model_available ? 'Available' : 'Missing'}</Td>
+              <Td>{compactNumber(row.fresh_feature_rows)}</Td>
+              <Td muted>{compactNumber(row.total_feature_rows)}</Td>
+              <Td muted>{coverageReasonLabel(row.unavailable_reason)}</Td>
+            </tr>
+          ))}
+        </DataTable>
+      </Section>
 
       <Section
         title="Coverage By Horizon"

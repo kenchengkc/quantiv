@@ -174,15 +174,37 @@ class MLAvailableHorizon(BaseModel):
     forecast_scored_at: Optional[datetime] = None
 
 
+class MLEventHorizonStatus(BaseModel):
+    horizon_days: int
+    earnings_date: Optional[date] = None
+    snapshot_date: Optional[date] = None
+    snapshot_age_days: Optional[int] = None
+    live_eligible: bool = Field(
+        False,
+        description="True when /api/ml/predict can use this event/horizon now.",
+    )
+    unavailable_reason: Optional[str] = Field(
+        None,
+        description=(
+            "Machine-readable reason when unavailable: no_snapshot, "
+            "missing_feature_vector, or snapshot_stale."
+        ),
+    )
+    spot_price: Optional[float] = None
+    forecast_scored_at: Optional[datetime] = None
+
+
 class MLCoverageResponse(BaseModel):
     total_feature_rows: int
     fresh_window_days: int
     fresh_distinct_symbols: int
     fresh_distinct_events: int
+    supported_horizons: List[int] = Field(default_factory=list)
     rows_by_horizon: List[MLCoverageHorizonRow]
     symbol: Optional[str] = None
     earnings_date: Optional[date] = None
     available_horizons: List[MLAvailableHorizon] = Field(default_factory=list)
+    event_horizon_statuses: List[MLEventHorizonStatus] = Field(default_factory=list)
     checked_at: datetime
 
 
@@ -256,6 +278,22 @@ class MLStatusHorizonRow(BaseModel):
     latest_scored_at: Optional[datetime] = None
 
 
+class MLStatusCoverageGapRow(BaseModel):
+    horizon_days: int
+    model_available: bool
+    has_any_feature_rows: bool
+    has_fresh_feature_rows: bool
+    total_feature_rows: int
+    fresh_feature_rows: int
+    unavailable_reason: Optional[str] = Field(
+        None,
+        description=(
+            "None when usable; otherwise model_missing, no_feature_rows, "
+            "or no_fresh_feature_rows."
+        ),
+    )
+
+
 class MLStatusImportRow(BaseModel):
     parquet_file: str
     imported_at: datetime
@@ -280,11 +318,15 @@ class MLStatusResponse(BaseModel):
     fresh_window_days: int
     max_snapshot_age_days: int
     models_dir: str
+    supported_horizons: List[int] = Field(default_factory=list)
     available_model_horizons: List[int]
     loaded_model_horizons: List[int]
+    missing_model_horizons: List[int] = Field(default_factory=list)
+    missing_fresh_horizons: List[int] = Field(default_factory=list)
     redis_available: bool
     postgres_available: bool
     data: Optional[MLStatusDataRow] = None
     rows_by_horizon: List[MLStatusHorizonRow] = Field(default_factory=list)
+    coverage_gaps: List[MLStatusCoverageGapRow] = Field(default_factory=list)
     latest_import: Optional[MLStatusImportRow] = None
     models: List[MLStatusModelRow] = Field(default_factory=list)
