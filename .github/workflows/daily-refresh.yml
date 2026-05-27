@@ -340,7 +340,7 @@ jobs:
             echo "No changes to commit"
           else
             git commit -m "daily refresh $(date -u +%Y-%m-%d)"
-            git push origin main
+            bash scripts/git_push_with_retry.sh origin main
           fi
 
   finnhub-profile-sweep:
@@ -422,7 +422,7 @@ jobs:
             echo "No Finnhub profile/logo cache changes to commit"
           else
             git commit -m "refresh Finnhub profile logos $(date -u +%Y-%m-%d)"
-            git push origin main
+            bash scripts/git_push_with_retry.sh origin main
           fi
 
   # Weekly only — see `on.schedule` second cron. Does not commit to git; uploads
