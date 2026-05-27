@@ -46,16 +46,19 @@ npm run data:frontend
 ## FMP EPS/Revenue Backfill
 
 `sync_fmp_earnings.py` uses one broad `/stable/earnings-calendar` request for
-near-term rows. `backfill_fmp_earnings_by_symbol.py` handles the free-tier
-historical path: `/stable/earnings?symbol=SYM` returns many quarters for one
-symbol, but comma-separated symbols are not available on the current plan.
+near-term rows. `backfill_fmp_earnings_by_symbol.py` handles the historical
+path for FMP plans that allow `/stable/earnings?symbol=SYM`; that endpoint can
+return many quarters for one symbol, but comma-separated symbols are not
+available on the current plan.
 
-The daily workflow therefore runs the symbol backfill with `--max-calls 240`
-after the one-call calendar overlay. It writes progress to
-`data/fmp_earnings_backfill_state.json` and merges fill-missing-only by default.
-Do not use this as a source of truth for earnings dates until provider
-disagreements are explicitly reviewed; FMP-only dates are skipped unless
-`--insert-new-events` is passed.
+The current free-tier key rejects `/stable/earnings?symbol=SYM` with a
+plan-level 402, so the daily workflow keeps the symbol backfill behind
+repository variable `ENABLE_FMP_SYMBOL_BACKFILL=1`. Leave that variable unset
+until the FMP plan supports the symbol endpoint. When enabled, the script writes
+progress to `data/fmp_earnings_backfill_state.json` and merges
+fill-missing-only by default. Do not use this as a source of truth for earnings
+dates until provider disagreements are explicitly reviewed; FMP-only dates are
+skipped unless `--insert-new-events` is passed.
 
 ## Env
 
