@@ -3664,16 +3664,23 @@ export default function SymbolPage({
   const intradayForSymbol = intraday?.symbol === symbol ? intraday : null;
   const livePrice = liveForSymbol?.price ?? null;
   const spot = livePrice ?? data.spot_price ?? 0;
+  const livePreviousCloseForChange =
+    intradayForSymbol === null ? null : liveForSymbol?.previousClose ?? null;
   const previousCloseForChange =
-    intradayForSymbol?.previousClose ?? liveForSymbol?.previousClose ?? null;
+    intradayForSymbol?.previousClose ?? livePreviousCloseForChange;
+  const useLiveChangeFallback = intradayForSymbol !== null;
   const change =
     livePrice != null && previousCloseForChange != null && previousCloseForChange > 0
       ? livePrice - previousCloseForChange
-      : liveForSymbol?.change ?? 0;
+      : useLiveChangeFallback
+        ? liveForSymbol?.change ?? 0
+        : 0;
   const changePct =
     livePrice != null && previousCloseForChange != null && previousCloseForChange > 0
       ? change / previousCloseForChange
-      : liveForSymbol?.changePct ?? 0;
+      : useLiveChangeFallback
+        ? liveForSymbol?.changePct ?? 0
+        : 0;
 
   const straddlePct = em?.straddle_pct ?? 0;
   const ivPct = em?.iv_pct ?? straddlePct;
