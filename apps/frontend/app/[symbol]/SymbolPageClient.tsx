@@ -217,10 +217,20 @@ function SymbolPageLoading({ symbol }: { symbol: string }) {
               </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 14, flexWrap: 'wrap' }}>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'auto auto 1fr',
+                alignItems: 'baseline',
+                columnGap: 14,
+                minHeight: 44,
+              }}
+            >
               <SkeletonBlock width={128} height={42} radius={7} />
-              <SkeletonBlock width={118} height={15} />
-              <SkeletonBlock width={156} height={12} />
+              <SkeletonBlock width={118} height={15} radius={5} />
+              <div style={{ justifySelf: 'end' }}>
+                <SkeletonBlock width={156} height={12} radius={5} />
+              </div>
             </div>
 
             <div>
@@ -230,13 +240,15 @@ function SymbolPageLoading({ symbol }: { symbol: string }) {
                   marginTop: 12,
                   display: 'flex',
                   justifyContent: 'space-between',
+                  alignItems: 'center',
                   gap: 16,
                   paddingTop: 8,
+                  minHeight: 29,
                   borderTop: '1px solid color-mix(in oklab, var(--line) 70%, transparent)',
                 }}
               >
-                <SkeletonBlock width={214} height={12} />
-                <SkeletonBlock width={60} height={12} />
+                <SkeletonBlock width={214} height={12} radius={5} />
+                <SkeletonBlock width={60} height={12} radius={5} />
               </div>
             </div>
 
@@ -1129,63 +1141,66 @@ function DetailHero({
             </div>
           </div>
 
-          {quotePending ? (
-            <div
-              aria-label="Loading live quote"
-              style={{ display: 'flex', alignItems: 'baseline', gap: 14, flexWrap: 'wrap', minHeight: 43 }}
-            >
-              <SkeletonBlock width={124} height={38} radius={7} />
-              <SkeletonBlock width={112} height={14} radius={5} />
-              <span
-                style={{
-                  fontSize: 10,
-                  color: 'var(--ink-4)',
-                  letterSpacing: '0.14em',
-                  textTransform: 'uppercase',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                Live quote loading
-              </span>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 14, flexWrap: 'wrap' }}>
-              <span
-                className="serif tnum"
-                style={{ fontSize: 36, fontWeight: 700, letterSpacing: '-0.02em' }}
-              >
-                ${spot.toFixed(2)}
-              </span>
-              <span
-                className="mono tnum"
-                style={{
-                  fontSize: 13,
-                  color: flat ? 'var(--ink-4)' : up ? 'var(--up)' : 'var(--down)',
-                }}
-              >
-                {flat ? '–' : up ? '▲' : '▼'} {Math.abs(change).toFixed(2)} (
-                {(Math.abs(changePct) * 100).toFixed(2)}%)
-              </span>
-              <span
-                title={quoteLabel}
-                style={{
-                  fontSize: 10,
-                  color: 'var(--ink-4)',
-                  letterSpacing: '0.14em',
-                  textTransform: 'uppercase',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {quoteLabel}
-              </span>
-            </div>
-          )}
+          <div
+            aria-busy={quotePending}
+            aria-label={quotePending ? 'Loading live quote' : undefined}
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'auto auto 1fr',
+              alignItems: 'baseline',
+              columnGap: 14,
+              minHeight: 44,
+            }}
+          >
+            {quotePending ? (
+              <>
+                <SkeletonBlock width={128} height={42} radius={7} />
+                <SkeletonBlock width={118} height={15} radius={5} />
+                <div style={{ justifySelf: 'end' }}>
+                  <SkeletonBlock width={156} height={12} radius={5} />
+                </div>
+              </>
+            ) : (
+              <>
+                <span
+                  className="serif tnum"
+                  style={{ fontSize: 36, fontWeight: 700, letterSpacing: '-0.02em' }}
+                >
+                  ${spot.toFixed(2)}
+                </span>
+                <span
+                  className="mono tnum"
+                  style={{
+                    fontSize: 13,
+                    color: flat ? 'var(--ink-4)' : up ? 'var(--up)' : 'var(--down)',
+                  }}
+                >
+                  {flat ? '–' : up ? '▲' : '▼'} {Math.abs(change).toFixed(2)} (
+                  {(Math.abs(changePct) * 100).toFixed(2)}%)
+                </span>
+                <span
+                  title={quoteLabel}
+                  style={{
+                    justifySelf: 'end',
+                    textAlign: 'right',
+                    fontSize: 10,
+                    color: 'var(--ink-4)',
+                    letterSpacing: '0.14em',
+                    textTransform: 'uppercase',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {quoteLabel}
+                </span>
+              </>
+            )}
+          </div>
 
           <div style={{ minHeight: 0 }}>
             {/* Real 1D intraday sparkline (Alpaca IEX 5-min bars). Sits
                 above the small caption row so the chart reads as a
                 visual answer to the session % printed beneath it. */}
-            <div style={{ height: 42, marginBottom: 4 }}>
+            <div style={{ height: 42 }}>
               <HeroSpark ticker={symbol} up={sparkUp} bars={intradayBars} loading={intradayLoading} />
             </div>
             <div
@@ -1193,9 +1208,11 @@ function DetailHero({
                 width: '100%',
                 display: 'flex',
                 justifyContent: 'space-between',
+                alignItems: 'center',
                 gap: 16,
-                flexWrap: 'wrap',
+                marginTop: 12,
                 paddingTop: 8,
+                minHeight: 29,
                 borderTop: '1px solid color-mix(in oklab, var(--line) 70%, transparent)',
                 fontSize: 10,
                 color: 'var(--ink-4)',
@@ -1203,22 +1220,41 @@ function DetailHero({
                 textTransform: 'uppercase',
               }}
             >
-              <span>{sparkCaption}</span>
-              <span
-                className="mono tnum"
-                style={{
-                  color:
-                    sessionPct == null || sessionPct === 0
-                      ? 'var(--ink-4)'
-                      : sessionPct > 0
-                        ? 'var(--up)'
-                        : 'var(--down)',
-                }}
-              >
-                {sessionPct == null
-                  ? '--'
-                  : `${sessionPct >= 0 ? '+' : ''}${(sessionPct * 100).toFixed(2)}%`}
-              </span>
+              {intradayLoading ? (
+                <>
+                  <SkeletonBlock width={214} height={12} radius={5} />
+                  <SkeletonBlock width={60} height={12} radius={5} />
+                </>
+              ) : (
+                <>
+                  <span
+                    style={{
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      minWidth: 0,
+                    }}
+                  >
+                    {sparkCaption}
+                  </span>
+                  <span
+                    className="mono tnum"
+                    style={{
+                      flexShrink: 0,
+                      color:
+                        sessionPct == null || sessionPct === 0
+                          ? 'var(--ink-4)'
+                          : sessionPct > 0
+                            ? 'var(--up)'
+                            : 'var(--down)',
+                    }}
+                  >
+                    {sessionPct == null
+                      ? '--'
+                      : `${sessionPct >= 0 ? '+' : ''}${(sessionPct * 100).toFixed(2)}%`}
+                  </span>
+                </>
+              )}
             </div>
           </div>
 
