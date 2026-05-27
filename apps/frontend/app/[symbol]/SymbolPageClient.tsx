@@ -102,6 +102,7 @@ interface SymbolDetail {
 }
 
 interface LivePrice {
+  symbol: string;
   price: number | null;
   previousClose: number | null;
   change: number | null;
@@ -3223,6 +3224,7 @@ export default function SymbolPage({
   // wraps Alpaca's IEX feed; we cache aggressively server-side and
   // refresh once a minute client-side during the regular session.
   const [intraday, setIntraday] = useState<{
+    symbol: string;
     bars: { t: string; c: number }[];
     previousClose: number | null;
     asOf: string | null;
@@ -3252,6 +3254,7 @@ export default function SymbolPage({
         };
         if (cancelled) return;
         setIntraday({
+          symbol,
           bars: Array.isArray(json.bars) ? json.bars : [],
           previousClose: json.previousClose ?? null,
           asOf: json.asOf ?? null,
@@ -3261,6 +3264,7 @@ export default function SymbolPage({
       } catch {
         if (!cancelled) {
           setIntraday({
+            symbol,
             bars: [],
             previousClose: null,
             asOf: null,
@@ -3350,6 +3354,7 @@ export default function SymbolPage({
         const tick = json.data?.[0];
         if (!cancelled && tick && tick.price !== null) {
           setLive({
+            symbol: (tick.symbol || symbol).toUpperCase(),
             price: tick.price,
             previousClose: tick.previousClose,
             change: tick.change,
@@ -3517,13 +3522,17 @@ export default function SymbolPage({
     return <SymbolPageLoading symbol={symbol} />;
   }
 
+  if (data && data.symbol.toUpperCase() !== symbol) {
+    return <SymbolPageLoading symbol={symbol} />;
+  }
+
   if (error || !data) {
     // Limited view for tickers that exist (search hit, valid ticker)
     // but have no pre-built /symbols/SYM.json (e.g. not in the options
     // universe yet, or in flight to be added). We still know the
     // company name (sp500 lookup) and can usually show a live quote
     // via the batch-price API.
-    const tick = live;
+    const tick = live?.symbol === symbol ? live : null;
     const knownName = companyName(symbol);
     const hasFriendlyName = knownName !== symbol;
     const pct = tick?.changePct;
@@ -3651,10 +3660,20 @@ export default function SymbolPage({
   }
 
   const em = data.expected_move;
-  const livePrice = live?.price ?? null;
+  const liveForSymbol = live?.symbol === symbol ? live : null;
+  const intradayForSymbol = intraday?.symbol === symbol ? intraday : null;
+  const livePrice = liveForSymbol?.price ?? null;
   const spot = livePrice ?? data.spot_price ?? 0;
-  const change = live?.change ?? 0;
-  const changePct = live?.changePct ?? 0;
+  const previousCloseForChange =
+    intradayForSymbol?.previousClose ?? liveForSymbol?.previousClose ?? null;
+  const change =
+    livePrice != null && previousCloseForChange != null && previousCloseForChange > 0
+      ? livePrice - previousCloseForChange
+      : liveForSymbol?.change ?? 0;
+  const changePct =
+    livePrice != null && previousCloseForChange != null && previousCloseForChange > 0
+      ? change / previousCloseForChange
+      : liveForSymbol?.changePct ?? 0;
 
   const straddlePct = em?.straddle_pct ?? 0;
   const ivPct = em?.iv_pct ?? straddlePct;
@@ -3724,14 +3743,18 @@ export default function SymbolPage({
           earningsDate={earningsDate}
           earningsTiming={earningsTiming}
           eventLabel={eventLabel}
-          quoteLabel={quoteSourceLabel(live, symbol, data.as_of_date)}
-          intradayBars={intraday?.bars && intraday.bars.length >= 2 ? intraday.bars : null}
-          intradayLoading={intraday === null}
-          intradaySessionDate={intraday?.sessionDate ?? null}
-          intradayIsCurrentSession={intraday?.isCurrentSession ?? null}
+          quoteLabel={quoteSourceLabel(liveForSymbol, symbol, data.as_of_date)}
+          intradayBars={
+            intradayForSymbol?.bars && intradayForSymbol.bars.length >= 2
+              ? intradayForSymbol.bars
+              : null
+          }
+          intradayLoading={intradayForSymbol === null}
+          intradaySessionDate={intradayForSymbol?.sessionDate ?? null}
+          intradayIsCurrentSession={intradayForSymbol?.isCurrentSession ?? null}
           // Real session %: first→last close on the displayed IEX session.
           intradaySessionPct={(() => {
-            const bars = intraday?.bars;
+            const bars = intradayForSymbol?.bars;
             if (!bars || bars.length < 2) return null;
             const first = bars[0].c;
             const last = bars[bars.length - 1].c;

@@ -7,6 +7,8 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(REPO_ROOT / "apps" / "backend"))
 
 from workers.quote_worker import (  # noqa: E402
+    PREVIOUS_CLOSE_CACHE_MAX_AGE_S,
+    cached_previous_close,
     is_quote_window,
     monday_iso_for,
     normalize_symbol,
@@ -61,3 +63,29 @@ def test_score_week_events_prioritizes_today_and_tomorrow():
         weight=55,
     )
     assert scores["CRM"] > scores["NVDA"] > scores["AAPL"]
+
+
+def test_cached_previous_close_only_uses_recent_rest_quotes():
+    now_ms = 1_800_000
+    assert (
+        cached_previous_close(
+            '{"at": 1200000, "transport": "rest", "tick": {"previousClose": 295.19}}',
+            now_ms=now_ms,
+        )
+        == 295.19
+    )
+    assert (
+        cached_previous_close(
+            '{"at": 1200000, "transport": "websocket", "tick": {"previousClose": 252.8}}',
+            now_ms=now_ms,
+        )
+        is None
+    )
+    stale_ms = now_ms - (PREVIOUS_CLOSE_CACHE_MAX_AGE_S + 1) * 1000
+    assert (
+        cached_previous_close(
+            f'{{"at": {stale_ms}, "transport": "rest", "tick": {{"previousClose": 295.19}}}}',
+            now_ms=now_ms,
+        )
+        is None
+    )

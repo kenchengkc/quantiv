@@ -34,6 +34,7 @@ logger = structlog.get_logger()
 QUOTE_REFRESH_OPEN_MIN = 9 * 60 + 25
 QUOTE_REFRESH_CLOSE_MIN = 16 * 60 + 45
 STALE_TTL_S = 7 * 24 * 60 * 60
+PREVIOUS_CLOSE_CACHE_MAX_AGE_S = 30 * 60
 INTEREST_ZSET = "quote:interest"
 STATUS_KEY = "quote:worker:status"
 CURSOR_KEY = "quote:railway:cursor"
@@ -270,11 +271,33 @@ def score_week_events(
         scores[symbol] = scores.get(symbol, 0.0) + weight + bonus
 
 
+def cached_previous_close(raw: str | bytes | None, *, now_ms: int) -> float | None:
+    if not raw:
+        return None
+    try:
+        entry = json.loads(raw) if isinstance(raw, str) else json.loads(raw.decode())
+    except Exception:
+        return None
+    if not isinstance(entry, dict) or entry.get("transport") != "rest":
+        return None
+    at_ms = entry.get("at")
+    if not isinstance(at_ms, (int, float)):
+        return None
+    if now_ms - int(at_ms) > PREVIOUS_CLOSE_CACHE_MAX_AGE_S * 1000:
+        return None
+    tick = entry.get("tick")
+    if not isinstance(tick, dict):
+        return None
+    pc = tick.get("previousClose")
+    return float(pc) if isinstance(pc, (int, float)) and pc > 0 else None
+
+
 @dataclass
 class QuoteWorkerState:
     ranked_symbols: list[str] = field(default_factory=list)
     websocket_symbols: set[str] = field(default_factory=set)
     previous_close: dict[str, float] = field(default_factory=dict)
+    missing_previous_close_cursor: int = 0
     calls_ok: int = 0
     calls_failed: int = 0
     ws_messages: int = 0
@@ -374,17 +397,11 @@ class QuoteWorker:
             raws = await self.redis.mget(keys)
         except Exception:
             return
+        now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
         for symbol, raw in zip(missing, raws, strict=False):
-            if not raw:
-                continue
-            try:
-                entry = json.loads(raw) if isinstance(raw, str) else raw
-                tick = entry.get("tick") if isinstance(entry, dict) else None
-                pc = tick.get("previousClose") if isinstance(tick, dict) else None
-                if isinstance(pc, (int, float)) and pc > 0:
-                    self.state.previous_close[symbol] = float(pc)
-            except Exception:
-                continue
+            pc = cached_previous_close(raw, now_ms=now_ms)
+            if pc is not None:
+                self.state.previous_close[symbol] = pc
 
     async def write_status(self) -> None:
         payload = {
@@ -463,20 +480,37 @@ class QuoteWorker:
                 continue
 
             await self.refresh_universe()
-            symbols = [
+            websocket_missing_previous_close = [
+                s
+                for s in self.state.ranked_symbols
+                if s in self.state.websocket_symbols and s not in self.state.previous_close
+            ]
+            longtail_symbols = [
                 s for s in self.state.ranked_symbols if s not in self.state.websocket_symbols
             ]
+            symbols = websocket_missing_previous_close + longtail_symbols
             if not symbols:
                 self.state.status = "no_rest_symbols"
                 await asyncio.sleep(5)
                 continue
-            try:
-                raw_cursor = await self.redis.get(CURSOR_KEY)
-                cursor = int(raw_cursor) % len(symbols) if raw_cursor is not None else 0
-            except Exception:
-                cursor = 0
-            symbol = symbols[cursor]
-            next_cursor = (cursor + 1) % len(symbols)
+            if websocket_missing_previous_close:
+                cursor = self.state.missing_previous_close_cursor % len(
+                    websocket_missing_previous_close
+                )
+                symbol = websocket_missing_previous_close[cursor]
+                self.state.missing_previous_close_cursor = (cursor + 1) % len(
+                    websocket_missing_previous_close
+                )
+                next_cursor = None
+            else:
+                self.state.missing_previous_close_cursor = 0
+                try:
+                    raw_cursor = await self.redis.get(CURSOR_KEY)
+                    cursor = int(raw_cursor) % len(symbols) if raw_cursor is not None else 0
+                except Exception:
+                    cursor = 0
+                symbol = symbols[cursor]
+                next_cursor = (cursor + 1) % len(symbols)
 
             tick = await self.fetch_quote(symbol)
             if tick:
@@ -490,10 +524,11 @@ class QuoteWorker:
                     logger.warning("quote write failed", symbol=symbol, error=str(exc))
             else:
                 self.state.calls_failed += 1
-            try:
-                await self.redis.set(CURSOR_KEY, next_cursor)
-            except Exception:
-                pass
+            if next_cursor is not None:
+                try:
+                    await self.redis.set(CURSOR_KEY, next_cursor)
+                except Exception:
+                    pass
             await asyncio.sleep(spacing)
 
     async def websocket_loop(self) -> None:
