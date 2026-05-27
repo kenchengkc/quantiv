@@ -22,7 +22,7 @@ import sys
 import time
 from datetime import date, datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 from zoneinfo import ZoneInfo
 
 import pandas as pd
@@ -469,6 +469,17 @@ def _drop_stale_dolthub_ghosts(
     return merged, dropped
 
 
+def _fq_key(row: dict[str, Any]) -> Optional[tuple[str, Any, Any]]:
+    """Stable (ticker, fiscal_year, fiscal_q) identifier for an earnings
+    event. Returns None when fiscal_year / fiscal_q aren't known — those
+    rows can't be deduped by quarter so we leave them alone."""
+    fy = row.get("fiscal_year")
+    fq = row.get("fiscal_q")
+    if fy is None or fq is None or pd.isna(fy) or pd.isna(fq):
+        return None
+    return (row["act_symbol"], fy, fq)
+
+
 def merge_overlay(existing: pd.DataFrame, overlay: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, int]]:
     existing = normalize_existing(existing)
     overlay = normalize_existing(overlay)
@@ -484,7 +495,22 @@ def merge_overlay(existing: pd.DataFrame, overlay: pd.DataFrame) -> tuple[pd.Dat
         "updated": 0,
         "timing_updates": 0,
         "dolthub_ghosts_dropped": 0,
+        "stale_finnhub_quarters_dropped": 0,
     }
+
+    # Treat the current overlay as the source of truth for the date of any
+    # (ticker, fiscal_year, fiscal_q) it covers. Finnhub revises projected
+    # dates between sweeps; without this pass we'd accumulate one row per
+    # revision (e.g. AGX Q1 FY27 ending up on 06-02, 06-04, AND 06-10).
+    # Only future-dated finnhub-touched rows are eligible for eviction —
+    # past events stay, and dolthub-only historicals stay.
+    today_dt = pd.Timestamp.today().date()
+    overlay_quarters: dict[tuple[str, Any, Any], date] = {}
+    for _, row in overlay.iterrows():
+        fk = _fq_key(row.to_dict())
+        if fk is None:
+            continue
+        overlay_quarters[fk] = row["date"]
 
     for _, row in overlay.iterrows():
         key = (row["act_symbol"], row["date"])
@@ -518,6 +544,33 @@ def merge_overlay(existing: pd.DataFrame, overlay: pd.DataFrame) -> tuple[pd.Dat
         if changed:
             current["source"] = "dolthub+finnhub"
             stats["updated"] += 1
+
+    # Evict stale finnhub date estimates for fiscal quarters whose date the
+    # current overlay just (re)set. Without this, every Finnhub date
+    # revision (06-02 → 06-04 → 06-10 for AGX Q1 FY27) accumulated as a
+    # separate row because the upsert key is (ticker, date) — same fiscal
+    # quarter, three different dates. We keep only the date the latest
+    # overlay reports for that quarter. Past events and dolthub-only
+    # historicals are untouched.
+    finnhub_sources = {"finnhub", "dolthub+finnhub"}
+    evicted = 0
+    for key in list(by_key.keys()):
+        row = by_key[key]
+        row_source = row.get("source")
+        row_date = row.get("date")
+        if row_source not in finnhub_sources:
+            continue
+        if row_date is None or row_date < today_dt:
+            continue
+        fk = _fq_key(row)
+        if fk is None:
+            continue
+        authoritative_date = overlay_quarters.get(fk)
+        if authoritative_date is None or authoritative_date == row_date:
+            continue
+        del by_key[key]
+        evicted += 1
+    stats["stale_finnhub_quarters_dropped"] = evicted
 
     merged = pd.DataFrame(by_key.values(), columns=OUTPUT_COLUMNS)
     merged = merged.sort_values(["date", "act_symbol"]).reset_index(drop=True)
