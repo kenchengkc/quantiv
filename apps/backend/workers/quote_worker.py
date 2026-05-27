@@ -271,7 +271,12 @@ def score_week_events(
         scores[symbol] = scores.get(symbol, 0.0) + weight + bonus
 
 
-def cached_previous_close(raw: str | bytes | None, *, now_ms: int) -> float | None:
+def cached_previous_close(
+    raw: str | bytes | None,
+    *,
+    now_ms: int,
+    session_date: str | None = None,
+) -> float | None:
     if not raw:
         return None
     try:
@@ -279,6 +284,13 @@ def cached_previous_close(raw: str | bytes | None, *, now_ms: int) -> float | No
     except Exception:
         return None
     if not isinstance(entry, dict) or entry.get("transport") != "rest":
+        return None
+    cached_session_date = entry.get("sessionDate")
+    if (
+        session_date
+        and isinstance(cached_session_date, str)
+        and cached_session_date[:10] != session_date
+    ):
         return None
     at_ms = entry.get("at")
     if not isinstance(at_ms, (int, float)):
@@ -297,6 +309,7 @@ class QuoteWorkerState:
     ranked_symbols: list[str] = field(default_factory=list)
     websocket_symbols: set[str] = field(default_factory=set)
     previous_close: dict[str, float] = field(default_factory=dict)
+    previous_close_session_date: str | None = None
     missing_previous_close_cursor: int = 0
     calls_ok: int = 0
     calls_failed: int = 0
@@ -305,6 +318,15 @@ class QuoteWorkerState:
     last_rest_symbol: str | None = None
     last_ws_symbol: str | None = None
     status: str = "starting"
+
+
+def reset_previous_close_session(state: QuoteWorkerState, session_date: str) -> bool:
+    if state.previous_close_session_date == session_date:
+        return False
+    state.previous_close.clear()
+    state.missing_previous_close_cursor = 0
+    state.previous_close_session_date = session_date
+    return True
 
 
 class QuoteWorker:
@@ -337,6 +359,11 @@ class QuoteWorker:
         await self.redis.aclose()
         if self.pg_pool:
             await self.pg_pool.close()
+
+    def ensure_quote_session(self) -> None:
+        _weekday, session_date, _minutes = et_parts()
+        if reset_previous_close_session(self.state, session_date):
+            logger.info("quote previous-close session reset", session_date=session_date)
 
     async def refresh_universe(self, *, force: bool = False) -> None:
         now = asyncio.get_running_loop().time()
@@ -398,8 +425,9 @@ class QuoteWorker:
         except Exception:
             return
         now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+        _weekday, session_date, _minutes = et_parts()
         for symbol, raw in zip(missing, raws, strict=False):
-            pc = cached_previous_close(raw, now_ms=now_ms)
+            pc = cached_previous_close(raw, now_ms=now_ms, session_date=session_date)
             if pc is not None:
                 self.state.previous_close[symbol] = pc
 
@@ -461,11 +489,13 @@ class QuoteWorker:
         }
 
     async def write_quote(self, tick: dict[str, Any], *, transport: str) -> None:
+        _weekday, session_date, _minutes = et_parts()
         entry = {
             "at": int(datetime.now(timezone.utc).timestamp() * 1000),
             "tick": tick,
             "source": "finnhub",
             "session": "regular",
+            "sessionDate": session_date,
             "transport": transport,
         }
         await self.redis.set(f"quote:{tick['symbol']}", json.dumps(entry), ex=STALE_TTL_S)
@@ -479,6 +509,7 @@ class QuoteWorker:
                 await asyncio.sleep(30)
                 continue
 
+            self.ensure_quote_session()
             await self.refresh_universe()
             websocket_missing_previous_close = [
                 s
@@ -538,6 +569,7 @@ class QuoteWorker:
             if not is_quote_window(holidays=self.holidays) and not self.config.allow_market_hours_override:
                 await asyncio.sleep(30)
                 continue
+            self.ensure_quote_session()
             await self.refresh_universe()
             symbols = set(self.state.websocket_symbols)
             if not symbols:
