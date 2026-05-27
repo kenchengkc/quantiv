@@ -115,6 +115,20 @@ jobs:
           FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
         run: python scripts/sync_fmp_earnings.py --allow-missing-key --no-date-params
 
+      - name: Backfill FMP EPS and revenue history by symbol
+        # FMP free tier does not allow symbol batching on /stable/earnings.
+        # Advance a persistent one-symbol queue slowly under the 250/day cap:
+        # 1 call is used by the broad calendar overlay above, so this keeps
+        # roughly 9 calls of buffer for retries/manual checks.
+        env:
+          FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
+        run: |
+          python scripts/backfill_fmp_earnings_by_symbol.py \
+            --allow-missing-key \
+            --max-calls 240 \
+            --delay 0.25 \
+            --refresh-after-days 90
+
       - name: Probe Alpha Vantage V/OI coverage
         # Low-priority options enrichment audit. Free tier is small, so this
         # advances a persistent queue slowly and skips symbols checked recently.
@@ -314,7 +328,7 @@ jobs:
           # with [ -f ... ] guards so a missing file (e.g. the changes
           # log on the very first run, before any diff entries land)
           # doesn't tank the commit step with a pathspec error.
-          for f in data/popular_snapshot.json data/popular_changes.jsonl data/fmp_earnings_metadata.json data/alpha_vantage_voi_probe.json; do
+          for f in data/popular_snapshot.json data/popular_changes.jsonl data/fmp_earnings_metadata.json data/fmp_earnings_backfill_state.json data/alpha_vantage_voi_probe.json; do
             if [ -f "$f" ]; then
               git add -f "$f"
             else

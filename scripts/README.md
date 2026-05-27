@@ -11,6 +11,7 @@ See [`.github/workflows/daily-refresh.yml`](../.github/workflows/daily-refresh.y
 | `sync_dolthub.py` | Options, earnings, OHLCV, vol history from DoltHub | `data:sync*`, nightly |
 | `sync_finnhub_earnings.py` | Near-term earnings overlay into `data/earnings_calendar.csv` | `data:earnings:finnhub`, nightly |
 | `sync_fmp_earnings.py` | Date-window FMP EPS/revenue overlay into `data/earnings_calendar.csv` | `data:earnings:fmp`, nightly |
+| `backfill_fmp_earnings_by_symbol.py` | Free-tier-safe one-symbol FMP EPS/revenue history backfill | `data:earnings:fmp-backfill`, nightly |
 | `sync_finnhub_profiles.py` | Market-hours-guarded Finnhub profile/logo cache for `ticker-logos.json` | `data:profiles:finnhub`, weekly/manual |
 | `sync_vix.py` | FRED VIX → Parquet | Nightly |
 | `probe_alphavantage_voi.py` | Persistent multi-day Alpha Vantage V/OI entitlement and coverage audit | `data:probe:alphavantage-voi`, nightly |
@@ -35,11 +36,26 @@ Frontend JSON build lives in [`tools/`](../tools/README.md) (`build_frontend_dat
 ```bash
 npm run data:sync
 npm run data:earnings:finnhub -- --symbols AAPL,MSFT
+npm run data:earnings:fmp-backfill -- --dry-run --max-calls 10
 python scripts/check_earnings_calendar_integrity.py --warn-only   # optional locally
 npm run data:views
 npm run ml:score
 npm run data:frontend
 ```
+
+## FMP EPS/Revenue Backfill
+
+`sync_fmp_earnings.py` uses one broad `/stable/earnings-calendar` request for
+near-term rows. `backfill_fmp_earnings_by_symbol.py` handles the free-tier
+historical path: `/stable/earnings?symbol=SYM` returns many quarters for one
+symbol, but comma-separated symbols are not available on the current plan.
+
+The daily workflow therefore runs the symbol backfill with `--max-calls 240`
+after the one-call calendar overlay. It writes progress to
+`data/fmp_earnings_backfill_state.json` and merges fill-missing-only by default.
+Do not use this as a source of truth for earnings dates until provider
+disagreements are explicitly reviewed; FMP-only dates are skipped unless
+`--insert-new-events` is passed.
 
 ## Env
 
