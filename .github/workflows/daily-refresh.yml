@@ -113,7 +113,7 @@ jobs:
         # live quote polling window begins.
         env:
           FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
-        run: python scripts/sync_fmp_earnings.py --allow-missing-key
+        run: python scripts/sync_fmp_earnings.py --allow-missing-key --no-date-params
 
       - name: Probe Alpha Vantage V/OI coverage
         # Low-priority options enrichment audit. Free tier is small, so this
