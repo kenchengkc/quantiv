@@ -2,10 +2,10 @@
 """
 Backfill EPS/revenue history from Financial Modeling Prep one symbol at a time.
 
-FMP free tier does not allow comma-separated symbols on /stable/earnings, but a
-single-symbol request can return many historical quarters. This script advances
-a resumable queue under a daily call budget and merges only missing EPS/revenue
-fields into data/earnings_calendar.{csv,parquet} by default.
+Some FMP plans allow /stable/earnings?symbol=SYM to return many historical
+quarters in one call. This script advances a resumable one-symbol queue under a
+daily call budget and merges only missing EPS/revenue fields into
+data/earnings_calendar.{csv,parquet} by default.
 """
 
 from __future__ import annotations
@@ -42,6 +42,7 @@ STATE_FILENAME = "fmp_earnings_backfill_state.json"
 DEFAULT_MAX_CALLS = 240
 DEFAULT_DELAY_S = 0.25
 DEFAULT_REFRESH_AFTER_DAYS = 90
+ENTITLEMENT_KEY = "symbol_endpoint_unavailable"
 VALUE_COLUMNS = [
     "eps_actual",
     "eps_estimate",
@@ -55,6 +56,18 @@ class FMPRequestError(RuntimeError):
     def __init__(self, message: str, *, stop: bool = False) -> None:
         super().__init__(message)
         self.stop = stop
+
+
+def is_symbol_endpoint_unavailable(message: str) -> bool:
+    text = message.lower()
+    return (
+        "symbol" in text
+        and (
+            "premium query parameter" in text
+            or "not available under your current subscription" in text
+            or "special endpoint" in text
+        )
+    )
 
 
 def normalize_symbol(value: Any) -> str | None:
@@ -101,6 +114,36 @@ def load_state(path: Path) -> dict[str, Any]:
     if isinstance(data, dict) and isinstance(data.get("symbols"), dict):
         return data
     return {"symbols": {}}
+
+
+def recent_symbol_endpoint_unavailable(
+    state: dict[str, Any],
+    *,
+    now: datetime,
+    refresh_after_days: int,
+) -> str | None:
+    cutoff = now - timedelta(days=refresh_after_days)
+    entry = state.get(ENTITLEMENT_KEY)
+    if isinstance(entry, dict):
+        checked_at = parse_checked_at(entry.get("checked_at"))
+        reason = str(entry.get("reason") or "").strip()
+        if checked_at and checked_at >= cutoff and reason:
+            return reason
+
+    symbols = state.get("symbols")
+    if isinstance(symbols, dict):
+        for symbol_entry in symbols.values():
+            if not isinstance(symbol_entry, dict):
+                continue
+            checked_at = parse_checked_at(symbol_entry.get("checked_at"))
+            error = str(symbol_entry.get("error") or "").strip()
+            if (
+                checked_at
+                and checked_at >= cutoff
+                and is_symbol_endpoint_unavailable(error)
+            ):
+                return error
+    return None
 
 
 def save_state(path: Path, state: dict[str, Any]) -> None:
@@ -244,7 +287,11 @@ def request_symbol(symbol: str, api_key: str) -> list[dict[str, Any]]:
         raise FMPRequestError(f"FMP HTTP 429: {resp.text[:240]}", stop=True)
     if resp.status_code == 402:
         text = resp.text[:300]
-        stop = "daily" in text.lower() or "limit" in text.lower()
+        stop = (
+            "daily" in text.lower()
+            or "limit" in text.lower()
+            or is_symbol_endpoint_unavailable(text)
+        )
         raise FMPRequestError(f"FMP HTTP 402: {text}", stop=stop)
     if not resp.ok:
         raise FMPRequestError(f"FMP HTTP {resp.status_code}: {resp.text[:240]}")
@@ -342,6 +389,21 @@ def main() -> int:
     existing = load_existing(data_dir)
     state = load_state(state_path)
     now = datetime.now(timezone.utc)
+    if not args.force:
+        blocked_reason = recent_symbol_endpoint_unavailable(
+            state,
+            now=now,
+            refresh_after_days=args.refresh_after_days,
+        )
+        if blocked_reason:
+            print(
+                "FMP symbol earnings backfill skipped: "
+                "/stable/earnings?symbol is unavailable on this FMP plan. "
+                "Use --force after upgrading the plan to re-probe."
+            )
+            print(f"reason: {blocked_reason}")
+            return 0
+
     manual_symbols = parse_symbols(args.symbols)
     work, pending_before_budget = select_symbols(
         existing,
@@ -383,16 +445,22 @@ def main() -> int:
         try:
             rows = request_symbol(symbol, api_key)
         except FMPRequestError as exc:
+            error_text = str(exc)
             update_state_entry(
                 state,
                 symbol,
                 checked_at=checked_at,
                 ok=False,
-                error=str(exc),
+                error=error_text,
             )
+            if is_symbol_endpoint_unavailable(error_text):
+                state[ENTITLEMENT_KEY] = {
+                    "checked_at": checked_at,
+                    "reason": error_text[:500],
+                }
             print(f"{symbol}: {exc}", file=sys.stderr)
             if exc.stop:
-                stopped_reason = str(exc)
+                stopped_reason = error_text
                 break
         else:
             rows_fetched += len(rows)

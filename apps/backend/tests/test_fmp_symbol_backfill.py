@@ -8,7 +8,11 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 from backfill_fmp_earnings_by_symbol import (  # noqa: E402
+    FMPRequestError,
+    is_symbol_endpoint_unavailable,
     normalize_fmp,
+    recent_symbol_endpoint_unavailable,
+    request_symbol,
     select_symbols,
 )
 from sync_fmp_earnings import merge_overlay  # noqa: E402
@@ -115,3 +119,52 @@ def test_fmp_symbol_rows_merge_fill_missing_only():
     assert row["eps_estimate"] == 1.86
     assert row["revenue_estimate"] == 108414000000
     assert row["source"] == "dolthub+fmp"
+
+
+def test_symbol_endpoint_402_stops_for_plan_entitlement(monkeypatch):
+    class Response:
+        status_code = 402
+        text = (
+            "Premium Query Parameter: 'Special Endpoint : This value set for "
+            "'symbol' is not available under your current subscription"
+        )
+        ok = False
+
+    monkeypatch.setattr(
+        "backfill_fmp_earnings_by_symbol.requests.get",
+        lambda *args, **kwargs: Response(),
+    )
+
+    try:
+        request_symbol("AAPL", "test-token")
+    except FMPRequestError as exc:
+        assert exc.stop is True
+        assert is_symbol_endpoint_unavailable(str(exc))
+    else:
+        raise AssertionError("expected FMPRequestError")
+
+
+def test_recent_symbol_endpoint_unavailable_detects_existing_state():
+    now = datetime(2026, 5, 27, tzinfo=timezone.utc)
+    state = {
+        "symbols": {
+            "REX": {
+                "checked_at": (now - timedelta(days=1)).isoformat(),
+                "ok": False,
+                "error": (
+                    "FMP HTTP 402: Premium Query Parameter: "
+                    "value set for 'symbol' is not available under your "
+                    "current subscription"
+                ),
+            }
+        }
+    }
+
+    reason = recent_symbol_endpoint_unavailable(
+        state,
+        now=now,
+        refresh_after_days=90,
+    )
+
+    assert reason is not None
+    assert "symbol" in reason

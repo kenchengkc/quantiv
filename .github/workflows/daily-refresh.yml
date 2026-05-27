@@ -116,10 +116,11 @@ jobs:
         run: python scripts/sync_fmp_earnings.py --allow-missing-key --no-date-params
 
       - name: Backfill FMP EPS and revenue history by symbol
-        # FMP free tier does not allow symbol batching on /stable/earnings.
-        # Advance a persistent one-symbol queue slowly under the 250/day cap:
-        # 1 call is used by the broad calendar overlay above, so this keeps
-        # roughly 9 calls of buffer for retries/manual checks.
+        # The current FMP free-tier key rejects /stable/earnings?symbol=SYM
+        # with a plan-level 402, so keep this disabled until the plan supports
+        # the symbol endpoint. Set repository variable
+        # ENABLE_FMP_SYMBOL_BACKFILL=1 after upgrading/re-verifying.
+        if: ${{ vars.ENABLE_FMP_SYMBOL_BACKFILL == '1' }}
         env:
           FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
         run: |
