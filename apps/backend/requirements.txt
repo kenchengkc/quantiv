@@ -24,6 +24,7 @@ pandas>=2.1.0
 # unpickle path with another → segfault-adjacent crash before /health.
 numpy>=1.24.0,<2
 duckdb>=1.0.0
+requests>=2.31.0
 
 # Object storage — Cloudflare R2 model pull at lifespan startup. R2 is
 # S3-compatible; boto3 talks to it via a custom endpoint_url. Required
