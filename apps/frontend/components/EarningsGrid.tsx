@@ -45,13 +45,13 @@ const MAX_OFFSET = 2;
 //   MIN_GRID_LOADING_MS    — minimum skeleton hold so a cache-warm fetch
 //                            doesn't strobe the skeleton on/off in <100 ms.
 //   INITIAL_QUOTE_WAIT_MS  — upper bound on waiting for the first live-quote
-//                            batch before unblocking; rows still appear if
-//                            the quote API is slow.
-//   LOGO_PRELOAD_TIMEOUT_MS — caps logo preload so one slow third-party
-//                            image can't hold the whole page hostage.
+//                            batch; pending symbols fill in after paint.
+//   LOGO_PRELOAD_TIMEOUT_MS — caps background logo preload. Calendar rows
+//                            don't wait for this because logo boxes have
+//                            fixed dimensions and can resolve in place.
 const MIN_GRID_LOADING_MS = 750;
-const INITIAL_QUOTE_WAIT_MS = 3_200;
-const LOGO_PRELOAD_TIMEOUT_MS = 4_000;
+const INITIAL_QUOTE_WAIT_MS = 800;
+const LOGO_PRELOAD_TIMEOUT_MS = 1_500;
 const OFFSETS: { v: number; l: string }[] = [
   { v: -1, l: 'Last week' },
   { v: 0, l: 'This week' },
@@ -657,7 +657,6 @@ export default function EarningsGrid() {
   const [marketOpen, setMarketOpen] = useState<boolean>(true);
   const [minLoadingDoneWeek, setMinLoadingDoneWeek] = useState<string | null>(null);
   const [quotesReadyWeek, setQuotesReadyWeek] = useState<string | null>(null);
-  const [logosReadyKey, setLogosReadyKey] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const thisMonday = useMemo(() => mondayOf(new Date()), []);
@@ -777,17 +776,19 @@ export default function EarningsGrid() {
       }
     };
 
-    // Phase 1: aggressive polling until the first paint is fully populated.
+    // Phase 1: wait for one quote response, then keep polling pending symbols
+    // in the background. A handful of slow/missing quotes should not hold the
+    // entire calendar behind a skeleton.
     // Phase 2: gentle 30s loop while market is open. When closed, drop to a
     // very slow 5-min heartbeat — quotes are frozen anyway, no need to spin.
     const fastPoll = async (attempt = 0) => {
       if (cancelled) return;
       const { pending, quoteRefreshActive: refreshOn } = await fetchOnce();
+      markQuotesReady();
       if (refreshOn && pending > 0 && attempt < 30) {
         const delay = attempt < 10 ? 2_000 : 8_000;
         timer = setTimeout(() => fastPoll(attempt + 1), delay);
       } else {
-        markQuotesReady();
         const slowLoop = () => {
           if (cancelled) return;
           // 30s while Finnhub refresh window (incl. post-close settlement), 5min otherwise.
@@ -875,21 +876,21 @@ export default function EarningsGrid() {
 
   useEffect(() => {
     if (!weekReady) {
-      setLogosReadyKey(null);
       return;
     }
 
     const tickers = allTickerKey ? allTickerKey.split('|') : [];
     const uncached = tickers.filter((ticker) => !hasTickerLogoState(ticker));
     if (uncached.length === 0) {
-      setLogosReadyKey(weekStartIso);
       return;
     }
 
     let cancelled = false;
-    setLogosReadyKey(null);
     void preloadTickerLogos(uncached, LOGO_PRELOAD_TIMEOUT_MS).then(() => {
-      if (!cancelled) setLogosReadyKey(weekStartIso);
+      // Warm the module-level logo cache for subsequent renders. Individual
+      // TickerLogo components have fixed dimensions and fallback states, so
+      // the calendar can render immediately while images settle.
+      if (cancelled) return;
     });
 
     return () => {
@@ -909,16 +910,14 @@ export default function EarningsGrid() {
   }, [days, filteredEvents]);
 
   const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
-  // All three gates have to clear before the real rows render. The whole
-  // calendar stays on the skeleton until the week's JSON is fetched,
-  // logos have preloaded (or timed out), the first quote batch is back
-  // (or the wait-bound fired), and the min-loading hold has elapsed.
-  // Trades a slower first paint for a more "ready" look.
+  // Keep the initial skeleton only until weekly data is present, the first
+  // quote batch returned or briefly timed out, and the minimum hold elapsed.
+  // Logo boxes have fixed dimensions and resolve in place, so waiting on every
+  // third-party logo turns one slow image into a 4-6s calendar load.
   const contentReady =
     weekReady &&
     minLoadingDoneWeek === weekStartIso &&
-    quotesReadyWeek === weekStartIso &&
-    logosReadyKey === weekStartIso;
+    quotesReadyWeek === weekStartIso;
   const showSkeleton = !error && !contentReady;
 
   return (

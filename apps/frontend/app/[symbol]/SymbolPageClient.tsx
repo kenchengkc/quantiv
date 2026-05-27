@@ -502,6 +502,10 @@ function erf(x: number) {
 function normCDF(z: number) {
   return 0.5 * (1 + erf(z / Math.SQRT2));
 }
+function formatSvgNumber(value: number) {
+  if (!Number.isFinite(value)) return '0';
+  return value.toFixed(4).replace(/\.?0+$/, '');
+}
 
 // ---------- Watchlist + Toast ----------
 function WatchlistButton({
@@ -967,6 +971,7 @@ function DetailHero({
   spot,
   change,
   changePct,
+  quotePending,
   emPct,
   daysLeft,
   earningsDate,
@@ -987,6 +992,7 @@ function DetailHero({
   spot: number;
   change: number;
   changePct: number;
+  quotePending: boolean;
   emPct: number;
   daysLeft: number | null;
   earningsDate: string | null;
@@ -1123,36 +1129,57 @@ function DetailHero({
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 14, flexWrap: 'wrap' }}>
-            <span
-              className="serif tnum"
-              style={{ fontSize: 36, fontWeight: 700, letterSpacing: '-0.02em' }}
+          {quotePending ? (
+            <div
+              aria-label="Loading live quote"
+              style={{ display: 'flex', alignItems: 'baseline', gap: 14, flexWrap: 'wrap', minHeight: 43 }}
             >
-              ${spot.toFixed(2)}
-            </span>
-            <span
-              className="mono tnum"
-              style={{
-                fontSize: 13,
-                color: flat ? 'var(--ink-4)' : up ? 'var(--up)' : 'var(--down)',
-              }}
-            >
-              {flat ? '–' : up ? '▲' : '▼'} {Math.abs(change).toFixed(2)} (
-              {(Math.abs(changePct) * 100).toFixed(2)}%)
-            </span>
-            <span
-              title={quoteLabel}
-              style={{
-                fontSize: 10,
-                color: 'var(--ink-4)',
-                letterSpacing: '0.14em',
-                textTransform: 'uppercase',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {quoteLabel}
-            </span>
-          </div>
+              <SkeletonBlock width={124} height={38} radius={7} />
+              <SkeletonBlock width={112} height={14} radius={5} />
+              <span
+                style={{
+                  fontSize: 10,
+                  color: 'var(--ink-4)',
+                  letterSpacing: '0.14em',
+                  textTransform: 'uppercase',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                Live quote loading
+              </span>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 14, flexWrap: 'wrap' }}>
+              <span
+                className="serif tnum"
+                style={{ fontSize: 36, fontWeight: 700, letterSpacing: '-0.02em' }}
+              >
+                ${spot.toFixed(2)}
+              </span>
+              <span
+                className="mono tnum"
+                style={{
+                  fontSize: 13,
+                  color: flat ? 'var(--ink-4)' : up ? 'var(--up)' : 'var(--down)',
+                }}
+              >
+                {flat ? '–' : up ? '▲' : '▼'} {Math.abs(change).toFixed(2)} (
+                {(Math.abs(changePct) * 100).toFixed(2)}%)
+              </span>
+              <span
+                title={quoteLabel}
+                style={{
+                  fontSize: 10,
+                  color: 'var(--ink-4)',
+                  letterSpacing: '0.14em',
+                  textTransform: 'uppercase',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {quoteLabel}
+              </span>
+            </div>
+          )}
 
           <div style={{ minHeight: 0 }}>
             {/* Real 1D intraday sparkline (Alpaca IEX 5-min bars). Sits
@@ -1433,6 +1460,23 @@ function InteractiveBar({
     const maxP = Math.max(...arr.map((p) => p.y));
     return arr.map((p) => ({ x: p.x, y: maxP > 0 ? p.y / maxP : 0 }));
   }, [sigma, minPct, maxPct]);
+  const densityAreaPath = useMemo(
+    () =>
+      `M 0,90 ${density
+        .map((p) => `L ${formatSvgNumber(p.x)},${formatSvgNumber(90 - p.y * 76)}`)
+        .join(' ')} L 100,90 Z`,
+    [density],
+  );
+  const densityStrokePath = useMemo(
+    () =>
+      density
+        .map(
+          (p, i) =>
+            `${i ? 'L' : 'M'}${formatSvgNumber(p.x)},${formatSvgNumber(90 - p.y * 76)}`,
+        )
+        .join(' '),
+    [density],
+  );
 
   const emLow = toX(-em);
   const emHigh = toX(em);
@@ -1495,15 +1539,11 @@ function InteractiveBar({
             </linearGradient>
           </defs>
           <path
-            d={
-              `M 0,90 ` +
-              density.map((p) => `L ${p.x},${90 - p.y * 76}`).join(' ') +
-              ` L 100,90 Z`
-            }
+            d={densityAreaPath}
             fill="url(#den-grad)"
           />
           <path
-            d={density.map((p, i) => `${i ? 'L' : 'M'}${p.x},${90 - p.y * 76}`).join(' ')}
+            d={densityStrokePath}
             stroke="url(#den-stroke)"
             strokeWidth="0.8"
             fill="none"
@@ -3214,6 +3254,7 @@ export default function SymbolPage({
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(() => seededData === null);
   const [live, setLive] = useState<LivePrice | null>(null);
+  const [quoteReady, setQuoteReady] = useState(false);
   const [predictionMode, setPredictionMode] = useState<PredictionMode>('snapshot');
   const [livePrediction, setLivePrediction] =
     useState<LivePredictionState>(EMPTY_LIVE_PREDICTION);
@@ -3324,6 +3365,7 @@ export default function SymbolPage({
   useEffect(() => {
     if (!symbol) return;
     setLive(null);
+    setQuoteReady(false);
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
     let lastQuoteRefreshActive = true;
@@ -3368,6 +3410,8 @@ export default function SymbolPage({
         return json.pending ?? 0;
       } catch {
         return 0;
+      } finally {
+        if (!cancelled) setQuoteReady(true);
       }
     };
 
@@ -3663,6 +3707,7 @@ export default function SymbolPage({
   const liveForSymbol = live?.symbol === symbol ? live : null;
   const intradayForSymbol = intraday?.symbol === symbol ? intraday : null;
   const livePrice = liveForSymbol?.price ?? null;
+  const quotePending = !quoteReady && livePrice == null;
   const spot = livePrice ?? data.spot_price ?? 0;
   const livePreviousCloseForChange =
     intradayForSymbol === null ? null : liveForSymbol?.previousClose ?? null;
@@ -3745,6 +3790,7 @@ export default function SymbolPage({
           spot={spot}
           change={change}
           changePct={changePct}
+          quotePending={quotePending}
           emPct={straddlePct}
           daysLeft={daysLeft}
           earningsDate={earningsDate}
@@ -3752,11 +3798,11 @@ export default function SymbolPage({
           eventLabel={eventLabel}
           quoteLabel={quoteSourceLabel(liveForSymbol, symbol, data.as_of_date)}
           intradayBars={
-            intradayForSymbol?.bars && intradayForSymbol.bars.length >= 2
+            !quotePending && intradayForSymbol?.bars && intradayForSymbol.bars.length >= 2
               ? intradayForSymbol.bars
               : null
           }
-          intradayLoading={intradayForSymbol === null}
+          intradayLoading={quotePending || intradayForSymbol === null}
           intradaySessionDate={intradayForSymbol?.sessionDate ?? null}
           intradayIsCurrentSession={intradayForSymbol?.isCurrentSession ?? null}
           // Real session %: first→last close on the displayed IEX session.
