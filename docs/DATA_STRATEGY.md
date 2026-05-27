@@ -273,7 +273,9 @@ enrichment priorities are:
    default so provider date disagreements do not create duplicate events. The
    current FMP route is already call-efficient: it requests calendar date
    windows, split into 31-day chunks, so the default 90-day near-term overlay is
-   about three calls rather than one call per ticker.
+   about three calls rather than one call per ticker. FMP free-tier keys may
+   reject `from`/`to`; CI therefore runs this script with `--no-date-params`,
+   which fetches the endpoint default once and filters returned rows locally.
 2. `tools/pull_market_caps.py` now reuses Finnhub `/stock/profile2` responses
    to write `apps/frontend/public/ticker-logos.json`. The browser uses that
    cached map only as a logo fallback after Parqet fails.
