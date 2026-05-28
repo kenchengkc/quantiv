@@ -276,9 +276,12 @@ enrichment priorities are:
    about three calls rather than one call per ticker. FMP free-tier keys may
    reject `from`/`to`; CI therefore runs this script with `--no-date-params`,
    which fetches the endpoint default once and filters returned rows locally.
-2. `tools/pull_market_caps.py` now reuses Finnhub `/stock/profile2` responses
-   to write `apps/frontend/public/ticker-logos.json`. The browser uses that
-   cached map only as a logo fallback after Parqet fails.
+2. `tools/pull_market_caps.py` and `scripts/sync_finnhub_profiles.py` write
+   Finnhub `/stock/profile2` logos to `apps/frontend/public/ticker-logos.json`.
+   The browser prefers those cached logos over Parqet (Parqet keys on bare
+   symbols and can show the wrong issuer, e.g. `NA` → National Bank of Canada
+   while NASDAQ `NA` is Nano Labs). `scripts/check_ticker_identity.py` guards
+   risky symbols and profile/name mismatches.
 3. `scripts/sync_finnhub_market_holidays.py` refreshes
    `apps/frontend/lib/marketHolidays.generated.ts` from Finnhub
    `/stock/market-holiday`, so the quote refresh window no longer relies on
