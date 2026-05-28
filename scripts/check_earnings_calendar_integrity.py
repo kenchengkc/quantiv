@@ -263,11 +263,28 @@ def main() -> int:
             f"(threshold: {args.max_future_vanished}). Sample: {sample}"
         )
 
-    # 4. Anchor tickers losing all rows. "Anchor" = had ≥N historical rows
+    # 5. Blank act_symbol in the new CSV — never a legitimate ticker
+    #    (usually pandas eating "NA" on a read without keep_default_na=False).
+    #    Reject at commit time so corruption can't ship.
+    blank_new = new[new["act_symbol"].astype(str).str.strip() == ""]
+    if len(blank_new):
+        sample_dates = sorted(blank_new["date"].unique())[:5]
+        tripped.append(
+            f"{len(blank_new):,} rows in new CSV have blank act_symbol "
+            f"(sample dates: {sample_dates})"
+        )
+
+    # 6. Anchor tickers losing all rows. "Anchor" = had ≥N historical rows
     #    in the prior CSV — established names whose disappearance signals
-    #    a universe-wide drop, not a delisting.
+    #    a universe-wide drop, not a delisting. Blank act_symbol values are
+    #    never legitimate tickers — exclude them so cleanup of corrupt rows
+    #    in HEAD can't block shipping a clean new CSV (see gate 5).
     ticker_counts_old = old["act_symbol"].value_counts()
-    anchors = set(ticker_counts_old[ticker_counts_old >= args.anchor_min_history].index)
+    anchors = {
+        sym
+        for sym in ticker_counts_old[ticker_counts_old >= args.anchor_min_history].index
+        if str(sym or "").strip()
+    }
     anchors_in_new = set(new["act_symbol"].unique())
     lost_anchors = anchors - anchors_in_new
     if lost_anchors:
