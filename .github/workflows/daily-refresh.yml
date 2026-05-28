@@ -412,6 +412,7 @@ jobs:
             --allow-missing-key \
             --universe earnings \
             $ARGS
+          python scripts/check_ticker_identity.py
 
       - name: Commit + push Finnhub profile/logo cache
         run: |

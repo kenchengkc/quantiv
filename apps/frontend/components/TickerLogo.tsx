@@ -28,9 +28,13 @@ function cachedFinnhubLogoUrl(ticker: string): string | null {
 
 export function tickerLogoUrls(ticker: string) {
   const normalized = normalizeTicker(ticker);
-  const urls = [tickerLogoUrl(normalized)];
   const finnhubUrl = cachedFinnhubLogoUrl(normalized);
-  if (finnhubUrl && !urls.includes(finnhubUrl)) urls.push(finnhubUrl);
+  const parqetUrl = tickerLogoUrl(normalized);
+  // Prefer Finnhub when cached: Parqet keys on bare symbols and can return the
+  // wrong issuer (e.g. NA → National Bank of Canada while NASDAQ NA is Nano Labs).
+  const urls: string[] = [];
+  if (finnhubUrl) urls.push(finnhubUrl);
+  if (!urls.includes(parqetUrl)) urls.push(parqetUrl);
   return urls;
 }
 
@@ -45,7 +49,10 @@ export function hasTickerLogoState(ticker: string) {
 export function setTickerLogoState(ticker: string, state: TickerLogoLoadState) {
   const normalized = normalizeTicker(ticker);
   if (state === 'loaded') {
-    setTickerLogoLoaded(normalized, tickerLogoUrl(normalized));
+    setTickerLogoLoaded(
+      normalized,
+      cachedFinnhubLogoUrl(normalized) ?? tickerLogoUrl(normalized),
+    );
   } else {
     setTickerLogoFailed(normalized);
   }
