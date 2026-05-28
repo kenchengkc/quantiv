@@ -278,10 +278,11 @@ enrichment priorities are:
    which fetches the endpoint default once and filters returned rows locally.
 2. `tools/pull_market_caps.py` and `scripts/sync_finnhub_profiles.py` write
    Finnhub `/stock/profile2` logos to `apps/frontend/public/ticker-logos.json`.
-   The browser prefers those cached logos over Parqet (Parqet keys on bare
-   symbols and can show the wrong issuer, e.g. `NA` → National Bank of Canada
-   while NASDAQ `NA` is Nano Labs). `scripts/check_ticker_identity.py` guards
-   risky symbols and profile/name mismatches.
+   The browser prefers those cached logos over Parqet so foreign listings that
+   share a bare symbol (e.g. Parqet `NA` → National Bank of Canada while NASDAQ
+   `NA` is Nano Labs) do not override the US issuer. `scripts/check_ticker_identity.py`
+   guards foreign-suffix CSV rows, non-US Finnhub profiles in the US universe, and
+   SEC vs Finnhub name mismatches (run via `.venv/bin/python`).
 3. `scripts/sync_finnhub_market_holidays.py` refreshes
    `apps/frontend/lib/marketHolidays.generated.ts` from Finnhub
    `/stock/market-holiday`, so the quote refresh window no longer relies on
