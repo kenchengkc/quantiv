@@ -16,7 +16,7 @@ See [`.github/workflows/daily-refresh.yml`](../.github/workflows/daily-refresh.y
 | `sync_vix.py` | FRED VIX → Parquet | Nightly |
 | `probe_alphavantage_voi.py` | Persistent multi-day Alpha Vantage V/OI entitlement and coverage audit | `data:probe:alphavantage-voi`, nightly |
 | `check_earnings_calendar_integrity.py` | Guardrails before committing calendar CSV | Nightly (blocks commit on failure) |
-| `check_ticker_identity.py` | Finnhub profile names vs `ticker-names.json`; Parqet-risky logo cache | After `sync_finnhub_profiles` |
+| `check_ticker_identity.py` | Foreign-ticker leaks + Finnhub/SEC name alignment; bare-symbol logo cache | After `sync_finnhub_profiles` |
 | `setup_duckdb_from_parquet.py` | Recreate DuckDB views | `data:views`, nightly |
 | `check_duckdb_freshness.py` | CI gate before scoring | Nightly |
 | `daily_score.py` | ML forecasts for upcoming earnings | `ml:score`, nightly |
@@ -32,9 +32,22 @@ See [`.github/workflows/daily-refresh.yml`](../.github/workflows/daily-refresh.y
 
 Frontend JSON build lives in [`tools/`](../tools/README.md) (`build_frontend_data.py`, `build_popular_weights.py`, `pull_market_caps.py`).
 
+## Python environment
+
+Scripts that import shared modules (`sync_finnhub_earnings`, pyarrow, etc.) expect the
+repo virtualenv:
+
+```bash
+source .venv/bin/activate
+# or: .venv/bin/python scripts/check_ticker_identity.py
+```
+
+If a dependency is missing: `.venv/bin/pip install <package>` (see root `requirements*.txt`).
+
 ## Typical local flow
 
 ```bash
+source .venv/bin/activate
 npm run data:sync
 npm run data:earnings:finnhub -- --symbols AAPL,MSFT
 npm run data:earnings:fmp-backfill -- --dry-run --max-calls 10

@@ -1,17 +1,20 @@
 #!/usr/bin/env python3
-"""Guard against display-name vs issuer-metadata mismatches in the UI.
+"""Guard against foreign-ticker / display-metadata mismatches in the UI.
 
-Compares SEC/Nasdaq display names (ticker-names.json) to Finnhub /stock/profile2
-names in apps/frontend/public/ticker-logos.json. When they disagree, the UI can
-show the right company name with the wrong logo because Parqet resolves bare
-symbols globally (NA → National Bank of Canada while US NA is Nano Labs).
+Primary concern: foreign listings that share a bare symbol with a US name
+(DoltHub rows without .TO/.L suffix, or logo CDNs that resolve globally).
+Those show up as US rows in earnings_calendar.csv but Parqet (and sometimes
+upstream feeds) attach the foreign issuer's logo while ticker-names.json
+carries the US SEC name.
 
-Also flags high-risk symbols (very short tickers) that lack a cached Finnhub logo,
-since the browser will fall back to Parqet for those rows.
+Checks (using cached Finnhub /stock/profile2 data in ticker-logos.json):
+  1. No foreign-exchange suffix rows in the committed earnings CSV.
+  2. No US-filtered symbols whose Finnhub profile is clearly non-US.
+  3. No large gaps between SEC display names and Finnhub profile names.
 
-Run locally:
+Run with the project venv (pyarrow, shared script imports):
+  source .venv/bin/activate
   python scripts/check_ticker_identity.py
-  python scripts/check_ticker_identity.py --warn-only
 """
 from __future__ import annotations
 
@@ -27,30 +30,76 @@ NAMES_PATH = REPO_ROOT / "apps" / "frontend" / "public" / "ticker-names.json"
 LOGOS_PATH = REPO_ROOT / "apps" / "frontend" / "public" / "ticker-logos.json"
 EARNINGS_CSV = REPO_ROOT / "data" / "earnings_calendar.csv"
 
-# Keep in sync with scripts/sync_finnhub_earnings.py (import avoided — pyarrow dep).
-FOREIGN_EXCHANGE_SUFFIXES = frozenset({
-    "AX", "BC", "BR", "CN", "CO", "DE", "HE", "HK", "IR", "IS", "JK", "JO", "KS",
-    "L", "MC", "MI", "MX", "NE", "NS", "OL", "PA", "PM", "SA", "SN", "SS", "ST",
-    "SW", "T", "TA", "TO", "TW", "V",
-})
+sys.path.insert(0, str(REPO_ROOT / "scripts"))
+from sync_finnhub_earnings import is_us_symbol  # noqa: E402
 
+US_COUNTRY_CODES = frozenset({"US", "USA", "UNITED STATES"})
 
-def is_us_symbol(value: object) -> bool:
-    s = str(value or "").strip().upper()
-    if not s or ":" in s:
-        return False
-    if "." in s:
-        return s.rsplit(".", 1)[-1] not in FOREIGN_EXCHANGE_SUFFIXES
-    return True
+# Exchange substrings that indicate a non-US listing in Finnhub profile2 text.
+FOREIGN_EXCHANGE_MARKERS = (
+    "TORONTO",
+    "TSX",
+    "NEO EXCHANGE",
+    "LONDON",
+    "LSE",
+    "XETRA",
+    "FRANKFURT",
+    "PARIS",
+    "EURONEXT",
+    "HONG KONG",
+    "SEHK",
+    "SHANGHAI",
+    "SHENZHEN",
+    "TOKYO",
+    "TSE",
+    "JPX",
+    "ASX",
+    "SWISS",
+    "SIX",
+    "BOMBAY",
+    "NSE INDIA",
+    "KOSPI",
+    "KOREA",
+    "TAIWAN",
+    "TWSE",
+    "SINGAPORE",
+    "SGX",
+    "MILAN",
+    "BORSA",
+    "MADRID",
+    "MEXICO",
+    "SAO PAULO",
+    "BOVESPA",
+    "JOHANNESBURG",
+    "JSE",
+    "OSLO",
+    "STOCKHOLM",
+    "COPENHAGEN",
+    "HELSINKI",
+    "ISTANBUL",
+    "TEL AVIV",
+    "TASE",
+)
+
+US_EXCHANGE_MARKERS = (
+    "NASDAQ",
+    "NYSE",
+    "AMEX",
+    "ARCA",
+    "BATS",
+    "OTC",
+    "NYSE MKT",
+    "CBOE BZX",
+)
+
+# Bare US tickers where global logo CDNs often pick a foreign listing (same symbol).
+BARE_SYMBOL_LOGO_COLLISIONS = frozenset({"NA"})
 
 LEGAL_SUFFIX_RE = re.compile(
     r",?\s+(?:Inc\.?|Incorporated|Corp(?:oration)?\.?|(?:&\s+)?Co(?:mpany|mpanies)?\.?|"
     r"Ltd\.?|Limited|Holdings?|Group|LLC|PLC)$",
     re.I,
 )
-
-# Bare symbols Parqet often maps to a non-US listing; require Finnhub logo cache.
-PARQET_RISKY_SYMBOLS = frozenset({"NA"})
 
 
 def strip_legal_suffix(name: str) -> str:
@@ -75,6 +124,23 @@ def names_align(display: str, finnhub: str) -> bool:
     return overlap >= 1 and overlap / min(len(a), len(b)) >= 0.5
 
 
+def profile_looks_foreign(profile: dict) -> bool:
+    if profile.get("has_profile") is False:
+        return False
+    country = str(profile.get("country") or "").strip().upper()
+    if country and country not in US_COUNTRY_CODES:
+        return True
+    exchange = str(profile.get("exchange") or "").upper()
+    if not exchange:
+        return False
+    if any(marker in exchange for marker in FOREIGN_EXCHANGE_MARKERS):
+        return True
+    if any(marker in exchange for marker in US_EXCHANGE_MARKERS):
+        return False
+    # Unrecognized exchange label with no US country — treat as foreign.
+    return bool(country) and country not in US_COUNTRY_CODES
+
+
 def load_earnings_symbols() -> set[str]:
     if not EARNINGS_CSV.exists():
         return set()
@@ -87,6 +153,21 @@ def load_earnings_symbols() -> set[str]:
     return out
 
 
+def count_foreign_suffix_rows() -> tuple[int, list[str]]:
+    if not EARNINGS_CSV.exists():
+        return 0, []
+    seen: list[str] = []
+    count = 0
+    with EARNINGS_CSV.open(newline="") as f:
+        for row in csv.DictReader(f):
+            sym = str(row.get("act_symbol") or "").strip().upper()
+            if sym and not is_us_symbol(sym):
+                count += 1
+                if sym not in seen:
+                    seen.append(sym)
+    return count, seen[:20]
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -95,16 +176,28 @@ def main() -> int:
         help="Print issues but exit 0 (for optional CI steps).",
     )
     parser.add_argument(
+        "--max-foreign-rows",
+        type=int,
+        default=0,
+        help="Allowed earnings rows with foreign-exchange suffixes (default: 0).",
+    )
+    parser.add_argument(
+        "--max-foreign-profiles",
+        type=int,
+        default=0,
+        help="Allowed US-universe symbols with non-US Finnhub profiles (default: 0).",
+    )
+    parser.add_argument(
         "--max-name-mismatches",
         type=int,
         default=0,
-        help="Allowed profile-name mismatches before failing (default: 0).",
+        help="Allowed profile-name mismatches vs ticker-names.json (default: 0).",
     )
     parser.add_argument(
         "--max-missing-logos",
         type=int,
         default=0,
-        help="Allowed risky symbols without Finnhub logos (default: 0).",
+        help="Allowed bare-symbol collision tickers without Finnhub logos (default: 0).",
     )
     args = parser.parse_args()
 
@@ -129,41 +222,57 @@ def main() -> int:
         }
 
     symbols = load_earnings_symbols()
-    # Only symbols with known Parqet bare-ticker collisions — not every 1-letter ticker.
-    risky = PARQET_RISKY_SYMBOLS & symbols
+    foreign_rows, foreign_sample = count_foreign_suffix_rows()
+    logo_collisions = BARE_SYMBOL_LOGO_COLLISIONS & symbols
 
+    foreign_profiles: list[tuple[str, str, str]] = []
     name_mismatches: list[tuple[str, str, str]] = []
     for sym in sorted(symbols):
         profile = profiles.get(sym)
         if not profile or profile.get("has_profile") is False:
             continue
         fh_name = str(profile.get("name") or "").strip()
-        if not fh_name:
+        country = str(profile.get("country") or "").strip()
+        exchange = str(profile.get("exchange") or "").strip()
+        if profile_looks_foreign(profile):
+            foreign_profiles.append((sym, country or "?", exchange or fh_name or "?"))
             continue
-        display = display_names.get(sym, sym)
-        if not names_align(display, fh_name):
-            name_mismatches.append((sym, display, fh_name))
+        if fh_name:
+            display = display_names.get(sym, sym)
+            if not names_align(display, fh_name):
+                name_mismatches.append((sym, display, fh_name))
 
-    missing_logos = sorted(sym for sym in risky if sym not in logos)
+    missing_logos = sorted(sym for sym in logo_collisions if sym not in logos)
 
     print("TICKER IDENTITY CHECK")
-    print(f"  earnings symbols (US): {len(symbols):,}")
-    print(f"  cached profiles:       {len(profiles):,}")
-    print(f"  cached logos:          {len(logos):,}")
-    print(f"  name mismatches:       {len(name_mismatches):,}")
-    print(f"  risky w/o Finnhub logo:{len(missing_logos):,}")
+    print(f"  earnings symbols (US):     {len(symbols):,}")
+    print(f"  foreign-suffix CSV rows:   {foreign_rows:,}")
+    print(f"  cached Finnhub profiles:   {len(profiles):,}")
+    print(f"  cached Finnhub logos:      {len(logos):,}")
+    print(f"  foreign profile leaks:     {len(foreign_profiles):,}")
+    print(f"  name mismatches:           {len(name_mismatches):,}")
+    print(f"  bare-symbol w/o logo:      {len(missing_logos):,}")
 
     tripped: list[str] = []
-    if len(name_mismatches) > args.max_name_mismatches:
-        sample = name_mismatches[:15]
+    if foreign_rows > args.max_foreign_rows:
         tripped.append(
-            f"{len(name_mismatches):,} symbols have Finnhub profile names that "
-            f"don't match ticker-names.json (threshold {args.max_name_mismatches}). "
-            f"Sample: {sample}"
+            f"{foreign_rows:,} earnings_calendar rows use foreign-exchange suffixes "
+            f"(threshold {args.max_foreign_rows}). Sample symbols: {foreign_sample}"
+        )
+    if len(foreign_profiles) > args.max_foreign_profiles:
+        tripped.append(
+            f"{len(foreign_profiles):,} US-universe symbols have non-US Finnhub profiles "
+            f"(threshold {args.max_foreign_profiles}). Sample: {foreign_profiles[:15]}"
+        )
+    if len(name_mismatches) > args.max_name_mismatches:
+        tripped.append(
+            f"{len(name_mismatches):,} symbols have Finnhub names that don't match "
+            f"ticker-names.json (threshold {args.max_name_mismatches}). "
+            f"Sample: {name_mismatches[:15]}"
         )
     if len(missing_logos) > args.max_missing_logos:
         tripped.append(
-            f"{len(missing_logos):,} Parqet-risky symbols lack Finnhub logos "
+            f"{len(missing_logos):,} bare-symbol logo-collision tickers lack Finnhub logos "
             f"(threshold {args.max_missing_logos}): {missing_logos}"
         )
 
