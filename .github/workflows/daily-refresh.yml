@@ -45,6 +45,7 @@ concurrency:
 
 permissions:
   contents: write
+  issues: write   # detect_delistings.py opens ticker-lifecycle issues
 
 jobs:
   refresh:
@@ -297,8 +298,12 @@ jobs:
         # anchor/vanished guards. Ticker renames (company still listed under a new
         # symbol, e.g. BK→BNY) are detected by name and surfaced for a manual
         # remap — never auto-delisted. --allow-fetch-failure: a directory fetch
-        # hiccup must never break the nightly build.
-        run: python scripts/detect_delistings.py --allow-fetch-failure
+        # hiccup must never break the nightly build. --notify-github opens a
+        # tracking issue per suspected rename / auto-promoted delisting
+        # (idempotent by title) so they surface in your GitHub notifications.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python scripts/detect_delistings.py --allow-fetch-failure --notify-github
 
       - name: Gate — earnings_calendar integrity
         # Prints a structured diff of the about-to-be-committed CSV vs HEAD
@@ -376,7 +381,9 @@ jobs:
           cache: pip
 
       - name: Install Python dependencies
-        run: pip install requests
+        # Full requirements (not just requests): check_ticker_identity.py imports
+        # sync_finnhub_earnings, which imports pandas/pyarrow at module level.
+        run: pip install -r requirements.txt
 
       - name: Pull latest main after daily refresh commit
         run: |
@@ -425,7 +432,7 @@ jobs:
             --allow-missing-key \
             --universe earnings \
             $ARGS
-          .venv/bin/python scripts/check_ticker_identity.py
+          python scripts/check_ticker_identity.py
 
       - name: Commit + push Finnhub profile/logo cache
         run: |
