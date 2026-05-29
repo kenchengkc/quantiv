@@ -288,6 +288,18 @@ jobs:
             echo "No forecast-eligible tickers missing display names — skipping EDGAR refresh."
           fi
 
+      - name: Detect delistings (exchange-directory diff)
+        # Cross-references our active forecast universe against the authoritative
+        # NASDAQ/NYSE listing directories. A forecast-page ticker absent for ≥3
+        # consecutive days (tracked in data/delisting_watch.json) is auto-recorded
+        # in config/delisted_tickers.json, so the integrity gate below and
+        # tomorrow's sync_dolthub drop it cleanly instead of tripping the
+        # anchor/vanished guards. Ticker renames (company still listed under a new
+        # symbol, e.g. BK→BNY) are detected by name and surfaced for a manual
+        # remap — never auto-delisted. --allow-fetch-failure: a directory fetch
+        # hiccup must never break the nightly build.
+        run: python scripts/detect_delistings.py --allow-fetch-failure
+
       - name: Gate — earnings_calendar integrity
         # Prints a structured diff of the about-to-be-committed CSV vs HEAD
         # and aborts if any guardrail trips (row drop >2.5%, >50 tickers
@@ -322,6 +334,7 @@ jobs:
           git config --local user.email "action@github.com"
           git config --local user.name  "Quantiv bot"
           git add apps/frontend/public apps/frontend/lib/popular.ts apps/frontend/lib/marketHolidays.generated.ts
+          git add config/delisted_tickers.json config/ticker_renames.json
           git add -f data/earnings_calendar.csv data/market_caps.json
           # Snapshot + diff log are gitignored under /data/ but need to
           # persist across CI runs so tomorrow's build can diff against
@@ -329,7 +342,7 @@ jobs:
           # with [ -f ... ] guards so a missing file (e.g. the changes
           # log on the very first run, before any diff entries land)
           # doesn't tank the commit step with a pathspec error.
-          for f in data/popular_snapshot.json data/popular_changes.jsonl data/fmp_earnings_metadata.json data/fmp_earnings_backfill_state.json data/alpha_vantage_voi_probe.json; do
+          for f in data/popular_snapshot.json data/popular_changes.jsonl data/fmp_earnings_metadata.json data/fmp_earnings_backfill_state.json data/alpha_vantage_voi_probe.json data/delisting_watch.json; do
             if [ -f "$f" ]; then
               git add -f "$f"
             else

@@ -16,8 +16,59 @@ function normalizeTicker(ticker: string) {
   return ticker.trim().toUpperCase();
 }
 
+type LogoSource = 'logodev' | 'finnhub' | 'parqet';
+
+// Default resolution order, highest trust first. Each is tried until one image
+// loads; misses cascade to the next (Logo.dev/Finnhub return 404 on unknowns):
+//   Logo.dev → Finnhub (cached) → Parqet → (letter tile in render)
+// Finnhub stays ahead of Parqet because Parqet keys on bare symbols and can
+// return the wrong issuer (e.g. NA → National Bank of Canada vs NASDAQ NA =
+// Nano Labs).
+const DEFAULT_SOURCE_ORDER: LogoSource[] = ['logodev', 'finnhub', 'parqet'];
+
+// Per-ticker source preference, from manual audit. Moves one provider to the
+// front of the chain for tickers where the default primary (Logo.dev) serves
+// the wrong brand or has no logo. The other providers stay as fallbacks.
+const LOGO_SOURCE_OVERRIDES: Record<string, LogoSource> = {
+  // Logo.dev wrong/missing here; Finnhub carries the correct mark.
+  DG: 'finnhub',
+  URI: 'finnhub',
+  PCAR: 'finnhub',
+  NTAP: 'finnhub',
+  B: 'finnhub',
+  ALAB: 'finnhub',
+  CMCSA: 'finnhub',
+  PAAS: 'finnhub',
+  DUK: 'finnhub',
+  'BRK.B': 'finnhub',
+  LRCX: 'finnhub',
+  SMR: 'finnhub',
+  MRSH: 'finnhub', // Logo.dev returned no image
+  // Logo.dev/Finnhub wrong; Parqet carries the correct mark.
+  USAR: 'parqet',
+};
+
+// Explicit URL pins for the rare case where *every* provider is wrong. Tried
+// before any provider; keep this small.
+const LOGO_OVERRIDES: Record<string, string> = {
+  // 'NA': 'https://…',  // pin Nano Labs if Logo.dev/Finnhub disagree
+};
+
+// Publishable (pk_) key, exposed to the client via next.config.js. Safe to embed
+// in URLs by design; the secret sk_ key stays server-side only.
+const LOGO_DEV_KEY = process.env.NEXT_PUBLIC_LOGO_DEV_PUBLISHABLE_KEY ?? '';
+
 export function tickerLogoUrl(ticker: string) {
   return `https://assets.parqet.com/logos/symbol/${normalizeTicker(ticker)}?format=png`;
+}
+
+// Logo.dev resolves by stock ticker and is our highest-quality source. The
+// fallback=404 param is critical: without it Logo.dev returns a generated grey
+// monogram with HTTP 200 for unknown tickers, which would mask the rest of the
+// chain. With it, misses 404 cleanly so the next source gets a turn.
+function logoDevUrl(ticker: string): string | null {
+  if (!LOGO_DEV_KEY) return null;
+  return `https://img.logo.dev/ticker/${normalizeTicker(ticker)}?token=${LOGO_DEV_KEY}&size=200&format=png&fallback=404`;
 }
 
 function cachedFinnhubLogoUrl(ticker: string): string | null {
@@ -26,15 +77,33 @@ function cachedFinnhubLogoUrl(ticker: string): string | null {
   return typeof url === 'string' && /^https?:\/\//.test(url) ? url : null;
 }
 
+function sourceUrl(source: LogoSource, ticker: string): string | null {
+  switch (source) {
+    case 'logodev':
+      return logoDevUrl(ticker);
+    case 'finnhub':
+      return cachedFinnhubLogoUrl(ticker);
+    case 'parqet':
+      return tickerLogoUrl(ticker);
+  }
+}
+
 export function tickerLogoUrls(ticker: string) {
   const normalized = normalizeTicker(ticker);
-  const finnhubUrl = cachedFinnhubLogoUrl(normalized);
-  const parqetUrl = tickerLogoUrl(normalized);
-  // Prefer Finnhub when cached: Parqet keys on bare symbols and can return the
-  // wrong issuer (e.g. NA → National Bank of Canada while NASDAQ NA is Nano Labs).
+  // A preferred source (if any) jumps to the front; the rest follow in default
+  // order so a wrong/missing image still cascades to a working fallback.
+  const preferred = LOGO_SOURCE_OVERRIDES[normalized];
+  const order: LogoSource[] = preferred
+    ? [preferred, ...DEFAULT_SOURCE_ORDER.filter((s) => s !== preferred)]
+    : DEFAULT_SOURCE_ORDER;
+  const candidates: (string | null)[] = [
+    LOGO_OVERRIDES[normalized] ?? null,
+    ...order.map((source) => sourceUrl(source, normalized)),
+  ];
   const urls: string[] = [];
-  if (finnhubUrl) urls.push(finnhubUrl);
-  if (!urls.includes(parqetUrl)) urls.push(parqetUrl);
+  for (const url of candidates) {
+    if (url && !urls.includes(url)) urls.push(url);
+  }
   return urls;
 }
 
@@ -51,7 +120,7 @@ export function setTickerLogoState(ticker: string, state: TickerLogoLoadState) {
   if (state === 'loaded') {
     setTickerLogoLoaded(
       normalized,
-      cachedFinnhubLogoUrl(normalized) ?? tickerLogoUrl(normalized),
+      tickerLogoUrls(normalized)[0] ?? tickerLogoUrl(normalized),
     );
   } else {
     setTickerLogoFailed(normalized);

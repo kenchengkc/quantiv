@@ -15,7 +15,9 @@ See [`.github/workflows/daily-refresh.yml`](../.github/workflows/daily-refresh.y
 | `sync_finnhub_profiles.py` | Market-hours-guarded Finnhub profile/logo cache for `ticker-logos.json` | `data:profiles:finnhub`, weekly/manual |
 | `sync_vix.py` | FRED VIX → Parquet | Nightly |
 | `probe_alphavantage_voi.py` | Persistent multi-day Alpha Vantage V/OI entitlement and coverage audit | `data:probe:alphavantage-voi`, nightly |
-| `check_earnings_calendar_integrity.py` | Guardrails before committing calendar CSV | Nightly (blocks commit on failure) |
+| `detect_delistings.py` | Flags forecast-universe tickers gone from NASDAQ/NYSE directories; auto-adds confirmed delistings to `config/delisted_tickers.json` after N days (renames excluded) | Nightly (before integrity gate) |
+| `delisted.py` | Loader for `config/delisted_tickers.json` + `config/ticker_renames.json` (delistings & old→new symbol remaps; shared by the gates + `sync_dolthub`) | import-only |
+| `check_earnings_calendar_integrity.py` | Guardrails before committing calendar CSV (honors `delisted_tickers.json`) | Nightly (blocks commit on failure) |
 | `check_ticker_identity.py` | Foreign-ticker leaks + Finnhub/SEC name alignment; bare-symbol logo cache | After `sync_finnhub_profiles` |
 | `setup_duckdb_from_parquet.py` | Recreate DuckDB views | `data:views`, nightly |
 | `check_duckdb_freshness.py` | CI gate before scoring | Nightly |

@@ -88,6 +88,13 @@ export const COMPANY_NAMES: Record<string, string> = {
   // sp500-constituents.json has "Advanced Micro Devices" (full legal name).
   // Users know the acronym ticker as the brand — preserve it explicitly.
   AMD:  'AMD',
+  // EDGAR mixed-caps "Freeport-Mcmoran" title-cases to "Freeport-mcmoran";
+  // the brand intercaps the second surname.
+  FCX:  'Freeport-McMoRan',
+  // EDGAR stores "Horton D R Inc" (surname-first); brand form is initials.
+  DHI:  'D.R. Horton',
+  // Bare-acronym ticker — EDGAR/sp500 give just "CME"; the brand is the group.
+  CME:  'CME Group',
 };
 
 // ── EDGAR extended-names cache ─────────────────────────────────────────
