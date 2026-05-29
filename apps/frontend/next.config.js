@@ -22,6 +22,12 @@ try {
   if (!process.env.CLERK_SECRET_KEY && process.env.E2E_CLERK_SECRET_KEY) {
     process.env.CLERK_SECRET_KEY = process.env.E2E_CLERK_SECRET_KEY;
   }
+  // Logo.dev's publishable key is stored as LOGO_DEV_API_KEY (pk_…). Expose it
+  // to the client under the NEXT_PUBLIC_ name TickerLogo reads. The secret
+  // LOGO_DEV_API_SECRET (sk_…) is intentionally never surfaced to the browser.
+  if (!process.env.NEXT_PUBLIC_LOGO_DEV_PUBLISHABLE_KEY && process.env.LOGO_DEV_API_KEY) {
+    process.env.NEXT_PUBLIC_LOGO_DEV_PUBLISHABLE_KEY = process.env.LOGO_DEV_API_KEY;
+  }
 } catch (_) {
   // dotenv not available in production build — env vars come from Vercel
 }

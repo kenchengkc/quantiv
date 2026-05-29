@@ -27,6 +27,7 @@ import pandas as pd
 # works when invoked as `python scripts/check_earnings_calendar_integrity.py`.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from sync_finnhub_earnings import is_us_symbol  # noqa: E402
+from delisted import is_retired  # noqa: E402
 
 CSV_PATH = Path("data/earnings_calendar.csv")
 
@@ -189,8 +190,14 @@ def main() -> int:
 
     past_vanished_raw = past_old - past_new
     future_vanished_raw = future_old - future_new
-    past_vanished = {k for k in past_vanished_raw if not _rescued(*k)}
-    future_vanished = {k for k in future_vanished_raw if not _rescued(*k)}
+    # Drop date-drifted rescues and retired tickers (delisted via M&A/bankruptcy
+    # or renamed away) — their events vanishing is expected, not a regression.
+    past_vanished = {
+        k for k in past_vanished_raw if not _rescued(*k) and not is_retired(k[0])
+    }
+    future_vanished = {
+        k for k in future_vanished_raw if not _rescued(*k) and not is_retired(k[0])
+    }
     past_drifted = len(past_vanished_raw) - len(past_vanished)
     future_drifted = len(future_vanished_raw) - len(future_vanished)
     print(
@@ -235,9 +242,18 @@ def main() -> int:
     #    US and a regression affecting them would still trip the gate.
     vanished_all = set(old["act_symbol"]) - set(new["act_symbol"])
     foreign_trimmed = {t for t in vanished_all if not is_us_symbol(t)}
-    vanished = vanished_all - foreign_trimmed
+    # Retired tickers (delisted via config/delisted_tickers.json, or renamed
+    # away via config/ticker_renames.json) are removed on purpose; their
+    # disappearance is expected, not a silent-drop regression.
+    retired_trimmed = {t for t in vanished_all if is_retired(t)}
+    vanished = vanished_all - foreign_trimmed - retired_trimmed
     if foreign_trimmed:
         print(f"  ({len(foreign_trimmed):,} foreign-symbol trims excluded from gate)")
+    if retired_trimmed:
+        print(
+            f"  ({len(retired_trimmed):,} delisted/renamed trims excluded from gate: "
+            f"{sorted(retired_trimmed)})"
+        )
     if len(vanished) > args.max_ticker_drop:
         sample = sorted(vanished)[:15]
         tripped.append(
@@ -286,7 +302,10 @@ def main() -> int:
         if str(sym or "").strip()
     }
     anchors_in_new = set(new["act_symbol"].unique())
-    lost_anchors = anchors - anchors_in_new
+    # A retired anchor losing all rows (delisted, or renamed to a new symbol) is
+    # the intended outcome, not a universe-wide drop — exclude it so the commit
+    # ships. (For renames the new symbol picks the rows back up.)
+    lost_anchors = {a for a in (anchors - anchors_in_new) if not is_retired(a)}
     if lost_anchors:
         sample = sorted(lost_anchors)[:20]
         tripped.append(

@@ -32,6 +32,7 @@ EARNINGS_CSV = REPO_ROOT / "data" / "earnings_calendar.csv"
 
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 from sync_finnhub_earnings import is_us_symbol  # noqa: E402
+from delisted import is_retired  # noqa: E402
 
 US_COUNTRY_CODES = frozenset({"US", "USA", "UNITED STATES"})
 
@@ -148,7 +149,7 @@ def load_earnings_symbols() -> set[str]:
     with EARNINGS_CSV.open(newline="") as f:
         for row in csv.DictReader(f):
             sym = str(row.get("act_symbol") or "").strip().upper()
-            if sym and is_us_symbol(sym):
+            if sym and is_us_symbol(sym) and not is_retired(sym):
                 out.add(sym)
     return out
 

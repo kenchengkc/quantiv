@@ -85,6 +85,14 @@ COLUMN_LIST = [f.name for f in ARROW_SCHEMA]
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_DATA_DIR = REPO_ROOT / "data"
 SYMBOLS_DIR = REPO_ROOT / "apps" / "frontend" / "public" / "symbols"
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from delisted import (  # noqa: E402
+    canonical_ticker,
+    delisted_tickers,
+    is_delisted,
+    ticker_renames,
+)
 METADATA_FILE = "sync_metadata.json"
 API_DELAY = 0.3  # seconds between API calls
 
@@ -454,7 +462,12 @@ def sync_earnings():
             # Foreign-only Finnhub tickers stay filtered (never in DoltHub
             # snapshot, never get a forecast).
             forecast_tickers = {p.stem for p in SYMBOLS_DIR.glob("*.json")}
-            dolthub_universe = set(df["act_symbol"].unique()) | forecast_tickers
+            # Subtract confirmed-delisted tickers so a stale forecast JSON
+            # (or a lagging DoltHub snapshot) can't resurrect a name we've
+            # deliberately removed (config/delisted_tickers.json).
+            dolthub_universe = (
+                (set(df["act_symbol"].unique()) | forecast_tickers) - delisted_tickers()
+            )
             kept_before = len(existing)
             existing = existing[existing["act_symbol"].isin(dolthub_universe)]
             print(
@@ -503,6 +516,35 @@ def sync_earnings():
             print(f"  Merge: {len(df):,} total rows (DoltHub fresh + Finnhub-only carried forward)")
         except Exception as exc:
             print(f"  ⚠ Could not merge existing enriched columns: {exc}")
+
+    # Apply ticker renames (old -> new) so earnings history carries over under
+    # the company's current symbol. Only the renamed rows are rewritten; a
+    # collision with a fresh DoltHub row already under the new symbol is then
+    # deduped on (symbol, date).
+    renames = ticker_renames()
+    if renames:
+        mask = df["act_symbol"].astype(str).str.strip().str.upper().isin(renames)
+        if mask.any():
+            df.loc[mask, "act_symbol"] = df.loc[mask, "act_symbol"].map(canonical_ticker)
+            before = len(df)
+            df = df.drop_duplicates(subset=["act_symbol", "date"], keep="last").reset_index(drop=True)
+            print(
+                f"  Renamed {int(mask.sum())} row(s) to current symbols "
+                f"{sorted(set(renames.values()))}; deduped {before - len(df)} collision(s)"
+            )
+
+    # Final universe filter: drop delisted tickers that survived the merge.
+    # The universe gate above only screens carried-forward rows; fresh DoltHub
+    # rows reach here unfiltered, so a just-delisted name still in DoltHub's
+    # snapshot would otherwise slip through.
+    if delisted_tickers():
+        before = len(df)
+        df = df[~df["act_symbol"].map(is_delisted)].reset_index(drop=True)
+        if len(df) != before:
+            print(
+                f"  Dropped {before - len(df):,} delisted-ticker row(s): "
+                f"{sorted(delisted_tickers())}"
+            )
 
     # Write Parquet
     out_path = data_dir() / "earnings_calendar.parquet"

@@ -1,0 +1,23 @@
+{
+  "_comment": "Ticker renames: same company, new trading symbol (rebrand or exchange change). The daily refresh rewrites the OLD symbol to the NEW one (sync_dolthub.py) so earnings history carries over seamlessly, and the integrity gate treats the old symbol's disappearance as expected. Distinct from config/delisted_tickers.json, which removes companies that stopped trading entirely. Loaded via scripts/delisted.py. Format: OLD -> { new, reason, renamed_on, source }.",
+  "renames": {
+    "BK": {
+      "new": "BNY",
+      "reason": "BNY Mellon corporate rebrand; NYSE ticker BK -> BNY.",
+      "renamed_on": "2025-09-02",
+      "source": "auto-detected (company still listed under BNY in NYSE directory)"
+    },
+    "EXPI": {
+      "new": "AGNT",
+      "reason": "eXp World Holdings changed its Nasdaq ticker EXPI -> AGNT.",
+      "renamed_on": "2026-05-01",
+      "source": "auto-detected (company still listed under AGNT in NASDAQ directory)"
+    },
+    "ASGN": {
+      "new": "EFOR",
+      "reason": "ASGN rebranded to Everforth, Inc.; NYSE ticker ASGN -> EFOR.",
+      "renamed_on": "2026-05-01",
+      "source": "manual (user-confirmed rebrand)"
+    }
+  }
+}
