@@ -104,22 +104,39 @@ test.describe('screener · virtualization', () => {
     // We measure the screen-x of the cell text rather than a header to
     // avoid the sticky-thead's z-index masking the row beneath.
 
-    // Pick a column that's always within the default 1280px viewport
-    // before scrolling. "Hist 4Q avg" sits around x=516..604 — comfortably
-    // inside the viewport, and its position should be byte-for-byte
-    // identical regardless of which filter is active because the
-    // colgroup widths are fixed.
+    // Pick a column that's always within the default 1280px viewport before
+    // scrolling. "Hist 4Q avg" sits around x=516..604 — comfortably inside the
+    // viewport, and its position should be byte-for-byte identical regardless
+    // of which filter is active because the colgroup widths are fixed.
+    //
+    // IMPORTANT: scope to the REAL table shell, not the loading skeleton. Both
+    // render this same header via renderHeaderCells(), but the skeleton's
+    // container carries role="status". Toggling a filter re-triggers logo
+    // preload for the newly-visible subset, which briefly flips the screener
+    // back to its skeleton — and the skeleton renders "Hist 4Q avg" at a
+    // different x. An unscoped `.first()` would then measure the skeleton's
+    // header mid-reflow and report a large, bogus shift (the original flake).
     const headerCell = page
-      .locator('.qv-screener-table-shell thead th')
+      .locator('.qv-screener-table-shell:not([role="status"]) thead th')
       .filter({ hasText: /Hist 4Q avg/i })
       .first();
+    const filteredCount = page.locator('[data-testid="screener-filtered-count"]');
+
     await expect(headerCell).toBeVisible();
     const beforeX = await headerCell.evaluate((el) => el.getBoundingClientRect().x);
+    const initialCount = (await filteredCount.textContent())?.trim() ?? '';
 
     // Click AMC in the All/BMO/AMC segmented pill group.
     await page.getByRole('button', { name: /^AMC$/, exact: true }).first().click();
-    // Give the filter a tick to settle.
-    await page.waitForTimeout(300);
+
+    // Deterministic settle (replaces a fixed 300ms wait): AMC is a strict subset
+    // of All, so the filtered count changes; and any transient loading skeleton
+    // must clear before we measure the real, settled table.
+    await expect(filteredCount).not.toHaveText(initialCount);
+    await expect(
+      page.locator('[role="status"][aria-label="Loading screener"]'),
+    ).toHaveCount(0);
+    await expect(headerCell).toBeVisible();
 
     const afterX = await headerCell.evaluate((el) => el.getBoundingClientRect().x);
     // Allow 1px of jitter for sub-pixel rounding; nothing more.

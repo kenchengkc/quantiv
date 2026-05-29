@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -45,6 +46,8 @@ SYMBOL_DIR_HEADERS = {
     "Accept": "text/plain,*/*",
 }
 DEFAULT_THRESHOLD_DAYS = 3
+GITHUB_API = "https://api.github.com"
+LIFECYCLE_LABEL = "ticker-lifecycle"
 
 
 def normalize(symbol: str) -> str:
@@ -73,12 +76,12 @@ def fetch_pipe_table(url: str) -> list[dict[str, str]]:
     return rows
 
 
-def fetch_directory() -> tuple[set[str], list[str]]:
-    """Return (currently-listed US symbols, security-name strings) from both
-    NASDAQ Trader directory files. The name corpus lets us tell a real
-    delisting apart from a ticker rename (same company, new symbol)."""
+def fetch_directory() -> tuple[set[str], list[tuple[str, str]]]:
+    """Return (currently-listed US symbols, [(symbol, security_name), …]) from
+    both NASDAQ Trader directory files. The name corpus lets us tell a real
+    delisting apart from a ticker rename and name the likely new symbol."""
     listed: set[str] = set()
-    names: list[str] = []
+    entries: list[tuple[str, str]] = []
     for url, sym_col in ((NASDAQ_LISTED_URL, "Symbol"), (OTHER_LISTED_URL, "ACT Symbol")):
         for row in fetch_pipe_table(url):
             if row.get("Test Issue") == "Y":
@@ -89,8 +92,8 @@ def fetch_directory() -> tuple[set[str], list[str]]:
             listed.add(sym)
             name = (row.get("Security Name") or "").strip()
             if name:
-                names.append(name)
-    return listed, names
+                entries.append((sym, name))
+    return listed, entries
 
 
 def load_names() -> dict[str, str]:
@@ -101,28 +104,30 @@ def load_names() -> dict[str, str]:
     return payload if isinstance(payload, dict) else {}
 
 
-def build_rename_finder(directory_names: list[str]):
-    """Return a fn mapping a company name → True if that company still appears
-    in the exchange directories (i.e. the ticker was renamed, not delisted).
+def build_rename_finder(directory_entries: list[tuple[str, str]]):
+    """Return a fn mapping a company name → the symbol it currently trades under
+    (or None). A non-None result means the ticker was renamed, not delisted.
 
     Matches on distinctive token overlap so 'Bank of New York Mellon' (BK)
-    still resolves to the 'The Bank of New York Mellon Corporation' row now
-    listed as BNY. Requires ≥2 shared significant tokens and ≥60% overlap to
-    avoid matching on a single common word like 'American' or 'Holdings'.
+    resolves to the 'The Bank of New York Mellon Corporation' row now listed as
+    BNY. Requires ≥2 shared significant tokens and ≥60% overlap (and picks the
+    best overlap) to avoid matching on a single common word like 'American'.
     """
-    corpus = [toks for name in directory_names if (toks := norm_tokens(name))]
+    corpus = [(sym, toks) for sym, name in directory_entries if (toks := norm_tokens(name))]
 
-    def still_listed(company_name: str) -> bool:
+    def renamed_symbol(company_name: str) -> str | None:
         a = norm_tokens(company_name)
         if len(a) < 2:
-            return False  # too generic to disambiguate safely
-        for b in corpus:
+            return None  # too generic to disambiguate safely
+        best_sym, best_ratio = None, 0.0
+        for sym, b in corpus:
             overlap = len(a & b)
-            if overlap >= 2 and overlap / min(len(a), len(b)) >= 0.6:
-                return True
-        return False
+            ratio = overlap / min(len(a), len(b))
+            if overlap >= 2 and ratio >= 0.6 and ratio > best_ratio:
+                best_sym, best_ratio = sym, ratio
+        return best_sym
 
-    return still_listed
+    return renamed_symbol
 
 
 def load_active_universe() -> set[str]:
@@ -191,6 +196,89 @@ def promote_to_delisted(tickers: list[str], threshold: int) -> None:
     DELISTED_PATH.write_text(json.dumps(payload, indent=2) + "\n")
 
 
+def notify_github(renames: dict[str, str], promoted: list[str], *, dry_run: bool) -> None:
+    """Open a tracking GitHub issue per actionable lifecycle event, idempotent
+    by title (skips when an open issue with the same title already exists).
+
+    Suspected renames need a manual remap into config/ticker_renames.json;
+    auto-promoted delistings are informational. Uses GITHUB_TOKEN +
+    GITHUB_REPOSITORY from the Actions environment. Fail-soft: a notify error
+    never breaks the nightly build.
+    """
+    issues: list[tuple[str, str]] = []  # (title, body)
+    for old, new in sorted(renames.items()):
+        issues.append((
+            f"Ticker rename suspected: {old} → {new}",
+            f"`{old}` is gone from the NASDAQ/NYSE listing directories, but the "
+            f"company still appears to trade as **`{new}`**.\n\n"
+            f"**Action — confirm and add to `config/ticker_renames.json`:**\n\n"
+            f"```json\n"
+            f'"{old}": {{ "new": "{new}", "reason": "…", '
+            f'"renamed_on": "YYYY-MM-DD", "source": "…" }}\n'
+            f"```\n\n"
+            f"_Detected {today_iso()} by `scripts/detect_delistings.py`._",
+        ))
+    for tkr in promoted:
+        issues.append((
+            f"Ticker delisted (auto-removed): {tkr}",
+            f"`{tkr}` was absent from the NASDAQ/NYSE listing directories for "
+            f"≥ the threshold and was **auto-added to "
+            f"`config/delisted_tickers.json`** on {today_iso()} by "
+            f"`scripts/detect_delistings.py`.\n\n"
+            f"**Review:** if this was actually a rename (company still trading "
+            f"under a new symbol), move it to `config/ticker_renames.json` instead.",
+        ))
+    if not issues:
+        return
+
+    repo = os.getenv("GITHUB_REPOSITORY")
+    token = os.getenv("GITHUB_TOKEN") or os.getenv("GH_TOKEN")
+    if dry_run or not (repo and token):
+        why = "dry-run" if dry_run else "no GITHUB_REPOSITORY/GITHUB_TOKEN"
+        print(f"  (github notify skipped [{why}] — would open {len(issues)} issue(s):)")
+        for title, _ in issues:
+            print(f"       • {title}")
+        return
+
+    sess = requests.Session()
+    sess.headers.update({
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+    })
+    try:
+        resp = sess.get(
+            f"{GITHUB_API}/repos/{repo}/issues",
+            params={"labels": LIFECYCLE_LABEL, "state": "open", "per_page": 100},
+            timeout=20,
+        )
+        existing = (
+            {i["title"] for i in resp.json() if isinstance(i, dict) and "title" in i}
+            if resp.ok else set()
+        )
+    except (requests.RequestException, ValueError) as exc:
+        print(f"  ⚠ github notify: could not list existing issues ({exc}); skipping")
+        return
+
+    for title, body in issues:
+        if title in existing:
+            print(f"  (issue already open, skipping: {title})")
+            continue
+        try:
+            resp = sess.post(
+                f"{GITHUB_API}/repos/{repo}/issues",
+                json={"title": title, "body": body, "labels": [LIFECYCLE_LABEL]},
+                timeout=20,
+            )
+        except requests.RequestException as exc:
+            print(f"  ⚠ github notify: create failed for {title!r} ({exc})")
+            continue
+        if resp.ok:
+            print(f"  📨 opened issue #{resp.json().get('number')}: {title}")
+        else:
+            print(f"  ⚠ github notify: create returned {resp.status_code} for {title!r}")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -209,10 +297,16 @@ def main() -> int:
         action="store_true",
         help="Exit 0 (no changes) if the directories can't be fetched. Default in CI.",
     )
+    parser.add_argument(
+        "--notify-github",
+        action="store_true",
+        help="Open a tracking GitHub issue per suspected rename / auto-promoted "
+        "delisting (uses GITHUB_TOKEN + GITHUB_REPOSITORY; idempotent by title).",
+    )
     args = parser.parse_args()
 
     try:
-        listed, directory_names = fetch_directory()
+        listed, directory_entries = fetch_directory()
     except requests.RequestException as exc:
         print(f"⚠ Could not fetch exchange directories: {exc}")
         return 0 if args.allow_fetch_failure else 1
@@ -231,13 +325,14 @@ def main() -> int:
     # a new symbol — e.g. BK→BNY, EXPI→AGNT) and genuine disappearances. Only
     # the latter are auto-promotable; renames need a symbol remap, not removal,
     # and would otherwise be wrongly purged.
-    still_listed = build_rename_finder(directory_names)
-    renames: dict[str, str] = {}      # ticker → our known company name
+    renamed_symbol = build_rename_finder(directory_entries)
+    renames: dict[str, str] = {}      # old ticker → suspected new symbol
     genuine: set[str] = set()
     for ticker in missing_now:
         company = names.get(ticker) or names.get(ticker.replace("-", "."))
-        if company and still_listed(company):
-            renames[ticker] = company
+        new_sym = renamed_symbol(company) if company else None
+        if new_sym and new_sym != ticker:
+            renames[ticker] = new_sym
         else:
             genuine.add(ticker)
 
@@ -278,7 +373,7 @@ def main() -> int:
     if renames:
         print("  ✋ likely ticker renames (review/remap — NOT auto-delisted):")
         for t in sorted(renames):
-            print(f"       {t:<8} {renames[t]} (company still listed under a new symbol)")
+            print(f"       {t:<8} → {renames[t]} (company still listed under new symbol)")
     if cleared:
         print(f"  ↩ reappeared / cleared:       {sorted(cleared)}")
     pending = sorted(
@@ -292,6 +387,12 @@ def main() -> int:
             print(f"       {t:<8} {w['days_missing']}d (since {w['first_missing']})")
     if promoted:
         print(f"  🚫 PROMOTING to delisted (≥{args.threshold}d): {sorted(promoted)}")
+
+    # Notify on actionable events: suspected renames (need a manual remap) and
+    # this run's auto-promotions (informational; revert if it was really a
+    # rename). Idempotent + fail-soft inside notify_github.
+    if args.notify_github and (renames or promoted):
+        notify_github(renames, sorted(promoted), dry_run=args.dry_run)
 
     if args.dry_run:
         print("  (dry run — no files written)")
