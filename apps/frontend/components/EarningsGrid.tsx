@@ -28,6 +28,10 @@ interface EarningsEvent {
   timing: string;
   em_straddle_pct?: number | null;
   em_iv_pct?: number | null;
+  // Signed regular-session close-to-close move across the print, populated by
+  // build_frontend_data for already-reported events. Shown (marked as the
+  // earnings-day reaction) instead of the live tick once the date has passed.
+  realized_move_pct?: number | null;
 }
 
 interface WeeklyData {
@@ -89,16 +93,32 @@ function TickerRow({
   live?: { change: number | null; changePct: number | null };
 }) {
   const movePct = ev.em_straddle_pct ?? ev.em_iv_pct ?? null;
-  const changePct = live?.changePct ?? null;
-  const change = live?.change ?? null;
+  // Once a reporter's date has passed, show the stable earnings-day reaction
+  // (regular-session close-to-close from the build) instead of the live tick,
+  // which keeps drifting to the latest session and can include extended-hours
+  // prints. Upcoming/today rows keep the live quote.
+  const todayIso = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/New_York',
+  }).format(new Date());
+  const isPast = ev.earnings_date < todayIso;
+  const realizedPct = ev.realized_move_pct ?? null;
+  const showReaction = isPast && realizedPct !== null;
+  const changePct = showReaction ? realizedPct : (live?.changePct ?? null);
   // Round to display precision before deciding flat — avoids "−0.00 (-0.00%)"
   // showing as a down move because the underlying float was -1e-5.
   const pctRounded = changePct !== null ? Math.round(changePct * 10000) / 10000 : null;
-  const dollarRounded = change !== null ? Math.round(change * 100) / 100 : null;
-  const flat = pctRounded === 0 && (dollarRounded === null || dollarRounded === 0);
+  const flat = pctRounded === 0;
   const up = !flat && (changePct ?? 0) >= 0;
   const arrow = flat ? '–' : up ? '▲' : '▼';
   const color = flat ? 'var(--ink-4)' : up ? 'var(--up)' : 'var(--down)';
+  // "earnings Thu 5/28" — names the exact session the reaction covers.
+  const reactionLabel = showReaction
+    ? `earnings ${new Date(`${ev.earnings_date}T12:00:00`).toLocaleDateString('en-US', {
+        weekday: 'short',
+        month: 'numeric',
+        day: 'numeric',
+      })}`
+    : null;
   const hover = useTickerHover(ev.ticker);
   return (
     <Link
@@ -163,6 +183,17 @@ function TickerRow({
             }}
           >
             {arrow} {Math.abs(changePct * 100).toFixed(2)}%
+            {reactionLabel && (
+              <span
+                style={{
+                  color: 'var(--ink-4)',
+                  letterSpacing: '0.02em',
+                  marginLeft: 4,
+                }}
+              >
+                · {reactionLabel}
+              </span>
+            )}
           </div>
         )}
       </div>
