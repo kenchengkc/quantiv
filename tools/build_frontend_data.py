@@ -593,11 +593,16 @@ def screener_extras(conn, ticker: str, earnings_dt: date, as_of_date: date) -> d
 
 
 def collapse_duplicate_earnings(conn, start: date, end: date):
-    """Pick one canonical earnings date per (ticker, fiscal quarter) across the
-    forward window, so a ticker whose estimated date was revised (e.g. PLUS
-    2026-05-20 → 05-27 → 05-28) shows on a single day instead of two or three.
+    """Pick one canonical earnings date per ticker across the forward window, so
+    a ticker whose estimated date was revised (e.g. PLUS 2026-05-20 → 05-27 →
+    05-28) shows on a single day instead of two or three.
 
-    Rule (matches the confirmed report date on all known cases):
+    Partitions by ticker only (NOT ticker+fiscal_q): a revised estimate can be
+    tagged with a different/blank fiscal quarter (e.g. M's 05-26 vs 06-03), so
+    keying on the quarter would fail to merge them. Within this ~25-day window a
+    ticker has at most one real print, so per-ticker collapse is safe.
+
+    Rule (matches the confirmed report date 5/5 on known cases):
       1. prefer the row that already has reported actuals (the confirmed date),
       2. otherwise the latest date (the most recent revision).
     Returns (keep, dropped): keep is the set of (ticker, iso_date) to retain;
@@ -606,14 +611,14 @@ def collapse_duplicate_earnings(conn, start: date, end: date):
     rows = conn.execute(
         """
         WITH base AS (
-            SELECT ticker, earnings_dt, fiscal_q, eps_actual, revenue_actual
+            SELECT ticker, earnings_dt, eps_actual, revenue_actual
             FROM earnings_events
             WHERE earnings_dt BETWEEN ? AND ?
         ),
         ranked AS (
-            SELECT ticker, earnings_dt, fiscal_q,
+            SELECT ticker, earnings_dt,
                 ROW_NUMBER() OVER (
-                    PARTITION BY ticker, fiscal_q
+                    PARTITION BY ticker
                     ORDER BY
                         ((NULLIF(CAST(eps_actual AS VARCHAR), '') IS NOT NULL)
                           OR (NULLIF(CAST(revenue_actual AS VARCHAR), '') IS NOT NULL)) DESC,
@@ -621,19 +626,19 @@ def collapse_duplicate_earnings(conn, start: date, end: date):
                 ) AS rn
             FROM base
         )
-        SELECT ticker, earnings_dt, fiscal_q, rn FROM ranked
+        SELECT ticker, earnings_dt, rn FROM ranked
         """,
         [start, end],
     ).fetchall()
     keep: set[tuple[str, str]] = set()
-    kept_iso: dict[tuple[str, object], str] = {}
-    for ticker, earnings_dt, fiscal_q, rn in rows:
+    kept_iso: dict[str, str] = {}
+    for ticker, earnings_dt, rn in rows:
         if rn == 1:
             keep.add((ticker, earnings_dt.isoformat()))
-            kept_iso[(ticker, fiscal_q)] = earnings_dt.isoformat()
+            kept_iso[ticker] = earnings_dt.isoformat()
     dropped = [
-        (ticker, earnings_dt.isoformat(), kept_iso.get((ticker, fiscal_q), "?"))
-        for ticker, earnings_dt, fiscal_q, rn in rows
+        (ticker, earnings_dt.isoformat(), kept_iso.get(ticker, "?"))
+        for ticker, earnings_dt, rn in rows
         if rn != 1
     ]
     return keep, dropped
@@ -799,6 +804,21 @@ def main():
     week_payloads = {}
     tickers_needing_detail: dict[str, date] = {}
 
+    # Collapse revised/duplicate forward earnings dates to one per ticker across
+    # the whole window so weekly/weeks/screener stay consistent (a revised
+    # estimate like PLUS 5/20→5/27→5/28 otherwise shows 2-3 times). Prefer the
+    # row with reported actuals (the confirmed date), else the latest revision.
+    span_start = this_monday + timedelta(days=7 * min(WEEK_OFFSETS))
+    span_end = this_monday + timedelta(days=7 * max(WEEK_OFFSETS) + 4)
+    canonical_keys, dropped_dupes = collapse_duplicate_earnings(conn, span_start, span_end)
+    if dropped_dupes:
+        print(
+            f"  Earnings dedup: collapsed {len(dropped_dupes)} duplicate date(s) "
+            "to one per ticker (actuals first, else latest):"
+        )
+        for tk, dropped_iso, kept in sorted(dropped_dupes):
+            print(f"    {tk}: dropped {dropped_iso} → kept {kept}")
+
     if skip_weeks:
         print("⏭️  --resume/--skip-weeks: reading existing weeks/*.json from disk", flush=True)
         for offset in WEEK_OFFSETS:
@@ -822,7 +842,7 @@ def main():
         # options_math baseline for those; enforce ML on current + next week.
         require_ml = offset in (0, 1)
         events = build_week_events(conn, as_of_date, wk_start, wk_end, ml_lookup,
-                                   require_ml=require_ml)
+                                   require_ml=require_ml, canonical=canonical_keys)
 
         # Past-week preservation: once a week is fully in the past, the
         # rebuild loses events whose options chains have rolled off
