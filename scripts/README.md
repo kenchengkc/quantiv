@@ -19,6 +19,7 @@ See [`.github/workflows/daily-refresh.yml`](../.github/workflows/daily-refresh.y
 | `delisted.py` | Loader for `config/delisted_tickers.json` + `config/ticker_renames.json` (delistings & old→new symbol remaps; shared by the gates + `sync_dolthub`) | import-only |
 | `check_earnings_calendar_integrity.py` | Guardrails before committing calendar CSV (honors `delisted_tickers.json`) | Nightly (blocks commit on failure) |
 | `check_ticker_identity.py` | Foreign-ticker leaks + Finnhub/SEC name alignment; bare-symbol logo cache | After `sync_finnhub_profiles` |
+| `audit_logo_sources.py` | Per-ticker logo path audit for full `ticker-names.json` universe (no HTTP) | Manual / after logo changes |
 | `setup_duckdb_from_parquet.py` | Recreate DuckDB views | `data:views`, nightly |
 | `check_duckdb_freshness.py` | CI gate before scoring | Nightly |
 | `daily_score.py` | ML forecasts for upcoming earnings | `ml:score`, nightly |
