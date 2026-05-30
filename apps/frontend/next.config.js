@@ -22,14 +22,19 @@ try {
   if (!process.env.CLERK_SECRET_KEY && process.env.E2E_CLERK_SECRET_KEY) {
     process.env.CLERK_SECRET_KEY = process.env.E2E_CLERK_SECRET_KEY;
   }
-  // Logo.dev's publishable key is stored as LOGO_DEV_API_KEY (pk_…). Expose it
-  // to the client under the NEXT_PUBLIC_ name TickerLogo reads. The secret
-  // LOGO_DEV_API_SECRET (sk_…) is intentionally never surfaced to the browser.
-  if (!process.env.NEXT_PUBLIC_LOGO_DEV_PUBLISHABLE_KEY && process.env.LOGO_DEV_API_KEY) {
-    process.env.NEXT_PUBLIC_LOGO_DEV_PUBLISHABLE_KEY = process.env.LOGO_DEV_API_KEY;
-  }
 } catch (_) {
   // dotenv not available in production build — env vars come from Vercel
+}
+
+// Logo.dev publishable key — MUST stay OUTSIDE the try/catch above. That block
+// begins with require('dotenv'), which throws on Vercel's production build, so
+// anything inside it is silently skipped in prod (this mapping used to live in
+// there, which is why LOGO_DEV_API_KEY set in the Vercel dashboard never reached
+// the client). This only reads process.env (Vercel dashboard in prod, or dotenv
+// locally), exposing LOGO_DEV_API_KEY (pk_…) under the NEXT_PUBLIC_ name
+// TickerLogo reads. The sk_ secret is never surfaced to the browser.
+if (!process.env.NEXT_PUBLIC_LOGO_DEV_PUBLISHABLE_KEY && process.env.LOGO_DEV_API_KEY) {
+  process.env.NEXT_PUBLIC_LOGO_DEV_PUBLISHABLE_KEY = process.env.LOGO_DEV_API_KEY;
 }
 
 /** @type {import('next').NextConfig} */
