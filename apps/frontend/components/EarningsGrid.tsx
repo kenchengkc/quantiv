@@ -14,6 +14,10 @@ import {
   preloadTickerLogos,
   TickerLogo,
 } from '@/components/TickerLogo';
+import {
+  resolveEarningsReactionDisplay,
+  shouldPollLiveQuote,
+} from '@/lib/earningsReaction';
 import sp500Constituents from '../../../lib/data/sp500-constituents.json';
 
 // Full S&P 500 (503 constituents incl. dual-class). Used for the "S&P 500"
@@ -93,17 +97,13 @@ function TickerRow({
   live?: { change: number | null; changePct: number | null };
 }) {
   const movePct = ev.em_straddle_pct ?? ev.em_iv_pct ?? null;
-  // Once a reporter's date has passed, show the stable earnings-day reaction
-  // (regular-session close-to-close from the build) instead of the live tick,
-  // which keeps drifting to the latest session and can include extended-hours
-  // prints. Upcoming/today rows keep the live quote.
-  const todayIso = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/New_York',
-  }).format(new Date());
-  const isPast = ev.earnings_date < todayIso;
-  const realizedPct = ev.realized_move_pct ?? null;
-  const showReaction = isPast && realizedPct !== null;
-  const changePct = showReaction ? realizedPct : (live?.changePct ?? null);
+  const reaction = resolveEarningsReactionDisplay({
+    earningsDate: ev.earnings_date,
+    timing: ev.timing,
+    realizedMovePct: ev.realized_move_pct,
+    liveChangePct: live?.changePct ?? null,
+  });
+  const changePct = reaction.changePct;
   // Round to display precision before deciding flat — avoids "−0.00 (-0.00%)"
   // showing as a down move because the underlying float was -1e-5.
   const pctRounded = changePct !== null ? Math.round(changePct * 10000) / 10000 : null;
@@ -111,9 +111,7 @@ function TickerRow({
   const up = !flat && (changePct ?? 0) >= 0;
   const arrow = flat ? '–' : up ? '▲' : '▼';
   const color = flat ? 'var(--ink-4)' : up ? 'var(--up)' : 'var(--down)';
-  // Label the number's nature: "Realized" = the stable close-to-close reaction
-  // on the (past) report day; "Live" = the current session's day-change tick.
-  const moveTag = changePct === null ? null : showReaction ? 'Realized' : 'Live';
+  const moveTag = reaction.tag;
   const hover = useTickerHover(ev.ticker);
   return (
     <Link
@@ -749,7 +747,15 @@ export default function EarningsGrid() {
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
     let initialReadyTimer: ReturnType<typeof setTimeout> | null = null;
-    const symbols = Array.from(new Set(data.events.map((e) => e.ticker)));
+    const symbols = Array.from(
+      new Set(
+        data.events
+          .filter((e) =>
+            shouldPollLiveQuote(e.earnings_date, e.timing, e.realized_move_pct),
+          )
+          .map((e) => e.ticker),
+      ),
+    );
 
     let lastMarketOpen = true;
     let lastQuoteRefreshActive = true;
@@ -761,6 +767,13 @@ export default function EarningsGrid() {
       }
       setQuotesReadyWeek(weekStartIso);
     };
+
+    if (symbols.length === 0) {
+      markQuotesReady();
+      return () => {
+        cancelled = true;
+      };
+    }
 
     setQuotesReadyWeek(null);
     initialReadyTimer = setTimeout(markQuotesReady, INITIAL_QUOTE_WAIT_MS);

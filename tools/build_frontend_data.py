@@ -368,14 +368,14 @@ def build_symbol_detail(conn, ticker: str, as_of_date: date, earnings_dt: date |
             LEFT JOIN v_ohlcv pre  ON pre.act_symbol = e.ticker
                 AND pre.date >= e.earnings_dt - INTERVAL '5' DAY
                 AND (
-                    (e.timing = 'after_market_close' AND pre.date <= e.earnings_dt)
-                    OR (e.timing <> 'after_market_close' AND pre.date < e.earnings_dt)
+                    (LOWER(e.timing) IN ('after_market_close', 'amc') AND pre.date <= e.earnings_dt)
+                    OR (LOWER(e.timing) NOT IN ('after_market_close', 'amc') AND pre.date < e.earnings_dt)
                 )
             LEFT JOIN v_ohlcv post ON post.act_symbol = e.ticker
                 AND post.date <= e.earnings_dt + INTERVAL '5' DAY
                 AND (
-                    (e.timing = 'before_market_open' AND post.date >= e.earnings_dt)
-                    OR (e.timing <> 'before_market_open' AND post.date > e.earnings_dt)
+                    (LOWER(e.timing) IN ('before_market_open', 'bmo') AND post.date >= e.earnings_dt)
+                    OR (LOWER(e.timing) NOT IN ('before_market_open', 'bmo') AND post.date > e.earnings_dt)
                 )
             WHERE e.ticker = ?
             QUALIFY ROW_NUMBER() OVER (
@@ -664,14 +664,14 @@ def build_week_events(conn, as_of_date: date, week_start: date, week_end: date,
             LEFT JOIN v_ohlcv pre  ON pre.act_symbol = e.ticker
                 AND pre.date >= e.earnings_dt - INTERVAL '5' DAY
                 AND (
-                    (e.timing = 'after_market_close' AND pre.date <= e.earnings_dt)
-                    OR (e.timing <> 'after_market_close' AND pre.date < e.earnings_dt)
+                    (LOWER(e.timing) IN ('after_market_close', 'amc') AND pre.date <= e.earnings_dt)
+                    OR (LOWER(e.timing) NOT IN ('after_market_close', 'amc') AND pre.date < e.earnings_dt)
                 )
             LEFT JOIN v_ohlcv post ON post.act_symbol = e.ticker
                 AND post.date <= e.earnings_dt + INTERVAL '5' DAY
                 AND (
-                    (e.timing = 'before_market_open' AND post.date >= e.earnings_dt)
-                    OR (e.timing <> 'before_market_open' AND post.date > e.earnings_dt)
+                    (LOWER(e.timing) IN ('before_market_open', 'bmo') AND post.date >= e.earnings_dt)
+                    OR (LOWER(e.timing) NOT IN ('before_market_open', 'bmo') AND post.date > e.earnings_dt)
                 )
             WHERE e.earnings_dt BETWEEN ? AND ?
             QUALIFY ROW_NUMBER() OVER (
