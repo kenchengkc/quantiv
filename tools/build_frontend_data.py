@@ -863,6 +863,12 @@ def main():
                     preserved = [
                         e for e in prior_events
                         if (e["ticker"], e["earnings_date"]) not in new_keys
+                        # Don't resurrect a date the dedup just collapsed away:
+                        # a revised estimate (e.g. WSM 05-20/28 superseded by
+                        # 05-21) would otherwise be re-preserved here and
+                        # reintroduce the duplicate. Keep only canonical keys.
+                        and (canonical_keys is None
+                             or (e["ticker"], e["earnings_date"]) in canonical_keys)
                     ]
                     if preserved:
                         print(
