@@ -63,6 +63,7 @@ interface ScreenerBundle {
 }
 
 type SortKey =
+  | 'name'
   | 'edge'
   | 'dte'
   | 'date'
@@ -911,6 +912,9 @@ export default function EarningsScreener() {
       }
     };
     return [...filtered].sort((a, b) => {
+      // Name column sorts alphabetically by ticker (asc = A→Z). Pure string
+      // compare — the numeric `val()` path below doesn't apply.
+      if (sortKey === 'name') return a.ticker.localeCompare(b.ticker) * dir;
       const va = val(a);
       const vb = val(b);
       if (va == null && vb == null) return a.ticker.localeCompare(b.ticker);
