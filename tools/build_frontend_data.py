@@ -592,9 +592,57 @@ def screener_extras(conn, ticker: str, earnings_dt: date, as_of_date: date) -> d
     return extras
 
 
+def collapse_duplicate_earnings(conn, start: date, end: date):
+    """Pick one canonical earnings date per (ticker, fiscal quarter) across the
+    forward window, so a ticker whose estimated date was revised (e.g. PLUS
+    2026-05-20 → 05-27 → 05-28) shows on a single day instead of two or three.
+
+    Rule (matches the confirmed report date on all known cases):
+      1. prefer the row that already has reported actuals (the confirmed date),
+      2. otherwise the latest date (the most recent revision).
+    Returns (keep, dropped): keep is the set of (ticker, iso_date) to retain;
+    dropped is [(ticker, dropped_iso, kept_iso)] for the build log.
+    """
+    rows = conn.execute(
+        """
+        WITH base AS (
+            SELECT ticker, earnings_dt, fiscal_q, eps_actual, revenue_actual
+            FROM earnings_events
+            WHERE earnings_dt BETWEEN ? AND ?
+        ),
+        ranked AS (
+            SELECT ticker, earnings_dt, fiscal_q,
+                ROW_NUMBER() OVER (
+                    PARTITION BY ticker, fiscal_q
+                    ORDER BY
+                        ((NULLIF(CAST(eps_actual AS VARCHAR), '') IS NOT NULL)
+                          OR (NULLIF(CAST(revenue_actual AS VARCHAR), '') IS NOT NULL)) DESC,
+                        earnings_dt DESC
+                ) AS rn
+            FROM base
+        )
+        SELECT ticker, earnings_dt, fiscal_q, rn FROM ranked
+        """,
+        [start, end],
+    ).fetchall()
+    keep: set[tuple[str, str]] = set()
+    kept_iso: dict[tuple[str, object], str] = {}
+    for ticker, earnings_dt, fiscal_q, rn in rows:
+        if rn == 1:
+            keep.add((ticker, earnings_dt.isoformat()))
+            kept_iso[(ticker, fiscal_q)] = earnings_dt.isoformat()
+    dropped = [
+        (ticker, earnings_dt.isoformat(), kept_iso.get((ticker, fiscal_q), "?"))
+        for ticker, earnings_dt, fiscal_q, rn in rows
+        if rn != 1
+    ]
+    return keep, dropped
+
+
 def build_week_events(conn, as_of_date: date, week_start: date, week_end: date,
                       ml_lookup: dict[tuple[str, str], dict],
-                      require_ml: bool = True) -> list[dict]:
+                      require_ml: bool = True,
+                      canonical: set[tuple[str, str]] | None = None) -> list[dict]:
     rows = conn.execute(
         """
         SELECT ticker, earnings_dt, timing, fiscal_q,
@@ -609,6 +657,7 @@ def build_week_events(conn, as_of_date: date, week_start: date, week_end: date,
     events = []
     skipped_no_ml = 0
     skipped_no_options = 0
+    skipped_dupe = 0
     today = date.today()
     for i, (
         ticker,
@@ -620,6 +669,11 @@ def build_week_events(conn, as_of_date: date, week_start: date, week_end: date,
         revenue_actual,
         revenue_estimate,
     ) in enumerate(rows, 1):
+        # Drop revised/duplicate dates: keep only the canonical date chosen per
+        # (ticker, fiscal quarter) by collapse_duplicate_earnings.
+        if canonical is not None and (ticker, earnings_dt.isoformat()) not in canonical:
+            skipped_dupe += 1
+            continue
         fc = ml_lookup.get((ticker, earnings_dt.isoformat()))
         # Require ML only for *future* earnings. Past earnings within the same
         # week (e.g. Mon/Tue when today is Wed) fall back to options_math —
@@ -664,10 +718,11 @@ def build_week_events(conn, as_of_date: date, week_start: date, week_end: date,
         }
         events.append(event)
     events.sort(key=lambda e: (e["earnings_date"], e["ticker"]))
-    if skipped_no_ml or skipped_no_options:
+    if skipped_no_ml or skipped_no_options or skipped_dupe:
         print(
             f"    skipped: {skipped_no_ml} (no ML forecast), "
-            f"{skipped_no_options} (no options data)",
+            f"{skipped_no_options} (no options data), "
+            f"{skipped_dupe} (duplicate revised date)",
             flush=True,
         )
     return events
