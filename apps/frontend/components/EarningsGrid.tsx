@@ -111,14 +111,9 @@ function TickerRow({
   const up = !flat && (changePct ?? 0) >= 0;
   const arrow = flat ? '–' : up ? '▲' : '▼';
   const color = flat ? 'var(--ink-4)' : up ? 'var(--up)' : 'var(--down)';
-  // "earnings Thu 5/28" — names the exact session the reaction covers.
-  const reactionLabel = showReaction
-    ? `earnings ${new Date(`${ev.earnings_date}T12:00:00`).toLocaleDateString('en-US', {
-        weekday: 'short',
-        month: 'numeric',
-        day: 'numeric',
-      })}`
-    : null;
+  // Label the number's nature: "Realized" = the stable close-to-close reaction
+  // on the (past) report day; "Live" = the current session's day-change tick.
+  const moveTag = changePct === null ? null : showReaction ? 'Realized' : 'Live';
   const hover = useTickerHover(ev.ticker);
   return (
     <Link
@@ -183,15 +178,17 @@ function TickerRow({
             }}
           >
             {arrow} {Math.abs(changePct * 100).toFixed(2)}%
-            {reactionLabel && (
+            {moveTag && (
               <span
                 style={{
                   color: 'var(--ink-4)',
-                  letterSpacing: '0.02em',
+                  fontSize: 8.5,
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
                   marginLeft: 4,
                 }}
               >
-                · {reactionLabel}
+                {moveTag}
               </span>
             )}
           </div>
