@@ -77,14 +77,26 @@ function cachedFinnhubLogoUrl(ticker: string): string | null {
   return typeof url === 'string' && /^https?:\/\//.test(url) ? url : null;
 }
 
-function sourceUrl(source: LogoSource, ticker: string): string | null {
+// Dual-class tickers carry a separator (BRK.B) that providers key inconsistently:
+// Logo.dev and Parqet want the dash form (BF-B), while our Finnhub cache stores
+// the dot form (BF.B). Emit both separator variants per provider so whichever
+// the provider actually hosts resolves instead of 404-ing the brand.
+function separatorVariants(ticker: string): string[] {
+  const dot = ticker.replace(/-/g, '.');
+  const dash = ticker.replace(/\./g, '-');
+  return dot === dash ? [ticker] : [dash, dot];
+}
+
+function sourceUrl(source: LogoSource, ticker: string): (string | null)[] {
   switch (source) {
     case 'logodev':
-      return logoDevUrl(ticker);
+      // Logo.dev hosts dual-class under the dash symbol; try dash first.
+      return separatorVariants(ticker).map(logoDevUrl);
     case 'finnhub':
-      return cachedFinnhubLogoUrl(ticker);
+      // Cache is keyed exactly as committed (dot form for BF.B); try both.
+      return separatorVariants(ticker).map(cachedFinnhubLogoUrl);
     case 'parqet':
-      return tickerLogoUrl(ticker);
+      return separatorVariants(ticker).map(tickerLogoUrl);
   }
 }
 
@@ -98,7 +110,7 @@ export function tickerLogoUrls(ticker: string) {
     : DEFAULT_SOURCE_ORDER;
   const candidates: (string | null)[] = [
     LOGO_OVERRIDES[normalized] ?? null,
-    ...order.map((source) => sourceUrl(source, normalized)),
+    ...order.flatMap((source) => sourceUrl(source, normalized)),
   ];
   const urls: string[] = [];
   for (const url of candidates) {
