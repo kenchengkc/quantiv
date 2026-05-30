@@ -54,6 +54,14 @@ const LOGO_OVERRIDES: Record<string, string> = {
   // 'NA': 'https://…',  // pin Nano Labs if Logo.dev/Finnhub disagree
 };
 
+// Domain pins for tickers no provider resolves by symbol. Logo.dev's domain
+// endpoint (img.logo.dev/<domain>) finds these reliably. Use the company's own
+// domain — beware brand collisions (P = Everpure Inc., formerly Pure Storage,
+// at everpuredata.com — NOT the Pentair water brand at everpure.com).
+const LOGO_DOMAIN_OVERRIDES: Record<string, string> = {
+  P: 'everpuredata.com',
+};
+
 // Publishable (pk_) key, exposed to the client via next.config.js. Safe to embed
 // in URLs by design; the secret sk_ key stays server-side only.
 const LOGO_DEV_KEY = process.env.NEXT_PUBLIC_LOGO_DEV_PUBLISHABLE_KEY ?? '';
@@ -69,6 +77,13 @@ export function tickerLogoUrl(ticker: string) {
 function logoDevUrl(ticker: string): string | null {
   if (!LOGO_DEV_KEY) return null;
   return `https://img.logo.dev/ticker/${normalizeTicker(ticker)}?token=${LOGO_DEV_KEY}&size=200&format=png&fallback=404`;
+}
+
+// Logo.dev's domain endpoint, used for LOGO_DOMAIN_OVERRIDES tickers.
+function logoDevDomainUrl(ticker: string): string | null {
+  const domain = LOGO_DOMAIN_OVERRIDES[normalizeTicker(ticker)];
+  if (!domain || !LOGO_DEV_KEY) return null;
+  return `https://img.logo.dev/${domain}?token=${LOGO_DEV_KEY}&size=200&format=png&fallback=404`;
 }
 
 function cachedFinnhubLogoUrl(ticker: string): string | null {
@@ -110,6 +125,7 @@ export function tickerLogoUrls(ticker: string) {
     : DEFAULT_SOURCE_ORDER;
   const candidates: (string | null)[] = [
     LOGO_OVERRIDES[normalized] ?? null,
+    logoDevDomainUrl(normalized),
     ...order.flatMap((source) => sourceUrl(source, normalized)),
   ];
   const urls: string[] = [];
