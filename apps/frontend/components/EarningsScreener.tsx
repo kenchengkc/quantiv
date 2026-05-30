@@ -687,7 +687,7 @@ function dedupeEvents(rows: ScreenerEvent[]): ScreenerEvent[] {
 }
 
 const SORT_KEYS: readonly SortKey[] = [
-  'edge', 'dte', 'date', 'straddle', 'ml', 'iv', 'band', 'skew', 'spot',
+  'name', 'edge', 'dte', 'date', 'straddle', 'ml', 'iv', 'band', 'skew', 'spot',
   'iv_rank', 'hist_avg', 'hist_edge', 'iv_crush',
 ] as const;
 
@@ -1746,7 +1746,36 @@ export default function EarningsScreener() {
                 background: 'var(--bg)',
               }}
             >
-              Name
+              <button
+                type="button"
+                onClick={() => toggleSort('name')}
+                className="mono"
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: 10.5,
+                  letterSpacing: '0.18em',
+                  textTransform: 'uppercase',
+                  color: sortKey === 'name' ? 'var(--ink)' : 'var(--ink-3)',
+                  fontWeight: 600,
+                  padding: 0,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 5,
+                }}
+              >
+                Name
+                <span
+                  style={{
+                    opacity: sortKey === 'name' ? 1 : 0.6,
+                    fontSize: 10,
+                    color: sortKey === 'name' ? 'var(--ink)' : 'var(--ink-2)',
+                  }}
+                >
+                  {sortKey === 'name' ? (sortDir === 'desc' ? '▼' : '▲') : '▼'}
+                </span>
+              </button>
             </th>
             {th('date', 'Date', 'Reporting date for the upcoming earnings event.')}
             {th('dte', 'DTE', 'Calendar days from today until the earnings print.')}
