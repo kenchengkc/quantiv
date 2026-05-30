@@ -648,16 +648,54 @@ def build_week_events(conn, as_of_date: date, week_start: date, week_end: date,
                       ml_lookup: dict[tuple[str, str], dict],
                       require_ml: bool = True,
                       canonical: set[tuple[str, str]] | None = None) -> list[dict]:
-    rows = conn.execute(
-        """
-        SELECT ticker, earnings_dt, timing, fiscal_q,
-               eps_actual, eps_estimate, revenue_actual, revenue_estimate
-        FROM earnings_events
-        WHERE earnings_dt BETWEEN ? AND ?
-        ORDER BY earnings_dt, ticker
-        """,
-        [week_start, week_end],
-    ).fetchall()
+    # realized_move: signed regular-session close-to-close move ACROSS the
+    # print, for events already reported. Same timing-aware bracket as
+    # build_symbol_detail (BMO → prev close→report-day close; AMC → report-day
+    # close→next close). Regular-session OHLCV only, so it excludes the
+    # pre/after-hours IEX prints the live quote can include. NULL for upcoming
+    # events (no post close yet) — the calendar then shows the live tick.
+    try:
+        rows = conn.execute(
+            """
+            SELECT e.ticker, e.earnings_dt, e.timing, e.fiscal_q,
+                   e.eps_actual, e.eps_estimate, e.revenue_actual, e.revenue_estimate,
+                   (post.close / NULLIF(pre.close, 0) - 1.0) AS realized_move
+            FROM earnings_events e
+            LEFT JOIN v_ohlcv pre  ON pre.act_symbol = e.ticker
+                AND pre.date >= e.earnings_dt - INTERVAL '5' DAY
+                AND (
+                    (e.timing = 'after_market_close' AND pre.date <= e.earnings_dt)
+                    OR (e.timing <> 'after_market_close' AND pre.date < e.earnings_dt)
+                )
+            LEFT JOIN v_ohlcv post ON post.act_symbol = e.ticker
+                AND post.date <= e.earnings_dt + INTERVAL '5' DAY
+                AND (
+                    (e.timing = 'before_market_open' AND post.date >= e.earnings_dt)
+                    OR (e.timing <> 'before_market_open' AND post.date > e.earnings_dt)
+                )
+            WHERE e.earnings_dt BETWEEN ? AND ?
+            QUALIFY ROW_NUMBER() OVER (
+                PARTITION BY e.ticker, e.earnings_dt
+                ORDER BY pre.date DESC NULLS LAST, post.date ASC NULLS LAST
+            ) = 1
+            ORDER BY e.earnings_dt, e.ticker
+            """,
+            [week_start, week_end],
+        ).fetchall()
+    except Exception:
+        # v_ohlcv absent (e.g. options-only build) — fall back without moves.
+        rows = [
+            (*r, None) for r in conn.execute(
+                """
+                SELECT ticker, earnings_dt, timing, fiscal_q,
+                       eps_actual, eps_estimate, revenue_actual, revenue_estimate
+                FROM earnings_events
+                WHERE earnings_dt BETWEEN ? AND ?
+                ORDER BY earnings_dt, ticker
+                """,
+                [week_start, week_end],
+            ).fetchall()
+        ]
 
     events = []
     skipped_no_ml = 0
@@ -673,6 +711,7 @@ def build_week_events(conn, as_of_date: date, week_start: date, week_end: date,
         eps_estimate,
         revenue_actual,
         revenue_estimate,
+        realized_move,
     ) in enumerate(rows, 1):
         # Drop revised/duplicate dates: keep only the canonical date chosen per
         # (ticker, fiscal quarter) by collapse_duplicate_earnings.
@@ -704,6 +743,11 @@ def build_week_events(conn, as_of_date: date, week_start: date, week_end: date,
             "eps_estimate": jsonable(eps_estimate),
             "revenue_actual": jsonable(revenue_actual),
             "revenue_estimate": jsonable(revenue_estimate),
+            # Signed regular-session close-to-close move across the print, for
+            # already-reported events. The calendar shows this (clearly marked
+            # as the earnings-day reaction) instead of the live tick once a
+            # reporter's date has passed. NULL for upcoming events.
+            "realized_move_pct": jsonable(realized_move),
             "as_of_date": as_of_date.isoformat(),
             "spot_price": jsonable(em["estimated_spot"]),
             "atm_strike": jsonable(em["atm_strike"]),
