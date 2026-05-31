@@ -11,7 +11,7 @@
  *   Today AMC — through next trading day's regular close (weekends/holidays skipped)
  */
 import { MARKET_HOLIDAYS_US } from './marketHolidays.generated';
-import { etDateIso, isNyseRegularSessionET } from './marketHours';
+import { etDateIso, hasRegularClosePassedET } from './marketHours';
 
 export type EarningsTimingBucket = 'bmo' | 'amc' | 'unknown';
 
@@ -73,7 +73,7 @@ export function isRealizationWindowComplete(
   const closeDate = earningsReactionCloseDate(earningsDate, timing);
   if (today > closeDate) return true;
   if (today < closeDate) return false;
-  return !isNyseRegularSessionET(now);
+  return hasRegularClosePassedET(now);
 }
 
 /** Whether batch-price polling is still useful for this event. */

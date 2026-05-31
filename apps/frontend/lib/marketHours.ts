@@ -97,6 +97,12 @@ export function isNyseRegularSessionET(now: Date = new Date()): boolean {
   return minutes >= REGULAR_OPEN_MIN && minutes < REGULAR_CLOSE_MIN;
 }
 
+/** True after the regular 16:00 ET close on the given ET date. */
+export function hasRegularClosePassedET(now: Date = new Date()): boolean {
+  const { minutes } = nowParts(now);
+  return minutes >= REGULAR_CLOSE_MIN;
+}
+
 /** When cron / batch-price / fast polling should still hit Finnhub. */
 export function isQuoteRefreshWindowET(now: Date = new Date()): boolean {
   if (!isTradingDayET(now)) return false;

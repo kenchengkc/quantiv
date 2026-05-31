@@ -248,6 +248,17 @@ jobs:
         run: python -u tools/build_popular_weights.py
 
       - name: Build frontend JSON
+        env:
+          # Only TWELVEDATA_API_KEY needs to be configured as a GitHub secret.
+          # The remaining values pin the Basic-tier defaults so repo variables
+          # are not required for the nightly build to stay within quota.
+          TWELVEDATA_API_KEY: ${{ secrets.TWELVEDATA_API_KEY }}
+          TWELVEDATA_REALIZED_FALLBACK: "1"
+          TWELVEDATA_DAILY_CREDIT_LIMIT: "792"
+          TWELVEDATA_BATCH_SIZE: "8"
+          TWELVEDATA_BATCH_DELAY_SEC: "61"
+          TWELVEDATA_VALIDATION_SAMPLE_SIZE: "8"
+          TWELVEDATA_VALIDATION_DELTA_PCT: "0.005"
         run: python -u tools/build_frontend_data.py
 
       - name: Refresh ticker names if DoltHub introduced new tickers
