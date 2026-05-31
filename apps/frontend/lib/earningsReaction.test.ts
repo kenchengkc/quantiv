@@ -32,6 +32,22 @@ describe('earningsReaction', () => {
     expect(out).toEqual({ changePct: 0.042, tag: 'REALIZED' });
   });
 
+  it('keeps BMO report day LIVE until the regular close', () => {
+    const premarket = new Date('2026-05-28T12:00:00Z'); // 08:00 ET
+    const oneMinuteBeforeClose = new Date('2026-05-28T19:59:00Z'); // 15:59 ET
+    expect(isRealizationWindowComplete('2026-05-28', 'bmo', premarket)).toBe(false);
+    expect(isRealizationWindowComplete('2026-05-28', 'bmo', oneMinuteBeforeClose)).toBe(false);
+
+    const out = resolveEarningsReactionDisplay({
+      earningsDate: '2026-05-28',
+      timing: 'before_market_open',
+      realizedMovePct: 0.04,
+      liveChangePct: 0.018,
+      now: oneMinuteBeforeClose,
+    });
+    expect(out).toEqual({ changePct: 0.018, tag: 'LIVE' });
+  });
+
   it('shows LIVE on AMC report day before next session close', () => {
     const friAfterClose = new Date('2026-05-22T21:00:00Z');
     expect(
