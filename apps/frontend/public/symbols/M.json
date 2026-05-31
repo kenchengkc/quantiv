@@ -3,10 +3,10 @@
   "as_of_date": "2026-05-29",
   "spot_price": 22.0,
   "expected_move": {
-    "earnings_date": "2026-05-26",
+    "earnings_date": "2026-06-03",
     "expiration": "2026-06-12",
     "dte": 14,
-    "lead_time_days": -3,
+    "lead_time_days": 5,
     "atm_strike": 22.0,
     "atm_iv": 0.73568,
     "straddle_abs": 2.52,
@@ -15,7 +15,17 @@
     "skew_atm": -0.089011,
     "term_slope": -0.123995,
     "total_vega": 0.0339,
-    "em_method": "options_math",
+    "em_ml_pct": 0.080271,
+    "em_ml_abs": 1.689706,
+    "correction_factor": 0.676795,
+    "model_horizon": 7,
+    "ml_snapshot_date": "2026-05-27",
+    "p10": 0.01071,
+    "p25": 0.030668,
+    "p50": 0.061476,
+    "p75": 0.121495,
+    "p90": 0.182443,
+    "em_method": "ml_lightgbm",
     "timing": "before_market_open"
   },
   "straddle_features": [
@@ -270,7 +280,7 @@
       "rev_surprise_pct": null
     }
   ],
-  "next_earnings": "2026-05-26",
+  "next_earnings": "2026-06-03",
   "vol_regime": {
     "iv_current": 0.6118,
     "iv_rank": 0.688571,
