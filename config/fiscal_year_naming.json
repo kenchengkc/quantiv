@@ -1,0 +1,9 @@
+{
+  "_comment": "Ticker -> offset applied to a market-data vendor's END-year fiscal label to match the company's OWN naming. -1 = company names the fiscal year by the year it BEGINS (4-5-4 retail calendar, e.g. DG calls the year ending ~Jan 2027 'fiscal 2026'). 0 (default, unlisted) = company uses the vendor end-year convention (e.g. NVDA, WMT, AAPL, UVV). The convention is per-company and must be verified against the issuer's 10-K before adding — do NOT infer it from the fiscal-year-end month. See tools/fiscal_calendar.py.",
+  "offsets": {
+    "DG": -1,
+    "LULU": -1,
+    "FIVE": -1,
+    "PVH": -1
+  }
+}

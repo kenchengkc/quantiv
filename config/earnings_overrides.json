@@ -1,0 +1,23 @@
+{
+  "_comment": "Manual earnings-calendar overrides re-applied after provider sync, before build. Schema + actions documented in scripts/apply_earnings_overrides.py. Prefer matching on fiscal_year + fiscal_q (stable identity) so an override still binds after a provider re-asserts a different date.",
+  "overrides": [
+    {
+      "symbol": "PVH",
+      "match": { "fiscal_year": 2027, "fiscal_q": "Q1" },
+      "set": { "date": "2026-06-03", "timing": "amc" },
+      "note": "manual move +1 trading day, AMC"
+    },
+    {
+      "symbol": "FIVE",
+      "match": { "fiscal_year": 2027, "fiscal_q": "Q1" },
+      "set": { "date": "2026-06-03", "timing": "amc" },
+      "note": "manual move +1 trading day, AMC"
+    },
+    {
+      "symbol": "LULU",
+      "match": { "fiscal_year": 2027, "fiscal_q": "Q1" },
+      "set": { "date": "2026-06-04", "timing": "amc" },
+      "note": "manual move +1 trading day, AMC"
+    }
+  ]
+}
