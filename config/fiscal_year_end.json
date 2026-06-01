@@ -1,0 +1,29 @@
+{
+  "_comment": "Fiscal-year-end month per ticker, derived from Polygon financials by scripts/derive_fiscal_calendar.py. Non-December filers may need an entry in config/fiscal_year_naming.json \u2014 verify begin-vs-end-year convention against the 10-K.",
+  "needs_naming_review": [
+    "AAPL",
+    "COST",
+    "DG",
+    "FIVE",
+    "LULU",
+    "MSFT",
+    "NVDA",
+    "PVH",
+    "UVV",
+    "WMT"
+  ],
+  "fye_month": {
+    "AAPL": 9,
+    "AMZN": 12,
+    "COST": 8,
+    "DG": 1,
+    "FIVE": 1,
+    "JPM": 12,
+    "LULU": 2,
+    "MSFT": 6,
+    "NVDA": 1,
+    "PVH": 2,
+    "UVV": 3,
+    "WMT": 1
+  }
+}
