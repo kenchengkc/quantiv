@@ -1,90 +1,119 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Route } from '@playwright/test';
 
 /**
  * Earnings calendar (/) is public — no Clerk sign-in required.
- * Verifies REALIZED vs LIVE reaction labels and captures screenshots.
+ *
+ * The first two tests verify the REALIZED-vs-LIVE *rendering logic* against
+ * self-contained fixtures (inline week JSON + a pinned clock), so they are
+ * deterministic regardless of when CI runs or how the committed data churns.
+ * The last is a loose smoke test against the real build to catch data-shape /
+ * render regressions without asserting on any specific dated reporter.
  */
+
+// Pinned into the 2026-05-25 trading week. The calendar derives its default
+// week from the real clock (mondayOf(new Date())); pinning makes "This week"
+// deterministically 2026-05-25 so the fixtures below load by default.
+const PINNED = new Date('2026-05-29T21:00:00Z'); // Fri 17:00 ET
+const WEEK_START = '2026-05-25';
+const WEEK_END = '2026-05-29';
+
+type FixtureEvent = {
+  ticker: string;
+  earnings_date: string;
+  timing: string;
+  em_straddle_pct?: number | null;
+  em_iv_pct?: number | null;
+  realized_move_pct?: number | null;
+};
+
+function weekPayload(events: FixtureEvent[]) {
+  return {
+    metadata: { as_of_date: WEEK_END, method: 'fixture' },
+    window: { start: WEEK_START, end: WEEK_END },
+    events,
+  };
+}
+
+/** Serve the inline week fixture for every weeks/weekly request; keep a valid
+ *  (empty) manifest so anything that reads it doesn't choke. */
+async function routeWeeks(route: Route, events: FixtureEvent[]) {
+  const url = route.request().url();
+  if (url.includes('manifest')) {
+    await route.fulfill({
+      json: { current_week: WEEK_START, as_of_date: WEEK_END, weeks: [] },
+    });
+    return;
+  }
+  await route.fulfill({ json: weekPayload(events) });
+}
+
+async function installWeekFixture(
+  page: import('@playwright/test').Page,
+  events: FixtureEvent[],
+) {
+  await page.clock.setFixedTime(PINNED);
+  await page.route('**/weeks/*.json', (route) => routeWeeks(route, events));
+  await page.route('**/weekly.json', (route) => routeWeeks(route, events));
+}
+
 test.describe('earnings calendar reaction labels', () => {
-  test('past week shows OHLCV close-to-close moves as REALIZED', async ({ page }) => {
-    // The default week comes from the real clock (mondayOf(new Date())), and the
-    // realized reporters this test relies on (AZO 05-26, ADSK 05-28) live in the
-    // 2026-05-25 week. Pin the clock into that week so the default `/` view is
-    // deterministic regardless of when CI runs (otherwise it drifts forward and
-    // the realized reporters fall into "Last week").
-    await page.clock.setFixedTime(new Date('2026-05-29T21:00:00Z')); // Fri 17:00 ET
+  test('renders REALIZED with the close-to-close move for a past reporter', async ({
+    page,
+  }) => {
+    // AZO reported 05-27 AMC → realization window completes 05-28 close, which
+    // is before the pinned 05-29, so the row must read REALIZED (-8.99%).
+    await installWeekFixture(page, [
+      {
+        ticker: 'AZO',
+        earnings_date: '2026-05-27',
+        timing: 'after_market_close',
+        em_straddle_pct: 0.05,
+        realized_move_pct: -0.0899,
+      },
+    ]);
+
     await page.goto('/');
     await expect(page.locator('.qv-calendar-shell')).toBeVisible({ timeout: 60_000 });
-    await page.waitForTimeout(2_000);
+    await page.getByRole('button', { name: 'All' }).click();
+    await page.waitForTimeout(1_000);
 
     await expect(page.getByText(/^REALIZED$/).first()).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText(/^LIVE$/)).toHaveCount(0);
     await expect(page.getByRole('link', { name: /AZO/i }).first()).toContainText('8.99%');
-
-    await page.screenshot({
-      path: 'test-results/earnings-reaction/calendar-last-week.png',
-      fullPage: true,
-    });
   });
 
-  test('shows REALIZED when weekly JSON includes realized_move_pct', async ({ page }) => {
-    const patchWeek = async (route: import('@playwright/test').Route) => {
-      const response = await route.fetch();
-      const json = (await response.json()) as {
-        events?: {
-          ticker: string;
-          earnings_date: string;
-          timing?: string;
-          realized_move_pct?: number | null;
-          em_straddle_pct?: number;
-        }[];
-      };
-      for (const e of json.events ?? []) {
-        if (e.ticker === 'ADSK' && e.earnings_date.startsWith('2026-05-28')) {
-          e.realized_move_pct = 0.0312;
-          e.timing = 'after_market_close';
-        }
-      }
-      await route.fulfill({ json });
-    };
-
-    await page.route('**/weeks/*.json', patchWeek);
-    await page.route('**/weekly.json', patchWeek);
-
-    // Pin into the 2026-05-25 week so the default view contains ADSK's 05-28
-    // report (see the note in the first test).
-    await page.clock.setFixedTime(new Date('2026-05-29T21:00:00Z')); // Fri 17:00 ET
-    await page.goto('/');
-    await expect(page.locator('.qv-calendar-shell')).toBeVisible({ timeout: 60_000 });
-    await page.getByRole('button', { name: 'All' }).click();
-    await page.waitForTimeout(2_000);
-
-    await expect(page.getByText('REALIZED').first()).toBeVisible({ timeout: 15_000 });
-    const adsk = page.getByRole('link', { name: /ADSK/i }).first();
-    await expect(adsk).toContainText('3.12%');
-    await page.screenshot({
-      path: 'test-results/earnings-reaction/calendar-realized-mock.png',
-      fullPage: true,
-    });
-  });
-
-  test('shows LIVE for upcoming reporters when quotes are available', async ({ page }) => {
+  test('renders LIVE from a live quote for a not-yet-realized reporter', async ({
+    page,
+  }) => {
+    // ZZZ reports 05-29 AMC → window completes on the next trading day (06-01),
+    // after the pinned 05-29, so it is still live and should read LIVE.
+    await installWeekFixture(page, [
+      {
+        ticker: 'ZZZ',
+        earnings_date: '2026-05-29',
+        timing: 'after_market_close',
+        em_straddle_pct: 0.05,
+        realized_move_pct: null,
+      },
+    ]);
     await page.route('**/api/stocks/batch-price*', async (route) => {
-      const url = new URL(route.request().url());
-      const symbols = (url.searchParams.get('symbols') ?? '').split(',').filter(Boolean);
+      const symbols = (new URL(route.request().url()).searchParams.get('symbols') ?? '')
+        .split(',')
+        .filter(Boolean);
       await route.fulfill({
         json: {
-          updated: new Date().toISOString(),
+          updated: PINNED.toISOString(),
           source: 'finnhub',
-          session: 'closed',
+          session: 'afterhours',
           marketOpen: false,
-          quoteRefreshActive: false,
+          quoteRefreshActive: true,
           pending: 0,
           data: symbols.map((symbol) => ({
             symbol,
-            price: 100,
-            previousClose: 98,
-            change: 2,
-            changePct: 0.0204,
+            price: 110,
+            previousClose: 100,
+            change: 10,
+            changePct: 0.1,
           })),
         },
       });
@@ -92,13 +121,26 @@ test.describe('earnings calendar reaction labels', () => {
 
     await page.goto('/');
     await expect(page.locator('.qv-calendar-shell')).toBeVisible({ timeout: 60_000 });
-    await page.locator('button.chip', { hasText: 'Next week' }).click();
     await page.getByRole('button', { name: 'All' }).click();
-    await page.waitForTimeout(3_000);
+    await page.waitForTimeout(2_000);
 
-    await expect(page.getByText('LIVE').first()).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText(/^LIVE$/).first()).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText(/^REALIZED$/)).toHaveCount(0);
+    await expect(page.getByRole('link', { name: /ZZZ/i }).first()).toBeVisible();
+  });
+
+  test('smoke: real calendar renders the shell and week navigation', async ({ page }) => {
+    // No mocks: exercises the real build output. Intentionally asserts nothing
+    // about specific tickers, dates, values, or reaction labels (those depend
+    // on the live clock + data churn and are covered deterministically above),
+    // so it only fails on a genuinely broken build or render.
+    await page.goto('/');
+    await expect(page.locator('.qv-calendar-shell')).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByRole('button', { name: 'This week' })).toBeVisible();
+    await page.getByRole('button', { name: 'All' }).click();
+    await page.waitForTimeout(2_000);
     await page.screenshot({
-      path: 'test-results/earnings-reaction/calendar-next-week-live.png',
+      path: 'test-results/earnings-reaction/calendar-smoke.png',
       fullPage: true,
     });
   });
