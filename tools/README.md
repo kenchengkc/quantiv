@@ -20,6 +20,10 @@ TwelveData fallback requires `TWELVEDATA_API_KEY` in the environment that runs
 `TWELVEDATA_DAILY_CREDIT_LIMIT` (default `792`), `TWELVEDATA_BATCH_SIZE`
 (default `8`), `TWELVEDATA_BATCH_DELAY_SEC` (default `61`), and
 `TWELVEDATA_LEDGER_PATH` (default `data/twelvedata_usage_ledger.json`).
+By default, TwelveData credits are also mirrored into the shared provider ledger
+(`data/provider_usage_ledger.json`) so press-release/enrichment usage and
+realized-move fallback usage share one daily cap. Set
+`TWELVEDATA_SHARE_PROVIDER_LEDGER=0` only for isolated local tests.
 After realized moves and historical averages, leftover credits may run a small
 local-vs-TwelveData validation sample controlled by
 `TWELVEDATA_VALIDATION_SAMPLE_SIZE` (default `8`) and

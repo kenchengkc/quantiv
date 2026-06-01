@@ -22,7 +22,7 @@ Why a probe first:
     provider for the historical path.
 
 Usage:
-  export MASSIVE_API_KEY=...
+  export POLYGON_API_KEY=...
   python scripts/probe_massive_capabilities.py
   # writes data/ref/provider_samples/massive/YYYY-MM-DD/
 
@@ -75,12 +75,13 @@ SAMPLE_ROOT = REPO_ROOT / "data" / "ref" / "provider_samples" / "massive"
 
 
 def api_key() -> str:
-    key = os.getenv("MASSIVE_API_KEY")
+    key = os.getenv("POLYGON_API_KEY") or os.getenv("MASSIVE_API_KEY")
     if not key:
         print(
-            "✗ MASSIVE_API_KEY not set.\n"
-            "  Sign up at https://massive.com/ → copy API key from the\n"
-            "  dashboard → export MASSIVE_API_KEY=...",
+            "✗ POLYGON_API_KEY not set.\n"
+            "  Massive is the post-acquisition Polygon API surface, so this\n"
+            "  repo uses POLYGON_API_KEY as the canonical key. MASSIVE_API_KEY\n"
+            "  remains accepted only as a local compatibility alias.",
             file=sys.stderr,
         )
         sys.exit(1)

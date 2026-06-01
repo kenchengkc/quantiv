@@ -142,9 +142,57 @@ jobs:
           python scripts/probe_alphavantage_voi.py \
             --allow-missing-key \
             --universe priority \
-            --max-calls 20 \
+            --max-calls 5 \
             --delay 15 \
             --refresh-after-days 30
+
+      - name: Probe additive provider capabilities
+        # Entitlement/shape probe for non-redundant provider data: options
+        # snapshots, short interest, fundamentals, analyst/revision data,
+        # press releases/news, macro, and corporate actions. Stores only
+        # status + response-shape metadata in provider_capabilities.json.
+        env:
+          FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
+          ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
+          POLYGON_API_KEY: ${{ secrets.POLYGON_API_KEY }}
+          TWELVEDATA_API_KEY: ${{ secrets.TWELVEDATA_API_KEY }}
+          FMP_DAILY_CALL_LIMIT: "215"          # leaves room for FMP earnings overlay
+          ALPHAVANTAGE_DAILY_CALL_LIMIT: "20" # leaves room for the V/OI probe above
+          TWELVEDATA_DAILY_CREDIT_LIMIT: "72" # leaves 720 credits for frontend fallback
+          MASSIVE_MINUTE_CALL_LIMIT: "5"
+        run: |
+          python scripts/probe_provider_capabilities.py \
+            --allow-missing-key \
+            --max-calls 35 \
+            --respect-minute-limits
+
+      - name: Sync backend-only provider enrichments
+        # Writes derived summaries only under data/provider_enrichments.
+        # Public frontend JSON is not changed by this step.
+        env:
+          FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
+          ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
+          POLYGON_API_KEY: ${{ secrets.POLYGON_API_KEY }}
+          TWELVEDATA_API_KEY: ${{ secrets.TWELVEDATA_API_KEY }}
+          FMP_DAILY_CALL_LIMIT: "215"
+          ALPHAVANTAGE_DAILY_CALL_LIMIT: "20"
+          TWELVEDATA_DAILY_CREDIT_LIMIT: "72"
+          MASSIVE_MINUTE_CALL_LIMIT: "5"
+        run: |
+          # Daily run skips slow-changing reference/macro endpoints. Add the
+          # weekly cadence on Mondays (profile cross-checks) and the monthly
+          # cadence on the 1st (treasury/fed-funds/CPI) so that data still
+          # refreshes without paying for it in the daily AV budget.
+          CADENCES=daily
+          if [ "$(date -u +%u)" = "1" ]; then CADENCES="$CADENCES,weekly"; fi
+          if [ "$(date -u +%d)" = "01" ]; then CADENCES="$CADENCES,monthly"; fi
+          echo "provider enrichment cadences: $CADENCES"
+          python scripts/sync_provider_enrichments.py \
+            --allow-missing-key \
+            --max-symbols 8 \
+            --max-total-calls 60 \
+            --cadences "$CADENCES" \
+            --respect-minute-limits
 
       - name: Refresh cached US market holidays
         # Non-price Finnhub call. This workflow runs before regular quote
@@ -259,6 +307,7 @@ jobs:
           TWELVEDATA_BATCH_DELAY_SEC: "61"
           TWELVEDATA_VALIDATION_SAMPLE_SIZE: "8"
           TWELVEDATA_VALIDATION_DELTA_PCT: "0.005"
+          TWELVEDATA_SHARE_PROVIDER_LEDGER: "1"
         run: python -u tools/build_frontend_data.py
 
       - name: Refresh ticker names if DoltHub introduced new tickers
@@ -358,7 +407,7 @@ jobs:
           # with [ -f ... ] guards so a missing file (e.g. the changes
           # log on the very first run, before any diff entries land)
           # doesn't tank the commit step with a pathspec error.
-          for f in data/popular_snapshot.json data/popular_changes.jsonl data/fmp_earnings_metadata.json data/fmp_earnings_backfill_state.json data/alpha_vantage_voi_probe.json data/delisting_watch.json; do
+          for f in data/popular_snapshot.json data/popular_changes.jsonl data/fmp_earnings_metadata.json data/fmp_earnings_backfill_state.json data/alpha_vantage_voi_probe.json data/provider_capabilities.json data/provider_usage_ledger.json data/provider_enrichments/metadata.json data/provider_enrichments/earnings_news_signals.json data/provider_enrichments/company_facts.json data/provider_enrichments/options_provider_signals.json data/provider_enrichments/corporate_actions.json data/provider_enrichments/live_market_signals.json data/delisting_watch.json; do
             if [ -f "$f" ]; then
               git add -f "$f"
             else

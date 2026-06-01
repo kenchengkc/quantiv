@@ -87,6 +87,46 @@ def load_twelvedata_config(data_dir: Path) -> TwelveDataConfig:
     )
 
 
+def _reserve_shared_provider_ledger(
+    symbols: list[str],
+    *,
+    purpose: str,
+    daily_credit_limit: int,
+) -> None:
+    """Mirror TwelveData credits into the shared provider ledger when available."""
+    raw_enabled = os.getenv("TWELVEDATA_SHARE_PROVIDER_LEDGER", "1").strip().lower()
+    if raw_enabled in {"0", "false", "no", "off"}:
+        return
+    try:
+        import sys
+
+        repo_root = Path(__file__).resolve().parent.parent
+        scripts_dir = repo_root / "scripts"
+        if str(scripts_dir) not in sys.path:
+            sys.path.insert(0, str(scripts_dir))
+        from provider_utils import ProviderBudget, ProviderUsageLedger  # type: ignore
+
+        ledger_raw = os.getenv("PROVIDER_USAGE_LEDGER_PATH")
+        ledger_path = Path(ledger_raw) if ledger_raw else repo_root / "data" / "provider_usage_ledger.json"
+        ledger = ProviderUsageLedger(
+            ledger_path,
+            budgets={
+                "twelvedata": ProviderBudget(
+                    daily_limit=daily_credit_limit,
+                    minute_limit=None,
+                )
+            },
+        )
+        ledger.reserve(
+            "twelvedata",
+            f"twelvedata_time_series:{purpose}",
+            credits=len(symbols),
+            symbols=symbols,
+        )
+    except Exception as exc:
+        raise RuntimeError(f"shared provider ledger rejected TwelveData credits: {exc}") from exc
+
+
 class TwelveDataUsageLedger:
     """Conservative local credit ledger for Basic-tier daily quota.
 
@@ -286,6 +326,11 @@ def fetch_daily_closes(
             result.skipped_symbols.extend(clean_symbols[requested_count:])
             break
 
+        _reserve_shared_provider_ledger(
+            effective_batch,
+            purpose=purpose,
+            daily_credit_limit=config.daily_credit_limit,
+        )
         ledger.reserve(effective_batch, purpose=purpose)
         result.used_credits += len(effective_batch)
         result.requested_symbols.extend(effective_batch)
