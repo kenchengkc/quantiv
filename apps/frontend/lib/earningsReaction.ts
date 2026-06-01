@@ -76,6 +76,25 @@ export function isRealizationWindowComplete(
   return hasRegularClosePassedET(now);
 }
 
+/** The realization window has closed but OHLCV hasn't been recorded yet (the
+ *  nightly build runs after the close). On the realization day itself, the live
+ *  quote's close-to-close move equals what the realized move will be — for a
+ *  BMO reporter, today's quote anchors prior-close → report-day close; for an
+ *  AMC reporter, the next session's quote anchors report-day close → next close.
+ *  So we keep showing LIVE as a faithful stand-in until realized lands. Bounded
+ *  to the realization day: after it, previousClose rolls forward and the live
+ *  move would no longer match the earnings reaction. */
+export function isRealizedPending(
+  earningsDate: string,
+  timing: string | undefined,
+  realizedMovePct: number | null | undefined,
+  now: Date = new Date(),
+): boolean {
+  if (realizedMovePct != null) return false;
+  if (!isRealizationWindowComplete(earningsDate, timing, now)) return false;
+  return etDateIso(now) === earningsReactionCloseDate(earningsDate, timing);
+}
+
 /** Whether batch-price polling is still useful for this event. */
 export function shouldPollLiveQuote(
   earningsDate: string,
@@ -86,7 +105,11 @@ export function shouldPollLiveQuote(
   const complete = isRealizationWindowComplete(earningsDate, timing, now);
   if (complete && realizedMovePct != null) return false;
   const today = etDateIso(now);
-  return earningsDate > today || !complete;
+  return (
+    earningsDate > today ||
+    !complete ||
+    isRealizedPending(earningsDate, timing, realizedMovePct, now)
+  );
 }
 
 export function resolveEarningsReactionDisplay(args: {
@@ -111,7 +134,10 @@ export function resolveEarningsReactionDisplay(args: {
     return { changePct: realizedMovePct, tag: 'REALIZED' };
   }
 
-  const showLive = earningsDate > today || !complete;
+  const showLive =
+    earningsDate > today ||
+    !complete ||
+    isRealizedPending(earningsDate, timing, realizedMovePct, now);
   if (showLive && liveChangePct != null) {
     return { changePct: liveChangePct, tag: 'LIVE' };
   }

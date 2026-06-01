@@ -86,6 +86,53 @@ describe('earningsReaction', () => {
     expect(out).toEqual({ changePct: null, tag: null });
   });
 
+  it('shows LIVE on BMO report day after close when realized not yet recorded', () => {
+    // OLLI/SAIC case: reported BMO today, it is past the close, but the nightly
+    // build has not recorded realized_move_pct yet. The live close-to-close
+    // equals the eventual realized move, so show LIVE rather than nothing.
+    const reportDayAfterClose = new Date('2026-06-01T23:27:00Z'); // 19:27 ET
+    expect(
+      isRealizationWindowComplete('2026-06-01', 'bmo', reportDayAfterClose),
+    ).toBe(true);
+    const out = resolveEarningsReactionDisplay({
+      earningsDate: '2026-06-01',
+      timing: 'before_market_open',
+      realizedMovePct: null,
+      liveChangePct: -0.0208,
+      now: reportDayAfterClose,
+    });
+    expect(out).toEqual({ changePct: -0.0208, tag: 'LIVE' });
+    expect(
+      shouldPollLiveQuote('2026-06-01', 'before_market_open', null, reportDayAfterClose),
+    ).toBe(true);
+  });
+
+  it('shows LIVE on AMC realization day after close, but suppresses the day after', () => {
+    // AMC reported 05-29 → realization completes 06-01 close.
+    const realizationDayAfterClose = new Date('2026-06-01T21:00:00Z'); // 17:00 ET
+    expect(
+      resolveEarningsReactionDisplay({
+        earningsDate: '2026-05-29',
+        timing: 'amc',
+        realizedMovePct: null,
+        liveChangePct: 0.07,
+        now: realizationDayAfterClose,
+      }),
+    ).toEqual({ changePct: 0.07, tag: 'LIVE' });
+
+    // One day later, still no realized: the live anchor has rolled forward, so
+    // it would no longer equal the earnings move — suppress instead of mislead.
+    expect(
+      resolveEarningsReactionDisplay({
+        earningsDate: '2026-05-29',
+        timing: 'amc',
+        realizedMovePct: null,
+        liveChangePct: 0.07,
+        now: new Date('2026-06-02T17:00:00Z'),
+      }),
+    ).toEqual({ changePct: null, tag: null });
+  });
+
   it('shouldPollLiveQuote is false when realized is shown', () => {
     expect(
       shouldPollLiveQuote('2026-05-01', 'bmo', -0.02, new Date('2026-05-28T15:00:00Z')),
