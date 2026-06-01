@@ -3,7 +3,7 @@ import { Redis } from '@upstash/redis';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { timingSafeEqual } from 'node:crypto';
-import { etDateIso } from '@/lib/marketHours';
+import { etDateIso, isQuoteRefreshWindowET } from '@/lib/marketHours';
 import { fetchLatestTwoSessions } from '@/lib/polygon';
 
 // Broad, whole-universe quote refresh from Polygon/Massive grouped-daily
@@ -82,6 +82,15 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
 
+  // Only refresh while the market is closed. During the live quote-refresh
+  // window the Finnhub/Alpaca path writes fresh quotes for priority reporters;
+  // grouped-daily is 15-min delayed, so writing it then would clobber those
+  // live ticks. `?force=1` overrides for manual backfills.
+  const force = new URL(req.url).searchParams.get('force') === '1';
+  if (!force && isQuoteRefreshWindowET()) {
+    return NextResponse.json({ universe: 0, written: 0, skipped: 'market_open' });
+  }
+
   const apiKey = process.env.POLYGON_API_KEY;
   if (!apiKey) {
     return NextResponse.json({ error: 'POLYGON_API_KEY not configured' }, { status: 500 });
@@ -124,7 +133,9 @@ export async function GET(req: NextRequest) {
     };
     // Store the object directly (Upstash serializes) to match the other
     // quote:{SYM} writers; batch-price's mget deserializes it back.
-    pipeline.set(`quote:${symbol}`, entry, { ex: 86_400 });
+    // 48h TTL bridges a missed cron (GitHub Actions schedules can be delayed
+    // or skipped) without the cache going empty between closed-market runs.
+    pipeline.set(`quote:${symbol}`, entry, { ex: 172_800 });
     written++;
   }
   if (written > 0) await pipeline.exec();

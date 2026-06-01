@@ -1,0 +1,41 @@
+name: Broad quote refresh (Polygon grouped-daily)
+
+# Keeps the whole calendar universe's quote:{SYM} cache warm while the market is
+# CLOSED, in one Polygon grouped-daily call (vs Finnhub's 30+ min single-symbol
+# cursor). The /api/cron/refresh-broad route self-gates: it no-ops during the
+# live quote-refresh window so it never clobbers fresh Finnhub/Alpaca ticks, so
+# these schedules can fire around the clock and only do work off-hours.
+#
+# Requires the CRON_SECRET repo secret (same value as Vercel / the Cloudflare
+# worker). POLYGON_API_KEY is already configured in the Vercel project env.
+on:
+  schedule:
+    - cron: '0 */3 * * *'    # every 3h, all days; route skips in-market fires
+    - cron: '0 23 * * 1-5'   # guaranteed post-close capture (after EDT & EST close)
+  workflow_dispatch: {}
+
+concurrency:
+  group: refresh-broad
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Trigger broad quote refresh
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          # Override via the REFRESH_BROAD_URL repo variable if the domain changes.
+          REFRESH_BROAD_URL: ${{ vars.REFRESH_BROAD_URL || 'https://usequantiv.com/api/cron/refresh-broad' }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::CRON_SECRET secret is not set"; exit 1
+          fi
+          code=$(curl -sS -o /tmp/broad.json -w '%{http_code}' --max-time 90 \
+            -H "Authorization: Bearer $CRON_SECRET" "$REFRESH_BROAD_URL")
+          echo "HTTP $code"; cat /tmp/broad.json; echo
+          [ "$code" = "200" ]
