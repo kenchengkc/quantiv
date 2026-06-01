@@ -3,10 +3,10 @@
   "as_of_date": "2026-05-29",
   "spot_price": 55.0,
   "expected_move": {
-    "earnings_date": "2026-06-04",
+    "earnings_date": "2026-05-28",
     "expiration": "2026-06-18",
     "dte": 20,
-    "lead_time_days": 6,
+    "lead_time_days": -1,
     "atm_strike": 55.0,
     "atm_iv": 0.3813,
     "straddle_abs": 3.75,
@@ -15,17 +15,7 @@
     "skew_atm": 0.0,
     "term_slope": null,
     "total_vega": 0.0571,
-    "em_ml_pct": 0.055871,
-    "em_ml_abs": 2.858339,
-    "correction_factor": 0.620784,
-    "model_horizon": 7,
-    "ml_snapshot_date": "2026-05-28",
-    "p10": 0.007608,
-    "p25": 0.018451,
-    "p50": 0.046793,
-    "p75": 0.075127,
-    "p90": 0.122849,
-    "em_method": "ml_lightgbm",
+    "em_method": "options_math",
     "timing": "after_market_close"
   },
   "straddle_features": [
@@ -79,6 +69,21 @@
       "revenue_actual": null,
       "revenue_estimate": null,
       "rev_surprise_pct": null
+    },
+    {
+      "date": "2026-05-28",
+      "timing": "after_market_close",
+      "q": "Q4 26",
+      "fiscal_year": 2026,
+      "fiscal_q": "Q4",
+      "actual": 0.013878,
+      "implied": null,
+      "eps_actual": -1.73,
+      "eps_estimate": 1.0908,
+      "eps_surprise_pct": -2.585992,
+      "revenue_actual": 715243000.0,
+      "revenue_estimate": 735482000.0,
+      "rev_surprise_pct": -0.027518
     },
     {
       "date": "2026-05-25",
@@ -229,24 +234,9 @@
       "revenue_actual": null,
       "revenue_estimate": null,
       "rev_surprise_pct": null
-    },
-    {
-      "date": "2023-05-24",
-      "timing": "after_market_close",
-      "q": "Q2 23",
-      "fiscal_year": 2023,
-      "fiscal_q": "Q2",
-      "actual": 0.000373,
-      "implied": null,
-      "eps_actual": null,
-      "eps_estimate": null,
-      "eps_surprise_pct": null,
-      "revenue_actual": null,
-      "revenue_estimate": null,
-      "rev_surprise_pct": null
     }
   ],
-  "next_earnings": "2026-06-04",
+  "next_earnings": "2026-05-28",
   "vol_regime": {
     "iv_current": 0.3149,
     "iv_rank": 0.630243,
