@@ -32,6 +32,8 @@
     "data:profiles:finnhub": "python scripts/sync_finnhub_profiles.py",
     "data:holidays:finnhub": "python scripts/sync_finnhub_market_holidays.py",
     "data:probe:alphavantage-voi": "python scripts/probe_alphavantage_voi.py",
+    "data:probe:providers": "python scripts/probe_provider_capabilities.py",
+    "data:providers:enrich": "python scripts/sync_provider_enrichments.py",
     "data:ohlcv": "python scripts/sync_dolthub.py --ohlcv",
     "data:csv-parquet": "python scripts/csv_to_parquet.py",
     "data:views": "python scripts/setup_duckdb_from_parquet.py",

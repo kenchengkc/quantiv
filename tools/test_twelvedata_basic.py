@@ -125,7 +125,8 @@ class _FakeResponse:
         return self.payload
 
 
-def test_fetch_daily_closes_reserves_before_request_and_caps_quota(tmp_path):
+def test_fetch_daily_closes_reserves_before_request_and_caps_quota(tmp_path, monkeypatch):
+    monkeypatch.setenv("TWELVEDATA_SHARE_PROVIDER_LEDGER", "0")
     ledger = TwelveDataUsageLedger(
         tmp_path / "ledger.json",
         3,
@@ -164,7 +165,8 @@ def test_fetch_daily_closes_reserves_before_request_and_caps_quota(tmp_path):
     assert set(result.closes) == {"AAPL", "MSFT", "NVDA"}
 
 
-def test_fetch_daily_closes_records_provider_credit_headers(tmp_path):
+def test_fetch_daily_closes_records_provider_credit_headers(tmp_path, monkeypatch):
+    monkeypatch.setenv("TWELVEDATA_SHARE_PROVIDER_LEDGER", "0")
     ledger = TwelveDataUsageLedger(
         tmp_path / "ledger.json",
         2,
@@ -198,7 +200,8 @@ def test_fetch_daily_closes_records_provider_credit_headers(tmp_path):
     assert result.provider_credits_left == 799
 
 
-def test_fetch_daily_closes_skips_partial_quota_batch_once(tmp_path):
+def test_fetch_daily_closes_skips_partial_quota_batch_once(tmp_path, monkeypatch):
+    monkeypatch.setenv("TWELVEDATA_SHARE_PROVIDER_LEDGER", "0")
     ledger = TwelveDataUsageLedger(
         tmp_path / "ledger.json",
         3,
@@ -234,7 +237,8 @@ def test_fetch_daily_closes_skips_partial_quota_batch_once(tmp_path):
     assert len(result.skipped_symbols) == len(set(result.skipped_symbols))
 
 
-def test_fetch_daily_closes_records_provider_quota_error(tmp_path):
+def test_fetch_daily_closes_records_provider_quota_error(tmp_path, monkeypatch):
+    monkeypatch.setenv("TWELVEDATA_SHARE_PROVIDER_LEDGER", "0")
     ledger = TwelveDataUsageLedger(
         tmp_path / "ledger.json",
         2,

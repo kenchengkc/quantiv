@@ -200,7 +200,7 @@ Create `scripts/probe_massive_capabilities.py` before creating a full sync scrip
 
 It should:
 
-1. Read `MASSIVE_API_KEY`.
+1. Read `POLYGON_API_KEY` first; accept `MASSIVE_API_KEY` only as a local compatibility alias.
 2. Fetch option-chain snapshot for `AAPL`, `NVDA`, and one smaller earnings symbol.
 3. Paginate until complete for one symbol.
 4. Record fields present for each contract:
@@ -649,7 +649,7 @@ Instead:
 
 ```yaml
 - name: Sync Massive option snapshots
-  if: env.MASSIVE_API_KEY != ''
+  if: env.POLYGON_API_KEY != ''
   run: python scripts/sync_massive_snapshots.py --days-ahead 45
 ```
 

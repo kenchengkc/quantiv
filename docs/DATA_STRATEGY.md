@@ -294,6 +294,17 @@ enrichment priorities are:
    symbol/function pairs checked recently, and resumes the priority queue on the
    next run. Do not add V/OI to UI or ML features until the probe shows useful
    historical coverage for the covered earnings universe.
+5. `scripts/probe_provider_capabilities.py` and
+   `scripts/sync_provider_enrichments.py` allocate free/basic provider calls to
+   non-price signals before redundant OHLCV. The capability probe records only
+   entitlement and response-shape metadata in `data/provider_capabilities.json`.
+   The enrichment sync writes backend-only derived summaries under
+   `data/provider_enrichments/`: `earnings_news_signals`, `company_facts`,
+   `options_provider_signals`, and `corporate_actions`. Massive/Polygon uses
+   the existing `POLYGON_API_KEY`; TwelveData is mirrored into the shared
+   `data/provider_usage_ledger.json` so press-release usage and realized-move
+   fallback usage share the same Basic-tier cap. Public frontend JSON must not
+   expose raw provider payloads.
 
 Non-price Finnhub scripts refuse to run during the 09:25-16:45 ET quote refresh
 window unless `--allow-market-hours` is passed. This keeps the Finnhub quota
