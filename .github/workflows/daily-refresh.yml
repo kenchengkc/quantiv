@@ -230,6 +230,12 @@ jobs:
             --max-calls 8000 \
             --allow-missing-key
 
+      - name: Apply manual earnings overrides
+        # Re-applies config/earnings_overrides.json on top of the provider
+        # syncs above so manual date/timing corrections survive the nightly
+        # re-pull. Must run after all earnings syncs and before the build.
+        run: python scripts/apply_earnings_overrides.py --allow-missing
+
       - name: Sync OHLCV
         run: python scripts/sync_dolthub.py --ohlcv
 

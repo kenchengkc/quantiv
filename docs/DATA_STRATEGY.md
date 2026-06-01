@@ -86,7 +86,7 @@ This tells you if your models are **actually good** or just memorizing training 
 
 ### Step 2: Full Retrain (AFTER VALIDATION)
 
-**Run:** `python run_full_retrain_2023_2025.py --n-trials 50`
+**Run:** `python apps/ml/run_full_retrain_2023_2025.py --n-trials 50`
 
 **What it does:**
 1. Retrains models on ALL 32 months (2023-2025)
@@ -157,7 +157,7 @@ T-7:  Val MAE: 0.61% → Test MAE: 0.55% (10% better, great!)
 
 ```bash
 cd apps/ml
-python run_full_retrain_2023_2025.py --n-trials 50
+python apps/ml/run_full_retrain_2023_2025.py --n-trials 50
 ```
 
 **Benefits:**
@@ -236,7 +236,7 @@ python scripts/walk_forward.py
 
 ### Priority 2: Full Retrain
 ```bash
-python run_full_retrain_2023_2025.py --n-trials 50
+python apps/ml/run_full_retrain_2023_2025.py --n-trials 50
 ```
 **Time:** 30-60 minutes  
 **Purpose:** Maximize performance with all available data

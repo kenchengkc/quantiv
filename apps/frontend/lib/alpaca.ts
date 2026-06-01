@@ -123,28 +123,53 @@ export type IntradayPayload = {
   isCurrentSession: boolean;
 };
 
-/** Fetch ~78 5-minute IEX bars covering the most recent regular-hours
- *  session (plus pre/post-market when available on the Basic plan).
- *  Time range: yesterday 00:00 ET → now, which guarantees we capture
- *  both the previous day's close and today's session.
+/** IEX system hours are 08:00–17:00 ET. We display one ET session's worth of
+ *  bars from the 08:00 pre-market start:
+ *    • Live session (today, before the IEX day ends): 08:00 → latest print,
+ *      so the chart grows through the day instead of showing a stale full day.
+ *    • Finished session (after 17:00, or a weekend/holiday): the full
+ *      08:00–17:00 day of the most recent session with bars. */
+const IEX_SESSION_OPEN_MIN = 8 * 60; // 08:00 ET
+
+/** Minutes since ET midnight for an ISO timestamp (handles EST/EDT). */
+function etMinutesOf(iso: string): number {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(new Date(iso));
+  const m: Record<string, string> = {};
+  for (const p of parts) m[p.type] = p.value;
+  return ((parseInt(m.hour ?? '0') % 24) * 60) + parseInt(m.minute ?? '0');
+}
+
+/** Fetch IEX bars covering the most recent session from its 08:00 ET open.
+ *
+ *  Time range: now − 6 calendar days → now. The wide lookback guarantees we
+ *  reach the last trading session even across a 3-day weekend plus a Monday
+ *  holiday (the old 48h window returned zero bars there, which surfaced as
+ *  "IEX bars unavailable"). We then keep only the latest session's bars.
  *
  *  Docs: https://docs.alpaca.markets/reference/stockbars-1 */
 export async function fetchIntradayBars(
   symbol: string,
   timeframe: '1Min' | '5Min' | '15Min' = '5Min',
 ): Promise<IntradayPayload> {
-  // Pull two trading days of bars so the chart has yesterday's close
-  // plus today's session. Alpaca rejects start dates more than ~15
-  // minutes in the future, so we anchor on `now` and walk back 48h.
+  // Alpaca rejects start dates in the future, so we anchor on `now` and walk
+  // back far enough to always include the previous session's close plus the
+  // most recent session, regardless of intervening weekends/holidays.
   const end = new Date();
-  const start = new Date(end.getTime() - 48 * 60 * 60 * 1000);
+  const start = new Date(end.getTime() - 6 * 24 * 60 * 60 * 1000);
   const params = new URLSearchParams({
     timeframe,
     start: start.toISOString(),
     end: end.toISOString(),
     feed: 'iex',
     adjustment: 'raw',
-    limit: '500',
+    // Enough for a full 1-min IEX day (08:00–17:00 = 540 bars) across the
+    // multi-day window; coarser timeframes need far fewer.
+    limit: '1000',
   });
   const data = (await alpacaFetch(
     `/v2/stocks/${encodeURIComponent(symbol)}/bars?${params.toString()}`,
@@ -165,19 +190,22 @@ export async function fetchIntradayBars(
   const etDate = (iso: string) => etDateIso(new Date(iso));
   const todayKey = etDateIso(end);
   const availableDates = Array.from(new Set(sortedBars.map((b) => etDate(b.t)))).sort();
+  // Today if it already has bars (live session), else the latest session that
+  // does — the UI labels weekend/holiday sessions explicitly via sessionDate.
   const sessionDate = availableDates.includes(todayKey)
     ? todayKey
     : availableDates[availableDates.length - 1];
-  const sessionRawBars = sortedBars.filter((b) => etDate(b.t) === sessionDate);
+  // The full session from the 08:00 ET open. For a live session these bars
+  // run up to the latest print (08:00 → now); for a finished session they
+  // span the whole 08:00–17:00 IEX day.
+  const sessionRawBars = sortedBars.filter(
+    (b) => etDate(b.t) === sessionDate && etMinutesOf(b.t) >= IEX_SESSION_OPEN_MIN,
+  );
   const priorBars = sortedBars.filter((b) => etDate(b.t) < sessionDate);
   const previousClose =
     priorBars.length > 0 ? priorBars[priorBars.length - 1].c : null;
 
-  // Show one ET session at a time. On a market holiday or weekend this is
-  // the latest prior session with bars, which the UI labels explicitly.
-  const bars = sessionRawBars.slice(-78).map(
-    (b) => ({ t: b.t, c: b.c }),
-  );
+  const bars = sessionRawBars.map((b) => ({ t: b.t, c: b.c }));
 
   return {
     bars,

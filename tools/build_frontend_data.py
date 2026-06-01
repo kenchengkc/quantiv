@@ -23,6 +23,7 @@ import duckdb
 
 sys.path.append(str(Path(__file__).parent))
 from build_earnings_events import build_earnings_events_table, create_duckdb_views
+from fiscal_calendar import display_fiscal_year, load_fiscal_year_naming
 from math_baseline import compute_em_math
 from twelvedata_basic import (
     TwelveDataUsageLedger,
@@ -790,9 +791,29 @@ def _surprise_pct(actual, estimate):
     return (a - e) / abs(e)
 
 
+# Curated ticker -> fiscal-year naming offset (see tools/fiscal_calendar.py).
+# Loaded once; empty when the config is absent so the build is unaffected.
+_FY_NAMING = load_fiscal_year_naming()
+
+
+def _corrected_fiscal_year(symbol, fiscal_year, source):
+    """Vendor labels (Finnhub) name a fiscal year by its END year; some
+    retailers name it by the START year. Apply the curated per-ticker offset,
+    but only to vendor-end-year rows (source contains 'finnhub'). DoltHub-only
+    rows use a different (calendar-ordinal) labeling and are left untouched."""
+    if fiscal_year is None:
+        return None
+    if not (source and "finnhub" in str(source).lower()):
+        return fiscal_year
+    try:
+        return display_fiscal_year(symbol, int(fiscal_year), _FY_NAMING)
+    except (TypeError, ValueError):
+        return fiscal_year
+
+
 def _quarter_label(fiscal_year, fiscal_q, fallback_date):
-    """Render 'Q3 24' from Finnhub-provided fiscal_year/fiscal_q. Falls
-    back to a calendar-month inference when either piece is missing —
+    """Render 'Q3 24' from a (already naming-corrected) fiscal_year/fiscal_q.
+    Falls back to a calendar-month inference when either piece is missing —
     correct for ~70% of names, wrong for non-calendar-year filers, but
     no worse than the current frontend default."""
     fy = fiscal_year
@@ -810,15 +831,16 @@ def _quarter_label(fiscal_year, fiscal_q, fallback_date):
 
 
 def _history_row(d, timing, fiscal_year, fiscal_q, eps_actual, eps_estimate,
-                 rev_actual, rev_estimate, actual_move):
+                 rev_actual, rev_estimate, actual_move, symbol=None, source=None):
     """Shape one earnings_history entry. Implied is null until historical
     option-chain data is wired; everything else is best-effort from the
     Finnhub-overlaid earnings_events table."""
+    fy = _corrected_fiscal_year(symbol, fiscal_year, source)
     return {
         "date": d.isoformat(),
         "timing": timing,
-        "q": _quarter_label(fiscal_year, fiscal_q, d),
-        "fiscal_year": int(fiscal_year) if fiscal_year is not None else None,
+        "q": _quarter_label(fy, fiscal_q, d),
+        "fiscal_year": int(fy) if fy is not None else None,
         "fiscal_q": (fiscal_q or "").upper() or None,
         # Signed close-to-close realized move (e.g. +0.034 = +3.4%).
         # NULL when OHLCV doesn't bracket the event.
@@ -964,7 +986,8 @@ def build_symbol_detail(conn, ticker: str, as_of_date: date, earnings_dt: date |
                 e.eps_estimate,
                 e.revenue_actual,
                 e.revenue_estimate,
-                (post.close / NULLIF(pre.close, 0) - 1.0) AS actual
+                (post.close / NULLIF(pre.close, 0) - 1.0) AS actual,
+                e.source
             FROM earnings_events e
             LEFT JOIN v_ohlcv pre  ON pre.act_symbol = e.ticker
                 AND pre.date >= e.earnings_dt - INTERVAL '5' DAY
@@ -999,11 +1022,11 @@ def build_symbol_detail(conn, ticker: str, as_of_date: date, earnings_dt: date |
     except Exception:
         # v_ohlcv may not exist for this build; fall back to bare history.
         history = [
-            (d, t, fy, fq, epa, epe, rva, rve, None)
-            for d, t, fy, fq, epa, epe, rva, rve in conn.execute(
+            (d, t, fy, fq, epa, epe, rva, rve, None, src)
+            for d, t, fy, fq, epa, epe, rva, rve, src in conn.execute(
                 """
                 SELECT earnings_dt, timing, fiscal_year, fiscal_q,
-                       eps_actual, eps_estimate, revenue_actual, revenue_estimate
+                       eps_actual, eps_estimate, revenue_actual, revenue_estimate, source
                 FROM earnings_events
                 WHERE ticker = ?
                 ORDER BY earnings_dt DESC
@@ -1095,8 +1118,8 @@ def build_symbol_detail(conn, ticker: str, as_of_date: date, earnings_dt: date |
         "expected_move": em,
         "straddle_features": straddles,
         "earnings_history": [
-            _history_row(d, t, fy, fq, epa, epe, rva, rve, a)
-            for d, t, fy, fq, epa, epe, rva, rve, a in history
+            _history_row(d, t, fy, fq, epa, epe, rva, rve, a, symbol=ticker, source=src)
+            for d, t, fy, fq, epa, epe, rva, rve, a, src in history
         ],
         "next_earnings": earnings_dt.isoformat() if earnings_dt else None,
         "vol_regime": vol_regime,

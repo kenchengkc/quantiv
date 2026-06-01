@@ -82,7 +82,7 @@ Notes:
 
 ## DuckDB Database and Views
 - Database file: `quantiv.duckdb`
-- Created by: `migration/setup_duckdb.py`
+- Created by: `scripts/setup_duckdb_from_parquet.py` (`npm run data:views`)
 - Extensions: `parquet`, `httpfs`
 - Important settings: `memory_limit`, `threads`, `temp_directory`
 
@@ -101,7 +101,7 @@ Notes:
 
 ### Regeneration runbook
 ```
-python3 migration/setup_duckdb.py --data-dir ./data --db-file ./quantiv.duckdb
+python3 scripts/setup_duckdb_from_parquet.py --data-dir ./data --db-file ./quantiv.duckdb
 ```
 - Creates/loads extensions, sets DB settings, creates views/tables, runs light test queries, and exports schema info to `duckdb_schema.txt`.
 
@@ -120,7 +120,7 @@ python3 migration/setup_duckdb.py --data-dir ./data --db-file ./quantiv.duckdb
 - Compression: Snappy for new exports; legacy `data/parquet/options_chains` is ZSTD and not required for production.
 
 ## Exporter Guidelines
-- Script: `migration/export_to_parquet.py`
+- Scripts: `scripts/csv_to_parquet.py` (`npm run data:csv-parquet`) and `scripts/csv_to_parquet_volhist.py`
 - Defaults: Snappy compression, partitioning by year/month (options) and year (volatility)
 - Recommended: re-run exports that still have numeric column names when convenient; otherwise rely on DuckDB view casts.
 

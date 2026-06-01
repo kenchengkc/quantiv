@@ -6,6 +6,12 @@ import { test, expect } from '@playwright/test';
  */
 test.describe('earnings calendar reaction labels', () => {
   test('past week shows OHLCV close-to-close moves as REALIZED', async ({ page }) => {
+    // The default week comes from the real clock (mondayOf(new Date())), and the
+    // realized reporters this test relies on (AZO 05-26, ADSK 05-28) live in the
+    // 2026-05-25 week. Pin the clock into that week so the default `/` view is
+    // deterministic regardless of when CI runs (otherwise it drifts forward and
+    // the realized reporters fall into "Last week").
+    await page.clock.setFixedTime(new Date('2026-05-29T21:00:00Z')); // Fri 17:00 ET
     await page.goto('/');
     await expect(page.locator('.qv-calendar-shell')).toBeVisible({ timeout: 60_000 });
     await page.waitForTimeout(2_000);
@@ -44,6 +50,9 @@ test.describe('earnings calendar reaction labels', () => {
     await page.route('**/weeks/*.json', patchWeek);
     await page.route('**/weekly.json', patchWeek);
 
+    // Pin into the 2026-05-25 week so the default view contains ADSK's 05-28
+    // report (see the note in the first test).
+    await page.clock.setFixedTime(new Date('2026-05-29T21:00:00Z')); // Fri 17:00 ET
     await page.goto('/');
     await expect(page.locator('.qv-calendar-shell')).toBeVisible({ timeout: 60_000 });
     await page.getByRole('button', { name: 'All' }).click();
