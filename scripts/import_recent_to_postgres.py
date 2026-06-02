@@ -38,6 +38,7 @@ import json
 import math
 import os
 import sys
+import time
 from dataclasses import dataclass
 from datetime import date, timedelta
 from pathlib import Path
@@ -385,6 +386,34 @@ def record_import(
         )
 
 
+def connect_with_retry(url: str, attempts: int = 4):
+    """Connect to Postgres with a per-attempt timeout and backoff.
+
+    Neon free-tier computes auto-suspend and can be slow/flaky to wake, and the
+    GitHub runner occasionally hits transient network blips reaching AWS. A bare
+    connect with no timeout hung ~7 min across every resolved IP and then failed
+    the whole daily refresh; this fails fast per attempt and retries instead.
+    """
+    delays = [3, 8, 20]
+    last_exc: Exception | None = None
+    for i in range(attempts):
+        try:
+            return psycopg2.connect(url, connect_timeout=15)
+        except psycopg2.OperationalError as exc:
+            last_exc = exc
+            if i < attempts - 1:
+                wait = delays[min(i, len(delays) - 1)]
+                first_line = str(exc).splitlines()[0][:140]
+                print(
+                    f"  connect attempt {i + 1}/{attempts} failed ({first_line}); "
+                    f"retrying in {wait}s",
+                    flush=True,
+                )
+                time.sleep(wait)
+    assert last_exc is not None
+    raise last_exc
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--days", type=int, default=7,
@@ -410,7 +439,7 @@ def main() -> int:
     print(f"import_recent_to_postgres: {parquet_path.name} → {len(df)} rows "
           f"({import_mode})")
 
-    conn = psycopg2.connect(url)
+    conn = connect_with_retry(url)
     try:
         with conn:
             with conn.cursor() as cur:
