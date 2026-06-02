@@ -3,7 +3,11 @@ import { Redis } from '@upstash/redis';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { timingSafeEqual } from 'node:crypto';
-import { etDateIso, isQuoteRefreshWindowET } from '@/lib/marketHours';
+import {
+  etDateIso,
+  isQuoteRefreshWindowET,
+  lastCompletedTradingDayIso,
+} from '@/lib/marketHours';
 import { fetchLatestTwoSessions } from '@/lib/polygon';
 
 // Broad, whole-universe quote refresh from Polygon/Massive grouped-daily
@@ -136,25 +140,34 @@ export async function GET(req: NextRequest) {
   //   • today still 403/unavailable (latest === yesterday) → latest session
   const prevCloseSource = isToday ? sessions.prior : sessions.latest;
 
+  // Only overwrite the full quote:{SYM} when grouped-daily's latest bar is
+  // actually the most recent completed session. On a weekday evening today's
+  // bar isn't published yet (403), so grouped's "latest" is the PRIOR day —
+  // writing that would regress the fresher Finnhub close already in cache. The
+  // prevclose:{SYM} reference is always safe to write (it's the prior close by
+  // definition).
+  const groupedIsCurrent = sessions.latest.date === lastCompletedTradingDayIso();
+
   const pipeline = redis.pipeline();
   let written = 0;
   let prevcloseWritten = 0;
   for (const symbol of universe) {
     const latest = sessions.latest.closes.get(symbol);
     if (!latest) continue;
-    const prior = sessions.prior?.closes.get(symbol) ?? null;
-    const entry: CachedQuote = {
-      at: now,
-      tick: { price: latest.close, previousClose: prior ? prior.close : null },
-      source: 'polygon_grouped',
-      session,
-    };
-    // Store the object directly (Upstash serializes) to match the other
-    // quote:{SYM} writers; batch-price's mget deserializes it back.
-    // 48h TTL bridges a missed cron (GitHub Actions schedules can be delayed
-    // or skipped) without the cache going empty between closed-market runs.
-    pipeline.set(`quote:${symbol}`, entry, { ex: 172_800 });
-    written++;
+    if (groupedIsCurrent) {
+      const prior = sessions.prior?.closes.get(symbol) ?? null;
+      const entry: CachedQuote = {
+        at: now,
+        tick: { price: latest.close, previousClose: prior ? prior.close : null },
+        source: 'polygon_grouped',
+        session,
+      };
+      // Store the object directly (Upstash serializes) to match the other
+      // quote:{SYM} writers; batch-price's mget deserializes it back. 48h TTL
+      // bridges a missed cron without the cache going empty.
+      pipeline.set(`quote:${symbol}`, entry, { ex: 172_800 });
+      written++;
+    }
 
     const prevClose = prevCloseSource?.closes.get(symbol)?.close ?? null;
     if (prevClose != null) {
@@ -168,7 +181,8 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     universe: universe.length,
-    written,
+    quotesWritten: written,
+    groupedIsCurrent,
     prevcloseWritten,
     prevcloseSession: prevCloseSource?.date ?? null,
     latestSession: sessions.latest.date,

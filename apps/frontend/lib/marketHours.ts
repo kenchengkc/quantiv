@@ -103,6 +103,22 @@ export function hasRegularClosePassedET(now: Date = new Date()): boolean {
   return minutes >= REGULAR_CLOSE_MIN;
 }
 
+/** ET date of the most recent trading day whose regular session has fully
+ *  ended as of `now`. Today counts only once its 16:00 ET close has passed;
+ *  otherwise walk back to the previous trading day (skipping weekends/holidays).
+ *  Used to tell whether a vendor's "latest" daily bar is actually current. */
+export function lastCompletedTradingDayIso(now: Date = new Date()): string {
+  if (isTradingDayET(now) && hasRegularClosePassedET(now)) {
+    return etDateIso(now);
+  }
+  const d = new Date(now);
+  for (let i = 0; i < 8; i++) {
+    d.setUTCDate(d.getUTCDate() - 1);
+    if (isTradingDayET(d)) return etDateIso(d);
+  }
+  return etDateIso(now);
+}
+
 /** When cron / batch-price / fast polling should still hit Finnhub. */
 export function isQuoteRefreshWindowET(now: Date = new Date()): boolean {
   if (!isTradingDayET(now)) return false;
