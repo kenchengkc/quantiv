@@ -74,11 +74,20 @@ function safeEqual(a: string, b: string): boolean {
 }
 
 export async function GET(req: NextRequest) {
-  const required = process.env.CRON_SECRET;
-  if (!required) {
-    return NextResponse.json({ error: 'CRON_SECRET not configured' }, { status: 500 });
+  // Prefer a dedicated BROAD_REFRESH_SECRET (so this endpoint doesn't depend on
+  // the shared CRON_SECRET, which the Cloudflare worker also uses); still accept
+  // CRON_SECRET so a manual curl with that token works.
+  const accepted = [process.env.BROAD_REFRESH_SECRET, process.env.CRON_SECRET].filter(
+    (s): s is string => Boolean(s),
+  );
+  if (accepted.length === 0) {
+    return NextResponse.json(
+      { error: 'BROAD_REFRESH_SECRET / CRON_SECRET not configured' },
+      { status: 500 },
+    );
   }
-  if (!safeEqual(req.headers.get('authorization') ?? '', `Bearer ${required}`)) {
+  const auth = req.headers.get('authorization') ?? '';
+  if (!accepted.some((s) => safeEqual(auth, `Bearer ${s}`))) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
 
