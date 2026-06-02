@@ -408,6 +408,24 @@ async function runRegularHours(
   for (let i = cursor; i < end; i++) batch.push(symbols[i % symbols.length]);
   const nextCursor = end % symbols.length;
 
+  // Authoritative previous closes (Polygon grouped-daily, written by
+  // /api/cron/refresh-broad as prevclose:{SYM}) override Finnhub's `pc`, which
+  // lags after weekends/overnight — that lag inflated reaction % on the
+  // calendar (e.g. an 8% move shown as 15%). Missing keys fall back to
+  // Finnhub's pc, so this is strictly additive.
+  const prevcloseMap = new Map<string, number>();
+  try {
+    const vals = (await redis.mget<(number | null)[]>(
+      ...batch.map((s) => `prevclose:${s}`),
+    )) ?? [];
+    batch.forEach((s, i) => {
+      const v = vals[i];
+      if (typeof v === 'number' && v > 0) prevcloseMap.set(s, v);
+    });
+  } catch {
+    // Best-effort: on a Redis hiccup, just use Finnhub's pc for this batch.
+  }
+
   const spacingMs = Math.ceil(60_000 / RATE_LIMIT_PER_MIN);
   let ok2 = 0;
   let fail = 0;
@@ -417,9 +435,13 @@ async function runRegularHours(
     const tick = await fetchQuote(symbol, apiKey);
     if (tick) {
       try {
+        const authoritativePrev = prevcloseMap.get(symbol);
         const entry: CachedQuote = {
           at: Date.now(),
-          tick,
+          tick:
+            authoritativePrev != null
+              ? { ...tick, previousClose: authoritativePrev }
+              : tick,
           source: 'finnhub',
           session: 'regular',
         };

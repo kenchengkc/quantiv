@@ -119,8 +119,17 @@ export async function GET(req: NextRequest) {
   const session: CachedQuote['session'] = isToday ? 'delayed' : 'closed';
   const now = Date.now();
 
+  // Authoritative previous close = the close of the session *strictly before*
+  // today (ET). That's the correct anchor for the live quote refresh path,
+  // which writes today's Finnhub price but whose Finnhub `pc` field lags after
+  // weekends/overnight. The cron reads prevclose:{SYM} and overrides `pc`.
+  //   • today's grouped published (latest === today) → prior session
+  //   • today still 403/unavailable (latest === yesterday) → latest session
+  const prevCloseSource = isToday ? sessions.prior : sessions.latest;
+
   const pipeline = redis.pipeline();
   let written = 0;
+  let prevcloseWritten = 0;
   for (const symbol of universe) {
     const latest = sessions.latest.closes.get(symbol);
     if (!latest) continue;
@@ -137,12 +146,22 @@ export async function GET(req: NextRequest) {
     // or skipped) without the cache going empty between closed-market runs.
     pipeline.set(`quote:${symbol}`, entry, { ex: 172_800 });
     written++;
+
+    const prevClose = prevCloseSource?.closes.get(symbol)?.close ?? null;
+    if (prevClose != null) {
+      // 3-day TTL survives a weekend so Friday's close stays the authoritative
+      // previous close through Monday's session until it is rewritten.
+      pipeline.set(`prevclose:${symbol}`, prevClose, { ex: 259_200 });
+      prevcloseWritten++;
+    }
   }
   if (written > 0) await pipeline.exec();
 
   return NextResponse.json({
     universe: universe.length,
     written,
+    prevcloseWritten,
+    prevcloseSession: prevCloseSource?.date ?? null,
     latestSession: sessions.latest.date,
     priorSession: sessions.prior?.date ?? null,
     session,
