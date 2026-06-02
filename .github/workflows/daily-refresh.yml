@@ -267,6 +267,13 @@ jobs:
         # Pushes the newest forecast snapshot into the em_forecasts table
         # the Railway-hosted FastAPI backend reads from. The script is a
         # no-op when DATABASE_URL is unset (forks / preview branches).
+        #
+        # Non-blocking: later steps (R2 push, frontend build, commit) read
+        # DuckDB/parquet, not Postgres, so a transient Neon outage must not
+        # abort the whole refresh. The script already retries with backoff;
+        # continue-on-error covers a genuine outage so the frontend still ships
+        # (the step still shows red in the Actions UI for visibility).
+        continue-on-error: true
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         # Import the whole nightly Parquet — rows use chain snapshot_date
