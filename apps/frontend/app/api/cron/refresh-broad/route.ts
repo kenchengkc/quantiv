@@ -35,7 +35,14 @@ type CachedQuote = {
 };
 
 function publicDir(): string {
-  return join(process.cwd(), 'apps', 'frontend', 'public');
+  // process.cwd() may be the repo root or apps/frontend depending on the
+  // deployment, so try both (matches /api/cron/refresh-prices).
+  const candidates = [
+    join(process.cwd(), 'apps', 'frontend', 'public'),
+    join(process.cwd(), 'public'),
+  ];
+  for (const c of candidates) if (existsSync(c)) return c;
+  return candidates[0];
 }
 
 function mondayIsoForEtDate(isoDate: string): string {
