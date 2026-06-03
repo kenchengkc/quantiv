@@ -1,5 +1,5 @@
 {
-  "error_count": 37,
+  "error_count": 38,
   "errors": [
     {
       "endpoint": "fmp_key_metrics_ttm",
@@ -55,7 +55,7 @@
       "http_status": 402,
       "retry_after": "2026-07-03",
       "status": "entitlement_denied",
-      "symbol": "DG"
+      "symbol": "VEEV"
     },
     {
       "endpoint": "fmp_key_metrics_ttm",
@@ -63,7 +63,7 @@
       "http_status": 402,
       "retry_after": "2026-07-03",
       "status": "entitlement_denied",
-      "symbol": "ABM"
+      "symbol": "DG"
     },
     {
       "endpoint": "fmp_ratios_ttm",
@@ -119,7 +119,7 @@
       "http_status": 402,
       "retry_after": "2026-07-03",
       "status": "entitlement_denied",
-      "symbol": "DG"
+      "symbol": "VEEV"
     },
     {
       "endpoint": "fmp_ratios_ttm",
@@ -127,7 +127,7 @@
       "http_status": 402,
       "retry_after": "2026-07-03",
       "status": "entitlement_denied",
-      "symbol": "ABM"
+      "symbol": "DG"
     },
     {
       "endpoint": "fmp_ratings_snapshot",
@@ -183,7 +183,7 @@
       "http_status": 402,
       "retry_after": "2026-07-03",
       "status": "entitlement_denied",
-      "symbol": "DG"
+      "symbol": "VEEV"
     },
     {
       "endpoint": "fmp_ratings_snapshot",
@@ -191,7 +191,7 @@
       "http_status": 402,
       "retry_after": "2026-07-03",
       "status": "entitlement_denied",
-      "symbol": "ABM"
+      "symbol": "DG"
     },
     {
       "endpoint": "fmp_analyst_estimates",
@@ -247,7 +247,7 @@
       "http_status": 402,
       "retry_after": "2026-07-03",
       "status": "entitlement_denied",
-      "symbol": "DG"
+      "symbol": "VEEV"
     },
     {
       "endpoint": "fmp_analyst_estimates",
@@ -255,7 +255,7 @@
       "http_status": 402,
       "retry_after": "2026-07-03",
       "status": "entitlement_denied",
-      "symbol": "ABM"
+      "symbol": "DG"
     },
     {
       "endpoint": "massive_dividends",
@@ -310,6 +310,24 @@
       "retry_after": "2026-06-04",
       "status": "empty",
       "symbol": "CIEN"
+    },
+    {
+      "endpoint": "massive_dividends",
+      "http_status": 200,
+      "response_shape": {
+        "has_data": false,
+        "kind": "json_object",
+        "row_count": 0,
+        "sample_keys": [],
+        "top_level_keys": [
+          "request_id",
+          "results",
+          "status"
+        ]
+      },
+      "retry_after": "2026-06-04",
+      "status": "empty",
+      "symbol": "VEEV"
     },
     {
       "endpoint": "massive_splits",
@@ -348,7 +366,7 @@
       "symbol": "MDT"
     }
   ],
-  "generated_at": "2026-06-03T03:03:00.353152+00:00",
+  "generated_at": "2026-06-03T03:37:10.035313+00:00",
   "planned_calls": 60,
   "symbols": [
     "AVGO",
@@ -357,12 +375,12 @@
     "MDT",
     "CIEN",
     "HPE",
-    "DG",
-    "ABM"
+    "VEEV",
+    "DG"
   ],
   "tables": {
     "company_facts": 8,
-    "corporate_actions": 7,
+    "corporate_actions": 6,
     "earnings_news_signals": 0,
     "live_market_signals": 0,
     "options_provider_signals": 8
