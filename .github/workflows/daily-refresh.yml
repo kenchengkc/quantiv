@@ -243,6 +243,10 @@ jobs:
         run: python scripts/sync_dolthub.py --volhist
 
       - name: Sync VIX (FRED)
+        # Auxiliary macro series (not required to build the frontend). The
+        # script retries FRED with backoff; continue-on-error covers a genuine
+        # FRED outage so a single missed VIX day can't abort the whole refresh.
+        continue-on-error: true
         run: python scripts/sync_vix.py
 
       # Parquet + models only — forecasts are written later by daily_score.

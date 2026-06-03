@@ -16,6 +16,7 @@ Usage:
 
 import os
 import sys
+import time
 from io import StringIO
 from pathlib import Path
 
@@ -31,17 +32,41 @@ def data_dir() -> Path:
     return Path(os.getenv("DATA_DIR", str(Path(__file__).resolve().parent.parent / "data")))
 
 
+def fetch_fred_csv(url: str, attempts: int = 4) -> str:
+    """GET the FRED CSV with explicit connect/read timeouts + backoff. FRED
+    occasionally read-times-out from CI; a bare request with no retry was fatal
+    to the whole daily refresh."""
+    delays = [2, 5, 15]
+    last_exc: Exception | None = None
+    for i in range(attempts):
+        try:
+            res = requests.get(url, timeout=(10, 30))  # (connect, read)
+            res.raise_for_status()
+            return res.text
+        except requests.RequestException as exc:
+            last_exc = exc
+            if i < attempts - 1:
+                wait = delays[min(i, len(delays) - 1)]
+                print(
+                    f"⚠️  fetch attempt {i + 1}/{attempts} failed "
+                    f"({str(exc)[:120]}); retrying in {wait}s",
+                    flush=True,
+                )
+                time.sleep(wait)
+    assert last_exc is not None
+    raise last_exc
+
+
 def main() -> None:
     out_dir = data_dir() / "parquet" / "vix"
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / "vix.parquet"
 
     print(f"📥 fetching {FRED_URL}", flush=True)
-    res = requests.get(FRED_URL, timeout=30)
-    res.raise_for_status()
+    csv_text = fetch_fred_csv(FRED_URL)
 
     # FRED CSV columns: observation_date, VIXCLS
-    df = pd.read_csv(StringIO(res.text))
+    df = pd.read_csv(StringIO(csv_text))
     df.columns = [c.strip() for c in df.columns]
     if "observation_date" not in df.columns or "VIXCLS" not in df.columns:
         print(f"❌ unexpected columns: {df.columns.tolist()}")
