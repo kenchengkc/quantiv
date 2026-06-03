@@ -242,10 +242,11 @@ jobs:
       - name: Sync volatility history
         run: python scripts/sync_dolthub.py --volhist
 
-      - name: Sync VIX (FRED)
+      - name: Sync VIX (CBOE)
         # Auxiliary macro series (not required to build the frontend). The
-        # script retries FRED with backoff; continue-on-error covers a genuine
-        # FRED outage so a single missed VIX day can't abort the whole refresh.
+        # script pulls CBOE's official VIX history CSV with retry/backoff;
+        # continue-on-error covers a genuine source outage so a single missed
+        # VIX day can't abort the whole refresh.
         continue-on-error: true
         run: python scripts/sync_vix.py
 
