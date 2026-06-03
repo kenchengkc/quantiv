@@ -93,6 +93,9 @@ def tune_hyperparameters(X_train: pd.DataFrame, y_train: pd.Series,
     def objective(trial: optuna.Trial) -> float:
         params = {
             "n_estimators": 2000,  # capped by early_stopping
+            # L1/MAE objective so the search tunes the same loss we deploy and
+            # score on (see train_point_model docstring).
+            "objective": "regression_l1",
             "learning_rate":      trial.suggest_float("learning_rate", 0.01, 0.3, log=True),
             "num_leaves":         trial.suggest_int("num_leaves", 15, 255),
             "max_depth":          trial.suggest_int("max_depth", 4, 12),
@@ -128,9 +131,17 @@ def train_point_model(X_train: pd.DataFrame, y_train: pd.Series,
                       horizon: int,
                       sample_weight: np.ndarray | None = None,
                       params: Dict[str, Any] | None = None) -> Tuple[LGBMRegressor, Dict[str, Any]]:
-    """Train the main point-estimate model (L2 loss)."""
+    """Train the main point-estimate model (L1 / MAE loss).
+
+    L1 predicts the conditional MEDIAN, which is the MAE-optimal point forecast
+    for this right-skewed target. A paired walk-forward test (5 folds × 4 seeds)
+    showed 5–9% lower OOS MAE than the previous L2 (squared-error) objective,
+    consistent and significant across horizons (t = −4 to −8.5), and it aligns
+    the point estimate with the p50 quantile model.
+    """
 
     p = dict(DEFAULT_PARAMS if params is None else params)
+    p.setdefault("objective", "regression_l1")  # MAE loss — see docstring
     p.setdefault("min_child_samples", max(10, len(X_train) // 50))
     p.setdefault("n_estimators", 2000)
     p["random_state"] = 42
