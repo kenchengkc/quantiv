@@ -1,13 +1,13 @@
 {
   "symbol": "CPRI",
-  "as_of_date": "2026-05-29",
+  "as_of_date": "2026-06-01",
   "spot_price": null,
   "expected_move": {
     "expiration": "2026-07-17",
-    "dte": 49,
+    "dte": 46,
     "atm_strike": 20.0,
-    "atm_iv": 0.5065,
-    "straddle_abs": 3.075,
+    "atm_iv": 0.50055,
+    "straddle_abs": 2.95,
     "straddle_pct": null,
     "iv_pct": null,
     "timing": "before_market_open"
@@ -15,20 +15,20 @@
   "straddle_features": [
     {
       "expiration": "2026-07-17",
-      "dte": 49,
+      "dte": 46,
       "atm_strike": 20.0,
-      "atm_iv": 0.5065,
-      "atm_call_iv": 0.508,
-      "atm_put_iv": 0.505,
-      "straddle_mid": 3.075,
-      "em_straddle": 3.075,
+      "atm_iv": 0.50055,
+      "atm_call_iv": 0.5016,
+      "atm_put_iv": 0.4995,
+      "straddle_mid": 2.95,
+      "em_straddle": 2.95,
       "em_straddle_pct": null,
       "em_iv": null,
       "em_iv_pct": null,
-      "call_delta": 0.381,
-      "call_gamma": 0.1109,
-      "call_vega": 0.0258,
-      "call_theta": -0.0141
+      "call_delta": 0.3813,
+      "call_gamma": 0.1149,
+      "call_vega": 0.0251,
+      "call_theta": -0.0142
     }
   ],
   "earnings_history": [
@@ -215,13 +215,13 @@
   ],
   "next_earnings": "2026-05-27",
   "vol_regime": {
-    "iv_current": 0.5149,
-    "iv_rank": 0.274359,
+    "iv_current": 0.4878,
+    "iv_rank": 0.197151,
     "iv_year_high": 0.7696,
     "iv_year_low": 0.4186,
-    "hv_current": 0.4897,
-    "hv_rank": 0.461256,
-    "iv_mom_week": -0.2255,
+    "hv_current": 0.4608,
+    "hv_rank": 0.343393,
+    "iv_mom_week": -0.2526,
     "iv_mom_month": null
   },
   "next_earnings_timing": "before_market_open"
