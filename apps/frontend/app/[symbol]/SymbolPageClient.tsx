@@ -1029,10 +1029,12 @@ function DetailHero({
     Math.round(change * 100) / 100 === 0 &&
     Math.round(changePct * 10000) / 10000 === 0;
   const up = !flat && change >= 0;
-  const sessionPct = intradaySessionPct;
-  // The sparkline color tracks the session direction once real bars exist.
-  // The placeholder is always neutral.
-  const sparkUp = intradaySessionPct != null ? intradaySessionPct >= 0 : up;
+  // The sparkline and its % both track the authoritative day change (vs the
+  // official previous close, from batch-price) so the ticker page matches the
+  // calendar. The IEX bars provide the intraday shape only — they previously
+  // drove a first-bar→last-bar % that excluded the overnight earnings gap and
+  // disagreed with the calendar's LIVE %.
+  const sparkUp = up;
   const sparkCaption = (() => {
     if (intradayLoading) return 'IEX bars loading';
     if (!intradayBars || intradayBars.length < 2) return 'IEX bars unavailable';
@@ -1242,16 +1244,18 @@ function DetailHero({
                     style={{
                       flexShrink: 0,
                       color:
-                        sessionPct == null || sessionPct === 0
+                        changePct == null || flat
                           ? 'var(--ink-4)'
-                          : sessionPct > 0
+                          : changePct > 0
                             ? 'var(--up)'
                             : 'var(--down)',
                     }}
                   >
-                    {sessionPct == null
+                    {/* Authoritative day change vs official previous close (the
+                        same number the calendar's LIVE % shows). */}
+                    {changePct == null
                       ? '--'
-                      : `${sessionPct >= 0 ? '+' : ''}${(sessionPct * 100).toFixed(2)}%`}
+                      : `${changePct >= 0 ? '+' : ''}${(changePct * 100).toFixed(2)}%`}
                   </span>
                 </>
               )}
