@@ -1,12 +1,20 @@
 #!/usr/bin/env python3
 """Rigorous, paired search for model improvements (not noise).
 
-For each monthly walk-forward fold (expanding train, decay-weighted, like prod)
-and each random seed, every variant is trained on the SAME (X_train, y_train, w)
-and evaluated on the SAME X_test. So the variant-vs-baseline delta per (fold,seed)
-is paired — it removes seed/fold variance and isolates the change. We aggregate
-the paired ΔMAE across folds×seeds and report mean, std, and a t-stat; an
-improvement only counts if it's consistent and clears the noise band.
+The target is realized_move_pct. Raw straddle/implied move is never treated as
+truth; it is the naive benchmark the model must beat against realized outcomes.
+In this data, straddles structurally over-predict realized moves and the
+realized-vs-implied cross-sectional correlation is low, so most transforms of
+existing implied features should be expected to test null unless they add real
+information.
+
+For each monthly walk-forward fold (expanding train, production half-life
+decay weights by default) and each random seed, every variant is trained on the
+SAME (X_train, y_train, w) and evaluated on the SAME X_test. So the
+variant-vs-baseline delta per (fold,seed) is paired — it removes seed/fold
+variance and isolates the change. We aggregate the paired ΔMAE across
+folds×seeds and report mean, std, and a t-stat; an improvement only counts if
+ΔMAE < 0 and |t| >= 2.
 
 Round is chosen with --round: objectives | validate | ensemble | skew | dist.
 """
@@ -33,6 +41,7 @@ from walk_forward import (  # noqa: E402
 
 BASE = dict(DEFAULT_PARAMS)
 BASE.update(n_estimators=400, verbose=-1, n_jobs=-1)
+SIGNIFICANT_T = 2.0
 
 ID = (lambda y: y, lambda p: p)
 LOG = (lambda y: np.log1p(y), lambda p: np.clip(np.expm1(p), 0, None))
@@ -105,6 +114,29 @@ def make_folds(ed: pd.Series, n_folds: int, test_days: int, offset: int = 0):
     return out
 
 
+def summarize_implied_benchmark(y_parts: list[np.ndarray], implied_parts: list[np.ndarray]) -> dict | None:
+    if not y_parts or not implied_parts:
+        return None
+    y = np.concatenate(y_parts).astype(float)
+    implied = np.concatenate(implied_parts).astype(float)
+    mask = np.isfinite(y) & np.isfinite(implied) & (implied > 0)
+    if mask.sum() < 2:
+        return None
+    y = y[mask]
+    implied = implied[mask]
+    denom = float(np.dot(implied, implied))
+    slope = float(np.dot(y, implied) / denom) if denom > 0 else np.nan
+    corr = float(np.corrcoef(y, implied)[0, 1]) if np.std(y) > 0 and np.std(implied) > 0 else np.nan
+    return {
+        "n": int(mask.sum()),
+        "mae": float(mean_absolute_error(y, implied)),
+        "bias": float(np.mean(implied - y)),
+        "slope": slope,
+        "median_ratio": float(np.median(y / implied)),
+        "corr": corr,
+    }
+
+
 class SeedBag:
     """Average several LGBM models trained with different seeds (variance
     reduction). Built per (fold) — each seed gets a distinct bag seed offset."""
@@ -137,6 +169,8 @@ def run_horizon(horizon, specs, seeds, n_folds, test_days, hl, min_train, offset
     maes = {n: [] for n in names}
     paired = {n: [] for n in names}  # ΔMAE vs baseline per (fold,seed)
     bias = {n: [] for n in names}    # mean(pred - actual): >0 over-predicts
+    implied_y_parts: list[np.ndarray] = []
+    implied_parts: list[np.ndarray] = []
     n_obs = 0
     for (c0, c1) in folds:
         tr = (ed < c0).to_numpy()
@@ -145,6 +179,12 @@ def run_horizon(horizon, specs, seeds, n_folds, test_days, hl, min_train, offset
             continue
         Xtr, ytr = X[tr], y[tr].to_numpy()
         Xte, yte = X[te], y[te].to_numpy()
+        if "straddle_pct" in Xte.columns:
+            implied = Xte["straddle_pct"].to_numpy(dtype=float)
+            mask = np.isfinite(yte) & np.isfinite(implied) & (implied > 0)
+            if mask.any():
+                implied_y_parts.append(yte[mask])
+                implied_parts.append(implied[mask])
         w = decay_w(ed[tr], c0, hl)
         for seed in seeds:
             fold_mae = {}
@@ -161,7 +201,7 @@ def run_horizon(horizon, specs, seeds, n_folds, test_days, hl, min_train, offset
                 maes[name].append(fold_mae[name])
                 paired[name].append(fold_mae[name] - base)
             n_obs += 1
-    return maes, paired, bias, n_obs
+    return maes, paired, bias, n_obs, summarize_implied_benchmark(implied_y_parts, implied_parts)
 
 
 def main() -> int:
@@ -188,11 +228,20 @@ def main() -> int:
           f"folds={args.folds}x{args.test_days}d\n")
 
     for h in args.horizons:
-        maes, paired, bias, n = run_horizon(
+        maes, paired, bias, n, implied = run_horizon(
             h, specs, args.seeds, args.folds, args.test_days, args.half_life,
             args.min_train, args.oos_offset, ml_dir,
         )
         print(f"=== T{h}  ({n} fold×seed obs, oos_offset={args.oos_offset}d) ===")
+        if implied:
+            print(
+                "raw implied benchmark vs realized: "
+                f"MAE={implied['mae']:.4f}  "
+                f"bias(straddle-realized)={implied['bias']:+.4f}  "
+                f"realized≈{implied['slope']:.2f}×straddle  "
+                f"median(y/straddle)={implied['median_ratio']:.2f}  "
+                f"corr={implied['corr']:.2f}  n={implied['n']}"
+            )
         print(f"{'variant':>16} {'mean MAE':>10} {'Δ vs base':>10} {'±std':>8} {'t':>6} "
               f"{'bias':>9}  verdict")
         print("-" * 80)
@@ -206,11 +255,11 @@ def main() -> int:
             b = float(np.mean(bias[name]))
             if name == base_name:
                 verdict = "(baseline)"
-            elif dmean < 0 and abs(t) >= 2:
+            elif dmean < 0 and abs(t) >= SIGNIFICANT_T:
                 verdict = "✅ better (sig)"
             elif dmean < 0:
                 verdict = "~ better (noisy)"
-            elif abs(t) >= 2:
+            elif abs(t) >= SIGNIFICANT_T:
                 verdict = "❌ worse (sig)"
             else:
                 verdict = "~ worse (noisy)"
