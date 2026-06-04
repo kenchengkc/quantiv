@@ -37,6 +37,22 @@ See [`.github/workflows/daily-refresh.yml`](../.github/workflows/daily-refresh.y
 
 Frontend JSON build lives in [`tools/`](../tools/README.md) (`build_frontend_data.py`, `build_popular_weights.py`, `pull_market_caps.py`).
 
+## ML Experiment Guardrails
+
+Feature experiments must score predictions against realized moves. The raw
+straddle/implied move is the naive benchmark, not the truth target. This matters
+because the current data has a stable variance-risk-premium shape: straddles
+over-predict realized moves, and realized-vs-implied cross-sectional
+correlation is low enough that most transforms of existing implied features
+should be expected to test null.
+
+Use [`experiment_model_improvements.py`](experiment_model_improvements.py) for
+paired searches. It uses expanding walk-forward folds, production-style
+half-life decay weights (`0.5y` by default), identical folds/seeds for
+variant-vs-baseline comparisons, and a strict verdict: a variant only counts as
+better when paired `ΔMAE < 0` and `|t| >= 2`. Run a second OOS window with
+`--oos-offset` before promoting a feature.
+
 ## Python environment
 
 Scripts that import shared modules (`sync_finnhub_earnings`, pyarrow, etc.) expect the

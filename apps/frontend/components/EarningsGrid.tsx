@@ -33,6 +33,13 @@ interface EarningsEvent {
   timing: string;
   em_straddle_pct?: number | null;
   em_iv_pct?: number | null;
+  // LightGBM median expected move (calibrated to realized — the straddle
+  // structurally over-states realized by ~2×) and its 80% prediction interval
+  // (p10–p90). Preferred over the raw straddle for the headline ± move, matching
+  // the screener / symbol / watchlist surfaces.
+  em_ml_pct?: number | null;
+  p10?: number | null;
+  p90?: number | null;
   // Signed regular-session close-to-close move across the print, populated by
   // build_frontend_data for already-reported events. Shown (marked as the
   // earnings-day reaction) instead of the live tick once the date has passed.
@@ -97,7 +104,24 @@ function TickerRow({
   ev: EarningsEvent;
   live?: LiveMap[string];
 }) {
-  const movePct = ev.em_straddle_pct ?? ev.em_iv_pct ?? null;
+  // Headline ± move: the calibrated ML median (≈0.5–0.7× the straddle, which
+  // structurally over-states realized), falling back to the implied straddle
+  // when no model forecast exists. The p10–p90 80% interval rides along as the
+  // band; both shown like the screener / symbol surfaces.
+  const impliedPct = ev.em_straddle_pct ?? ev.em_iv_pct ?? null;
+  const movePct = ev.em_ml_pct ?? impliedPct;
+  const isCalibrated = ev.em_ml_pct != null;
+  const bandLo = ev.p10;
+  const bandHi = ev.p90;
+  const moveTitle = isCalibrated
+    ? `ML expected move ±${(movePct! * 100).toFixed(1)}% (calibrated to realized)` +
+      (impliedPct != null ? ` · implied straddle ±${(impliedPct * 100).toFixed(1)}%` : '') +
+      (bandLo != null && bandHi != null
+        ? ` · 80% range ${(bandLo * 100).toFixed(1)}–${(bandHi * 100).toFixed(1)}%`
+        : '')
+    : impliedPct != null
+      ? `Implied straddle move ±${(impliedPct * 100).toFixed(1)}%`
+      : '';
   // Prefer the nightly-built realized move; until it lands, fall back to the
   // post-close KV backfill, but only when it's for *this* event's date.
   const realizedFromBackfill =
@@ -200,22 +224,33 @@ function TickerRow({
         )}
       </div>
       <div
-        className="serif tnum"
+        title={moveTitle}
         style={{
-          fontSize: 14,
-          fontWeight: 600,
-          color: 'var(--ink-2)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'flex-end',
           flexShrink: 0,
           whiteSpace: 'nowrap',
+          lineHeight: 1.1,
         }}
       >
-        {movePct !== null ? (
-          <>
-            ±{(movePct * 100).toFixed(1)}
-            <span style={{ fontSize: 9, color: 'var(--ink-3)', marginLeft: 1 }}>%</span>
-          </>
-        ) : (
-          <span style={{ fontSize: 11, color: 'var(--ink-4)' }}>—</span>
+        <div className="serif tnum" style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink-2)' }}>
+          {movePct != null ? (
+            <>
+              ±{(movePct * 100).toFixed(1)}
+              <span style={{ fontSize: 9, color: 'var(--ink-3)', marginLeft: 1 }}>%</span>
+            </>
+          ) : (
+            <span style={{ fontSize: 11, color: 'var(--ink-4)' }}>—</span>
+          )}
+        </div>
+        {bandLo != null && bandHi != null && (
+          <div
+            className="mono tnum"
+            style={{ fontSize: 8.5, color: 'var(--ink-4)', letterSpacing: '0.02em', marginTop: 1 }}
+          >
+            {(bandLo * 100).toFixed(0)}–{(bandHi * 100).toFixed(0)}%
+          </div>
         )}
       </div>
     </Link>
