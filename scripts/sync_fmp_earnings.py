@@ -49,6 +49,10 @@ class FMPPremiumParameterError(RuntimeError):
     """Raised when the plan rejects a query parameter such as from/to."""
 
 
+class FMPQuotaError(RuntimeError):
+    """Raised when the FMP account has exhausted its daily/request quota."""
+
+
 def date_chunks(start: date, end: date) -> list[tuple[date, date]]:
     chunks: list[tuple[date, date]] = []
     cur = start
@@ -84,13 +88,18 @@ def get_api_key() -> str | None:
 
 
 def decode_fmp_response(resp: requests.Response) -> list[dict[str, Any]]:
+    if resp.status_code == 429:
+        raise FMPQuotaError(f"FMP HTTP 429: {resp.text[:300]}")
     if resp.status_code == 402 and "Premium Query Parameter" in resp.text:
         raise FMPPremiumParameterError(f"FMP HTTP 402: {resp.text[:300]}")
     if not resp.ok:
         raise RuntimeError(f"FMP HTTP {resp.status_code}: {resp.text[:300]}")
     body = resp.json()
     if isinstance(body, dict) and ("Error Message" in body or "Note" in body):
-        raise RuntimeError(f"FMP response error: {str(body)[:300]}")
+        text = str(body)
+        if "limit" in text.lower() or "quota" in text.lower():
+            raise FMPQuotaError(f"FMP response quota error: {text[:300]}")
+        raise RuntimeError(f"FMP response error: {text[:300]}")
     if not isinstance(body, list):
         raise RuntimeError(f"Unexpected FMP response: {str(body)[:300]}")
     return [row for row in body if isinstance(row, dict)]
@@ -330,6 +339,11 @@ def main() -> int:
         action="store_true",
         help="Exit 0 instead of failing when FMP_API_KEY is missing.",
     )
+    parser.add_argument(
+        "--allow-quota-exhausted",
+        action="store_true",
+        help="Exit 0 instead of failing when FMP says the plan quota is exhausted.",
+    )
     args = parser.parse_args()
 
     start = args.from_date or (today - timedelta(days=args.past_days))
@@ -381,9 +395,18 @@ def main() -> int:
                 budget=budget,
                 delay_s=args.delay,
             )
+        except FMPQuotaError:
+            raise
         except RuntimeError as retry_exc:
             print(f"{retry_exc}", file=sys.stderr)
             return 1
+    except FMPQuotaError as exc:
+        msg = f"{exc}; skipping FMP earnings overlay because quota is exhausted"
+        if args.allow_quota_exhausted:
+            print(msg)
+            return 0
+        print(msg, file=sys.stderr)
+        return 1
     except RuntimeError as exc:
         print(f"{exc}", file=sys.stderr)
         return 1

@@ -114,7 +114,7 @@ jobs:
         # live quote polling window begins.
         env:
           FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
-        run: python scripts/sync_fmp_earnings.py --allow-missing-key --no-date-params
+        run: python scripts/sync_fmp_earnings.py --allow-missing-key --allow-quota-exhausted --no-date-params
 
       - name: Backfill FMP EPS and revenue history by symbol
         # The current FMP free-tier key rejects /stable/earnings?symbol=SYM
