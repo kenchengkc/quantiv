@@ -106,7 +106,12 @@ jobs:
       - name: Overlay near-term earnings from Finnhub
         env:
           FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
-        run: python scripts/sync_finnhub_earnings.py --allow-missing-key
+        run: |
+          EXTRA_ARGS=""
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            EXTRA_ARGS="--allow-market-hours"
+          fi
+          python scripts/sync_finnhub_earnings.py --allow-missing-key $EXTRA_ARGS
 
       - name: Overlay EPS and revenue from FMP
         # Complements Finnhub's date/timing overlay with richer EPS/revenue
