@@ -103,4 +103,4 @@ Use Vercel Speed Insights (already in layout) and Chrome Performance → Network
 ## Related
 
 - [README.md](../README.md) — hosting and data pipeline
-- [EXTENDED_HOURS_AND_OPTIONS_DATA_PLAN.md](EXTENDED_HOURS_AND_OPTIONS_DATA_PLAN.md) — quote provider roadmap
+- [../scripts/README.md](../scripts/README.md) — data/provider pipeline runbook

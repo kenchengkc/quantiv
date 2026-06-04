@@ -20,6 +20,40 @@ const SP500_SET = new Set(
 );
 
 /** One row from weeks/*.json — aligned with tools/build_frontend_data week events */
+export interface ProviderEnrichment {
+  short_interest?: {
+    days_to_cover?: number | null;
+    shares?: number | null;
+    avg_daily_volume?: number | null;
+    settlement_date?: string | null;
+    provider?: string;
+    endpoint?: string;
+    collected_at?: string;
+  };
+  options_flow?: {
+    put_call_volume_ratio?: number | null;
+    put_call_open_interest_ratio?: number | null;
+    total_call_volume?: number | null;
+    total_put_volume?: number | null;
+    total_call_open_interest?: number | null;
+    total_put_open_interest?: number | null;
+    contract_count?: number | null;
+    iv_coverage_pct?: number | null;
+    greeks_coverage_pct?: number | null;
+    provider?: string;
+    endpoint?: string;
+    collected_at?: string;
+  };
+  corporate_actions?: {
+    dividend_events?: number | null;
+    latest_dividend_date?: string | null;
+    split_events?: number | null;
+    latest_split_date?: string | null;
+  };
+  flags?: string[];
+  signal_score?: number | null;
+}
+
 export interface ScreenerEvent {
   ticker: string;
   earnings_date: string;
@@ -43,6 +77,13 @@ export interface ScreenerEvent {
   iv_rank?: number | null;            // 0..1, percentile of current IV in trailing year
   hist_move_avg_4q?: number | null;   // |close pre→post| avg over last 4 quarters
   iv_crush_pct?: number | null;       // (front − back) / front
+  provider_enrichment?: ProviderEnrichment | null;
+  short_days_to_cover?: number | null;
+  short_interest_shares?: number | null;
+  put_call_volume_ratio?: number | null;
+  put_call_open_interest_ratio?: number | null;
+  provider_options_volume?: number | null;
+  provider_signal_score?: number | null;
 }
 
 interface WeekPayload {
@@ -76,7 +117,9 @@ type SortKey =
   | 'iv_rank'
   | 'hist_avg'
   | 'hist_edge'
-  | 'iv_crush';
+  | 'iv_crush'
+  | 'short'
+  | 'flow';
 type SortDir = 'asc' | 'desc';
 type TimingFilter = 'all' | 'bmo' | 'amc';
 
@@ -617,6 +660,8 @@ function ScreenerSkeletonRow({ delayMs }: { delayMs: number }) {
       </td>
       {cell(40, 40, 10)}
       {cell(45, 32, 10)}
+      {cell(48, 30, 10)}
+      {cell(49, 34, 10)}
       {cell(50, 40, 10)}
       {cell(55, 36, 10)}
       {cell(60, 44, 10)}
@@ -674,6 +719,25 @@ function histEdge(ev: ScreenerEvent): number | null {
   return (s - h) / h;
 }
 
+function shortDays(ev: ScreenerEvent): number | null {
+  return ev.short_days_to_cover ?? ev.provider_enrichment?.short_interest?.days_to_cover ?? null;
+}
+
+function putCallVolumeRatio(ev: ScreenerEvent): number | null {
+  return ev.put_call_volume_ratio ?? ev.provider_enrichment?.options_flow?.put_call_volume_ratio ?? null;
+}
+
+function flowImbalance(ev: ScreenerEvent): number | null {
+  const ratio = putCallVolumeRatio(ev);
+  if (ratio == null || ratio <= 0 || !Number.isFinite(ratio)) return null;
+  return Math.abs(Math.log(ratio));
+}
+
+function ratioText(v: number | null | undefined) {
+  if (v == null || !Number.isFinite(v) || v <= 0) return '—';
+  return `${v.toFixed(2)}x`;
+}
+
 function dedupeEvents(rows: ScreenerEvent[]): ScreenerEvent[] {
   const seen = new Set<string>();
   const out: ScreenerEvent[] = [];
@@ -688,7 +752,7 @@ function dedupeEvents(rows: ScreenerEvent[]): ScreenerEvent[] {
 
 const SORT_KEYS: readonly SortKey[] = [
   'name', 'edge', 'dte', 'date', 'straddle', 'ml', 'iv', 'band', 'skew', 'spot',
-  'iv_rank', 'hist_avg', 'hist_edge', 'iv_crush',
+  'iv_rank', 'hist_avg', 'hist_edge', 'iv_crush', 'short', 'flow',
 ] as const;
 
 function parseSort(s: string | null): SortKey {
@@ -715,12 +779,11 @@ export default function EarningsScreener() {
   const [error, setError] = useState<string | null>(null);
   const [live, setLive] = useState<Record<string, LiveTick>>({});
 
-  // Three independent gates that together unblock the real table.
-  // Each defaults to false and flips true asynchronously:
-  //   logosReady — every logo in the bundle has preloaded (or failed cleanly)
+  // Two independent gates unblock the real table:
   //   quotesReady — first live-quote batch returned, or fallback timer fired
   //   minLoadingDone — minimum skeleton hold elapsed (kills sub-second flash)
-  const [logosReady, setLogosReady] = useState(false);
+  // Logos are warmed in the background because fixed logo boxes can settle
+  // after paint without shifting rows.
   const [quotesReady, setQuotesReady] = useState(false);
   const [minLoadingDone, setMinLoadingDone] = useState(false);
 
@@ -735,7 +798,7 @@ export default function EarningsScreener() {
   const mlOnly = searchParams.get('ml') === '1';
   // Preset chips encode common screener intents in a single string param so
   // the URL stays shareable. Only one preset can be active at a time.
-  type Preset = 'rich_vol' | 'cheap_vol' | 'big_movers' | 'confident' | null;
+  type Preset = 'rich_vol' | 'cheap_vol' | 'big_movers' | 'confident' | 'crowded' | null;
   const preset = (searchParams.get('preset') as Preset) ?? null;
   const sortKey = parseSort(searchParams.get('sort'));
   const sortDir = parseDir(searchParams.get('dir'));
@@ -825,20 +888,13 @@ export default function EarningsScreener() {
   // trigger a redundant preload pass.
   useEffect(() => {
     if (loading || error) return;
-    if (events.length === 0) {
-      setLogosReady(true);
-      return;
-    }
+    if (events.length === 0) return;
     const tickers = Array.from(new Set(events.map((e) => e.ticker)));
     const uncached = tickers.filter((ticker) => !hasTickerLogoState(ticker));
-    if (uncached.length === 0) {
-      setLogosReady(true);
-      return;
-    }
+    if (uncached.length === 0) return;
     let cancelled = false;
-    setLogosReady(false);
     void preloadTickerLogos(uncached, LOGO_PRELOAD_TIMEOUT_MS).then(() => {
-      if (!cancelled) setLogosReady(true);
+      if (cancelled) return;
     });
     return () => {
       cancelled = true;
@@ -870,6 +926,10 @@ export default function EarningsScreener() {
       } else if (preset === 'confident') {
         const bw = band80(ev);
         if (bw == null || bw > 0.08) return false;
+      } else if (preset === 'crowded') {
+        const dtc = shortDays(ev);
+        const flow = flowImbalance(ev);
+        if ((dtc == null || dtc < 3) && (flow == null || flow < 0.35)) return false;
       }
       return true;
     });
@@ -907,6 +967,10 @@ export default function EarningsScreener() {
           return finite(histEdge(ev));
         case 'iv_crush':
           return finite(ev.iv_crush_pct);
+        case 'short':
+          return finite(shortDays(ev));
+        case 'flow':
+          return finite(flowImbalance(ev));
         default:
           return 0;
       }
@@ -1061,16 +1125,11 @@ export default function EarningsScreener() {
   // when data lands, causing a jarring vertical jump from "Loading…" to the
   // full table. Keeping the header + filters fixed eliminates the jitter.
 
-  // Real rows + KPI strip only unblock once *every* gate is green: data
-  // fetched, logos cached, initial quotes back (or timer expired), and
-  // the min skeleton hold elapsed. Until then, render the waterfall.
-  // All three gates have to clear before the real table renders. The
-  // skeleton stays up until the bundle JSON is fetched, all logos have
-  // preloaded (or timed out), the first live-quote batch is back (or the
-  // wait-bound fired), and the min-loading hold has elapsed. Trades a
-  // slower first paint for a more "ready" look.
+  // Real rows + KPI strip unblock once JSON is fetched, the initial quote
+  // batch returned or timed out, and the min skeleton hold elapsed. Logos warm
+  // independently in fixed-size boxes.
   const contentReady =
-    !loading && !error && logosReady && quotesReady && minLoadingDone;
+    !loading && !error && quotesReady && minLoadingDone;
   const showSkeleton = !error && !contentReady;
 
   return (
@@ -1573,6 +1632,7 @@ export default function EarningsScreener() {
             ['cheap_vol',  'Cheap IV',       'IV Rank ≤ 30%; options trading near 52-week lows'],
             ['big_movers', 'Big movers',     'Implied move ≥ 10%'],
             ['confident',  'Tight bands',    'P90−P10 ≤ 8%; model is highly confident'],
+            ['crowded',    'Crowded flow',   'Short interest ≥ 3 days to cover or options put/call flow is materially imbalanced'],
           ] as [string, string, string][]).map(([key, label, tip]) => {
             const active = preset === key;
             return (
@@ -1679,6 +1739,8 @@ export default function EarningsScreener() {
           straddle: 150,
           histAvg: 116,
           histEdge: 110,
+          short: 92,
+          flow: 96,
           ml: 84,
           edge: 128,
           band: 104,
@@ -1701,6 +1763,8 @@ export default function EarningsScreener() {
             <col style={{ width: col.straddle }} />
             <col style={{ width: col.histAvg }} />
             <col style={{ width: col.histEdge }} />
+            <col style={{ width: col.short }} />
+            <col style={{ width: col.flow }} />
             <col style={{ width: col.ml }} />
             <col style={{ width: col.edge }} />
             <col style={{ width: col.band }} />
@@ -1796,6 +1860,8 @@ export default function EarningsScreener() {
             {th('straddle', 'Straddle EM', 'One-day move priced by the print-expiry ATM straddle.')}
             {th('hist_avg', 'Hist 4Q avg', 'Mean absolute close-to-close move over the last 4 prints.')}
             {th('hist_edge', 'Hist edge', '(Straddle EM − hist 4Q avg) / hist 4Q avg. Positive = richer.')}
+            {th('short', 'Short DTC', 'Short-interest days to cover from provider enrichment. Higher = more crowded borrow/short positioning.')}
+            {th('flow', 'P/C flow', 'Current options put/call volume ratio from provider enrichment. Sort uses absolute imbalance from 1.0.')}
             {th('ml', 'ML EM', 'LightGBM median expected absolute one-day move on print.')}
             {th('edge', 'Edge (vs ML)', 'Straddle EM minus ML EM in percentage points.')}
             {th('band', 'P90−P10', "Width of model's 80% prediction interval. Tighter = more confident.")}
@@ -1910,6 +1976,48 @@ export default function EarningsScreener() {
                     fontWeight: hot ? 600 : 400,
                   }}>
                     {hEdge == null ? '—' : `${hEdge > 0 ? '+' : ''}${(hEdge * 100).toFixed(0)}%`}
+                  </td>
+                );
+              })()}
+              {(() => {
+                const dtc = shortDays(ev);
+                const crowded = dtc != null && dtc >= 3;
+                return (
+                  <td
+                    className="mono tnum"
+                    style={{
+                      textAlign: 'right',
+                      padding: '16px 14px',
+                      color: crowded ? 'var(--flag)' : 'var(--ink-2)',
+                      fontWeight: crowded ? 600 : 400,
+                    }}
+                  >
+                    {dtc == null ? '—' : dtc.toFixed(1)}
+                  </td>
+                );
+              })()}
+              {(() => {
+                const pcv = putCallVolumeRatio(ev);
+                const imbalanced = pcv != null && (pcv >= 1.25 || pcv <= 0.75);
+                const tone =
+                  pcv == null
+                    ? 'var(--ink-3)'
+                    : pcv >= 1.25
+                      ? 'var(--down)'
+                      : pcv <= 0.75
+                        ? 'var(--up)'
+                        : 'var(--ink-2)';
+                return (
+                  <td
+                    className="mono tnum"
+                    style={{
+                      textAlign: 'right',
+                      padding: '16px 14px',
+                      color: tone,
+                      fontWeight: imbalanced ? 600 : 400,
+                    }}
+                  >
+                    {ratioText(pcv)}
                   </td>
                 );
               })()}

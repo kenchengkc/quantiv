@@ -8,7 +8,7 @@ is paired — it removes seed/fold variance and isolates the change. We aggregat
 the paired ΔMAE across folds×seeds and report mean, std, and a t-stat; an
 improvement only counts if it's consistent and clears the noise band.
 
-Round is chosen with --round: objectives | targets | features | ensemble.
+Round is chosen with --round: objectives | validate | ensemble | skew | dist.
 """
 
 from __future__ import annotations
@@ -82,6 +82,17 @@ def specs_for(round_name):
             ("L1_smile", lgbm(l1), ID, ["skew_25d", "skew_pc_ratio"]),
             ("L1_all", lgbm(l1), ID, None),
         ]
+    if round_name == "dist":
+        # Baseline = committed L1 WITHOUT the new distribution-shape features;
+        # variant adds the fat-tail/skew summary of past moves. ΔMAE isolates
+        # whether tail shape buys point accuracy on top of mean/median history.
+        l1 = {"objective": "regression_l1"}
+        DIST = ["hist_move_p75_8q", "hist_move_p90_8q", "hist_move_max_12q",
+                "hist_move_kurt_8q", "hist_move_last"]
+        return [
+            ("L1_base", lgbm(l1), ID, DIST),
+            ("L1_dist", lgbm(l1), ID, None),
+        ]
     raise ValueError(round_name)
 
 
@@ -138,8 +149,8 @@ def run_horizon(horizon, specs, seeds, n_folds, test_days, hl, min_train, offset
         for seed in seeds:
             fold_mae = {}
             for name, fac, (fwd, inv), drop in specs:
-                Xtr_v = Xtr.drop(columns=drop) if drop else Xtr
-                Xte_v = Xte.drop(columns=drop) if drop else Xte
+                Xtr_v = Xtr.drop(columns=drop, errors="ignore") if drop else Xtr
+                Xte_v = Xte.drop(columns=drop, errors="ignore") if drop else Xte
                 m = fac(seed)
                 m.fit(Xtr_v, fwd(ytr), sample_weight=w)
                 pred = inv(m.predict(Xte_v))
@@ -165,7 +176,11 @@ def main() -> int:
     ap.add_argument("--oos-offset", type=int, default=0,
                     help="Shift the OOS window back N days (test an earlier period)")
     ap.add_argument("--ml-dir", default=None, help="Override training parquet dir")
+    ap.add_argument("--n-estimators", type=int, default=None,
+                    help="Override LightGBM tree count for quick experiment screens")
     args = ap.parse_args()
+    if args.n_estimators is not None:
+        BASE["n_estimators"] = args.n_estimators
     ml_dir = Path(args.ml_dir) if args.ml_dir else None
 
     specs = specs_for(args.round)

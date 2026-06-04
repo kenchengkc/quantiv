@@ -17,7 +17,7 @@ See [`.github/workflows/daily-refresh.yml`](../.github/workflows/daily-refresh.y
 | `sync_vix.py` | FRED VIX → Parquet | Nightly |
 | `probe_alphavantage_voi.py` | Persistent multi-day Alpha Vantage V/OI entitlement and coverage audit | `data:probe:alphavantage-voi`, nightly |
 | `probe_provider_capabilities.py` | Quota-managed entitlement/shape probes for FMP, Alpha Vantage, Massive/Polygon, and TwelveData additive endpoints | `data:probe:providers`, nightly |
-| `sync_provider_enrichments.py` | Backend-only derived enrichment tables: news signals, company facts, options provider signals, corporate actions | `data:providers:enrich`, nightly |
+| `sync_provider_enrichments.py` | Product enrichment tables used by frontend JSON: news signals, company facts, options provider signals, corporate actions | `data:providers:enrich`, nightly |
 | `detect_delistings.py` | Flags forecast-universe tickers gone from NASDAQ/NYSE directories; auto-adds confirmed delistings to `config/delisted_tickers.json` after N days (renames excluded) | Nightly (before integrity gate) |
 | `delisted.py` | Loader for `config/delisted_tickers.json` + `config/ticker_renames.json` (delistings & old→new symbol remaps; shared by the gates + `sync_dolthub`) | import-only |
 | `check_earnings_calendar_integrity.py` | Guardrails before committing calendar CSV (honors `delisted_tickers.json`) | Nightly (blocks commit on failure) |
@@ -33,7 +33,6 @@ See [`.github/workflows/daily-refresh.yml`](../.github/workflows/daily-refresh.y
 | `walk_forward.py` | Walk-forward validation (research) | `ml:walk-forward` |
 | `build_ticker_names.mjs` | SEC EDGAR → `ticker-names.json` + exchanges | Quarterly workflow |
 | `migrate.mjs` | Watchlist DDL against `DATABASE_URL` | Manual pre-deploy (not in CI) |
-| `probe_massive_capabilities.py` | Massive.com API probe (Phase 0) | Manual |
 | `r2_pull.sh` / `r2_push.sh` / `r2_bootstrap.sh` | R2 sync | Nightly + [r2_setup.md](r2_setup.md) |
 
 Frontend JSON build lives in [`tools/`](../tools/README.md) (`build_frontend_data.py`, `build_popular_weights.py`, `pull_market_caps.py`).
@@ -112,9 +111,10 @@ Alpha Vantage's 25/day-per-key cap.
 
 `probe_provider_capabilities.py` writes `data/provider_capabilities.json` with
 status and response-shape metadata only. `sync_provider_enrichments.py` then
-uses only endpoints that probed `ok` and writes derived backend-only JSON tables
-under `data/provider_enrichments/`. Raw provider payloads are not persisted or
-published in frontend JSON.
+uses only endpoints that probed `ok` and writes derived JSON tables under
+`data/provider_enrichments/`. `tools/build_frontend_data.py` publishes a compact
+subset into week/screener/symbol JSON so these calls directly power product
+signals. Raw provider payloads are not persisted or published in frontend JSON.
 
 Quota defaults are conservative: `FMP_DAILY_CALL_LIMIT=225`,
 `ALPHAVANTAGE_DAILY_CALL_LIMIT=25`, `TWELVEDATA_DAILY_CREDIT_LIMIT=792`, and
@@ -132,6 +132,7 @@ npm run data:providers:enrich -- --dry-run --max-symbols 8 --max-total-calls 60
 
 `DATA_DIR`, `DUCKDB_PATH`, `DATABASE_URL` in **`config/.env.local`** — see [`.env.example`](../.env.example).
 
-## Provider roadmap
+## Archive
 
-DoltHub is the historical baseline. Massive.com overlay evaluation: [`docs/EXTENDED_HOURS_AND_OPTIONS_DATA_PLAN.md`](../docs/EXTENDED_HOURS_AND_OPTIONS_DATA_PLAN.md), probe via `probe_massive_capabilities.py`. Massive/Polygon uses `POLYGON_API_KEY`; `MASSIVE_API_KEY` is only accepted as a local compatibility alias.
+Older one-off provider and retrain experiments live under `scripts/archive/`
+and `scripts/research/`. Keep active CI entrypoints in the inventory above.

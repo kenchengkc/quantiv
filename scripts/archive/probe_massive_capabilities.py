@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 """
+Archived Phase 0 probe.
+
 Phase 0 probe: validate what Massive.com Starter actually exposes
 before writing any production sync code.
+
+Use scripts/probe_provider_capabilities.py for the active provider catalog.
 
 This script is read-only. It does NOT write to data/parquet, does NOT
 touch DuckDB views, and does NOT modify R2. It hits the live Massive
@@ -23,7 +27,7 @@ Why a probe first:
 
 Usage:
   export POLYGON_API_KEY=...
-  python scripts/probe_massive_capabilities.py
+  python scripts/archive/probe_massive_capabilities.py
   # writes data/ref/provider_samples/massive/YYYY-MM-DD/
 
 Pass criteria (manually verified by reviewing the output):

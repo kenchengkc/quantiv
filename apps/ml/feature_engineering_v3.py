@@ -43,6 +43,10 @@ class FeatureSet:
     # Held alongside features but not used as a model input. Lets the trainer
     # compute sample weights (e.g. time-decay) without re-querying source data.
     earnings_date: pd.Series = field(default_factory=pd.Series)
+    # Per-row ticker, written as the __symbol meta column. Never a model input
+    # (trainer strips all __ cols); used by symbol-keyed feature experiments and
+    # leakage audits that need to join external panels (OHLCV, sector, etc.).
+    symbol: pd.Series = field(default_factory=pd.Series)
     metadata: Dict[str, Any] = field(default_factory=dict)
 
 
@@ -301,6 +305,22 @@ def extract_training_data(conn: duckdb.DuckDBPyConnection,
             MEDIAN(prev.realized_move_pct) FILTER (
                 WHERE prev.event_num >= h.event_num - 8 AND prev.event_num < h.event_num
             ) AS hist_move_med_8q,
+            QUANTILE_CONT(prev.realized_move_pct, 0.75) FILTER (
+                WHERE prev.event_num >= h.event_num - 8 AND prev.event_num < h.event_num
+            ) AS hist_move_p75_8q,
+            QUANTILE_CONT(prev.realized_move_pct, 0.90) FILTER (
+                WHERE prev.event_num >= h.event_num - 8 AND prev.event_num < h.event_num
+            ) AS hist_move_p90_8q,
+            KURTOSIS(prev.realized_move_pct) FILTER (
+                WHERE prev.event_num >= h.event_num - 8 AND prev.event_num < h.event_num
+            ) AS hist_move_kurt_8q,
+            -- Fat-tail / recency summaries from the pasted research note.
+            MAX(prev.realized_move_pct) FILTER (
+                WHERE prev.event_num >= h.event_num - 12 AND prev.event_num < h.event_num
+            ) AS hist_move_max_12q,
+            ARG_MAX(prev.realized_move_pct, prev.earnings_date) FILTER (
+                WHERE prev.event_num < h.event_num
+            ) AS hist_move_last,
             -- Count of historical events available
             COUNT(prev.realized_move_pct) FILTER (
                 WHERE prev.event_num < h.event_num
@@ -458,6 +478,11 @@ def extract_training_data(conn: duckdb.DuckDBPyConnection,
             ts.hist_move_std_4q,
             ts.hist_move_avg_8q,
             ts.hist_move_med_8q,
+            ts.hist_move_p75_8q,
+            ts.hist_move_p90_8q,
+            ts.hist_move_max_12q,
+            ts.hist_move_kurt_8q,
+            ts.hist_move_last,
             ts.hist_event_count,
 
             -- Straddle accuracy: how well did straddle predict past moves?
@@ -563,7 +588,8 @@ def extract_training_data(conn: duckdb.DuckDBPyConnection,
             # Historical earnings pattern
             "hist_move_avg_4q", "hist_move_med_4q", "hist_move_std_4q",
             "hist_move_avg_8q", "hist_move_med_8q", "hist_event_count",
-            "hist_straddle_accuracy",
+            "hist_move_p75_8q", "hist_move_p90_8q", "hist_move_max_12q",
+            "hist_move_kurt_8q", "hist_move_last", "hist_straddle_accuracy",
             # Vol regime (from v_volhist — NULL if volatility_history parquet absent)
             "iv_rank", "hv_rank", "iv_mom_week", "iv_mom_month",
             # Market regime (from VIX + SPY/TLT — NULL pre-1990 or pre-2023)
@@ -583,6 +609,8 @@ def extract_training_data(conn: duckdb.DuckDBPyConnection,
         X = hdf[feature_cols].copy()
         y = hdf["realized_move_pct"].copy()
         ed = pd.to_datetime(hdf["earnings_date"]).dt.date
+        sym = (hdf["act_symbol"].astype(str)
+               if "act_symbol" in hdf.columns else pd.Series([""] * len(hdf)))
 
         # LightGBM handles NaN natively — only remove inf and extreme outliers
         X = X.replace([np.inf, -np.inf], np.nan)
@@ -590,6 +618,7 @@ def extract_training_data(conn: duckdb.DuckDBPyConnection,
         X = X[valid].reset_index(drop=True)
         y = y[valid].reset_index(drop=True)
         ed = ed[valid].reset_index(drop=True)
+        sym = sym[valid].reset_index(drop=True)
 
         if len(X) < 30:
             logger.warning(f"T-{horizon}: only {len(X)} valid samples after cleaning")
@@ -606,6 +635,7 @@ def extract_training_data(conn: duckdb.DuckDBPyConnection,
             features=X,
             target=y,
             earnings_date=ed,
+            symbol=sym,
             metadata={
                 "n_samples": len(X),
                 "target_mean": float(y.mean()),
@@ -616,6 +646,7 @@ def extract_training_data(conn: duckdb.DuckDBPyConnection,
                 "straddle_pct_mean": float(X["straddle_pct"].mean()),
                 "event_move_coverage": float(X["event_move_implied"].notna().mean()),
                 "hist_move_coverage": float(X["hist_move_avg_4q"].notna().mean()),
+                "hist_dist_coverage": float(X["hist_move_p75_8q"].notna().mean()),
                 "ohlcv_coverage": float(
                     (hdf[valid]["realized_source"] == "ohlcv").mean()
                     if "realized_source" in hdf.columns else 0
@@ -627,7 +658,8 @@ def extract_training_data(conn: duckdb.DuckDBPyConnection,
             f"T-{horizon}: {len(X)} samples, "
             f"target mean={y.mean():.4f}, med={y.median():.4f}, "
             f"event_vol coverage={X['event_move_implied'].notna().mean():.0%}, "
-            f"hist_move coverage={X['hist_move_avg_4q'].notna().mean():.0%}"
+            f"hist_move coverage={X['hist_move_avg_4q'].notna().mean():.0%}, "
+            f"hist_dist coverage={X['hist_move_p75_8q'].notna().mean():.0%}"
         )
 
     return feature_sets
@@ -642,6 +674,8 @@ def save_training_data(feature_sets: Dict[int, FeatureSet], output_dir: Path):
         # Trainer pops it before fitting; never seen by LightGBM as a feature.
         if len(fs.earnings_date) == len(fs.features):
             training_df["__earnings_date"] = fs.earnings_date.values
+        if len(fs.symbol) == len(fs.features):
+            training_df["__symbol"] = fs.symbol.values
         path = output_dir / f"training_T{horizon}.parquet"
         training_df.to_parquet(path, index=False)
 

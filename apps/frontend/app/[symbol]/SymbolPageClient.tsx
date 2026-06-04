@@ -67,6 +67,41 @@ interface VolRegime {
   iv_mom_month: number | null;
 }
 
+interface ProviderEnrichment {
+  short_interest?: {
+    days_to_cover?: number | null;
+    shares?: number | null;
+    avg_daily_volume?: number | null;
+    settlement_date?: string | null;
+    provider?: string;
+    endpoint?: string;
+    collected_at?: string;
+  };
+  options_flow?: {
+    put_call_volume_ratio?: number | null;
+    put_call_open_interest_ratio?: number | null;
+    total_call_volume?: number | null;
+    total_put_volume?: number | null;
+    total_call_open_interest?: number | null;
+    total_put_open_interest?: number | null;
+    contract_count?: number | null;
+    iv_coverage_pct?: number | null;
+    greeks_coverage_pct?: number | null;
+    provider?: string;
+    endpoint?: string;
+    collected_at?: string;
+  };
+  corporate_actions?: {
+    dividend_events?: number | null;
+    latest_dividend_date?: string | null;
+    split_events?: number | null;
+    latest_split_date?: string | null;
+  };
+  flags?: string[];
+  signal_score?: number | null;
+  sources?: string[];
+}
+
 interface SymbolDetail {
   symbol: string;
   as_of_date: string;
@@ -99,6 +134,11 @@ interface SymbolDetail {
   next_earnings?: string | null;
   next_earnings_timing?: string;
   vol_regime?: VolRegime | null;
+  provider_enrichment?: ProviderEnrichment | null;
+  short_days_to_cover?: number | null;
+  put_call_volume_ratio?: number | null;
+  put_call_open_interest_ratio?: number | null;
+  provider_signal_score?: number | null;
 }
 
 interface LivePrice {
@@ -108,8 +148,8 @@ interface LivePrice {
   change: number | null;
   changePct: number | null;
   updated: string | null;
-  source: 'finnhub' | 'alpaca_iex' | 'mixed' | 'unavailable';
-  session?: 'premarket' | 'regular' | 'afterhours' | 'closed';
+  source: 'finnhub' | 'alpaca_iex' | 'polygon_grouped' | 'mixed' | 'unavailable';
+  session?: 'premarket' | 'regular' | 'afterhours' | 'delayed' | 'closed';
   marketOpen: boolean;
 }
 
@@ -791,6 +831,190 @@ function KpiCard({
           style={{ fontSize: 12.5, color: 'var(--ink-4)', marginTop: 4 }}
         >
           {sub}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function compactNumber(value: number | null | undefined) {
+  if (value == null || !Number.isFinite(value)) return '–';
+  return new Intl.NumberFormat('en-US', {
+    notation: 'compact',
+    maximumFractionDigits: 1,
+  }).format(value);
+}
+
+function ratioValue(value: number | null | undefined) {
+  if (value == null || !Number.isFinite(value) || value <= 0) return '–';
+  return `${value.toFixed(2)}x`;
+}
+
+function ProviderSignalMetric({
+  label,
+  value,
+  sub,
+  tone,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  tone?: string;
+}) {
+  return (
+    <div
+      style={{
+        padding: '12px 14px',
+        borderRadius: 8,
+        border: '1px solid var(--line)',
+        background: 'color-mix(in oklab, var(--bg-2) 72%, transparent)',
+        minWidth: 0,
+      }}
+    >
+      <div
+        style={{
+          fontSize: 9.5,
+          letterSpacing: '0.14em',
+          textTransform: 'uppercase',
+          color: 'var(--ink-4)',
+        }}
+      >
+        {label}
+      </div>
+      <div
+        className="serif tnum"
+        style={{
+          marginTop: 7,
+          fontSize: 24,
+          fontWeight: 700,
+          lineHeight: 1,
+          color: tone || 'var(--ink)',
+        }}
+      >
+        {value}
+      </div>
+      {sub && (
+        <div
+          className="mono tnum"
+          style={{
+            marginTop: 8,
+            fontSize: 11,
+            color: 'var(--ink-4)',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+          title={sub}
+        >
+          {sub}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ProviderSignalsPanel({ enrichment }: { enrichment?: ProviderEnrichment | null }) {
+  if (!enrichment) return null;
+  const short = enrichment.short_interest;
+  const flow = enrichment.options_flow;
+  const actions = enrichment.corporate_actions;
+  const hasSignals = short || flow || actions;
+  if (!hasSignals) return null;
+
+  const daysToCover = short?.days_to_cover ?? null;
+  const pcVolume = flow?.put_call_volume_ratio ?? null;
+  const pcOi = flow?.put_call_open_interest_ratio ?? null;
+  const shortTone =
+    daysToCover != null && daysToCover >= 5
+      ? 'var(--flag)'
+      : daysToCover != null && daysToCover >= 3
+        ? 'var(--accent-hi)'
+        : undefined;
+  const flowTone =
+    pcVolume != null && pcVolume >= 1.25
+      ? 'var(--down)'
+      : pcVolume != null && pcVolume <= 0.75
+        ? 'var(--up)'
+        : undefined;
+  const sourceText = [
+    ...(enrichment.sources ?? []),
+    short?.settlement_date ? `short ${short.settlement_date}` : null,
+    flow?.iv_coverage_pct != null ? `IV coverage ${flow.iv_coverage_pct.toFixed(0)}%` : null,
+  ].filter(Boolean).join(' · ');
+
+  return (
+    <div className="qv-card" style={{ marginTop: 22 }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          gap: 16,
+          marginBottom: 16,
+        }}
+      >
+        <div>
+          <span className="qv-pill">Provider signals</span>
+          <h3
+            className="serif"
+            style={{
+              margin: '10px 0 0',
+              fontSize: 20,
+              fontWeight: 700,
+              letterSpacing: '-0.01em',
+            }}
+          >
+            Crowding and flow context
+          </h3>
+        </div>
+        {enrichment.signal_score != null && (
+          <div className="mono tnum" style={{ fontSize: 11, color: 'var(--ink-4)', textAlign: 'right' }}>
+            Signal score {(enrichment.signal_score * 100).toFixed(0)}
+          </div>
+        )}
+      </div>
+      <div
+        className="qv-m-2col"
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+          gap: 12,
+        }}
+      >
+        <ProviderSignalMetric
+          label="Short days"
+          value={daysToCover == null ? '–' : daysToCover.toFixed(1)}
+          sub={short?.shares != null ? `${compactNumber(short.shares)} shares short` : undefined}
+          tone={shortTone}
+        />
+        <ProviderSignalMetric
+          label="P/C volume"
+          value={ratioValue(pcVolume)}
+          sub={
+            flow?.total_put_volume != null || flow?.total_call_volume != null
+              ? `${compactNumber(flow?.total_put_volume)} puts / ${compactNumber(flow?.total_call_volume)} calls`
+              : undefined
+          }
+          tone={flowTone}
+        />
+        <ProviderSignalMetric
+          label="P/C OI"
+          value={ratioValue(pcOi)}
+          sub={
+            flow?.total_put_open_interest != null || flow?.total_call_open_interest != null
+              ? `${compactNumber(flow?.total_put_open_interest)} puts / ${compactNumber(flow?.total_call_open_interest)} calls`
+              : undefined
+          }
+        />
+        <ProviderSignalMetric
+          label="Actions"
+          value={`${actions?.dividend_events ?? 0}/${actions?.split_events ?? 0}`}
+          sub="dividend / split events"
+        />
+      </div>
+      {sourceText && (
+        <div className="mono" style={{ marginTop: 14, fontSize: 11, color: 'var(--ink-4)' }}>
+          {sourceText}
         </div>
       )}
     </div>
@@ -3416,8 +3640,8 @@ export default function SymbolPage({
         const json = (await res.json()) as {
           pending?: number;
           updated: string | null;
-          source: 'finnhub' | 'alpaca_iex' | 'mixed' | 'unavailable';
-          session?: 'premarket' | 'regular' | 'afterhours' | 'closed';
+          source: 'finnhub' | 'alpaca_iex' | 'polygon_grouped' | 'mixed' | 'unavailable';
+          session?: 'premarket' | 'regular' | 'afterhours' | 'delayed' | 'closed';
           marketOpen?: boolean;
           quoteRefreshActive?: boolean;
           data: Array<{
@@ -3426,8 +3650,8 @@ export default function SymbolPage({
             previousClose: number | null;
             change: number | null;
             changePct: number | null;
-            source?: 'finnhub' | 'alpaca_iex';
-            session?: 'premarket' | 'regular' | 'afterhours';
+            source?: 'finnhub' | 'alpaca_iex' | 'polygon_grouped';
+            session?: 'premarket' | 'regular' | 'afterhours' | 'delayed' | 'closed';
           }>;
         };
         const open = json.marketOpen ?? true;
@@ -3919,6 +4143,12 @@ export default function SymbolPage({
               }
             />
           </div>
+        </Reveal>
+      )}
+
+      {data.provider_enrichment && (
+        <Reveal delay={100}>
+          <ProviderSignalsPanel enrichment={data.provider_enrichment} />
         </Reveal>
       )}
 

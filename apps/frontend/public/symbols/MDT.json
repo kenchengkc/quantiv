@@ -274,5 +274,66 @@
     "iv_mom_week": 0.0229,
     "iv_mom_month": null
   },
+  "provider_enrichment": {
+    "short_interest": {
+      "provider": "massive",
+      "endpoint": "massive_short_interest",
+      "collected_at": "2026-06-03T12:46:49.177248+00:00",
+      "shares": 14645842,
+      "avg_daily_volume": 9882933,
+      "days_to_cover": 1.48,
+      "settlement_date": "2026-05-15"
+    },
+    "options_flow": {
+      "provider": "massive",
+      "endpoint": "massive_options_snapshot",
+      "collected_at": "2026-06-03T12:46:49.177248+00:00",
+      "contract_count": 250,
+      "call_count": 134,
+      "put_count": 116,
+      "total_call_volume": 15173,
+      "total_put_volume": 12559,
+      "total_call_open_interest": 57024,
+      "total_put_open_interest": 27283,
+      "put_call_volume_ratio": 0.82772,
+      "put_call_open_interest_ratio": 0.478448,
+      "iv_coverage_pct": 74.4,
+      "greeks_coverage_pct": 74.4
+    },
+    "corporate_actions": {
+      "dividend_events": 5,
+      "latest_dividend_date": "2026-03-27",
+      "split_events": 0,
+      "latest_split_date": null,
+      "sources": [
+        {
+          "provider": "massive",
+          "endpoint": "massive_dividends",
+          "collected_at": "2026-06-03T12:46:49.177248+00:00"
+        }
+      ]
+    },
+    "flags": [
+      "call_heavy_open_interest",
+      "recent_dividend_history"
+    ],
+    "signal_score": 0.358096,
+    "sources": [
+      "massive"
+    ],
+    "generated_at": {
+      "company_facts": "2026-06-03T12:51:50.022150+00:00",
+      "options_provider_signals": "2026-06-03T12:51:50.022150+00:00",
+      "corporate_actions": "2026-06-03T12:51:50.022150+00:00",
+      "earnings_news_signals": "2026-06-03T12:51:50.022150+00:00",
+      "live_market_signals": "2026-06-03T12:51:50.022150+00:00"
+    }
+  },
+  "short_days_to_cover": 1.48,
+  "short_interest_shares": 14645842,
+  "put_call_volume_ratio": 0.82772,
+  "put_call_open_interest_ratio": 0.478448,
+  "provider_options_volume": 27732,
+  "provider_signal_score": 0.358096,
   "next_earnings_timing": "before_market_open"
 }
