@@ -246,11 +246,16 @@ jobs:
             echo "Not Sunday (UTC weekday=$DOW); skipping full-universe Finnhub sweep."
             exit 0
           fi
+          EXTRA_ARGS=""
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            EXTRA_ARGS="--allow-market-hours"
+          fi
           python scripts/sync_finnhub_earnings.py \
             --all-recent \
             --delay 1.05 \
             --max-calls 8000 \
-            --allow-missing-key
+            --allow-missing-key \
+            $EXTRA_ARGS
 
       - name: Apply manual earnings overrides
         # Re-applies config/earnings_overrides.json on top of the provider
@@ -324,7 +329,12 @@ jobs:
         # (~500 calls/week, well within the 60/min free tier).
         env:
           FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
-        run: python -u tools/pull_market_caps.py --allow-missing-key
+        run: |
+          EXTRA_ARGS=""
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            EXTRA_ARGS="--allow-market-hours"
+          fi
+          python -u tools/pull_market_caps.py --allow-missing-key $EXTRA_ARGS
 
       - name: Build popular-ticker weights
         # Regenerate apps/frontend/lib/popular.ts from a composite score:
@@ -528,6 +538,9 @@ jobs:
               exit 2
               ;;
           esac
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            ARGS="$ARGS --allow-market-hours"
+          fi
           python -u scripts/sync_finnhub_profiles.py \
             --allow-missing-key \
             --universe earnings \
