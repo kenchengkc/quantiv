@@ -63,6 +63,25 @@ def specs_for(round_name):
             ("L1_mae", lgbm({"objective": "regression_l1"}), ID, None),
             ("L1_logtarget", lgbm({"objective": "regression_l1"}), LOG, None),
         ]
+    if round_name == "ensemble":
+        l1 = {"objective": "regression_l1"}
+        return [
+            ("L1_single", lgbm(l1), ID, None),
+            ("L1_bag3", (lambda seed: SeedBag(l1, 3, seed)), ID, None),
+            ("L1_bag5", (lambda seed: SeedBag(l1, 5, seed)), ID, None),
+        ]
+    if round_name == "skew":
+        # Baseline = L1 WITHOUT the new options-shape features; variants add
+        # skew (directional), smile width (magnitude), or both. ΔMAE isolates
+        # each one's contribution on top of the committed L1 model.
+        l1 = {"objective": "regression_l1"}
+        ALL = ["skew_25d", "skew_pc_ratio", "smile_width"]
+        return [
+            ("L1_none", lgbm(l1), ID, ALL),
+            ("L1_skew", lgbm(l1), ID, ["smile_width"]),
+            ("L1_smile", lgbm(l1), ID, ["skew_25d", "skew_pc_ratio"]),
+            ("L1_all", lgbm(l1), ID, None),
+        ]
     raise ValueError(round_name)
 
 
@@ -75,8 +94,30 @@ def make_folds(ed: pd.Series, n_folds: int, test_days: int, offset: int = 0):
     return out
 
 
-def run_horizon(horizon, specs, seeds, n_folds, test_days, hl, min_train, offset=0):
-    df = load_training_frame(get_data_dir() / "ml_training", horizon)
+class SeedBag:
+    """Average several LGBM models trained with different seeds (variance
+    reduction). Built per (fold) — each seed gets a distinct bag seed offset."""
+
+    def __init__(self, extra, n_bag, base_seed):
+        self.extra = extra
+        self.n_bag = n_bag
+        self.base_seed = base_seed
+        self.models = []
+
+    def fit(self, X, y, sample_weight=None):
+        self.models = []
+        for k in range(self.n_bag):
+            m = LGBMRegressor(**{**BASE, "random_state": self.base_seed * 100 + k, **self.extra})
+            m.fit(X, y, sample_weight=sample_weight)
+            self.models.append(m)
+        return self
+
+    def predict(self, X):
+        return np.mean([m.predict(X) for m in self.models], axis=0)
+
+
+def run_horizon(horizon, specs, seeds, n_folds, test_days, hl, min_train, offset=0, ml_dir=None):
+    df = load_training_frame(ml_dir or (get_data_dir() / "ml_training"), horizon)
     X, y, ed = feature_target_split(df)
     ed = pd.to_datetime(ed)
     folds = make_folds(ed, n_folds, test_days, offset)
@@ -96,10 +137,12 @@ def run_horizon(horizon, specs, seeds, n_folds, test_days, hl, min_train, offset
         w = decay_w(ed[tr], c0, hl)
         for seed in seeds:
             fold_mae = {}
-            for name, fac, (fwd, inv), _feat in specs:
+            for name, fac, (fwd, inv), drop in specs:
+                Xtr_v = Xtr.drop(columns=drop) if drop else Xtr
+                Xte_v = Xte.drop(columns=drop) if drop else Xte
                 m = fac(seed)
-                m.fit(Xtr, fwd(ytr), sample_weight=w)
-                pred = inv(m.predict(Xte))
+                m.fit(Xtr_v, fwd(ytr), sample_weight=w)
+                pred = inv(m.predict(Xte_v))
                 fold_mae[name] = mean_absolute_error(yte, pred)
                 bias[name].append(float(np.mean(pred - yte)))
             base = fold_mae[names[0]]
@@ -121,7 +164,9 @@ def main() -> int:
     ap.add_argument("--min-train", type=int, default=2000)
     ap.add_argument("--oos-offset", type=int, default=0,
                     help="Shift the OOS window back N days (test an earlier period)")
+    ap.add_argument("--ml-dir", default=None, help="Override training parquet dir")
     args = ap.parse_args()
+    ml_dir = Path(args.ml_dir) if args.ml_dir else None
 
     specs = specs_for(args.round)
     print(f"ROUND={args.round}  horizons={args.horizons}  seeds={args.seeds}  "
@@ -130,7 +175,7 @@ def main() -> int:
     for h in args.horizons:
         maes, paired, bias, n = run_horizon(
             h, specs, args.seeds, args.folds, args.test_days, args.half_life,
-            args.min_train, args.oos_offset,
+            args.min_train, args.oos_offset, ml_dir,
         )
         print(f"=== T{h}  ({n} fold×seed obs, oos_offset={args.oos_offset}d) ===")
         print(f"{'variant':>16} {'mean MAE':>10} {'Δ vs base':>10} {'±std':>8} {'t':>6} "
