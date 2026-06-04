@@ -271,7 +271,6 @@ Full audit and fix priority: [**docs/PERFORMANCE.md**](docs/PERFORMANCE.md).
 | [docs/duckdb_architecture.md](docs/duckdb_architecture.md) | DuckDB / hybrid backend |
 | [docs/PERFORMANCE.md](docs/PERFORMANCE.md) | Frontend load times |
 | [docs/EXTENDED_HOURS_AND_OPTIONS_DATA_PLAN.md](docs/EXTENDED_HOURS_AND_OPTIONS_DATA_PLAN.md) | Quote / options provider roadmap |
-| [docs/archive/](docs/archive/) | Oct 2025 ML write-ups (historical) |
 
 ## License
 
