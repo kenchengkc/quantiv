@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { getRedis } from '@/lib/redis';
 import {
@@ -41,8 +41,8 @@ type Tick = {
  *  `session` fields are additive: pre-extended-hours cache entries
  *  written by older deploys have neither, and we treat those as
  *  `finnhub` / `regular` for response labeling. */
-type Source = 'finnhub' | 'alpaca_iex';
-type Session = 'premarket' | 'regular' | 'afterhours';
+type Source = 'finnhub' | 'alpaca_iex' | 'polygon_grouped';
+type Session = 'premarket' | 'regular' | 'afterhours' | 'delayed' | 'closed';
 type Cached = {
   at: number;
   tick: Tick;
@@ -55,6 +55,32 @@ const memCache = new Map<string, Cached>();
 
 const redisKey = (symbol: string) => `quote:${symbol}`;
 
+// Post-close realized-move backfill written by /api/cron/refresh-broad. Keyed by
+// symbol with the resolving event's date so a stale key (symbol's next quarter
+// hasn't landed) can never be applied to the wrong event.
+type RealizedEntry = { date: string; pct: number };
+
+async function readRealizedBatch(
+  symbols: string[],
+): Promise<Map<string, RealizedEntry>> {
+  const out = new Map<string, RealizedEntry>();
+  const redis = getRedis();
+  if (!redis || symbols.length === 0) return out;
+  try {
+    const raws =
+      (await redis.mget<RealizedEntry[]>(...symbols.map((s) => `realized:${s}`))) ?? [];
+    for (let i = 0; i < symbols.length; i++) {
+      const r = raws[i];
+      if (r && typeof r.pct === 'number' && typeof r.date === 'string') {
+        out.set(symbols[i], r);
+      }
+    }
+  } catch {
+    /* best-effort overlay; calendar still has the nightly-built realized field */
+  }
+  return out;
+}
+
 function publicDir(): string {
   const candidates = [
     join(process.cwd(), 'apps', 'frontend', 'public'),
@@ -62,6 +88,66 @@ function publicDir(): string {
   ];
   for (const c of candidates) if (existsSync(c)) return c;
   return candidates[0];
+}
+
+let knownQuoteSymbols: Set<string> | null = null;
+
+function loadKnownQuoteSymbols(): Set<string> {
+  if (knownQuoteSymbols) return knownQuoteSymbols;
+  const set = new Set<string>();
+  const dir = publicDir();
+
+  const addEventSymbols = (rel: string) => {
+    const path = join(dir, rel);
+    if (!existsSync(path)) return;
+    try {
+      const payload = JSON.parse(readFileSync(path, 'utf8')) as {
+        events?: { ticker?: string }[];
+      };
+      for (const event of payload.events ?? []) {
+        if (event.ticker) set.add(event.ticker.toUpperCase());
+      }
+    } catch {
+      /* ignore malformed static JSON */
+    }
+  };
+
+  addEventSymbols('weekly.json');
+  addEventSymbols('screener.json');
+
+  const manifestPath = join(dir, 'weeks', 'manifest.json');
+  if (existsSync(manifestPath)) {
+    try {
+      const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as {
+        weeks?: { start?: string }[];
+      };
+      for (const week of manifest.weeks ?? []) {
+        if (week.start) addEventSymbols(join('weeks', `${week.start}.json`));
+      }
+    } catch {
+      /* ignore malformed manifest */
+    }
+  }
+
+  const symbolsDir = join(dir, 'symbols');
+  if (existsSync(symbolsDir)) {
+    try {
+      for (const file of readdirSync(symbolsDir)) {
+        if (file.endsWith('.json')) set.add(file.slice(0, -5).toUpperCase());
+      }
+    } catch {
+      /* static symbols are optional in local dev */
+    }
+  }
+
+  knownQuoteSymbols = set;
+  return set;
+}
+
+function knownInterestSymbols(symbols: string[]): string[] {
+  const known = loadKnownQuoteSymbols();
+  if (known.size === 0) return symbols;
+  return symbols.filter((symbol) => known.has(symbol));
 }
 
 function mondayIsoForEtDate(isoDate: string): string {
@@ -242,9 +328,15 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  await recordQuoteInterest(symbols, interestContext(url.searchParams.get('context')));
+  const context = interestContext(url.searchParams.get('context'));
+  await recordQuoteInterest(knownInterestSymbols(symbols), context);
 
-  const cache = await readCacheBatch(symbols);
+  const [cache, realized] = await Promise.all([
+    readCacheBatch(symbols),
+    // Only the calendar needs the realized overlay; skip the extra round-trip
+    // for symbol/watchlist/screener quote reads.
+    context === 'earnings' ? readRealizedBatch(symbols) : Promise.resolve(new Map()),
+  ]);
 
   const marketOpen = isNyseRegularSessionET();
   const session: Session | 'closed' = currentRefreshWindow() ?? 'closed';
@@ -264,8 +356,12 @@ export async function GET(req: NextRequest) {
   // Use the batch read map (not only memCache) so this request sees Redis
   // payloads that were just merged into `cache` for cold keys.
   const data = symbols.map((s) => {
+    const r = realized.get(s);
+    const realizedFields = r
+      ? { realizedMovePct: r.pct, realizedDate: r.date }
+      : { realizedMovePct: null, realizedDate: null };
     const entry = cache.get(s) ?? null;
-    if (!entry) return enrichTick(nullTick(s));
+    if (!entry) return { ...enrichTick(nullTick(s)), ...realizedFields };
     if (entry.at > latestAt) latestAt = entry.at;
     const src = entry.source ?? 'finnhub';
     seenSources.add(src);
@@ -274,6 +370,7 @@ export async function GET(req: NextRequest) {
       source: src,
       session: entry.session ?? 'regular',
       transport: entry.transport ?? null,
+      ...realizedFields,
     };
   });
 
@@ -297,7 +394,7 @@ export async function GET(req: NextRequest) {
   // Finnhub regular-hours entries with Alpaca extended entries (common
   // around 4 PM ET when AMC reporters update via Alpaca while everyone
   // else is still on Finnhub), call it 'mixed'.
-  let topSource: 'finnhub' | 'alpaca_iex' | 'mixed' | 'unavailable';
+  let topSource: Source | 'mixed' | 'unavailable';
   if (seenSources.size === 0) {
     topSource = 'unavailable';
   } else if (seenSources.size === 1) {

@@ -16,6 +16,7 @@ import {
 } from '@/components/TickerLogo';
 import {
   resolveEarningsReactionDisplay,
+  shouldFetchRealizedBackfill,
   shouldPollLiveQuote,
 } from '@/lib/earningsReaction';
 import sp500Constituents from '../../../lib/data/sp500-constituents.json';
@@ -94,13 +95,19 @@ function TickerRow({
   live,
 }: {
   ev: EarningsEvent;
-  live?: { change: number | null; changePct: number | null };
+  live?: LiveMap[string];
 }) {
   const movePct = ev.em_straddle_pct ?? ev.em_iv_pct ?? null;
+  // Prefer the nightly-built realized move; until it lands, fall back to the
+  // post-close KV backfill, but only when it's for *this* event's date.
+  const realizedFromBackfill =
+    live?.realizedDate && live.realizedDate === ev.earnings_date
+      ? live.realizedMovePct ?? null
+      : null;
   const reaction = resolveEarningsReactionDisplay({
     earningsDate: ev.earnings_date,
     timing: ev.timing,
-    realizedMovePct: ev.realized_move_pct,
+    realizedMovePct: ev.realized_move_pct ?? realizedFromBackfill,
     liveChangePct: live?.changePct ?? null,
   });
   const changePct = reaction.changePct;
@@ -215,7 +222,17 @@ function TickerRow({
   );
 }
 
-type LiveMap = Record<string, { change: number | null; changePct: number | null }>;
+type LiveMap = Record<
+  string,
+  {
+    change: number | null;
+    changePct: number | null;
+    // Post-close realized-move backfill (realized:{SYM} via batch-price). Only
+    // applied when realizedDate matches the event's earnings_date.
+    realizedMovePct?: number | null;
+    realizedDate?: string | null;
+  }
+>;
 
 function Group({
   title,
@@ -750,8 +767,10 @@ export default function EarningsGrid() {
     const symbols = Array.from(
       new Set(
         data.events
-          .filter((e) =>
-            shouldPollLiveQuote(e.earnings_date, e.timing, e.realized_move_pct),
+          .filter(
+            (e) =>
+              shouldPollLiveQuote(e.earnings_date, e.timing, e.realized_move_pct) ||
+              shouldFetchRealizedBackfill(e.earnings_date, e.timing, e.realized_move_pct),
           )
           .map((e) => e.ticker),
       ),
@@ -790,7 +809,14 @@ export default function EarningsGrid() {
           pending?: number;
           marketOpen?: boolean;
           quoteRefreshActive?: boolean;
-          data: { symbol: string; price: number | null; change: number | null; changePct: number | null }[];
+          data: {
+            symbol: string;
+            price: number | null;
+            change: number | null;
+            changePct: number | null;
+            realizedMovePct?: number | null;
+            realizedDate?: string | null;
+          }[];
         };
         if (cancelled) {
           return { pending: 0, marketOpen: lastMarketOpen, quoteRefreshActive: lastQuoteRefreshActive };
@@ -798,11 +824,18 @@ export default function EarningsGrid() {
         setLive((prev) => {
           const next: LiveMap = { ...prev };
           for (const t of json.data) {
-            // Only overwrite with non-null values so we never *remove* a
-            // price that landed on an earlier poll.
-            if (t.price !== null) {
-              next[t.symbol] = { change: t.change, changePct: t.changePct };
-            }
+            // The realized backfill stands alone — it arrives post-close when
+            // there may be no fresh live price, so capture it even if price is
+            // null. Only overwrite the live price with non-null values so we
+            // never *remove* a price that landed on an earlier poll.
+            if (t.price === null && t.realizedMovePct == null) continue;
+            const prevEntry = next[t.symbol];
+            next[t.symbol] = {
+              change: t.price !== null ? t.change : prevEntry?.change ?? null,
+              changePct: t.price !== null ? t.changePct : prevEntry?.changePct ?? null,
+              realizedMovePct: t.realizedMovePct ?? prevEntry?.realizedMovePct ?? null,
+              realizedDate: t.realizedDate ?? prevEntry?.realizedDate ?? null,
+            };
           }
           return next;
         });

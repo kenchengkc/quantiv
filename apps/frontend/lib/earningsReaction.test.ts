@@ -4,6 +4,7 @@ import {
   isRealizationWindowComplete,
   nextTradingDayIso,
   resolveEarningsReactionDisplay,
+  shouldFetchRealizedBackfill,
   shouldPollLiveQuote,
 } from './earningsReaction';
 
@@ -137,5 +138,36 @@ describe('earningsReaction', () => {
     expect(
       shouldPollLiveQuote('2026-05-01', 'bmo', -0.02, new Date('2026-05-28T15:00:00Z')),
     ).toBe(false);
+  });
+
+  it('fetches the realized backfill in the gap after the realization day', () => {
+    // AMC 06-02 → realization completes 06-03 close. At 01:00 ET 06-04 the live
+    // anchor has rolled forward (LIVE suppressed) and the nightly build hasn't
+    // run — exactly the window the KV backfill covers, so we still fetch once.
+    const gapMorning = new Date('2026-06-04T05:00:00Z'); // 01:00 ET Thu
+    expect(shouldPollLiveQuote('2026-06-02', 'amc', null, gapMorning)).toBe(false);
+    expect(shouldFetchRealizedBackfill('2026-06-02', 'amc', null, gapMorning)).toBe(true);
+  });
+
+  it('does not fetch backfill once realized is recorded or for stale events', () => {
+    const gapMorning = new Date('2026-06-04T05:00:00Z');
+    expect(shouldFetchRealizedBackfill('2026-06-02', 'amc', 0.07, gapMorning)).toBe(false);
+    // Week-old null event: never poll forever.
+    expect(shouldFetchRealizedBackfill('2026-05-20', 'bmo', null, gapMorning)).toBe(false);
+  });
+
+  it('shows REALIZED from the backfill the morning after the reaction', () => {
+    // Same gap window as the user report: feeding the KV-backfilled realized
+    // value takes the REALIZED branch (no day restriction), filling the blank.
+    const gapMorning = new Date('2026-06-04T05:00:00Z');
+    expect(
+      resolveEarningsReactionDisplay({
+        earningsDate: '2026-06-02',
+        timing: 'amc',
+        realizedMovePct: 0.0512, // from realized:{SYM}
+        liveChangePct: null,
+        now: gapMorning,
+      }),
+    ).toEqual({ changePct: 0.0512, tag: 'REALIZED' });
   });
 });

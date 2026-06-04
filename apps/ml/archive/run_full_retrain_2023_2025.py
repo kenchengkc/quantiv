@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 """
+Archived legacy retrain entrypoint.
+
 Full Retrain: Train models on ALL available data (2023-2025)
 This maximizes model learning for production deployment
+
+The active training path is feature_engineering_v3.py + model_trainer_v3.py.
 """
 
 import os

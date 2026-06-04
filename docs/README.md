@@ -10,8 +10,13 @@ Start with the root [README.md](../README.md), then use the guides below.
 | [duckdb_architecture.md](duckdb_architecture.md) | Parquet layout, DuckDB views, `DATA_BACKEND` modes |
 | [PERFORMANCE.md](PERFORMANCE.md) | Why pages feel slow and prioritized fixes |
 | [HMAC_PROXY.md](HMAC_PROXY.md) | Vercel ↔ Railway signed proxy (`/api/ml/predict`) |
-| [DATA_STRATEGY.md](DATA_STRATEGY.md) | ML train/validation split strategy (Oct 2025 notes) |
-| [EXTENDED_HOURS_AND_OPTIONS_DATA_PLAN.md](EXTENDED_HOURS_AND_OPTIONS_DATA_PLAN.md) | Alpaca extended hours, Massive overlay roadmap |
+
+## Archive
+
+| Doc | Why archived |
+|-----|--------------|
+| [archive/DATA_STRATEGY.md](archive/DATA_STRATEGY.md) | Historical ML split notes; active training is v3 + walk-forward |
+| [archive/EXTENDED_HOURS_AND_OPTIONS_DATA_PLAN.md](archive/EXTENDED_HOURS_AND_OPTIONS_DATA_PLAN.md) | Original quote/provider roadmap; implemented runbook lives in scripts/workers docs |
 
 ## Scripts & workers
 
@@ -21,4 +26,3 @@ Start with the root [README.md](../README.md), then use the guides below.
 | [../tools/README.md](../tools/README.md) | `build_frontend_data`, market caps, popular weights |
 | [../workers/refresh-prices/README.md](../workers/refresh-prices/README.md) | Cloudflare Worker → Vercel quote cron |
 | [../scripts/r2_setup.md](../scripts/r2_setup.md) | One-time R2 / rclone setup |
-

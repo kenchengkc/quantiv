@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Does retraining more frequently improve out-of-sample accuracy?
+"""Research experiment: does retraining more frequently improve out-of-sample accuracy?
 
 Controlled walk-forward: over a fixed recent test window, predict every OOS
 earnings event exactly once, varying ONLY how fresh the training cutoff is
@@ -15,7 +15,7 @@ decay-weighted) and predict that bin. Smaller D = fresher model per event =
 never retrain" (the staleness extreme).
 
 Usage:
-  python scripts/experiment_retrain_cadence.py --horizons 1 2 3 7 --test-days 150
+  python scripts/research/experiment_retrain_cadence.py --horizons 1 2 3 7 --test-days 150
 """
 
 from __future__ import annotations

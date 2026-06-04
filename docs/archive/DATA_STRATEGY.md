@@ -1,7 +1,11 @@
 # ML Data Strategy: Current vs Optimal
 
+> Archived: historical notes kept for context. The active training path is
+> `apps/ml/feature_engineering_v3.py`, `apps/ml/model_trainer_v3.py`, and
+> `scripts/walk_forward.py`.
+
 **Date:** October 5, 2025 · **Status:** historical strategy notes. For the live
-walk-forward entrypoint use [`scripts/walk_forward.py`](../scripts/walk_forward.py)
+walk-forward entrypoint use [`scripts/walk_forward.py`](../../scripts/walk_forward.py)
 (`npm run ml:walk-forward`). The old `run_walk_forward_validation.py` script was removed.
 
 ---
@@ -86,7 +90,7 @@ This tells you if your models are **actually good** or just memorizing training 
 
 ### Step 2: Full Retrain (AFTER VALIDATION)
 
-**Run:** `python apps/ml/run_full_retrain_2023_2025.py --n-trials 50`
+**Historical run:** `python apps/ml/archive/run_full_retrain_2023_2025.py --n-trials 50`
 
 **What it does:**
 1. Retrains models on ALL 32 months (2023-2025)
@@ -157,7 +161,7 @@ T-7:  Val MAE: 0.61% → Test MAE: 0.55% (10% better, great!)
 
 ```bash
 cd apps/ml
-python apps/ml/run_full_retrain_2023_2025.py --n-trials 50
+python apps/ml/archive/run_full_retrain_2023_2025.py --n-trials 50
 ```
 
 **Benefits:**
@@ -236,7 +240,7 @@ python scripts/walk_forward.py
 
 ### Priority 2: Full Retrain
 ```bash
-python apps/ml/run_full_retrain_2023_2025.py --n-trials 50
+python apps/ml/archive/run_full_retrain_2023_2025.py --n-trials 50
 ```
 **Time:** 30-60 minutes  
 **Purpose:** Maximize performance with all available data

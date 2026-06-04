@@ -17,6 +17,7 @@ import redis.asyncio as redis
 import httpx
 import structlog
 import duckdb
+import hmac
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -123,6 +124,12 @@ def _validate_env():
         warnings.append("POLYGON_API_KEY not set — live market data unavailable")
     if not os.getenv("ADMIN_API_KEY"):
         warnings.append("ADMIN_API_KEY not set — admin endpoints will return 503")
+    is_production = (
+        os.getenv("ENVIRONMENT", "").lower() in {"production", "prod"}
+        or os.getenv("RAILWAY_ENVIRONMENT", "").lower() == "production"
+    )
+    if is_production and not os.getenv("BACKEND_SHARED_SECRET"):
+        errors.append("BACKEND_SHARED_SECRET is required in production for HMAC-protected backend routes")
 
     for w in warnings:
         logger.warning("Env config warning", detail=w)
@@ -307,7 +314,7 @@ async def verify_admin_key(api_key: Optional[str] = Security(_api_key_header)) -
     expected = os.getenv("ADMIN_API_KEY")
     if not expected:
         raise HTTPException(status_code=503, detail="Admin API key not configured on server")
-    if not api_key or api_key != expected:
+    if not api_key or not hmac.compare_digest(api_key, expected):
         raise HTTPException(status_code=403, detail="Invalid or missing API key")
     return api_key
 

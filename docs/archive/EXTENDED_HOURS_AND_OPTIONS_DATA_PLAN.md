@@ -1,5 +1,9 @@
 # Extended-Hours Quotes and Options Data Migration Plan
 
+> Archived: the implemented quote/enrichment system now lives in the worker,
+> cron routes, provider scripts, and `scripts/README.md`. This file remains as
+> background planning context.
+
 **Date:** May 17, 2026  
 **Status:** Recommended implementation plan  
 **Scope:** Targeted extended-hours stock quotes, broader options coverage, and a safe path from DoltHub toward a paid options provider.

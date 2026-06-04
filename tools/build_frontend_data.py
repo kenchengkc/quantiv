@@ -39,6 +39,7 @@ DATA_DIR = REPO_ROOT / "data"
 PUBLIC_DIR = REPO_ROOT / "apps" / "frontend" / "public"
 EARNINGS_CSV = DATA_DIR / "earnings_calendar.csv"
 FORECASTS_DIR = DATA_DIR / "forecasts"
+PROVIDER_ENRICHMENTS_DIR = DATA_DIR / "provider_enrichments"
 MODEL_HORIZONS = [1, 2, 3, 7, 14, 21]
 MARKET_HOLIDAYS_TS = REPO_ROOT / "apps" / "frontend" / "lib" / "marketHolidays.generated.ts"
 ET = ZoneInfo("America/New_York")
@@ -111,6 +112,223 @@ def ml_fields(fc: dict | None) -> dict:
     out["p75"] = jsonable(pick("p75", "band68_high_pct"))
     out["p90"] = jsonable(pick("p90", "band95_high_pct"))
     return {k: v for k, v in out.items() if v is not None}
+
+
+def _read_enrichment_rows(filename: str) -> tuple[str | None, list[dict]]:
+    path = PROVIDER_ENRICHMENTS_DIR / filename
+    if not path.exists():
+        return None, []
+    try:
+        payload = json.loads(path.read_text())
+    except Exception as exc:
+        print(f"⚠️  Could not read provider enrichment {filename}: {exc}")
+        return None, []
+    rows = payload.get("rows") if isinstance(payload, dict) else None
+    if not isinstance(rows, list):
+        return payload.get("generated_at") if isinstance(payload, dict) else None, []
+    return payload.get("generated_at"), [r for r in rows if isinstance(r, dict)]
+
+
+def _latest_row(rows: list[dict], *, date_keys: tuple[str, ...] = ("collected_at",)) -> dict | None:
+    if not rows:
+        return None
+    return sorted(
+        rows,
+        key=lambda r: tuple(str(r.get(k) or "") for k in date_keys),
+        reverse=True,
+    )[0]
+
+
+def _row_source(row: dict) -> dict:
+    return {
+        k: v
+        for k, v in {
+            "provider": row.get("provider"),
+            "endpoint": row.get("source_endpoint"),
+            "collected_at": row.get("collected_at"),
+        }.items()
+        if v is not None
+    }
+
+
+def _provider_signal_flags(enrichment: dict) -> list[str]:
+    flags: list[str] = []
+    short = enrichment.get("short_interest") or {}
+    options = enrichment.get("options_flow") or {}
+    actions = enrichment.get("corporate_actions") or {}
+    days_to_cover = short.get("days_to_cover")
+    if isinstance(days_to_cover, (int, float)):
+        if days_to_cover >= 5:
+            flags.append("high_short_interest")
+        elif days_to_cover >= 3:
+            flags.append("elevated_short_interest")
+    pcv = options.get("put_call_volume_ratio")
+    if isinstance(pcv, (int, float)) and pcv > 0:
+        if pcv >= 1.25:
+            flags.append("put_heavy_flow")
+        elif pcv <= 0.75:
+            flags.append("call_heavy_flow")
+    pcoi = options.get("put_call_open_interest_ratio")
+    if isinstance(pcoi, (int, float)) and pcoi > 0:
+        if pcoi >= 1.25:
+            flags.append("put_heavy_open_interest")
+        elif pcoi <= 0.75:
+            flags.append("call_heavy_open_interest")
+    if actions.get("split_events"):
+        flags.append("recent_split_history")
+    if actions.get("dividend_events"):
+        flags.append("recent_dividend_history")
+    return flags
+
+
+def _provider_signal_score(enrichment: dict) -> float | None:
+    short = enrichment.get("short_interest") or {}
+    options = enrichment.get("options_flow") or {}
+    score = 0.0
+    count = 0
+    days_to_cover = short.get("days_to_cover")
+    if isinstance(days_to_cover, (int, float)) and days_to_cover > 0:
+        score += min(float(days_to_cover) / 10.0, 1.0)
+        count += 1
+    for key in ("put_call_volume_ratio", "put_call_open_interest_ratio"):
+        ratio = options.get(key)
+        if isinstance(ratio, (int, float)) and ratio > 0:
+            score += min(abs(math.log(float(ratio))), 1.0)
+            count += 1
+    return round(score / count, 6) if count else None
+
+
+def load_provider_enrichments() -> dict[str, dict]:
+    """Load derived provider tables and compact them into per-symbol signals.
+
+    Raw provider payloads are intentionally not published. This emits only
+    normalized fields useful to product surfaces and future ML features.
+    """
+    generated_at: dict[str, str] = {}
+    tables: dict[str, list[dict]] = {}
+    for table, filename in {
+        "company_facts": "company_facts.json",
+        "options_provider_signals": "options_provider_signals.json",
+        "corporate_actions": "corporate_actions.json",
+        "earnings_news_signals": "earnings_news_signals.json",
+        "live_market_signals": "live_market_signals.json",
+    }.items():
+        ts, rows = _read_enrichment_rows(filename)
+        if ts:
+            generated_at[table] = ts
+        tables[table] = rows
+
+    by_symbol: dict[str, dict] = {}
+
+    def slot(symbol: str) -> dict:
+        symbol = symbol.upper()
+        return by_symbol.setdefault(symbol, {})
+
+    facts_by_symbol: dict[str, list[dict]] = {}
+    for row in tables["company_facts"]:
+        symbol = str(row.get("symbol") or "").upper()
+        if symbol:
+            facts_by_symbol.setdefault(symbol, []).append(row)
+    for symbol, rows in facts_by_symbol.items():
+        short_rows = [r for r in rows if r.get("days_to_cover") is not None or r.get("short_interest") is not None]
+        short = _latest_row(short_rows, date_keys=("settlement_date", "collected_at"))
+        if short:
+            slot(symbol)["short_interest"] = {
+                **_row_source(short),
+                "shares": jsonable(short.get("short_interest")),
+                "avg_daily_volume": jsonable(short.get("avg_daily_volume")),
+                "days_to_cover": jsonable(short.get("days_to_cover")),
+                "settlement_date": short.get("settlement_date"),
+            }
+
+    option_by_symbol: dict[str, list[dict]] = {}
+    for row in tables["options_provider_signals"]:
+        symbol = str(row.get("symbol") or "").upper()
+        if symbol:
+            option_by_symbol.setdefault(symbol, []).append(row)
+    for symbol, rows in option_by_symbol.items():
+        row = _latest_row(rows)
+        if not row:
+            continue
+        slot(symbol)["options_flow"] = {
+            **_row_source(row),
+            "contract_count": jsonable(row.get("contract_count")),
+            "call_count": jsonable(row.get("call_count")),
+            "put_count": jsonable(row.get("put_count")),
+            "total_call_volume": jsonable(row.get("total_call_volume")),
+            "total_put_volume": jsonable(row.get("total_put_volume")),
+            "total_call_open_interest": jsonable(row.get("total_call_open_interest")),
+            "total_put_open_interest": jsonable(row.get("total_put_open_interest")),
+            "put_call_volume_ratio": jsonable(row.get("put_call_volume_ratio")),
+            "put_call_open_interest_ratio": jsonable(row.get("put_call_open_interest_ratio")),
+            "iv_coverage_pct": jsonable(row.get("iv_coverage_pct")),
+            "greeks_coverage_pct": jsonable(row.get("greeks_coverage_pct")),
+        }
+
+    actions_by_symbol: dict[str, list[dict]] = {}
+    for row in tables["corporate_actions"]:
+        symbol = str(row.get("symbol") or "").upper()
+        if symbol:
+            actions_by_symbol.setdefault(symbol, []).append(row)
+    for symbol, rows in actions_by_symbol.items():
+        dividends = [r for r in rows if "dividend" in str(r.get("source_endpoint") or "")]
+        splits = [r for r in rows if "split" in str(r.get("source_endpoint") or "")]
+        latest_div = _latest_row(dividends, date_keys=("latest_event_date", "collected_at"))
+        latest_split = _latest_row(splits, date_keys=("latest_event_date", "collected_at"))
+        if latest_div or latest_split:
+            slot(symbol)["corporate_actions"] = {
+                "dividend_events": jsonable(sum(int(r.get("event_count") or 0) for r in dividends)),
+                "latest_dividend_date": latest_div.get("latest_event_date") if latest_div else None,
+                "split_events": jsonable(sum(int(r.get("event_count") or 0) for r in splits)),
+                "latest_split_date": latest_split.get("latest_event_date") if latest_split else None,
+                "sources": [src for src in (_row_source(r) for r in [latest_div, latest_split] if r) if src],
+            }
+
+    for symbol, enrichment in list(by_symbol.items()):
+        flags = _provider_signal_flags(enrichment)
+        score = _provider_signal_score(enrichment)
+        if flags:
+            enrichment["flags"] = flags
+        if score is not None:
+            enrichment["signal_score"] = score
+        sources = sorted(
+            {
+                str(v.get("provider"))
+                for v in enrichment.values()
+                if isinstance(v, dict) and v.get("provider")
+            }
+        )
+        enrichment["sources"] = sources
+        enrichment["generated_at"] = generated_at or None
+        by_symbol[symbol] = {k: v for k, v in enrichment.items() if v is not None}
+
+    if by_symbol:
+        print(f"🧩 Loaded provider enrichment signals for {len(by_symbol)} symbols")
+    return by_symbol
+
+
+def provider_event_fields(enrichment: dict | None) -> dict:
+    if not enrichment:
+        return {}
+    short = enrichment.get("short_interest") or {}
+    options = enrichment.get("options_flow") or {}
+    total_call_volume = options.get("total_call_volume")
+    total_put_volume = options.get("total_put_volume")
+    total_options_volume = (
+        total_call_volume + total_put_volume
+        if isinstance(total_call_volume, (int, float)) and isinstance(total_put_volume, (int, float))
+        else None
+    )
+    flat = {
+        "provider_enrichment": enrichment,
+        "short_days_to_cover": short.get("days_to_cover"),
+        "short_interest_shares": short.get("shares"),
+        "put_call_volume_ratio": options.get("put_call_volume_ratio"),
+        "put_call_open_interest_ratio": options.get("put_call_open_interest_ratio"),
+        "provider_options_volume": total_options_volume,
+        "provider_signal_score": enrichment.get("signal_score"),
+    }
+    return {k: jsonable(v) for k, v in flat.items() if v is not None}
 
 
 def write_to_public(relpath: str, content: str) -> None:
@@ -859,7 +1077,8 @@ def _history_row(d, timing, fiscal_year, fiscal_q, eps_actual, eps_estimate,
 
 
 def build_symbol_detail(conn, ticker: str, as_of_date: date, earnings_dt: date | None,
-                        ml_lookup: dict[tuple[str, str], dict] | None = None) -> dict | None:
+                        ml_lookup: dict[tuple[str, str], dict] | None = None,
+                        provider_lookup: dict[str, dict] | None = None) -> dict | None:
     """Build per-symbol detail: implied moves across expiries + term structure."""
     expiries = conn.execute(
         """
@@ -1111,6 +1330,7 @@ def build_symbol_detail(conn, ticker: str, as_of_date: date, earnings_dt: date |
         # v_volhist may not exist if volatility_history parquet hasn't been synced yet
         pass
 
+    provider_fields = provider_event_fields((provider_lookup or {}).get(ticker))
     return {
         "symbol": ticker,
         "as_of_date": as_of_date.isoformat(),
@@ -1123,6 +1343,7 @@ def build_symbol_detail(conn, ticker: str, as_of_date: date, earnings_dt: date |
         ],
         "next_earnings": earnings_dt.isoformat() if earnings_dt else None,
         "vol_regime": vol_regime,
+        **provider_fields,
     }
 
 
@@ -1294,6 +1515,7 @@ def collapse_duplicate_earnings(conn, start: date, end: date):
 
 def build_week_events(conn, as_of_date: date, week_start: date, week_end: date,
                       ml_lookup: dict[tuple[str, str], dict],
+                      provider_lookup: dict[str, dict] | None = None,
                       require_ml: bool = True,
                       canonical: set[tuple[str, str]] | None = None) -> list[dict]:
     # realized_move: signed regular-session close-to-close move ACROSS the
@@ -1390,6 +1612,7 @@ def build_week_events(conn, as_of_date: date, week_start: date, week_end: date,
             print(f"    event {i}/{len(rows)}: {ticker} {earnings_dt}", flush=True)
         ml = ml_fields(fc)
         extras = screener_extras(conn, ticker, earnings_dt, as_of_date)
+        provider_fields = provider_event_fields((provider_lookup or {}).get(str(ticker).upper()))
         event = {
             "ticker": ticker,
             "earnings_date": earnings_dt.isoformat(),
@@ -1419,6 +1642,7 @@ def build_week_events(conn, as_of_date: date, week_start: date, week_end: date,
             "em_method": "ml_lightgbm" if ml else "options_math",
             "confidence": "high" if ml else "high",
             **extras,
+            **provider_fields,
             **ml,
         }
         events.append(event)
@@ -1473,6 +1697,7 @@ def main():
     build_earnings_events_table(conn, EARNINGS_CSV)
     create_duckdb_views(conn, DATA_DIR)
     ml_lookup = load_ml_forecasts()
+    provider_lookup = load_provider_enrichments()
 
     as_of_row = conn.execute("SELECT MAX(as_of_date) FROM v_options_chain").fetchone()
     as_of_date = as_of_row[0]
@@ -1549,7 +1774,7 @@ def main():
         # so require_ml would leave last/+2 weeks empty. Fall back to the
         # options_math baseline for those; enforce ML on current + next week.
         require_ml = offset in (0, 1)
-        events = build_week_events(conn, as_of_date, wk_start, wk_end, ml_lookup,
+        events = build_week_events(conn, as_of_date, wk_start, wk_end, ml_lookup, provider_lookup,
                                    require_ml=require_ml, canonical=canonical_keys)
 
         # Past-week preservation: once a week is fully in the past, the
@@ -1750,7 +1975,7 @@ def main():
             build_earnings_events_table(conn, EARNINGS_CSV)
             create_duckdb_views(conn, DATA_DIR)
         try:
-            detail = build_symbol_detail(conn, ticker, as_of_date, earn_dt, ml_lookup)
+            detail = build_symbol_detail(conn, ticker, as_of_date, earn_dt, ml_lookup, provider_lookup)
             if not detail:
                 continue
             # Attach timing (BMO/AMC/unknown) from the earnings row, surfaced on the detail page.

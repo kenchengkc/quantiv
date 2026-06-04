@@ -120,7 +120,7 @@ python3 scripts/setup_duckdb_from_parquet.py --data-dir ./data --db-file ./quant
 - Compression: Snappy for new exports; legacy `data/parquet/options_chains` is ZSTD and not required for production.
 
 ## Exporter Guidelines
-- Scripts: `scripts/csv_to_parquet.py` (`npm run data:csv-parquet`) and `scripts/csv_to_parquet_volhist.py`
+- Legacy/manual exporters: `scripts/csv_to_parquet.py` (`npm run data:csv-parquet`) and `scripts/csv_to_parquet_volhist.py`
 - Defaults: Snappy compression, partitioning by year/month (options) and year (volatility)
 - Recommended: re-run exports that still have numeric column names when convenient; otherwise rely on DuckDB view casts.
 

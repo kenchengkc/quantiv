@@ -95,6 +95,23 @@ export function isRealizedPending(
   return etDateIso(now) === earningsReactionCloseDate(earningsDate, timing);
 }
 
+/** The realization window has closed but the nightly-built realized move still
+ *  hasn't landed. Fetch once so the post-close KV backfill (realized:{SYM},
+ *  written by /api/cron/refresh-broad) can fill the calendar in the ≈15 h gap
+ *  before the morning build. Bounded a few days back so an event that never
+ *  receives a realized value doesn't poll forever. */
+export function shouldFetchRealizedBackfill(
+  earningsDate: string,
+  timing: string | undefined,
+  realizedMovePct: number | null | undefined,
+  now: Date = new Date(),
+): boolean {
+  if (realizedMovePct != null) return false;
+  if (!isRealizationWindowComplete(earningsDate, timing, now)) return false;
+  const cutoff = etDateIso(new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000));
+  return earningsDate >= cutoff;
+}
+
 /** Whether batch-price polling is still useful for this event. */
 export function shouldPollLiveQuote(
   earningsDate: string,

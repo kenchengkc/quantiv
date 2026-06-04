@@ -53,11 +53,15 @@ function mondayIsoForEtDate(isoDate: string): string {
   return d.toISOString().slice(0, 10);
 }
 
-/** Distinct tickers across the calendar's active weeks (offsets -1..2), which
- *  is exactly the universe the calendar can display. */
-function calendarUniverse(todayIso: string): string[] {
+type CalEvent = { ticker: string; earningsDate: string; timing: string };
+
+/** Every event across the calendar's active weeks (offsets -1..2), which is
+ *  exactly the universe the calendar can display. Carries earnings_date+timing
+ *  so the post-close pass can backfill realized moves, not just symbols. */
+function calendarEvents(todayIso: string): CalEvent[] {
   const monday = new Date(`${mondayIsoForEtDate(todayIso)}T00:00:00Z`);
-  const symbols = new Set<string>();
+  const events: CalEvent[] = [];
+  const seen = new Set<string>();
   for (const offset of [-1, 0, 1, 2]) {
     const d = new Date(monday);
     d.setUTCDate(d.getUTCDate() + 7 * offset);
@@ -66,16 +70,22 @@ function calendarUniverse(todayIso: string): string[] {
     if (!existsSync(path)) continue;
     try {
       const payload = JSON.parse(readFileSync(path, 'utf8')) as {
-        events?: { ticker?: string }[];
+        events?: { ticker?: string; earnings_date?: string; timing?: string }[];
       };
       for (const e of payload.events ?? []) {
-        if (e.ticker) symbols.add(e.ticker.toUpperCase());
+        if (!e.ticker) continue;
+        const ticker = e.ticker.toUpperCase();
+        const earningsDate = (e.earnings_date ?? '').slice(0, 10);
+        const key = `${ticker}|${earningsDate}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        events.push({ ticker, earningsDate, timing: (e.timing ?? '').toLowerCase() });
       }
     } catch {
       /* skip unreadable week file */
     }
   }
-  return [...symbols];
+  return events;
 }
 
 function safeEqual(a: string, b: string): boolean {
@@ -123,7 +133,8 @@ export async function GET(req: NextRequest) {
   const redis = new Redis({ url, token });
 
   const todayIso = etDateIso();
-  const universe = calendarUniverse(todayIso);
+  const events = calendarEvents(todayIso);
+  const universe = [...new Set(events.map((e) => e.ticker))];
   if (universe.length === 0) {
     return NextResponse.json({ universe: 0, written: 0, skipped: 'no_active_week_reporters' });
   }
@@ -184,13 +195,52 @@ export async function GET(req: NextRequest) {
       prevcloseWritten++;
     }
   }
-  if (written > 0) await pipeline.exec();
+
+  // ── Realized-move backfill ───────────────────────────────────────────────
+  // The static realized_move_pct in weeks/*.json only refreshes in the 7 AM ET
+  // nightly build, so between a reaction's close and that build (≈15 h) the
+  // calendar shows nothing. Once grouped-daily's latest bar is the last
+  // completed session, latest/prior closes ARE the earnings-reaction closes for
+  // events that just resolved — write them as realized:{SYM} so the calendar can
+  // show REALIZED immediately instead of waiting for the build.
+  //   • BMO reporting on the latest session: prior close → latest close
+  //   • AMC reporting on the prior session:  prior close → latest close
+  // (AMC's report-day close is `prior`, its reaction close is `latest`.)
+  let realizedWritten = 0;
+  if (groupedIsCurrent && sessions.prior) {
+    const latestDate = sessions.latest.date;
+    const priorDate = sessions.prior.date;
+    for (const ev of events) {
+      const isBmo = ev.timing === 'bmo' || ev.timing.includes('before');
+      const isAmc = ev.timing === 'amc' || ev.timing.includes('after');
+      const reactsOnLatest =
+        (isBmo && ev.earningsDate === latestDate) ||
+        (isAmc && ev.earningsDate === priorDate);
+      if (!reactsOnLatest) continue;
+      const post = sessions.latest.closes.get(ev.ticker)?.close ?? null;
+      const pre = sessions.prior.closes.get(ev.ticker)?.close ?? null;
+      if (post == null || pre == null || pre <= 0) continue;
+      const realized = post / pre - 1;
+      // Event-keyed payload: the consumer only trusts it when `date` matches the
+      // event's earnings_date, so a stale key can never paint the wrong quarter.
+      // 4-day TTL bridges a long weekend until the nightly build bakes it in.
+      pipeline.set(
+        `realized:${ev.ticker}`,
+        { date: ev.earningsDate, pct: realized },
+        { ex: 345_600 },
+      );
+      realizedWritten++;
+    }
+  }
+
+  if (written > 0 || prevcloseWritten > 0 || realizedWritten > 0) await pipeline.exec();
 
   return NextResponse.json({
     universe: universe.length,
     quotesWritten: written,
     groupedIsCurrent,
     prevcloseWritten,
+    realizedWritten,
     prevcloseSession: prevCloseSource?.date ?? null,
     latestSession: sessions.latest.date,
     priorSession: sessions.prior?.date ?? null,

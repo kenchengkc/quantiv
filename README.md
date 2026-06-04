@@ -270,7 +270,7 @@ Full audit and fix priority: [**docs/PERFORMANCE.md**](docs/PERFORMANCE.md).
 | [docs/RAILWAY_SETUP.md](docs/RAILWAY_SETUP.md) | FastAPI on Railway |
 | [docs/duckdb_architecture.md](docs/duckdb_architecture.md) | DuckDB / hybrid backend |
 | [docs/PERFORMANCE.md](docs/PERFORMANCE.md) | Frontend load times |
-| [docs/EXTENDED_HOURS_AND_OPTIONS_DATA_PLAN.md](docs/EXTENDED_HOURS_AND_OPTIONS_DATA_PLAN.md) | Quote / options provider roadmap |
+| [scripts/README.md](scripts/README.md) | Provider/data pipeline runbook |
 
 ## License
 
