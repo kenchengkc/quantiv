@@ -101,3 +101,27 @@ is low. Two honest paths instead of grinding it:
 The de-bias/calibrated band (shipped) was the realistic free-tier win.
 `backfill_analyst_dispersion.py` stays as the resumable tool if we choose to
 accumulate annual dispersion for an eventual paired test anyway.
+
+## Implemented: forward-accumulation (2026-06-04)
+
+Chose path (1). `scripts/accumulate_event_signals.py` snapshots, for every
+UPCOMING reporter (within `--lead-days`, from `weeks/*.json`), the Massive
+options snapshot (put/call vol & OI ratios, VOI, ATM IV) + short interest, and
+appends to the append-only `data/event_signals_panel.jsonl`. Targeting upcoming
+reporters — not the popular-symbol set the enrichment cron uses — is the key:
+Massive has the headroom (58 calls in seconds; the `5/min` budget is self-imposed
+elsewhere). Wired into `daily-refresh.yml` (best-effort step) and `git add -f`'d
+so the panel persists across the stateless CI and grows daily.
+
+Panel row: `{snapshot_date, act_symbol, earnings_date, timing, lead_days,
+put_call_oi_ratio, put_call_vol_ratio, options_voi, total_{call,put}_{oi,vol},
+atm_iv_snap, short_days_to_cover, short_interest, short_avg_vol, short_settlement}`.
+Note: the nightly run is ~7am ET (pre-market), so `*_vol`/VOI reflect the prior
+session (or are sparse) — OI ratios and short interest are the stable signals;
+the per-event snapshot closest before the print is the one to use.
+
+**When mature (~4-8 quarters):** write `experiment_event_signals.py` (mirrors
+`experiment_garch_feature.py`): for each training event take the last panel
+snapshot before its `earnings_date`, as-of join the columns, and paired-test L1
+±signals on both OOS windows (ship only if ΔMAE<0 and |t|≥2). Until then the
+panel just accumulates; no model change.
