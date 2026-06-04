@@ -217,7 +217,12 @@ jobs:
         # refresh window unless explicitly overridden.
         env:
           FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
-        run: python scripts/sync_finnhub_market_holidays.py --allow-missing-key
+        run: |
+          EXTRA_ARGS=""
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            EXTRA_ARGS="--allow-market-hours"
+          fi
+          python scripts/sync_finnhub_market_holidays.py --allow-missing-key $EXTRA_ARGS
 
       - name: Sunday full-universe Finnhub sweep
         # Walks every ticker that reported in the last 2 years (~6,600
