@@ -72,3 +72,32 @@ MAE rather than bundling:
 
 This is the only remaining lever expected to move *point* accuracy; coverage/band
 quality is already addressed by the calibrated ML quantile bands.
+
+## Probe results (executed 2026-06-04)
+
+Built `scripts/backfill_analyst_dispersion.py` (resumable) and ran it. Hard
+free-tier walls on FMP:
+- **`period=quarter` is premium** → only **annual** dispersion is free. Annual is
+  one value per fiscal year (shared by that year's 4 prints) → weak per-event
+  signal. Prior: likely null for point MAE.
+- **`limit` ≤ 10**, but **pagination works** (page 1 → 2011-2013), so annual
+  history depth back to ~2007 is reachable.
+- **~250 requests/day**, and the nightly `sync_provider_enrichments` cron already
+  spends FMP quota — the backfill 429'd ("Limit Reach") after ~22 symbols. Only
+  **one** FMP key configured (no key-pool). So a full S&P-500 annual backfill is
+  ~4 days of daily-quota accumulation; the 7.6k-symbol universe is ~2 months.
+- AlphaVantage `EARNINGS_ESTIMATES` is the quarterly-granular alternative, but
+  free tier is ~25 req/day — even more rate-bound.
+
+**Verdict / recommendation:** the high-signal version (quarterly dispersion) is
+paywalled; the free annual proxy is coarse AND multi-day to backfill, so its EV
+is low. Two honest paths instead of grinding it:
+1. **Forward-accumulate** the already-collected event-specific signals (put/call,
+   VOI, short interest are snapshotted per upcoming reporter today) into a dated
+   panel — best event-specificity, zero backfill cost, matures over ~4-8 quarters.
+2. **Paid data** (FMP quarterly estimates / a contract OI history feed) if point
+   accuracy is a priority — the free plan has likely hit its point-MAE ceiling
+   (realized↔implied corr ≈ 0.26; every free-feature transform tests null).
+The de-bias/calibrated band (shipped) was the realistic free-tier win.
+`backfill_analyst_dispersion.py` stays as the resumable tool if we choose to
+accumulate annual dispersion for an eventual paired test anyway.
