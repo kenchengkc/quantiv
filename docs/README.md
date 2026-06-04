@@ -22,8 +22,3 @@ Start with the root [README.md](../README.md), then use the guides below.
 | [../workers/refresh-prices/README.md](../workers/refresh-prices/README.md) | Cloudflare Worker → Vercel quote cron |
 | [../scripts/r2_setup.md](../scripts/r2_setup.md) | One-time R2 / rclone setup |
 
-## Archive (historical)
-
-| Doc | Notes |
-|-----|--------|
-| [archive/README.md](archive/README.md) | Oct 2025 ML MVP2 write-ups — paths may be stale |
