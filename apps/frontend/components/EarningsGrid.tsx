@@ -693,6 +693,15 @@ function WeekHeader({
   );
 }
 
+// Module-level caches survive client-side back/forward remounts (same JS
+// context) and bfcache restores. Without them, returning to the calendar
+// replays the loading skeleton, then a window where the ± move shows but the
+// REALIZED/LIVE reaction hasn't reloaded — what reads as "a flash, then stale
+// numbers with no label". We seed state from these on mount (instant last-good
+// render) and revalidate immediately after.
+const weekDataCache = new Map<string, WeeklyData>();
+let liveCache: LiveMap = {};
+
 export default function EarningsGrid() {
   // Triggers the one-time EDGAR ticker-names fetch + re-render on
   // arrival so non-S&P-500 tickers in the weekly view get their real
@@ -728,13 +737,29 @@ export default function EarningsGrid() {
     // replace (not push) so state updates don't pollute back-button history.
     router.replace(url, { scroll: false });
   }, [offset, filter, router]);
-  const [data, setData] = useState<WeeklyData | null>(null);
-  const [isFetching, setIsFetching] = useState(true);
+  // Seed from the module cache so a back-nav / bfcache remount paints the
+  // last-good week + quotes on the first frame (no skeleton, no label-less gap).
+  const initialWeekIso = (() => {
+    const d = mondayOf(new Date());
+    d.setDate(d.getDate() + 7 * initialOffset);
+    return isoDay(d);
+  })();
+  const warmStart = weekDataCache.has(initialWeekIso);
+  const [data, setData] = useState<WeeklyData | null>(
+    () => weekDataCache.get(initialWeekIso) ?? null,
+  );
+  const [isFetching, setIsFetching] = useState(() => !warmStart);
   const [error, setError] = useState<string | null>(null);
-  const [live, setLive] = useState<LiveMap>({});
+  const [live, setLive] = useState<LiveMap>(() => ({ ...liveCache }));
   const [marketOpen, setMarketOpen] = useState<boolean>(true);
-  const [minLoadingDoneWeek, setMinLoadingDoneWeek] = useState<string | null>(null);
-  const [quotesReadyWeek, setQuotesReadyWeek] = useState<string | null>(null);
+  // On a warm (cached) remount, treat the artificial min-loading hold and the
+  // quotes-ready gate as already satisfied so the grid shows on frame one.
+  const [minLoadingDoneWeek, setMinLoadingDoneWeek] = useState<string | null>(
+    () => (warmStart ? initialWeekIso : null),
+  );
+  const [quotesReadyWeek, setQuotesReadyWeek] = useState<string | null>(
+    () => (warmStart ? initialWeekIso : null),
+  );
   const [isPending, startTransition] = useTransition();
 
   const thisMonday = useMemo(() => mondayOf(new Date()), []);
@@ -745,6 +770,11 @@ export default function EarningsGrid() {
   }, [thisMonday, offset]);
 
   useEffect(() => {
+    // Cached week → no skeleton hold (the data is already on screen).
+    if (weekDataCache.has(weekStartIso)) {
+      setMinLoadingDoneWeek(weekStartIso);
+      return;
+    }
     setMinLoadingDoneWeek(null);
     const timeoutId = window.setTimeout(() => {
       setMinLoadingDoneWeek(weekStartIso);
@@ -768,14 +798,24 @@ export default function EarningsGrid() {
 
   useEffect(() => {
     let cancelled = false;
-    setIsFetching(true);
+    const cached = weekDataCache.get(weekStartIso);
+    if (cached) {
+      // Render cached week immediately, then revalidate silently below.
+      setData(cached);
+      setIsFetching(false);
+    } else {
+      setIsFetching(true);
+    }
     setError(null);
     fetchWeek(weekStartIso)
       .then((json) => {
-        if (!cancelled) setData(json);
+        if (cancelled) return;
+        weekDataCache.set(weekStartIso, json);
+        setData(json);
       })
       .catch((e) => {
-        if (!cancelled) setError((e as Error).message);
+        // Keep showing the cached week on a revalidation error.
+        if (!cancelled && !weekDataCache.has(weekStartIso)) setError((e as Error).message);
       })
       .finally(() => {
         if (!cancelled) setIsFetching(false);
@@ -784,6 +824,12 @@ export default function EarningsGrid() {
       cancelled = true;
     };
   }, [weekStartIso, fetchWeek]);
+
+  // Mirror the live-quote map into the module cache so the next remount /
+  // bfcache restore starts with the last-known quotes (reactions render at once).
+  useEffect(() => {
+    liveCache = live;
+  }, [live]);
 
   useEffect(() => {
     const dataWeek = data?.window?.start?.slice(0, 10) ?? null;
@@ -829,7 +875,11 @@ export default function EarningsGrid() {
       };
     }
 
-    setQuotesReadyWeek(null);
+    // Cold load → hide behind the skeleton until quotes land. Warm (cached)
+    // remount → keep the last-good grid on screen and revalidate silently.
+    if (!weekDataCache.has(weekStartIso)) {
+      setQuotesReadyWeek(null);
+    }
     initialReadyTimer = setTimeout(markQuotesReady, INITIAL_QUOTE_WAIT_MS);
 
     const fetchOnce = async (): Promise<{ pending: number; marketOpen: boolean; quoteRefreshActive: boolean }> => {
@@ -919,8 +969,15 @@ export default function EarningsGrid() {
         fetchOnce();
       }
     };
+    // bfcache restore (back from an external page): the document is served
+    // frozen and effects don't re-run, so a stale quote map + time-based
+    // REALIZED/LIVE labels stay on screen. Re-fetch to refresh them immediately.
+    const onPageShow = (e: PageTransitionEvent) => {
+      if (e.persisted && !cancelled) fetchOnce();
+    };
     document.addEventListener('visibilitychange', onVisible);
     window.addEventListener('focus', onVisible);
+    window.addEventListener('pageshow', onPageShow);
 
     return () => {
       cancelled = true;
@@ -928,6 +985,7 @@ export default function EarningsGrid() {
       if (initialReadyTimer) clearTimeout(initialReadyTimer);
       document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('focus', onVisible);
+      window.removeEventListener('pageshow', onPageShow);
     };
   }, [data, weekStartIso]);
 
