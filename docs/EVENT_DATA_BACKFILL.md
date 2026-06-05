@@ -125,3 +125,15 @@ the per-event snapshot closest before the print is the one to use.
 snapshot before its `earnings_date`, as-of join the columns, and paired-test L1
 ±signals on both OOS windows (ship only if ΔMAE<0 and |t|≥2). Until then the
 panel just accumulates; no model change.
+
+### Effectiveness read so far (2026-06-04)
+
+Short interest is the one signal with free *historical* depth (Massive serves
+~15 months of FINRA settlements), so it could be tested now without waiting.
+`scripts/probe_signal_effectiveness.py` aligned 796 historical events to the
+settlement before each print: **days-to-cover is NULL** for both magnitude
+(Spearman rho=−0.02, p=0.61) and direction (rho=−0.02, p=0.64), with a flat
+quintile table. So short interest is unlikely to help the model — deprioritize
+it. put/call & options VOI still have no stored history and remain UNTESTED; they
+are the reason the forward panel is worth accumulating, since the one positioning
+signal we *could* test (short interest) came up empty.
