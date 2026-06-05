@@ -1,30 +1,25 @@
 {
   "_comment": "Single source of truth for tickers removed from the universe after delisting (M&A, bankruptcy, going-private). Honored by the daily-refresh integrity gates (check_earnings_calendar_integrity.py, check_ticker_identity.py) so deliberate removals don't trip silent-drop guards, and by sync_dolthub.py's universe gate so a stale forecast JSON can't resurrect them. Loaded via scripts/delisted.py. Add an entry (ticker -> reason/delisted_on/source) when a holding is confirmed delisted.",
   "tickers": {
-    "CTRA": {
-      "reason": "Merged into Devon Energy (DVN) in an all-stock deal; Coterra ceased trading.",
-      "delisted_on": "2026-05-07",
-      "source": "https://investors.coterra.com/Investors/news/news-details/2026/Devon-Energy-and-Coterra-Energy-to-Combine-Creating-a-Premier-Shale-Operator/default.aspx"
-    },
-    "TERN": {
-      "reason": "Acquired by Merck via $53.00/share cash tender offer; Terns Pharmaceuticals delisted.",
-      "delisted_on": "2026-05-05",
-      "source": "https://www.businesswire.com/news/home/20260505216715/en/Merck-Completes-Acquisition-of-Terns-Pharmaceuticals-Inc."
+    "AMWD": {
+      "reason": "Completed all-stock merger into MasterBrand, Inc. (NYSE: MBC); American Woodmark delisted.",
+      "delisted_on": "2026-05-29",
+      "source": "manual (user-confirmed merger)"
     },
     "APLS": {
       "reason": "Acquired by Biogen Inc. (BIIB); Apellis Pharmaceuticals delisted from Nasdaq.",
       "delisted_on": "2026-05-14",
       "source": "manual (user-confirmed acquisition)"
     },
-    "AMWD": {
-      "reason": "Completed all-stock merger into MasterBrand, Inc. (NYSE: MBC); American Woodmark delisted.",
-      "delisted_on": "2026-05-29",
-      "source": "manual (user-confirmed merger)"
-    },
     "CSGS": {
       "reason": "Acquired by NEC Corporation; CSG Systems International delisted.",
       "delisted_on": "2026-05-29",
       "source": "manual (user-confirmed acquisition)"
+    },
+    "CTRA": {
+      "reason": "Merged into Devon Energy (DVN) in an all-stock deal; Coterra ceased trading.",
+      "delisted_on": "2026-05-07",
+      "source": "https://investors.coterra.com/Investors/news/news-details/2026/Devon-Energy-and-Coterra-Energy-to-Combine-Creating-a-Premier-Shale-Operator/default.aspx"
     },
     "GDEN": {
       "reason": "Completed going-private transaction; Golden Entertainment delisted from Nasdaq.",
@@ -35,6 +30,16 @@
       "reason": "Acquired by Allegiant Travel Company (NASDAQ: ALGT); Sun Country Airlines delisted from Nasdaq.",
       "delisted_on": "2026-05-29",
       "source": "manual (user-confirmed acquisition)"
+    },
+    "TERN": {
+      "reason": "Acquired by Merck via $53.00/share cash tender offer; Terns Pharmaceuticals delisted.",
+      "delisted_on": "2026-05-05",
+      "source": "https://www.businesswire.com/news/home/20260505216715/en/Merck-Completes-Acquisition-of-Terns-Pharmaceuticals-Inc."
+    },
+    "VSCO": {
+      "reason": "Auto-detected: absent from NASDAQ/NYSE exchange directories for \u22653 consecutive days (likely M&A, bankruptcy, or going-private).",
+      "delisted_on": "2026-06-05",
+      "source": "auto: scripts/detect_delistings.py"
     }
   }
 }
