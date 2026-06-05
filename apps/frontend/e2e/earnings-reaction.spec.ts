@@ -24,8 +24,8 @@ type FixtureEvent = {
   em_straddle_pct?: number | null;
   em_iv_pct?: number | null;
   em_ml_pct?: number | null;
-  p10?: number | null;
-  p90?: number | null;
+  p25?: number | null;
+  p75?: number | null;
   realized_move_pct?: number | null;
 };
 
@@ -132,12 +132,12 @@ test.describe('earnings calendar reaction labels', () => {
     await expect(page.getByRole('link', { name: /ZZZ/i }).first()).toBeVisible();
   });
 
-  test('headline ± uses the calibrated ML move + p10–p90 band, not the straddle', async ({
+  test('headline ± uses the calibrated ML move + p25–p75 band, not the straddle', async ({
     page,
   }) => {
     // CALB has both an inflated straddle (±13%) and a calibrated ML move (±7%)
-    // with an 80% band of 1–16%. The grid must show the ML move and the band,
-    // matching the screener/symbol surfaces — never the raw straddle headline.
+    // with a 50% interquartile range of 4–11%. The grid must show the ML move and
+    // the IQR band, matching the screener/symbol surfaces — never the raw straddle.
     await installWeekFixture(page, [
       {
         ticker: 'CALB',
@@ -145,8 +145,8 @@ test.describe('earnings calendar reaction labels', () => {
         timing: 'before_market_open',
         em_straddle_pct: 0.13,
         em_ml_pct: 0.07,
-        p10: 0.01,
-        p90: 0.16,
+        p25: 0.04,
+        p75: 0.11,
         realized_move_pct: null,
       },
     ]);
@@ -158,7 +158,7 @@ test.describe('earnings calendar reaction labels', () => {
 
     const row = page.getByRole('link', { name: /CALB/i }).first();
     await expect(row).toContainText('7.0%');     // calibrated ML move
-    await expect(row).toContainText('1–16%');    // p10–p90 band
+    await expect(row).toContainText('4–11%');    // p25–p75 IQR band
     await expect(row).not.toContainText('13.0%'); // never the raw straddle
   });
 
