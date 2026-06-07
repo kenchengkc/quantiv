@@ -257,5 +257,65 @@
     "iv_mom_week": 0.0209,
     "iv_mom_month": null
   },
+  "provider_enrichment": {
+    "short_interest": {
+      "provider": "massive",
+      "endpoint": "massive_short_interest",
+      "collected_at": "2026-06-07T11:42:56.143223+00:00",
+      "shares": 1063567,
+      "avg_daily_volume": 416341,
+      "days_to_cover": 2.55,
+      "settlement_date": "2026-05-15"
+    },
+    "options_flow": {
+      "provider": "massive",
+      "endpoint": "massive_options_snapshot",
+      "collected_at": "2026-06-07T11:42:56.143223+00:00",
+      "contract_count": 250,
+      "call_count": 152,
+      "put_count": 98,
+      "total_call_volume": 275,
+      "total_put_volume": 220,
+      "total_call_open_interest": 1907,
+      "total_put_open_interest": 1496,
+      "put_call_volume_ratio": 0.8,
+      "put_call_open_interest_ratio": 0.784478,
+      "iv_coverage_pct": 87.6,
+      "greeks_coverage_pct": 87.6
+    },
+    "corporate_actions": {
+      "dividend_events": 5,
+      "latest_dividend_date": "2026-05-01",
+      "split_events": 0,
+      "latest_split_date": null,
+      "sources": [
+        {
+          "provider": "massive",
+          "endpoint": "massive_dividends",
+          "collected_at": "2026-06-07T11:42:56.143223+00:00"
+        }
+      ]
+    },
+    "flags": [
+      "recent_dividend_history"
+    ],
+    "signal_score": 0.240293,
+    "sources": [
+      "massive"
+    ],
+    "generated_at": {
+      "company_facts": "2026-06-07T11:47:56.992087+00:00",
+      "options_provider_signals": "2026-06-07T11:47:56.992087+00:00",
+      "corporate_actions": "2026-06-07T11:47:56.992087+00:00",
+      "earnings_news_signals": "2026-06-07T11:47:56.992087+00:00",
+      "live_market_signals": "2026-06-07T11:47:56.992087+00:00"
+    }
+  },
+  "short_days_to_cover": 2.55,
+  "short_interest_shares": 1063567,
+  "put_call_volume_ratio": 0.8,
+  "put_call_open_interest_ratio": 0.784478,
+  "provider_options_volume": 495,
+  "provider_signal_score": 0.240293,
   "next_earnings_timing": "after_market_close"
 }
