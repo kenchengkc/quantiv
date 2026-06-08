@@ -3,10 +3,10 @@
   "as_of_date": "2026-06-05",
   "spot_price": 45.0,
   "expected_move": {
-    "earnings_date": "2026-06-04",
+    "earnings_date": "2026-06-11",
     "expiration": "2026-06-18",
     "dte": 13,
-    "lead_time_days": -1,
+    "lead_time_days": 6,
     "atm_strike": 45.0,
     "atm_iv": 0.687424,
     "straddle_abs": 4.775,
@@ -15,7 +15,17 @@
     "skew_atm": -0.1366,
     "term_slope": null,
     "total_vega": 0.0644,
-    "em_method": "options_math",
+    "em_ml_pct": 0.066617,
+    "em_ml_abs": 2.904507,
+    "correction_factor": 0.6213,
+    "model_horizon": 7,
+    "ml_snapshot_date": "2026-06-04",
+    "p10": 0.007604,
+    "p25": 0.020837,
+    "p50": 0.052459,
+    "p75": 0.090743,
+    "p90": 0.139589,
+    "em_method": "ml_lightgbm",
     "timing": "after_market_close"
   },
   "straddle_features": [
@@ -68,6 +78,21 @@
       "eps_surprise_pct": null,
       "revenue_actual": null,
       "revenue_estimate": 939875052.0,
+      "rev_surprise_pct": null
+    },
+    {
+      "date": "2026-06-11",
+      "timing": "after_market_close",
+      "q": "Q2 26",
+      "fiscal_year": 2026,
+      "fiscal_q": "Q2",
+      "actual": null,
+      "implied": null,
+      "eps_actual": null,
+      "eps_estimate": null,
+      "eps_surprise_pct": null,
+      "revenue_actual": null,
+      "revenue_estimate": null,
       "rev_surprise_pct": null
     },
     {
@@ -219,24 +244,9 @@
       "revenue_actual": null,
       "revenue_estimate": null,
       "rev_surprise_pct": null
-    },
-    {
-      "date": "2024-08-01",
-      "timing": "after_market_close",
-      "q": "Q3 24",
-      "fiscal_year": 2024,
-      "fiscal_q": "Q3",
-      "actual": -0.079437,
-      "implied": null,
-      "eps_actual": null,
-      "eps_estimate": null,
-      "eps_surprise_pct": null,
-      "revenue_actual": null,
-      "revenue_estimate": null,
-      "rev_surprise_pct": null
     }
   ],
-  "next_earnings": "2026-06-04",
+  "next_earnings": "2026-06-11",
   "vol_regime": {
     "iv_current": 0.5465,
     "iv_rank": 0.447583,
