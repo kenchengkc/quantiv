@@ -8,17 +8,23 @@ import {
   currentRefreshWindow,
   etDateIso,
 } from '@/lib/marketHours';
+import {
+  isFreshMemoryQuote,
+  isUsableSharedQuote,
+} from '@/lib/quoteCachePolicy';
+import {
+  interestContext,
+  writeQuoteInterest,
+  type InterestContext,
+} from '@/lib/quoteInterest';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-// Read-only quote endpoint. The Cloudflare-Worker-driven cron at
-// /api/cron/refresh-prices is the ONLY writer of `quote:{SYM}` keys — it
-// rotates through the priority symbol list (watchlist + reporters + S&P
-// 500) at 55/min within Finnhub's 60/min cap. This route serves whatever
-// is in Upstash. Symbols that aren't in the cron's universe will return
-// a null tick; the search bar's primary use case (earnings reporters in
-// the ±2-week window) is already covered by the cron's tier list.
+// Read-only quote endpoint. The Railway worker is the primary writer of
+// `quote:{SYM}` keys and the Vercel cron is its lease-aware fallback. This
+// route serves the shared cache and records which symbols users are viewing
+// so the worker can prioritize them.
 const FRESH_TTL_MS = 60_000;
 const MAX_SYMBOLS = 400;
 const BATCH_PRICE_HEADERS = {
@@ -51,7 +57,12 @@ type Cached = {
   transport?: 'rest' | 'websocket';
 };
 
-const memCache = new Map<string, Cached>();
+type MemoryCached = {
+  entry: Cached;
+  fetchedAt: number;
+};
+
+const memCache = new Map<string, MemoryCached>();
 
 const redisKey = (symbol: string) => `quote:${symbol}`;
 
@@ -216,10 +227,15 @@ function loadTodaysReporterSet(
 async function readCacheBatch(symbols: string[]): Promise<Map<string, Cached | null>> {
   const result = new Map<string, Cached | null>();
   const need: string[] = [];
+  const now = Date.now();
   for (const s of symbols) {
     const mem = memCache.get(s);
-    if (mem) result.set(s, mem);
-    else need.push(s);
+    if (mem && isFreshMemoryQuote(mem.fetchedAt, now)) {
+      result.set(s, mem.entry);
+    } else {
+      if (mem) memCache.delete(s);
+      need.push(s);
+    }
   }
   if (need.length === 0) return result;
   const redis = getRedis();
@@ -231,43 +247,15 @@ async function readCacheBatch(symbols: string[]): Promise<Map<string, Cached | n
     const keys = need.map(redisKey);
     const raws = (await redis.mget<Cached[]>(...keys)) ?? [];
     for (let i = 0; i < need.length; i++) {
-      const entry = raws[i] ?? null;
-      if (entry) memCache.set(need[i], entry);
+      const raw = raws[i] ?? null;
+      const entry = isUsableSharedQuote(raw, now) ? raw : null;
+      if (entry) memCache.set(need[i], { entry, fetchedAt: now });
       result.set(need[i], entry);
     }
   } catch {
     for (const s of need) result.set(s, null);
   }
   return result;
-}
-
-type InterestContext = 'symbol' | 'watchlist' | 'earnings' | 'screener' | 'batch';
-
-function interestContext(raw: string | null): InterestContext {
-  if (
-    raw === 'symbol' ||
-    raw === 'watchlist' ||
-    raw === 'earnings' ||
-    raw === 'screener'
-  ) {
-    return raw;
-  }
-  return 'batch';
-}
-
-function interestIncrement(context: InterestContext): number {
-  switch (context) {
-    case 'symbol':
-      return 30;
-    case 'watchlist':
-      return 18;
-    case 'earnings':
-      return 10;
-    case 'screener':
-      return 6;
-    default:
-      return 3;
-  }
 }
 
 async function recordQuoteInterest(
@@ -278,14 +266,7 @@ async function recordQuoteInterest(
   const redis = getRedis();
   if (!redis || symbols.length === 0) return;
   try {
-    const inc = interestIncrement(context);
-    const score = Math.floor(Date.now() / 1000) + inc * 60;
-    const pipeline = redis.pipeline();
-    for (const symbol of symbols.slice(0, 100)) {
-      pipeline.zadd('quote:interest', { score, member: symbol });
-    }
-    pipeline.expire('quote:interest', 2 * 60 * 60);
-    await pipeline.exec();
+    await writeQuoteInterest(redis, symbols, context);
   } catch {
     // Best-effort signal for the Railway quote worker; never block prices.
   }
