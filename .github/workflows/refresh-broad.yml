@@ -10,8 +10,10 @@ name: Broad quote refresh (Polygon grouped-daily)
 # the Vercel project env). POLYGON_API_KEY is already configured in Vercel.
 on:
   schedule:
-    - cron: '0 */3 * * *'    # every 3h, all days; route skips in-market fires
-    - cron: '0 23 * * 1-5'   # guaranteed post-close capture (after EDT & EST close)
+    # Two weekday attempts absorb GitHub schedule delays and provider lag.
+    # Sunday is a final fallback so Friday's close is warm before Monday.
+    - cron: '0 22,23 * * 1-5'
+    - cron: '0 23 * * 0'
   workflow_dispatch: {}
 
 concurrency:

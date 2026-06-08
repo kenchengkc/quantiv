@@ -942,6 +942,10 @@ export default function EarningsGrid() {
     // very slow 5-min heartbeat — quotes are frozen anyway, no need to spin.
     const fastPoll = async (attempt = 0) => {
       if (cancelled) return;
+      if (document.visibilityState !== 'visible') {
+        timer = setTimeout(() => fastPoll(attempt), 30_000);
+        return;
+      }
       const { pending, quoteRefreshActive: refreshOn } = await fetchOnce();
       markQuotesReady();
       if (refreshOn && pending > 0 && attempt < 30) {
@@ -953,7 +957,9 @@ export default function EarningsGrid() {
           // 30s while Finnhub refresh window (incl. post-close settlement), 5min otherwise.
           const interval = lastQuoteRefreshActive ? 30_000 : 300_000;
           timer = setTimeout(async () => {
-            await fetchOnce();
+            if (document.visibilityState === 'visible') {
+              await fetchOnce();
+            }
             slowLoop();
           }, interval);
         };

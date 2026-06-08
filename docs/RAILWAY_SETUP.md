@@ -98,6 +98,11 @@ Optional worker tuning:
 | `QUOTE_WORKER_ENABLE_WEBSOCKET` | `1` | Set `0` to run REST-only. |
 | `QUOTE_WORKER_UNIVERSE_REFRESH_S` | `300` | Rebuild watchlist/earnings/interest ranking interval. |
 | `QUOTE_WORKER_WS_REFRESH_S` | `120` | Reconnect/resubscribe interval for the current top-50 set. |
+| `QUOTE_WORKER_STATUS_REFRESH_S` | `60` | Heartbeat interval. The status key keeps a 180-second TTL. |
+| `QUOTE_WORKER_CURSOR_CHECKPOINT_S` | `60` | Persist the in-memory REST cursor once per minute. |
+| `QUOTE_WORKER_LEASE_TTL_S` | `90` | Single-writer lease TTL; renewed every third of this interval. |
+| `QUOTE_WORKER_QUOTE_FLUSH_S` | `5` | Dirty-quote batch flush interval when batching is enabled. |
+| `QUOTE_WORKER_BATCH_WRITES` | `0` | Set to `1` only after the lease heartbeat is healthy; batches dirty quote keys with `MSET`. |
 
 Once the worker is healthy, set this on Vercel production:
 
@@ -106,9 +111,14 @@ Once the worker is healthy, set this on Vercel production:
 | `QUOTE_REFRESH_PROVIDER` | `railway` | Makes `/api/cron/refresh-prices?window=regular` return a no-op so Vercel stops doing regular-hours Finnhub polling. Premarket/after-hours Alpaca reporter refreshes still run. |
 
 The worker writes a heartbeat to Redis key `quote:worker:status` with counts,
-top universe size, and last REST/WebSocket symbols. If this heartbeat goes
-stale, unset `QUOTE_REFRESH_PROVIDER` or set it back to `vercel` on Vercel to
-fail back to the old cron route.
+top universe size, lease protocol, batch metrics, and last REST/WebSocket
+symbols. During the regular quote window it also owns
+`quote:regular:lease`; outside that window it releases the lease and stops
+heartbeats so weekends do not generate idle Redis traffic. Once the
+lease-protocol marker is present, the Vercel route automatically acquires the
+same lease and fails over only when Railway's heartbeat/ownership is stale.
+Before that marker exists, the route retains the legacy manual-failback
+behavior to avoid running two Finnhub producers during deployment.
 
 ---
 

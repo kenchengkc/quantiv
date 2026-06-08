@@ -180,18 +180,14 @@ export async function GET(req: NextRequest) {
         source: 'polygon_grouped',
         session,
       };
-      // Store the object directly (Upstash serializes) to match the other
-      // quote:{SYM} writers; batch-price's mget deserializes it back. 48h TTL
-      // bridges a missed cron without the cache going empty.
-      pipeline.set(`quote:${symbol}`, entry, { ex: 172_800 });
+      // Seven days covers long weekends and a missed post-close run.
+      pipeline.set(`quote:${symbol}`, entry, { ex: 604_800 });
       written++;
     }
 
     const prevClose = prevCloseSource?.closes.get(symbol)?.close ?? null;
     if (prevClose != null) {
-      // 3-day TTL survives a weekend so Friday's close stays the authoritative
-      // previous close through Monday's session until it is rewritten.
-      pipeline.set(`prevclose:${symbol}`, prevClose, { ex: 259_200 });
+      pipeline.set(`prevclose:${symbol}`, prevClose, { ex: 604_800 });
       prevcloseWritten++;
     }
   }
@@ -223,11 +219,11 @@ export async function GET(req: NextRequest) {
       const realized = post / pre - 1;
       // Event-keyed payload: the consumer only trusts it when `date` matches the
       // event's earnings_date, so a stale key can never paint the wrong quarter.
-      // 4-day TTL bridges a long weekend until the nightly build bakes it in.
+      // Seven days bridges long weekends until the nightly build bakes it in.
       pipeline.set(
         `realized:${ev.ticker}`,
         { date: ev.earningsDate, pct: realized },
-        { ex: 345_600 },
+        { ex: 604_800 },
       );
       realizedWritten++;
     }

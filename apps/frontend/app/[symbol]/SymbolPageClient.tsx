@@ -3681,6 +3681,10 @@ export default function SymbolPage({
 
     const fastPoll = async (attempt = 0) => {
       if (cancelled) return;
+      if (document.visibilityState !== 'visible') {
+        timer = setTimeout(() => void fastPoll(attempt), 30_000);
+        return;
+      }
       const pending = await fetchOnce();
       if (pending > 0 && attempt < 30) {
         const delay = attempt < 10 ? 2_000 : 8_000;
@@ -3691,7 +3695,9 @@ export default function SymbolPage({
           if (cancelled) return;
           const interval = lastQuoteRefreshActive ? 30_000 : 300_000;
           timer = setTimeout(async () => {
-            await fetchOnce();
+            if (document.visibilityState === 'visible') {
+              await fetchOnce();
+            }
             slowLoop();
           }, interval);
         };

@@ -12,6 +12,10 @@ import {
   type RefreshWindowKind,
 } from '@/lib/marketHours';
 import { fetchExtendedHoursSnapshot } from '@/lib/alpaca';
+import {
+  classifyRailwayOwnership,
+  type RailwayOwnershipState,
+} from '@/lib/quoteWorkerLease';
 
 // Cron-driven Finnhub price refresher. Triggered every 5 min by an external
 // scheduler (Cloudflare Worker). Walks a rotating cursor through a priority-
@@ -49,6 +53,16 @@ const RATE_LIMIT_PER_MIN = 55;
 // being written.
 const STALE_TTL_S = 7 * 24 * 60 * 60;
 const CURSOR_KEY = 'quote:cursor';
+const WORKER_STATUS_KEY = 'quote:worker:status';
+const REGULAR_LEASE_KEY = 'quote:regular:lease';
+const LEASE_PROTOCOL_KEY = 'quote:regular:lease:enabled';
+const VERCEL_LEASE_TTL_S = 75;
+const RELEASE_LEASE_SCRIPT = `
+if redis.call("GET", KEYS[1]) == ARGV[1] then
+  return redis.call("DEL", KEYS[1])
+end
+return 0
+`;
 
 type Tick = {
   symbol: string;
@@ -236,11 +250,67 @@ async function fetchQuote(symbol: string, apiKey: string): Promise<Tick | null> 
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
-function regularPollingHandledByRailway(): boolean {
+function railwayIsPreferred(): boolean {
   return (
     process.env.QUOTE_REFRESH_PROVIDER === 'railway' ||
     process.env.DISABLE_VERCEL_REGULAR_QUOTE_REFRESH === '1'
   );
+}
+
+type RailwayRefreshState =
+  | RailwayOwnershipState
+  | {
+      deferToRailway: false;
+      leaseProtocolEnabled: false;
+      reason: 'vercel_primary';
+    };
+
+async function railwayRefreshState(redis: Redis): Promise<RailwayRefreshState> {
+  if (!railwayIsPreferred()) {
+    return {
+      deferToRailway: false,
+      leaseProtocolEnabled: false,
+      reason: 'vercel_primary',
+    };
+  }
+
+  try {
+    const [statusRaw, leaseOwner, protocolRaw] =
+      (await redis.mget<unknown[]>(
+        WORKER_STATUS_KEY,
+        REGULAR_LEASE_KEY,
+        LEASE_PROTOCOL_KEY,
+      )) ?? [];
+    return classifyRailwayOwnership(statusRaw, leaseOwner, protocolRaw);
+  } catch {
+    // Preserve the current single-writer behavior if Redis cannot confirm
+    // that the new lease protocol is active.
+    return {
+      deferToRailway: true,
+      leaseProtocolEnabled: false,
+      reason: 'legacy_railway',
+    };
+  }
+}
+
+async function acquireVercelRegularLease(redis: Redis): Promise<string | null> {
+  const owner = `vercel:${crypto.randomUUID()}`;
+  const result = await redis.set(REGULAR_LEASE_KEY, owner, {
+    nx: true,
+    ex: VERCEL_LEASE_TTL_S,
+  });
+  return result === 'OK' ? owner : null;
+}
+
+async function releaseVercelRegularLease(
+  redis: Redis,
+  owner: string,
+): Promise<void> {
+  try {
+    await redis.eval(RELEASE_LEASE_SCRIPT, [REGULAR_LEASE_KEY], [owner]);
+  } catch {
+    // The TTL is the final safety net if release fails.
+  }
 }
 
 // Constant-time string compare to avoid timing-leak side channels.
@@ -305,7 +375,10 @@ export async function GET(req: NextRequest) {
   const extendedEnabled = process.env.ENABLE_ALPACA_EXTENDED_QUOTES === '1';
   if ((kind === 'premarket' || kind === 'afterhours') && !extendedEnabled) {
     if (kind === 'afterhours' && isQuoteRefreshWindowET()) {
-      if (regularPollingHandledByRailway()) {
+      const ready = redisOrError();
+      if ('response' in ready) return ready.response;
+      const railwayState = await railwayRefreshState(ready.redis);
+      if (railwayState.deferToRailway) {
         return NextResponse.json({
           universe: 0,
           fetched: 0,
@@ -313,12 +386,15 @@ export async function GET(req: NextRequest) {
           skipped: 'extended_quotes_disabled',
           regularSettle: {
             skipped: 'regular_quotes_handled_by_railway',
+            reason: railwayState.reason,
           },
         });
       }
-      const ready = redisOrError();
-      if ('response' in ready) return ready.response;
-      const regularSettle = await runRegularHours(ready.redis);
+      const regularSettle = await runRegularHours(
+        ready.redis,
+        new Set(),
+        railwayState.leaseProtocolEnabled,
+      );
       const regularBody = await responseJson(regularSettle);
       return NextResponse.json(
         {
@@ -348,14 +424,19 @@ export async function GET(req: NextRequest) {
 
   if (kind === 'premarket' || kind === 'afterhours') {
     if (kind === 'afterhours' && isQuoteRefreshWindowET()) {
-      if (regularPollingHandledByRailway()) {
+      const railwayState = await railwayRefreshState(redis);
+      if (railwayState.deferToRailway) {
         return runExtendedHours(kind, redis);
       }
       // Preserve the original full-universe Finnhub settle pass during
       // 16:00-16:45 ET, but exclude today's AMC reporters so fresh Alpaca
       // extended-hours writes cannot be overwritten by stale Finnhub ticks.
       const amcReporters = new Set(loadTodaysReporters(etDateIso(), 'amc'));
-      const regularSettlePromise = runRegularHours(redis, amcReporters);
+      const regularSettlePromise = runRegularHours(
+        redis,
+        amcReporters,
+        railwayState.leaseProtocolEnabled,
+      );
       const extended = await runExtendedHours(kind, redis);
       const regularSettle = await regularSettlePromise;
       const extendedBody = await responseJson(extended);
@@ -373,15 +454,21 @@ export async function GET(req: NextRequest) {
     }
     return runExtendedHours(kind, redis);
   }
-  if (regularPollingHandledByRailway()) {
+  const railwayState = await railwayRefreshState(redis);
+  if (railwayState.deferToRailway) {
     return NextResponse.json({
       window: 'regular',
       universe: 0,
       fetched: 0,
       skipped: 'regular_quotes_handled_by_railway',
+      reason: railwayState.reason,
     });
   }
-  return runRegularHours(redis);
+  return runRegularHours(
+    redis,
+    new Set(),
+    railwayState.leaseProtocolEnabled,
+  );
 }
 
 /** Regular-hours flow — Finnhub rotating cursor across the full universe.
@@ -390,84 +477,104 @@ export async function GET(req: NextRequest) {
 async function runRegularHours(
   redis: Redis,
   excludeSymbols: ReadonlySet<string> = new Set(),
+  requireLease = false,
 ): Promise<NextResponse> {
-  const apiKey = process.env.FINNHUB_API_KEY;
-  if (!apiKey) {
-    return NextResponse.json({ error: 'FINNHUB_API_KEY missing' }, { status: 500 });
+  let leaseOwner: string | null = null;
+  if (requireLease) {
+    leaseOwner = await acquireVercelRegularLease(redis);
+    if (!leaseOwner) {
+      return NextResponse.json({
+        window: 'regular',
+        universe: 0,
+        fetched: 0,
+        skipped: 'regular_quote_lease_held',
+      });
+    }
   }
 
-  const symbols = (await buildSymbolList()).filter((s) => !excludeSymbols.has(s.toUpperCase()));
-  if (symbols.length === 0) {
-    return NextResponse.json({ universe: 0, fetched: 0, message: 'no symbols to refresh' });
-  }
-
-  const raw = await redis.get(CURSOR_KEY);
-  const cursor = Number.isFinite(Number(raw)) ? Number(raw) % symbols.length : 0;
-  const end = cursor + BATCH_SIZE;
-  const batch: string[] = [];
-  for (let i = cursor; i < end; i++) batch.push(symbols[i % symbols.length]);
-  const nextCursor = end % symbols.length;
-
-  // Authoritative previous closes (Polygon grouped-daily, written by
-  // /api/cron/refresh-broad as prevclose:{SYM}) override Finnhub's `pc`, which
-  // lags after weekends/overnight — that lag inflated reaction % on the
-  // calendar (e.g. an 8% move shown as 15%). Missing keys fall back to
-  // Finnhub's pc, so this is strictly additive.
-  const prevcloseMap = new Map<string, number>();
   try {
-    const vals = (await redis.mget<(number | null)[]>(
-      ...batch.map((s) => `prevclose:${s}`),
-    )) ?? [];
-    batch.forEach((s, i) => {
-      const v = vals[i];
-      if (typeof v === 'number' && v > 0) prevcloseMap.set(s, v);
-    });
-  } catch {
-    // Best-effort: on a Redis hiccup, just use Finnhub's pc for this batch.
-  }
+    const apiKey = process.env.FINNHUB_API_KEY;
+    if (!apiKey) {
+      return NextResponse.json({ error: 'FINNHUB_API_KEY missing' }, { status: 500 });
+    }
 
-  const spacingMs = Math.ceil(60_000 / RATE_LIMIT_PER_MIN);
-  let ok2 = 0;
-  let fail = 0;
-  const start = Date.now();
-  for (const symbol of batch) {
-    const tickStart = Date.now();
-    const tick = await fetchQuote(symbol, apiKey);
-    if (tick) {
-      try {
-        const authoritativePrev = prevcloseMap.get(symbol);
-        const entry: CachedQuote = {
-          at: Date.now(),
-          tick:
-            authoritativePrev != null
-              ? { ...tick, previousClose: authoritativePrev }
-              : tick,
-          source: 'finnhub',
-          session: 'regular',
-        };
-        await redis.set(`quote:${symbol}`, entry, { ex: STALE_TTL_S });
-        ok2++;
-      } catch {
+    const symbols = (await buildSymbolList()).filter((s) => !excludeSymbols.has(s.toUpperCase()));
+    if (symbols.length === 0) {
+      return NextResponse.json({ universe: 0, fetched: 0, message: 'no symbols to refresh' });
+    }
+
+    const raw = await redis.get(CURSOR_KEY);
+    const cursor = Number.isFinite(Number(raw)) ? Number(raw) % symbols.length : 0;
+    const end = cursor + BATCH_SIZE;
+    const batch: string[] = [];
+    for (let i = cursor; i < end; i++) batch.push(symbols[i % symbols.length]);
+    const nextCursor = end % symbols.length;
+
+    // Authoritative previous closes (Polygon grouped-daily, written by
+    // /api/cron/refresh-broad as prevclose:{SYM}) override Finnhub's `pc`, which
+    // lags after weekends/overnight — that lag inflated reaction % on the
+    // calendar (e.g. an 8% move shown as 15%). Missing keys fall back to
+    // Finnhub's pc, so this is strictly additive.
+    const prevcloseMap = new Map<string, number>();
+    try {
+      const vals = (await redis.mget<(number | null)[]>(
+        ...batch.map((s) => `prevclose:${s}`),
+      )) ?? [];
+      batch.forEach((s, i) => {
+        const v = vals[i];
+        if (typeof v === 'number' && v > 0) prevcloseMap.set(s, v);
+      });
+    } catch {
+      // Best-effort: on a Redis hiccup, just use Finnhub's pc for this batch.
+    }
+
+    const spacingMs = Math.ceil(60_000 / RATE_LIMIT_PER_MIN);
+    let ok2 = 0;
+    let fail = 0;
+    const start = Date.now();
+    for (const symbol of batch) {
+      const tickStart = Date.now();
+      const tick = await fetchQuote(symbol, apiKey);
+      if (tick) {
+        try {
+          const authoritativePrev = prevcloseMap.get(symbol);
+          const entry: CachedQuote = {
+            at: Date.now(),
+            tick:
+              authoritativePrev != null
+                ? { ...tick, previousClose: authoritativePrev }
+                : tick,
+            source: 'finnhub',
+            session: 'regular',
+          };
+          await redis.set(`quote:${symbol}`, entry, { ex: STALE_TTL_S });
+          ok2++;
+        } catch {
+          fail++;
+        }
+      } else {
         fail++;
       }
-    } else {
-      fail++;
+      const elapsed = Date.now() - tickStart;
+      if (elapsed < spacingMs) await sleep(spacingMs - elapsed);
     }
-    const elapsed = Date.now() - tickStart;
-    if (elapsed < spacingMs) await sleep(spacingMs - elapsed);
-  }
-  await redis.set(CURSOR_KEY, nextCursor);
+    await redis.set(CURSOR_KEY, nextCursor);
 
-  return NextResponse.json({
-    window: 'regular',
-    universe: symbols.length,
-    batchSize: batch.length,
-    cursor,
-    nextCursor,
-    fetched: ok2,
-    failed: fail,
-    durationMs: Date.now() - start,
-  });
+    return NextResponse.json({
+      window: 'regular',
+      universe: symbols.length,
+      batchSize: batch.length,
+      cursor,
+      nextCursor,
+      fetched: ok2,
+      failed: fail,
+      durationMs: Date.now() - start,
+    });
+  } finally {
+    if (leaseOwner) {
+      await releaseVercelRegularLease(redis, leaseOwner);
+    }
+  }
 }
 
 async function responseJson(res: Response): Promise<unknown> {
