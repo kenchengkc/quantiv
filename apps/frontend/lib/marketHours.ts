@@ -164,6 +164,18 @@ export function isMarketOpenET(now: Date = new Date()): boolean {
   return isQuoteRefreshWindowET(now);
 }
 
+/** True while earnings-calendar quote-based moves should read LIVE (vs CLOSE).
+ *  Weekends/holidays, the overnight gap, and post-17:00 ET are false — IEX
+ *  (Alpaca Basic) stops then and Finnhub's settle window ends at 16:45. */
+export function areEarningsQuotesLive(now: Date = new Date()): boolean {
+  if (!isTradingDayET(now)) return false;
+  const { minutes } = nowParts(now);
+  if (minutes >= PREMARKET_OPEN_MIN && minutes <= PREMARKET_CLOSE_MIN) return true;
+  if (minutes >= QUOTE_REFRESH_OPEN_MIN && minutes <= QUOTE_REFRESH_CLOSE_MIN) return true;
+  if (minutes >= AFTERHOURS_OPEN_MIN && minutes < AFTERHOURS_CLOSE_MIN) return true;
+  return false;
+}
+
 /** Human-readable status string for UI badges. Returns null during regular hours. */
 export function marketClosedReason(now: Date = new Date()): string | null {
   const { weekday, minutes, isoDate } = nowParts(now);

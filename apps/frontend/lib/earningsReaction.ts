@@ -9,13 +9,16 @@
  *   Future reporters — last close → current price
  *   Today BMO — through report-day regular close
  *   Today AMC — through next trading day's regular close (weekends/holidays skipped)
+ *
+ * Close — same quote as LIVE but shown when the market is closed or quotes
+ *   are no longer refreshing (weekends/holidays, after 17:00 ET IEX cutoff).
  */
 import { MARKET_HOLIDAYS_US } from './marketHolidays.generated';
-import { etDateIso, hasRegularClosePassedET } from './marketHours';
+import { areEarningsQuotesLive, etDateIso, hasRegularClosePassedET } from './marketHours';
 
 export type EarningsTimingBucket = 'bmo' | 'amc' | 'unknown';
 
-export type EarningsReactionTag = 'REALIZED' | 'LIVE';
+export type EarningsReactionTag = 'REALIZED' | 'LIVE' | 'CLOSE';
 
 export type EarningsReactionDisplay = {
   changePct: number | null;
@@ -151,12 +154,13 @@ export function resolveEarningsReactionDisplay(args: {
     return { changePct: realizedMovePct, tag: 'REALIZED' };
   }
 
-  const showLive =
+  const showQuote =
     earningsDate > today ||
     !complete ||
     isRealizedPending(earningsDate, timing, realizedMovePct, now);
-  if (showLive && liveChangePct != null) {
-    return { changePct: liveChangePct, tag: 'LIVE' };
+  if (showQuote && liveChangePct != null) {
+    const tag: EarningsReactionTag = areEarningsQuotesLive(now) ? 'LIVE' : 'CLOSE';
+    return { changePct: liveChangePct, tag };
   }
 
   return { changePct: null, tag: null };
