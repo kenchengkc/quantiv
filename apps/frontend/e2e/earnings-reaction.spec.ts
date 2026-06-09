@@ -13,7 +13,7 @@ import { test, expect, type Route } from '@playwright/test';
 // Pinned into the 2026-05-25 trading week. The calendar derives its default
 // week from the real clock (mondayOf(new Date())); pinning makes "This week"
 // deterministically 2026-05-25 so the fixtures below load by default.
-const PINNED = new Date('2026-05-29T21:00:00Z'); // Fri 17:00 ET
+const PINNED = new Date('2026-05-29T20:30:00Z'); // Fri 16:30 ET — IEX after-hours still live
 const WEEK_START = '2026-05-25';
 const WEEK_END = '2026-05-29';
 
