@@ -10,6 +10,7 @@ import { Splash } from '@/components/Splash';
 import { TickerHoverHost } from '@/components/TickerHoverCard';
 import { Analytics } from '@vercel/analytics/next';
 import { SpeedInsights } from '@vercel/speed-insights/next';
+import { SPLASH_GATE_SCRIPT } from '@/lib/splashSession';
 
 // Self-host the three typefaces through next/font/google. This sidesteps
 // the @import ordering bug we used to work around with a <link> in <head>:
@@ -88,11 +89,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         className={`${mulish.variable} ${nunitoSans.variable} ${jetbrainsMono.variable}`}
         style={{ backgroundColor: '#000000', colorScheme: 'dark' }}
       >
+        <head>
+          {/* Sync inline gate — must run before <body> paints so first-time
+              homepage visitors never flash the SSR calendar one frame. */}
+          <script dangerouslySetInnerHTML={{ __html: SPLASH_GATE_SCRIPT }} />
+        </head>
         <body style={{ backgroundColor: '#000000' }}>
           <Providers>
             <ErrorBoundary>
               <Splash />
-              <div className="min-h-screen flex flex-col">
+              <div className="min-h-screen flex flex-col quantiv-app-shell">
                 <Topbar />
                 <main className="flex-1">{children}</main>
                 <Footer />
