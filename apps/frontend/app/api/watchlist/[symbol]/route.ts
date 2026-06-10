@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { sql } from '@/lib/db';
+import { bumpWatchlistRev } from '@/lib/watchlistRev';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -37,6 +38,7 @@ export async function DELETE(
     DELETE FROM watchlist
     WHERE user_id = ${userId} AND symbol = ${symbol}
   `;
+  await bumpWatchlistRev();
   const rows = (await sql`
     SELECT symbol FROM watchlist
     WHERE user_id = ${userId}

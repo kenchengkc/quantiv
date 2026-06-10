@@ -38,6 +38,7 @@ QUOTE_REFRESH_CLOSE_MIN = 16 * 60 + 45
 STALE_TTL_S = 7 * 24 * 60 * 60
 PREVIOUS_CLOSE_CACHE_MAX_AGE_S = 30 * 60
 INTEREST_ZSET = "quote:interest"
+WATCHLIST_REV_KEY = "watchlist:rev"
 STATUS_KEY = "quote:worker:status"
 CURSOR_KEY = "quote:railway:cursor"
 LEASE_KEY = "quote:regular:lease"
@@ -76,12 +77,9 @@ FLUSH_QUOTES_SCRIPT = """
 if redis.call("GET", KEYS[1]) ~= ARGV[1] then
   return 0
 end
-local values = {}
 for i = 2, #KEYS do
-  values[#values + 1] = KEYS[i]
-  values[#values + 1] = ARGV[i]
+  redis.call("SET", KEYS[i], ARGV[i], "EX", ARGV[#ARGV])
 end
-redis.call("MSET", unpack(values))
 return #KEYS - 1
 """
 
@@ -375,6 +373,9 @@ def cached_previous_close(
 class QuoteWorkerState:
     ranked_symbols: list[str] = field(default_factory=list)
     websocket_symbols: set[str] = field(default_factory=set)
+    watchlist_symbols: list[str] = field(default_factory=list)
+    watchlist_rev: str | None = None
+    watchlist_loaded: bool = False
     previous_close: dict[str, float] = field(default_factory=dict)
     previous_close_session_date: str | None = None
     missing_previous_close_cursor: int = 0
@@ -563,6 +564,32 @@ class QuoteWorker:
         if reset_previous_close_session(self.state, session_date):
             logger.info("quote previous-close session reset", session_date=session_date)
 
+    async def load_watchlist(self) -> list[str]:
+        """Watchlist symbols gated by the Redis revision key so Neon is only
+        queried when membership actually changed (the watchlist API INCRs
+        watchlist:rev on add/remove). Without the gate the 5-min universe
+        refresh kept Neon compute awake for the whole market session.
+        Direct SQL edits that bypass the API are picked up on worker restart."""
+        if self.pg_pool is None:
+            return []
+        try:
+            rev = await self.redis.get(WATCHLIST_REV_KEY)
+        except Exception as exc:
+            # On a Redis hiccup serve the cache rather than waking Neon;
+            # ranking tolerates a one-cycle-stale watchlist.
+            if self.state.watchlist_loaded:
+                return self.state.watchlist_symbols
+            logger.warning("watchlist rev read failed", error=str(exc))
+            rev = None
+        if self.state.watchlist_loaded and rev == self.state.watchlist_rev:
+            return self.state.watchlist_symbols
+        symbols = await load_watchlist_symbols(self.pg_pool)
+        self.state.watchlist_symbols = symbols
+        self.state.watchlist_rev = rev
+        self.state.watchlist_loaded = True
+        logger.info("watchlist reloaded", symbols=len(symbols), rev=rev)
+        return symbols
+
     async def refresh_universe(self, *, force: bool = False) -> None:
         now = asyncio.get_running_loop().time()
         if (
@@ -601,7 +628,7 @@ class QuoteWorker:
         for symbol, score in list(scores.items()):
             scores[symbol] = min(score, 250.0)
 
-        for symbol in await load_watchlist_symbols(self.pg_pool):
+        for symbol in await self.load_watchlist():
             scores[symbol] = scores.get(symbol, 0.0) + 120.0
 
         score_week_events(
@@ -762,10 +789,10 @@ class QuoteWorker:
             batch = self.pending_quotes
             self.pending_quotes = {}
         try:
-            # The owner check and MSET are atomic. Readers reject entries older
-            # than STALE_TTL_S because MSET cannot preserve per-key expirations.
+            # The owner check and the SET loop are atomic, and every key keeps
+            # the STALE_TTL_S expiration (passed as the trailing ARGV).
             keys = [LEASE_KEY, *batch.keys()]
-            values = [self.lease_owner, *batch.values()]
+            values = [self.lease_owner, *batch.values(), STALE_TTL_S]
             flushed = await self.redis.eval(
                 FLUSH_QUOTES_SCRIPT,
                 len(keys),
