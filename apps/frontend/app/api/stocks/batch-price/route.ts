@@ -281,7 +281,7 @@ const nullTick = (symbol: string): Tick => ({
   changePct: null,
 });
 
-import { enrichQuoteTick } from '@/lib/quoteTick';
+export async function GET(req: NextRequest) {
   const url = new URL(req.url);
   const symbolsParam = url.searchParams.get('symbols') ?? '';
   const symbols = Array.from(
