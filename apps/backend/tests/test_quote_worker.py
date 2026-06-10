@@ -15,6 +15,8 @@ from workers.quote_worker import (  # noqa: E402
     LEASE_PROTOCOL_KEY,
     LEASE_PROTOCOL_TTL_S,
     RENEW_LEASE_SCRIPT,
+    STALE_TTL_S,
+    WATCHLIST_REV_KEY,
     PREVIOUS_CLOSE_CACHE_MAX_AGE_S,
     QuoteWorker,
     QuoteWorkerState,
@@ -137,14 +139,16 @@ class _FakeRedis:
         self.set_calls = []
         self.eval_calls = []
         self.mset_calls = []
+        self.flush_ttls = []
+        self.get_responses = {}
         self.fail_mset = False
 
     async def set(self, *args, **kwargs):
         self.set_calls.append((args, kwargs))
         return True
 
-    async def get(self, _key):
-        return "7"
+    async def get(self, key):
+        return self.get_responses.get(key, "7")
 
     async def eval(self, *args):
         self.eval_calls.append(args)
@@ -153,7 +157,9 @@ class _FakeRedis:
                 raise RuntimeError("temporary Redis failure")
             numkeys = args[1]
             keys = args[3 : 2 + numkeys]
-            values = args[3 + numkeys :]
+            # ARGV layout: lease owner, one value per key, trailing TTL.
+            values = args[3 + numkeys : -1]
+            self.flush_ttls.append(args[-1])
             self.mset_calls.append(dict(zip(keys, values, strict=True)))
             return numkeys - 1
         return 1
@@ -163,6 +169,16 @@ class _FakeRedis:
         if self.fail_mset:
             raise RuntimeError("temporary Redis failure")
         return True
+
+
+class _FakePool:
+    def __init__(self, rows):
+        self.rows = rows
+        self.fetch_calls = 0
+
+    async def fetch(self, _query):
+        self.fetch_calls += 1
+        return self.rows
 
 
 def _worker(*, batch_writes=False) -> QuoteWorker:
@@ -316,5 +332,39 @@ async def test_batched_quotes_keep_latest_value_and_retry_failed_flush():
         assert worker.pending_quotes == {}
         assert worker.state.redis_flushes == 1
         assert worker.state.redis_keys_flushed == 1
+        assert worker.redis.flush_ttls == [STALE_TTL_S]
+    finally:
+        await _close_test_worker(worker)
+
+
+@pytest.mark.asyncio
+async def test_watchlist_reload_gated_by_redis_revision():
+    worker = _worker()
+    pool = _FakePool([{"symbol": "AAPL"}, {"symbol": " tsla "}])
+    worker.pg_pool = pool
+    worker.redis.get_responses[WATCHLIST_REV_KEY] = "1"
+    try:
+        assert await worker.load_watchlist() == ["AAPL", "TSLA"]
+        assert await worker.load_watchlist() == ["AAPL", "TSLA"]
+        assert pool.fetch_calls == 1
+
+        worker.redis.get_responses[WATCHLIST_REV_KEY] = "2"
+        pool.rows = [{"symbol": "AAPL"}]
+        assert await worker.load_watchlist() == ["AAPL"]
+        assert pool.fetch_calls == 2
+    finally:
+        await _close_test_worker(worker)
+
+
+@pytest.mark.asyncio
+async def test_watchlist_missing_rev_key_queries_neon_once():
+    worker = _worker()
+    pool = _FakePool([{"symbol": "NVDA"}])
+    worker.pg_pool = pool
+    worker.redis.get_responses[WATCHLIST_REV_KEY] = None
+    try:
+        assert await worker.load_watchlist() == ["NVDA"]
+        assert await worker.load_watchlist() == ["NVDA"]
+        assert pool.fetch_calls == 1
     finally:
         await _close_test_worker(worker)
