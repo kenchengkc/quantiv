@@ -153,6 +153,7 @@ def endpoint_specs(sample_symbol: str = "AAPL", today: date | None = None) -> li
             {"symbols": symbol},
             derived_table="live_market_signals",
             doc_url="https://site.financialmodelingprep.com/developer/docs/stable/batch-aftermarket-quote",
+            cadence="off",  # premium on free tier — manual probe only
         ),
         EndpointSpec(
             "fmp_batch_aftermarket_trade",
@@ -163,6 +164,7 @@ def endpoint_specs(sample_symbol: str = "AAPL", today: date | None = None) -> li
             {"symbols": symbol},
             derived_table="live_market_signals",
             doc_url="https://site.financialmodelingprep.com/developer/docs/stable/batch-aftermarket-trade",
+            cadence="off",
         ),
         EndpointSpec(
             "fmp_press_releases",
@@ -173,6 +175,7 @@ def endpoint_specs(sample_symbol: str = "AAPL", today: date | None = None) -> li
             {"symbols": symbol, "page": 0, "limit": 5},
             derived_table="earnings_news_signals",
             doc_url=fmp_doc,
+            cadence="off",
         ),
         EndpointSpec(
             "fmp_stock_news",
@@ -183,6 +186,7 @@ def endpoint_specs(sample_symbol: str = "AAPL", today: date | None = None) -> li
             {"symbols": symbol, "page": 0, "limit": 5},
             derived_table="earnings_news_signals",
             doc_url=fmp_doc,
+            cadence="off",
         ),
         EndpointSpec(
             "fmp_symbol_changes",
@@ -194,6 +198,7 @@ def endpoint_specs(sample_symbol: str = "AAPL", today: date | None = None) -> li
             symbol_scoped=False,
             derived_table="corporate_actions",
             doc_url=fmp_doc,
+            cadence="off",
         ),
         EndpointSpec(
             "fmp_delisted_companies",
@@ -474,7 +479,7 @@ def endpoint_specs(sample_symbol: str = "AAPL", today: date | None = None) -> li
             "corporate_actions",
             "IPO reference data",
             f"{MASSIVE_BASE_URL}/vX/reference/ipos",
-            {"limit": 5, "sort": "ipo_date.desc"},
+            {"limit": 5, "sort": "listing_date", "order": "desc"},
             symbol_scoped=False,
             derived_table="corporate_actions",
             doc_url=massive_doc,

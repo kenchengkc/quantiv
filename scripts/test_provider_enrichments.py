@@ -8,7 +8,7 @@ import sys
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
-from provider_probe import classify_response  # noqa: E402
+from provider_probe import capability_probe_due, classify_response, select_specs  # noqa: E402
 from provider_specs import endpoint_specs  # noqa: E402
 from provider_utils import (  # noqa: E402
     ProviderBudget,
@@ -17,7 +17,10 @@ from provider_utils import (  # noqa: E402
     api_keys_for_provider,
     massive_api_key,
 )
-from sync_provider_enrichments import normalize_options_signal  # noqa: E402
+from sync_provider_enrichments import (  # noqa: E402
+    load_fmp_symbol_blocks,
+    normalize_options_signal,
+)
 
 
 class FakeResponse:
@@ -134,6 +137,79 @@ def test_key_pool_stacking_extends_daily_budget(tmp_path):
         assert "daily budget exhausted across 2 key(s)" in str(exc)
     else:
         raise AssertionError("expected ProviderQuotaError once all keys exhausted")
+
+
+def test_av_throttle_and_daily_cap_messages_are_quota_not_entitlement():
+    # AV returns HTTP 200 with an "Information" message that upsells premium
+    # plans in both its throttle and daily-cap notices. Neither is an
+    # entitlement denial — a 30-day block here starves healthy endpoints.
+    now = datetime(2026, 6, 10, tzinfo=timezone.utc)
+    spec = [s for s in endpoint_specs("AAPL") if s.id == "av_cpi"][0]
+
+    throttle = FakeResponse(payload={
+        "Information": (
+            "Thank you for using Alpha Vantage! Please consider spreading out "
+            "your free API requests more sparingly (1 request per second). You "
+            "may subscribe to any of the premium plans at "
+            "https://www.alphavantage.co/premium/ to instantly remove all rate limits."
+        ),
+    })
+    out = classify_response(spec, throttle, now=now)
+    assert out["status"] == "quota_limited"
+    assert out["retry_after"] == "2026-06-11"
+
+    daily_cap = FakeResponse(payload={
+        "Information": (
+            "We have detected your API key and our standard API rate limit is "
+            "25 requests per day. Please subscribe to any of the premium plans "
+            "to instantly remove all daily rate limits."
+        ),
+    })
+    assert classify_response(spec, daily_cap, now=now)["status"] == "quota_limited"
+
+    premium = FakeResponse(payload={
+        "Information": (
+            "This is a premium endpoint. You may subscribe to any of the "
+            "premium plans to instantly unlock all premium endpoints."
+        ),
+    })
+    assert classify_response(spec, premium, now=now)["status"] == "entitlement_denied"
+
+
+def test_fmp_symbol_blocks_load_prunes_expired_and_malformed(tmp_path):
+    path = tmp_path / "fmp_symbol_blocks.json"
+    path.write_text(
+        '{"OLD": "2026-06-01", "LIVE": "2026-07-05", "BAD": "not-a-date"}'
+    )
+    blocks = load_fmp_symbol_blocks(path, date(2026, 6, 10))
+    assert blocks == {"LIVE": "2026-07-05"}
+    assert load_fmp_symbol_blocks(tmp_path / "missing.json", date(2026, 6, 10)) == {}
+
+
+def test_capability_probe_due_skips_future_retry_after():
+    now = datetime(2026, 6, 10, tzinfo=timezone.utc)
+    blocked = {
+        "status": "entitlement_denied",
+        "retry_after": "2026-07-10",
+    }
+    assert capability_probe_due(blocked, now=now) is False
+    assert capability_probe_due(blocked, now=datetime(2026, 7, 10, tzinfo=timezone.utc)) is True
+    assert capability_probe_due({"status": "missing_key"}, now=now) is True
+
+
+def test_select_specs_skips_off_cadence_and_future_retry():
+    now = datetime(2026, 6, 10, tzinfo=timezone.utc)
+    capabilities = {
+        "endpoints": {
+            "fmp_batch_aftermarket_quote": {
+                "status": "entitlement_denied",
+                "retry_after": "2026-07-10",
+            }
+        }
+    }
+    ids = {spec.id for spec in select_specs(capabilities=capabilities, now=now)}
+    assert "fmp_batch_aftermarket_quote" not in ids
+    assert "massive_options_snapshot" in ids
 
 
 def test_massive_options_signal_is_derived_not_raw_payload():

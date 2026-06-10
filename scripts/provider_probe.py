@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import csv
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from io import StringIO
 from pathlib import Path
 from typing import Any, Callable
@@ -16,7 +16,7 @@ from provider_specs import EndpointSpec, endpoint_specs
 from provider_utils import (
     ProviderQuotaError,
     ProviderUsageLedger,
-    api_key_for_provider,
+    api_keys_for_provider,
     default_data_dir,
     write_json,
 )
@@ -145,10 +145,27 @@ def _provider_error_message(payload: Any) -> str | None:
 
 def _classify_error_text(text: str) -> str:
     lower = text.lower()
+    # Quota/throttle notices often upsell ("subscribe to any of the premium
+    # plans"), so quota phrasing must win over entitlement phrasing —
+    # otherwise Alpha Vantage's 1-req/sec throttle message turns a healthy
+    # free endpoint into a 30-day entitlement block.
+    if any(
+        term in lower
+        for term in (
+            "rate limit",
+            "api call frequency",
+            "daily",
+            "quota",
+            "too many requests",
+            "spreading out",
+            "sparingly",
+            "per second",
+            "per minute",
+        )
+    ):
+        return "quota_limited"
     if any(term in lower for term in ("premium", "subscription", "not entitled", "not available under", "forbidden")):
         return "entitlement_denied"
-    if any(term in lower for term in ("rate limit", "api call frequency", "daily", "quota", "too many requests")):
-        return "quota_limited"
     return "provider_error"
 
 
@@ -231,6 +248,28 @@ def capability_is_ok(capabilities: dict[str, Any], endpoint_id: str) -> bool:
     return isinstance(endpoint, dict) and endpoint.get("status") == "ok"
 
 
+def capability_probe_due(
+    endpoint: dict[str, Any] | None,
+    *,
+    now: datetime | None = None,
+) -> bool:
+    """False when a prior probe failed and retry_after is still in the future."""
+    if not isinstance(endpoint, dict):
+        return True
+    if endpoint.get("status") == "missing_key":
+        # Keys may have been added since the last run — always re-check.
+        return True
+    retry_after = endpoint.get("retry_after")
+    if not retry_after:
+        return True
+    now = now or datetime.now(timezone.utc)
+    try:
+        due = date.fromisoformat(str(retry_after)[:10])
+    except ValueError:
+        return True
+    return now.date() >= due
+
+
 def probe_spec(
     spec: EndpointSpec,
     *,
@@ -251,18 +290,36 @@ def probe_spec(
         "doc_url": spec.doc_url,
     }
 
-    api_key = api_key_for_provider(spec.provider)
-    if not api_key:
+    keys = api_keys_for_provider(spec.provider)
+    if not keys:
         return {**base, "status": "missing_key", "error": f"{spec.provider} API key missing"}
 
+    symbol_list = (
+        []
+        if not spec.symbol_scoped
+        else [str(spec.params.get("symbol") or spec.params.get("ticker") or "")]
+    )
     try:
-        ledger.reserve(
-            spec.provider,
-            spec.id,
-            credits=spec.credit_cost,
-            symbols=[] if not spec.symbol_scoped else [str(spec.params.get("symbol") or spec.params.get("ticker") or "")],
-            wait_for_minute=wait_for_minute,
-        )
+        if len(keys) > 1:
+            accounts = [f"k{idx}" for idx in range(len(keys))]
+            chosen_account, _ = ledger.reserve_pooled(
+                spec.provider,
+                spec.id,
+                accounts,
+                credits=spec.credit_cost,
+                symbols=symbol_list,
+                wait_for_minute=wait_for_minute,
+            )
+            api_key = keys[int(chosen_account.removeprefix("k"))]
+        else:
+            ledger.reserve(
+                spec.provider,
+                spec.id,
+                credits=spec.credit_cost,
+                symbols=symbol_list,
+                wait_for_minute=wait_for_minute,
+            )
+            api_key = keys[0]
     except ProviderQuotaError as exc:
         return {
             **base,
@@ -316,11 +373,23 @@ def select_specs(
     *,
     providers: set[str] | None = None,
     include_heavy: bool = False,
+    include_off_cadence: bool = False,
     sample_symbol: str = "AAPL",
+    capabilities: dict[str, Any] | None = None,
+    now: datetime | None = None,
 ) -> list[EndpointSpec]:
     specs = endpoint_specs(sample_symbol)
     if providers:
         specs = [spec for spec in specs if spec.provider in providers]
     if not include_heavy:
         specs = [spec for spec in specs if not spec.heavy]
+    if not include_off_cadence:
+        specs = [spec for spec in specs if getattr(spec, "cadence", "daily") != "off"]
+    if capabilities is not None:
+        endpoints = capabilities.get("endpoints") or {}
+        specs = [
+            spec
+            for spec in specs
+            if capability_probe_due(endpoints.get(spec.id), now=now)
+        ]
     return specs

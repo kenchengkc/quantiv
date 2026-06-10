@@ -8,7 +8,13 @@ import sys
 import time
 from pathlib import Path
 
-from provider_probe import CAPABILITIES_PATH, probe_spec, select_specs, write_capabilities
+from provider_probe import (
+    CAPABILITIES_PATH,
+    load_capabilities,
+    probe_spec,
+    select_specs,
+    write_capabilities,
+)
 from provider_utils import DEFAULT_LEDGER_PATH, ProviderUsageLedger, load_local_env
 
 
@@ -49,10 +55,12 @@ def main() -> int:
     if args.max_calls < 1:
         parser.error("--max-calls must be at least 1")
 
+    capabilities = load_capabilities(args.output)
     specs = select_specs(
         providers=args.providers,
         include_heavy=args.include_heavy,
         sample_symbol=args.sample_symbol,
+        capabilities=capabilities,
     )[: args.max_calls]
 
     print(
@@ -80,8 +88,14 @@ def main() -> int:
         )
         results.append(result)
         print(f"  {result['status']}")
-        if idx < len(specs) and args.delay > 0:
-            time.sleep(args.delay)
+        if idx < len(specs):
+            pause = args.delay
+            if spec.provider == "alphavantage":
+                # AV free tier throttles at 1 req/sec; an explicit --delay
+                # below that must not undercut the floor.
+                pause = max(pause, 1.2)
+            if pause > 0:
+                time.sleep(pause)
 
     payload = write_capabilities(results, output=args.output, sample_symbol=args.sample_symbol.upper())
     status_counts: dict[str, int] = {}
