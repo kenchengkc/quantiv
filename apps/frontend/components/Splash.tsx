@@ -48,9 +48,16 @@ export function Splash() {
   // while the splash images decode. Returning visitors / Clerk redirects must
   // skip *before paint* — `useEffect` runs too late and any rendered mark
   // would flash for a frame after sessionStorage already says the intro ran.
-  const [phase, setPhase] = useState<'hold' | 'play' | 'done'>(
-    isHomepage ? 'hold' : 'done',
-  );
+  const [phase, setPhase] = useState<'hold' | 'play' | 'done'>(() => {
+    if (!isHomepage) return 'done';
+    // SSR: omit splash markup so a back-navigation HTML response never
+    // paints a full-screen layer for one frame before hydration.
+    if (typeof window === 'undefined') return 'done';
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const alreadyPlayed = window.sessionStorage.getItem(SESSION_KEY) === '1';
+    if (reduced || alreadyPlayed) return 'done';
+    return 'hold';
+  });
 
   useLayoutEffect(() => {
     if (typeof window === 'undefined') return;

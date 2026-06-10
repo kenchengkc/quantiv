@@ -344,7 +344,7 @@ export function TickerLogo({
         ...baseStyle,
         borderRadius: radius,
         objectFit: 'cover',
-        background: 'var(--paper)',
+        background: 'var(--bg-3)',
         border: '1px solid var(--line)',
         display: 'block',
         ...style,
