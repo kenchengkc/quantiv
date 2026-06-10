@@ -84,7 +84,7 @@ def fmp_api_key() -> str | None:
 
 
 def alpha_vantage_api_key() -> str | None:
-    return os.getenv("ALPHAVANTAGE_API_KEY") or os.getenv("ALPHA_VANTAGE_API_KEY")
+    return os.getenv("ALPHAVANTAGE_API_KEY")
 
 
 def massive_api_key() -> str | None:
@@ -112,7 +112,7 @@ _PROVIDER_KEY_ENV: dict[str, list[str]] = {
         "FINANCIAL_MODELING_PREP_API_KEY",
         "FINANCIALMODELINGPREP_API_KEY",
     ],
-    "alphavantage": ["ALPHAVANTAGE_API_KEY", "ALPHA_VANTAGE_API_KEY"],
+    "alphavantage": ["ALPHAVANTAGE_API_KEY"],
     "massive": ["POLYGON_API_KEY", "MASSIVE_API_KEY"],
     "twelvedata": ["TWELVEDATA_API_KEY", "TWELVE_DATA_API_KEY", "TWELVEDATA_KEY"],
 }
