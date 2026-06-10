@@ -142,7 +142,8 @@ jobs:
         # The output is informational only; the app and ML path do not consume
         # V/OI until coverage is proven useful.
         env:
-          ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
+          ALPHAVANTAGE_API_KEY: ${{ secrets.ALPHAVANTAGE_API_KEY }}
+          ALPHAVANTAGE_API_KEY_2: ${{ secrets.ALPHAVANTAGE_API_KEY_2 }}
         run: |
           python scripts/probe_alphavantage_voi.py \
             --allow-missing-key \
@@ -158,7 +159,8 @@ jobs:
         # status + response-shape metadata in provider_capabilities.json.
         env:
           FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
-          ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
+          ALPHAVANTAGE_API_KEY: ${{ secrets.ALPHAVANTAGE_API_KEY }}
+          ALPHAVANTAGE_API_KEY_2: ${{ secrets.ALPHAVANTAGE_API_KEY_2 }}
           POLYGON_API_KEY: ${{ secrets.POLYGON_API_KEY }}
           TWELVEDATA_API_KEY: ${{ secrets.TWELVEDATA_API_KEY }}
           FMP_DAILY_CALL_LIMIT: "215"          # leaves room for FMP earnings overlay
@@ -176,7 +178,8 @@ jobs:
         # Public frontend JSON is not changed by this step.
         env:
           FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
-          ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
+          ALPHAVANTAGE_API_KEY: ${{ secrets.ALPHAVANTAGE_API_KEY }}
+          ALPHAVANTAGE_API_KEY_2: ${{ secrets.ALPHAVANTAGE_API_KEY_2 }}
           POLYGON_API_KEY: ${{ secrets.POLYGON_API_KEY }}
           TWELVEDATA_API_KEY: ${{ secrets.TWELVEDATA_API_KEY }}
           FMP_DAILY_CALL_LIMIT: "215"
