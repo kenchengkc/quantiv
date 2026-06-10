@@ -164,13 +164,14 @@ jobs:
           POLYGON_API_KEY: ${{ secrets.POLYGON_API_KEY }}
           TWELVEDATA_API_KEY: ${{ secrets.TWELVEDATA_API_KEY }}
           FMP_DAILY_CALL_LIMIT: "215"          # leaves room for FMP earnings overlay
-          ALPHAVANTAGE_DAILY_CALL_LIMIT: "20" # leaves room for the V/OI probe above
+          ALPHAVANTAGE_DAILY_CALL_LIMIT: "25" # per stacked key (×2 keys ≈ 50/day)
           TWELVEDATA_DAILY_CREDIT_LIMIT: "72" # leaves 720 credits for frontend fallback
           MASSIVE_MINUTE_CALL_LIMIT: "5"
         run: |
           python scripts/probe_provider_capabilities.py \
             --allow-missing-key \
             --max-calls 35 \
+            --delay 1 \
             --respect-minute-limits
 
       - name: Sync backend-only provider enrichments
@@ -183,7 +184,7 @@ jobs:
           POLYGON_API_KEY: ${{ secrets.POLYGON_API_KEY }}
           TWELVEDATA_API_KEY: ${{ secrets.TWELVEDATA_API_KEY }}
           FMP_DAILY_CALL_LIMIT: "215"
-          ALPHAVANTAGE_DAILY_CALL_LIMIT: "20"
+          ALPHAVANTAGE_DAILY_CALL_LIMIT: "25"
           TWELVEDATA_DAILY_CREDIT_LIMIT: "72"
           MASSIVE_MINUTE_CALL_LIMIT: "5"
         run: |
@@ -195,10 +196,14 @@ jobs:
           if [ "$(date -u +%u)" = "1" ]; then CADENCES="$CADENCES,weekly"; fi
           if [ "$(date -u +%d)" = "01" ]; then CADENCES="$CADENCES,monthly"; fi
           echo "provider enrichment cadences: $CADENCES"
+          # 220 covers the full plan on the heaviest day (Monday on the 1st:
+          # 216 calls — massive 81, fmp 81, td 32, av 22) so the planner never
+          # truncates WORK_ORDER; per-provider ledgers and minute limits are
+          # the real governors. Massive pacing adds ~16 min at 5/min.
           python scripts/sync_provider_enrichments.py \
             --allow-missing-key \
-            --max-symbols 8 \
-            --max-total-calls 60 \
+            --max-symbols 16 \
+            --max-total-calls 220 \
             --cadences "$CADENCES" \
             --respect-minute-limits
 

@@ -14,7 +14,7 @@ import math
 import re
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from io import StringIO
 from pathlib import Path
 from typing import Any, Callable
@@ -74,18 +74,49 @@ WORK_ORDER = [
 ]
 
 ENDPOINT_SYMBOL_LIMITS = {
-    # Alpha Vantage is 25/day per key. Moving macro to monthly and retiring
-    # av_news_sentiment from the daily run frees ~4 AV calls/day, redirected to
-    # broader coverage of the unique numeric option-flow / EARNINGS endpoints.
-    # Key-pool stacking (ALPHAVANTAGE_API_KEY_2, ...) multiplies this budget, so
-    # these limits can be raised further when more keys are configured.
-    "av_earnings": 3,
-    "av_realtime_put_call_ratio": 2,
-    "av_realtime_voi_ratio": 2,
-    "av_historical_put_call_ratio": 3,
-    "av_historical_voi": 3,
-    "av_news_sentiment": 1,
+    # Alpha Vantage is 25/day per key. Key-pool stacking multiplies the budget.
+    "av_earnings": 4,
+    "av_realtime_put_call_ratio": 3,
+    "av_realtime_voi_ratio": 3,
+    "av_historical_put_call_ratio": 4,
+    "av_historical_voi": 4,
+    "av_news_sentiment": 2,
 }
+
+# FMP free tier only serves a subset of tickers for these fundamentals endpoints.
+# Probe passes on AAPL, but calendar reporters often 402 — skip after first deny.
+FMP_SYMBOL_TIER_ENDPOINTS = frozenset(
+    {
+        "fmp_key_metrics_ttm",
+        "fmp_ratios_ttm",
+        "fmp_ratings_snapshot",
+        "fmp_analyst_estimates",
+    }
+)
+
+# Denied symbols persist across runs so tomorrow's budget isn't re-spent
+# discovering the same tier blocks. Entries expire so symbols promoted into
+# FMP's free tier (or fixed entitlements) are eventually retried.
+FMP_SYMBOL_BLOCKS_FILENAME = "fmp_symbol_blocks.json"
+FMP_SYMBOL_BLOCK_DAYS = 30
+
+
+def load_fmp_symbol_blocks(path: Path, today: date) -> dict[str, str]:
+    """Map of 402-blocked FMP symbols to their ISO retry date, expired pruned."""
+    try:
+        body = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError):
+        return {}
+    if not isinstance(body, dict):
+        return {}
+    blocks: dict[str, str] = {}
+    for symbol, until in body.items():
+        try:
+            if date.fromisoformat(str(until)) > today:
+                blocks[str(symbol)] = str(until)
+        except ValueError:
+            continue
+    return blocks
 
 
 def normalize_symbol(value: Any) -> str | None:
@@ -755,18 +786,49 @@ def main() -> int:
         "live_market_signals": [],
     }
     errors: list[dict[str, Any]] = []
+    today = datetime.now(timezone.utc).date()
+    fmp_symbol_blocks = load_fmp_symbol_blocks(
+        args.output_dir / FMP_SYMBOL_BLOCKS_FILENAME, today
+    )
+    fmp_symbol_blocked: set[str] = set(fmp_symbol_blocks)
     collected_at = datetime.now(timezone.utc).isoformat()
     for idx, (symbol, spec) in enumerate(work, start=1):
+        if (
+            spec.provider == "fmp"
+            and spec.id in FMP_SYMBOL_TIER_ENDPOINTS
+            and symbol in fmp_symbol_blocked
+        ):
+            print(
+                f"skip {spec.provider}:{spec.id} {symbol} ({idx}/{len(work)}) — fmp tier block",
+                flush=True,
+            )
+            continue
         print(f"fetching {spec.provider}:{spec.id} {symbol} ({idx}/{len(work)})", flush=True)
         payload, status = fetch_payload(spec, ledger, wait_for_minute=args.respect_minute_limits)
         if payload is None:
             errors.append({"symbol": symbol, "endpoint": spec.id, **status})
             print(f"  {status.get('status')}")
+            err = str(status.get("error") or "").lower()
+            if (
+                spec.provider == "fmp"
+                and spec.id in FMP_SYMBOL_TIER_ENDPOINTS
+                and status.get("status") == "entitlement_denied"
+                and "symbol" in err
+            ):
+                fmp_symbol_blocked.add(symbol)
+                fmp_symbol_blocks[symbol] = (
+                    today + timedelta(days=FMP_SYMBOL_BLOCK_DAYS)
+                ).isoformat()
         else:
             merge_table(tables, normalize_response(spec, symbol, payload, collected_at))
             print("  ok")
-        if idx < len(work) and args.delay > 0:
-            time.sleep(args.delay)
+        if idx < len(work):
+            pause = args.delay
+            if spec.provider == "alphavantage":
+                # AV free tier throttles at 1 req/sec; never undercut the floor.
+                pause = max(pause, 1.2)
+            if pause > 0:
+                time.sleep(pause)
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
     metadata = {
@@ -780,6 +842,7 @@ def main() -> int:
     for name, rows in tables.items():
         write_json(args.output_dir / f"{name}.json", {"generated_at": metadata["generated_at"], "rows": rows})
     write_json(args.output_dir / "metadata.json", metadata)
+    write_json(args.output_dir / FMP_SYMBOL_BLOCKS_FILENAME, fmp_symbol_blocks)
     print(f"wrote {args.output_dir}")
 
     if work and len(errors) == len(work) and all(err.get("status") == "missing_key" for err in errors):
