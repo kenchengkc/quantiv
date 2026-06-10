@@ -53,7 +53,7 @@ def load_local_env() -> None:
 
 
 def get_api_key() -> str | None:
-    return os.getenv("ALPHAVANTAGE_API_KEY") or os.getenv("ALPHA_VANTAGE_API_KEY")
+    return os.getenv("ALPHAVANTAGE_API_KEY")
 
 
 def normalize_symbol(value: Any) -> str | None:

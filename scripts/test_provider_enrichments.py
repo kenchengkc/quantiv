@@ -109,8 +109,7 @@ def test_massive_key_prefers_polygon(monkeypatch):
 
 
 def test_api_keys_for_provider_collects_and_dedupes_stacked_keys(monkeypatch):
-    for name in ("ALPHAVANTAGE_API_KEY", "ALPHA_VANTAGE_API_KEY"):
-        monkeypatch.delenv(name, raising=False)
+    monkeypatch.delenv("ALPHAVANTAGE_API_KEY", raising=False)
     monkeypatch.setenv("ALPHAVANTAGE_API_KEY", "aaa")
     monkeypatch.setenv("ALPHAVANTAGE_API_KEY_2", "bbb")
     monkeypatch.setenv("ALPHAVANTAGE_API_KEY_3", "aaa")  # duplicate, dropped
