@@ -17,6 +17,7 @@ import {
   writeQuoteInterest,
   type InterestContext,
 } from '@/lib/quoteInterest';
+import { enrichQuoteTick } from '@/lib/quoteTick';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -280,17 +281,7 @@ const nullTick = (symbol: string): Tick => ({
   changePct: null,
 });
 
-/** Finnhub often omits d/dp while c and pc are present; derive so clients are not stuck without % until the next 30s poll. */
-function enrichTick(t: Tick): Tick {
-  if (t.price == null || !(t.price > 0)) return t;
-  const pc = t.previousClose;
-  if (pc == null || !(pc > 0)) return t;
-  const change = t.change != null ? t.change : t.price - pc;
-  const changePct = t.changePct != null ? t.changePct : change / pc;
-  return { ...t, change, changePct, previousClose: pc };
-}
-
-export async function GET(req: NextRequest) {
+import { enrichQuoteTick } from '@/lib/quoteTick';
   const url = new URL(req.url);
   const symbolsParam = url.searchParams.get('symbols') ?? '';
   const symbols = Array.from(
@@ -342,12 +333,12 @@ export async function GET(req: NextRequest) {
       ? { realizedMovePct: r.pct, realizedDate: r.date }
       : { realizedMovePct: null, realizedDate: null };
     const entry = cache.get(s) ?? null;
-    if (!entry) return { ...enrichTick(nullTick(s)), ...realizedFields };
+    if (!entry) return { ...enrichQuoteTick(nullTick(s)), ...realizedFields };
     if (entry.at > latestAt) latestAt = entry.at;
     const src = entry.source ?? 'finnhub';
     seenSources.add(src);
     return {
-      ...enrichTick({ ...entry.tick, symbol: entry.tick.symbol || s }),
+      ...enrichQuoteTick({ ...entry.tick, symbol: entry.tick.symbol || s }),
       source: src,
       session: entry.session ?? 'regular',
       transport: entry.transport ?? null,

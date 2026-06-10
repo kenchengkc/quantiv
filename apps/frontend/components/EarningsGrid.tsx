@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from 'react';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { Sun, Moon, Info, ChevronLeft, ChevronRight, Search, Circle, Clock } from 'lucide-react';
 import { POPULAR_WEIGHT } from '@/lib/popular';
 import { companyName } from '@/lib/companyNames';
@@ -19,6 +19,15 @@ import {
   shouldFetchRealizedBackfill,
   shouldPollLiveQuote,
 } from '@/lib/earningsReaction';
+import {
+  hasWeekCache,
+  readLiveQuoteCache,
+  readWeekCache,
+  writeLiveQuoteCache,
+  writeWeekCache,
+  type LiveQuoteMap,
+} from '@/lib/earningsCalendarCache';
+import type { HomeCalendarFilter } from '@/lib/homeSearchParams';
 import sp500Constituents from '../../../lib/data/sp500-constituents.json';
 
 // Full S&P 500 (503 constituents incl. dual-class). Used for the "S&P 500"
@@ -52,7 +61,7 @@ interface WeeklyData {
   events: EarningsEvent[];
 }
 
-type Filter = 'popular' | 'sp500' | 'movers' | 'all';
+type Filter = HomeCalendarFilter;
 
 const MIN_OFFSET = -1;
 const MAX_OFFSET = 2;
@@ -60,13 +69,12 @@ const MAX_OFFSET = 2;
 // Each stops a different class of "looks loaded but isn't" jitter:
 //   MIN_GRID_LOADING_MS    — minimum skeleton hold so a cache-warm fetch
 //                            doesn't strobe the skeleton on/off in <100 ms.
-//   INITIAL_QUOTE_WAIT_MS  — upper bound on waiting for the first live-quote
-//                            batch; pending symbols fill in after paint.
+//   batch-price first poll — cold loads wait for the first quote batch
+//                            (3 s cap) so rows don't paint without CLOSE/LIVE.
 //   LOGO_PRELOAD_TIMEOUT_MS — caps background logo preload. Calendar rows
 //                            don't wait for this because logo boxes have
 //                            fixed dimensions and can resolve in place.
 const MIN_GRID_LOADING_MS = 750;
-const INITIAL_QUOTE_WAIT_MS = 800;
 const LOGO_PRELOAD_TIMEOUT_MS = 1_500;
 const OFFSETS: { v: number; l: string }[] = [
   { v: -1, l: 'Last week' },
@@ -257,17 +265,7 @@ function TickerRow({
   );
 }
 
-type LiveMap = Record<
-  string,
-  {
-    change: number | null;
-    changePct: number | null;
-    // Post-close realized-move backfill (realized:{SYM} via batch-price). Only
-    // applied when realizedDate matches the event's earnings_date.
-    realizedMovePct?: number | null;
-    realizedDate?: string | null;
-  }
->;
+type LiveMap = LiveQuoteMap;
 
 function Group({
   title,
@@ -693,16 +691,13 @@ function WeekHeader({
   );
 }
 
-// Module-level caches survive client-side back/forward remounts (same JS
-// context) and bfcache restores. Without them, returning to the calendar
-// replays the loading skeleton, then a window where the ± move shows but the
-// REALIZED/LIVE reaction hasn't reloaded — what reads as "a flash, then stale
-// numbers with no label". We seed state from these on mount (instant last-good
-// render) and revalidate immediately after.
-const weekDataCache = new Map<string, WeeklyData>();
-let liveCache: LiveMap = {};
-
-export default function EarningsGrid() {
+export default function EarningsGrid({
+  initialOffset = 0,
+  initialFilter = 'popular',
+}: {
+  initialOffset?: number;
+  initialFilter?: Filter;
+}) {
   // Triggers the one-time EDGAR ticker-names fetch + re-render on
   // arrival so non-S&P-500 tickers in the weekly view get their real
   // names instead of echoing the ticker symbol.
@@ -711,20 +706,16 @@ export default function EarningsGrid() {
   // Persist (offset, filter) in the URL so that navigating to a ticker and
   // hitting back returns the user to the same week + filter they were on.
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const initialOffset = (() => {
-    const v = Number(searchParams.get('offset'));
-    return Number.isFinite(v) && v >= MIN_OFFSET && v <= MAX_OFFSET ? v : 0;
-  })();
-  const initialFilter: Filter = (() => {
-    const v = searchParams.get('filter');
-    return v === 'popular' || v === 'sp500' || v === 'movers' || v === 'all'
-      ? v
-      : 'popular';
-  })();
   const [offset, setOffset] = useState(initialOffset);
   const [filter, setFilter] = useState<Filter>(initialFilter);
   const [search, setSearch] = useState('');
+
+  // Browser back/forward can change the server-provided URL params without
+  // remounting this client component — mirror those into local state.
+  useEffect(() => {
+    setOffset(initialOffset);
+    setFilter(initialFilter);
+  }, [initialOffset, initialFilter]);
 
   // Mirror state → URL query. Omit default values so a fresh landing stays
   // on a clean `/` URL.
@@ -744,13 +735,13 @@ export default function EarningsGrid() {
     d.setDate(d.getDate() + 7 * initialOffset);
     return isoDay(d);
   })();
-  const warmStart = weekDataCache.has(initialWeekIso);
+  const warmStart = hasWeekCache(initialWeekIso);
   const [data, setData] = useState<WeeklyData | null>(
-    () => weekDataCache.get(initialWeekIso) ?? null,
+    () => readWeekCache<WeeklyData>(initialWeekIso),
   );
   const [isFetching, setIsFetching] = useState(() => !warmStart);
   const [error, setError] = useState<string | null>(null);
-  const [live, setLive] = useState<LiveMap>(() => ({ ...liveCache }));
+  const [live, setLive] = useState<LiveMap>(() => readLiveQuoteCache());
   const [marketOpen, setMarketOpen] = useState<boolean>(true);
   // On a warm (cached) remount, treat the artificial min-loading hold and the
   // quotes-ready gate as already satisfied so the grid shows on frame one.
@@ -771,7 +762,7 @@ export default function EarningsGrid() {
 
   useEffect(() => {
     // Cached week → no skeleton hold (the data is already on screen).
-    if (weekDataCache.has(weekStartIso)) {
+    if (hasWeekCache(weekStartIso)) {
       setMinLoadingDoneWeek(weekStartIso);
       return;
     }
@@ -798,7 +789,7 @@ export default function EarningsGrid() {
 
   useEffect(() => {
     let cancelled = false;
-    const cached = weekDataCache.get(weekStartIso);
+    const cached = readWeekCache<WeeklyData>(weekStartIso);
     if (cached) {
       // Render cached week immediately, then revalidate silently below.
       setData(cached);
@@ -810,12 +801,12 @@ export default function EarningsGrid() {
     fetchWeek(weekStartIso)
       .then((json) => {
         if (cancelled) return;
-        weekDataCache.set(weekStartIso, json);
+        writeWeekCache(weekStartIso, json);
         setData(json);
       })
       .catch((e) => {
         // Keep showing the cached week on a revalidation error.
-        if (!cancelled && !weekDataCache.has(weekStartIso)) setError((e as Error).message);
+        if (!cancelled && !hasWeekCache(weekStartIso)) setError((e as Error).message);
       })
       .finally(() => {
         if (!cancelled) setIsFetching(false);
@@ -828,7 +819,7 @@ export default function EarningsGrid() {
   // Mirror the live-quote map into the module cache so the next remount /
   // bfcache restore starts with the last-known quotes (reactions render at once).
   useEffect(() => {
-    liveCache = live;
+    writeLiveQuoteCache(live);
   }, [live]);
 
   useEffect(() => {
@@ -877,10 +868,11 @@ export default function EarningsGrid() {
 
     // Cold load → hide behind the skeleton until quotes land. Warm (cached)
     // remount → keep the last-good grid on screen and revalidate silently.
-    if (!weekDataCache.has(weekStartIso)) {
+    if (!hasWeekCache(weekStartIso)) {
       setQuotesReadyWeek(null);
+      // Cold load only: cap how long we wait if batch-price hangs.
+      initialReadyTimer = setTimeout(markQuotesReady, 3_000);
     }
-    initialReadyTimer = setTimeout(markQuotesReady, INITIAL_QUOTE_WAIT_MS);
 
     const fetchOnce = async (): Promise<{ pending: number; marketOpen: boolean; quoteRefreshActive: boolean }> => {
       try {
@@ -975,11 +967,10 @@ export default function EarningsGrid() {
         fetchOnce();
       }
     };
-    // bfcache restore (back from an external page): the document is served
-    // frozen and effects don't re-run, so a stale quote map + time-based
-    // REALIZED/LIVE labels stay on screen. Re-fetch to refresh them immediately.
-    const onPageShow = (e: PageTransitionEvent) => {
-      if (e.persisted && !cancelled) fetchOnce();
+    // Back/forward (incl. bfcache restore from an external tab): refetch
+    // quotes immediately so CLOSE/LIVE/REALIZED labels and % stay in sync.
+    const onPageShow = () => {
+      if (!cancelled) fetchOnce();
     };
     document.addEventListener('visibilitychange', onVisible);
     window.addEventListener('focus', onVisible);
@@ -1090,7 +1081,8 @@ export default function EarningsGrid() {
   const contentReady =
     weekReady &&
     minLoadingDoneWeek === weekStartIso &&
-    quotesReadyWeek === weekStartIso;
+    (quotesReadyWeek === weekStartIso ||
+      (hasWeekCache(weekStartIso) && Object.keys(live).length > 0));
   const showSkeleton = !error && !contentReady;
 
   return (

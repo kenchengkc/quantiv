@@ -16,6 +16,7 @@ import {
   classifyRailwayOwnership,
   type RailwayOwnershipState,
 } from '@/lib/quoteWorkerLease';
+import { enrichQuoteTick } from '@/lib/quoteTick';
 
 // Cron-driven Finnhub price refresher. Triggered every 5 min by an external
 // scheduler (Cloudflare Worker). Walks a rotating cursor through a priority-
@@ -538,12 +539,13 @@ async function runRegularHours(
       if (tick) {
         try {
           const authoritativePrev = prevcloseMap.get(symbol);
+          const resolvedTick =
+            authoritativePrev != null
+              ? enrichQuoteTick({ ...tick, previousClose: authoritativePrev })
+              : enrichQuoteTick(tick);
           const entry: CachedQuote = {
             at: Date.now(),
-            tick:
-              authoritativePrev != null
-                ? { ...tick, previousClose: authoritativePrev }
-                : tick,
+            tick: resolvedTick,
             source: 'finnhub',
             session: 'regular',
           };
