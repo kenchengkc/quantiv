@@ -2,10 +2,15 @@
 
 import { useEffect, useLayoutEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
+import {
+  clearSplashGate,
+  markSplashPlayed,
+  splashAlreadyPlayed,
+  SPLASH_SESSION_KEY,
+} from '@/lib/splashSession';
 
 // Once-per-session intro. The sequence starts with a closed ring, opens the
 // bottom-right slit, then reveals the exact logo tail through it.
-const SESSION_KEY = 'quantiv:splash:played';
 const TOTAL_MS = 2327;
 const READY_HOLD_MS = 280;
 const MAX_ASSET_WAIT_MS = 900;
@@ -33,38 +38,35 @@ async function decodeSplashAsset(src: string) {
   }
 }
 
+function shouldSkipSplash(): boolean {
+  if (typeof window === 'undefined') return true;
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  return reduced || splashAlreadyPlayed();
+}
+
 export function Splash() {
   // Splash is a homepage-only intro. On any subpage we don't render it at
   // all — including during SSR — so reopening a tab (Cmd+Shift+T) to
   // /screener, /watchlist, /AAPL, etc. doesn't flash the white ring for a
-  // frame during hydration. (The flash came from the SSR HTML including
-  // the splash because `useState` initial values run on both server and
-  // client; useLayoutEffect's sessionStorage check then flipped it off
-  // after the first paint.)
+  // frame during hydration.
   const pathname = usePathname();
   const isHomepage = pathname === '/';
 
-  // Start in `hold` so first-time homepage visitors get a plain black frame
-  // while the splash images decode. Returning visitors / Clerk redirects must
-  // skip *before paint* — `useEffect` runs too late and any rendered mark
-  // would flash for a frame after sessionStorage already says the intro ran.
   const [phase, setPhase] = useState<'hold' | 'play' | 'done'>(() => {
     if (!isHomepage) return 'done';
-    // SSR: omit splash markup so a back-navigation HTML response never
-    // paints a full-screen layer for one frame before hydration.
     if (typeof window === 'undefined') return 'done';
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const alreadyPlayed = window.sessionStorage.getItem(SESSION_KEY) === '1';
-    if (reduced || alreadyPlayed) return 'done';
-    return 'hold';
+    return shouldSkipSplash() ? 'done' : 'hold';
   });
 
   useLayoutEffect(() => {
-    if (typeof window === 'undefined') return;
-    if (!isHomepage) return;
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const alreadyPlayed = window.sessionStorage.getItem(SESSION_KEY) === '1';
-    if (reduced || alreadyPlayed) setPhase('done');
+    if (!isHomepage) {
+      clearSplashGate();
+      return;
+    }
+    if (shouldSkipSplash()) {
+      clearSplashGate();
+      setPhase('done');
+    }
   }, [isHomepage]);
 
   useEffect(() => {
@@ -88,9 +90,14 @@ export function Splash() {
   }, [phase]);
 
   useEffect(() => {
+    if (phase === 'play') clearSplashGate();
+  }, [phase]);
+
+  useEffect(() => {
     if (phase !== 'play') return;
     const t = window.setTimeout(() => {
-      window.sessionStorage.setItem(SESSION_KEY, '1');
+      markSplashPlayed();
+      clearSplashGate();
       setPhase('done');
     }, TOTAL_MS);
     return () => window.clearTimeout(t);
