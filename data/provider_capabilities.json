@@ -2,137 +2,272 @@
   "endpoints": {
     "av_cpi": {
       "category": "macro",
-      "checked_at": "2026-06-09T12:14:53.826648+00:00",
+      "checked_at": "2026-06-10T00:48:35.592655+00:00",
       "credit_cost": 1,
       "derived_table": "company_facts",
       "doc_url": "https://www.alphavantage.co/documentation/",
       "endpoint": "av_cpi",
-      "error": "alphavantage API key missing",
+      "error": "Thank you for using Alpha Vantage! Please consider spreading out your free API requests more sparingly (1 request per second). You may subscribe to any of the premium plans at https://www.alphavantage.co/premium/ to lift the free key rate l",
       "heavy": false,
+      "http_status": 200,
       "provider": "alphavantage",
       "purpose": "CPI inflation macro context",
-      "status": "missing_key"
+      "response_shape": {
+        "has_data": false,
+        "kind": "json_object",
+        "row_count": 0,
+        "sample_keys": [],
+        "top_level_keys": [
+          "Information"
+        ]
+      },
+      "retry_after": "2026-07-10",
+      "status": "entitlement_denied"
     },
     "av_earnings": {
       "category": "earnings",
-      "checked_at": "2026-06-09T12:14:53.826243+00:00",
+      "checked_at": "2026-06-10T00:48:33.582774+00:00",
       "credit_cost": 1,
       "derived_table": "company_facts",
       "doc_url": "https://www.alphavantage.co/documentation/",
       "endpoint": "av_earnings",
-      "error": "alphavantage API key missing",
+      "error": "Thank you for using Alpha Vantage! Please consider spreading out your free API requests more sparingly (1 request per second). You may subscribe to any of the premium plans at https://www.alphavantage.co/premium/ to lift the free key rate l",
       "heavy": false,
+      "http_status": 200,
       "provider": "alphavantage",
       "purpose": "Earnings history/estimates validation",
-      "status": "missing_key"
+      "response_shape": {
+        "has_data": false,
+        "kind": "json_object",
+        "row_count": 0,
+        "sample_keys": [],
+        "top_level_keys": [
+          "Information"
+        ]
+      },
+      "retry_after": "2026-07-10",
+      "status": "entitlement_denied"
     },
     "av_federal_funds_rate": {
       "category": "macro",
-      "checked_at": "2026-06-09T12:14:53.826596+00:00",
+      "checked_at": "2026-06-10T00:48:35.463201+00:00",
       "credit_cost": 1,
       "derived_table": "company_facts",
       "doc_url": "https://www.alphavantage.co/documentation/",
       "endpoint": "av_federal_funds_rate",
-      "error": "alphavantage API key missing",
+      "error": "Thank you for using Alpha Vantage! Please consider spreading out your free API requests more sparingly (1 request per second). You may subscribe to any of the premium plans at https://www.alphavantage.co/premium/ to lift the free key rate l",
       "heavy": false,
+      "http_status": 200,
       "provider": "alphavantage",
       "purpose": "Federal funds rate macro context",
-      "status": "missing_key"
+      "response_shape": {
+        "has_data": false,
+        "kind": "json_object",
+        "row_count": 0,
+        "sample_keys": [],
+        "top_level_keys": [
+          "Information"
+        ]
+      },
+      "retry_after": "2026-07-10",
+      "status": "entitlement_denied"
     },
     "av_historical_put_call_ratio": {
       "category": "options",
-      "checked_at": "2026-06-09T12:14:53.826439+00:00",
+      "checked_at": "2026-06-10T00:48:34.990625+00:00",
       "credit_cost": 1,
       "derived_table": "options_provider_signals",
       "doc_url": "https://www.alphavantage.co/documentation/",
       "endpoint": "av_historical_put_call_ratio",
-      "error": "alphavantage API key missing",
+      "error": "Thank you for using Alpha Vantage! Please consider spreading out your free API requests more sparingly (1 request per second). You may subscribe to any of the premium plans at https://www.alphavantage.co/premium/ to lift the free key rate l",
       "heavy": false,
+      "http_status": 200,
       "provider": "alphavantage",
       "purpose": "Historical options put/call ratio",
-      "status": "missing_key"
+      "response_shape": {
+        "has_data": false,
+        "kind": "json_object",
+        "row_count": 0,
+        "sample_keys": [],
+        "top_level_keys": [
+          "Information"
+        ]
+      },
+      "retry_after": "2026-07-10",
+      "status": "entitlement_denied"
     },
     "av_historical_voi": {
       "category": "options",
-      "checked_at": "2026-06-09T12:14:53.826699+00:00",
+      "checked_at": "2026-06-10T00:48:35.717097+00:00",
       "credit_cost": 1,
       "derived_table": "options_provider_signals",
       "doc_url": "https://www.alphavantage.co/documentation/",
       "endpoint": "av_historical_voi",
-      "error": "alphavantage API key missing",
+      "error": "Thank you for using Alpha Vantage! Please consider spreading out your free API requests more sparingly (1 request per second). You may subscribe to any of the premium plans at https://www.alphavantage.co/premium/ to lift the free key rate l",
       "heavy": false,
+      "http_status": 200,
       "provider": "alphavantage",
       "purpose": "Historical options volume/open-interest ratio",
-      "status": "missing_key"
+      "response_shape": {
+        "has_data": false,
+        "kind": "json_object",
+        "row_count": 0,
+        "sample_keys": [],
+        "top_level_keys": [
+          "Information"
+        ]
+      },
+      "retry_after": "2026-07-10",
+      "status": "entitlement_denied"
     },
     "av_ipo_calendar": {
       "category": "corporate_actions",
-      "checked_at": "2026-06-09T12:14:53.826493+00:00",
+      "checked_at": "2026-06-10T00:48:35.125851+00:00",
       "credit_cost": 1,
       "derived_table": "corporate_actions",
       "doc_url": "https://www.alphavantage.co/documentation/",
       "endpoint": "av_ipo_calendar",
-      "error": "alphavantage API key missing",
       "heavy": false,
+      "http_status": 200,
       "provider": "alphavantage",
       "purpose": "IPO calendar",
-      "status": "missing_key"
+      "response_shape": {
+        "columns": [
+          "symbol",
+          "name",
+          "ipoDate",
+          "priceRangeLow",
+          "priceRangeHigh",
+          "currency",
+          "exchange"
+        ],
+        "has_data": true,
+        "kind": "csv",
+        "row_count": 3
+      },
+      "status": "ok"
     },
     "av_news_sentiment": {
       "category": "news",
-      "checked_at": "2026-06-09T12:14:53.826176+00:00",
+      "checked_at": "2026-06-10T00:48:32.968754+00:00",
       "credit_cost": 1,
       "derived_table": "earnings_news_signals",
       "doc_url": "https://www.alphavantage.co/documentation/",
       "endpoint": "av_news_sentiment",
-      "error": "alphavantage API key missing",
       "heavy": false,
+      "http_status": 200,
       "provider": "alphavantage",
       "purpose": "Earnings-topic news sentiment",
-      "status": "missing_key"
+      "response_shape": {
+        "has_data": true,
+        "kind": "json_object",
+        "row_count": 50,
+        "sample_keys": [
+          "authors",
+          "banner_image",
+          "category_within_source",
+          "overall_sentiment_label",
+          "overall_sentiment_score",
+          "source",
+          "source_domain",
+          "summary",
+          "ticker_sentiment",
+          "time_published",
+          "title",
+          "topics",
+          "url"
+        ],
+        "top_level_keys": [
+          "feed",
+          "items",
+          "relevance_score_definition",
+          "sentiment_score_definition"
+        ]
+      },
+      "status": "ok"
     },
     "av_realtime_put_call_ratio": {
       "category": "options",
-      "checked_at": "2026-06-09T12:14:53.826302+00:00",
+      "checked_at": "2026-06-10T00:48:33.718506+00:00",
       "credit_cost": 1,
       "derived_table": "options_provider_signals",
       "doc_url": "https://www.alphavantage.co/documentation/",
       "endpoint": "av_realtime_put_call_ratio",
-      "error": "alphavantage API key missing",
+      "error": "Thank you for using Alpha Vantage! Please consider spreading out your free API requests more sparingly (1 request per second). You may subscribe to any of the premium plans at https://www.alphavantage.co/premium/ to lift the free key rate l",
       "heavy": false,
+      "http_status": 200,
       "provider": "alphavantage",
       "purpose": "Realtime options put/call ratio",
-      "status": "missing_key"
+      "response_shape": {
+        "has_data": false,
+        "kind": "json_object",
+        "row_count": 0,
+        "sample_keys": [],
+        "top_level_keys": [
+          "Information"
+        ]
+      },
+      "retry_after": "2026-07-10",
+      "status": "entitlement_denied"
     },
     "av_realtime_voi_ratio": {
       "category": "options",
-      "checked_at": "2026-06-09T12:14:53.826369+00:00",
+      "checked_at": "2026-06-10T00:48:34.086545+00:00",
       "credit_cost": 1,
       "derived_table": "options_provider_signals",
       "doc_url": "https://www.alphavantage.co/documentation/",
       "endpoint": "av_realtime_voi_ratio",
-      "error": "alphavantage API key missing",
       "heavy": false,
+      "http_status": 200,
       "provider": "alphavantage",
       "purpose": "Realtime options volume/open-interest ratio",
-      "status": "missing_key"
+      "response_shape": {
+        "has_data": true,
+        "kind": "json_object",
+        "row_count": 3650,
+        "sample_keys": [
+          "contractID",
+          "date",
+          "expiration",
+          "strike",
+          "symbol",
+          "type",
+          "volume_open_interest_ratio"
+        ],
+        "top_level_keys": [
+          "data",
+          "symbol"
+        ]
+      },
+      "status": "ok"
     },
     "av_treasury_yield_10y": {
       "category": "macro",
-      "checked_at": "2026-06-09T12:14:53.826546+00:00",
+      "checked_at": "2026-06-10T00:48:35.267249+00:00",
       "credit_cost": 1,
       "derived_table": "company_facts",
       "doc_url": "https://www.alphavantage.co/documentation/",
       "endpoint": "av_treasury_yield_10y",
-      "error": "alphavantage API key missing",
+      "error": "Thank you for using Alpha Vantage! Please consider spreading out your free API requests more sparingly (1 request per second). You may subscribe to any of the premium plans at https://www.alphavantage.co/premium/ to lift the free key rate l",
       "heavy": false,
+      "http_status": 200,
       "provider": "alphavantage",
       "purpose": "10-year Treasury yield macro context",
-      "status": "missing_key"
+      "response_shape": {
+        "has_data": false,
+        "kind": "json_object",
+        "row_count": 0,
+        "sample_keys": [],
+        "top_level_keys": [
+          "Information"
+        ]
+      },
+      "retry_after": "2026-07-10",
+      "status": "entitlement_denied"
     },
     "fmp_analyst_estimates": {
       "category": "analyst",
-      "checked_at": "2026-06-09T12:14:52.802650+00:00",
+      "checked_at": "2026-06-10T00:48:29.388472+00:00",
       "credit_cost": 1,
       "derived_table": "company_facts",
       "doc_url": "https://site.financialmodelingprep.com/developer/docs",
@@ -175,7 +310,7 @@
     },
     "fmp_batch_aftermarket_quote": {
       "category": "live_market",
-      "checked_at": "2026-06-09T12:14:53.342072+00:00",
+      "checked_at": "2026-06-10T00:48:31.324879+00:00",
       "credit_cost": 1,
       "derived_table": "live_market_signals",
       "doc_url": "https://site.financialmodelingprep.com/developer/docs/stable/batch-aftermarket-quote",
@@ -185,12 +320,12 @@
       "http_status": 402,
       "provider": "fmp",
       "purpose": "Batch aftermarket bid/ask quote probe",
-      "retry_after": "2026-07-09",
+      "retry_after": "2026-07-10",
       "status": "entitlement_denied"
     },
     "fmp_batch_aftermarket_trade": {
       "category": "live_market",
-      "checked_at": "2026-06-09T12:14:53.386909+00:00",
+      "checked_at": "2026-06-10T00:48:31.606603+00:00",
       "credit_cost": 1,
       "derived_table": "live_market_signals",
       "doc_url": "https://site.financialmodelingprep.com/developer/docs/stable/batch-aftermarket-trade",
@@ -200,12 +335,12 @@
       "http_status": 402,
       "provider": "fmp",
       "purpose": "Batch aftermarket trade probe",
-      "retry_after": "2026-07-09",
+      "retry_after": "2026-07-10",
       "status": "entitlement_denied"
     },
     "fmp_delisted_companies": {
       "category": "corporate_actions",
-      "checked_at": "2026-06-09T12:14:53.635422+00:00",
+      "checked_at": "2026-06-10T00:48:32.647661+00:00",
       "credit_cost": 1,
       "derived_table": "corporate_actions",
       "doc_url": "https://site.financialmodelingprep.com/developer/docs",
@@ -231,7 +366,7 @@
     },
     "fmp_financial_scores": {
       "category": "fundamentals",
-      "checked_at": "2026-06-09T12:14:53.102586+00:00",
+      "checked_at": "2026-06-10T00:48:30.812324+00:00",
       "credit_cost": 1,
       "derived_table": "company_facts",
       "doc_url": "https://site.financialmodelingprep.com/developer/docs",
@@ -263,7 +398,7 @@
     },
     "fmp_key_metrics_ttm": {
       "category": "fundamentals",
-      "checked_at": "2026-06-09T12:14:52.977863+00:00",
+      "checked_at": "2026-06-10T00:48:29.910660+00:00",
       "credit_cost": 1,
       "derived_table": "company_facts",
       "doc_url": "https://site.financialmodelingprep.com/developer/docs",
@@ -314,7 +449,7 @@
     },
     "fmp_press_releases": {
       "category": "news",
-      "checked_at": "2026-06-09T12:14:53.424260+00:00",
+      "checked_at": "2026-06-10T00:48:31.849019+00:00",
       "credit_cost": 1,
       "derived_table": "earnings_news_signals",
       "doc_url": "https://site.financialmodelingprep.com/developer/docs",
@@ -324,12 +459,12 @@
       "http_status": 402,
       "provider": "fmp",
       "purpose": "Official company press releases",
-      "retry_after": "2026-07-09",
+      "retry_after": "2026-07-10",
       "status": "entitlement_denied"
     },
     "fmp_profile": {
       "category": "company_facts",
-      "checked_at": "2026-06-09T12:14:52.746214+00:00",
+      "checked_at": "2026-06-10T00:48:29.111867+00:00",
       "credit_cost": 1,
       "derived_table": "company_facts",
       "doc_url": "https://site.financialmodelingprep.com/developer/docs",
@@ -380,7 +515,7 @@
     },
     "fmp_ratings_snapshot": {
       "category": "analyst",
-      "checked_at": "2026-06-09T12:14:52.923626+00:00",
+      "checked_at": "2026-06-10T00:48:29.659081+00:00",
       "credit_cost": 1,
       "derived_table": "company_facts",
       "doc_url": "https://site.financialmodelingprep.com/developer/docs",
@@ -410,7 +545,7 @@
     },
     "fmp_ratios_ttm": {
       "category": "fundamentals",
-      "checked_at": "2026-06-09T12:14:53.025009+00:00",
+      "checked_at": "2026-06-10T00:48:30.207274+00:00",
       "credit_cost": 1,
       "derived_table": "company_facts",
       "doc_url": "https://site.financialmodelingprep.com/developer/docs",
@@ -461,7 +596,7 @@
     },
     "fmp_stock_news": {
       "category": "news",
-      "checked_at": "2026-06-09T12:14:53.472528+00:00",
+      "checked_at": "2026-06-10T00:48:32.105793+00:00",
       "credit_cost": 1,
       "derived_table": "earnings_news_signals",
       "doc_url": "https://site.financialmodelingprep.com/developer/docs",
@@ -471,12 +606,12 @@
       "http_status": 402,
       "provider": "fmp",
       "purpose": "Ticker-specific stock news",
-      "retry_after": "2026-07-09",
+      "retry_after": "2026-07-10",
       "status": "entitlement_denied"
     },
     "fmp_stock_peers": {
       "category": "reference",
-      "checked_at": "2026-06-09T12:14:53.222646+00:00",
+      "checked_at": "2026-06-10T00:48:31.054114+00:00",
       "credit_cost": 1,
       "derived_table": "company_facts",
       "doc_url": "https://site.financialmodelingprep.com/developer/docs",
@@ -501,7 +636,7 @@
     },
     "fmp_symbol_changes": {
       "category": "corporate_actions",
-      "checked_at": "2026-06-09T12:14:53.588970+00:00",
+      "checked_at": "2026-06-10T00:48:32.376325+00:00",
       "credit_cost": 1,
       "derived_table": "corporate_actions",
       "doc_url": "https://site.financialmodelingprep.com/developer/docs",
@@ -511,12 +646,12 @@
       "http_status": 402,
       "provider": "fmp",
       "purpose": "Recent symbol changes",
-      "retry_after": "2026-07-09",
+      "retry_after": "2026-07-10",
       "status": "entitlement_denied"
     },
     "massive_aggregates_daily": {
       "category": "ohlcv",
-      "checked_at": "2026-06-09T12:15:54.242461+00:00",
+      "checked_at": "2026-06-10T00:49:36.720912+00:00",
       "credit_cost": 1,
       "derived_table": null,
       "doc_url": "https://massive.com/docs/rest",
@@ -528,7 +663,7 @@
       "response_shape": {
         "has_data": true,
         "kind": "json_object",
-        "row_count": 6,
+        "row_count": 5,
         "sample_keys": [
           "c",
           "h",
@@ -554,7 +689,7 @@
     },
     "massive_dividends": {
       "category": "corporate_actions",
-      "checked_at": "2026-06-09T12:14:54.148595+00:00",
+      "checked_at": "2026-06-10T00:48:36.624885+00:00",
       "credit_cost": 1,
       "derived_table": "corporate_actions",
       "doc_url": "https://massive.com/docs/rest",
@@ -590,7 +725,7 @@
     },
     "massive_financials": {
       "category": "fundamentals",
-      "checked_at": "2026-06-09T12:14:54.254078+00:00",
+      "checked_at": "2026-06-10T00:48:37.179485+00:00",
       "credit_cost": 1,
       "derived_table": "company_facts",
       "doc_url": "https://massive.com/docs/rest",
@@ -626,22 +761,22 @@
     },
     "massive_ipos": {
       "category": "corporate_actions",
-      "checked_at": "2026-06-09T12:15:54.407992+00:00",
+      "checked_at": "2026-06-10T00:49:37.183534+00:00",
       "credit_cost": 1,
       "derived_table": "corporate_actions",
       "doc_url": "https://massive.com/docs/rest",
       "endpoint": "massive_ipos",
-      "error": "{\"status\":\"ERROR\",\"request_id\":\"7dcac099c18c781ba24f7db8db7a7914\",\"error\":\"sort field is invalid: ipo_date.desc\"}",
+      "error": "{\"status\":\"ERROR\",\"request_id\":\"dcc29ad852d7f53e3e60d68c4b9cd698\",\"error\":\"sort field is invalid: ipo_date.desc\"}",
       "heavy": false,
       "http_status": 400,
       "provider": "massive",
       "purpose": "IPO reference data",
-      "retry_after": "2026-06-10",
+      "retry_after": "2026-06-11",
       "status": "http_error"
     },
     "massive_market_status": {
       "category": "reference",
-      "checked_at": "2026-06-09T12:15:54.355616+00:00",
+      "checked_at": "2026-06-10T00:49:36.971899+00:00",
       "credit_cost": 1,
       "derived_table": null,
       "doc_url": "https://massive.com/docs/rest",
@@ -669,7 +804,7 @@
     },
     "massive_options_snapshot": {
       "category": "options",
-      "checked_at": "2026-06-09T12:15:54.076859+00:00",
+      "checked_at": "2026-06-10T00:49:36.407594+00:00",
       "credit_cost": 1,
       "derived_table": "options_provider_signals",
       "doc_url": "https://massive.com/docs/rest/options/snapshots/option-chain-snapshot",
@@ -686,7 +821,6 @@
           "day",
           "details",
           "greeks",
-          "implied_volatility",
           "open_interest",
           "underlying_asset"
         ],
@@ -701,7 +835,7 @@
     },
     "massive_related_tickers": {
       "category": "reference",
-      "checked_at": "2026-06-09T12:14:53.909347+00:00",
+      "checked_at": "2026-06-10T00:48:36.099791+00:00",
       "credit_cost": 1,
       "derived_table": "company_facts",
       "doc_url": "https://massive.com/docs/rest",
@@ -728,7 +862,7 @@
     },
     "massive_short_interest": {
       "category": "sentiment",
-      "checked_at": "2026-06-09T12:15:53.962659+00:00",
+      "checked_at": "2026-06-10T00:49:36.087109+00:00",
       "credit_cost": 1,
       "derived_table": "company_facts",
       "doc_url": "https://massive.com/docs/rest",
@@ -759,7 +893,7 @@
     },
     "massive_splits": {
       "category": "corporate_actions",
-      "checked_at": "2026-06-09T12:14:54.201736+00:00",
+      "checked_at": "2026-06-10T00:48:36.898212+00:00",
       "credit_cost": 1,
       "derived_table": "corporate_actions",
       "doc_url": "https://massive.com/docs/rest",
@@ -789,7 +923,7 @@
     },
     "massive_stock_news": {
       "category": "news",
-      "checked_at": "2026-06-09T12:14:54.003113+00:00",
+      "checked_at": "2026-06-10T00:48:36.373910+00:00",
       "credit_cost": 1,
       "derived_table": "earnings_news_signals",
       "doc_url": "https://massive.com/docs/rest",
@@ -827,7 +961,7 @@
     },
     "massive_ticker_overview": {
       "category": "company_facts",
-      "checked_at": "2026-06-09T12:14:53.826748+00:00",
+      "checked_at": "2026-06-10T00:48:35.857586+00:00",
       "credit_cost": 1,
       "derived_table": "company_facts",
       "doc_url": "https://massive.com/docs/rest",
@@ -851,7 +985,7 @@
     },
     "td_press_releases": {
       "category": "news",
-      "checked_at": "2026-06-09T12:16:53.909552+00:00",
+      "checked_at": "2026-06-10T00:50:36.104135+00:00",
       "credit_cost": 1,
       "derived_table": "earnings_news_signals",
       "doc_url": "https://twelvedata.com/docs/fundamentals/last-changes",
@@ -880,7 +1014,7 @@
       "status": "ok"
     }
   },
-  "generated_at": "2026-06-09T12:16:54.068229+00:00",
+  "generated_at": "2026-06-10T00:50:36.653105+00:00",
   "notes": [
     "Entitlement probes store only status/shape metadata, never raw provider payloads.",
     "entitlement_denied endpoints are retried after 30 days by default."
