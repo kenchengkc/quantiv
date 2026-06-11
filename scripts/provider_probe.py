@@ -25,6 +25,10 @@ from provider_utils import (
 CAPABILITIES_PATH = default_data_dir() / "provider_capabilities.json"
 ENTITLEMENT_RETRY_DAYS = 30
 QUOTA_RETRY_DAYS = 1
+# Healthy endpoints don't need daily re-verification — re-probing all of them
+# burned ~10 AV calls/day (a quarter of the pooled budget) confirming what the
+# enrichment run would surface anyway if it broke.
+OK_RECHECK_DAYS = 7
 
 
 def _retry_after(days: int, now: datetime) -> str:
@@ -200,7 +204,13 @@ def classify_response(spec: EndpointSpec, response: Any, *, now: datetime | None
     if spec.response_kind == "csv" or "text/csv" in content_type:
         summary = summarize_payload(text, response_kind="csv")
         status = "ok" if summary["has_data"] else "empty"
-        return {"status": status, "http_status": status_code, "response_shape": summary}
+        retry_days = QUOTA_RETRY_DAYS if status == "empty" else OK_RECHECK_DAYS
+        return {
+            "status": status,
+            "http_status": status_code,
+            "response_shape": summary,
+            "retry_after": _retry_after(retry_days, now),
+        }
 
     payload, parse_error = _parse_json_response(response)
     if parse_error:
@@ -228,6 +238,8 @@ def classify_response(spec: EndpointSpec, response: Any, *, now: datetime | None
     out = {"status": status, "http_status": status_code, "response_shape": summary}
     if status == "empty":
         out["retry_after"] = _retry_after(QUOTA_RETRY_DAYS, now)
+    else:
+        out["retry_after"] = _retry_after(OK_RECHECK_DAYS, now)
     return out
 
 

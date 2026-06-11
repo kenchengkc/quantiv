@@ -128,8 +128,9 @@ def test_key_pool_stacking_extends_daily_budget(tmp_path):
     )
     accounts = ["k0", "k1"]
     chosen = [ledger.reserve_pooled("alphavantage", "av_x", accounts)[0] for _ in range(4)]
-    # Two keys at 2/day each → fills k0 first, then k1: 4 total reservations.
-    assert chosen == ["k0", "k0", "k1", "k1"]
+    # Two keys at 2/day each → least-used balancing alternates keys (k0 wins
+    # ties via stable sort): 4 total reservations.
+    assert chosen == ["k0", "k1", "k0", "k1"]
     assert ledger.used("alphavantage") == 4
     try:
         ledger.reserve_pooled("alphavantage", "av_x", accounts)
@@ -184,6 +185,51 @@ def test_fmp_symbol_blocks_load_prunes_expired_and_malformed(tmp_path):
     blocks = load_fmp_symbol_blocks(path, date(2026, 6, 10))
     assert blocks == {"LIVE": "2026-07-05"}
     assert load_fmp_symbol_blocks(tmp_path / "missing.json", date(2026, 6, 10)) == {}
+
+
+def test_single_key_and_pooled_reserves_share_the_k0_bucket(tmp_path):
+    ledger = ProviderUsageLedger(
+        tmp_path / "ledger.json",
+        budgets={"alphavantage": ProviderBudget(daily_limit=5)},
+    )
+    # A single-key caller (e.g. the V/OI probe path) books to k0 by default…
+    ledger.reserve("alphavantage", "av_voi_probe", credits=4)
+    # …so the pool sees that usage and rotates to k1 instead of overdrawing
+    # the same physical key.
+    account, _ = ledger.reserve_pooled(
+        "alphavantage", "av_earnings", ["k0", "k1"], credits=2
+    )
+    assert account == "k1"
+
+
+def test_reserve_pooled_prefers_least_used_key(tmp_path):
+    ledger = ProviderUsageLedger(
+        tmp_path / "ledger.json",
+        budgets={"alphavantage": ProviderBudget(daily_limit=10)},
+    )
+    ledger.reserve("alphavantage", "seed", credits=3, account="k0")
+    account, _ = ledger.reserve_pooled(
+        "alphavantage", "av_earnings", ["k0", "k1"], credits=1
+    )
+    assert account == "k1"
+    # Now k1 has 1 used vs k0's 3 — still k1 until it catches up.
+    account, _ = ledger.reserve_pooled(
+        "alphavantage", "av_earnings", ["k0", "k1"], credits=1
+    )
+    assert account == "k1"
+
+
+def test_ok_probe_results_get_weekly_recheck_window():
+    now = datetime(2026, 6, 11, tzinfo=timezone.utc)
+    spec = [s for s in endpoint_specs("AAPL") if s.id == "av_earnings"][0]
+    out = classify_response(spec, success_response_for(spec), now=now)
+    assert out["status"] == "ok"
+    assert out["retry_after"] == "2026-06-18"
+    # And select_specs honors it: a healthy endpoint inside its recheck
+    # window is not re-probed.
+    capabilities = {"endpoints": {"av_earnings": out}}
+    ids = {spec.id for spec in select_specs(capabilities=capabilities, now=now)}
+    assert "av_earnings" not in ids
 
 
 def test_capability_probe_due_skips_future_retry_after():
