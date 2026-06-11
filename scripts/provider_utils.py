@@ -259,7 +259,7 @@ class ProviderUsageLedger:
         for event in state.get("events", []):
             if not isinstance(event, dict) or event.get("provider") != provider:
                 continue
-            if account is not None and event.get("account", "default") != account:
+            if account is not None and event.get("account", "k0") != account:
                 continue
             try:
                 at = datetime.fromisoformat(str(event.get("at")).replace("Z", "+00:00"))
@@ -306,7 +306,12 @@ class ProviderUsageLedger:
         symbols: list[str] | None = None,
         wait_for_minute: bool = False,
         sleep_fn: Callable[[float], None] = time.sleep,
-        account: str = "default",
+        # "k0" matches reserve_pooled's first stacked key so single-key
+        # callers and the pool share ONE bucket per physical key. A separate
+        # "default" bucket let the same key be double-budgeted (seen 2026-06-10:
+        # AV key #1 blocked at its real 25/day while the pool's k0 bucket still
+        # showed headroom, so rotation to key #2 never happened).
+        account: str = "k0",
     ) -> int:
         credits = max(0, int(credits))
         if credits == 0:
@@ -354,7 +359,7 @@ class ProviderUsageLedger:
             "credits": credits,
             "symbols": (symbols or [])[:50],
         }
-        if account != "default":
+        if account != "k0":
             event["account"] = account
         state.setdefault("events", []).append(event)
         self.write(state)
@@ -379,7 +384,7 @@ class ProviderUsageLedger:
         ProviderQuotaError only when every key's daily budget is exhausted.
         """
         if not accounts:
-            accounts = ["default"]
+            accounts = ["k0"]
         budget = self.budgets.get(provider, ProviderBudget(daily_limit=None))
         now = self.now_fn()
 
@@ -390,6 +395,10 @@ class ProviderUsageLedger:
                 or self.used(provider, account) + credits <= budget.daily_limit
             ):
                 daily_ok.append(account)
+        # Balance load across keys instead of draining the first to its cap —
+        # leaves headroom on each physical key for unledgered callers (e.g. the
+        # AV V/OI probe hits key #1 directly) and provider-side miscounting.
+        daily_ok.sort(key=lambda acct: self.used(provider, acct))
         if not daily_ok:
             raise ProviderQuotaError(
                 f"{provider} daily budget exhausted across {len(accounts)} key(s)"

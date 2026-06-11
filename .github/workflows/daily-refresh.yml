@@ -164,7 +164,7 @@ jobs:
           POLYGON_API_KEY: ${{ secrets.POLYGON_API_KEY }}
           TWELVEDATA_API_KEY: ${{ secrets.TWELVEDATA_API_KEY }}
           FMP_DAILY_CALL_LIMIT: "215"          # leaves room for FMP earnings overlay
-          ALPHAVANTAGE_DAILY_CALL_LIMIT: "25" # per stacked key (×2 keys ≈ 50/day)
+          ALPHAVANTAGE_DAILY_CALL_LIMIT: "20" # per stacked key; 25 is AV's real cap — 5/key headroom covers the unledgered V/OI probe on key #1
           TWELVEDATA_DAILY_CREDIT_LIMIT: "72" # leaves 720 credits for frontend fallback
           MASSIVE_MINUTE_CALL_LIMIT: "5"
         run: |
@@ -184,7 +184,7 @@ jobs:
           POLYGON_API_KEY: ${{ secrets.POLYGON_API_KEY }}
           TWELVEDATA_API_KEY: ${{ secrets.TWELVEDATA_API_KEY }}
           FMP_DAILY_CALL_LIMIT: "215"
-          ALPHAVANTAGE_DAILY_CALL_LIMIT: "25"
+          ALPHAVANTAGE_DAILY_CALL_LIMIT: "20"
           TWELVEDATA_DAILY_CREDIT_LIMIT: "72"
           MASSIVE_MINUTE_CALL_LIMIT: "5"
         run: |
@@ -465,7 +465,7 @@ jobs:
           # with [ -f ... ] guards so a missing file (e.g. the changes
           # log on the very first run, before any diff entries land)
           # doesn't tank the commit step with a pathspec error.
-          for f in data/popular_snapshot.json data/popular_changes.jsonl data/fmp_earnings_metadata.json data/fmp_earnings_backfill_state.json data/alpha_vantage_voi_probe.json data/provider_capabilities.json data/provider_usage_ledger.json data/event_signals_panel.jsonl data/provider_enrichments/metadata.json data/provider_enrichments/earnings_news_signals.json data/provider_enrichments/company_facts.json data/provider_enrichments/options_provider_signals.json data/provider_enrichments/corporate_actions.json data/provider_enrichments/live_market_signals.json data/delisting_watch.json; do
+          for f in data/popular_snapshot.json data/popular_changes.jsonl data/fmp_earnings_metadata.json data/fmp_earnings_backfill_state.json data/alpha_vantage_voi_probe.json data/provider_capabilities.json data/provider_usage_ledger.json data/event_signals_panel.jsonl data/provider_enrichments/metadata.json data/provider_enrichments/earnings_news_signals.json data/provider_enrichments/company_facts.json data/provider_enrichments/options_provider_signals.json data/provider_enrichments/corporate_actions.json data/provider_enrichments/live_market_signals.json data/provider_enrichments/fmp_symbol_blocks.json data/delisting_watch.json; do
             if [ -f "$f" ]; then
               git add -f "$f"
             else
