@@ -1,0 +1,85 @@
+name: Afternoon AV enrichment
+
+# Second Alpha Vantage pass on a separate runner. AV enforces its ~25/day free
+# cap per IP, not per key (verified 2026-06-10/11 — see daily-refresh.yml), so
+# stacked keys inside the morning run share one allowance. A separate workflow
+# run gets a fresh runner IP and therefore a fresh ~25-call budget, which we
+# spend on the option-flow endpoints whose intraday values move during the
+# session (put/call, V/OI) plus a second earnings pass.
+#
+# Isolation from the morning run:
+#   • --ledger uses a fresh per-run file (the committed morning ledger would
+#     show both keys exhausted). 10/key keeps per-key cumulative use across
+#     both runs ≤ ~25 in case AV also tracks per key.
+#   • --output-dir writes to data/provider_enrichments_pm/ so the morning
+#     tables are never clobbered; consumers can union both dirs.
+on:
+  schedule:
+    # 18:30 UTC = 14:30 ET during EDT — mid-session option flow, ~6h after
+    # the 11:00 UTC daily refresh.
+    - cron: '30 18 * * 1-5'
+  workflow_dispatch: {}
+
+concurrency:
+  group: av-enrichment
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  enrich:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests python-dotenv
+
+      - name: AV-only enrichment (fresh runner IP = fresh AV allowance)
+        env:
+          ALPHAVANTAGE_API_KEY: ${{ secrets.ALPHAVANTAGE_API_KEY }}
+          ALPHAVANTAGE_API_KEY_2: ${{ secrets.ALPHAVANTAGE_API_KEY_2 }}
+          ALPHAVANTAGE_DAILY_CALL_LIMIT: "10"
+        run: |
+          python scripts/sync_provider_enrichments.py \
+            --allow-missing-key \
+            --providers alphavantage \
+            --max-symbols 16 \
+            --max-total-calls 25 \
+            --ledger data/provider_usage_ledger_pm.json \
+            --output-dir data/provider_enrichments_pm \
+            --respect-minute-limits
+
+      - name: Commit results
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name  "Quantiv bot"
+          # /data/ is broadly gitignored — force-add each output explicitly.
+          for f in data/provider_usage_ledger_pm.json \
+                   data/provider_enrichments_pm/metadata.json \
+                   data/provider_enrichments_pm/company_facts.json \
+                   data/provider_enrichments_pm/options_provider_signals.json \
+                   data/provider_enrichments_pm/earnings_news_signals.json \
+                   data/provider_enrichments_pm/corporate_actions.json \
+                   data/provider_enrichments_pm/live_market_signals.json \
+                   data/provider_enrichments_pm/fmp_symbol_blocks.json; do
+            if [ -f "$f" ]; then
+              git add -f "$f"
+            else
+              echo "skipping $f (not present)"
+            fi
+          done
+          if git diff --staged --quiet; then
+            echo "No afternoon enrichment changes to commit"
+          else
+            git commit -m "afternoon AV enrichment $(date -u +%Y-%m-%d)"
+            bash scripts/git_push_with_retry.sh origin main
+          fi

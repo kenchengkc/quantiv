@@ -689,15 +689,21 @@ def build_work(
     capabilities: dict[str, Any],
     ignore_capabilities: bool,
     cadences: set[str] | None = None,
+    providers: set[str] | None = None,
 ) -> list[tuple[str, EndpointSpec]]:
     # Default: only daily-cadence endpoints. Weekly/monthly reference and macro
     # endpoints run when their cadence is explicitly enabled; "off" endpoints
-    # (retired redundancies) never auto-run.
+    # (retired redundancies) never auto-run. `providers` narrows the run to a
+    # subset (e.g. the afternoon AV-only workflow, which exists because Alpha
+    # Vantage enforces its daily cap per IP — a separate runner gets a fresh
+    # allowance).
     cadences = cadences or {"daily"}
     work: list[tuple[str, EndpointSpec]] = []
     for endpoint_id in WORK_ORDER:
         # Use the first symbol to decide whether this endpoint is symbol-scoped.
         base_spec = endpoint_specs_by_id(symbols[0] if symbols else "AAPL")[endpoint_id]
+        if providers and base_spec.provider not in providers:
+            continue
         if getattr(base_spec, "cadence", "daily") not in cadences:
             continue
         if not ignore_capabilities and not capability_is_ok(capabilities, endpoint_id):
@@ -736,6 +742,14 @@ def main() -> int:
             "slow-changing reference and macro endpoints."
         ),
     )
+    parser.add_argument(
+        "--providers",
+        default="",
+        help=(
+            "Comma/space-separated provider subset (fmp, alphavantage, massive, "
+            "twelvedata). Default: all providers."
+        ),
+    )
     parser.add_argument("--delay", type=float, default=0.0)
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--ignore-capabilities", action="store_true")
@@ -755,6 +769,14 @@ def main() -> int:
         return 1
 
     cadences = {c.strip().lower() for c in args.cadences.split(",") if c.strip()} or {"daily"}
+    providers = {
+        p.strip().lower() for p in args.providers.replace(",", " ").split() if p.strip()
+    } or None
+    if providers:
+        allowed = {"fmp", "alphavantage", "massive", "twelvedata"}
+        unknown = providers - allowed
+        if unknown:
+            parser.error(f"unknown provider(s): {', '.join(sorted(unknown))}")
     capabilities = load_capabilities(args.capabilities)
     work = build_work(
         symbols,
@@ -762,6 +784,7 @@ def main() -> int:
         capabilities=capabilities,
         ignore_capabilities=args.ignore_capabilities,
         cadences=cadences,
+        providers=providers,
     )
     print(
         "Provider enrichment sync: "
