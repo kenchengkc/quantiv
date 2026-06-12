@@ -164,7 +164,14 @@ jobs:
           POLYGON_API_KEY: ${{ secrets.POLYGON_API_KEY }}
           TWELVEDATA_API_KEY: ${{ secrets.TWELVEDATA_API_KEY }}
           FMP_DAILY_CALL_LIMIT: "215"          # leaves room for FMP earnings overlay
-          ALPHAVANTAGE_DAILY_CALL_LIMIT: "20" # per stacked key; 25 is AV's real cap — 5/key headroom covers the unledgered V/OI probe on key #1
+          # AV enforces ~25/day per IP, not per key (verified 06-10 + 06-11:
+          # runs from one runner got exactly ~25 calls total before BOTH keys
+          # were refused, regardless of per-key usage). Stacked keys in one
+          # run do NOT multiply quota. 10/key × 2 keys = 20 ledgered + 5
+          # unledgered V/OI-probe calls = the 25/IP physical ceiling.
+          # To actually use both keys' quotas, AV work must be split across
+          # separate workflow runs (different runner IPs).
+          ALPHAVANTAGE_DAILY_CALL_LIMIT: "10"
           TWELVEDATA_DAILY_CREDIT_LIMIT: "72" # leaves 720 credits for frontend fallback
           MASSIVE_MINUTE_CALL_LIMIT: "5"
         run: |
@@ -184,7 +191,7 @@ jobs:
           POLYGON_API_KEY: ${{ secrets.POLYGON_API_KEY }}
           TWELVEDATA_API_KEY: ${{ secrets.TWELVEDATA_API_KEY }}
           FMP_DAILY_CALL_LIMIT: "215"
-          ALPHAVANTAGE_DAILY_CALL_LIMIT: "20"
+          ALPHAVANTAGE_DAILY_CALL_LIMIT: "10"
           TWELVEDATA_DAILY_CREDIT_LIMIT: "72"
           MASSIVE_MINUTE_CALL_LIMIT: "5"
         run: |
