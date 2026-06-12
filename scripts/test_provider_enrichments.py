@@ -18,6 +18,7 @@ from provider_utils import (  # noqa: E402
     massive_api_key,
 )
 from sync_provider_enrichments import (  # noqa: E402
+    build_work,
     load_fmp_symbol_blocks,
     normalize_options_signal,
 )
@@ -185,6 +186,18 @@ def test_fmp_symbol_blocks_load_prunes_expired_and_malformed(tmp_path):
     blocks = load_fmp_symbol_blocks(path, date(2026, 6, 10))
     assert blocks == {"LIVE": "2026-07-05"}
     assert load_fmp_symbol_blocks(tmp_path / "missing.json", date(2026, 6, 10)) == {}
+
+
+def test_build_work_filters_to_requested_providers():
+    work = build_work(
+        ["AAPL", "MSFT"],
+        max_total_calls=99,
+        capabilities={},
+        ignore_capabilities=True,
+        providers={"alphavantage"},
+    )
+    assert work
+    assert all(spec.provider == "alphavantage" for _, spec in work)
 
 
 def test_single_key_and_pooled_reserves_share_the_k0_bucket(tmp_path):
