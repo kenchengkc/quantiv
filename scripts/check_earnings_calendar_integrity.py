@@ -247,12 +247,38 @@ def main() -> int:
     # disappearance is expected, not a silent-drop regression.
     retired_trimmed = {t for t in vanished_all if is_retired(t)}
     vanished = vanished_all - foreign_trimmed - retired_trimmed
+    # Finnhub's upcoming-earnings discovery is volatile for illiquid names: a
+    # ticker that only ever appeared via Finnhub (no DoltHub backing) and
+    # carried fewer than --anchor-min-history rows swings in and out of the
+    # feed day to day. Counting those vanishings trips the gate on ordinary
+    # churn, not the silent-drop regression it guards — which removes
+    # DoltHub-backed or established tickers (still counted here) and is caught
+    # harder by the anchor gate below (any ticker with ≥anchor-min-history rows
+    # losing all of them, Finnhub-only included). Exclude finnhub-only
+    # sub-anchor names so a high-churn Finnhub day can't trip the count gate.
+    churn_trimmed: set[str] = set()
+    if "source" in old.columns and vanished:
+        sub = old[old["act_symbol"].isin(vanished)]
+        sub_counts = sub["act_symbol"].value_counts()
+        sub_sources = sub.groupby("act_symbol")["source"].agg(set)
+        churn_trimmed = {
+            t
+            for t in vanished
+            if int(sub_counts.get(t, 0)) < args.anchor_min_history
+            and all("dolthub" not in str(s) for s in sub_sources.get(t, ()))
+        }
+        vanished = vanished - churn_trimmed
     if foreign_trimmed:
         print(f"  ({len(foreign_trimmed):,} foreign-symbol trims excluded from gate)")
     if retired_trimmed:
         print(
             f"  ({len(retired_trimmed):,} delisted/renamed trims excluded from gate: "
             f"{sorted(retired_trimmed)})"
+        )
+    if churn_trimmed:
+        print(
+            f"  ({len(churn_trimmed):,} low-confidence Finnhub-only churn trims "
+            f"excluded from gate: <{args.anchor_min_history} prior rows, no DoltHub backing)"
         )
     if len(vanished) > args.max_ticker_drop:
         sample = sorted(vanished)[:15]
