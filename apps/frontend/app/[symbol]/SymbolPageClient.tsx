@@ -3979,11 +3979,16 @@ export default function SymbolPage({
   const livePrice = liveForSymbol?.price ?? null;
   const quotePending = !quoteReady && livePrice == null;
   const spot = livePrice ?? data.spot_price ?? 0;
-  const livePreviousCloseForChange =
-    intradayForSymbol === null ? null : liveForSymbol?.previousClose ?? null;
+  // Anchor the headline day-change to the OFFICIAL previous close from
+  // batch-price (the Polygon prevclose override), not Alpaca's intraday
+  // previousClose. The intraday value is the prior session's last IEX bar, and
+  // for an AMC earnings reporter that bar already includes part of the
+  // after-hours move — anchoring to it understates the reaction (ADBE read
+  // −1.5% off the ~17:00 after-hours print vs the true −6.4% off the official
+  // close). Fall back to intraday's close only when batch-price has none.
   const previousCloseForChange =
-    intradayForSymbol?.previousClose ?? livePreviousCloseForChange;
-  const useLiveChangeFallback = intradayForSymbol !== null;
+    liveForSymbol?.previousClose ?? intradayForSymbol?.previousClose ?? null;
+  const useLiveChangeFallback = liveForSymbol != null;
   const change =
     livePrice != null && previousCloseForChange != null && previousCloseForChange > 0
       ? livePrice - previousCloseForChange

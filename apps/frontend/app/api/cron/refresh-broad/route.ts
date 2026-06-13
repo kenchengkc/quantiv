@@ -24,7 +24,10 @@ import { fetchLatestTwoSessions } from '@/lib/polygon';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
-export const maxDuration = 60;
+// 90s matches the workflow's curl --max-time: fetchLatestTwoSessions makes up
+// to two grouped-daily calls (latest + prior), each able to spend ~30s
+// streaming the multi-MB payload right after Polygon publishes the day's bar.
+export const maxDuration = 90;
 
 type Tick = { price: number | null; previousClose: number | null };
 type CachedQuote = {

@@ -24,17 +24,22 @@ export async function fetchGroupedDailyCloses(
   const url =
     `${POLYGON_BASE}/v2/aggs/grouped/locale/us/market/stocks/${dateIso}` +
     `?adjusted=true&apiKey=${encodeURIComponent(apiKey)}`;
-  let res: Response;
-  try {
-    res = await fetch(url, { signal: AbortSignal.timeout(20_000) });
-  } catch {
-    return null;
-  }
-  if (!res.ok) return null;
-  const json = (await res.json()) as {
+  let json: {
     resultsCount?: number;
     results?: Array<{ T?: string; c?: number; v?: number }>;
   };
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(30_000) });
+    if (!res.ok) return null;
+    // Read the body INSIDE the try: AbortSignal.timeout governs the whole
+    // request including streaming the ~12k-row, multi-MB payload. Right after
+    // Polygon publishes the day's grouped bar that stream can run long, so a
+    // body-read timeout must be caught here too — otherwise the TimeoutError
+    // escapes and the caller 500s instead of walking back a session.
+    json = (await res.json()) as typeof json;
+  } catch {
+    return null;
+  }
   if (!json.results || json.results.length === 0) return null;
   const out = new Map<string, GroupedClose>();
   for (const r of json.results) {
