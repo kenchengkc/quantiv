@@ -130,6 +130,7 @@ export type IntradayPayload = {
  *    • Finished session (after 17:00, or a weekend/holiday): the full
  *      08:00–17:00 day of the most recent session with bars. */
 const IEX_SESSION_OPEN_MIN = 8 * 60; // 08:00 ET
+const REGULAR_CLOSE_MIN = 16 * 60;   // 16:00 ET — regular-session close
 
 /** Minutes since ET midnight for an ISO timestamp (handles EST/EDT). */
 function etMinutesOf(iso: string): number {
@@ -176,6 +177,18 @@ export async function fetchIntradayBars(
   )) as { bars?: Array<{ t: string; o: number; h: number; l: number; c: number; v: number }> };
 
   const rawBars = Array.isArray(data?.bars) ? data.bars : [];
+  return buildIntradayPayload(rawBars, end);
+}
+
+/** Pure transform from raw Alpaca bars to the intraday payload: pick the most
+ *  recent session's bars (from its 08:00 ET open) and anchor previousClose to
+ *  the prior session's last regular-hours bar. Extracted from fetchIntradayBars
+ *  so the session/previousClose logic is unit-testable without an Alpaca
+ *  round-trip; `end` defines "today" in ET. */
+export function buildIntradayPayload(
+  rawBars: Array<{ t: string; c: number }>,
+  end: Date,
+): IntradayPayload {
   if (rawBars.length === 0) {
     return {
       bars: [],
@@ -201,7 +214,14 @@ export async function fetchIntradayBars(
   const sessionRawBars = sortedBars.filter(
     (b) => etDate(b.t) === sessionDate && etMinutesOf(b.t) >= IEX_SESSION_OPEN_MIN,
   );
-  const priorBars = sortedBars.filter((b) => etDate(b.t) < sessionDate);
+  // Previous close = the prior session's last REGULAR-hours bar (≤16:00 ET).
+  // The IEX feed runs to 17:00, so the chronologically last prior-session bar
+  // is a post-market print; for an AMC earnings reporter that bar already
+  // reflects part of the after-hours move, which would understate the next
+  // session's reaction. Excluding ≥16:00 bars anchors to the regular close.
+  const priorBars = sortedBars.filter(
+    (b) => etDate(b.t) < sessionDate && etMinutesOf(b.t) < REGULAR_CLOSE_MIN,
+  );
   const previousClose =
     priorBars.length > 0 ? priorBars[priorBars.length - 1].c : null;
 
