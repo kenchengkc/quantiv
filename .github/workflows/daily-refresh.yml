@@ -227,13 +227,19 @@ jobs:
           python scripts/accumulate_event_signals.py --lead-days 12 --max-symbols 80
 
       - name: Refresh cached US market holidays
-        # Non-price Finnhub call. This workflow runs before regular quote
-        # polling starts; the script also refuses to run during the live quote
-        # refresh window unless explicitly overridden.
+        # Non-price Finnhub call. A scheduled run can be delayed by GitHub into
+        # the 09:25-16:45 ET quote window (happened 2026-06-15, a ~2h delay put
+        # this step at 09:30 ET); when it is, --skip-during-market-hours makes it
+        # exit 0 rather than fail. The holiday cache changes only a few times a
+        # year, so a skipped day is harmless. A manual run passes
+        # --allow-market-hours to force a refresh. continue-on-error keeps any
+        # holiday-sync hiccup from aborting the data build/commit below — this
+        # metadata refresh must never gate the daily data ship.
+        continue-on-error: true
         env:
           FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
         run: |
-          EXTRA_ARGS=""
+          EXTRA_ARGS="--skip-during-market-hours"
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             EXTRA_ARGS="--allow-market-hours"
           fi
