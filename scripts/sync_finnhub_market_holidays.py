@@ -19,7 +19,10 @@ from typing import Any
 
 import requests
 
-from provider_market_hours import block_finnhub_reserved_window
+from provider_market_hours import (
+    block_finnhub_reserved_window,
+    is_finnhub_reserved_window,
+)
 from sync_finnhub_earnings import load_local_env
 
 
@@ -140,6 +143,16 @@ def main() -> int:
         action="store_true",
         help="Allow non-price Finnhub calls during the 09:25-16:45 ET quote refresh window.",
     )
+    parser.add_argument(
+        "--skip-during-market-hours",
+        action="store_true",
+        help=(
+            "Exit 0 (skip) instead of failing when run inside the 09:25-16:45 ET "
+            "quote window. For scheduled runs that can be delayed into market hours: "
+            "the holiday cache changes rarely, so a skipped day is harmless, whereas "
+            "a hard failure here aborts the whole daily refresh."
+        ),
+    )
     args = parser.parse_args()
 
     token = os.getenv("FINNHUB_API_KEY")
@@ -151,6 +164,12 @@ def main() -> int:
         print(msg, file=sys.stderr)
         return 1
 
+    if args.skip_during_market_hours and is_finnhub_reserved_window():
+        print(
+            "In the 09:25-16:45 ET quote-refresh window; skipping holiday sync "
+            "(cache changes rarely and will refresh on the next off-hours run)"
+        )
+        return 0
     block_finnhub_reserved_window(args.allow_market_hours)
     body = fetch_holidays(token, args.exchange)
     closed, early_closes = split_holidays(body.get("data") or [])
