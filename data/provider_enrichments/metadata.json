@@ -1,23 +1,69 @@
 {
-  "error_count": 15,
+  "error_count": 19,
   "errors": [
     {
-      "endpoint": "massive_dividends",
-      "http_status": 200,
-      "response_shape": {
-        "has_data": false,
-        "kind": "json_object",
-        "row_count": 0,
-        "sample_keys": [],
-        "top_level_keys": [
-          "request_id",
-          "results",
-          "status"
-        ]
-      },
-      "retry_after": "2026-06-14",
-      "status": "empty",
-      "symbol": "CHWY"
+      "endpoint": "fmp_key_metrics_ttm",
+      "error": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/",
+      "http_status": 402,
+      "retry_after": "2026-07-16",
+      "status": "entitlement_denied",
+      "symbol": "ACN"
+    },
+    {
+      "endpoint": "fmp_key_metrics_ttm",
+      "error": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/",
+      "http_status": 402,
+      "retry_after": "2026-07-16",
+      "status": "entitlement_denied",
+      "symbol": "JBL"
+    },
+    {
+      "endpoint": "fmp_key_metrics_ttm",
+      "error": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/",
+      "http_status": 402,
+      "retry_after": "2026-07-16",
+      "status": "entitlement_denied",
+      "symbol": "KR"
+    },
+    {
+      "endpoint": "fmp_key_metrics_ttm",
+      "error": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/",
+      "http_status": 402,
+      "retry_after": "2026-07-16",
+      "status": "entitlement_denied",
+      "symbol": "KMX"
+    },
+    {
+      "endpoint": "fmp_key_metrics_ttm",
+      "error": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/",
+      "http_status": 402,
+      "retry_after": "2026-07-16",
+      "status": "entitlement_denied",
+      "symbol": "LZB"
+    },
+    {
+      "endpoint": "fmp_key_metrics_ttm",
+      "error": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/",
+      "http_status": 402,
+      "retry_after": "2026-07-16",
+      "status": "entitlement_denied",
+      "symbol": "WLY"
+    },
+    {
+      "endpoint": "fmp_key_metrics_ttm",
+      "error": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/",
+      "http_status": 402,
+      "retry_after": "2026-07-16",
+      "status": "entitlement_denied",
+      "symbol": "MU"
+    },
+    {
+      "endpoint": "fmp_key_metrics_ttm",
+      "error": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/",
+      "http_status": 402,
+      "retry_after": "2026-07-16",
+      "status": "entitlement_denied",
+      "symbol": "PAYX"
     },
     {
       "endpoint": "massive_dividends",
@@ -33,45 +79,9 @@
           "status"
         ]
       },
-      "retry_after": "2026-06-14",
+      "retry_after": "2026-06-17",
       "status": "empty",
-      "symbol": "CNM"
-    },
-    {
-      "endpoint": "massive_dividends",
-      "http_status": 200,
-      "response_shape": {
-        "has_data": false,
-        "kind": "json_object",
-        "row_count": 0,
-        "sample_keys": [],
-        "top_level_keys": [
-          "request_id",
-          "results",
-          "status"
-        ]
-      },
-      "retry_after": "2026-06-14",
-      "status": "empty",
-      "symbol": "RH"
-    },
-    {
-      "endpoint": "massive_dividends",
-      "http_status": 200,
-      "response_shape": {
-        "has_data": false,
-        "kind": "json_object",
-        "row_count": 0,
-        "sample_keys": [],
-        "top_level_keys": [
-          "request_id",
-          "results",
-          "status"
-        ]
-      },
-      "retry_after": "2026-06-14",
-      "status": "empty",
-      "symbol": "UNFI"
+      "symbol": "KMX"
     },
     {
       "endpoint": "massive_splits",
@@ -87,7 +97,79 @@
           "status"
         ]
       },
-      "retry_after": "2026-06-14",
+      "retry_after": "2026-06-17",
+      "status": "empty",
+      "symbol": "ACN"
+    },
+    {
+      "endpoint": "massive_splits",
+      "http_status": 200,
+      "response_shape": {
+        "has_data": false,
+        "kind": "json_object",
+        "row_count": 0,
+        "sample_keys": [],
+        "top_level_keys": [
+          "request_id",
+          "results",
+          "status"
+        ]
+      },
+      "retry_after": "2026-06-17",
+      "status": "empty",
+      "symbol": "LZB"
+    },
+    {
+      "endpoint": "massive_splits",
+      "http_status": 200,
+      "response_shape": {
+        "has_data": false,
+        "kind": "json_object",
+        "row_count": 0,
+        "sample_keys": [],
+        "top_level_keys": [
+          "request_id",
+          "results",
+          "status"
+        ]
+      },
+      "retry_after": "2026-06-17",
+      "status": "empty",
+      "symbol": "WLY"
+    },
+    {
+      "endpoint": "massive_splits",
+      "http_status": 200,
+      "response_shape": {
+        "has_data": false,
+        "kind": "json_object",
+        "row_count": 0,
+        "sample_keys": [],
+        "top_level_keys": [
+          "request_id",
+          "results",
+          "status"
+        ]
+      },
+      "retry_after": "2026-06-17",
+      "status": "empty",
+      "symbol": "APOG"
+    },
+    {
+      "endpoint": "massive_splits",
+      "http_status": 200,
+      "response_shape": {
+        "has_data": false,
+        "kind": "json_object",
+        "row_count": 0,
+        "sample_keys": [],
+        "top_level_keys": [
+          "request_id",
+          "results",
+          "status"
+        ]
+      },
+      "retry_after": "2026-06-17",
       "status": "empty",
       "symbol": "ORCL"
     },
@@ -105,7 +187,43 @@
           "status"
         ]
       },
-      "retry_after": "2026-06-14",
+      "retry_after": "2026-06-17",
+      "status": "empty",
+      "symbol": "FDX"
+    },
+    {
+      "endpoint": "massive_splits",
+      "http_status": 200,
+      "response_shape": {
+        "has_data": false,
+        "kind": "json_object",
+        "row_count": 0,
+        "sample_keys": [],
+        "top_level_keys": [
+          "request_id",
+          "results",
+          "status"
+        ]
+      },
+      "retry_after": "2026-06-17",
+      "status": "empty",
+      "symbol": "CCL"
+    },
+    {
+      "endpoint": "massive_splits",
+      "http_status": 200,
+      "response_shape": {
+        "has_data": false,
+        "kind": "json_object",
+        "row_count": 0,
+        "sample_keys": [],
+        "top_level_keys": [
+          "request_id",
+          "results",
+          "status"
+        ]
+      },
+      "retry_after": "2026-06-17",
       "status": "empty",
       "symbol": "CASY"
     },
@@ -123,178 +241,52 @@
           "status"
         ]
       },
-      "retry_after": "2026-06-14",
+      "retry_after": "2026-06-17",
+      "status": "empty",
+      "symbol": "PAYX"
+    },
+    {
+      "endpoint": "massive_splits",
+      "http_status": 200,
+      "response_shape": {
+        "has_data": false,
+        "kind": "json_object",
+        "row_count": 0,
+        "sample_keys": [],
+        "top_level_keys": [
+          "request_id",
+          "results",
+          "status"
+        ]
+      },
+      "retry_after": "2026-06-17",
       "status": "empty",
       "symbol": "ASO"
-    },
-    {
-      "endpoint": "massive_splits",
-      "http_status": 200,
-      "response_shape": {
-        "has_data": false,
-        "kind": "json_object",
-        "row_count": 0,
-        "sample_keys": [],
-        "top_level_keys": [
-          "request_id",
-          "results",
-          "status"
-        ]
-      },
-      "retry_after": "2026-06-14",
-      "status": "empty",
-      "symbol": "CBRL"
-    },
-    {
-      "endpoint": "massive_splits",
-      "http_status": 200,
-      "response_shape": {
-        "has_data": false,
-        "kind": "json_object",
-        "row_count": 0,
-        "sample_keys": [],
-        "top_level_keys": [
-          "request_id",
-          "results",
-          "status"
-        ]
-      },
-      "retry_after": "2026-06-14",
-      "status": "empty",
-      "symbol": "CHWY"
-    },
-    {
-      "endpoint": "massive_splits",
-      "http_status": 200,
-      "response_shape": {
-        "has_data": false,
-        "kind": "json_object",
-        "row_count": 0,
-        "sample_keys": [],
-        "top_level_keys": [
-          "request_id",
-          "results",
-          "status"
-        ]
-      },
-      "retry_after": "2026-06-14",
-      "status": "empty",
-      "symbol": "CNM"
-    },
-    {
-      "endpoint": "massive_splits",
-      "http_status": 200,
-      "response_shape": {
-        "has_data": false,
-        "kind": "json_object",
-        "row_count": 0,
-        "sample_keys": [],
-        "top_level_keys": [
-          "request_id",
-          "results",
-          "status"
-        ]
-      },
-      "retry_after": "2026-06-14",
-      "status": "empty",
-      "symbol": "CPB"
-    },
-    {
-      "endpoint": "massive_splits",
-      "http_status": 200,
-      "response_shape": {
-        "has_data": false,
-        "kind": "json_object",
-        "row_count": 0,
-        "sample_keys": [],
-        "top_level_keys": [
-          "request_id",
-          "results",
-          "status"
-        ]
-      },
-      "retry_after": "2026-06-14",
-      "status": "empty",
-      "symbol": "MTN"
-    },
-    {
-      "endpoint": "massive_splits",
-      "http_status": 200,
-      "response_shape": {
-        "has_data": false,
-        "kind": "json_object",
-        "row_count": 0,
-        "sample_keys": [],
-        "top_level_keys": [
-          "request_id",
-          "results",
-          "status"
-        ]
-      },
-      "retry_after": "2026-06-14",
-      "status": "empty",
-      "symbol": "RH"
-    },
-    {
-      "endpoint": "massive_splits",
-      "http_status": 200,
-      "response_shape": {
-        "has_data": false,
-        "kind": "json_object",
-        "row_count": 0,
-        "sample_keys": [],
-        "top_level_keys": [
-          "request_id",
-          "results",
-          "status"
-        ]
-      },
-      "retry_after": "2026-06-14",
-      "status": "empty",
-      "symbol": "SJM"
-    },
-    {
-      "endpoint": "massive_splits",
-      "http_status": 200,
-      "response_shape": {
-        "has_data": false,
-        "kind": "json_object",
-        "row_count": 0,
-        "sample_keys": [],
-        "top_level_keys": [
-          "request_id",
-          "results",
-          "status"
-        ]
-      },
-      "retry_after": "2026-06-14",
-      "status": "empty",
-      "symbol": "APOG"
     }
   ],
-  "generated_at": "2026-06-13T17:22:29.648522+00:00",
+  "generated_at": "2026-06-16T07:25:06.721419+00:00",
   "planned_calls": 165,
   "symbols": [
+    "ACN",
+    "JBL",
+    "KR",
+    "KMX",
+    "LZB",
+    "WLY",
+    "APOG",
+    "MU",
     "ORCL",
     "ADBE",
+    "FDX",
+    "NKE",
+    "CCL",
     "CASY",
-    "ASO",
-    "CBRL",
-    "CHWY",
-    "CNM",
-    "CPB",
-    "HUBG",
-    "LEN",
-    "MTN",
-    "OXM",
-    "RH",
-    "SJM",
-    "UNFI",
-    "APOG"
+    "PAYX",
+    "ASO"
   ],
   "tables": {
-    "company_facts": 40,
-    "corporate_actions": 20,
+    "company_facts": 52,
+    "corporate_actions": 24,
     "earnings_news_signals": 0,
     "live_market_signals": 0,
     "options_provider_signals": 30
