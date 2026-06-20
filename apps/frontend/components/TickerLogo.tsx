@@ -42,6 +42,7 @@ const LOGO_SOURCE_OVERRIDES: Record<string, LogoSource> = {
   DUK: 'finnhub',
   'BRK.B': 'finnhub',
   LRCX: 'finnhub',
+  MU: 'finnhub', // Logo.dev ticker MU is wrong; Finnhub cache is Micron
   SMR: 'finnhub',
   MRSH: 'finnhub', // Logo.dev returned no image
   // Logo.dev/Finnhub wrong; Parqet carries the correct mark.
