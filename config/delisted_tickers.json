@@ -26,15 +26,10 @@
       "delisted_on": "2026-04-30",
       "source": "manual (user-confirmed go-private)"
     },
-    "IAC": {
-      "reason": "Auto-detected: absent from NASDAQ/NYSE exchange directories for \u22653 consecutive days (likely M&A, bankruptcy, or going-private).",
-      "delisted_on": "2026-06-12",
-      "source": "auto: scripts/detect_delistings.py"
-    },
     "MASI": {
-      "reason": "Auto-detected: absent from NASDAQ/NYSE exchange directories for \u22653 consecutive days (likely M&A, bankruptcy, or going-private).",
-      "delisted_on": "2026-06-13",
-      "source": "auto: scripts/detect_delistings.py"
+      "reason": "Acquired by Danaher Corporation (NYSE: DHR); Masimo delisted from Nasdaq.",
+      "delisted_on": "2026-06-10",
+      "source": "manual (SEC 8-K / Danaher acquisition completed 2026-06-10)"
     },
     "SNCY": {
       "reason": "Acquired by Allegiant Travel Company (NASDAQ: ALGT); Sun Country Airlines delisted from Nasdaq.",
@@ -45,11 +40,6 @@
       "reason": "Acquired by Merck via $53.00/share cash tender offer; Terns Pharmaceuticals delisted.",
       "delisted_on": "2026-05-05",
       "source": "https://www.businesswire.com/news/home/20260505216715/en/Merck-Completes-Acquisition-of-Terns-Pharmaceuticals-Inc."
-    },
-    "VSCO": {
-      "reason": "Auto-detected: absent from NASDAQ/NYSE exchange directories for \u22653 consecutive days (likely M&A, bankruptcy, or going-private).",
-      "delisted_on": "2026-06-12",
-      "source": "auto: scripts/detect_delistings.py"
     }
   }
 }
