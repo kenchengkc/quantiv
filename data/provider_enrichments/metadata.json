@@ -1,6 +1,14 @@
 {
-  "error_count": 10,
+  "error_count": 13,
   "errors": [
+    {
+      "endpoint": "fmp_key_metrics_ttm",
+      "error": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/",
+      "http_status": 402,
+      "retry_after": "2026-07-20",
+      "status": "entitlement_denied",
+      "symbol": "AVAV"
+    },
     {
       "endpoint": "massive_dividends",
       "http_status": 200,
@@ -15,9 +23,27 @@
           "status"
         ]
       },
-      "retry_after": "2026-06-20",
+      "retry_after": "2026-06-21",
       "status": "empty",
       "symbol": "KMX"
+    },
+    {
+      "endpoint": "massive_dividends",
+      "http_status": 200,
+      "response_shape": {
+        "has_data": false,
+        "kind": "json_object",
+        "row_count": 0,
+        "sample_keys": [],
+        "top_level_keys": [
+          "request_id",
+          "results",
+          "status"
+        ]
+      },
+      "retry_after": "2026-06-21",
+      "status": "empty",
+      "symbol": "AVAV"
     },
     {
       "endpoint": "massive_splits",
@@ -33,7 +59,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-06-20",
+      "retry_after": "2026-06-21",
       "status": "empty",
       "symbol": "ACN"
     },
@@ -51,7 +77,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-06-20",
+      "retry_after": "2026-06-21",
       "status": "empty",
       "symbol": "LZB"
     },
@@ -69,25 +95,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-06-20",
-      "status": "empty",
-      "symbol": "WLY"
-    },
-    {
-      "endpoint": "massive_splits",
-      "http_status": 200,
-      "response_shape": {
-        "has_data": false,
-        "kind": "json_object",
-        "row_count": 0,
-        "sample_keys": [],
-        "top_level_keys": [
-          "request_id",
-          "results",
-          "status"
-        ]
-      },
-      "retry_after": "2026-06-20",
+      "retry_after": "2026-06-21",
       "status": "empty",
       "symbol": "APOG"
     },
@@ -105,7 +113,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-06-20",
+      "retry_after": "2026-06-21",
       "status": "empty",
       "symbol": "ORCL"
     },
@@ -123,7 +131,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-06-20",
+      "retry_after": "2026-06-21",
       "status": "empty",
       "symbol": "FDX"
     },
@@ -141,7 +149,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-06-20",
+      "retry_after": "2026-06-21",
       "status": "empty",
       "symbol": "CCL"
     },
@@ -159,7 +167,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-06-20",
+      "retry_after": "2026-06-21",
       "status": "empty",
       "symbol": "CASY"
     },
@@ -177,21 +185,55 @@
           "status"
         ]
       },
-      "retry_after": "2026-06-20",
+      "retry_after": "2026-06-21",
       "status": "empty",
       "symbol": "PAYX"
+    },
+    {
+      "endpoint": "massive_splits",
+      "http_status": 200,
+      "response_shape": {
+        "has_data": false,
+        "kind": "json_object",
+        "row_count": 0,
+        "sample_keys": [],
+        "top_level_keys": [
+          "request_id",
+          "results",
+          "status"
+        ]
+      },
+      "retry_after": "2026-06-21",
+      "status": "empty",
+      "symbol": "ASO"
+    },
+    {
+      "endpoint": "massive_splits",
+      "http_status": 200,
+      "response_shape": {
+        "has_data": false,
+        "kind": "json_object",
+        "row_count": 0,
+        "sample_keys": [],
+        "top_level_keys": [
+          "request_id",
+          "results",
+          "status"
+        ]
+      },
+      "retry_after": "2026-06-21",
+      "status": "empty",
+      "symbol": "AVAV"
     }
   ],
-  "generated_at": "2026-06-19T12:44:55.274724+00:00",
+  "generated_at": "2026-06-20T12:03:51.520829+00:00",
   "planned_calls": 165,
   "symbols": [
     "ACN",
     "JBL",
     "KR",
-    "HUBG",
     "KMX",
     "LZB",
-    "WLY",
     "APOG",
     "MU",
     "ORCL",
@@ -200,11 +242,13 @@
     "NKE",
     "CCL",
     "CASY",
-    "PAYX"
+    "PAYX",
+    "ASO",
+    "AVAV"
   ],
   "tables": {
     "company_facts": 52,
-    "corporate_actions": 25,
+    "corporate_actions": 23,
     "earnings_news_signals": 0,
     "live_market_signals": 0,
     "options_provider_signals": 30
