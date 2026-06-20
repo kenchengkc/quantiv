@@ -30,7 +30,7 @@ import requests
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
-from delisted import delisted_tickers  # noqa: E402
+from delisted import delisted_tickers, ticker_renames  # noqa: E402
 from sync_finnhub_earnings import is_us_symbol  # noqa: E402
 from check_ticker_identity import norm_tokens  # noqa: E402
 
@@ -319,7 +319,8 @@ def main() -> int:
     universe = load_active_universe()
     names = load_names()
     already = {normalize(t) for t in delisted_tickers()}
-    missing_now = universe - listed - already
+    rename_old = {normalize(t) for t in ticker_renames()}
+    missing_now = universe - listed - already - rename_old
 
     # Split missing tickers into ticker RENAMES (the company still trades under
     # a new symbol — e.g. BK→BNY, EXPI→AGNT) and genuine disappearances. Only
@@ -369,6 +370,9 @@ def main() -> int:
     print(f"  listed symbols (NASDAQ/NYSE): {len(listed):,}")
     print(f"  active universe (US):         {len(universe):,}")
     print(f"  already delisted:             {len(already):,}")
+    skipped_renames = (universe - listed - already) & rename_old
+    if skipped_renames:
+        print(f"  ↷ documented renames (skipped): {sorted(skipped_renames)}")
     print(f"  missing from directories:     {len(missing_now):,}")
     if renames:
         print("  ✋ likely ticker renames (review/remap — NOT auto-delisted):")

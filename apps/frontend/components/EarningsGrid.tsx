@@ -477,7 +477,7 @@ function WeekHeader({
           flexWrap: 'wrap',
         }}
       >
-        <div style={{ maxWidth: 560, minWidth: 0 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
           <div
             style={{
               fontSize: 10,
@@ -549,7 +549,7 @@ function WeekHeader({
               letterSpacing: '-0.032em',
               lineHeight: 0.94,
               color: 'var(--ink)',
-              textWrap: 'balance',
+              textWrap: 'pretty',
               textTransform: 'uppercase',
             }}
           >
@@ -569,7 +569,7 @@ function WeekHeader({
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
           <button
             className="chip"
             onClick={() => setOffset(Math.max(MIN_OFFSET, offset - 1))}

@@ -179,7 +179,7 @@ function EarningsGridHeaderFallback({ days }: { days: Date[] }) {
           flexWrap: 'wrap',
         }}
       >
-        <div style={{ maxWidth: 560, minWidth: 0 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
           <div
             style={{
               fontSize: 10,
