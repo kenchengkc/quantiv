@@ -1,0 +1,40 @@
+# Build context for apps/backend/Dockerfile is the REPO ROOT. A fresh git clone
+# is already clean (only tracked files), but this keeps a dirty working tree —
+# 11G data/, .venv, node_modules, apps/ml/.tmp — out of the build context so
+# `docker build` here and on the VM stays fast. None of these are COPYed by the
+# Dockerfile, so excluding them does not change image contents (Railway parity).
+
+# VCS
+.git
+.gitignore
+
+# Large local-only trees (never COPYed)
+/data
+node_modules
+**/node_modules
+.venv
+**/.venv
+**/.tmp
+/.tmp
+
+# This deploy dir's local secrets + reconstructable data cache
+deploy/oracle/.env
+deploy/oracle/data
+
+# Python / build caches
+**/__pycache__
+**/*.pyc
+**/*.pyo
+**/*.egg-info
+.pytest_cache
+.ruff_cache
+.mypy_cache
+.mplcache
+
+# Frontend build output / TS cache
+**/.next
+tsconfig.tsbuildinfo
+
+# Misc
+*.log
+test-results

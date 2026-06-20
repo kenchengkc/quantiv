@@ -1,0 +1,23 @@
+# Caddy fronts the FastAPI backend and provisions/renews a Let's Encrypt cert
+# automatically. The domain + ACME email come from the caddy container env
+# (set in docker-compose.yml; override via API_DOMAIN / ACME_EMAIL in .env).
+#
+# Requirements for the cert to issue:
+#   - api.usequantiv.com must resolve to THIS VM's public IP (A record)
+#   - ports 80 and 443 reachable from the internet (VCN security list + host firewall)
+#   - if the record sits behind Cloudflare's proxy (orange cloud), set it to
+#     "DNS only" (grey cloud) so Caddy can complete the ACME challenge, or switch
+#     to the DNS-01 challenge.
+
+{
+	email {$ACME_EMAIL}
+}
+
+{$API_DOMAIN} {
+	encode zstd gzip
+
+	reverse_proxy api:8000 {
+		health_uri /health
+		health_interval 30s
+	}
+}
