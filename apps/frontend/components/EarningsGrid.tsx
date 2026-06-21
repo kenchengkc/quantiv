@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState, useTransition } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Sun, Moon, Info, ChevronLeft, ChevronRight, Search, Circle, Clock } from 'lucide-react';
@@ -105,6 +105,144 @@ function timingKey(t?: string) {
   if (k === 'dmh' || k === 'during_market_hours' || k === 'during_market_hour') return 'dmh' as const;
   return 'unknown' as const;
 }
+function fmtMovePct(v: number | null | undefined, digits = 1) {
+  if (v == null) return null;
+  return `${(Math.abs(v) * 100).toFixed(digits)}%`;
+}
+
+/** Hover card for the ± expected-move column — ML, implied straddle, typical band. */
+function ExpectedMoveHover({
+  movePct,
+  impliedPct,
+  isCalibrated,
+  bandLo,
+  bandHi,
+  children,
+}: {
+  movePct: number | null;
+  impliedPct: number | null;
+  isCalibrated: boolean;
+  bandLo: number | null | undefined;
+  bandHi: number | null | undefined;
+  children: React.ReactNode;
+}) {
+  const [show, setShow] = useState(false);
+  const timerRef = useRef<number | null>(null);
+
+  const clearTimer = () => {
+    if (timerRef.current !== null) {
+      window.clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+  };
+
+  useEffect(() => () => clearTimer(), []);
+
+  const mlLine = isCalibrated && movePct != null ? fmtMovePct(movePct) : null;
+  const straddleLine =
+    impliedPct != null ? fmtMovePct(impliedPct) : !isCalibrated && movePct != null ? fmtMovePct(movePct) : null;
+  const bandLine =
+    bandLo != null && bandHi != null
+      ? `${fmtMovePct(bandLo, 0)}–${fmtMovePct(bandHi, 0)}`
+      : null;
+  const hasTooltip = mlLine != null || straddleLine != null || bandLine != null;
+
+  return (
+    <div
+      style={{
+        position: 'relative',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'flex-end',
+        flexShrink: 0,
+        whiteSpace: 'nowrap',
+        lineHeight: 1.1,
+      }}
+      onMouseEnter={() => {
+        if (!hasTooltip) return;
+        clearTimer();
+        timerRef.current = window.setTimeout(() => setShow(true), 400);
+      }}
+      onMouseLeave={() => {
+        clearTimer();
+        setShow(false);
+      }}
+      onFocus={() => {
+        if (!hasTooltip) return;
+        setShow(true);
+      }}
+      onBlur={() => setShow(false)}
+    >
+      {children}
+      {show && hasTooltip && (
+        <div
+          role="tooltip"
+          style={{
+            position: 'absolute',
+            right: 0,
+            top: 'calc(100% + 6px)',
+            zIndex: 60,
+            padding: '8px 10px',
+            background: 'linear-gradient(180deg, var(--bg-3), var(--bg-2))',
+            border: '1px solid var(--line-2)',
+            borderRadius: 8,
+            boxShadow: '0 12px 32px rgba(0,0,0,0.55)',
+            minWidth: 168,
+            fontSize: 11,
+            lineHeight: 1.45,
+            color: 'var(--ink-2)',
+            textAlign: 'right',
+            letterSpacing: 0,
+            textTransform: 'none',
+            fontWeight: 400,
+            animation: 'qv-hover-pop 160ms cubic-bezier(.2,.8,.3,1) both',
+            pointerEvents: 'none',
+          }}
+        >
+          {mlLine != null && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+              <span style={{ color: 'var(--ink-3)', fontSize: 10 }}>ML</span>
+              <span className="mono tnum" style={{ color: 'var(--ink)' }}>
+                ±{mlLine}
+              </span>
+            </div>
+          )}
+          {straddleLine != null && (
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                gap: 12,
+                marginTop: mlLine != null ? 4 : 0,
+              }}
+            >
+              <span style={{ color: 'var(--ink-3)', fontSize: 10 }}>Implied</span>
+              <span className="mono tnum" style={{ color: 'var(--ink)' }}>
+                ±{straddleLine}
+              </span>
+            </div>
+          )}
+          {bandLine != null && (
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                gap: 12,
+                marginTop: 4,
+              }}
+            >
+              <span style={{ color: 'var(--ink-3)', fontSize: 10 }}>Typical</span>
+              <span className="mono tnum" style={{ color: 'var(--ink)' }}>
+                {bandLine}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function TickerRow({
   ev,
   live,
@@ -121,15 +259,6 @@ function TickerRow({
   const isCalibrated = ev.em_ml_pct != null;
   const bandLo = ev.p25;
   const bandHi = ev.p75;
-  const moveTitle = isCalibrated
-    ? `ML expected move ±${(movePct! * 100).toFixed(1)}% (calibrated to realized)` +
-      (impliedPct != null ? ` · implied straddle ±${(impliedPct * 100).toFixed(1)}%` : '') +
-      (bandLo != null && bandHi != null
-        ? ` · typical 50% range ${(bandLo * 100).toFixed(1)}–${(bandHi * 100).toFixed(1)}%`
-        : '')
-    : impliedPct != null
-      ? `Implied straddle move ±${(impliedPct * 100).toFixed(1)}%`
-      : '';
   // Prefer the nightly-built realized move; until it lands, fall back to the
   // post-close KV backfill, but only when it's for *this* event's date.
   const realizedFromBackfill =
@@ -231,16 +360,12 @@ function TickerRow({
           </div>
         )}
       </div>
-      <div
-        title={moveTitle}
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'flex-end',
-          flexShrink: 0,
-          whiteSpace: 'nowrap',
-          lineHeight: 1.1,
-        }}
+      <ExpectedMoveHover
+        movePct={movePct}
+        impliedPct={impliedPct}
+        isCalibrated={isCalibrated}
+        bandLo={bandLo}
+        bandHi={bandHi}
       >
         <div className="serif tnum" style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink-2)' }}>
           {movePct != null ? (
@@ -260,7 +385,7 @@ function TickerRow({
             {(bandLo * 100).toFixed(0)}–{(bandHi * 100).toFixed(0)}%
           </div>
         )}
-      </div>
+      </ExpectedMoveHover>
     </Link>
   );
 }
