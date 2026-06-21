@@ -3,10 +3,10 @@
   "as_of_date": "2026-06-19",
   "spot_price": 45.0,
   "expected_move": {
-    "earnings_date": "2026-06-18",
+    "earnings_date": "2026-06-25",
     "expiration": "2026-07-17",
     "dte": 28,
-    "lead_time_days": -1,
+    "lead_time_days": 6,
     "atm_strike": 45.0,
     "atm_iv": 0.519599,
     "straddle_abs": 5.25,
@@ -15,7 +15,17 @@
     "skew_atm": -0.0014,
     "term_slope": null,
     "total_vega": 0.0999,
-    "em_method": "options_math",
+    "em_ml_pct": 0.059736,
+    "em_ml_abs": 2.649296,
+    "correction_factor": 0.512024,
+    "model_horizon": 7,
+    "ml_snapshot_date": "2026-06-18",
+    "p10": 0.009259,
+    "p25": 0.026438,
+    "p50": 0.059261,
+    "p75": 0.099535,
+    "p90": 0.155594,
+    "em_method": "ml_lightgbm",
     "timing": "after_market_close"
   },
   "straddle_features": [
@@ -68,6 +78,21 @@
       "eps_surprise_pct": null,
       "revenue_actual": null,
       "revenue_estimate": 939875052.0,
+      "rev_surprise_pct": null
+    },
+    {
+      "date": "2026-06-25",
+      "timing": "after_market_close",
+      "q": "Q2 26",
+      "fiscal_year": 2026,
+      "fiscal_q": "Q2",
+      "actual": null,
+      "implied": null,
+      "eps_actual": null,
+      "eps_estimate": null,
+      "eps_surprise_pct": null,
+      "revenue_actual": null,
+      "revenue_estimate": null,
       "rev_surprise_pct": null
     },
     {
@@ -219,24 +244,9 @@
       "revenue_actual": null,
       "revenue_estimate": null,
       "rev_surprise_pct": null
-    },
-    {
-      "date": "2025-02-06",
-      "timing": "after_market_close",
-      "q": "Q1 25",
-      "fiscal_year": 2025,
-      "fiscal_q": "Q1",
-      "actual": -0.042283,
-      "implied": null,
-      "eps_actual": null,
-      "eps_estimate": null,
-      "eps_surprise_pct": null,
-      "revenue_actual": null,
-      "revenue_estimate": null,
-      "rev_surprise_pct": null
     }
   ],
-  "next_earnings": "2026-06-18",
+  "next_earnings": "2026-06-25",
   "vol_regime": {
     "iv_current": null,
     "iv_rank": null,
