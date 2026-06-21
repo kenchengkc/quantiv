@@ -6,7 +6,7 @@
 // ADRs (TSM, HDB) can't dominate via log(mcap), high-flow penny semis
 // (AXTI, CLS) can't ride a small-base log(dv) gain into the top.
 // Filtered to v_earnings tickers; top 200 mapped to weights 76..100.
-// Last generated: 2026-06-20; market-cap coverage: 400/400.
+// Last generated: 2026-06-21; market-cap coverage: 400/400.
 
 export const POPULAR_WEIGHT: Record<string, number> = {
   "NVDA": 100,
@@ -125,8 +125,8 @@ export const POPULAR_WEIGHT: Record<string, number> = {
   "CDNS": 93,
   "IBKR": 93,
   "PLD": 93,
-  "PGR": 93,
   "RY": 93,
+  "PGR": 93,
   "CEG": 93,
   "CB": 93,
   "MO": 93,

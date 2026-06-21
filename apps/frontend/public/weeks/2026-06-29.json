@@ -1,7 +1,7 @@
 {
   "metadata": {
     "version": "v4_multi_week",
-    "generated_at": "2026-06-20T12:06:26.438795",
+    "generated_at": "2026-06-21T14:43:42.674485",
     "as_of_date": "2026-06-19",
     "method": "ATM straddle + IV baseline",
     "offset": 1
@@ -38,55 +38,6 @@
       "iv_rank": null,
       "hist_move_avg_4q": 0.119015,
       "iv_crush_pct": 0.209275,
-      "provider_enrichment": {
-        "short_interest": {
-          "provider": "massive",
-          "endpoint": "massive_short_interest",
-          "collected_at": "2026-06-20T11:50:21.695821+00:00",
-          "shares": 4609551,
-          "avg_daily_volume": 1521438,
-          "days_to_cover": 3.03,
-          "settlement_date": "2026-05-29"
-        },
-        "options_flow": {
-          "provider": "massive",
-          "endpoint": "massive_options_snapshot",
-          "collected_at": "2026-06-20T11:50:21.695821+00:00",
-          "contract_count": 250,
-          "call_count": 145,
-          "put_count": 105,
-          "total_call_volume": 2138,
-          "total_put_volume": 691,
-          "total_call_open_interest": 4226,
-          "total_put_open_interest": 1735,
-          "put_call_volume_ratio": 0.323199,
-          "put_call_open_interest_ratio": 0.410554,
-          "iv_coverage_pct": 94.0,
-          "greeks_coverage_pct": 94.0
-        },
-        "flags": [
-          "elevated_short_interest",
-          "call_heavy_flow",
-          "call_heavy_open_interest"
-        ],
-        "signal_score": 0.731083,
-        "sources": [
-          "massive"
-        ],
-        "generated_at": {
-          "company_facts": "2026-06-20T12:03:51.520829+00:00",
-          "options_provider_signals": "2026-06-20T12:03:51.520829+00:00",
-          "corporate_actions": "2026-06-20T12:03:51.520829+00:00",
-          "earnings_news_signals": "2026-06-20T12:03:51.520829+00:00",
-          "live_market_signals": "2026-06-20T12:03:51.520829+00:00"
-        }
-      },
-      "short_days_to_cover": 3.03,
-      "short_interest_shares": 4609551,
-      "put_call_volume_ratio": 0.323199,
-      "put_call_open_interest_ratio": 0.410554,
-      "provider_options_volume": 2829,
-      "provider_signal_score": 0.731083,
       "em_ml_pct": 0.060649,
       "em_ml_abs": 10.428659,
       "correction_factor": 0.328327,
