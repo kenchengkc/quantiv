@@ -157,9 +157,9 @@ test.describe('earnings calendar reaction labels', () => {
     await page.waitForTimeout(1_000);
 
     const row = page.getByRole('link', { name: /CALB/i }).first();
-    await expect(row).toContainText('7.0%');     // calibrated ML move
-    await expect(row).toContainText('4–11%');    // p25–p75 IQR band
-    await expect(row).not.toContainText('13.0%'); // never the raw straddle
+    await expect(row).toContainText('7.0%');        // calibrated ML move
+    await expect(row).toContainText('4.0–11.0%');   // p25–p75 IQR band
+    await expect(row).not.toContainText('13.0%');   // never the raw straddle
   });
 
   test('smoke: real calendar renders the shell and week navigation', async ({ page }) => {
