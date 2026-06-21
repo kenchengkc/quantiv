@@ -143,7 +143,7 @@ function ExpectedMoveHover({
     impliedPct != null ? fmtMovePct(impliedPct) : !isCalibrated && movePct != null ? fmtMovePct(movePct) : null;
   const bandLine =
     bandLo != null && bandHi != null
-      ? `${fmtMovePct(bandLo, 0)}–${fmtMovePct(bandHi, 0)}`
+      ? `${fmtMovePct(bandLo)}–${fmtMovePct(bandHi)}`
       : null;
   const hasTooltip = mlLine != null || straddleLine != null || bandLine != null;
 
@@ -382,7 +382,7 @@ function TickerRow({
             className="mono tnum"
             style={{ fontSize: 8.5, color: 'var(--ink-4)', letterSpacing: '0.02em', marginTop: 1 }}
           >
-            {(bandLo * 100).toFixed(0)}–{(bandHi * 100).toFixed(0)}%
+            {(bandLo * 100).toFixed(1)}–{(bandHi * 100).toFixed(1)}%
           </div>
         )}
       </ExpectedMoveHover>
