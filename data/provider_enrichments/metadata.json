@@ -1,85 +1,31 @@
 {
-  "error_count": 17,
+  "error_count": 9,
   "errors": [
     {
       "endpoint": "fmp_key_metrics_ttm",
       "error": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/",
       "http_status": 402,
-      "retry_after": "2026-07-21",
+      "retry_after": "2026-07-22",
       "status": "entitlement_denied",
-      "symbol": "AYI"
+      "symbol": "GTLS"
     },
     {
-      "endpoint": "fmp_key_metrics_ttm",
-      "error": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/",
-      "http_status": 402,
-      "retry_after": "2026-07-21",
-      "status": "entitlement_denied",
-      "symbol": "CMC"
-    },
-    {
-      "endpoint": "fmp_key_metrics_ttm",
-      "error": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/",
-      "http_status": 402,
-      "retry_after": "2026-07-21",
-      "status": "entitlement_denied",
-      "symbol": "DRI"
-    },
-    {
-      "endpoint": "fmp_key_metrics_ttm",
-      "error": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/",
-      "http_status": 402,
-      "retry_after": "2026-07-21",
-      "status": "entitlement_denied",
-      "symbol": "EPAC"
-    },
-    {
-      "endpoint": "fmp_key_metrics_ttm",
-      "error": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/",
-      "http_status": 402,
-      "retry_after": "2026-07-21",
-      "status": "entitlement_denied",
-      "symbol": "FUL"
-    },
-    {
-      "endpoint": "fmp_key_metrics_ttm",
-      "error": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/",
-      "http_status": 402,
-      "retry_after": "2026-07-21",
-      "status": "entitlement_denied",
-      "symbol": "GIS"
-    },
-    {
-      "endpoint": "fmp_key_metrics_ttm",
-      "error": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/",
-      "http_status": 402,
-      "retry_after": "2026-07-21",
-      "status": "entitlement_denied",
-      "symbol": "JEF"
-    },
-    {
-      "endpoint": "fmp_key_metrics_ttm",
-      "error": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/",
-      "http_status": 402,
-      "retry_after": "2026-07-21",
-      "status": "entitlement_denied",
-      "symbol": "KBH"
-    },
-    {
-      "endpoint": "fmp_key_metrics_ttm",
-      "error": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/",
-      "http_status": 402,
-      "retry_after": "2026-07-21",
-      "status": "entitlement_denied",
-      "symbol": "KFY"
-    },
-    {
-      "endpoint": "fmp_key_metrics_ttm",
-      "error": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/",
-      "http_status": 402,
-      "retry_after": "2026-07-21",
-      "status": "entitlement_denied",
-      "symbol": "MKC"
+      "endpoint": "massive_dividends",
+      "http_status": 200,
+      "response_shape": {
+        "has_data": false,
+        "kind": "json_object",
+        "row_count": 0,
+        "sample_keys": [],
+        "top_level_keys": [
+          "request_id",
+          "results",
+          "status"
+        ]
+      },
+      "retry_after": "2026-06-23",
+      "status": "empty",
+      "symbol": "GTLS"
     },
     {
       "endpoint": "massive_splits",
@@ -95,7 +41,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-06-22",
+      "retry_after": "2026-06-23",
       "status": "empty",
       "symbol": "APOG"
     },
@@ -113,7 +59,25 @@
           "status"
         ]
       },
-      "retry_after": "2026-06-22",
+      "retry_after": "2026-06-23",
+      "status": "empty",
+      "symbol": "GTLS"
+    },
+    {
+      "endpoint": "massive_splits",
+      "http_status": 200,
+      "response_shape": {
+        "has_data": false,
+        "kind": "json_object",
+        "row_count": 0,
+        "sample_keys": [],
+        "top_level_keys": [
+          "request_id",
+          "results",
+          "status"
+        ]
+      },
+      "retry_after": "2026-06-23",
       "status": "empty",
       "symbol": "FDX"
     },
@@ -131,7 +95,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-06-22",
+      "retry_after": "2026-06-23",
       "status": "empty",
       "symbol": "CCL"
     },
@@ -149,7 +113,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-06-22",
+      "retry_after": "2026-06-23",
       "status": "empty",
       "symbol": "PAYX"
     },
@@ -167,7 +131,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-06-22",
+      "retry_after": "2026-06-23",
       "status": "empty",
       "symbol": "AYI"
     },
@@ -185,33 +149,16 @@
           "status"
         ]
       },
-      "retry_after": "2026-06-22",
+      "retry_after": "2026-06-23",
       "status": "empty",
       "symbol": "DRI"
-    },
-    {
-      "endpoint": "massive_splits",
-      "http_status": 200,
-      "response_shape": {
-        "has_data": false,
-        "kind": "json_object",
-        "row_count": 0,
-        "sample_keys": [],
-        "top_level_keys": [
-          "request_id",
-          "results",
-          "status"
-        ]
-      },
-      "retry_after": "2026-06-22",
-      "status": "empty",
-      "symbol": "KFY"
     }
   ],
-  "generated_at": "2026-06-21T12:13:58.314666+00:00",
-  "planned_calls": 165,
+  "generated_at": "2026-06-22T13:23:37.188827+00:00",
+  "planned_calls": 213,
   "symbols": [
     "APOG",
+    "GTLS",
     "MU",
     "FDX",
     "NKE",
@@ -223,14 +170,13 @@
     "EPAC",
     "FUL",
     "GIS",
+    "HUBG",
     "JEF",
-    "KBH",
-    "KFY",
-    "MKC"
+    "KBH"
   ],
   "tables": {
-    "company_facts": 48,
-    "corporate_actions": 28,
+    "company_facts": 96,
+    "corporate_actions": 27,
     "earnings_news_signals": 0,
     "live_market_signals": 0,
     "options_provider_signals": 30
