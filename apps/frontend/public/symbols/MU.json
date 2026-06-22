@@ -15,16 +15,16 @@
     "skew_atm": -0.008929,
     "term_slope": -0.03801,
     "total_vega": 1.7539,
-    "em_ml_pct": 0.064001,
-    "em_ml_abs": 66.765693,
-    "correction_factor": 0.345225,
+    "em_ml_pct": 0.068701,
+    "em_ml_abs": 71.667777,
+    "correction_factor": 0.370572,
     "model_horizon": 7,
     "ml_snapshot_date": "2026-06-17",
-    "p10": 0.009671,
-    "p25": 0.027348,
-    "p50": 0.067323,
-    "p75": 0.131114,
-    "p90": 0.19866,
+    "p10": 0.008247,
+    "p25": 0.025697,
+    "p50": 0.069608,
+    "p75": 0.144733,
+    "p90": 0.1986,
     "em_method": "ml_lightgbm",
     "timing": "after_market_close"
   },
@@ -295,7 +295,7 @@
     "short_interest": {
       "provider": "massive",
       "endpoint": "massive_short_interest",
-      "collected_at": "2026-06-21T12:00:29.274200+00:00",
+      "collected_at": "2026-06-22T13:05:05.232705+00:00",
       "shares": 37549121,
       "avg_daily_volume": 55527691,
       "days_to_cover": 1.0,
@@ -304,18 +304,18 @@
     "options_flow": {
       "provider": "massive",
       "endpoint": "massive_options_snapshot",
-      "collected_at": "2026-06-21T12:00:29.274200+00:00",
+      "collected_at": "2026-06-22T13:05:05.232705+00:00",
       "contract_count": 250,
       "call_count": 250,
       "put_count": 0,
       "total_call_volume": 12600,
       "total_put_volume": 0,
-      "total_call_open_interest": 50581,
+      "total_call_open_interest": 49549,
       "total_put_open_interest": 0,
       "put_call_volume_ratio": 0.0,
       "put_call_open_interest_ratio": 0.0,
-      "iv_coverage_pct": 10.4,
-      "greeks_coverage_pct": 10.4
+      "iv_coverage_pct": 1.6,
+      "greeks_coverage_pct": 1.6
     },
     "corporate_actions": {
       "dividend_events": 5,
@@ -326,12 +326,12 @@
         {
           "provider": "massive",
           "endpoint": "massive_dividends",
-          "collected_at": "2026-06-21T12:00:29.274200+00:00"
+          "collected_at": "2026-06-22T13:05:05.232705+00:00"
         },
         {
           "provider": "massive",
           "endpoint": "massive_splits",
-          "collected_at": "2026-06-21T12:00:29.274200+00:00"
+          "collected_at": "2026-06-22T13:05:05.232705+00:00"
         }
       ]
     },
@@ -344,11 +344,11 @@
       "massive"
     ],
     "generated_at": {
-      "company_facts": "2026-06-21T12:13:58.314666+00:00",
-      "options_provider_signals": "2026-06-21T12:13:58.314666+00:00",
-      "corporate_actions": "2026-06-21T12:13:58.314666+00:00",
-      "earnings_news_signals": "2026-06-21T12:13:58.314666+00:00",
-      "live_market_signals": "2026-06-21T12:13:58.314666+00:00"
+      "company_facts": "2026-06-22T13:23:37.188827+00:00",
+      "options_provider_signals": "2026-06-22T13:23:37.188827+00:00",
+      "corporate_actions": "2026-06-22T13:23:37.188827+00:00",
+      "earnings_news_signals": "2026-06-22T13:23:37.188827+00:00",
+      "live_market_signals": "2026-06-22T13:23:37.188827+00:00"
     }
   },
   "short_days_to_cover": 1.0,
