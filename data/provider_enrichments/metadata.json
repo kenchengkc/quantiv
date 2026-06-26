@@ -1,47 +1,13 @@
 {
-  "error_count": 16,
+  "error_count": 9,
   "errors": [
     {
-      "endpoint": "av_historical_put_call_ratio",
-      "error": "alphavantage daily budget exhausted across 2 key(s)",
-      "status": "quota_blocked",
-      "symbol": "MU"
-    },
-    {
-      "endpoint": "av_historical_put_call_ratio",
-      "error": "alphavantage daily budget exhausted across 2 key(s)",
-      "status": "quota_blocked",
-      "symbol": "FDX"
-    },
-    {
-      "endpoint": "av_historical_put_call_ratio",
-      "error": "alphavantage daily budget exhausted across 2 key(s)",
-      "status": "quota_blocked",
-      "symbol": "NKE"
-    },
-    {
-      "endpoint": "av_historical_voi",
-      "error": "alphavantage daily budget exhausted across 2 key(s)",
-      "status": "quota_blocked",
-      "symbol": "APOG"
-    },
-    {
-      "endpoint": "av_historical_voi",
-      "error": "alphavantage daily budget exhausted across 2 key(s)",
-      "status": "quota_blocked",
-      "symbol": "MU"
-    },
-    {
-      "endpoint": "av_historical_voi",
-      "error": "alphavantage daily budget exhausted across 2 key(s)",
-      "status": "quota_blocked",
-      "symbol": "FDX"
-    },
-    {
-      "endpoint": "av_historical_voi",
-      "error": "alphavantage daily budget exhausted across 2 key(s)",
-      "status": "quota_blocked",
-      "symbol": "NKE"
+      "endpoint": "fmp_key_metrics_ttm",
+      "error": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/",
+      "http_status": 402,
+      "retry_after": "2026-07-26",
+      "status": "entitlement_denied",
+      "symbol": "MLKN"
     },
     {
       "endpoint": "massive_splits",
@@ -57,7 +23,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-06-26",
+      "retry_after": "2026-06-27",
       "status": "empty",
       "symbol": "APOG"
     },
@@ -75,7 +41,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-06-26",
+      "retry_after": "2026-06-27",
       "status": "empty",
       "symbol": "FDX"
     },
@@ -93,7 +59,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-06-26",
+      "retry_after": "2026-06-27",
       "status": "empty",
       "symbol": "CCL"
     },
@@ -111,7 +77,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-06-26",
+      "retry_after": "2026-06-27",
       "status": "empty",
       "symbol": "PAYX"
     },
@@ -129,7 +95,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-06-26",
+      "retry_after": "2026-06-27",
       "status": "empty",
       "symbol": "AYI"
     },
@@ -147,7 +113,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-06-26",
+      "retry_after": "2026-06-27",
       "status": "empty",
       "symbol": "DRI"
     },
@@ -165,32 +131,35 @@
           "status"
         ]
       },
-      "retry_after": "2026-06-26",
+      "retry_after": "2026-06-27",
       "status": "empty",
       "symbol": "KFY"
     },
     {
-      "endpoint": "td_rsi_daily",
-      "error": "{\"code\":429,\"message\":\"You have run out of API credits for the current minute. 9 API credits were used, with the current limit being 8. Wait for the next minute or consider switching to a higher tier plan at https://twelvedata.com/pricing\",",
-      "http_status": 429,
-      "retry_after": "2026-06-26",
-      "status": "quota_limited",
-      "symbol": "FUL"
-    },
-    {
-      "endpoint": "av_ipo_calendar",
-      "error": "alphavantage daily budget exhausted across 2 key(s)",
-      "status": "quota_blocked",
-      "symbol": "__market__"
+      "endpoint": "massive_splits",
+      "http_status": 200,
+      "response_shape": {
+        "has_data": false,
+        "kind": "json_object",
+        "row_count": 0,
+        "sample_keys": [],
+        "top_level_keys": [
+          "request_id",
+          "results",
+          "status"
+        ]
+      },
+      "retry_after": "2026-06-27",
+      "status": "empty",
+      "symbol": "MLKN"
     }
   ],
-  "generated_at": "2026-06-25T12:20:02.091533+00:00",
+  "generated_at": "2026-06-26T12:16:13.463709+00:00",
   "planned_calls": 165,
   "symbols": [
     "APOG",
     "MU",
     "FDX",
-    "NKE",
     "CCL",
     "PAYX",
     "AYI",
@@ -202,13 +171,14 @@
     "JEF",
     "KBH",
     "KFY",
-    "MKC"
+    "MKC",
+    "MLKN"
   ],
   "tables": {
-    "company_facts": 47,
+    "company_facts": 44,
     "corporate_actions": 27,
     "earnings_news_signals": 0,
     "live_market_signals": 0,
-    "options_provider_signals": 23
+    "options_provider_signals": 30
   }
 }
