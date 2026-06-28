@@ -166,7 +166,12 @@ def load_cache() -> dict[str, Any]:
 
 
 def cache_age_days(payload: dict[str, Any]) -> float | None:
-    ts = payload.get("profile_sweep_at") or payload.get("generated_at")
+    # Trust ONLY this sweep's own timestamp. `generated_at` is also bumped by
+    # tools/pull_market_caps.py on every daily refresh, so falling back to it
+    # made the missing-only freshness guard read ~0d every day and skip the
+    # sweep forever (profiles froze at 1, small-cap earners never got logos).
+    # Absent profile_sweep_at → None → caller runs the sweep (and writes it).
+    ts = payload.get("profile_sweep_at")
     if not isinstance(ts, str) or not ts:
         return None
     try:

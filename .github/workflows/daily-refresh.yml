@@ -542,7 +542,11 @@ jobs:
                 echo "Profile sweep auto mode only runs on Saturday UTC (today=$DOW); skipping."
                 exit 0
               fi
-              ARGS="--missing-only"
+              # --force: the Saturday-only gate above already controls cadence,
+              # so bypass the script's internal freshness guard (which is borderline
+              # at exactly 7d between Saturdays and can skip on schedule jitter).
+              # missing-only keeps it cheap — only newly-added earners are fetched.
+              ARGS="--missing-only --force"
               ;;
             missing-only)
               ARGS="--missing-only --force"
