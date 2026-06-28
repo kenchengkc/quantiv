@@ -566,9 +566,15 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             ARGS="$ARGS --allow-market-hours"
           fi
+          # frontend universe = symbol pages + weeks + weekly + screener (~1.5k
+          # rendered tickers, incl. upcoming earnings weeks). The `earnings`
+          # universe (~7.9k) is almost all historical/delisted symbols from
+          # earnings_calendar.csv that never render a logo — no point fetching
+          # profiles for them. check_ticker_identity.py skips symbols without a
+          # cached profile, so it's unaffected.
           python -u scripts/sync_finnhub_profiles.py \
             --allow-missing-key \
-            --universe earnings \
+            --universe frontend \
             $ARGS
           python scripts/check_ticker_identity.py
 
