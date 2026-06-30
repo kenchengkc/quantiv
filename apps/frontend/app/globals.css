@@ -33,13 +33,6 @@
   --flag:      oklch(0.80 0.12 80);
 }
 
-/* Homepage splash gate — the inline beforeInteractive script sets
-   data-splash-gate on first visit so SSR calendar HTML never paints one
-   frame before the intro animation. Returning sessions skip the attribute. */
-html[data-splash-gate='1'] .quantiv-app-shell {
-  visibility: hidden;
-}
-
 @layer base {
   html, body {
     background: var(--bg);

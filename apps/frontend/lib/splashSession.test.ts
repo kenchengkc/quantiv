@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { SPLASH_GATE_SCRIPT, SPLASH_SESSION_KEY } from './splashSession';
+import { SPLASH_SESSION_KEY, markSplashPlayed, splashAlreadyPlayed } from './splashSession';
 
 describe('splashSession', () => {
-  it('gate script references the shared session key', () => {
-    expect(SPLASH_GATE_SCRIPT).toContain(SPLASH_SESSION_KEY);
-    expect(SPLASH_GATE_SCRIPT).toContain('data-splash-gate');
+  it('round-trips the played flag through sessionStorage', () => {
+    window.sessionStorage.removeItem(SPLASH_SESSION_KEY);
+    expect(splashAlreadyPlayed()).toBe(false);
+    markSplashPlayed();
+    expect(window.sessionStorage.getItem(SPLASH_SESSION_KEY)).toBe('1');
+    expect(splashAlreadyPlayed()).toBe(true);
   });
 });
