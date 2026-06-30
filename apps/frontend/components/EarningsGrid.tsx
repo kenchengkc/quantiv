@@ -21,6 +21,7 @@ import {
 } from '@/lib/earningsReaction';
 import {
   hasWeekCache,
+  primeWeekMemory,
   readLiveQuoteCache,
   readWeekCache,
   writeLiveQuoteCache,
@@ -55,7 +56,7 @@ interface EarningsEvent {
   realized_move_pct?: number | null;
 }
 
-interface WeeklyData {
+export interface WeeklyData {
   metadata: { as_of_date: string; method: string; offset?: number };
   window: { start: string; end: string };
   events: EarningsEvent[];
@@ -819,9 +820,14 @@ function WeekHeader({
 export default function EarningsGrid({
   initialOffset = 0,
   initialFilter = 'popular',
+  initialData = null,
 }: {
   initialOffset?: number;
   initialFilter?: Filter;
+  // Current-week calendar (weekly.json) rendered into the server HTML so the
+  // grid — the LCP element — paints from the first byte instead of after a
+  // hydrate → fetch → 750ms-hold round-trip. Only supplied for offset 0.
+  initialData?: WeeklyData | null;
 }) {
   // Triggers the one-time EDGAR ticker-names fetch + re-render on
   // arrival so non-S&P-500 tickers in the weekly view get their real
@@ -860,6 +866,14 @@ export default function EarningsGrid({
     d.setDate(d.getDate() + 7 * initialOffset);
     return isoDay(d);
   })();
+  // Fold the server-rendered week into the in-memory cache before the warm
+  // flags below read it, so SSR + first client render both paint the grid
+  // (no skeleton, no 750ms hold, no quote-wait). The mount effect still
+  // revalidates from the CDN, so a stale build-time copy self-heals. If the
+  // server/client week anchor disagrees (rare TZ-at-week-boundary case) this
+  // key won't match initialWeekIso and we fall back to the cold fetch path.
+  const ssrSeedIso = initialData?.window?.start?.slice(0, 10) ?? null;
+  if (ssrSeedIso) primeWeekMemory(ssrSeedIso, initialData);
   const warmStart = hasWeekCache(initialWeekIso);
   const [data, setData] = useState<WeeklyData | null>(
     () => readWeekCache<WeeklyData>(initialWeekIso),

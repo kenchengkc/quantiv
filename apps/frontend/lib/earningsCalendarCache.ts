@@ -94,3 +94,12 @@ export function writeWeekCache<T>(iso: string, data: T) {
 export function hasWeekCache(iso: string): boolean {
   return weekMemory.has(iso) || readSession(WEEK_PREFIX + iso) != null;
 }
+
+/** Seed the in-memory week cache only (no sessionStorage write). Lets the
+ *  server-rendered first paint flow through the same warm-path gating as a
+ *  cached week — the calendar renders straight from SSR HTML with no skeleton
+ *  hold or client round-trip. Safe to call during render: it's an idempotent
+ *  Map set, and the mount effect still revalidates from the CDN afterwards. */
+export function primeWeekMemory<T>(iso: string, data: T) {
+  if (!weekMemory.has(iso)) weekMemory.set(iso, data);
+}
