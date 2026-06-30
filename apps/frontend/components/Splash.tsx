@@ -3,10 +3,8 @@
 import { useEffect, useLayoutEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import {
-  clearSplashGate,
   markSplashPlayed,
   splashAlreadyPlayed,
-  SPLASH_SESSION_KEY,
 } from '@/lib/splashSession';
 
 // Once-per-session intro. The sequence starts with a closed ring, opens the
@@ -59,12 +57,8 @@ export function Splash() {
   });
 
   useLayoutEffect(() => {
-    if (!isHomepage) {
-      clearSplashGate();
-      return;
-    }
+    if (!isHomepage) return;
     if (shouldSkipSplash()) {
-      clearSplashGate();
       setPhase('done');
     }
   }, [isHomepage]);
@@ -90,14 +84,9 @@ export function Splash() {
   }, [phase]);
 
   useEffect(() => {
-    if (phase === 'play') clearSplashGate();
-  }, [phase]);
-
-  useEffect(() => {
     if (phase !== 'play') return;
     const t = window.setTimeout(() => {
       markSplashPlayed();
-      clearSplashGate();
       setPhase('done');
     }, TOTAL_MS);
     return () => window.clearTimeout(t);

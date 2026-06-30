@@ -1,9 +1,5 @@
-/** Shared splash session flag — must match the inline beforeInteractive gate script. */
+/** Shared splash session flag — set once the intro has played in this tab. */
 export const SPLASH_SESSION_KEY = 'quantiv:splash:played';
-
-/** Runs beforeInteractive in layout.tsx — keeps first-time homepage visitors on
- *  black until React mounts the splash (SSR calendar HTML is gated via CSS). */
-export const SPLASH_GATE_SCRIPT = `(function(){try{var p=location.pathname;if((p==="/"||p==="")&&sessionStorage.getItem("${SPLASH_SESSION_KEY}")!=="1"&&!window.matchMedia("(prefers-reduced-motion: reduce)").matches){document.documentElement.setAttribute("data-splash-gate","1");}}catch(e){}})();`;
 
 export function splashAlreadyPlayed(): boolean {
   if (typeof window === 'undefined') return true;
@@ -21,9 +17,4 @@ export function markSplashPlayed(): void {
   } catch {
     // ignore
   }
-}
-
-export function clearSplashGate(): void {
-  if (typeof document === 'undefined') return;
-  document.documentElement.removeAttribute('data-splash-gate');
 }
