@@ -1,5 +1,5 @@
 {
-  "error_count": 10,
+  "error_count": 13,
   "errors": [
     {
       "endpoint": "massive_dividends",
@@ -15,7 +15,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-01",
+      "retry_after": "2026-07-02",
       "status": "empty",
       "symbol": "AVAV"
     },
@@ -33,7 +33,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-01",
+      "retry_after": "2026-07-02",
       "status": "empty",
       "symbol": "AVAV"
     },
@@ -51,7 +51,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-01",
+      "retry_after": "2026-07-02",
       "status": "empty",
       "symbol": "CNXC"
     },
@@ -69,7 +69,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-01",
+      "retry_after": "2026-07-02",
       "status": "empty",
       "symbol": "FDS"
     },
@@ -87,7 +87,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-01",
+      "retry_after": "2026-07-02",
       "status": "empty",
       "symbol": "GBX"
     },
@@ -105,7 +105,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-01",
+      "retry_after": "2026-07-02",
       "status": "empty",
       "symbol": "LNN"
     },
@@ -123,7 +123,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-01",
+      "retry_after": "2026-07-02",
       "status": "empty",
       "symbol": "MSM"
     },
@@ -141,7 +141,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-01",
+      "retry_after": "2026-07-02",
       "status": "empty",
       "symbol": "UNF"
     },
@@ -159,7 +159,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-01",
+      "retry_after": "2026-07-02",
       "status": "empty",
       "symbol": "JNJ"
     },
@@ -177,19 +177,48 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-01",
+      "retry_after": "2026-07-02",
       "status": "empty",
       "symbol": "JPM"
+    },
+    {
+      "endpoint": "massive_splits",
+      "http_status": 200,
+      "response_shape": {
+        "has_data": false,
+        "kind": "json_object",
+        "row_count": 0,
+        "sample_keys": [],
+        "top_level_keys": [
+          "request_id",
+          "results",
+          "status"
+        ]
+      },
+      "retry_after": "2026-07-02",
+      "status": "empty",
+      "symbol": "GS"
+    },
+    {
+      "endpoint": "av_cpi",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
+      "symbol": "__market__"
+    },
+    {
+      "endpoint": "av_ipo_calendar",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
+      "symbol": "__market__"
     }
   ],
-  "generated_at": "2026-06-30T12:15:52.792041+00:00",
-  "planned_calls": 165,
+  "generated_at": "2026-07-01T12:25:47.213989+00:00",
+  "planned_calls": 168,
   "symbols": [
     "NKE",
     "AVAV",
     "CNXC",
     "FDS",
-    "FIZZ",
     "GBX",
     "GIS",
     "LNN",
@@ -200,11 +229,12 @@
     "JNJ",
     "JPM",
     "BAC",
-    "GE"
+    "GE",
+    "GS"
   ],
   "tables": {
-    "company_facts": 56,
-    "corporate_actions": 25,
+    "company_facts": 62,
+    "corporate_actions": 23,
     "earnings_news_signals": 0,
     "live_market_signals": 0,
     "options_provider_signals": 30
