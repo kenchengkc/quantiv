@@ -1,0 +1,77 @@
+{
+  "symbol": "FDXF",
+  "as_of_date": "2026-07-01",
+  "spot_price": 150.0,
+  "expected_move": {
+    "earnings_date": "2026-06-25",
+    "expiration": "2026-07-17",
+    "dte": 16,
+    "lead_time_days": -6,
+    "atm_strike": 150.0,
+    "atm_iv": 0.439095,
+    "straddle_abs": 11.15,
+    "straddle_pct": 0.074333,
+    "iv_pct": 0.091933,
+    "skew_atm": 0.011633,
+    "term_slope": null,
+    "total_vega": 0.2523,
+    "em_method": "options_math",
+    "timing": "after_market_close"
+  },
+  "straddle_features": [
+    {
+      "expiration": "2026-07-17",
+      "dte": 16,
+      "atm_strike": 150.0,
+      "atm_iv": 0.4391,
+      "atm_call_iv": 0.4417,
+      "atm_put_iv": 0.4365,
+      "straddle_mid": 11.15,
+      "em_straddle": 11.15,
+      "em_straddle_pct": 0.074333,
+      "em_iv": 13.790127,
+      "em_iv_pct": 0.091934,
+      "call_delta": 0.551,
+      "call_gamma": 0.028,
+      "call_vega": 0.1259,
+      "call_theta": -0.1679
+    },
+    {
+      "expiration": "2026-08-21",
+      "dte": 51,
+      "atm_strike": 155.0,
+      "atm_iv": 0.4297,
+      "atm_call_iv": 0.4333,
+      "atm_put_iv": 0.4261,
+      "straddle_mid": 19.8,
+      "em_straddle": 19.8,
+      "em_straddle_pct": 0.132,
+      "em_iv": 24.093243,
+      "em_iv_pct": 0.160622,
+      "call_delta": 0.4757,
+      "call_gamma": 0.0161,
+      "call_vega": 0.2249,
+      "call_theta": -0.097
+    }
+  ],
+  "earnings_history": [
+    {
+      "date": "2026-06-25",
+      "timing": "after_market_close",
+      "q": "Q2 26",
+      "fiscal_year": 2026,
+      "fiscal_q": "Q2",
+      "actual": -0.029269,
+      "implied": null,
+      "eps_actual": null,
+      "eps_estimate": null,
+      "eps_surprise_pct": null,
+      "revenue_actual": null,
+      "revenue_estimate": null,
+      "rev_surprise_pct": null
+    }
+  ],
+  "next_earnings": "2026-06-25",
+  "vol_regime": null,
+  "next_earnings_timing": "after_market_close"
+}

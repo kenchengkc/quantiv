@@ -1,6 +1,48 @@
 {
-  "error_count": 13,
+  "error_count": 18,
   "errors": [
+    {
+      "endpoint": "av_historical_put_call_ratio",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
+      "symbol": "AVAV"
+    },
+    {
+      "endpoint": "av_historical_put_call_ratio",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
+      "symbol": "CNXC"
+    },
+    {
+      "endpoint": "av_historical_put_call_ratio",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
+      "symbol": "FDS"
+    },
+    {
+      "endpoint": "av_historical_voi",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
+      "symbol": "NKE"
+    },
+    {
+      "endpoint": "av_historical_voi",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
+      "symbol": "AVAV"
+    },
+    {
+      "endpoint": "av_historical_voi",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
+      "symbol": "CNXC"
+    },
+    {
+      "endpoint": "av_historical_voi",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
+      "symbol": "FDS"
+    },
     {
       "endpoint": "massive_dividends",
       "http_status": 200,
@@ -15,7 +57,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-02",
+      "retry_after": "2026-07-03",
       "status": "empty",
       "symbol": "AVAV"
     },
@@ -33,7 +75,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-02",
+      "retry_after": "2026-07-03",
       "status": "empty",
       "symbol": "AVAV"
     },
@@ -51,7 +93,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-02",
+      "retry_after": "2026-07-03",
       "status": "empty",
       "symbol": "CNXC"
     },
@@ -69,7 +111,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-02",
+      "retry_after": "2026-07-03",
       "status": "empty",
       "symbol": "FDS"
     },
@@ -87,7 +129,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-02",
+      "retry_after": "2026-07-03",
       "status": "empty",
       "symbol": "GBX"
     },
@@ -105,7 +147,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-02",
+      "retry_after": "2026-07-03",
       "status": "empty",
       "symbol": "LNN"
     },
@@ -123,7 +165,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-02",
+      "retry_after": "2026-07-03",
       "status": "empty",
       "symbol": "MSM"
     },
@@ -141,7 +183,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-02",
+      "retry_after": "2026-07-03",
       "status": "empty",
       "symbol": "UNF"
     },
@@ -159,7 +201,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-02",
+      "retry_after": "2026-07-03",
       "status": "empty",
       "symbol": "JNJ"
     },
@@ -177,33 +219,9 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-02",
+      "retry_after": "2026-07-03",
       "status": "empty",
       "symbol": "JPM"
-    },
-    {
-      "endpoint": "massive_splits",
-      "http_status": 200,
-      "response_shape": {
-        "has_data": false,
-        "kind": "json_object",
-        "row_count": 0,
-        "sample_keys": [],
-        "top_level_keys": [
-          "request_id",
-          "results",
-          "status"
-        ]
-      },
-      "retry_after": "2026-07-02",
-      "status": "empty",
-      "symbol": "GS"
-    },
-    {
-      "endpoint": "av_cpi",
-      "error": "alphavantage daily budget exhausted across 2 key(s)",
-      "status": "quota_blocked",
-      "symbol": "__market__"
     },
     {
       "endpoint": "av_ipo_calendar",
@@ -212,13 +230,14 @@
       "symbol": "__market__"
     }
   ],
-  "generated_at": "2026-07-01T12:25:47.213989+00:00",
-  "planned_calls": 168,
+  "generated_at": "2026-07-02T12:14:46.108947+00:00",
+  "planned_calls": 165,
   "symbols": [
     "NKE",
     "AVAV",
     "CNXC",
     "FDS",
+    "FIZZ",
     "GBX",
     "GIS",
     "LNN",
@@ -229,14 +248,13 @@
     "JNJ",
     "JPM",
     "BAC",
-    "GE",
-    "GS"
+    "GE"
   ],
   "tables": {
-    "company_facts": 62,
-    "corporate_actions": 23,
+    "company_facts": 56,
+    "corporate_actions": 24,
     "earnings_news_signals": 0,
     "live_market_signals": 0,
-    "options_provider_signals": 30
+    "options_provider_signals": 23
   }
 }
