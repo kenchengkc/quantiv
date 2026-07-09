@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import re
 from datetime import datetime
 from pathlib import Path
@@ -38,6 +39,20 @@ def is_finnhub_reserved_window(now: datetime | None = None) -> bool:
 def block_finnhub_reserved_window(allow_market_hours: bool = False) -> None:
     if allow_market_hours or not is_finnhub_reserved_window():
         return
+    # Soft-skip for the scheduled daily refresh. GitHub's schedule-dispatch
+    # jitter (often 1-3h at the top of the hour) and a slow DoltHub merge can
+    # push these non-price Finnhub steps past 09:25 ET. Aborting there (exit 1)
+    # kills the whole pipeline — scoring, the frontend rebuild, and the commit
+    # never run, so the site data goes stale. When FINNHUB_RESERVED_WINDOW_SOFT_SKIP
+    # is set we instead skip just this enrichment and exit 0 so the rest of the
+    # pipeline completes; the overlay is picked up on the next clean run.
+    if os.getenv("FINNHUB_RESERVED_WINDOW_SOFT_SKIP") == "1":
+        print(
+            "↷ Skipping non-price Finnhub call during the quote refresh window "
+            "(09:25-16:45 ET) — FINNHUB_RESERVED_WINDOW_SOFT_SKIP=1.",
+            flush=True,
+        )
+        raise SystemExit(0)
     raise SystemExit(
         "Refusing non-price Finnhub calls during the quote refresh window "
         "(09:25-16:45 ET). Re-run outside market hours, or pass "

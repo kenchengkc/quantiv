@@ -85,6 +85,7 @@ FOREIGN_EXCHANGE_MARKERS = (
 US_EXCHANGE_MARKERS = (
     "NASDAQ",
     "NYSE",
+    "NEW YORK STOCK EXCHANGE",
     "AMEX",
     "ARCA",
     "BATS",
@@ -128,17 +129,19 @@ def names_align(display: str, finnhub: str) -> bool:
 def profile_looks_foreign(profile: dict) -> bool:
     if profile.get("has_profile") is False:
         return False
-    country = str(profile.get("country") or "").strip().upper()
-    if country and country not in US_COUNTRY_CODES:
-        return True
     exchange = str(profile.get("exchange") or "").upper()
-    if not exchange:
-        return False
-    if any(marker in exchange for marker in FOREIGN_EXCHANGE_MARKERS):
-        return True
-    if any(marker in exchange for marker in US_EXCHANGE_MARKERS):
-        return False
-    # Unrecognized exchange label with no US country — treat as foreign.
+    country = str(profile.get("country") or "").strip().upper()
+    # The listing venue decides this, not the domicile country. Plenty of
+    # legitimate US listings are foreign-domiciled (ACN/IE, CB/CH, ACGL/BM all
+    # trade on NYSE/Nasdaq) — those are not logo/name leaks. The collision this
+    # guards is a foreign *exchange* sharing a bare symbol with a US ticker, so
+    # check the exchange first and only fall back to domicile country when the
+    # exchange label is unrecognized or missing.
+    if exchange:
+        if any(marker in exchange for marker in FOREIGN_EXCHANGE_MARKERS):
+            return True
+        if any(marker in exchange for marker in US_EXCHANGE_MARKERS):
+            return False
     return bool(country) and country not in US_COUNTRY_CODES
 
 

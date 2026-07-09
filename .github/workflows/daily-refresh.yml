@@ -55,6 +55,14 @@ jobs:
     # sweep below (~110 min @ 60 calls/min for 6.6k tickers) → bumped to
     # 180 min to leave headroom for build_frontend_data + R2 push too.
     timeout-minutes: 180
+    env:
+      # Schedule-dispatch jitter + a slow DoltHub merge can push the non-price
+      # Finnhub steps (earnings overlay, market holidays) past the 09:25 ET
+      # quote-refresh guard. Soft-skip those steps (exit 0) instead of aborting
+      # the whole refresh, so scoring, the frontend rebuild, and the commit
+      # still run and the site data doesn't go stale. See
+      # provider_market_hours.block_finnhub_reserved_window.
+      FINNHUB_RESERVED_WINDOW_SOFT_SKIP: '1'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -576,7 +584,11 @@ jobs:
             --allow-missing-key \
             --universe frontend \
             $ARGS
-          python scripts/check_ticker_identity.py
+          # Data-quality lint only — the profile/logo cache above already wrote
+          # successfully. Warn (don't abort) so a residual foreign-venue leak or
+          # a cosmetic SEC-vs-Finnhub name diff can't fail the whole daily
+          # workflow; issues still print to the log for follow-up.
+          python scripts/check_ticker_identity.py --warn-only
 
       - name: Commit + push Finnhub profile/logo cache
         run: |
