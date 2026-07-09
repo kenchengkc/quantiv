@@ -115,11 +115,20 @@ jobs:
         env:
           FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
         run: |
+          set +e
           EXTRA_ARGS=""
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             EXTRA_ARGS="--allow-market-hours"
           fi
-          python scripts/sync_finnhub_earnings.py --allow-missing-key $EXTRA_ARGS
+          python scripts/sync_finnhub_earnings.py --allow-missing-key --delay 1.05 --max-calls 5 $EXTRA_ARGS
+          status=$?
+          set -e
+          if [ "$status" -ne 0 ]; then
+            if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+              exit "$status"
+            fi
+            echo "::warning::Finnhub earnings overlay failed with exit $status; continuing scheduled refresh so OHLCV, realized moves, frontend JSON, and commit still run."
+          fi
 
       - name: Overlay EPS and revenue from FMP
         # Complements Finnhub's date/timing overlay with richer EPS/revenue
