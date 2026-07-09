@@ -1,10 +1,10 @@
 'use client';
 
 import { useEffect, useLayoutEffect, useState } from 'react';
-import { usePathname } from 'next/navigation';
 import {
   markSplashPlayed,
   splashAlreadyPlayed,
+  SPLASH_SKIP_ATTRIBUTE,
 } from '@/lib/splashSession';
 
 // Once-per-session intro. The sequence starts with a closed ring, opens the
@@ -43,28 +43,26 @@ function shouldSkipSplash(): boolean {
 }
 
 export function Splash() {
-  // Splash is a homepage-only intro. On any subpage we don't render it at
-  // all — including during SSR — so reopening a tab (Cmd+Shift+T) to
-  // /screener, /watchlist, /AAPL, etc. doesn't flash the white ring for a
-  // frame during hydration.
-  const pathname = usePathname();
-  const isHomepage = pathname === '/';
-
-  const [phase, setPhase] = useState<'hold' | 'play' | 'done'>(() => {
-    if (!isHomepage) return 'done';
-    if (typeof window === 'undefined') return 'done';
-    return shouldSkipSplash() ? 'done' : 'hold';
-  });
+  // Mounted only from the homepage. The initial `hold` state is intentional:
+  // it lets SSR send the opaque cover in the first HTML paint. Returning
+  // sessions are hidden before paint by the inline script in app/page.tsx.
+  const [phase, setPhase] = useState<'hold' | 'play' | 'done'>('hold');
 
   useLayoutEffect(() => {
-    if (!isHomepage) return;
     if (shouldSkipSplash()) {
+      document.documentElement.setAttribute(SPLASH_SKIP_ATTRIBUTE, '1');
       setPhase('done');
     }
-  }, [isHomepage]);
+  }, []);
 
   useEffect(() => {
     if (phase !== 'hold') return;
+    if (shouldSkipSplash()) {
+      document.documentElement.setAttribute(SPLASH_SKIP_ATTRIBUTE, '1');
+      setPhase('done');
+      return;
+    }
+
     let cancelled = false;
     const ready = Promise.all(SPLASH_ASSETS.map(decodeSplashAsset));
     const cappedReady = Promise.race([ready, wait(MAX_ASSET_WAIT_MS)]);
@@ -87,6 +85,7 @@ export function Splash() {
     if (phase !== 'play') return;
     const t = window.setTimeout(() => {
       markSplashPlayed();
+      document.documentElement.setAttribute(SPLASH_SKIP_ATTRIBUTE, '1');
       setPhase('done');
     }, TOTAL_MS);
     return () => window.clearTimeout(t);

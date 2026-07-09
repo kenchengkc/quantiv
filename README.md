@@ -13,6 +13,17 @@ Quantiv is a monorepo for **researching and displaying** expected moves into ear
 
 > Research and educational use only — not financial advice.
 
+## By the numbers
+
+| Metric | Accomplishment |
+|--------|----------------|
+| **120,000+** earnings records | Git-tracked calendar history with nightly DoltHub, Finnhub, and FMP reconciliation |
+| **10,000+** ticker identities | Search/name metadata for public-company discovery and symbol pages |
+| **6** product surfaces | Calendar, screener, symbol detail, watchlist, about, and ML ops status |
+| **12** Vercel API routes | Quotes, intraday bars, search, watchlist CRUD, ML proxying, and protected cron jobs |
+| **3** quote writers | Railway live worker, Vercel regular-hours fallback, and off-hours Polygon broad refresh |
+| **5** GitHub workflows | CI, nightly data refresh, broad quote refresh, ticker-name refresh, and enrichment jobs |
+
 ## What the app does
 
 | Page | Route | Notes |

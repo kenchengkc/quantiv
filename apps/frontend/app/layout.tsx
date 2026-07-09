@@ -6,7 +6,6 @@ import { Providers } from './providers';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Topbar } from '@/components/Topbar';
 import { Footer } from '@/components/Footer';
-import { Splash } from '@/components/Splash';
 import { TickerHoverHost } from '@/components/TickerHoverCard';
 import { Analytics } from '@vercel/analytics/next';
 import { SpeedInsights } from '@vercel/speed-insights/next';
@@ -85,13 +84,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     >
       <html
         lang="en"
+        suppressHydrationWarning
         className={`${mulish.variable} ${nunitoSans.variable} ${jetbrainsMono.variable}`}
         style={{ backgroundColor: '#000000', colorScheme: 'dark' }}
       >
-        <body style={{ backgroundColor: '#000000' }}>
+        <body suppressHydrationWarning style={{ backgroundColor: '#000000' }}>
           <Providers>
             <ErrorBoundary>
-              <Splash />
               <div className="min-h-screen flex flex-col quantiv-app-shell">
                 <Topbar />
                 <main className="flex-1">{children}</main>

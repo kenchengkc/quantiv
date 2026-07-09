@@ -233,6 +233,10 @@
   pointer-events: auto;
 }
 
+:root[data-quantiv-splash-skip="1"] .quantiv-splash {
+  display: none;
+}
+
 .quantiv-splash--play {
   /* Hold the black backdrop opaque almost to the end, then dissolve in
      sync with the mark's zoom-forward to reveal the dashboard underneath. */
