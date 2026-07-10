@@ -1,6 +1,120 @@
 {
-  "error_count": 10,
+  "error_count": 30,
   "errors": [
+    {
+      "endpoint": "av_historical_put_call_ratio",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
+      "symbol": "AZZ"
+    },
+    {
+      "endpoint": "av_historical_put_call_ratio",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
+      "symbol": "H"
+    },
+    {
+      "endpoint": "av_historical_put_call_ratio",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
+      "symbol": "CTAS"
+    },
+    {
+      "endpoint": "av_historical_voi",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
+      "symbol": "PEP"
+    },
+    {
+      "endpoint": "av_historical_voi",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
+      "symbol": "AZZ"
+    },
+    {
+      "endpoint": "av_historical_voi",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
+      "symbol": "H"
+    },
+    {
+      "endpoint": "av_historical_voi",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
+      "symbol": "CTAS"
+    },
+    {
+      "endpoint": "fmp_key_metrics_ttm",
+      "error": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/",
+      "http_status": 402,
+      "retry_after": "2026-08-09",
+      "status": "entitlement_denied",
+      "symbol": "AZZ"
+    },
+    {
+      "endpoint": "fmp_key_metrics_ttm",
+      "error": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/",
+      "http_status": 402,
+      "retry_after": "2026-08-09",
+      "status": "entitlement_denied",
+      "symbol": "H"
+    },
+    {
+      "endpoint": "fmp_key_metrics_ttm",
+      "error": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/",
+      "http_status": 402,
+      "retry_after": "2026-08-09",
+      "status": "entitlement_denied",
+      "symbol": "CTAS"
+    },
+    {
+      "endpoint": "fmp_key_metrics_ttm",
+      "error": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/",
+      "http_status": 402,
+      "retry_after": "2026-08-09",
+      "status": "entitlement_denied",
+      "symbol": "CAG"
+    },
+    {
+      "endpoint": "fmp_key_metrics_ttm",
+      "error": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/",
+      "http_status": 402,
+      "retry_after": "2026-08-09",
+      "status": "entitlement_denied",
+      "symbol": "PENG"
+    },
+    {
+      "endpoint": "fmp_key_metrics_ttm",
+      "error": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/",
+      "http_status": 402,
+      "retry_after": "2026-08-09",
+      "status": "entitlement_denied",
+      "symbol": "PSMT"
+    },
+    {
+      "endpoint": "fmp_key_metrics_ttm",
+      "error": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/",
+      "http_status": 402,
+      "retry_after": "2026-08-09",
+      "status": "entitlement_denied",
+      "symbol": "SMPL"
+    },
+    {
+      "endpoint": "fmp_key_metrics_ttm",
+      "error": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/",
+      "http_status": 402,
+      "retry_after": "2026-08-09",
+      "status": "entitlement_denied",
+      "symbol": "WDFC"
+    },
+    {
+      "endpoint": "fmp_key_metrics_ttm",
+      "error": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/",
+      "http_status": 402,
+      "retry_after": "2026-08-09",
+      "status": "entitlement_denied",
+      "symbol": "GOOG"
+    },
     {
       "endpoint": "massive_dividends",
       "http_status": 200,
@@ -15,9 +129,45 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-05",
+      "retry_after": "2026-07-11",
       "status": "empty",
-      "symbol": "AVAV"
+      "symbol": "PENG"
+    },
+    {
+      "endpoint": "massive_dividends",
+      "http_status": 200,
+      "response_shape": {
+        "has_data": false,
+        "kind": "json_object",
+        "row_count": 0,
+        "sample_keys": [],
+        "top_level_keys": [
+          "request_id",
+          "results",
+          "status"
+        ]
+      },
+      "retry_after": "2026-07-11",
+      "status": "empty",
+      "symbol": "SMPL"
+    },
+    {
+      "endpoint": "massive_dividends",
+      "http_status": 200,
+      "response_shape": {
+        "has_data": false,
+        "kind": "json_object",
+        "row_count": 0,
+        "sample_keys": [],
+        "top_level_keys": [
+          "request_id",
+          "results",
+          "status"
+        ]
+      },
+      "retry_after": "2026-07-11",
+      "status": "empty",
+      "symbol": "TSLA"
     },
     {
       "endpoint": "massive_splits",
@@ -33,9 +183,9 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-05",
+      "retry_after": "2026-07-11",
       "status": "empty",
-      "symbol": "AVAV"
+      "symbol": "PEP"
     },
     {
       "endpoint": "massive_splits",
@@ -51,9 +201,9 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-05",
+      "retry_after": "2026-07-11",
       "status": "empty",
-      "symbol": "CNXC"
+      "symbol": "H"
     },
     {
       "endpoint": "massive_splits",
@@ -69,9 +219,9 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-05",
+      "retry_after": "2026-07-11",
       "status": "empty",
-      "symbol": "FDS"
+      "symbol": "DAL"
     },
     {
       "endpoint": "massive_splits",
@@ -87,9 +237,9 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-05",
+      "retry_after": "2026-07-11",
       "status": "empty",
-      "symbol": "GBX"
+      "symbol": "CAG"
     },
     {
       "endpoint": "massive_splits",
@@ -105,9 +255,9 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-05",
+      "retry_after": "2026-07-11",
       "status": "empty",
-      "symbol": "LNN"
+      "symbol": "PENG"
     },
     {
       "endpoint": "massive_splits",
@@ -123,9 +273,9 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-05",
+      "retry_after": "2026-07-11",
       "status": "empty",
-      "symbol": "MSM"
+      "symbol": "PSMT"
     },
     {
       "endpoint": "massive_splits",
@@ -141,9 +291,9 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-05",
+      "retry_after": "2026-07-11",
       "status": "empty",
-      "symbol": "UNF"
+      "symbol": "SMPL"
     },
     {
       "endpoint": "massive_splits",
@@ -159,7 +309,25 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-05",
+      "retry_after": "2026-07-11",
+      "status": "empty",
+      "symbol": "WDFC"
+    },
+    {
+      "endpoint": "massive_splits",
+      "http_status": 200,
+      "response_shape": {
+        "has_data": false,
+        "kind": "json_object",
+        "row_count": 0,
+        "sample_keys": [],
+        "top_level_keys": [
+          "request_id",
+          "results",
+          "status"
+        ]
+      },
+      "retry_after": "2026-07-11",
       "status": "empty",
       "symbol": "JNJ"
     },
@@ -177,36 +345,42 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-05",
+      "retry_after": "2026-07-11",
       "status": "empty",
       "symbol": "JPM"
+    },
+    {
+      "endpoint": "av_ipo_calendar",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
+      "symbol": "__market__"
     }
   ],
-  "generated_at": "2026-07-04T12:30:35.373524+00:00",
+  "generated_at": "2026-07-10T13:39:29.842731+00:00",
   "planned_calls": 165,
   "symbols": [
-    "NKE",
-    "AVAV",
-    "CNXC",
-    "FDS",
-    "FIZZ",
-    "GBX",
-    "GIS",
-    "LNN",
-    "MSM",
-    "PRGS",
-    "STZ",
-    "UNF",
+    "PEP",
+    "AZZ",
+    "H",
+    "CTAS",
+    "DAL",
+    "CAG",
+    "EPAC",
+    "PENG",
+    "PSMT",
+    "SMPL",
+    "WDFC",
+    "GOOG",
+    "TSLA",
+    "INTC",
     "JNJ",
-    "JPM",
-    "BAC",
-    "GE"
+    "JPM"
   ],
   "tables": {
-    "company_facts": 56,
-    "corporate_actions": 25,
+    "company_facts": 60,
+    "corporate_actions": 21,
     "earnings_news_signals": 0,
     "live_market_signals": 0,
-    "options_provider_signals": 30
+    "options_provider_signals": 23
   }
 }
