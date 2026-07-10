@@ -146,6 +146,22 @@ def main() -> int:
     removed = k_old - k_new
     print(f"Events: +{len(added):,} added, −{len(removed):,} removed")
 
+    old_counts_by_ticker = old["act_symbol"].value_counts()
+    old_sources_by_ticker = (
+        old.groupby("act_symbol")["source"].agg(set).to_dict()
+        if "source" in old.columns
+        else {}
+    )
+
+    def _is_low_confidence_provider_churn(sym: str) -> bool:
+        """Return True for sub-anchor tickers with no DoltHub backing in HEAD."""
+        if int(old_counts_by_ticker.get(sym, 0)) >= args.anchor_min_history:
+            return False
+        sources = old_sources_by_ticker.get(sym, ())
+        return bool(sources) and all(
+            "dolthub" not in str(source).lower() for source in sources
+        )
+
     # Past 30d / next 60d windows. We compare SETS of (ticker, date) keys
     # across CSVs — not bare counts — so events naturally rolling out of
     # the window don't look like a regression. Only events that existed
@@ -192,14 +208,22 @@ def main() -> int:
     future_vanished_raw = future_old - future_new
     # Drop date-drifted rescues and retired tickers (delisted via M&A/bankruptcy
     # or renamed away) — their events vanishing is expected, not a regression.
-    past_vanished = {
+    past_vanished_base = {
         k for k in past_vanished_raw if not _rescued(*k) and not is_retired(k[0])
     }
-    future_vanished = {
+    future_vanished_base = {
         k for k in future_vanished_raw if not _rescued(*k) and not is_retired(k[0])
     }
-    past_drifted = len(past_vanished_raw) - len(past_vanished)
-    future_drifted = len(future_vanished_raw) - len(future_vanished)
+    past_churn_trimmed = {
+        k for k in past_vanished_base if _is_low_confidence_provider_churn(k[0])
+    }
+    future_churn_trimmed = {
+        k for k in future_vanished_base if _is_low_confidence_provider_churn(k[0])
+    }
+    past_vanished = past_vanished_base - past_churn_trimmed
+    future_vanished = future_vanished_base - future_churn_trimmed
+    past_drifted = len(past_vanished_raw) - len(past_vanished_base)
+    future_drifted = len(future_vanished_raw) - len(future_vanished_base)
     print(
         f"Past 30d:  {len(past_new):,} events  "
         f"({len(past_vanished):,} vanished vs HEAD, "
@@ -210,6 +234,13 @@ def main() -> int:
         f"({len(future_vanished):,} vanished vs HEAD, "
         f"{future_drifted:,} date-drifted, {len(future_new - future_old):,} new)"
     )
+    if past_churn_trimmed or future_churn_trimmed:
+        print(
+            "Provider-only event churn excluded from event gates: "
+            f"{len(past_churn_trimmed):,} past-30d, "
+            f"{len(future_churn_trimmed):,} next-60d "
+            f"(<{args.anchor_min_history} prior rows, no DoltHub backing)"
+        )
 
     print()
 
@@ -254,20 +285,10 @@ def main() -> int:
     # churn, not the silent-drop regression it guards — which removes
     # DoltHub-backed or established tickers (still counted here) and is caught
     # harder by the anchor gate below (any ticker with ≥anchor-min-history rows
-    # losing all of them, Finnhub-only included). Exclude finnhub-only
-    # sub-anchor names so a high-churn Finnhub day can't trip the count gate.
-    churn_trimmed: set[str] = set()
-    if "source" in old.columns and vanished:
-        sub = old[old["act_symbol"].isin(vanished)]
-        sub_counts = sub["act_symbol"].value_counts()
-        sub_sources = sub.groupby("act_symbol")["source"].agg(set)
-        churn_trimmed = {
-            t
-            for t in vanished
-            if int(sub_counts.get(t, 0)) < args.anchor_min_history
-            and all("dolthub" not in str(s) for s in sub_sources.get(t, ()))
-        }
-        vanished = vanished - churn_trimmed
+    # losing all of them, provider-only included). Exclude provider-only
+    # sub-anchor names so a high-churn provider day can't trip the count gate.
+    churn_trimmed = {t for t in vanished if _is_low_confidence_provider_churn(t)}
+    vanished = vanished - churn_trimmed
     if foreign_trimmed:
         print(f"  ({len(foreign_trimmed):,} foreign-symbol trims excluded from gate)")
     if retired_trimmed:
@@ -277,7 +298,7 @@ def main() -> int:
         )
     if churn_trimmed:
         print(
-            f"  ({len(churn_trimmed):,} low-confidence Finnhub-only churn trims "
+            f"  ({len(churn_trimmed):,} low-confidence provider-only churn trims "
             f"excluded from gate: <{args.anchor_min_history} prior rows, no DoltHub backing)"
         )
     if len(vanished) > args.max_ticker_drop:
@@ -321,10 +342,11 @@ def main() -> int:
     #    a universe-wide drop, not a delisting. Blank act_symbol values are
     #    never legitimate tickers — exclude them so cleanup of corrupt rows
     #    in HEAD can't block shipping a clean new CSV (see gate 5).
-    ticker_counts_old = old["act_symbol"].value_counts()
     anchors = {
         sym
-        for sym in ticker_counts_old[ticker_counts_old >= args.anchor_min_history].index
+        for sym in old_counts_by_ticker[
+            old_counts_by_ticker >= args.anchor_min_history
+        ].index
         if str(sym or "").strip()
     }
     anchors_in_new = set(new["act_symbol"].unique())
