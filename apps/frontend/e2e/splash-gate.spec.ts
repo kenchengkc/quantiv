@@ -1,15 +1,44 @@
 import { expect, test } from '@playwright/test';
-import { SPLASH_SESSION_KEY, SPLASH_SKIP_ATTRIBUTE } from '@/lib/splashSession';
+import {
+  SPLASH_FIRST_PAINT_ATTRIBUTE,
+  SPLASH_SESSION_KEY,
+  SPLASH_SKIP_ATTRIBUTE,
+} from '@/lib/splashSession';
 
 test.describe('homepage splash cover', () => {
   test('first visit covers the homepage from the first rendered frame', async ({ page }) => {
+    const observedKey = 'quantiv:test:splash-first-paint-observed';
+
     // Simulate a brand-new session (splash not yet played).
-    await page.addInitScript((key) => {
-      sessionStorage.removeItem(key);
-    }, SPLASH_SESSION_KEY);
+    await page.addInitScript(
+      ({ attribute, observedKey, sessionKey }) => {
+        sessionStorage.removeItem(sessionKey);
+        sessionStorage.removeItem(observedKey);
+
+        const recordFirstPaintGuard = () => {
+          if (document.documentElement?.getAttribute(attribute) === '1') {
+            sessionStorage.setItem(observedKey, '1');
+          }
+        };
+
+        new MutationObserver(recordFirstPaintGuard).observe(document, {
+          attributes: true,
+          childList: true,
+          subtree: true,
+        });
+        recordFirstPaintGuard();
+      },
+      {
+        attribute: SPLASH_FIRST_PAINT_ATTRIBUTE,
+        observedKey,
+        sessionKey: SPLASH_SESSION_KEY,
+      },
+    );
 
     await page.goto('/', { waitUntil: 'domcontentloaded' });
 
+    expect(await page.evaluate((key) => sessionStorage.getItem(key), observedKey)).toBe('1');
+    await expect(page.locator('head > script#quantiv-splash-first-paint')).toHaveCount(1);
     await expect(page.locator('.quantiv-splash')).toBeVisible();
 
     // The shell still server-renders visibly; the splash is an overlay, not the

@@ -1,6 +1,7 @@
 /** Shared splash session flag — set once the intro has played in this tab. */
 export const SPLASH_SESSION_KEY = 'quantiv:splash:played';
 export const SPLASH_SKIP_ATTRIBUTE = 'data-quantiv-splash-skip';
+export const SPLASH_FIRST_PAINT_ATTRIBUTE = 'data-quantiv-splash-first-paint';
 
 export function splashAlreadyPlayed(): boolean {
   if (typeof window === 'undefined') return true;
