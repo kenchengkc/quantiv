@@ -2,7 +2,6 @@ import type { Metadata } from 'next';
 import { Splash } from '@/components/Splash';
 import EarningsGrid, { type WeeklyData } from '@/components/EarningsGrid';
 import { parseHomeSearchParams } from '@/lib/homeSearchParams';
-import { SPLASH_SESSION_KEY, SPLASH_SKIP_ATTRIBUTE } from '@/lib/splashSession';
 // Bundled at build time from the daily refresh. Rendered into the initial HTML
 // for the default "this week" view so the calendar (the LCP element) paints
 // without waiting on the client bundle + a /weeks fetch. The client revalidates
@@ -21,26 +20,6 @@ export const metadata: Metadata = {
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-function SplashFirstPaintScript() {
-  const script = `
-    (() => {
-      try {
-        const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-        const played = window.sessionStorage.getItem(${JSON.stringify(SPLASH_SESSION_KEY)}) === '1';
-        if (reduced || played) {
-          document.documentElement.setAttribute(${JSON.stringify(SPLASH_SKIP_ATTRIBUTE)}, '1');
-        } else {
-          document.documentElement.removeAttribute(${JSON.stringify(SPLASH_SKIP_ATTRIBUTE)});
-        }
-      } catch {
-        document.documentElement.setAttribute(${JSON.stringify(SPLASH_SKIP_ATTRIBUTE)}, '1');
-      }
-    })();
-  `;
-
-  return <script dangerouslySetInnerHTML={{ __html: script }} />;
-}
-
 export default async function Home({
   searchParams,
 }: {
@@ -55,7 +34,6 @@ export default async function Home({
 
   return (
     <>
-      <SplashFirstPaintScript />
       <Splash />
       <div className="qv-m-pad" style={{ maxWidth: 1240, margin: '0 auto', padding: '0 28px 60px' }}>
         <EarningsGrid

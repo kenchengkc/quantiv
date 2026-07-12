@@ -221,6 +221,15 @@
 }
 
 /* ─── Quantiv splash (once-per-session intro) ──────────────────────────── */
+:root[data-quantiv-splash-first-paint="1"] body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: #000000;
+  pointer-events: auto;
+}
+
 .quantiv-splash {
   position: fixed;
   inset: 0;

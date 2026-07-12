@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useState } from 'react';
 import {
   markSplashPlayed,
   splashAlreadyPlayed,
+  SPLASH_FIRST_PAINT_ATTRIBUTE,
   SPLASH_SKIP_ATTRIBUTE,
 } from '@/lib/splashSession';
 
@@ -44,11 +45,15 @@ function shouldSkipSplash(): boolean {
 
 export function Splash() {
   // Mounted only from the homepage. The initial `hold` state is intentional:
-  // it lets SSR send the opaque cover in the first HTML paint. Returning
-  // sessions are hidden before paint by the inline script in app/page.tsx.
+  // it lets SSR send the opaque cover. The head guard in app/layout.tsx covers
+  // the parser gap before this node arrives and pre-hides returning sessions.
   const [phase, setPhase] = useState<'hold' | 'play' | 'done'>('hold');
 
   useLayoutEffect(() => {
+    // The SSR splash is mounted now, so it is safe to remove the temporary
+    // head-created cover without exposing the shared topbar between paints.
+    document.documentElement.removeAttribute(SPLASH_FIRST_PAINT_ATTRIBUTE);
+
     if (shouldSkipSplash()) {
       document.documentElement.setAttribute(SPLASH_SKIP_ATTRIBUTE, '1');
       setPhase('done');

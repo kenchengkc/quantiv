@@ -7,6 +7,11 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Topbar } from '@/components/Topbar';
 import { Footer } from '@/components/Footer';
 import { TickerHoverHost } from '@/components/TickerHoverCard';
+import {
+  SPLASH_FIRST_PAINT_ATTRIBUTE,
+  SPLASH_SESSION_KEY,
+  SPLASH_SKIP_ATTRIBUTE,
+} from '@/lib/splashSession';
 import { Analytics } from '@vercel/analytics/next';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 
@@ -66,6 +71,34 @@ export const viewport = {
   maximumScale: 5,
 };
 
+function SplashFirstPaintGuard() {
+  const script = `
+    (() => {
+      if (window.location.pathname !== '/') return;
+
+      const root = document.documentElement;
+      try {
+        const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+        const played = window.sessionStorage.getItem(${JSON.stringify(SPLASH_SESSION_KEY)}) === '1';
+        if (reduced || played) {
+          root.setAttribute(${JSON.stringify(SPLASH_SKIP_ATTRIBUTE)}, '1');
+          root.removeAttribute(${JSON.stringify(SPLASH_FIRST_PAINT_ATTRIBUTE)});
+        } else {
+          root.removeAttribute(${JSON.stringify(SPLASH_SKIP_ATTRIBUTE)});
+          root.setAttribute(${JSON.stringify(SPLASH_FIRST_PAINT_ATTRIBUTE)}, '1');
+        }
+      } catch {
+        root.setAttribute(${JSON.stringify(SPLASH_SKIP_ATTRIBUTE)}, '1');
+        root.removeAttribute(${JSON.stringify(SPLASH_FIRST_PAINT_ATTRIBUTE)});
+      }
+    })();
+  `;
+
+  // This must execute in <head>, before the browser can parse and paint the
+  // shared layout's topbar. The real splash remains homepage-only.
+  return <script id="quantiv-splash-first-paint" dangerouslySetInnerHTML={{ __html: script }} />;
+}
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <ClerkProvider
@@ -88,6 +121,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         className={`${mulish.variable} ${nunitoSans.variable} ${jetbrainsMono.variable}`}
         style={{ backgroundColor: '#000000', colorScheme: 'dark' }}
       >
+        <head>
+          <SplashFirstPaintGuard />
+        </head>
         <body suppressHydrationWarning style={{ backgroundColor: '#000000' }}>
           <Providers>
             <ErrorBoundary>
