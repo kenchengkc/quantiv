@@ -184,6 +184,7 @@ export function preloadTickerLogo(
   const urls = tickerLogoUrls(normalized);
   const promise = new Promise<TickerLogoLoadState>((resolve) => {
     let settled = false;
+    let timedOut = false;
     let timeoutId: number | null = null;
     let index = 0;
     const finish = (state: TickerLogoLoadState) => {
@@ -191,7 +192,7 @@ export function preloadTickerLogo(
       settled = true;
       if (timeoutId !== null) window.clearTimeout(timeoutId);
       if (state === 'failed') setTickerLogoFailed(normalized);
-      resolve(state);
+      if (!timedOut) resolve(state);
     };
 
     const tryNext = () => {
@@ -232,7 +233,18 @@ export function preloadTickerLogo(
       }
     };
 
-    timeoutId = window.setTimeout(() => finish('failed'), timeoutMs);
+    // The timeout releases the caller but must NOT cache 'failed': on a
+    // 200-ticker week the preload queue can't finish inside the budget, and a
+    // cached failure pins the letter tile for the whole session even though
+    // the logo exists. Let the cascade keep running — it caches the real
+    // loaded/failed outcome when it settles, and <img>'s own onError chain
+    // covers anything still uncached. Only cascade exhaustion (a genuine miss
+    // on every provider) caches 'failed', via finish() in tryNext.
+    timeoutId = window.setTimeout(() => {
+      if (settled) return;
+      timedOut = true;
+      resolve('failed');
+    }, timeoutMs);
     tryNext();
   });
 
