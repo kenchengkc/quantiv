@@ -18,6 +18,12 @@
       "match": { "fiscal_year": 2027, "fiscal_q": "Q1" },
       "set": { "date": "2026-06-04", "timing": "amc" },
       "note": "manual move +1 trading day, AMC"
+    },
+    {
+      "symbol": "FAST",
+      "match": { "date": "2026-07-13", "fiscal_year": 2026, "fiscal_q": "Q2" },
+      "set": { "date": "2026-07-14", "timing": "bmo" },
+      "note": "Finnhub/DoltHub stuck on estimated 07-13; company PR sets the Q2 call for Tue 2026-07-14 9:00am CT, results out same morning (BMO). Date kept in match so the 2026-04-13 row, also labeled FY2026 Q2, stays untouched."
     }
   ]
 }
