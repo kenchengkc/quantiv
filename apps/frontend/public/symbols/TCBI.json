@@ -3,30 +3,30 @@
   "as_of_date": "2026-07-10",
   "spot_price": 105.0,
   "expected_move": {
-    "earnings_date": "2026-07-16",
-    "expiration": "2026-07-17",
-    "dte": 7,
-    "lead_time_days": 6,
+    "earnings_date": "2026-07-22",
+    "expiration": "2026-08-21",
+    "dte": 42,
+    "lead_time_days": 12,
     "atm_strike": 105.0,
-    "atm_iv": 0.371103,
-    "straddle_abs": 4.65,
-    "straddle_pct": 0.044286,
-    "iv_pct": 0.051392,
-    "skew_atm": -0.065925,
-    "term_slope": -0.027071,
-    "total_vega": 0.1071,
-    "em_ml_pct": 0.039731,
-    "em_ml_abs": 4.079222,
-    "correction_factor": 0.704101,
-    "model_horizon": 7,
-    "ml_snapshot_date": "2026-07-09",
-    "p10": 0.007132,
-    "p25": 0.017408,
-    "p50": 0.035351,
-    "p75": 0.071203,
-    "p90": 0.120293,
+    "atm_iv": 0.33995,
+    "straddle_abs": 9.7,
+    "straddle_pct": 0.092381,
+    "iv_pct": 0.115317,
+    "skew_atm": -0.0129,
+    "term_slope": null,
+    "total_vega": 0.2791,
+    "em_ml_pct": 0.03819,
+    "em_ml_abs": 3.875155,
+    "correction_factor": 0.389317,
+    "model_horizon": 14,
+    "ml_snapshot_date": "2026-07-08",
+    "p10": 0.006936,
+    "p25": 0.016493,
+    "p50": 0.035029,
+    "p75": 0.073187,
+    "p90": 0.119956,
     "em_method": "ml_lightgbm",
-    "timing": "before_market_open"
+    "timing": "after_market_close"
   },
   "straddle_features": [
     {
@@ -82,6 +82,21 @@
     }
   ],
   "earnings_history": [
+    {
+      "date": "2026-07-22",
+      "timing": "after_market_close",
+      "q": "Q3 26",
+      "fiscal_year": 2026,
+      "fiscal_q": "Q3",
+      "actual": null,
+      "implied": null,
+      "eps_actual": null,
+      "eps_estimate": null,
+      "eps_surprise_pct": null,
+      "revenue_actual": null,
+      "revenue_estimate": null,
+      "rev_surprise_pct": null
+    },
     {
       "date": "2026-07-16",
       "timing": "before_market_open",
@@ -246,24 +261,9 @@
       "revenue_actual": null,
       "revenue_estimate": null,
       "rev_surprise_pct": null
-    },
-    {
-      "date": "2023-10-19",
-      "timing": "before_market_open",
-      "q": "Q4 23",
-      "fiscal_year": 2023,
-      "fiscal_q": "Q4",
-      "actual": -0.034738,
-      "implied": null,
-      "eps_actual": null,
-      "eps_estimate": null,
-      "eps_surprise_pct": null,
-      "revenue_actual": null,
-      "revenue_estimate": null,
-      "rev_surprise_pct": null
     }
   ],
-  "next_earnings": "2026-07-16",
+  "next_earnings": "2026-07-22",
   "vol_regime": {
     "iv_current": 0.3449,
     "iv_rank": 0.385972,
@@ -274,5 +274,5 @@
     "iv_mom_week": -0.023,
     "iv_mom_month": null
   },
-  "next_earnings_timing": "before_market_open"
+  "next_earnings_timing": "after_market_close"
 }
