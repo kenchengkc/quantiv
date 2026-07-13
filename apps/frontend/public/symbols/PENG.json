@@ -189,52 +189,5 @@
     "iv_mom_week": -0.2601,
     "iv_mom_month": null
   },
-  "provider_enrichment": {
-    "short_interest": {
-      "provider": "massive",
-      "endpoint": "massive_short_interest",
-      "collected_at": "2026-07-11T12:03:41.446998+00:00",
-      "shares": 8750900,
-      "avg_daily_volume": 3387056,
-      "days_to_cover": 2.58,
-      "settlement_date": "2026-06-30"
-    },
-    "options_flow": {
-      "provider": "massive",
-      "endpoint": "massive_options_snapshot",
-      "collected_at": "2026-07-11T12:03:41.446998+00:00",
-      "contract_count": 250,
-      "call_count": 125,
-      "put_count": 125,
-      "total_call_volume": 7420,
-      "total_put_volume": 7285,
-      "total_call_open_interest": 39190,
-      "total_put_open_interest": 29290,
-      "put_call_volume_ratio": 0.981806,
-      "put_call_open_interest_ratio": 0.747385,
-      "iv_coverage_pct": 94.8,
-      "greeks_coverage_pct": 94.8
-    },
-    "flags": [
-      "call_heavy_open_interest"
-    ],
-    "signal_score": 0.189179,
-    "sources": [
-      "massive"
-    ],
-    "generated_at": {
-      "company_facts": "2026-07-11T12:17:11.062659+00:00",
-      "options_provider_signals": "2026-07-11T12:17:11.062659+00:00",
-      "corporate_actions": "2026-07-11T12:17:11.062659+00:00",
-      "earnings_news_signals": "2026-07-11T12:17:11.062659+00:00",
-      "live_market_signals": "2026-07-11T12:17:11.062659+00:00"
-    }
-  },
-  "short_days_to_cover": 2.58,
-  "short_interest_shares": 8750900,
-  "put_call_volume_ratio": 0.981806,
-  "put_call_open_interest_ratio": 0.747385,
-  "provider_options_volume": 14705,
-  "provider_signal_score": 0.189179,
   "next_earnings_timing": "after_market_close"
 }
