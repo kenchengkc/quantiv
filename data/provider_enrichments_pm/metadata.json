@@ -1,29 +1,51 @@
 {
-  "error_count": 0,
-  "errors": [],
-  "generated_at": "2026-07-10T19:59:20.050208+00:00",
+  "error_count": 1,
+  "errors": [
+    {
+      "endpoint": "av_ipo_calendar",
+      "http_status": 200,
+      "response_shape": {
+        "columns": [
+          "symbol",
+          "name",
+          "ipoDate",
+          "priceRangeLow",
+          "priceRangeHigh",
+          "currency",
+          "exchange"
+        ],
+        "has_data": false,
+        "kind": "csv",
+        "row_count": 0
+      },
+      "retry_after": "2026-07-14",
+      "status": "empty",
+      "symbol": "__market__"
+    }
+  ],
+  "generated_at": "2026-07-13T19:59:23.362112+00:00",
   "planned_calls": 19,
   "symbols": [
-    "PEP",
-    "AZZ",
-    "H",
-    "DAL",
-    "EPAC",
-    "PENG",
-    "PSMT",
-    "SMPL",
-    "WDFC",
-    "GOOG",
-    "TSLA",
-    "INTC",
     "JNJ",
     "JPM",
-    "XOM",
-    "BAC"
+    "BAC",
+    "GE",
+    "GS",
+    "NFLX",
+    "UNH",
+    "C",
+    "MS",
+    "STX",
+    "WFC",
+    "ABT",
+    "PGR",
+    "PLD",
+    "PNC",
+    "USB"
   ],
   "tables": {
     "company_facts": 4,
-    "corporate_actions": 1,
+    "corporate_actions": 0,
     "earnings_news_signals": 0,
     "live_market_signals": 0,
     "options_provider_signals": 14
