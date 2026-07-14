@@ -1,61 +1,21 @@
 {
-  "error_count": 17,
+  "error_count": 12,
   "errors": [
     {
       "endpoint": "fmp_key_metrics_ttm",
       "error": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/",
       "http_status": 402,
-      "retry_after": "2026-08-12",
+      "retry_after": "2026-08-13",
       "status": "entitlement_denied",
-      "symbol": "MS"
+      "symbol": "PNC"
     },
     {
       "endpoint": "fmp_key_metrics_ttm",
       "error": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/",
       "http_status": 402,
-      "retry_after": "2026-08-12",
+      "retry_after": "2026-08-13",
       "status": "entitlement_denied",
-      "symbol": "STX"
-    },
-    {
-      "endpoint": "fmp_key_metrics_ttm",
-      "error": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/",
-      "http_status": 402,
-      "retry_after": "2026-08-12",
-      "status": "entitlement_denied",
-      "symbol": "ABT"
-    },
-    {
-      "endpoint": "fmp_key_metrics_ttm",
-      "error": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/",
-      "http_status": 402,
-      "retry_after": "2026-08-12",
-      "status": "entitlement_denied",
-      "symbol": "ISRG"
-    },
-    {
-      "endpoint": "fmp_key_metrics_ttm",
-      "error": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/",
-      "http_status": 402,
-      "retry_after": "2026-08-12",
-      "status": "entitlement_denied",
-      "symbol": "PGR"
-    },
-    {
-      "endpoint": "fmp_key_metrics_ttm",
-      "error": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/",
-      "http_status": 402,
-      "retry_after": "2026-08-12",
-      "status": "entitlement_denied",
-      "symbol": "PLD"
-    },
-    {
-      "endpoint": "fmp_key_metrics_ttm",
-      "error": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/",
-      "http_status": 402,
-      "retry_after": "2026-08-12",
-      "status": "entitlement_denied",
-      "symbol": "FCX"
+      "symbol": "USB"
     },
     {
       "endpoint": "massive_dividends",
@@ -71,27 +31,9 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-14",
+      "retry_after": "2026-07-15",
       "status": "empty",
       "symbol": "NFLX"
-    },
-    {
-      "endpoint": "massive_dividends",
-      "http_status": 200,
-      "response_shape": {
-        "has_data": false,
-        "kind": "json_object",
-        "row_count": 0,
-        "sample_keys": [],
-        "top_level_keys": [
-          "request_id",
-          "results",
-          "status"
-        ]
-      },
-      "retry_after": "2026-07-14",
-      "status": "empty",
-      "symbol": "ISRG"
     },
     {
       "endpoint": "massive_splits",
@@ -107,7 +49,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-14",
+      "retry_after": "2026-07-15",
       "status": "empty",
       "symbol": "JNJ"
     },
@@ -125,7 +67,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-14",
+      "retry_after": "2026-07-15",
       "status": "empty",
       "symbol": "JPM"
     },
@@ -143,7 +85,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-14",
+      "retry_after": "2026-07-15",
       "status": "empty",
       "symbol": "GS"
     },
@@ -161,7 +103,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-14",
+      "retry_after": "2026-07-15",
       "status": "empty",
       "symbol": "MS"
     },
@@ -179,7 +121,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-14",
+      "retry_after": "2026-07-15",
       "status": "empty",
       "symbol": "STX"
     },
@@ -197,7 +139,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-14",
+      "retry_after": "2026-07-15",
       "status": "empty",
       "symbol": "ABT"
     },
@@ -215,34 +157,49 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-14",
+      "retry_after": "2026-07-15",
       "status": "empty",
       "symbol": "PLD"
     },
     {
-      "endpoint": "av_ipo_calendar",
+      "endpoint": "massive_splits",
       "http_status": 200,
       "response_shape": {
-        "columns": [
-          "symbol",
-          "name",
-          "ipoDate",
-          "priceRangeLow",
-          "priceRangeHigh",
-          "currency",
-          "exchange"
-        ],
         "has_data": false,
-        "kind": "csv",
-        "row_count": 0
+        "kind": "json_object",
+        "row_count": 0,
+        "sample_keys": [],
+        "top_level_keys": [
+          "request_id",
+          "results",
+          "status"
+        ]
       },
-      "retry_after": "2026-07-14",
+      "retry_after": "2026-07-15",
       "status": "empty",
-      "symbol": "__market__"
+      "symbol": "PNC"
+    },
+    {
+      "endpoint": "massive_splits",
+      "http_status": 200,
+      "response_shape": {
+        "has_data": false,
+        "kind": "json_object",
+        "row_count": 0,
+        "sample_keys": [],
+        "top_level_keys": [
+          "request_id",
+          "results",
+          "status"
+        ]
+      },
+      "retry_after": "2026-07-15",
+      "status": "empty",
+      "symbol": "USB"
     }
   ],
-  "generated_at": "2026-07-13T13:51:19.554048+00:00",
-  "planned_calls": 213,
+  "generated_at": "2026-07-14T12:37:25.391560+00:00",
+  "planned_calls": 165,
   "symbols": [
     "JNJ",
     "JPM",
@@ -256,13 +213,13 @@
     "STX",
     "WFC",
     "ABT",
-    "ISRG",
     "PGR",
     "PLD",
-    "FCX"
+    "PNC",
+    "USB"
   ],
   "tables": {
-    "company_facts": 120,
+    "company_facts": 72,
     "corporate_actions": 25,
     "earnings_news_signals": 0,
     "live_market_signals": 0,
