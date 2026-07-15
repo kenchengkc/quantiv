@@ -1,21 +1,23 @@
 {
-  "error_count": 12,
+  "error_count": 9,
   "errors": [
     {
-      "endpoint": "fmp_key_metrics_ttm",
-      "error": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/",
-      "http_status": 402,
-      "retry_after": "2026-08-13",
-      "status": "entitlement_denied",
-      "symbol": "PNC"
-    },
-    {
-      "endpoint": "fmp_key_metrics_ttm",
-      "error": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/",
-      "http_status": 402,
-      "retry_after": "2026-08-13",
-      "status": "entitlement_denied",
-      "symbol": "USB"
+      "endpoint": "massive_dividends",
+      "http_status": 200,
+      "response_shape": {
+        "has_data": false,
+        "kind": "json_object",
+        "row_count": 0,
+        "sample_keys": [],
+        "top_level_keys": [
+          "request_id",
+          "results",
+          "status"
+        ]
+      },
+      "retry_after": "2026-07-16",
+      "status": "empty",
+      "symbol": "NFLX"
     },
     {
       "endpoint": "massive_dividends",
@@ -31,9 +33,9 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-15",
+      "retry_after": "2026-07-16",
       "status": "empty",
-      "symbol": "NFLX"
+      "symbol": "ISRG"
     },
     {
       "endpoint": "massive_splits",
@@ -49,7 +51,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-15",
+      "retry_after": "2026-07-16",
       "status": "empty",
       "symbol": "JNJ"
     },
@@ -67,7 +69,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-15",
+      "retry_after": "2026-07-16",
       "status": "empty",
       "symbol": "JPM"
     },
@@ -85,7 +87,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-15",
+      "retry_after": "2026-07-16",
       "status": "empty",
       "symbol": "GS"
     },
@@ -103,7 +105,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-15",
+      "retry_after": "2026-07-16",
       "status": "empty",
       "symbol": "MS"
     },
@@ -121,7 +123,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-15",
+      "retry_after": "2026-07-16",
       "status": "empty",
       "symbol": "STX"
     },
@@ -139,7 +141,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-15",
+      "retry_after": "2026-07-16",
       "status": "empty",
       "symbol": "ABT"
     },
@@ -157,48 +159,12 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-15",
+      "retry_after": "2026-07-16",
       "status": "empty",
       "symbol": "PLD"
-    },
-    {
-      "endpoint": "massive_splits",
-      "http_status": 200,
-      "response_shape": {
-        "has_data": false,
-        "kind": "json_object",
-        "row_count": 0,
-        "sample_keys": [],
-        "top_level_keys": [
-          "request_id",
-          "results",
-          "status"
-        ]
-      },
-      "retry_after": "2026-07-15",
-      "status": "empty",
-      "symbol": "PNC"
-    },
-    {
-      "endpoint": "massive_splits",
-      "http_status": 200,
-      "response_shape": {
-        "has_data": false,
-        "kind": "json_object",
-        "row_count": 0,
-        "sample_keys": [],
-        "top_level_keys": [
-          "request_id",
-          "results",
-          "status"
-        ]
-      },
-      "retry_after": "2026-07-15",
-      "status": "empty",
-      "symbol": "USB"
     }
   ],
-  "generated_at": "2026-07-14T12:37:25.391560+00:00",
+  "generated_at": "2026-07-15T12:38:18.524685+00:00",
   "planned_calls": 165,
   "symbols": [
     "JNJ",
@@ -213,14 +179,14 @@
     "STX",
     "WFC",
     "ABT",
+    "ISRG",
     "PGR",
     "PLD",
-    "PNC",
-    "USB"
+    "FCX"
   ],
   "tables": {
     "company_facts": 72,
-    "corporate_actions": 25,
+    "corporate_actions": 26,
     "earnings_news_signals": 0,
     "live_market_signals": 0,
     "options_provider_signals": 30
