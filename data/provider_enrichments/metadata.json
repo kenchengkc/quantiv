@@ -1,6 +1,22 @@
 {
-  "error_count": 9,
+  "error_count": 12,
   "errors": [
+    {
+      "endpoint": "fmp_key_metrics_ttm",
+      "error": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/",
+      "http_status": 402,
+      "retry_after": "2026-08-15",
+      "status": "entitlement_denied",
+      "symbol": "IBM"
+    },
+    {
+      "endpoint": "fmp_key_metrics_ttm",
+      "error": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/",
+      "http_status": 402,
+      "retry_after": "2026-08-15",
+      "status": "entitlement_denied",
+      "symbol": "BLK"
+    },
     {
       "endpoint": "massive_dividends",
       "http_status": 200,
@@ -15,7 +31,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-16",
+      "retry_after": "2026-07-17",
       "status": "empty",
       "symbol": "NFLX"
     },
@@ -33,7 +49,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-16",
+      "retry_after": "2026-07-17",
       "status": "empty",
       "symbol": "ISRG"
     },
@@ -51,7 +67,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-16",
+      "retry_after": "2026-07-17",
       "status": "empty",
       "symbol": "JNJ"
     },
@@ -69,7 +85,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-16",
+      "retry_after": "2026-07-17",
       "status": "empty",
       "symbol": "JPM"
     },
@@ -87,7 +103,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-16",
+      "retry_after": "2026-07-17",
       "status": "empty",
       "symbol": "GS"
     },
@@ -105,7 +121,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-16",
+      "retry_after": "2026-07-17",
       "status": "empty",
       "symbol": "MS"
     },
@@ -123,7 +139,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-16",
+      "retry_after": "2026-07-17",
       "status": "empty",
       "symbol": "STX"
     },
@@ -141,7 +157,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-16",
+      "retry_after": "2026-07-17",
       "status": "empty",
       "symbol": "ABT"
     },
@@ -159,12 +175,33 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-16",
+      "retry_after": "2026-07-17",
       "status": "empty",
-      "symbol": "PLD"
+      "symbol": "BLK"
+    },
+    {
+      "endpoint": "av_ipo_calendar",
+      "http_status": 200,
+      "response_shape": {
+        "columns": [
+          "symbol",
+          "name",
+          "ipoDate",
+          "priceRangeLow",
+          "priceRangeHigh",
+          "currency",
+          "exchange"
+        ],
+        "has_data": false,
+        "kind": "csv",
+        "row_count": 0
+      },
+      "retry_after": "2026-07-17",
+      "status": "empty",
+      "symbol": "__market__"
     }
   ],
-  "generated_at": "2026-07-15T12:38:18.524685+00:00",
+  "generated_at": "2026-07-16T12:43:53.051561+00:00",
   "planned_calls": 165,
   "symbols": [
     "JNJ",
@@ -175,18 +212,18 @@
     "NFLX",
     "UNH",
     "C",
+    "IBM",
     "MS",
     "STX",
     "WFC",
     "ABT",
+    "BLK",
     "ISRG",
-    "PGR",
-    "PLD",
-    "FCX"
+    "PGR"
   ],
   "tables": {
     "company_facts": 72,
-    "corporate_actions": 26,
+    "corporate_actions": 25,
     "earnings_news_signals": 0,
     "live_market_signals": 0,
     "options_provider_signals": 30
