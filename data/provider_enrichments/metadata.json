@@ -1,21 +1,64 @@
 {
-  "error_count": 12,
+  "error_count": 18,
   "errors": [
     {
-      "endpoint": "fmp_key_metrics_ttm",
-      "error": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/",
-      "http_status": 402,
-      "retry_after": "2026-08-15",
-      "status": "entitlement_denied",
-      "symbol": "IBM"
+      "endpoint": "av_historical_put_call_ratio",
+      "error": "We have detected your API key as 7NHVPMDQ14N7ZSF1 and our standard API rate limit is 25 requests per day. Please subscribe to any of the premium plans at https://www.alphavantage.co/premium/ to instantly remove all daily rate limits.",
+      "http_status": 200,
+      "response_shape": {
+        "has_data": false,
+        "kind": "json_object",
+        "row_count": 0,
+        "sample_keys": [],
+        "top_level_keys": [
+          "Information"
+        ]
+      },
+      "retry_after": "2026-07-18",
+      "status": "quota_limited",
+      "symbol": "JNJ"
     },
     {
-      "endpoint": "fmp_key_metrics_ttm",
-      "error": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/",
-      "http_status": 402,
-      "retry_after": "2026-08-15",
-      "status": "entitlement_denied",
-      "symbol": "BLK"
+      "endpoint": "av_historical_put_call_ratio",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
+      "symbol": "JPM"
+    },
+    {
+      "endpoint": "av_historical_put_call_ratio",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
+      "symbol": "BAC"
+    },
+    {
+      "endpoint": "av_historical_put_call_ratio",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
+      "symbol": "GE"
+    },
+    {
+      "endpoint": "av_historical_voi",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
+      "symbol": "JNJ"
+    },
+    {
+      "endpoint": "av_historical_voi",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
+      "symbol": "JPM"
+    },
+    {
+      "endpoint": "av_historical_voi",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
+      "symbol": "BAC"
+    },
+    {
+      "endpoint": "av_historical_voi",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
+      "symbol": "GE"
     },
     {
       "endpoint": "massive_dividends",
@@ -31,7 +74,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-17",
+      "retry_after": "2026-07-18",
       "status": "empty",
       "symbol": "NFLX"
     },
@@ -49,7 +92,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-17",
+      "retry_after": "2026-07-18",
       "status": "empty",
       "symbol": "ISRG"
     },
@@ -67,7 +110,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-17",
+      "retry_after": "2026-07-18",
       "status": "empty",
       "symbol": "JNJ"
     },
@@ -85,7 +128,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-17",
+      "retry_after": "2026-07-18",
       "status": "empty",
       "symbol": "JPM"
     },
@@ -103,7 +146,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-17",
+      "retry_after": "2026-07-18",
       "status": "empty",
       "symbol": "GS"
     },
@@ -121,7 +164,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-17",
+      "retry_after": "2026-07-18",
       "status": "empty",
       "symbol": "MS"
     },
@@ -139,7 +182,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-17",
+      "retry_after": "2026-07-18",
       "status": "empty",
       "symbol": "STX"
     },
@@ -157,7 +200,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-17",
+      "retry_after": "2026-07-18",
       "status": "empty",
       "symbol": "ABT"
     },
@@ -175,33 +218,18 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-17",
+      "retry_after": "2026-07-18",
       "status": "empty",
       "symbol": "BLK"
     },
     {
       "endpoint": "av_ipo_calendar",
-      "http_status": 200,
-      "response_shape": {
-        "columns": [
-          "symbol",
-          "name",
-          "ipoDate",
-          "priceRangeLow",
-          "priceRangeHigh",
-          "currency",
-          "exchange"
-        ],
-        "has_data": false,
-        "kind": "csv",
-        "row_count": 0
-      },
-      "retry_after": "2026-07-17",
-      "status": "empty",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
       "symbol": "__market__"
     }
   ],
-  "generated_at": "2026-07-16T12:43:53.051561+00:00",
+  "generated_at": "2026-07-17T12:33:12.501101+00:00",
   "planned_calls": 165,
   "symbols": [
     "JNJ",
@@ -226,6 +254,6 @@
     "corporate_actions": 25,
     "earnings_news_signals": 0,
     "live_market_signals": 0,
-    "options_provider_signals": 30
+    "options_provider_signals": 22
   }
 }
