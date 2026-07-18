@@ -1,65 +1,6 @@
 {
-  "error_count": 18,
+  "error_count": 9,
   "errors": [
-    {
-      "endpoint": "av_historical_put_call_ratio",
-      "error": "We have detected your API key as 7NHVPMDQ14N7ZSF1 and our standard API rate limit is 25 requests per day. Please subscribe to any of the premium plans at https://www.alphavantage.co/premium/ to instantly remove all daily rate limits.",
-      "http_status": 200,
-      "response_shape": {
-        "has_data": false,
-        "kind": "json_object",
-        "row_count": 0,
-        "sample_keys": [],
-        "top_level_keys": [
-          "Information"
-        ]
-      },
-      "retry_after": "2026-07-18",
-      "status": "quota_limited",
-      "symbol": "JNJ"
-    },
-    {
-      "endpoint": "av_historical_put_call_ratio",
-      "error": "alphavantage daily budget exhausted across 2 key(s)",
-      "status": "quota_blocked",
-      "symbol": "JPM"
-    },
-    {
-      "endpoint": "av_historical_put_call_ratio",
-      "error": "alphavantage daily budget exhausted across 2 key(s)",
-      "status": "quota_blocked",
-      "symbol": "BAC"
-    },
-    {
-      "endpoint": "av_historical_put_call_ratio",
-      "error": "alphavantage daily budget exhausted across 2 key(s)",
-      "status": "quota_blocked",
-      "symbol": "GE"
-    },
-    {
-      "endpoint": "av_historical_voi",
-      "error": "alphavantage daily budget exhausted across 2 key(s)",
-      "status": "quota_blocked",
-      "symbol": "JNJ"
-    },
-    {
-      "endpoint": "av_historical_voi",
-      "error": "alphavantage daily budget exhausted across 2 key(s)",
-      "status": "quota_blocked",
-      "symbol": "JPM"
-    },
-    {
-      "endpoint": "av_historical_voi",
-      "error": "alphavantage daily budget exhausted across 2 key(s)",
-      "status": "quota_blocked",
-      "symbol": "BAC"
-    },
-    {
-      "endpoint": "av_historical_voi",
-      "error": "alphavantage daily budget exhausted across 2 key(s)",
-      "status": "quota_blocked",
-      "symbol": "GE"
-    },
     {
       "endpoint": "massive_dividends",
       "http_status": 200,
@@ -74,7 +15,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-18",
+      "retry_after": "2026-07-19",
       "status": "empty",
       "symbol": "NFLX"
     },
@@ -92,7 +33,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-18",
+      "retry_after": "2026-07-19",
       "status": "empty",
       "symbol": "ISRG"
     },
@@ -110,7 +51,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-18",
+      "retry_after": "2026-07-19",
       "status": "empty",
       "symbol": "JNJ"
     },
@@ -128,7 +69,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-18",
+      "retry_after": "2026-07-19",
       "status": "empty",
       "symbol": "JPM"
     },
@@ -146,7 +87,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-18",
+      "retry_after": "2026-07-19",
       "status": "empty",
       "symbol": "GS"
     },
@@ -164,7 +105,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-18",
+      "retry_after": "2026-07-19",
       "status": "empty",
       "symbol": "MS"
     },
@@ -182,7 +123,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-18",
+      "retry_after": "2026-07-19",
       "status": "empty",
       "symbol": "STX"
     },
@@ -200,7 +141,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-18",
+      "retry_after": "2026-07-19",
       "status": "empty",
       "symbol": "ABT"
     },
@@ -218,18 +159,12 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-18",
+      "retry_after": "2026-07-19",
       "status": "empty",
       "symbol": "BLK"
-    },
-    {
-      "endpoint": "av_ipo_calendar",
-      "error": "alphavantage daily budget exhausted across 2 key(s)",
-      "status": "quota_blocked",
-      "symbol": "__market__"
     }
   ],
-  "generated_at": "2026-07-17T12:33:12.501101+00:00",
+  "generated_at": "2026-07-18T12:15:44.735490+00:00",
   "planned_calls": 165,
   "symbols": [
     "JNJ",
@@ -251,9 +186,9 @@
   ],
   "tables": {
     "company_facts": 72,
-    "corporate_actions": 25,
+    "corporate_actions": 26,
     "earnings_news_signals": 0,
     "live_market_signals": 0,
-    "options_provider_signals": 22
+    "options_provider_signals": 30
   }
 }
