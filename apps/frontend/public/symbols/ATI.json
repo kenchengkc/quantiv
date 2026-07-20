@@ -3,10 +3,10 @@
   "as_of_date": "2026-07-17",
   "spot_price": 190.0,
   "expected_move": {
-    "earnings_date": "2026-07-30",
+    "earnings_date": "2026-08-06",
     "expiration": "2026-08-21",
     "dte": 35,
-    "lead_time_days": 13,
+    "lead_time_days": 20,
     "atm_strike": 190.0,
     "atm_iv": 0.573339,
     "straddle_abs": 26.695,
@@ -15,16 +15,16 @@
     "skew_atm": 0.004967,
     "term_slope": null,
     "total_vega": 0.4582,
-    "em_ml_pct": 0.063089,
-    "em_ml_abs": 11.703615,
-    "correction_factor": 0.448947,
-    "model_horizon": 14,
+    "em_ml_pct": 0.071387,
+    "em_ml_abs": 13.243091,
+    "correction_factor": 0.508001,
+    "model_horizon": 21,
     "ml_snapshot_date": "2026-07-16",
-    "p10": 0.008314,
-    "p25": 0.028415,
-    "p50": 0.060507,
-    "p75": 0.116175,
-    "p90": 0.181684,
+    "p10": 0.008982,
+    "p25": 0.031693,
+    "p50": 0.073073,
+    "p75": 0.133411,
+    "p90": 0.18967,
     "em_method": "ml_lightgbm",
     "timing": "before_market_open"
   },
@@ -66,7 +66,7 @@
   ],
   "earnings_history": [
     {
-      "date": "2026-07-30",
+      "date": "2026-08-06",
       "timing": "before_market_open",
       "q": "Q2 26",
       "fiscal_year": 2026,
@@ -74,10 +74,10 @@
       "actual": null,
       "implied": null,
       "eps_actual": null,
-      "eps_estimate": 1.0288,
+      "eps_estimate": 1.05,
       "eps_surprise_pct": null,
       "revenue_actual": null,
-      "revenue_estimate": 1227629750.0,
+      "revenue_estimate": 1229498250.0,
       "rev_surprise_pct": null
     },
     {
@@ -246,7 +246,7 @@
       "rev_surprise_pct": null
     }
   ],
-  "next_earnings": "2026-07-30",
+  "next_earnings": "2026-08-06",
   "vol_regime": {
     "iv_current": 0.5699,
     "iv_rank": 0.881003,
