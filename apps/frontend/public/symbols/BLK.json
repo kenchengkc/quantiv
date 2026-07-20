@@ -98,11 +98,11 @@
       "actual": 0.066274,
       "implied": null,
       "eps_actual": 13.91,
-      "eps_estimate": 12.7011,
-      "eps_surprise_pct": 0.095181,
+      "eps_estimate": 12.7175,
+      "eps_surprise_pct": 0.093768,
       "revenue_actual": 7084000000.0,
-      "revenue_estimate": 6767805727.0,
-      "rev_surprise_pct": 0.04672
+      "revenue_estimate": 6783080088.0,
+      "rev_surprise_pct": 0.044363
     },
     {
       "date": "2026-04-14",
@@ -281,67 +281,5 @@
     "iv_mom_week": -0.0535,
     "iv_mom_month": null
   },
-  "provider_enrichment": {
-    "short_interest": {
-      "provider": "massive",
-      "endpoint": "massive_short_interest",
-      "collected_at": "2026-07-18T12:02:12.883512+00:00",
-      "shares": 2073854,
-      "avg_daily_volume": 1054346,
-      "days_to_cover": 1.97,
-      "settlement_date": "2026-06-30"
-    },
-    "options_flow": {
-      "provider": "massive",
-      "endpoint": "massive_options_snapshot",
-      "collected_at": "2026-07-18T12:02:12.883512+00:00",
-      "contract_count": 250,
-      "call_count": 135,
-      "put_count": 115,
-      "total_call_volume": 314,
-      "total_put_volume": 821,
-      "total_call_open_interest": 1146,
-      "total_put_open_interest": 1714,
-      "put_call_volume_ratio": 2.61465,
-      "put_call_open_interest_ratio": 1.495637,
-      "iv_coverage_pct": 62.4,
-      "greeks_coverage_pct": 62.4
-    },
-    "corporate_actions": {
-      "dividend_events": 5,
-      "latest_dividend_date": "2026-06-05",
-      "split_events": 0,
-      "latest_split_date": null,
-      "sources": [
-        {
-          "provider": "massive",
-          "endpoint": "massive_dividends",
-          "collected_at": "2026-07-18T12:02:12.883512+00:00"
-        }
-      ]
-    },
-    "flags": [
-      "put_heavy_flow",
-      "put_heavy_open_interest",
-      "recent_dividend_history"
-    ],
-    "signal_score": 0.520227,
-    "sources": [
-      "massive"
-    ],
-    "generated_at": {
-      "company_facts": "2026-07-18T12:15:44.735490+00:00",
-      "options_provider_signals": "2026-07-18T12:15:44.735490+00:00",
-      "corporate_actions": "2026-07-18T12:15:44.735490+00:00",
-      "earnings_news_signals": "2026-07-18T12:15:44.735490+00:00",
-      "live_market_signals": "2026-07-18T12:15:44.735490+00:00"
-    }
-  },
-  "short_days_to_cover": 1.97,
-  "short_interest_shares": 2073854,
-  "put_call_volume_ratio": 2.61465,
-  "put_call_open_interest_ratio": 1.495637,
-  "provider_options_volume": 1135,
-  "provider_signal_score": 0.520227,
   "next_earnings_timing": "before_market_open"
 }
