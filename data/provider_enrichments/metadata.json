@@ -1,6 +1,48 @@
 {
-  "error_count": 10,
+  "error_count": 17,
   "errors": [
+    {
+      "endpoint": "av_historical_put_call_ratio",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
+      "symbol": "GOOGL"
+    },
+    {
+      "endpoint": "av_historical_put_call_ratio",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
+      "symbol": "TSLA"
+    },
+    {
+      "endpoint": "av_historical_put_call_ratio",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
+      "symbol": "INTC"
+    },
+    {
+      "endpoint": "av_historical_voi",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
+      "symbol": "GOOG"
+    },
+    {
+      "endpoint": "av_historical_voi",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
+      "symbol": "GOOGL"
+    },
+    {
+      "endpoint": "av_historical_voi",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
+      "symbol": "TSLA"
+    },
+    {
+      "endpoint": "av_historical_voi",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
+      "symbol": "INTC"
+    },
     {
       "endpoint": "massive_dividends",
       "http_status": 200,
@@ -15,7 +57,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-24",
+      "retry_after": "2026-07-25",
       "status": "empty",
       "symbol": "TSLA"
     },
@@ -33,7 +75,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-24",
+      "retry_after": "2026-07-25",
       "status": "empty",
       "symbol": "XOM"
     },
@@ -51,7 +93,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-24",
+      "retry_after": "2026-07-25",
       "status": "empty",
       "symbol": "GEV"
     },
@@ -69,7 +111,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-24",
+      "retry_after": "2026-07-25",
       "status": "empty",
       "symbol": "AXP"
     },
@@ -87,7 +129,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-24",
+      "retry_after": "2026-07-25",
       "status": "empty",
       "symbol": "PM"
     },
@@ -105,7 +147,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-24",
+      "retry_after": "2026-07-25",
       "status": "empty",
       "symbol": "TXN"
     },
@@ -123,7 +165,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-24",
+      "retry_after": "2026-07-25",
       "status": "empty",
       "symbol": "SCHW"
     },
@@ -141,7 +183,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-24",
+      "retry_after": "2026-07-25",
       "status": "empty",
       "symbol": "TMO"
     },
@@ -159,30 +201,18 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-24",
+      "retry_after": "2026-07-25",
       "status": "empty",
       "symbol": "TMUS"
     },
     {
-      "endpoint": "massive_splits",
-      "http_status": 200,
-      "response_shape": {
-        "has_data": false,
-        "kind": "json_object",
-        "row_count": 0,
-        "sample_keys": [],
-        "top_level_keys": [
-          "request_id",
-          "results",
-          "status"
-        ]
-      },
-      "retry_after": "2026-07-24",
-      "status": "empty",
-      "symbol": "VZ"
+      "endpoint": "av_ipo_calendar",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
+      "symbol": "__market__"
     }
   ],
-  "generated_at": "2026-07-23T12:49:09.859943+00:00",
+  "generated_at": "2026-07-24T12:41:05.507210+00:00",
   "planned_calls": 165,
   "symbols": [
     "GOOG",
@@ -194,19 +224,19 @@
     "KLAC",
     "MA",
     "AXP",
+    "IBM",
     "PM",
     "RTX",
     "TXN",
     "SCHW",
     "TMO",
-    "TMUS",
-    "VZ"
+    "TMUS"
   ],
   "tables": {
-    "company_facts": 56,
+    "company_facts": 52,
     "corporate_actions": 25,
     "earnings_news_signals": 0,
     "live_market_signals": 0,
-    "options_provider_signals": 30
+    "options_provider_signals": 23
   }
 }
