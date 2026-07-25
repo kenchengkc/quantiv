@@ -1,17 +1,17 @@
 {
-  "generated_at": "2026-07-24T12:25:07.567492+00:00",
+  "generated_at": "2026-07-25T12:12:15.636859+00:00",
   "provider": "alphavantage",
   "purpose": "volume_to_open_interest_ratio_probe",
   "universe": "priority",
   "symbol_count": 250,
-  "pending_before_budget": 210,
+  "pending_before_budget": 192,
   "calls_made": 5,
   "max_calls": 5,
   "delay_seconds": 15.0,
   "refresh_after_days": 30,
   "stopped_reason": null,
-  "historical_ok": 271,
-  "historical_checked": 272,
+  "historical_ok": 276,
+  "historical_checked": 277,
   "realtime_ok": 0,
   "realtime_checked": 0,
   "results": [
@@ -1922,6 +1922,28 @@
       ]
     },
     {
+      "symbol": "DLR",
+      "function": "HISTORICAL_VOLUME_OPEN_INTEREST_RATIO",
+      "checked_at": "2026-07-25T12:11:45.494927+00:00",
+      "ok": true,
+      "rows": 1056,
+      "error": null,
+      "top_level_keys": [
+        "data",
+        "date",
+        "symbol"
+      ],
+      "sample_keys": [
+        "contractID",
+        "date",
+        "expiration",
+        "strike",
+        "symbol",
+        "type",
+        "volume_open_interest_ratio"
+      ]
+    },
+    {
       "symbol": "DLTR",
       "function": "HISTORICAL_VOLUME_OPEN_INTEREST_RATIO",
       "checked_at": "2026-05-28T12:19:01.527124+00:00",
@@ -2279,6 +2301,28 @@
       "checked_at": "2026-05-31T11:39:48.239471+00:00",
       "ok": true,
       "rows": 510,
+      "error": null,
+      "top_level_keys": [
+        "data",
+        "date",
+        "symbol"
+      ],
+      "sample_keys": [
+        "contractID",
+        "date",
+        "expiration",
+        "strike",
+        "symbol",
+        "type",
+        "volume_open_interest_ratio"
+      ]
+    },
+    {
+      "symbol": "FIX",
+      "function": "HISTORICAL_VOLUME_OPEN_INTEREST_RATIO",
+      "checked_at": "2026-07-25T12:11:30.407435+00:00",
+      "ok": true,
+      "rows": 1108,
       "error": null,
       "top_level_keys": [
         "data",
@@ -3242,6 +3286,28 @@
       ]
     },
     {
+      "symbol": "KMI",
+      "function": "HISTORICAL_VOLUME_OPEN_INTEREST_RATIO",
+      "checked_at": "2026-07-25T12:12:00.574248+00:00",
+      "ok": true,
+      "rows": 630,
+      "error": null,
+      "top_level_keys": [
+        "data",
+        "date",
+        "symbol"
+      ],
+      "sample_keys": [
+        "contractID",
+        "date",
+        "expiration",
+        "strike",
+        "symbol",
+        "type",
+        "volume_open_interest_ratio"
+      ]
+    },
+    {
       "symbol": "KMX",
       "function": "HISTORICAL_VOLUME_OPEN_INTEREST_RATIO",
       "checked_at": "2026-05-31T11:44:04.811929+00:00",
@@ -3924,6 +3990,28 @@
       ]
     },
     {
+      "symbol": "NEE",
+      "function": "HISTORICAL_VOLUME_OPEN_INTEREST_RATIO",
+      "checked_at": "2026-07-25T12:11:15.326593+00:00",
+      "ok": true,
+      "rows": 916,
+      "error": null,
+      "top_level_keys": [
+        "data",
+        "date",
+        "symbol"
+      ],
+      "sample_keys": [
+        "contractID",
+        "date",
+        "expiration",
+        "strike",
+        "symbol",
+        "type",
+        "volume_open_interest_ratio"
+      ]
+    },
+    {
       "symbol": "NEM",
       "function": "HISTORICAL_VOLUME_OPEN_INTEREST_RATIO",
       "checked_at": "2026-07-21T12:32:29.744427+00:00",
@@ -3995,6 +4083,28 @@
       "checked_at": "2026-07-23T12:34:47.963627+00:00",
       "ok": true,
       "rows": 1986,
+      "error": null,
+      "top_level_keys": [
+        "data",
+        "date",
+        "symbol"
+      ],
+      "sample_keys": [
+        "contractID",
+        "date",
+        "expiration",
+        "strike",
+        "symbol",
+        "type",
+        "volume_open_interest_ratio"
+      ]
+    },
+    {
+      "symbol": "NSC",
+      "function": "HISTORICAL_VOLUME_OPEN_INTEREST_RATIO",
+      "checked_at": "2026-07-25T12:12:15.636526+00:00",
+      "ok": true,
+      "rows": 542,
       "error": null,
       "top_level_keys": [
         "data",
