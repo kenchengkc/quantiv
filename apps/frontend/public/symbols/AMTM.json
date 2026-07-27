@@ -3,10 +3,10 @@
   "as_of_date": "2026-07-24",
   "spot_price": 22.5,
   "expected_move": {
-    "earnings_date": "2026-08-10",
+    "earnings_date": "2026-08-11",
     "expiration": "2026-08-21",
     "dte": 28,
-    "lead_time_days": 17,
+    "lead_time_days": 18,
     "atm_strike": 22.5,
     "atm_iv": 0.621895,
     "straddle_abs": 3.1,
@@ -15,18 +15,18 @@
     "skew_atm": -0.0054,
     "term_slope": null,
     "total_vega": 0.0495,
-    "em_ml_pct": 0.067078,
-    "em_ml_abs": 1.419378,
-    "correction_factor": 0.457352,
+    "em_ml_pct": 0.06672,
+    "em_ml_abs": 1.399788,
+    "correction_factor": 0.45491,
     "model_horizon": 21,
-    "ml_snapshot_date": "2026-07-20",
-    "p10": 0.008816,
-    "p25": 0.028325,
-    "p50": 0.066018,
-    "p75": 0.125267,
-    "p90": 0.182605,
+    "ml_snapshot_date": "2026-07-21",
+    "p10": 0.008439,
+    "p25": 0.025525,
+    "p50": 0.060104,
+    "p75": 0.126212,
+    "p90": 0.171363,
     "em_method": "ml_lightgbm",
-    "timing": "after_market_close"
+    "timing": "before_market_open"
   },
   "straddle_features": [
     {
@@ -66,8 +66,23 @@
   ],
   "earnings_history": [
     {
+      "date": "2026-08-11",
+      "timing": "before_market_open",
+      "q": "Q3 26",
+      "fiscal_year": 2026,
+      "fiscal_q": "Q3",
+      "actual": null,
+      "implied": null,
+      "eps_actual": null,
+      "eps_estimate": null,
+      "eps_surprise_pct": null,
+      "revenue_actual": null,
+      "revenue_estimate": null,
+      "rev_surprise_pct": null
+    },
+    {
       "date": "2026-08-10",
-      "timing": "after_market_close",
+      "timing": "before_market_open",
       "q": "Q3 26",
       "fiscal_year": 2026,
       "fiscal_q": "Q3",
@@ -201,7 +216,7 @@
       "rev_surprise_pct": null
     }
   ],
-  "next_earnings": "2026-08-10",
+  "next_earnings": "2026-08-11",
   "vol_regime": {
     "iv_current": 0.6205,
     "iv_rank": 0.592476,
@@ -212,5 +227,5 @@
     "iv_mom_week": -0.0055,
     "iv_mom_month": null
   },
-  "next_earnings_timing": "after_market_close"
+  "next_earnings_timing": "before_market_open"
 }

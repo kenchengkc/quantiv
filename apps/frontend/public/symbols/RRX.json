@@ -3,10 +3,10 @@
   "as_of_date": "2026-07-24",
   "spot_price": 220.0,
   "expected_move": {
-    "earnings_date": "2026-08-03",
+    "earnings_date": "2026-08-05",
     "expiration": "2026-08-21",
     "dte": 28,
-    "lead_time_days": 10,
+    "lead_time_days": 12,
     "atm_strike": 220.0,
     "atm_iv": 0.606939,
     "straddle_abs": 29.445,
@@ -15,18 +15,18 @@
     "skew_atm": -0.00862,
     "term_slope": null,
     "total_vega": 0.4697,
-    "em_ml_pct": 0.046277,
-    "em_ml_abs": 9.513573,
-    "correction_factor": 0.329428,
+    "em_ml_pct": 0.054235,
+    "em_ml_abs": 11.649127,
+    "correction_factor": 0.396402,
     "model_horizon": 14,
-    "ml_snapshot_date": "2026-07-20",
-    "p10": 0.008006,
-    "p25": 0.027188,
-    "p50": 0.0506,
-    "p75": 0.117951,
-    "p90": 0.126913,
+    "ml_snapshot_date": "2026-07-22",
+    "p10": 0.009683,
+    "p25": 0.024741,
+    "p50": 0.054421,
+    "p75": 0.085282,
+    "p90": 0.158974,
     "em_method": "ml_lightgbm",
-    "timing": "after_market_close"
+    "timing": "before_market_open"
   },
   "straddle_features": [
     {
@@ -65,6 +65,21 @@
     }
   ],
   "earnings_history": [
+    {
+      "date": "2026-08-05",
+      "timing": "before_market_open",
+      "q": "Q3 26",
+      "fiscal_year": 2026,
+      "fiscal_q": "Q3",
+      "actual": null,
+      "implied": null,
+      "eps_actual": null,
+      "eps_estimate": null,
+      "eps_surprise_pct": null,
+      "revenue_actual": null,
+      "revenue_estimate": null,
+      "rev_surprise_pct": null
+    },
     {
       "date": "2026-08-03",
       "timing": "after_market_close",
@@ -229,24 +244,9 @@
       "revenue_actual": null,
       "revenue_estimate": null,
       "rev_surprise_pct": null
-    },
-    {
-      "date": "2023-11-01",
-      "timing": "after_market_close",
-      "q": "Q4 23",
-      "fiscal_year": 2023,
-      "fiscal_q": "Q4",
-      "actual": -0.157601,
-      "implied": null,
-      "eps_actual": null,
-      "eps_estimate": null,
-      "eps_surprise_pct": null,
-      "revenue_actual": null,
-      "revenue_estimate": null,
-      "rev_surprise_pct": null
     }
   ],
-  "next_earnings": "2026-08-03",
+  "next_earnings": "2026-08-05",
   "vol_regime": {
     "iv_current": 0.5997,
     "iv_rank": 0.852083,
@@ -257,5 +257,5 @@
     "iv_mom_week": 0.0051,
     "iv_mom_month": null
   },
-  "next_earnings_timing": "after_market_close"
+  "next_earnings_timing": "before_market_open"
 }

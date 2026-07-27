@@ -1,13 +1,37 @@
 {
-  "error_count": 11,
+  "error_count": 13,
   "errors": [
     {
       "endpoint": "fmp_key_metrics_ttm",
       "error": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/",
       "http_status": 402,
-      "retry_after": "2026-08-24",
+      "retry_after": "2026-08-26",
       "status": "entitlement_denied",
-      "symbol": "NEE"
+      "symbol": "CVCO"
+    },
+    {
+      "endpoint": "fmp_key_metrics_ttm",
+      "error": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/",
+      "http_status": 402,
+      "retry_after": "2026-08-26",
+      "status": "entitlement_denied",
+      "symbol": "PG"
+    },
+    {
+      "endpoint": "fmp_key_metrics_ttm",
+      "error": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/",
+      "http_status": 402,
+      "retry_after": "2026-08-26",
+      "status": "entitlement_denied",
+      "symbol": "LIN"
+    },
+    {
+      "endpoint": "fmp_key_metrics_ttm",
+      "error": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/",
+      "http_status": 402,
+      "retry_after": "2026-08-26",
+      "status": "entitlement_denied",
+      "symbol": "QCOM"
     },
     {
       "endpoint": "massive_dividends",
@@ -23,9 +47,45 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-26",
+      "retry_after": "2026-07-28",
       "status": "empty",
-      "symbol": "TSLA"
+      "symbol": "ISRG"
+    },
+    {
+      "endpoint": "massive_dividends",
+      "http_status": 200,
+      "response_shape": {
+        "has_data": false,
+        "kind": "json_object",
+        "row_count": 0,
+        "sample_keys": [],
+        "top_level_keys": [
+          "request_id",
+          "results",
+          "status"
+        ]
+      },
+      "retry_after": "2026-07-28",
+      "status": "empty",
+      "symbol": "CVCO"
+    },
+    {
+      "endpoint": "massive_dividends",
+      "http_status": 200,
+      "response_shape": {
+        "has_data": false,
+        "kind": "json_object",
+        "row_count": 0,
+        "sample_keys": [],
+        "top_level_keys": [
+          "request_id",
+          "results",
+          "status"
+        ]
+      },
+      "retry_after": "2026-07-28",
+      "status": "empty",
+      "symbol": "AMZN"
     },
     {
       "endpoint": "massive_splits",
@@ -41,7 +101,43 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-26",
+      "retry_after": "2026-07-28",
+      "status": "empty",
+      "symbol": "CVCO"
+    },
+    {
+      "endpoint": "massive_splits",
+      "http_status": 200,
+      "response_shape": {
+        "has_data": false,
+        "kind": "json_object",
+        "row_count": 0,
+        "sample_keys": [],
+        "top_level_keys": [
+          "request_id",
+          "results",
+          "status"
+        ]
+      },
+      "retry_after": "2026-07-28",
+      "status": "empty",
+      "symbol": "META"
+    },
+    {
+      "endpoint": "massive_splits",
+      "http_status": 200,
+      "response_shape": {
+        "has_data": false,
+        "kind": "json_object",
+        "row_count": 0,
+        "sample_keys": [],
+        "top_level_keys": [
+          "request_id",
+          "results",
+          "status"
+        ]
+      },
+      "retry_after": "2026-07-28",
       "status": "empty",
       "symbol": "XOM"
     },
@@ -59,9 +155,9 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-26",
+      "retry_after": "2026-07-28",
       "status": "empty",
-      "symbol": "GEV"
+      "symbol": "ABBV"
     },
     {
       "endpoint": "massive_splits",
@@ -77,9 +173,9 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-26",
+      "retry_after": "2026-07-28",
       "status": "empty",
-      "symbol": "AXP"
+      "symbol": "LIN"
     },
     {
       "endpoint": "massive_splits",
@@ -95,124 +191,34 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-26",
+      "retry_after": "2026-07-28",
       "status": "empty",
-      "symbol": "PM"
-    },
-    {
-      "endpoint": "massive_splits",
-      "http_status": 200,
-      "response_shape": {
-        "has_data": false,
-        "kind": "json_object",
-        "row_count": 0,
-        "sample_keys": [],
-        "top_level_keys": [
-          "request_id",
-          "results",
-          "status"
-        ]
-      },
-      "retry_after": "2026-07-26",
-      "status": "empty",
-      "symbol": "TXN"
-    },
-    {
-      "endpoint": "massive_splits",
-      "http_status": 200,
-      "response_shape": {
-        "has_data": false,
-        "kind": "json_object",
-        "row_count": 0,
-        "sample_keys": [],
-        "top_level_keys": [
-          "request_id",
-          "results",
-          "status"
-        ]
-      },
-      "retry_after": "2026-07-26",
-      "status": "empty",
-      "symbol": "SCHW"
-    },
-    {
-      "endpoint": "massive_splits",
-      "http_status": 200,
-      "response_shape": {
-        "has_data": false,
-        "kind": "json_object",
-        "row_count": 0,
-        "sample_keys": [],
-        "top_level_keys": [
-          "request_id",
-          "results",
-          "status"
-        ]
-      },
-      "retry_after": "2026-07-26",
-      "status": "empty",
-      "symbol": "TMO"
-    },
-    {
-      "endpoint": "massive_splits",
-      "http_status": 200,
-      "response_shape": {
-        "has_data": false,
-        "kind": "json_object",
-        "row_count": 0,
-        "sample_keys": [],
-        "top_level_keys": [
-          "request_id",
-          "results",
-          "status"
-        ]
-      },
-      "retry_after": "2026-07-26",
-      "status": "empty",
-      "symbol": "TMUS"
-    },
-    {
-      "endpoint": "massive_splits",
-      "http_status": 200,
-      "response_shape": {
-        "has_data": false,
-        "kind": "json_object",
-        "row_count": 0,
-        "sample_keys": [],
-        "top_level_keys": [
-          "request_id",
-          "results",
-          "status"
-        ]
-      },
-      "retry_after": "2026-07-26",
-      "status": "empty",
-      "symbol": "VZ"
+      "symbol": "QCOM"
     }
   ],
-  "generated_at": "2026-07-25T12:25:44.988337+00:00",
-  "planned_calls": 165,
+  "generated_at": "2026-07-27T14:04:56.535244+00:00",
+  "planned_calls": 213,
   "symbols": [
-    "GOOG",
-    "GOOGL",
-    "TSLA",
-    "INTC",
+    "ISRG",
+    "CVCO",
+    "AAPL",
+    "AMZN",
+    "MSFT",
+    "META",
+    "V",
     "XOM",
-    "GEV",
-    "AXP",
-    "IBM",
-    "PM",
-    "RTX",
-    "TXN",
-    "NEE",
-    "SCHW",
-    "TMO",
-    "TMUS",
-    "VZ"
+    "ABBV",
+    "CVX",
+    "KLAC",
+    "KO",
+    "MA",
+    "PG",
+    "LIN",
+    "QCOM"
   ],
   "tables": {
-    "company_facts": 56,
-    "corporate_actions": 25,
+    "company_facts": 120,
+    "corporate_actions": 26,
     "earnings_news_signals": 0,
     "live_market_signals": 0,
     "options_provider_signals": 30
