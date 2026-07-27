@@ -16,7 +16,7 @@
     "term_slope": null,
     "total_vega": 0.1411,
     "em_method": "options_math",
-    "timing": "after_market_close"
+    "timing": "before_market_open"
   },
   "straddle_features": [
     {
@@ -57,11 +57,11 @@
   "earnings_history": [
     {
       "date": "2026-07-22",
-      "timing": "after_market_close",
+      "timing": "before_market_open",
       "q": "Q2 26",
       "fiscal_year": 2026,
       "fiscal_q": "Q2",
-      "actual": 0.010541,
+      "actual": -0.029152,
       "implied": null,
       "eps_actual": 1.22,
       "eps_estimate": 1.1699,
@@ -247,5 +247,5 @@
     "iv_mom_week": 0.0153,
     "iv_mom_month": null
   },
-  "next_earnings_timing": "after_market_close"
+  "next_earnings_timing": "before_market_open"
 }
