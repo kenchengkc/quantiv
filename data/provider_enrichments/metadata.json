@@ -2,36 +2,72 @@
   "error_count": 13,
   "errors": [
     {
-      "endpoint": "fmp_key_metrics_ttm",
-      "error": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/",
-      "http_status": 402,
-      "retry_after": "2026-08-26",
-      "status": "entitlement_denied",
+      "endpoint": "av_historical_voi",
+      "error": "We have detected your API key as 9Z452IYR29I21LO5 and our standard API rate limit is 25 requests per day. Please subscribe to any of the premium plans at https://www.alphavantage.co/premium/ to instantly remove all daily rate limits.",
+      "http_status": 200,
+      "response_shape": {
+        "has_data": false,
+        "kind": "json_object",
+        "row_count": 0,
+        "sample_keys": [],
+        "top_level_keys": [
+          "Information"
+        ]
+      },
+      "retry_after": "2026-07-29",
+      "status": "quota_limited",
+      "symbol": "ISRG"
+    },
+    {
+      "endpoint": "av_historical_voi",
+      "error": "We have detected your API key as 7NHVPMDQ14N7ZSF1 and our standard API rate limit is 25 requests per day. Please subscribe to any of the premium plans at https://www.alphavantage.co/premium/ to instantly remove all daily rate limits.",
+      "http_status": 200,
+      "response_shape": {
+        "has_data": false,
+        "kind": "json_object",
+        "row_count": 0,
+        "sample_keys": [],
+        "top_level_keys": [
+          "Information"
+        ]
+      },
+      "retry_after": "2026-07-29",
+      "status": "quota_limited",
       "symbol": "CVCO"
     },
     {
-      "endpoint": "fmp_key_metrics_ttm",
-      "error": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/",
-      "http_status": 402,
-      "retry_after": "2026-08-26",
-      "status": "entitlement_denied",
-      "symbol": "PG"
+      "endpoint": "av_historical_voi",
+      "error": "We have detected your API key as 9Z452IYR29I21LO5 and our standard API rate limit is 25 requests per day. Please subscribe to any of the premium plans at https://www.alphavantage.co/premium/ to instantly remove all daily rate limits.",
+      "http_status": 200,
+      "response_shape": {
+        "has_data": false,
+        "kind": "json_object",
+        "row_count": 0,
+        "sample_keys": [],
+        "top_level_keys": [
+          "Information"
+        ]
+      },
+      "retry_after": "2026-07-29",
+      "status": "quota_limited",
+      "symbol": "AAPL"
     },
     {
-      "endpoint": "fmp_key_metrics_ttm",
-      "error": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/",
-      "http_status": 402,
-      "retry_after": "2026-08-26",
-      "status": "entitlement_denied",
-      "symbol": "LIN"
-    },
-    {
-      "endpoint": "fmp_key_metrics_ttm",
-      "error": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/",
-      "http_status": 402,
-      "retry_after": "2026-08-26",
-      "status": "entitlement_denied",
-      "symbol": "QCOM"
+      "endpoint": "av_historical_voi",
+      "error": "We have detected your API key as 7NHVPMDQ14N7ZSF1 and our standard API rate limit is 25 requests per day. Please subscribe to any of the premium plans at https://www.alphavantage.co/premium/ to instantly remove all daily rate limits.",
+      "http_status": 200,
+      "response_shape": {
+        "has_data": false,
+        "kind": "json_object",
+        "row_count": 0,
+        "sample_keys": [],
+        "top_level_keys": [
+          "Information"
+        ]
+      },
+      "retry_after": "2026-07-29",
+      "status": "quota_limited",
+      "symbol": "AMZN"
     },
     {
       "endpoint": "massive_dividends",
@@ -47,7 +83,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-28",
+      "retry_after": "2026-07-29",
       "status": "empty",
       "symbol": "ISRG"
     },
@@ -65,7 +101,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-28",
+      "retry_after": "2026-07-29",
       "status": "empty",
       "symbol": "CVCO"
     },
@@ -83,7 +119,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-28",
+      "retry_after": "2026-07-29",
       "status": "empty",
       "symbol": "AMZN"
     },
@@ -101,7 +137,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-28",
+      "retry_after": "2026-07-29",
       "status": "empty",
       "symbol": "CVCO"
     },
@@ -119,7 +155,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-28",
+      "retry_after": "2026-07-29",
       "status": "empty",
       "symbol": "META"
     },
@@ -137,7 +173,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-28",
+      "retry_after": "2026-07-29",
       "status": "empty",
       "symbol": "XOM"
     },
@@ -155,7 +191,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-28",
+      "retry_after": "2026-07-29",
       "status": "empty",
       "symbol": "ABBV"
     },
@@ -173,7 +209,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-28",
+      "retry_after": "2026-07-29",
       "status": "empty",
       "symbol": "LIN"
     },
@@ -191,13 +227,13 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-28",
+      "retry_after": "2026-07-29",
       "status": "empty",
       "symbol": "QCOM"
     }
   ],
-  "generated_at": "2026-07-27T14:04:56.535244+00:00",
-  "planned_calls": 213,
+  "generated_at": "2026-07-28T13:17:30.208194+00:00",
+  "planned_calls": 165,
   "symbols": [
     "ISRG",
     "CVCO",
@@ -217,10 +253,10 @@
     "QCOM"
   ],
   "tables": {
-    "company_facts": 120,
+    "company_facts": 72,
     "corporate_actions": 26,
     "earnings_news_signals": 0,
     "live_market_signals": 0,
-    "options_provider_signals": 30
+    "options_provider_signals": 26
   }
 }
