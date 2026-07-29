@@ -1,17 +1,17 @@
 {
-  "generated_at": "2026-07-28T13:04:01.015174+00:00",
+  "generated_at": "2026-07-29T13:10:37.384834+00:00",
   "provider": "alphavantage",
   "purpose": "volume_to_open_interest_ratio_probe",
   "universe": "priority",
   "symbol_count": 250,
-  "pending_before_budget": 233,
+  "pending_before_budget": 229,
   "calls_made": 5,
   "max_calls": 5,
   "delay_seconds": 15.0,
   "refresh_after_days": 30,
   "stopped_reason": null,
-  "historical_ok": 276,
-  "historical_checked": 277,
+  "historical_ok": 278,
+  "historical_checked": 279,
   "realtime_ok": 0,
   "realtime_checked": 0,
   "results": [
@@ -2538,6 +2538,28 @@
       ]
     },
     {
+      "symbol": "GILD",
+      "function": "HISTORICAL_VOLUME_OPEN_INTEREST_RATIO",
+      "checked_at": "2026-07-29T13:10:22.297292+00:00",
+      "ok": true,
+      "rows": 1328,
+      "error": null,
+      "top_level_keys": [
+        "data",
+        "date",
+        "symbol"
+      ],
+      "sample_keys": [
+        "contractID",
+        "date",
+        "expiration",
+        "strike",
+        "symbol",
+        "type",
+        "volume_open_interest_ratio"
+      ]
+    },
+    {
       "symbol": "GIS",
       "function": "HISTORICAL_VOLUME_OPEN_INTEREST_RATIO",
       "checked_at": "2026-06-12T12:19:15.163766+00:00",
@@ -3068,9 +3090,9 @@
     {
       "symbol": "ISRG",
       "function": "HISTORICAL_VOLUME_OPEN_INTEREST_RATIO",
-      "checked_at": "2026-06-29T12:37:45.592777+00:00",
+      "checked_at": "2026-07-29T13:09:36.795485+00:00",
       "ok": true,
-      "rows": 2386,
+      "rows": 2542,
       "error": null,
       "top_level_keys": [
         "data",
@@ -4454,9 +4476,9 @@
     {
       "symbol": "PG",
       "function": "HISTORICAL_VOLUME_OPEN_INTEREST_RATIO",
-      "checked_at": "2026-06-25T12:03:44.376145+00:00",
+      "checked_at": "2026-07-29T13:09:51.884050+00:00",
       "ok": true,
-      "rows": 1072,
+      "rows": 998,
       "error": null,
       "top_level_keys": [
         "data",
@@ -5224,9 +5246,9 @@
     {
       "symbol": "STX",
       "function": "HISTORICAL_VOLUME_OPEN_INTEREST_RATIO",
-      "checked_at": "2026-06-29T12:36:59.744408+00:00",
+      "checked_at": "2026-07-29T13:10:07.127017+00:00",
       "ok": true,
-      "rows": 5806,
+      "rows": 4782,
       "error": null,
       "top_level_keys": [
         "data",
@@ -5909,6 +5931,28 @@
       "checked_at": "2026-06-22T13:04:49.779186+00:00",
       "ok": true,
       "rows": 284,
+      "error": null,
+      "top_level_keys": [
+        "data",
+        "date",
+        "symbol"
+      ],
+      "sample_keys": [
+        "contractID",
+        "date",
+        "expiration",
+        "strike",
+        "symbol",
+        "type",
+        "volume_open_interest_ratio"
+      ]
+    },
+    {
+      "symbol": "WELL",
+      "function": "HISTORICAL_VOLUME_OPEN_INTEREST_RATIO",
+      "checked_at": "2026-07-29T13:10:37.384489+00:00",
+      "ok": true,
+      "rows": 536,
       "error": null,
       "top_level_keys": [
         "data",
