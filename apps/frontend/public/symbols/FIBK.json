@@ -1,13 +1,13 @@
 {
   "symbol": "FIBK",
-  "as_of_date": "2026-07-27",
+  "as_of_date": "2026-07-28",
   "spot_price": null,
   "expected_move": {
     "expiration": "2026-09-18",
-    "dte": 53,
+    "dte": 52,
     "atm_strike": 40.0,
-    "atm_iv": 0.2922,
-    "straddle_abs": 3.9,
+    "atm_iv": 0.2934,
+    "straddle_abs": 3.825,
     "straddle_pct": null,
     "iv_pct": null,
     "timing": "after_market_close"
@@ -15,20 +15,20 @@
   "straddle_features": [
     {
       "expiration": "2026-09-18",
-      "dte": 53,
+      "dte": 52,
       "atm_strike": 40.0,
-      "atm_iv": 0.2922,
-      "atm_call_iv": 0.2922,
-      "atm_put_iv": 0.2922,
-      "straddle_mid": 3.9,
-      "em_straddle": 3.9,
+      "atm_iv": 0.2934,
+      "atm_call_iv": 0.2934,
+      "atm_put_iv": 0.2934,
+      "straddle_mid": 3.825,
+      "em_straddle": 3.825,
       "em_straddle_pct": null,
       "em_iv": null,
       "em_iv_pct": null,
-      "call_delta": 0.3214,
-      "call_gamma": 0.0853,
-      "call_vega": 0.0513,
-      "call_theta": -0.0147
+      "call_delta": 0.3228,
+      "call_gamma": 0.0855,
+      "call_vega": 0.0511,
+      "call_theta": -0.0146
     }
   ],
   "earnings_history": [
@@ -215,13 +215,13 @@
   ],
   "next_earnings": "2026-07-23",
   "vol_regime": {
-    "iv_current": 0.3729,
-    "iv_rank": 0.491267,
+    "iv_current": 0.3411,
+    "iv_rank": 0.373096,
     "iv_year_high": 0.5098,
     "iv_year_low": 0.2407,
-    "hv_current": 0.2223,
-    "hv_rank": 0.108406,
-    "iv_mom_week": -0.0181,
+    "hv_current": 0.2196,
+    "hv_rank": 0.092754,
+    "iv_mom_week": 0.0808,
     "iv_mom_month": null
   },
   "next_earnings_timing": "after_market_close"
