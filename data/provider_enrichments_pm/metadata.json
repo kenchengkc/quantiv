@@ -1,7 +1,16 @@
 {
-  "error_count": 0,
-  "errors": [],
-  "generated_at": "2026-07-28T20:02:06.907713+00:00",
+  "error_count": 1,
+  "errors": [
+    {
+      "endpoint": "av_historical_voi",
+      "error": "<!DOCTYPE html>\n<html>\n  <head>\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n    <meta charset=\"utf-8\">\n    <title>Application Error</title>\n    <style media=\"screen\">\n      html,body,iframe {\n        margin: 0;\n",
+      "http_status": 503,
+      "retry_after": "2026-07-30",
+      "status": "http_error",
+      "symbol": "AMZN"
+    }
+  ],
+  "generated_at": "2026-07-29T19:53:53.115763+00:00",
   "planned_calls": 19,
   "symbols": [
     "ISRG",
@@ -10,22 +19,22 @@
     "AMZN",
     "META",
     "MSFT",
-    "MA",
     "V",
     "XOM",
     "ABBV",
     "CVX",
     "KO",
+    "LRCX",
+    "MA",
     "KLAC",
     "LIN",
-    "PG",
-    "QCOM"
+    "PG"
   ],
   "tables": {
     "company_facts": 4,
     "corporate_actions": 1,
     "earnings_news_signals": 0,
     "live_market_signals": 0,
-    "options_provider_signals": 14
+    "options_provider_signals": 13
   }
 }
