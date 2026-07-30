@@ -2,6 +2,14 @@
   "error_count": 9,
   "errors": [
     {
+      "endpoint": "fmp_key_metrics_ttm",
+      "error": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/",
+      "http_status": 402,
+      "retry_after": "2026-08-29",
+      "status": "entitlement_denied",
+      "symbol": "LRCX"
+    },
+    {
       "endpoint": "massive_dividends",
       "http_status": 200,
       "response_shape": {
@@ -15,7 +23,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-30",
+      "retry_after": "2026-07-31",
       "status": "empty",
       "symbol": "ISRG"
     },
@@ -33,7 +41,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-30",
+      "retry_after": "2026-07-31",
       "status": "empty",
       "symbol": "CVCO"
     },
@@ -51,7 +59,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-30",
+      "retry_after": "2026-07-31",
       "status": "empty",
       "symbol": "AMZN"
     },
@@ -69,7 +77,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-30",
+      "retry_after": "2026-07-31",
       "status": "empty",
       "symbol": "CVCO"
     },
@@ -87,7 +95,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-30",
+      "retry_after": "2026-07-31",
       "status": "empty",
       "symbol": "META"
     },
@@ -105,7 +113,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-30",
+      "retry_after": "2026-07-31",
       "status": "empty",
       "symbol": "XOM"
     },
@@ -123,7 +131,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-30",
+      "retry_after": "2026-07-31",
       "status": "empty",
       "symbol": "ABBV"
     },
@@ -141,30 +149,12 @@
           "status"
         ]
       },
-      "retry_after": "2026-07-30",
+      "retry_after": "2026-07-31",
       "status": "empty",
       "symbol": "LIN"
-    },
-    {
-      "endpoint": "massive_splits",
-      "http_status": 200,
-      "response_shape": {
-        "has_data": false,
-        "kind": "json_object",
-        "row_count": 0,
-        "sample_keys": [],
-        "top_level_keys": [
-          "request_id",
-          "results",
-          "status"
-        ]
-      },
-      "retry_after": "2026-07-30",
-      "status": "empty",
-      "symbol": "QCOM"
     }
   ],
-  "generated_at": "2026-07-29T13:24:10.499641+00:00",
+  "generated_at": "2026-07-30T12:54:08.430644+00:00",
   "planned_calls": 165,
   "symbols": [
     "ISRG",
@@ -173,20 +163,20 @@
     "AMZN",
     "META",
     "MSFT",
-    "MA",
     "V",
     "XOM",
     "ABBV",
     "CVX",
     "KO",
+    "LRCX",
+    "MA",
     "KLAC",
     "LIN",
-    "PG",
-    "QCOM"
+    "PG"
   ],
   "tables": {
     "company_facts": 72,
-    "corporate_actions": 26,
+    "corporate_actions": 27,
     "earnings_news_signals": 0,
     "live_market_signals": 0,
     "options_provider_signals": 30
