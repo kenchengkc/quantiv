@@ -1,13 +1,13 @@
 {
   "symbol": "GNTX",
-  "as_of_date": "2026-07-29",
+  "as_of_date": "2026-07-30",
   "spot_price": null,
   "expected_move": {
     "expiration": "2026-09-18",
-    "dte": 51,
-    "atm_strike": 22.5,
-    "atm_iv": 0.5207,
-    "straddle_abs": 2.05,
+    "dte": 50,
+    "atm_strike": 25.0,
+    "atm_iv": 0.4385,
+    "straddle_abs": 2.925,
     "straddle_pct": null,
     "iv_pct": null,
     "timing": "before_market_open"
@@ -15,20 +15,20 @@
   "straddle_features": [
     {
       "expiration": "2026-09-18",
-      "dte": 51,
-      "atm_strike": 22.5,
-      "atm_iv": 0.5207,
-      "atm_call_iv": 0.5323,
-      "atm_put_iv": 0.5091,
-      "straddle_mid": 2.05,
-      "em_straddle": 2.05,
+      "dte": 50,
+      "atm_strike": 25.0,
+      "atm_iv": 0.4385,
+      "atm_call_iv": 0.4385,
+      "atm_put_iv": 0.4385,
+      "straddle_mid": 2.925,
+      "em_straddle": 2.925,
       "em_straddle_pct": null,
       "em_iv": null,
       "em_iv_pct": null,
-      "call_delta": 0.6298,
-      "call_gamma": 0.077,
+      "call_delta": 0.3721,
+      "call_gamma": 0.0969,
       "call_vega": 0.0329,
-      "call_theta": -0.0135
+      "call_theta": -0.0123
     }
   ],
   "earnings_history": [
@@ -215,13 +215,13 @@
   ],
   "next_earnings": "2026-07-24",
   "vol_regime": {
-    "iv_current": 0.2631,
-    "iv_rank": 0.040672,
+    "iv_current": 0.2746,
+    "iv_rank": 0.054469,
     "iv_year_high": 1.0627,
     "iv_year_low": 0.2292,
-    "hv_current": 0.3232,
-    "hv_rank": 0.991941,
-    "iv_mom_week": -0.1106,
+    "hv_current": 0.3238,
+    "hv_rank": 0.99597,
+    "iv_mom_week": -0.1012,
     "iv_mom_month": null
   },
   "next_earnings_timing": "before_market_open"
