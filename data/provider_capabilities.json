@@ -147,7 +147,7 @@
     },
     "av_ipo_calendar": {
       "category": "corporate_actions",
-      "checked_at": "2026-07-31T13:07:15.376986+00:00",
+      "checked_at": "2026-08-01T12:09:49.323274+00:00",
       "credit_cost": 1,
       "derived_table": "corporate_actions",
       "doc_url": "https://www.alphavantage.co/documentation/",
@@ -166,12 +166,12 @@
           "currency",
           "exchange"
         ],
-        "has_data": false,
+        "has_data": true,
         "kind": "csv",
-        "row_count": 0
+        "row_count": 1
       },
-      "retry_after": "2026-08-01",
-      "status": "empty"
+      "retry_after": "2026-08-08",
+      "status": "ok"
     },
     "av_news_sentiment": {
       "category": "news",
@@ -1246,7 +1246,7 @@
       "status": "ok"
     }
   },
-  "generated_at": "2026-07-31T13:08:33.448773+00:00",
+  "generated_at": "2026-08-01T12:09:49.423909+00:00",
   "notes": [
     "Entitlement probes store only status/shape metadata, never raw provider payloads.",
     "entitlement_denied endpoints are retried after 30 days by default."
