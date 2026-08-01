@@ -1,49 +1,7 @@
 {
-  "error_count": 15,
+  "error_count": 11,
   "errors": [
     {
-      "endpoint": "av_historical_put_call_ratio",
-      "error": "alphavantage daily budget exhausted across 2 key(s)",
-      "status": "quota_blocked",
-      "symbol": "CVCO"
-    },
-    {
-      "endpoint": "av_historical_put_call_ratio",
-      "error": "alphavantage daily budget exhausted across 2 key(s)",
-      "status": "quota_blocked",
-      "symbol": "AAPL"
-    },
-    {
-      "endpoint": "av_historical_put_call_ratio",
-      "error": "alphavantage daily budget exhausted across 2 key(s)",
-      "status": "quota_blocked",
-      "symbol": "AMZN"
-    },
-    {
-      "endpoint": "av_historical_voi",
-      "error": "alphavantage daily budget exhausted across 2 key(s)",
-      "status": "quota_blocked",
-      "symbol": "ISRG"
-    },
-    {
-      "endpoint": "av_historical_voi",
-      "error": "alphavantage daily budget exhausted across 2 key(s)",
-      "status": "quota_blocked",
-      "symbol": "CVCO"
-    },
-    {
-      "endpoint": "av_historical_voi",
-      "error": "alphavantage daily budget exhausted across 2 key(s)",
-      "status": "quota_blocked",
-      "symbol": "AAPL"
-    },
-    {
-      "endpoint": "av_historical_voi",
-      "error": "alphavantage daily budget exhausted across 2 key(s)",
-      "status": "quota_blocked",
-      "symbol": "AMZN"
-    },
-    {
       "endpoint": "massive_dividends",
       "http_status": 200,
       "response_shape": {
@@ -57,7 +15,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-01",
+      "retry_after": "2026-08-02",
       "status": "empty",
       "symbol": "ISRG"
     },
@@ -75,7 +33,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-01",
+      "retry_after": "2026-08-02",
       "status": "empty",
       "symbol": "CVCO"
     },
@@ -93,7 +51,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-01",
+      "retry_after": "2026-08-02",
       "status": "empty",
       "symbol": "AMZN"
     },
@@ -111,7 +69,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-01",
+      "retry_after": "2026-08-02",
       "status": "empty",
       "symbol": "CVCO"
     },
@@ -129,7 +87,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-01",
+      "retry_after": "2026-08-02",
       "status": "empty",
       "symbol": "META"
     },
@@ -147,7 +105,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-01",
+      "retry_after": "2026-08-02",
       "status": "empty",
       "symbol": "XOM"
     },
@@ -165,7 +123,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-01",
+      "retry_after": "2026-08-02",
       "status": "empty",
       "symbol": "ABBV"
     },
@@ -183,13 +141,31 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-01",
+      "retry_after": "2026-08-02",
       "status": "empty",
       "symbol": "LIN"
+    },
+    {
+      "endpoint": "av_federal_funds_rate",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
+      "symbol": "__market__"
+    },
+    {
+      "endpoint": "av_cpi",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
+      "symbol": "__market__"
+    },
+    {
+      "endpoint": "av_ipo_calendar",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
+      "symbol": "__market__"
     }
   ],
-  "generated_at": "2026-07-31T13:22:54.907482+00:00",
-  "planned_calls": 164,
+  "generated_at": "2026-08-01T12:23:37.478505+00:00",
+  "planned_calls": 168,
   "symbols": [
     "ISRG",
     "CVCO",
@@ -209,10 +185,10 @@
     "PG"
   ],
   "tables": {
-    "company_facts": 72,
+    "company_facts": 73,
     "corporate_actions": 26,
     "earnings_news_signals": 0,
     "live_market_signals": 0,
-    "options_provider_signals": 23
+    "options_provider_signals": 30
   }
 }
