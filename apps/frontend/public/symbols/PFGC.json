@@ -15,18 +15,18 @@
     "skew_atm": -0.03812,
     "term_slope": null,
     "total_vega": 0.2174,
-    "em_ml_pct": 0.046651,
-    "em_ml_abs": 5.441838,
-    "correction_factor": 0.452731,
+    "em_ml_pct": 0.047652,
+    "em_ml_abs": 5.55862,
+    "correction_factor": 0.462447,
     "model_horizon": 14,
     "ml_snapshot_date": "2026-07-29",
-    "p10": 0.008061,
-    "p25": 0.019692,
-    "p50": 0.046456,
-    "p75": 0.08693,
-    "p90": 0.142515,
+    "p10": 0.006793,
+    "p25": 0.017545,
+    "p50": 0.044709,
+    "p75": 0.082722,
+    "p90": 0.12524,
     "em_method": "ml_lightgbm",
-    "timing": "after_market_close"
+    "timing": "before_market_open"
   },
   "straddle_features": [
     {
@@ -67,7 +67,7 @@
   "earnings_history": [
     {
       "date": "2026-08-12",
-      "timing": "after_market_close",
+      "timing": "before_market_open",
       "q": "Q4 26",
       "fiscal_year": 2026,
       "fiscal_q": "Q4",
@@ -257,5 +257,5 @@
     "iv_mom_week": 0.031,
     "iv_mom_month": null
   },
-  "next_earnings_timing": "after_market_close"
+  "next_earnings_timing": "before_market_open"
 }

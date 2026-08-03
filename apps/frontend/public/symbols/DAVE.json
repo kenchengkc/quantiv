@@ -15,18 +15,18 @@
     "skew_atm": -0.022314,
     "term_slope": -0.11647,
     "total_vega": 0.5873,
-    "em_ml_pct": 0.061764,
-    "em_ml_abs": 23.408004,
-    "correction_factor": 0.364694,
+    "em_ml_pct": 0.058238,
+    "em_ml_abs": 22.071743,
+    "correction_factor": 0.343875,
     "model_horizon": 14,
     "ml_snapshot_date": "2026-07-29",
-    "p10": 0.009869,
-    "p25": 0.025016,
-    "p50": 0.05584,
-    "p75": 0.1349,
-    "p90": 0.164126,
+    "p10": 0.007814,
+    "p25": 0.025189,
+    "p50": 0.062436,
+    "p75": 0.120528,
+    "p90": 0.173585,
     "em_method": "ml_lightgbm",
-    "timing": "before_market_open"
+    "timing": "after_market_close"
   },
   "straddle_features": [
     {
@@ -101,7 +101,7 @@
   "earnings_history": [
     {
       "date": "2026-08-12",
-      "timing": "before_market_open",
+      "timing": "after_market_close",
       "q": "Q2 26",
       "fiscal_year": 2026,
       "fiscal_q": "Q2",
@@ -112,6 +112,21 @@
       "eps_surprise_pct": null,
       "revenue_actual": null,
       "revenue_estimate": 173969343.0,
+      "rev_surprise_pct": null
+    },
+    {
+      "date": "2026-08-05",
+      "timing": "after_market_close",
+      "q": "Q3 26",
+      "fiscal_year": 2026,
+      "fiscal_q": "Q3",
+      "actual": null,
+      "implied": null,
+      "eps_actual": null,
+      "eps_estimate": null,
+      "eps_surprise_pct": null,
+      "revenue_actual": null,
+      "revenue_estimate": null,
       "rev_surprise_pct": null
     },
     {
@@ -263,21 +278,6 @@
       "revenue_actual": null,
       "revenue_estimate": null,
       "rev_surprise_pct": null
-    },
-    {
-      "date": "2023-11-07",
-      "timing": "after_market_close",
-      "q": "Q4 23",
-      "fiscal_year": 2023,
-      "fiscal_q": "Q4",
-      "actual": 0.028912,
-      "implied": null,
-      "eps_actual": null,
-      "eps_estimate": null,
-      "eps_surprise_pct": null,
-      "revenue_actual": null,
-      "revenue_estimate": null,
-      "rev_surprise_pct": null
     }
   ],
   "next_earnings": "2026-08-12",
@@ -291,5 +291,5 @@
     "iv_mom_week": 0.0437,
     "iv_mom_month": null
   },
-  "next_earnings_timing": "before_market_open"
+  "next_earnings_timing": "after_market_close"
 }
