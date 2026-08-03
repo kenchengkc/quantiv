@@ -1,17 +1,17 @@
 {
-  "generated_at": "2026-08-01T12:09:49.170432+00:00",
+  "generated_at": "2026-08-03T13:47:37.318758+00:00",
   "provider": "alphavantage",
   "purpose": "volume_to_open_interest_ratio_probe",
   "universe": "priority",
   "symbol_count": 250,
-  "pending_before_budget": 215,
+  "pending_before_budget": 247,
   "calls_made": 5,
   "max_calls": 5,
   "delay_seconds": 15.0,
   "refresh_after_days": 30,
   "stopped_reason": null,
-  "historical_ok": 292,
-  "historical_checked": 293,
+  "historical_ok": 293,
+  "historical_checked": 294,
   "realtime_ok": 0,
   "realtime_checked": 0,
   "results": [
@@ -436,9 +436,9 @@
     {
       "symbol": "AMD",
       "function": "HISTORICAL_VOLUME_OPEN_INTEREST_RATIO",
-      "checked_at": "2026-06-19T12:31:02.925433+00:00",
+      "checked_at": "2026-08-03T13:47:21.544337+00:00",
       "ok": true,
-      "rows": 5776,
+      "rows": 7266,
       "error": null,
       "top_level_keys": [
         "data",
@@ -937,6 +937,28 @@
       "checked_at": "2026-05-28T08:08:38.413341+00:00",
       "ok": true,
       "rows": 152,
+      "error": null,
+      "top_level_keys": [
+        "data",
+        "date",
+        "symbol"
+      ],
+      "sample_keys": [
+        "contractID",
+        "date",
+        "expiration",
+        "strike",
+        "symbol",
+        "type",
+        "volume_open_interest_ratio"
+      ]
+    },
+    {
+      "symbol": "BLFS",
+      "function": "HISTORICAL_VOLUME_OPEN_INTEREST_RATIO",
+      "checked_at": "2026-08-03T13:46:35.151685+00:00",
+      "ok": true,
+      "rows": 70,
       "error": null,
       "top_level_keys": [
         "data",
@@ -3640,9 +3662,9 @@
     {
       "symbol": "LLY",
       "function": "HISTORICAL_VOLUME_OPEN_INTEREST_RATIO",
-      "checked_at": "2026-06-20T11:49:50.714922+00:00",
+      "checked_at": "2026-08-03T13:47:37.318597+00:00",
       "ok": true,
-      "rows": 4146,
+      "rows": 4480,
       "error": null,
       "top_level_keys": [
         "data",
@@ -5048,9 +5070,9 @@
     {
       "symbol": "RL",
       "function": "HISTORICAL_VOLUME_OPEN_INTEREST_RATIO",
-      "checked_at": "2026-06-27T11:41:59.544212+00:00",
+      "checked_at": "2026-08-03T13:46:50.519025+00:00",
       "ok": true,
-      "rows": 380,
+      "rows": 364,
       "error": null,
       "top_level_keys": [
         "data",
@@ -5972,9 +5994,9 @@
     {
       "symbol": "UVV",
       "function": "HISTORICAL_VOLUME_OPEN_INTEREST_RATIO",
-      "checked_at": "2026-05-28T12:17:30.775478+00:00",
+      "checked_at": "2026-08-03T13:47:05.739256+00:00",
       "ok": true,
-      "rows": 88,
+      "rows": 86,
       "error": null,
       "top_level_keys": [
         "data",
