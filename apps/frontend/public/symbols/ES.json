@@ -1,13 +1,13 @@
 {
   "symbol": "ES",
-  "as_of_date": "2026-07-31",
+  "as_of_date": "2026-08-03",
   "spot_price": null,
   "expected_move": {
     "expiration": "2026-09-18",
-    "dte": 49,
+    "dte": 46,
     "atm_strike": 70.0,
-    "atm_iv": 0.2388,
-    "straddle_abs": 5.275,
+    "atm_iv": 0.2392,
+    "straddle_abs": 5.125,
     "straddle_pct": null,
     "iv_pct": null,
     "timing": "after_market_close"
@@ -15,20 +15,20 @@
   "straddle_features": [
     {
       "expiration": "2026-09-18",
-      "dte": 49,
+      "dte": 46,
       "atm_strike": 70.0,
-      "atm_iv": 0.2388,
-      "atm_call_iv": 0.2399,
-      "atm_put_iv": 0.2377,
-      "straddle_mid": 5.275,
-      "em_straddle": 5.275,
+      "atm_iv": 0.2392,
+      "atm_call_iv": 0.2392,
+      "atm_put_iv": 0.2392,
+      "straddle_mid": 5.125,
+      "em_straddle": 5.125,
       "em_straddle_pct": null,
       "em_iv": null,
       "em_iv_pct": null,
-      "call_delta": 0.6546,
-      "call_gamma": 0.058,
-      "call_vega": 0.0972,
-      "call_theta": -0.0272
+      "call_delta": 0.6583,
+      "call_gamma": 0.0602,
+      "call_vega": 0.0936,
+      "call_theta": -0.0293
     }
   ],
   "earnings_history": [
@@ -215,13 +215,13 @@
   ],
   "next_earnings": "2026-07-30",
   "vol_regime": {
-    "iv_current": 0.2529,
-    "iv_rank": 0.528884,
-    "iv_year_high": 0.3475,
+    "iv_current": 0.2451,
+    "iv_rank": 0.540362,
+    "iv_year_high": 0.3288,
     "iv_year_low": 0.1467,
-    "hv_current": 0.2178,
-    "hv_rank": 0.297642,
-    "iv_mom_week": 0.0044,
+    "hv_current": 0.2172,
+    "hv_rank": 0.291749,
+    "iv_mom_week": -0.0145,
     "iv_mom_month": null
   },
   "next_earnings_timing": "after_market_close"
