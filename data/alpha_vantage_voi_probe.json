@@ -1,17 +1,17 @@
 {
-  "generated_at": "2026-08-03T13:47:37.318758+00:00",
+  "generated_at": "2026-08-04T13:14:57.712848+00:00",
   "provider": "alphavantage",
   "purpose": "volume_to_open_interest_ratio_probe",
   "universe": "priority",
   "symbol_count": 250,
-  "pending_before_budget": 247,
+  "pending_before_budget": 242,
   "calls_made": 5,
   "max_calls": 5,
   "delay_seconds": 15.0,
   "refresh_after_days": 30,
   "stopped_reason": null,
-  "historical_ok": 293,
-  "historical_checked": 294,
+  "historical_ok": 296,
+  "historical_checked": 297,
   "realtime_ok": 0,
   "realtime_checked": 0,
   "results": [
@@ -456,6 +456,28 @@
       ]
     },
     {
+      "symbol": "AMGN",
+      "function": "HISTORICAL_VOLUME_OPEN_INTEREST_RATIO",
+      "checked_at": "2026-08-04T13:14:42.390295+00:00",
+      "ok": true,
+      "rows": 1638,
+      "error": null,
+      "top_level_keys": [
+        "data",
+        "date",
+        "symbol"
+      ],
+      "sample_keys": [
+        "contractID",
+        "date",
+        "expiration",
+        "strike",
+        "symbol",
+        "type",
+        "volume_open_interest_ratio"
+      ]
+    },
+    {
       "symbol": "AMZN",
       "function": "HISTORICAL_VOLUME_OPEN_INTEREST_RATIO",
       "checked_at": "2026-07-27T13:45:21.297827+00:00",
@@ -502,9 +524,9 @@
     {
       "symbol": "ANET",
       "function": "HISTORICAL_VOLUME_OPEN_INTEREST_RATIO",
-      "checked_at": "2026-06-26T12:01:49.284896+00:00",
+      "checked_at": "2026-08-04T13:14:11.950080+00:00",
       "ok": true,
-      "rows": 1344,
+      "rows": 1206,
       "error": null,
       "top_level_keys": [
         "data",
@@ -1176,9 +1198,9 @@
     {
       "symbol": "CAT",
       "function": "HISTORICAL_VOLUME_OPEN_INTEREST_RATIO",
-      "checked_at": "2026-06-23T12:12:10.837698+00:00",
+      "checked_at": "2026-08-04T13:13:56.736320+00:00",
       "ok": true,
-      "rows": 3410,
+      "rows": 3844,
       "error": null,
       "top_level_keys": [
         "data",
@@ -4078,6 +4100,28 @@
       ]
     },
     {
+      "symbol": "MRK",
+      "function": "HISTORICAL_VOLUME_OPEN_INTEREST_RATIO",
+      "checked_at": "2026-08-04T13:14:27.155840+00:00",
+      "ok": true,
+      "rows": 1082,
+      "error": null,
+      "top_level_keys": [
+        "data",
+        "date",
+        "symbol"
+      ],
+      "sample_keys": [
+        "contractID",
+        "date",
+        "expiration",
+        "strike",
+        "symbol",
+        "type",
+        "volume_open_interest_ratio"
+      ]
+    },
+    {
       "symbol": "MS",
       "function": "HISTORICAL_VOLUME_OPEN_INTEREST_RATIO",
       "checked_at": "2026-06-29T12:36:44.274012+00:00",
@@ -6239,6 +6283,28 @@
       "checked_at": "2026-05-30T11:44:12.227411+00:00",
       "ok": true,
       "rows": 1476,
+      "error": null,
+      "top_level_keys": [
+        "data",
+        "date",
+        "symbol"
+      ],
+      "sample_keys": [
+        "contractID",
+        "date",
+        "expiration",
+        "strike",
+        "symbol",
+        "type",
+        "volume_open_interest_ratio"
+      ]
+    },
+    {
+      "symbol": "WDC",
+      "function": "HISTORICAL_VOLUME_OPEN_INTEREST_RATIO",
+      "checked_at": "2026-08-04T13:14:57.712526+00:00",
+      "ok": true,
+      "rows": 3906,
       "error": null,
       "top_level_keys": [
         "data",
