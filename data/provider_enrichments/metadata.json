@@ -1,23 +1,13 @@
 {
-  "error_count": 15,
+  "error_count": 16,
   "errors": [
     {
-      "endpoint": "massive_dividends",
-      "http_status": 200,
-      "response_shape": {
-        "has_data": false,
-        "kind": "json_object",
-        "row_count": 0,
-        "sample_keys": [],
-        "top_level_keys": [
-          "request_id",
-          "results",
-          "status"
-        ]
-      },
-      "retry_after": "2026-08-05",
-      "status": "empty",
-      "symbol": "BLFS"
+      "endpoint": "fmp_key_metrics_ttm",
+      "error": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/",
+      "http_status": 402,
+      "retry_after": "2026-09-04",
+      "status": "entitlement_denied",
+      "symbol": "COP"
     },
     {
       "endpoint": "massive_dividends",
@@ -33,7 +23,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-05",
+      "retry_after": "2026-08-06",
       "status": "empty",
       "symbol": "AMD"
     },
@@ -51,7 +41,25 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-05",
+      "retry_after": "2026-08-06",
+      "status": "empty",
+      "symbol": "PLTR"
+    },
+    {
+      "endpoint": "massive_dividends",
+      "http_status": 200,
+      "response_shape": {
+        "has_data": false,
+        "kind": "json_object",
+        "row_count": 0,
+        "sample_keys": [],
+        "top_level_keys": [
+          "request_id",
+          "results",
+          "status"
+        ]
+      },
+      "retry_after": "2026-08-06",
       "status": "empty",
       "symbol": "ANET"
     },
@@ -69,7 +77,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-05",
+      "retry_after": "2026-08-06",
       "status": "empty",
       "symbol": "APP"
     },
@@ -87,7 +95,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-05",
+      "retry_after": "2026-08-06",
       "status": "empty",
       "symbol": "UBER"
     },
@@ -105,7 +113,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-05",
+      "retry_after": "2026-08-06",
       "status": "empty",
       "symbol": "RL"
     },
@@ -123,25 +131,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-05",
-      "status": "empty",
-      "symbol": "UVV"
-    },
-    {
-      "endpoint": "massive_splits",
-      "http_status": 200,
-      "response_shape": {
-        "has_data": false,
-        "kind": "json_object",
-        "row_count": 0,
-        "sample_keys": [],
-        "top_level_keys": [
-          "request_id",
-          "results",
-          "status"
-        ]
-      },
-      "retry_after": "2026-08-05",
+      "retry_after": "2026-08-06",
       "status": "empty",
       "symbol": "LLY"
     },
@@ -159,7 +149,25 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-05",
+      "retry_after": "2026-08-06",
+      "status": "empty",
+      "symbol": "PLTR"
+    },
+    {
+      "endpoint": "massive_splits",
+      "http_status": 200,
+      "response_shape": {
+        "has_data": false,
+        "kind": "json_object",
+        "row_count": 0,
+        "sample_keys": [],
+        "top_level_keys": [
+          "request_id",
+          "results",
+          "status"
+        ]
+      },
+      "retry_after": "2026-08-06",
       "status": "empty",
       "symbol": "MRK"
     },
@@ -177,7 +185,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-05",
+      "retry_after": "2026-08-06",
       "status": "empty",
       "symbol": "AMGN"
     },
@@ -195,7 +203,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-05",
+      "retry_after": "2026-08-06",
       "status": "empty",
       "symbol": "MCD"
     },
@@ -213,7 +221,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-05",
+      "retry_after": "2026-08-06",
       "status": "empty",
       "symbol": "WDC"
     },
@@ -231,7 +239,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-05",
+      "retry_after": "2026-08-06",
       "status": "empty",
       "symbol": "APP"
     },
@@ -249,7 +257,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-05",
+      "retry_after": "2026-08-06",
       "status": "empty",
       "symbol": "PFE"
     },
@@ -267,20 +275,19 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-05",
+      "retry_after": "2026-08-06",
       "status": "empty",
       "symbol": "UBER"
     }
   ],
-  "generated_at": "2026-08-04T13:28:30.288638+00:00",
+  "generated_at": "2026-08-05T13:14:38.188643+00:00",
   "planned_calls": 165,
   "symbols": [
-    "BLFS",
     "RL",
-    "UVV",
     "AMD",
-    "CAT",
     "LLY",
+    "CAT",
+    "PLTR",
     "ANET",
     "MRK",
     "AMGN",
@@ -290,10 +297,11 @@
     "BKNG",
     "GILD",
     "PFE",
-    "UBER"
+    "UBER",
+    "COP"
   ],
   "tables": {
-    "company_facts": 48,
+    "company_facts": 52,
     "corporate_actions": 20,
     "earnings_news_signals": 0,
     "live_market_signals": 0,

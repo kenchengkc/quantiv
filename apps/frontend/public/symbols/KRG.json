@@ -1,18 +1,18 @@
 {
   "symbol": "KRG",
-  "as_of_date": "2026-08-03",
+  "as_of_date": "2026-08-04",
   "spot_price": 22.5,
   "expected_move": {
     "earnings_date": "2026-07-30",
     "expiration": "2026-08-21",
-    "dte": 18,
-    "lead_time_days": -4,
+    "dte": 17,
+    "lead_time_days": -5,
     "atm_strike": 22.5,
     "atm_iv": 0.363676,
     "straddle_abs": 5.05,
     "straddle_pct": 0.224444,
-    "iv_pct": 0.080762,
-    "skew_atm": -0.3266,
+    "iv_pct": 0.078486,
+    "skew_atm": -0.24135,
     "term_slope": null,
     "total_vega": 0.1377,
     "em_method": "options_math",
@@ -21,7 +21,7 @@
   "straddle_features": [
     {
       "expiration": "2026-08-21",
-      "dte": 18,
+      "dte": 17,
       "atm_strike": 22.5,
       "atm_iv": 0.36365,
       "atm_call_iv": 0.3515,
@@ -29,29 +29,12 @@
       "straddle_mid": 5.05,
       "em_straddle": 5.05,
       "em_straddle_pct": 0.224444,
-      "em_iv": 1.817004,
-      "em_iv_pct": 0.080756,
+      "em_iv": 1.765811,
+      "em_iv_pct": 0.07848,
       "call_delta": 0.5312,
       "call_gamma": 0.0534,
       "call_vega": 0.0687,
       "call_theta": -0.0014
-    },
-    {
-      "expiration": "2026-09-18",
-      "dte": 46,
-      "atm_strike": 30.0,
-      "atm_iv": 0.6797,
-      "atm_call_iv": 0.6797,
-      "atm_put_iv": 0.6797,
-      "straddle_mid": 4.875,
-      "em_straddle": 4.875,
-      "em_straddle_pct": 0.216667,
-      "em_iv": 5.429155,
-      "em_iv_pct": 0.241296,
-      "call_delta": 0.4575,
-      "call_gamma": 0.0561,
-      "call_vega": 0.04,
-      "call_theta": -0.026
     }
   ],
   "earnings_history": [
@@ -238,13 +221,13 @@
   ],
   "next_earnings": "2026-07-30",
   "vol_regime": {
-    "iv_current": 0.3315,
-    "iv_rank": 0.271761,
+    "iv_current": 0.297,
+    "iv_rank": 0.217847,
     "iv_year_high": 0.7975,
     "iv_year_low": 0.1576,
-    "hv_current": 0.2023,
-    "hv_rank": 0.899563,
-    "iv_mom_week": null,
+    "hv_current": 0.209,
+    "hv_rank": 0.997089,
+    "iv_mom_week": -0.0411,
     "iv_mom_month": null
   },
   "next_earnings_timing": "before_market_open"
