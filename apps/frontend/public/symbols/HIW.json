@@ -1,13 +1,13 @@
 {
   "symbol": "HIW",
-  "as_of_date": "2026-08-04",
+  "as_of_date": "2026-08-05",
   "spot_price": null,
   "expected_move": {
     "expiration": "2026-09-18",
-    "dte": 45,
-    "atm_strike": 35.0,
-    "atm_iv": 0.40955,
-    "straddle_abs": 4.25,
+    "dte": 44,
+    "atm_strike": 30.0,
+    "atm_iv": 0.8959,
+    "straddle_abs": 3.75,
     "straddle_pct": null,
     "iv_pct": null,
     "timing": "after_market_close"
@@ -15,20 +15,20 @@
   "straddle_features": [
     {
       "expiration": "2026-09-18",
-      "dte": 45,
-      "atm_strike": 35.0,
-      "atm_iv": 0.40955,
-      "atm_call_iv": 0.4838,
-      "atm_put_iv": 0.3353,
-      "straddle_mid": 4.25,
-      "em_straddle": 4.25,
+      "dte": 44,
+      "atm_strike": 30.0,
+      "atm_iv": 0.8959,
+      "atm_call_iv": 0.7908,
+      "atm_put_iv": 1.001,
+      "straddle_mid": 3.75,
+      "em_straddle": 3.75,
       "em_straddle_pct": null,
       "em_iv": null,
       "em_iv_pct": null,
-      "call_delta": 0.3837,
-      "call_gamma": 0.0677,
-      "call_vega": 0.0439,
-      "call_theta": -0.0224
+      "call_delta": 0.6011,
+      "call_gamma": 0.0421,
+      "call_vega": 0.0413,
+      "call_theta": -0.0269
     }
   ],
   "earnings_history": [
@@ -215,13 +215,13 @@
   ],
   "next_earnings": "2026-07-28",
   "vol_regime": {
-    "iv_current": 0.3049,
-    "iv_rank": 0.289319,
-    "iv_year_high": 0.5105,
-    "iv_year_low": 0.2212,
-    "hv_current": 0.2554,
-    "hv_rank": 0.044829,
-    "iv_mom_week": -0.0297,
+    "iv_current": null,
+    "iv_rank": null,
+    "iv_year_high": null,
+    "iv_year_low": null,
+    "hv_current": 0.2625,
+    "hv_rank": 0.076343,
+    "iv_mom_week": null,
     "iv_mom_month": null
   },
   "next_earnings_timing": "after_market_close"
