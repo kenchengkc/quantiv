@@ -1,13 +1,13 @@
 {
   "symbol": "WERN",
-  "as_of_date": "2026-08-05",
+  "as_of_date": "2026-08-06",
   "spot_price": null,
   "expected_move": {
     "expiration": "2026-09-18",
-    "dte": 44,
+    "dte": 43,
     "atm_strike": 40.0,
-    "atm_iv": 0.4464,
-    "straddle_abs": 4.925,
+    "atm_iv": 0.46225,
+    "straddle_abs": 5.25,
     "straddle_pct": null,
     "iv_pct": null,
     "timing": "after_market_close"
@@ -15,20 +15,20 @@
   "straddle_features": [
     {
       "expiration": "2026-09-18",
-      "dte": 44,
+      "dte": 43,
       "atm_strike": 40.0,
-      "atm_iv": 0.4464,
-      "atm_call_iv": 0.4464,
-      "atm_put_iv": 0.4464,
-      "straddle_mid": 4.925,
-      "em_straddle": 4.925,
+      "atm_iv": 0.46225,
+      "atm_call_iv": 0.4749,
+      "atm_put_iv": 0.4496,
+      "straddle_mid": 5.25,
+      "em_straddle": 5.25,
       "em_straddle_pct": null,
       "em_iv": null,
       "em_iv_pct": null,
-      "call_delta": 0.4251,
-      "call_gamma": 0.0666,
-      "call_vega": 0.0519,
-      "call_theta": -0.029
+      "call_delta": 0.3823,
+      "call_gamma": 0.062,
+      "call_vega": 0.0491,
+      "call_theta": -0.0269
     }
   ],
   "earnings_history": [
@@ -215,13 +215,13 @@
   ],
   "next_earnings": "2026-07-28",
   "vol_regime": {
-    "iv_current": 0.5932,
-    "iv_rank": 0.854854,
+    "iv_current": 0.4843,
+    "iv_rank": 0.51926,
     "iv_year_high": 0.6403,
     "iv_year_low": 0.3158,
-    "hv_current": 0.4207,
-    "hv_rank": 0.46771,
-    "iv_mom_week": 0.0595,
+    "hv_current": 0.4257,
+    "hv_rank": 0.484018,
+    "iv_mom_week": 0.0435,
     "iv_mom_month": null
   },
   "next_earnings_timing": "after_market_close"

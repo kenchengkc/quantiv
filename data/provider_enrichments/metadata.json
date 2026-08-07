@@ -1,132 +1,41 @@
 {
-  "error_count": 23,
+  "error_count": 22,
   "errors": [
     {
       "endpoint": "av_historical_put_call_ratio",
-      "error": "We have detected your API key as 7NHVPMDQ14N7ZSF1 and our standard API rate limit is 25 requests per day. Please subscribe to any of the premium plans at https://www.alphavantage.co/premium/ to instantly remove all daily rate limits.",
-      "http_status": 200,
-      "response_shape": {
-        "has_data": false,
-        "kind": "json_object",
-        "row_count": 0,
-        "sample_keys": [],
-        "top_level_keys": [
-          "Information"
-        ]
-      },
-      "retry_after": "2026-08-07",
-      "status": "quota_limited",
-      "symbol": "UVV"
-    },
-    {
-      "endpoint": "av_historical_put_call_ratio",
-      "error": "We have detected your API key as 9Z452IYR29I21LO5 and our standard API rate limit is 25 requests per day. Please subscribe to any of the premium plans at https://www.alphavantage.co/premium/ to instantly remove all daily rate limits.",
-      "http_status": 200,
-      "response_shape": {
-        "has_data": false,
-        "kind": "json_object",
-        "row_count": 0,
-        "sample_keys": [],
-        "top_level_keys": [
-          "Information"
-        ]
-      },
-      "retry_after": "2026-08-07",
-      "status": "quota_limited",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
       "symbol": "AMD"
     },
     {
       "endpoint": "av_historical_put_call_ratio",
-      "error": "We have detected your API key as 7NHVPMDQ14N7ZSF1 and our standard API rate limit is 25 requests per day. Please subscribe to any of the premium plans at https://www.alphavantage.co/premium/ to instantly remove all daily rate limits.",
-      "http_status": 200,
-      "response_shape": {
-        "has_data": false,
-        "kind": "json_object",
-        "row_count": 0,
-        "sample_keys": [],
-        "top_level_keys": [
-          "Information"
-        ]
-      },
-      "retry_after": "2026-08-07",
-      "status": "quota_limited",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
       "symbol": "LLY"
     },
     {
       "endpoint": "av_historical_voi",
-      "error": "We have detected your API key as 9Z452IYR29I21LO5 and our standard API rate limit is 25 requests per day. Please subscribe to any of the premium plans at https://www.alphavantage.co/premium/ to instantly remove all daily rate limits.",
-      "http_status": 200,
-      "response_shape": {
-        "has_data": false,
-        "kind": "json_object",
-        "row_count": 0,
-        "sample_keys": [],
-        "top_level_keys": [
-          "Information"
-        ]
-      },
-      "retry_after": "2026-08-07",
-      "status": "quota_limited",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
+      "symbol": "BLFS"
+    },
+    {
+      "endpoint": "av_historical_voi",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
       "symbol": "RL"
     },
     {
       "endpoint": "av_historical_voi",
-      "error": "We have detected your API key as 7NHVPMDQ14N7ZSF1 and our standard API rate limit is 25 requests per day. Please subscribe to any of the premium plans at https://www.alphavantage.co/premium/ to instantly remove all daily rate limits.",
-      "http_status": 200,
-      "response_shape": {
-        "has_data": false,
-        "kind": "json_object",
-        "row_count": 0,
-        "sample_keys": [],
-        "top_level_keys": [
-          "Information"
-        ]
-      },
-      "retry_after": "2026-08-07",
-      "status": "quota_limited",
-      "symbol": "UVV"
-    },
-    {
-      "endpoint": "av_historical_voi",
-      "error": "We have detected your API key as 9Z452IYR29I21LO5 and our standard API rate limit is 25 requests per day. Please subscribe to any of the premium plans at https://www.alphavantage.co/premium/ to instantly remove all daily rate limits.",
-      "http_status": 200,
-      "response_shape": {
-        "has_data": false,
-        "kind": "json_object",
-        "row_count": 0,
-        "sample_keys": [],
-        "top_level_keys": [
-          "Information"
-        ]
-      },
-      "retry_after": "2026-08-07",
-      "status": "quota_limited",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
       "symbol": "AMD"
     },
     {
       "endpoint": "av_historical_voi",
-      "error": "We have detected your API key as 7NHVPMDQ14N7ZSF1 and our standard API rate limit is 25 requests per day. Please subscribe to any of the premium plans at https://www.alphavantage.co/premium/ to instantly remove all daily rate limits.",
-      "http_status": 200,
-      "response_shape": {
-        "has_data": false,
-        "kind": "json_object",
-        "row_count": 0,
-        "sample_keys": [],
-        "top_level_keys": [
-          "Information"
-        ]
-      },
-      "retry_after": "2026-08-07",
-      "status": "quota_limited",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
       "symbol": "LLY"
-    },
-    {
-      "endpoint": "fmp_key_metrics_ttm",
-      "error": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/",
-      "http_status": 402,
-      "retry_after": "2026-09-05",
-      "status": "entitlement_denied",
-      "symbol": "SNDK"
     },
     {
       "endpoint": "massive_dividends",
@@ -142,7 +51,25 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-07",
+      "retry_after": "2026-08-08",
+      "status": "empty",
+      "symbol": "BLFS"
+    },
+    {
+      "endpoint": "massive_dividends",
+      "http_status": 200,
+      "response_shape": {
+        "has_data": false,
+        "kind": "json_object",
+        "row_count": 0,
+        "sample_keys": [],
+        "top_level_keys": [
+          "request_id",
+          "results",
+          "status"
+        ]
+      },
+      "retry_after": "2026-08-08",
       "status": "empty",
       "symbol": "AMD"
     },
@@ -160,7 +87,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-07",
+      "retry_after": "2026-08-08",
       "status": "empty",
       "symbol": "PLTR"
     },
@@ -178,7 +105,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-07",
+      "retry_after": "2026-08-08",
       "status": "empty",
       "symbol": "ANET"
     },
@@ -196,7 +123,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-07",
+      "retry_after": "2026-08-08",
       "status": "empty",
       "symbol": "APP"
     },
@@ -214,7 +141,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-07",
+      "retry_after": "2026-08-08",
       "status": "empty",
       "symbol": "RL"
     },
@@ -232,25 +159,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-07",
-      "status": "empty",
-      "symbol": "UVV"
-    },
-    {
-      "endpoint": "massive_splits",
-      "http_status": 200,
-      "response_shape": {
-        "has_data": false,
-        "kind": "json_object",
-        "row_count": 0,
-        "sample_keys": [],
-        "top_level_keys": [
-          "request_id",
-          "results",
-          "status"
-        ]
-      },
-      "retry_after": "2026-08-07",
+      "retry_after": "2026-08-08",
       "status": "empty",
       "symbol": "LLY"
     },
@@ -268,7 +177,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-07",
+      "retry_after": "2026-08-08",
       "status": "empty",
       "symbol": "PLTR"
     },
@@ -286,7 +195,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-07",
+      "retry_after": "2026-08-08",
       "status": "empty",
       "symbol": "MRK"
     },
@@ -304,7 +213,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-07",
+      "retry_after": "2026-08-08",
       "status": "empty",
       "symbol": "SNDK"
     },
@@ -322,7 +231,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-07",
+      "retry_after": "2026-08-08",
       "status": "empty",
       "symbol": "WDC"
     },
@@ -340,7 +249,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-07",
+      "retry_after": "2026-08-08",
       "status": "empty",
       "symbol": "AMGN"
     },
@@ -358,7 +267,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-07",
+      "retry_after": "2026-08-08",
       "status": "empty",
       "symbol": "MCD"
     },
@@ -376,7 +285,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-07",
+      "retry_after": "2026-08-08",
       "status": "empty",
       "symbol": "APP"
     },
@@ -394,16 +303,22 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-07",
+      "retry_after": "2026-08-08",
       "status": "empty",
       "symbol": "DIS"
+    },
+    {
+      "endpoint": "av_ipo_calendar",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
+      "symbol": "__market__"
     }
   ],
-  "generated_at": "2026-08-06T13:22:45.209296+00:00",
+  "generated_at": "2026-08-07T12:11:10.549925+00:00",
   "planned_calls": 165,
   "symbols": [
+    "BLFS",
     "RL",
-    "UVV",
     "AMD",
     "LLY",
     "CAT",
@@ -421,9 +336,9 @@
   ],
   "tables": {
     "company_facts": 48,
-    "corporate_actions": 20,
+    "corporate_actions": 19,
     "earnings_news_signals": 0,
     "live_market_signals": 0,
-    "options_provider_signals": 23
+    "options_provider_signals": 24
   }
 }

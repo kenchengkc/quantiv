@@ -1,13 +1,13 @@
 {
   "symbol": "ALHC",
-  "as_of_date": "2026-08-05",
+  "as_of_date": "2026-08-06",
   "spot_price": null,
   "expected_move": {
     "expiration": "2026-09-18",
-    "dte": 44,
+    "dte": 43,
     "atm_strike": 15.0,
-    "atm_iv": 0.6163,
-    "straddle_abs": 2.625,
+    "atm_iv": 0.5171,
+    "straddle_abs": 2.375,
     "straddle_pct": null,
     "iv_pct": null,
     "timing": "after_market_close"
@@ -15,20 +15,20 @@
   "straddle_features": [
     {
       "expiration": "2026-09-18",
-      "dte": 44,
+      "dte": 43,
       "atm_strike": 15.0,
-      "atm_iv": 0.6163,
-      "atm_call_iv": 0.6163,
-      "atm_put_iv": 0.6163,
-      "straddle_mid": 2.625,
-      "em_straddle": 2.625,
+      "atm_iv": 0.5171,
+      "atm_call_iv": 0.5171,
+      "atm_put_iv": 0.5171,
+      "straddle_mid": 2.375,
+      "em_straddle": 2.375,
       "em_straddle_pct": null,
       "em_iv": null,
       "em_iv_pct": null,
-      "call_delta": 0.3782,
-      "call_gamma": 0.1305,
-      "call_vega": 0.018,
-      "call_theta": -0.0132
+      "call_delta": 0.3192,
+      "call_gamma": 0.1463,
+      "call_vega": 0.0166,
+      "call_theta": -0.0094
     }
   ],
   "earnings_history": [
@@ -215,13 +215,13 @@
   ],
   "next_earnings": "2026-07-30",
   "vol_regime": {
-    "iv_current": 0.5995,
-    "iv_rank": 0.47226,
+    "iv_current": 0.6645,
+    "iv_rank": 0.621275,
     "iv_year_high": 0.8297,
     "iv_year_low": 0.3935,
-    "hv_current": 0.9578,
-    "hv_rank": 0.841067,
-    "iv_mom_week": -0.1833,
+    "hv_current": 0.9567,
+    "hv_rank": 0.839409,
+    "iv_mom_week": -0.1021,
     "iv_mom_month": null
   },
   "next_earnings_timing": "after_market_close"
