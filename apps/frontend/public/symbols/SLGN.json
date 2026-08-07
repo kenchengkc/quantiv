@@ -1,34 +1,34 @@
 {
   "symbol": "SLGN",
-  "as_of_date": "2026-08-05",
+  "as_of_date": "2026-08-06",
   "spot_price": 40.0,
   "expected_move": {
     "expiration": "2026-09-18",
-    "dte": 44,
+    "dte": 43,
     "atm_strike": 45.0,
-    "atm_iv": 0.7881,
-    "straddle_abs": 4.025,
-    "straddle_pct": 0.100625,
-    "iv_pct": 0.273628,
+    "atm_iv": 0.8011,
+    "straddle_abs": 4.5,
+    "straddle_pct": 0.1125,
+    "iv_pct": 0.274963,
     "timing": "before_market_open"
   },
   "straddle_features": [
     {
       "expiration": "2026-09-18",
-      "dte": 44,
+      "dte": 43,
       "atm_strike": 45.0,
-      "atm_iv": 0.7881,
-      "atm_call_iv": 0.7881,
-      "atm_put_iv": 0.7881,
-      "straddle_mid": 4.025,
-      "em_straddle": 4.025,
-      "em_straddle_pct": 0.100625,
-      "em_iv": 10.945138,
-      "em_iv_pct": 0.273628,
-      "call_delta": 0.4876,
-      "call_gamma": 0.0353,
-      "call_vega": 0.0588,
-      "call_theta": -0.0621
+      "atm_iv": 0.8011,
+      "atm_call_iv": 0.8011,
+      "atm_put_iv": 0.8011,
+      "straddle_mid": 4.5,
+      "em_straddle": 4.5,
+      "em_straddle_pct": 0.1125,
+      "em_iv": 10.998527,
+      "em_iv_pct": 0.274963,
+      "call_delta": 0.4688,
+      "call_gamma": 0.0366,
+      "call_vega": 0.0568,
+      "call_theta": -0.0681
     }
   ],
   "earnings_history": [
@@ -215,13 +215,13 @@
   ],
   "next_earnings": "2026-07-29",
   "vol_regime": {
-    "iv_current": 0.3332,
-    "iv_rank": 0.410422,
+    "iv_current": 0.2926,
+    "iv_rank": 0.30137,
     "iv_year_high": 0.5527,
     "iv_year_low": 0.1804,
-    "hv_current": 0.4875,
-    "hv_rank": 0.99033,
-    "iv_mom_week": -0.0122,
+    "hv_current": 0.464,
+    "hv_rank": 0.895649,
+    "iv_mom_week": -0.0763,
     "iv_mom_month": null
   },
   "next_earnings_timing": "before_market_open"

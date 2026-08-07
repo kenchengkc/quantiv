@@ -1,13 +1,13 @@
 {
   "symbol": "NEOG",
-  "as_of_date": "2026-08-05",
+  "as_of_date": "2026-08-06",
   "spot_price": null,
   "expected_move": {
     "expiration": "2026-09-18",
-    "dte": 44,
+    "dte": 43,
     "atm_strike": 12.5,
-    "atm_iv": 0.9148,
-    "straddle_abs": 1.95,
+    "atm_iv": 0.4829,
+    "straddle_abs": 2.0,
     "straddle_pct": null,
     "iv_pct": null,
     "timing": "before_market_open"
@@ -15,20 +15,20 @@
   "straddle_features": [
     {
       "expiration": "2026-09-18",
-      "dte": 44,
+      "dte": 43,
       "atm_strike": 12.5,
-      "atm_iv": 0.9148,
-      "atm_call_iv": 0.8241,
-      "atm_put_iv": 1.0055,
-      "straddle_mid": 1.95,
-      "em_straddle": 1.95,
+      "atm_iv": 0.4829,
+      "atm_call_iv": 0.4829,
+      "atm_put_iv": 0.4829,
+      "straddle_mid": 2.0,
+      "em_straddle": 2.0,
       "em_straddle_pct": null,
       "em_iv": null,
       "em_iv_pct": null,
-      "call_delta": 0.4671,
-      "call_gamma": 0.1217,
-      "call_vega": 0.016,
-      "call_theta": -0.0166
+      "call_delta": 0.3155,
+      "call_gamma": 0.1897,
+      "call_vega": 0.0138,
+      "call_theta": -0.0082
     }
   ],
   "earnings_history": [
@@ -215,13 +215,13 @@
   ],
   "next_earnings": "2026-07-30",
   "vol_regime": {
-    "iv_current": 0.5134,
-    "iv_rank": 0.192884,
+    "iv_current": 0.4982,
+    "iv_rank": 0.168634,
     "iv_year_high": 1.0193,
     "iv_year_low": 0.3925,
-    "hv_current": 0.7104,
-    "hv_rank": 0.966773,
-    "iv_mom_week": -0.1103,
+    "hv_current": 0.7062,
+    "hv_rank": 0.958367,
+    "iv_mom_week": -0.023,
     "iv_mom_month": null
   },
   "next_earnings_timing": "before_market_open"
