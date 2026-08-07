@@ -1,11 +1,120 @@
 {
-  "error_count": 0,
-  "errors": [],
-  "generated_at": "2026-08-07T00:25:05.917836+00:00",
+  "error_count": 18,
+  "errors": [
+    {
+      "endpoint": "av_earnings",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
+      "symbol": "UVV"
+    },
+    {
+      "endpoint": "av_earnings",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
+      "symbol": "AMD"
+    },
+    {
+      "endpoint": "av_earnings",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
+      "symbol": "LLY"
+    },
+    {
+      "endpoint": "av_realtime_put_call_ratio",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
+      "symbol": "RL"
+    },
+    {
+      "endpoint": "av_realtime_put_call_ratio",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
+      "symbol": "UVV"
+    },
+    {
+      "endpoint": "av_realtime_put_call_ratio",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
+      "symbol": "AMD"
+    },
+    {
+      "endpoint": "av_realtime_voi_ratio",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
+      "symbol": "RL"
+    },
+    {
+      "endpoint": "av_realtime_voi_ratio",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
+      "symbol": "UVV"
+    },
+    {
+      "endpoint": "av_realtime_voi_ratio",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
+      "symbol": "AMD"
+    },
+    {
+      "endpoint": "av_historical_put_call_ratio",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
+      "symbol": "RL"
+    },
+    {
+      "endpoint": "av_historical_put_call_ratio",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
+      "symbol": "UVV"
+    },
+    {
+      "endpoint": "av_historical_put_call_ratio",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
+      "symbol": "AMD"
+    },
+    {
+      "endpoint": "av_historical_put_call_ratio",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
+      "symbol": "LLY"
+    },
+    {
+      "endpoint": "av_historical_voi",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
+      "symbol": "RL"
+    },
+    {
+      "endpoint": "av_historical_voi",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
+      "symbol": "UVV"
+    },
+    {
+      "endpoint": "av_historical_voi",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
+      "symbol": "AMD"
+    },
+    {
+      "endpoint": "av_historical_voi",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
+      "symbol": "LLY"
+    },
+    {
+      "endpoint": "av_ipo_calendar",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
+      "symbol": "__market__"
+    }
+  ],
+  "generated_at": "2026-08-07T19:30:23.656298+00:00",
   "planned_calls": 19,
   "symbols": [
-    "BLFS",
     "RL",
+    "UVV",
     "AMD",
     "LLY",
     "CAT",
@@ -22,10 +131,10 @@
     "GILD"
   ],
   "tables": {
-    "company_facts": 4,
-    "corporate_actions": 1,
+    "company_facts": 1,
+    "corporate_actions": 0,
     "earnings_news_signals": 0,
     "live_market_signals": 0,
-    "options_provider_signals": 14
+    "options_provider_signals": 0
   }
 }
