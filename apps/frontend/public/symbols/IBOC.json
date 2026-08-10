@@ -16,7 +16,7 @@
     "term_slope": null,
     "total_vega": 0.1163,
     "em_method": "options_math",
-    "timing": "unknown"
+    "timing": "during_market_hours"
   },
   "straddle_features": [
     {
@@ -57,15 +57,15 @@
   "earnings_history": [
     {
       "date": "2026-08-06",
-      "timing": "unknown",
-      "q": "Q3 26",
+      "timing": "during_market_hours",
+      "q": "Q2 26",
       "fiscal_year": 2026,
-      "fiscal_q": "Q3",
+      "fiscal_q": "Q2",
       "actual": -0.030962,
       "implied": null,
-      "eps_actual": null,
-      "eps_estimate": null,
-      "eps_surprise_pct": null,
+      "eps_actual": 1.54,
+      "eps_estimate": 1.7136,
+      "eps_surprise_pct": -0.101307,
       "revenue_actual": null,
       "revenue_estimate": null,
       "rev_surprise_pct": null
@@ -247,5 +247,5 @@
     "iv_mom_week": 0.0045,
     "iv_mom_month": null
   },
-  "next_earnings_timing": "unknown"
+  "next_earnings_timing": "during_market_hours"
 }

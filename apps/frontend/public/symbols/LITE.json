@@ -15,16 +15,16 @@
     "skew_atm": -0.002393,
     "term_slope": -0.048277,
     "total_vega": 1.3794,
-    "em_ml_pct": 0.060952,
-    "em_ml_abs": 51.777021,
-    "correction_factor": 0.294398,
+    "em_ml_pct": 0.067591,
+    "em_ml_abs": 57.41629,
+    "correction_factor": 0.326462,
     "model_horizon": 7,
     "ml_snapshot_date": "2026-08-04",
-    "p10": 0.007171,
-    "p25": 0.021009,
-    "p50": 0.068346,
-    "p75": 0.142146,
-    "p90": 0.214465,
+    "p10": 0.007624,
+    "p25": 0.020449,
+    "p50": 0.065149,
+    "p75": 0.129974,
+    "p90": 0.19337,
     "em_method": "ml_lightgbm",
     "timing": "after_market_close"
   },
@@ -291,5 +291,67 @@
     "iv_mom_week": -0.0331,
     "iv_mom_month": null
   },
+  "provider_enrichment": {
+    "short_interest": {
+      "provider": "massive",
+      "endpoint": "massive_short_interest",
+      "collected_at": "2026-08-10T11:54:25.225600+00:00",
+      "shares": 8784876,
+      "avg_daily_volume": 3991219,
+      "days_to_cover": 2.2,
+      "settlement_date": "2026-07-15"
+    },
+    "options_flow": {
+      "provider": "massive",
+      "endpoint": "massive_options_snapshot",
+      "collected_at": "2026-08-10T11:54:25.225600+00:00",
+      "contract_count": 250,
+      "call_count": 237,
+      "put_count": 13,
+      "total_call_volume": 6856,
+      "total_put_volume": 19,
+      "total_call_open_interest": 12341,
+      "total_put_open_interest": 338,
+      "put_call_volume_ratio": 0.002771,
+      "put_call_open_interest_ratio": 0.027388,
+      "iv_coverage_pct": 33.6,
+      "greeks_coverage_pct": 33.6
+    },
+    "corporate_actions": {
+      "dividend_events": 3,
+      "latest_dividend_date": "2004-05-24",
+      "split_events": 0,
+      "latest_split_date": null,
+      "sources": [
+        {
+          "provider": "massive",
+          "endpoint": "massive_dividends",
+          "collected_at": "2026-08-10T11:54:25.225600+00:00"
+        }
+      ]
+    },
+    "flags": [
+      "call_heavy_flow",
+      "call_heavy_open_interest",
+      "recent_dividend_history"
+    ],
+    "signal_score": 0.74,
+    "sources": [
+      "massive"
+    ],
+    "generated_at": {
+      "company_facts": "2026-08-10T12:13:03.563462+00:00",
+      "options_provider_signals": "2026-08-10T12:13:03.563462+00:00",
+      "corporate_actions": "2026-08-10T12:13:03.563462+00:00",
+      "earnings_news_signals": "2026-08-10T12:13:03.563462+00:00",
+      "live_market_signals": "2026-08-10T12:13:03.563462+00:00"
+    }
+  },
+  "short_days_to_cover": 2.2,
+  "short_interest_shares": 8784876,
+  "put_call_volume_ratio": 0.002771,
+  "put_call_open_interest_ratio": 0.027388,
+  "provider_options_volume": 6875,
+  "provider_signal_score": 0.74,
   "next_earnings_timing": "after_market_close"
 }
