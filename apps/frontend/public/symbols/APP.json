@@ -100,9 +100,9 @@
       "eps_actual": 3.76,
       "eps_estimate": 3.7574,
       "eps_surprise_pct": 0.000692,
-      "revenue_actual": 1923690000.0,
+      "revenue_actual": 1923686000.0,
       "revenue_estimate": 1954568644.0,
-      "rev_surprise_pct": -0.015798
+      "rev_surprise_pct": -0.0158
     },
     {
       "date": "2026-05-06",
@@ -281,53 +281,5 @@
     "iv_mom_week": -0.2802,
     "iv_mom_month": null
   },
-  "provider_enrichment": {
-    "short_interest": {
-      "provider": "massive",
-      "endpoint": "massive_short_interest",
-      "collected_at": "2026-08-08T11:38:27.287965+00:00",
-      "shares": 12561495,
-      "avg_daily_volume": 5691878,
-      "days_to_cover": 2.21,
-      "settlement_date": "2026-07-15"
-    },
-    "options_flow": {
-      "provider": "massive",
-      "endpoint": "massive_options_snapshot",
-      "collected_at": "2026-08-08T11:38:27.287965+00:00",
-      "contract_count": 250,
-      "call_count": 177,
-      "put_count": 73,
-      "total_call_volume": 7755,
-      "total_put_volume": 3641,
-      "total_call_open_interest": 10005,
-      "total_put_open_interest": 5124,
-      "put_call_volume_ratio": 0.469504,
-      "put_call_open_interest_ratio": 0.512144,
-      "iv_coverage_pct": 92.4,
-      "greeks_coverage_pct": 92.4
-    },
-    "flags": [
-      "call_heavy_flow",
-      "call_heavy_open_interest"
-    ],
-    "signal_score": 0.548743,
-    "sources": [
-      "massive"
-    ],
-    "generated_at": {
-      "company_facts": "2026-08-08T11:52:06.915769+00:00",
-      "options_provider_signals": "2026-08-08T11:52:06.915769+00:00",
-      "corporate_actions": "2026-08-08T11:52:06.915769+00:00",
-      "earnings_news_signals": "2026-08-08T11:52:06.915769+00:00",
-      "live_market_signals": "2026-08-08T11:52:06.915769+00:00"
-    }
-  },
-  "short_days_to_cover": 2.21,
-  "short_interest_shares": 12561495,
-  "put_call_volume_ratio": 0.469504,
-  "put_call_open_interest_ratio": 0.512144,
-  "provider_options_volume": 11396,
-  "provider_signal_score": 0.548743,
   "next_earnings_timing": "after_market_close"
 }

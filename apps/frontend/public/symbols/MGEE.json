@@ -10,7 +10,7 @@
     "straddle_abs": 10.2,
     "straddle_pct": 0.1275,
     "iv_pct": 0.157346,
-    "timing": "unknown"
+    "timing": "before_market_open"
   },
   "straddle_features": [
     {
@@ -34,15 +34,15 @@
   "earnings_history": [
     {
       "date": "2026-08-05",
-      "timing": "unknown",
-      "q": "Q3 26",
+      "timing": "before_market_open",
+      "q": "Q2 26",
       "fiscal_year": 2026,
-      "fiscal_q": "Q3",
-      "actual": 0.011827,
+      "fiscal_q": "Q2",
+      "actual": 0.003817,
       "implied": null,
-      "eps_actual": null,
-      "eps_estimate": null,
-      "eps_surprise_pct": null,
+      "eps_actual": 0.89,
+      "eps_estimate": 0.7854,
+      "eps_surprise_pct": 0.133181,
       "revenue_actual": null,
       "revenue_estimate": null,
       "rev_surprise_pct": null
@@ -224,5 +224,5 @@
     "iv_mom_week": -0.0984,
     "iv_mom_month": null
   },
-  "next_earnings_timing": "unknown"
+  "next_earnings_timing": "before_market_open"
 }

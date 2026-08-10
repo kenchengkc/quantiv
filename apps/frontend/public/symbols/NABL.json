@@ -3,10 +3,10 @@
   "as_of_date": "2026-08-07",
   "spot_price": 5.0,
   "expected_move": {
-    "earnings_date": "2026-08-06",
+    "earnings_date": "2026-08-10",
     "expiration": "2026-08-21",
     "dte": 14,
-    "lead_time_days": -1,
+    "lead_time_days": 3,
     "atm_strike": 5.0,
     "atm_iv": 3.599748,
     "straddle_abs": 1.1,
@@ -15,7 +15,17 @@
     "skew_atm": 0.5478,
     "term_slope": -0.964286,
     "total_vega": 0.0073,
-    "em_method": "options_math",
+    "em_ml_pct": 0.057953,
+    "em_ml_abs": 0.289184,
+    "correction_factor": 0.413948,
+    "model_horizon": 3,
+    "ml_snapshot_date": "2026-08-07",
+    "p10": 0.007809,
+    "p25": 0.020237,
+    "p50": 0.057952,
+    "p75": 0.10633,
+    "p90": 0.1809,
+    "em_method": "ml_lightgbm",
     "timing": "before_market_open"
   },
   "straddle_features": [
@@ -72,6 +82,21 @@
     }
   ],
   "earnings_history": [
+    {
+      "date": "2026-08-10",
+      "timing": "before_market_open",
+      "q": "Q2 26",
+      "fiscal_year": 2026,
+      "fiscal_q": "Q2",
+      "actual": null,
+      "implied": null,
+      "eps_actual": 0.1,
+      "eps_estimate": 0.0998,
+      "eps_surprise_pct": 0.002004,
+      "revenue_actual": 138220000.0,
+      "revenue_estimate": 140712906.0,
+      "rev_surprise_pct": -0.017716
+    },
     {
       "date": "2026-08-06",
       "timing": "before_market_open",
@@ -236,24 +261,9 @@
       "revenue_actual": null,
       "revenue_estimate": null,
       "rev_surprise_pct": null
-    },
-    {
-      "date": "2023-11-13",
-      "timing": "before_market_open",
-      "q": "Q4 23",
-      "fiscal_year": 2023,
-      "fiscal_q": "Q4",
-      "actual": -0.149635,
-      "implied": null,
-      "eps_actual": null,
-      "eps_estimate": null,
-      "eps_surprise_pct": null,
-      "revenue_actual": null,
-      "revenue_estimate": null,
-      "rev_surprise_pct": null
     }
   ],
-  "next_earnings": "2026-08-06",
+  "next_earnings": "2026-08-10",
   "vol_regime": {
     "iv_current": 0.8232,
     "iv_rank": 0.562378,
