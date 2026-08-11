@@ -1,13 +1,13 @@
 {
   "symbol": "AORT",
-  "as_of_date": "2026-08-07",
+  "as_of_date": "2026-08-10",
   "spot_price": null,
   "expected_move": {
     "expiration": "2026-09-18",
-    "dte": 42,
-    "atm_strike": 30.0,
-    "atm_iv": 1.4434,
-    "straddle_abs": 3.975,
+    "dte": 39,
+    "atm_strike": 25.0,
+    "atm_iv": 0.79465,
+    "straddle_abs": 5.2,
     "straddle_pct": null,
     "iv_pct": null,
     "timing": "after_market_close"
@@ -15,20 +15,37 @@
   "straddle_features": [
     {
       "expiration": "2026-09-18",
-      "dte": 42,
-      "atm_strike": 30.0,
-      "atm_iv": 1.4434,
-      "atm_call_iv": 1.3955,
-      "atm_put_iv": 1.4913,
-      "straddle_mid": 3.975,
-      "em_straddle": 3.975,
+      "dte": 39,
+      "atm_strike": 25.0,
+      "atm_iv": 0.79465,
+      "atm_call_iv": 0.7631,
+      "atm_put_iv": 0.8262,
+      "straddle_mid": 5.2,
+      "em_straddle": 5.2,
       "em_straddle_pct": null,
       "em_iv": null,
       "em_iv_pct": null,
-      "call_delta": 0.4597,
-      "call_gamma": 0.0286,
-      "call_vega": 0.0355,
-      "call_theta": -0.043
+      "call_delta": 0.5339,
+      "call_gamma": 0.0534,
+      "call_vega": 0.0324,
+      "call_theta": -0.0051
+    },
+    {
+      "expiration": "2026-10-16",
+      "dte": 67,
+      "atm_strike": 30.0,
+      "atm_iv": 0.5763,
+      "atm_call_iv": 0.8147,
+      "atm_put_iv": 0.3379,
+      "straddle_mid": 6.15,
+      "em_straddle": 6.15,
+      "em_straddle_pct": null,
+      "em_iv": null,
+      "em_iv_pct": null,
+      "call_delta": 0.4421,
+      "call_gamma": 0.041,
+      "call_vega": 0.0454,
+      "call_theta": -0.0259
     }
   ],
   "earnings_history": [
@@ -215,13 +232,13 @@
   ],
   "next_earnings": "2026-08-06",
   "vol_regime": {
-    "iv_current": 0.4955,
-    "iv_rank": 0.286137,
+    "iv_current": 0.4679,
+    "iv_rank": 0.240802,
     "iv_year_high": 0.9301,
     "iv_year_low": 0.3213,
-    "hv_current": 0.4484,
-    "hv_rank": 0.133968,
-    "iv_mom_week": -0.0627,
+    "hv_current": 0.4476,
+    "hv_rank": 0.132864,
+    "iv_mom_week": -0.1586,
     "iv_mom_month": null
   },
   "next_earnings_timing": "after_market_close"
