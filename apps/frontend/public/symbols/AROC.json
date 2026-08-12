@@ -1,13 +1,13 @@
 {
   "symbol": "AROC",
-  "as_of_date": "2026-08-10",
+  "as_of_date": "2026-08-11",
   "spot_price": null,
   "expected_move": {
     "expiration": "2026-09-18",
-    "dte": 39,
+    "dte": 38,
     "atm_strike": 35.0,
-    "atm_iv": 0.4375,
-    "straddle_abs": 4.175,
+    "atm_iv": 0.4241,
+    "straddle_abs": 3.97,
     "straddle_pct": null,
     "iv_pct": null,
     "timing": "after_market_close"
@@ -15,20 +15,20 @@
   "straddle_features": [
     {
       "expiration": "2026-09-18",
-      "dte": 39,
+      "dte": 38,
       "atm_strike": 35.0,
-      "atm_iv": 0.4375,
-      "atm_call_iv": 0.4375,
-      "atm_put_iv": 0.4375,
-      "straddle_mid": 4.175,
-      "em_straddle": 4.175,
+      "atm_iv": 0.4241,
+      "atm_call_iv": 0.4231,
+      "atm_put_iv": 0.4251,
+      "straddle_mid": 3.97,
+      "em_straddle": 3.97,
       "em_straddle_pct": null,
       "em_iv": null,
       "em_iv_pct": null,
-      "call_delta": 0.3896,
-      "call_gamma": 0.0817,
-      "call_vega": 0.0414,
-      "call_theta": -0.0262
+      "call_delta": 0.4202,
+      "call_gamma": 0.0858,
+      "call_vega": 0.0424,
+      "call_theta": -0.0267
     }
   ],
   "earnings_history": [
@@ -215,13 +215,13 @@
   ],
   "next_earnings": "2026-08-04",
   "vol_regime": {
-    "iv_current": 0.4341,
-    "iv_rank": 0.507055,
+    "iv_current": 0.4065,
+    "iv_rank": 0.425926,
     "iv_year_high": 0.6018,
     "iv_year_low": 0.2616,
-    "hv_current": 0.4042,
-    "hv_rank": 0.705071,
-    "iv_mom_week": -0.0088,
+    "hv_current": 0.3951,
+    "hv_rank": 0.668154,
+    "iv_mom_week": -0.0419,
     "iv_mom_month": null
   },
   "next_earnings_timing": "after_market_close"
