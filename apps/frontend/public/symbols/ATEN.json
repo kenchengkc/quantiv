@@ -1,13 +1,13 @@
 {
   "symbol": "ATEN",
-  "as_of_date": "2026-08-10",
+  "as_of_date": "2026-08-11",
   "spot_price": null,
   "expected_move": {
     "expiration": "2026-09-18",
-    "dte": 39,
+    "dte": 38,
     "atm_strike": 30.0,
-    "atm_iv": 0.5261,
-    "straddle_abs": 4.195,
+    "atm_iv": 0.4414,
+    "straddle_abs": 3.8,
     "straddle_pct": null,
     "iv_pct": null,
     "timing": "after_market_close"
@@ -15,20 +15,20 @@
   "straddle_features": [
     {
       "expiration": "2026-09-18",
-      "dte": 39,
+      "dte": 38,
       "atm_strike": 30.0,
-      "atm_iv": 0.5261,
-      "atm_call_iv": 0.5261,
-      "atm_put_iv": 0.5261,
-      "straddle_mid": 4.195,
-      "em_straddle": 4.195,
+      "atm_iv": 0.4414,
+      "atm_call_iv": 0.4414,
+      "atm_put_iv": 0.4414,
+      "straddle_mid": 3.8,
+      "em_straddle": 3.8,
       "em_straddle_pct": null,
       "em_iv": null,
       "em_iv_pct": null,
-      "call_delta": 0.4109,
-      "call_gamma": 0.0818,
-      "call_vega": 0.0358,
-      "call_theta": -0.0288
+      "call_delta": 0.3507,
+      "call_gamma": 0.0933,
+      "call_vega": 0.0335,
+      "call_theta": -0.0212
     }
   ],
   "earnings_history": [
@@ -215,13 +215,13 @@
   ],
   "next_earnings": "2026-08-05",
   "vol_regime": {
-    "iv_current": 0.5155,
-    "iv_rank": 0.452564,
+    "iv_current": 0.5019,
+    "iv_rank": 0.427656,
     "iv_year_high": 0.8144,
     "iv_year_low": 0.2684,
-    "hv_current": 0.583,
-    "hv_rank": 1.0,
-    "iv_mom_week": -0.1224,
+    "hv_current": 0.5754,
+    "hv_rank": 0.972504,
+    "iv_mom_week": -0.1754,
     "iv_mom_month": null
   },
   "next_earnings_timing": "after_market_close"

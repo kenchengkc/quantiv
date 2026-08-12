@@ -1,13 +1,13 @@
 {
   "symbol": "EFC",
-  "as_of_date": "2026-08-10",
+  "as_of_date": "2026-08-11",
   "spot_price": null,
   "expected_move": {
     "expiration": "2026-10-16",
-    "dte": 67,
+    "dte": 66,
     "atm_strike": 12.5,
-    "atm_iv": 0.5377,
-    "straddle_abs": 1.375,
+    "atm_iv": 0.58775,
+    "straddle_abs": 1.4,
     "straddle_pct": null,
     "iv_pct": null,
     "timing": "after_market_close"
@@ -15,20 +15,20 @@
   "straddle_features": [
     {
       "expiration": "2026-10-16",
-      "dte": 67,
+      "dte": 66,
       "atm_strike": 12.5,
-      "atm_iv": 0.5377,
-      "atm_call_iv": 0.5377,
-      "atm_put_iv": 0.5377,
-      "straddle_mid": 1.375,
-      "em_straddle": 1.375,
+      "atm_iv": 0.58775,
+      "atm_call_iv": 0.6091,
+      "atm_put_iv": 0.5664,
+      "straddle_mid": 1.4,
+      "em_straddle": 1.4,
       "em_straddle_pct": null,
       "em_iv": null,
       "em_iv_pct": null,
-      "call_delta": 0.6208,
-      "call_gamma": 0.116,
-      "call_vega": 0.021,
-      "call_theta": -0.0051
+      "call_delta": 0.6489,
+      "call_gamma": 0.1048,
+      "call_vega": 0.0208,
+      "call_theta": -0.0091
     }
   ],
   "earnings_history": [
@@ -215,13 +215,13 @@
   ],
   "next_earnings": "2026-08-06",
   "vol_regime": {
-    "iv_current": 0.2297,
-    "iv_rank": 0.316964,
+    "iv_current": 0.2546,
+    "iv_rank": 0.475765,
     "iv_year_high": 0.3368,
     "iv_year_low": 0.18,
-    "hv_current": 0.1615,
-    "hv_rank": 0.335314,
-    "iv_mom_week": -0.031,
+    "hv_current": 0.1625,
+    "hv_rank": 0.343803,
+    "iv_mom_week": 0.0068,
     "iv_mom_month": null
   },
   "next_earnings_timing": "after_market_close"
