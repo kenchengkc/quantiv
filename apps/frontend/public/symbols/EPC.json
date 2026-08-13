@@ -1,13 +1,13 @@
 {
   "symbol": "EPC",
-  "as_of_date": "2026-08-11",
+  "as_of_date": "2026-08-12",
   "spot_price": null,
   "expected_move": {
     "expiration": "2026-09-18",
-    "dte": 38,
+    "dte": 37,
     "atm_strike": 30.0,
-    "atm_iv": 0.4384,
-    "straddle_abs": 3.725,
+    "atm_iv": 0.6575,
+    "straddle_abs": 5.0,
     "straddle_pct": null,
     "iv_pct": null,
     "timing": "before_market_open"
@@ -15,20 +15,20 @@
   "straddle_features": [
     {
       "expiration": "2026-09-18",
-      "dte": 38,
+      "dte": 37,
       "atm_strike": 30.0,
-      "atm_iv": 0.4384,
-      "atm_call_iv": 0.4384,
-      "atm_put_iv": 0.4384,
-      "straddle_mid": 3.725,
-      "em_straddle": 3.725,
+      "atm_iv": 0.6575,
+      "atm_call_iv": 0.6795,
+      "atm_put_iv": 0.6355,
+      "straddle_mid": 5.0,
+      "em_straddle": 5.0,
       "em_straddle_pct": null,
       "em_iv": null,
       "em_iv_pct": null,
-      "call_delta": 0.3216,
-      "call_gamma": 0.0897,
-      "call_vega": 0.0322,
-      "call_theta": -0.0172
+      "call_delta": 0.513,
+      "call_gamma": 0.0633,
+      "call_vega": 0.0373,
+      "call_theta": -0.0378
     }
   ],
   "earnings_history": [
@@ -219,8 +219,8 @@
     "iv_rank": null,
     "iv_year_high": null,
     "iv_year_low": null,
-    "hv_current": 0.3823,
-    "hv_rank": 0.212372,
+    "hv_current": 0.368,
+    "hv_rank": 0.177545,
     "iv_mom_week": null,
     "iv_mom_month": null
   },
