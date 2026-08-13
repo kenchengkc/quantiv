@@ -1,13 +1,13 @@
 {
   "symbol": "KIM",
-  "as_of_date": "2026-08-11",
+  "as_of_date": "2026-08-12",
   "spot_price": null,
   "expected_move": {
     "expiration": "2026-10-16",
-    "dte": 66,
+    "dte": 65,
     "atm_strike": 25.0,
-    "atm_iv": 0.2452,
-    "straddle_abs": 2.15,
+    "atm_iv": 0.2447,
+    "straddle_abs": 2.175,
     "straddle_pct": null,
     "iv_pct": null,
     "timing": "before_market_open"
@@ -15,20 +15,20 @@
   "straddle_features": [
     {
       "expiration": "2026-10-16",
-      "dte": 66,
+      "dte": 65,
       "atm_strike": 25.0,
-      "atm_iv": 0.2452,
-      "atm_call_iv": 0.2452,
-      "atm_put_iv": 0.2452,
-      "straddle_mid": 2.15,
-      "em_straddle": 2.15,
+      "atm_iv": 0.2447,
+      "atm_call_iv": 0.2447,
+      "atm_put_iv": 0.2447,
+      "straddle_mid": 2.175,
+      "em_straddle": 2.175,
       "em_straddle_pct": null,
       "em_iv": null,
       "em_iv_pct": null,
-      "call_delta": 0.3642,
-      "call_gamma": 0.1466,
-      "call_vega": 0.0383,
-      "call_theta": -0.0057
+      "call_delta": 0.363,
+      "call_gamma": 0.1526,
+      "call_vega": 0.0377,
+      "call_theta": -0.008
     }
   ],
   "earnings_history": [
@@ -215,13 +215,13 @@
   ],
   "next_earnings": "2026-08-04",
   "vol_regime": {
-    "iv_current": 0.2978,
-    "iv_rank": 0.408122,
+    "iv_current": 0.2348,
+    "iv_rank": 0.226671,
     "iv_year_high": 0.5033,
     "iv_year_low": 0.1561,
-    "hv_current": 0.1903,
-    "hv_rank": 0.56059,
-    "iv_mom_week": 0.0618,
+    "hv_current": 0.1866,
+    "hv_rank": 0.521602,
+    "iv_mom_week": -0.0084,
     "iv_mom_month": null
   },
   "next_earnings_timing": "before_market_open"
