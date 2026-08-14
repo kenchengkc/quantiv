@@ -1,22 +1,41 @@
 {
-  "error_count": 13,
+  "error_count": 19,
   "errors": [
     {
-      "endpoint": "av_earnings",
-      "error": "Invalid API call. Please retry or visit the documentation (https://www.alphavantage.co/documentation/) for EARNINGS.",
-      "http_status": 200,
-      "response_shape": {
-        "has_data": false,
-        "kind": "json_object",
-        "row_count": 0,
-        "sample_keys": [],
-        "top_level_keys": [
-          "Error Message"
-        ]
-      },
-      "retry_after": "2026-08-14",
-      "status": "provider_error",
+      "endpoint": "av_historical_put_call_ratio",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
+      "symbol": "HUBG"
+    },
+    {
+      "endpoint": "av_historical_put_call_ratio",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
+      "symbol": "AMAT"
+    },
+    {
+      "endpoint": "av_historical_voi",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
+      "symbol": "AES"
+    },
+    {
+      "endpoint": "av_historical_voi",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
       "symbol": "AMR"
+    },
+    {
+      "endpoint": "av_historical_voi",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
+      "symbol": "HUBG"
+    },
+    {
+      "endpoint": "av_historical_voi",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
+      "symbol": "AMAT"
     },
     {
       "endpoint": "massive_dividends",
@@ -32,7 +51,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-14",
+      "retry_after": "2026-08-15",
       "status": "empty",
       "symbol": "COHR"
     },
@@ -50,7 +69,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-14",
+      "retry_after": "2026-08-15",
       "status": "empty",
       "symbol": "SMCI"
     },
@@ -68,7 +87,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-14",
+      "retry_after": "2026-08-15",
       "status": "empty",
       "symbol": "AMTM"
     },
@@ -86,7 +105,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-14",
+      "retry_after": "2026-08-15",
       "status": "empty",
       "symbol": "AES"
     },
@@ -104,7 +123,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-14",
+      "retry_after": "2026-08-15",
       "status": "empty",
       "symbol": "AMR"
     },
@@ -122,7 +141,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-14",
+      "retry_after": "2026-08-15",
       "status": "empty",
       "symbol": "AMAT"
     },
@@ -140,7 +159,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-14",
+      "retry_after": "2026-08-15",
       "status": "empty",
       "symbol": "CSCO"
     },
@@ -158,7 +177,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-14",
+      "retry_after": "2026-08-15",
       "status": "empty",
       "symbol": "LITE"
     },
@@ -176,7 +195,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-14",
+      "retry_after": "2026-08-15",
       "status": "empty",
       "symbol": "SPG"
     },
@@ -194,7 +213,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-14",
+      "retry_after": "2026-08-15",
       "status": "empty",
       "symbol": "CAH"
     },
@@ -212,7 +231,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-14",
+      "retry_after": "2026-08-15",
       "status": "empty",
       "symbol": "ACM"
     },
@@ -230,12 +249,18 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-14",
+      "retry_after": "2026-08-15",
       "status": "empty",
       "symbol": "AMTM"
+    },
+    {
+      "endpoint": "av_ipo_calendar",
+      "error": "alphavantage daily budget exhausted across 2 key(s)",
+      "status": "quota_blocked",
+      "symbol": "__market__"
     }
   ],
-  "generated_at": "2026-08-13T12:10:50.611377+00:00",
+  "generated_at": "2026-08-14T12:07:56.936768+00:00",
   "planned_calls": 165,
   "symbols": [
     "AES",
@@ -256,10 +281,10 @@
     "AMTM"
   ],
   "tables": {
-    "company_facts": 39,
-    "corporate_actions": 23,
+    "company_facts": 40,
+    "corporate_actions": 22,
     "earnings_news_signals": 0,
     "live_market_signals": 0,
-    "options_provider_signals": 30
+    "options_provider_signals": 24
   }
 }

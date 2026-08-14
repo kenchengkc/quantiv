@@ -1,13 +1,13 @@
 {
   "symbol": "AHCO",
-  "as_of_date": "2026-08-12",
+  "as_of_date": "2026-08-13",
   "spot_price": null,
   "expected_move": {
     "expiration": "2026-09-18",
-    "dte": 37,
+    "dte": 36,
     "atm_strike": 7.5,
-    "atm_iv": 2.58575,
-    "straddle_abs": 2.225,
+    "atm_iv": 1.541,
+    "straddle_abs": 1.875,
     "straddle_pct": null,
     "iv_pct": null,
     "timing": "before_market_open"
@@ -15,20 +15,20 @@
   "straddle_features": [
     {
       "expiration": "2026-09-18",
-      "dte": 37,
+      "dte": 36,
       "atm_strike": 7.5,
-      "atm_iv": 2.58575,
-      "atm_call_iv": 2.5992,
-      "atm_put_iv": 2.5723,
-      "straddle_mid": 2.225,
-      "em_straddle": 2.225,
+      "atm_iv": 1.541,
+      "atm_call_iv": 1.4538,
+      "atm_put_iv": 1.6282,
+      "straddle_mid": 1.875,
+      "em_straddle": 1.875,
       "em_straddle_pct": null,
       "em_iv": null,
       "em_iv_pct": null,
-      "call_delta": 0.489,
-      "call_gamma": 0.0764,
-      "call_vega": 0.007,
-      "call_theta": -0.0198
+      "call_delta": 0.3725,
+      "call_gamma": 0.1486,
+      "call_vega": 0.0067,
+      "call_theta": -0.0149
     }
   ],
   "earnings_history": [
@@ -215,13 +215,13 @@
   ],
   "next_earnings": "2026-08-04",
   "vol_regime": {
-    "iv_current": 0.5562,
-    "iv_rank": 0.388736,
+    "iv_current": 0.5714,
+    "iv_rank": 0.418564,
     "iv_year_high": 0.8677,
     "iv_year_low": 0.3581,
-    "hv_current": 1.4846,
-    "hv_rank": 1.0,
-    "iv_mom_week": -0.0205,
+    "hv_current": 1.4807,
+    "hv_rank": 0.996698,
+    "iv_mom_week": -0.0569,
     "iv_mom_month": null
   },
   "next_earnings_timing": "before_market_open"
