@@ -1,13 +1,13 @@
 {
   "symbol": "FG",
-  "as_of_date": "2026-08-12",
+  "as_of_date": "2026-08-13",
   "spot_price": null,
   "expected_move": {
     "expiration": "2026-10-16",
-    "dte": 65,
+    "dte": 64,
     "atm_strike": 25.0,
-    "atm_iv": 0.50265,
-    "straddle_abs": 4.42,
+    "atm_iv": 0.5388,
+    "straddle_abs": 4.825,
     "straddle_pct": null,
     "iv_pct": null,
     "timing": "after_market_close"
@@ -15,20 +15,20 @@
   "straddle_features": [
     {
       "expiration": "2026-10-16",
-      "dte": 65,
+      "dte": 64,
       "atm_strike": 25.0,
-      "atm_iv": 0.50265,
-      "atm_call_iv": 0.4832,
-      "atm_put_iv": 0.5221,
-      "straddle_mid": 4.42,
-      "em_straddle": 4.42,
+      "atm_iv": 0.5388,
+      "atm_call_iv": 0.5302,
+      "atm_put_iv": 0.5474,
+      "straddle_mid": 4.825,
+      "em_straddle": 4.825,
       "em_straddle_pct": null,
       "em_iv": null,
       "em_iv_pct": null,
-      "call_delta": 0.6208,
-      "call_gamma": 0.068,
-      "call_vega": 0.0415,
-      "call_theta": -0.0119
+      "call_delta": 0.6418,
+      "call_gamma": 0.0583,
+      "call_vega": 0.0407,
+      "call_theta": -0.0099
     }
   ],
   "earnings_history": [
@@ -215,13 +215,13 @@
   ],
   "next_earnings": "2026-08-05",
   "vol_regime": {
-    "iv_current": 0.6195,
-    "iv_rank": 0.75509,
+    "iv_current": 0.5038,
+    "iv_rank": 0.521871,
     "iv_year_high": 0.741,
     "iv_year_low": 0.2449,
-    "hv_current": 0.3849,
-    "hv_rank": 0.166741,
-    "iv_mom_week": 0.2427,
+    "hv_current": 0.3889,
+    "hv_rank": 0.184574,
+    "iv_mom_week": 0.1579,
     "iv_mom_month": null
   },
   "next_earnings_timing": "after_market_close"

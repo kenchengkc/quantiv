@@ -1,13 +1,13 @@
 {
   "symbol": "IRT",
-  "as_of_date": "2026-08-11",
+  "as_of_date": "2026-08-13",
   "spot_price": null,
   "expected_move": {
     "expiration": "2026-10-16",
-    "dte": 66,
+    "dte": 64,
     "atm_strike": 17.5,
-    "atm_iv": 0.7603,
-    "straddle_abs": 2.625,
+    "atm_iv": 0.2812,
+    "straddle_abs": 1.675,
     "straddle_pct": null,
     "iv_pct": null,
     "timing": "after_market_close"
@@ -15,20 +15,20 @@
   "straddle_features": [
     {
       "expiration": "2026-10-16",
-      "dte": 66,
+      "dte": 64,
       "atm_strike": 17.5,
-      "atm_iv": 0.7603,
-      "atm_call_iv": 0.7603,
-      "atm_put_iv": 0.7603,
-      "straddle_mid": 2.625,
-      "em_straddle": 2.625,
+      "atm_iv": 0.2812,
+      "atm_call_iv": 0.2801,
+      "atm_put_iv": 0.2823,
+      "straddle_mid": 1.675,
+      "em_straddle": 1.675,
       "em_straddle_pct": null,
       "em_iv": null,
       "em_iv_pct": null,
-      "call_delta": 0.4213,
-      "call_gamma": 0.0671,
-      "call_vega": 0.0267,
-      "call_theta": -0.0084
+      "call_delta": 0.3698,
+      "call_gamma": 0.1882,
+      "call_vega": 0.0264,
+      "call_theta": -0.0047
     }
   ],
   "earnings_history": [
@@ -215,13 +215,13 @@
   ],
   "next_earnings": "2026-08-03",
   "vol_regime": {
-    "iv_current": 0.2451,
-    "iv_rank": 0.123894,
+    "iv_current": 0.2473,
+    "iv_rank": 0.129017,
     "iv_year_high": 0.6213,
     "iv_year_low": 0.1919,
-    "hv_current": 0.2363,
-    "hv_rank": 0.727182,
-    "iv_mom_week": -0.0088,
+    "hv_current": 0.2254,
+    "hv_rank": 0.617854,
+    "iv_mom_week": -0.0198,
     "iv_mom_month": null
   },
   "next_earnings_timing": "after_market_close"

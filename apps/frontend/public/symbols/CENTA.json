@@ -1,34 +1,34 @@
 {
   "symbol": "CENTA",
-  "as_of_date": "2026-08-10",
+  "as_of_date": "2026-08-13",
   "spot_price": 35.0,
   "expected_move": {
     "expiration": "2026-09-18",
-    "dte": 39,
+    "dte": 36,
     "atm_strike": 40.0,
-    "atm_iv": 1.08945,
-    "straddle_abs": 5.55,
-    "straddle_pct": 0.158571,
-    "iv_pct": 0.356117,
+    "atm_iv": 1.007,
+    "straddle_abs": 4.725,
+    "straddle_pct": 0.135,
+    "iv_pct": 0.316253,
     "timing": "after_market_close"
   },
   "straddle_features": [
     {
       "expiration": "2026-09-18",
-      "dte": 39,
+      "dte": 36,
       "atm_strike": 40.0,
-      "atm_iv": 1.08945,
-      "atm_call_iv": 0.8118,
-      "atm_put_iv": 1.3671,
-      "straddle_mid": 5.55,
-      "em_straddle": 5.55,
-      "em_straddle_pct": 0.158571,
-      "em_iv": 12.464108,
-      "em_iv_pct": 0.356117,
-      "call_delta": 0.5345,
-      "call_gamma": 0.0443,
-      "call_vega": 0.0502,
-      "call_theta": -0.0851
+      "atm_iv": 1.007,
+      "atm_call_iv": 0.8431,
+      "atm_put_iv": 1.1709,
+      "straddle_mid": 4.725,
+      "em_straddle": 4.725,
+      "em_straddle_pct": 0.135,
+      "em_iv": 11.068846,
+      "em_iv_pct": 0.316253,
+      "call_delta": 0.464,
+      "call_gamma": 0.0408,
+      "call_vega": 0.0466,
+      "call_theta": -0.0612
     }
   ],
   "earnings_history": [
@@ -215,13 +215,13 @@
   ],
   "next_earnings": "2026-08-05",
   "vol_regime": {
-    "iv_current": 0.3752,
-    "iv_rank": 0.244041,
+    "iv_current": 0.3617,
+    "iv_rank": 0.218502,
     "iv_year_high": 0.7748,
     "iv_year_low": 0.2462,
-    "hv_current": 0.2876,
+    "hv_current": 0.2893,
     "hv_rank": 1.0,
-    "iv_mom_week": null,
+    "iv_mom_week": 0.1155,
     "iv_mom_month": null
   },
   "next_earnings_timing": "after_market_close"
