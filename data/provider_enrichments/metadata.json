@@ -1,8 +1,9 @@
 {
-  "error_count": 12,
+  "error_count": 29,
   "errors": [
     {
-      "endpoint": "massive_dividends",
+      "endpoint": "av_earnings",
+      "error": "Invalid API call. Please retry or visit the documentation (https://www.alphavantage.co/documentation/) for EARNINGS.",
       "http_status": 200,
       "response_shape": {
         "has_data": false,
@@ -10,14 +11,158 @@
         "row_count": 0,
         "sample_keys": [],
         "top_level_keys": [
-          "request_id",
-          "results",
-          "status"
+          "Error Message"
         ]
       },
-      "retry_after": "2026-08-16",
-      "status": "empty",
-      "symbol": "COHR"
+      "retry_after": "2026-08-18",
+      "status": "provider_error",
+      "symbol": "WMT"
+    },
+    {
+      "endpoint": "av_earnings",
+      "error": "Invalid API call. Please retry or visit the documentation (https://www.alphavantage.co/documentation/) for EARNINGS.",
+      "http_status": 200,
+      "response_shape": {
+        "has_data": false,
+        "kind": "json_object",
+        "row_count": 0,
+        "sample_keys": [],
+        "top_level_keys": [
+          "Error Message"
+        ]
+      },
+      "retry_after": "2026-08-18",
+      "status": "provider_error",
+      "symbol": "ADI"
+    },
+    {
+      "endpoint": "av_earnings",
+      "error": "Invalid API call. Please retry or visit the documentation (https://www.alphavantage.co/documentation/) for EARNINGS.",
+      "http_status": 200,
+      "response_shape": {
+        "has_data": false,
+        "kind": "json_object",
+        "row_count": 0,
+        "sample_keys": [],
+        "top_level_keys": [
+          "Error Message"
+        ]
+      },
+      "retry_after": "2026-08-18",
+      "status": "provider_error",
+      "symbol": "TJX"
+    },
+    {
+      "endpoint": "fmp_key_metrics_ttm",
+      "error": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/",
+      "http_status": 402,
+      "retry_after": "2026-09-16",
+      "status": "entitlement_denied",
+      "symbol": "HD"
+    },
+    {
+      "endpoint": "fmp_key_metrics_ttm",
+      "error": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/",
+      "http_status": 402,
+      "retry_after": "2026-09-16",
+      "status": "entitlement_denied",
+      "symbol": "ADI"
+    },
+    {
+      "endpoint": "fmp_key_metrics_ttm",
+      "error": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/",
+      "http_status": 402,
+      "retry_after": "2026-09-16",
+      "status": "entitlement_denied",
+      "symbol": "TJX"
+    },
+    {
+      "endpoint": "fmp_key_metrics_ttm",
+      "error": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/",
+      "http_status": 402,
+      "retry_after": "2026-09-16",
+      "status": "entitlement_denied",
+      "symbol": "DE"
+    },
+    {
+      "endpoint": "fmp_key_metrics_ttm",
+      "error": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/",
+      "http_status": 402,
+      "retry_after": "2026-09-16",
+      "status": "entitlement_denied",
+      "symbol": "LOW"
+    },
+    {
+      "endpoint": "fmp_key_metrics_ttm",
+      "error": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/",
+      "http_status": 402,
+      "retry_after": "2026-09-16",
+      "status": "entitlement_denied",
+      "symbol": "ROST"
+    },
+    {
+      "endpoint": "fmp_key_metrics_ttm",
+      "error": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/",
+      "http_status": 402,
+      "retry_after": "2026-09-16",
+      "status": "entitlement_denied",
+      "symbol": "KEYS"
+    },
+    {
+      "endpoint": "fmp_key_metrics_ttm",
+      "error": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/",
+      "http_status": 402,
+      "retry_after": "2026-09-16",
+      "status": "entitlement_denied",
+      "symbol": "AAP"
+    },
+    {
+      "endpoint": "fmp_key_metrics_ttm",
+      "error": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/",
+      "http_status": 402,
+      "retry_after": "2026-09-16",
+      "status": "entitlement_denied",
+      "symbol": "BILL"
+    },
+    {
+      "endpoint": "fmp_key_metrics_ttm",
+      "error": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/",
+      "http_status": 402,
+      "retry_after": "2026-09-16",
+      "status": "entitlement_denied",
+      "symbol": "BJ"
+    },
+    {
+      "endpoint": "fmp_key_metrics_ttm",
+      "error": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/",
+      "http_status": 402,
+      "retry_after": "2026-09-16",
+      "status": "entitlement_denied",
+      "symbol": "BKE"
+    },
+    {
+      "endpoint": "fmp_key_metrics_ttm",
+      "error": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/",
+      "http_status": 402,
+      "retry_after": "2026-09-16",
+      "status": "entitlement_denied",
+      "symbol": "EL"
+    },
+    {
+      "endpoint": "fmp_key_metrics_ttm",
+      "error": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/",
+      "http_status": 402,
+      "retry_after": "2026-09-16",
+      "status": "entitlement_denied",
+      "symbol": "FLO"
+    },
+    {
+      "endpoint": "fmp_key_metrics_ttm",
+      "error": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/",
+      "http_status": 402,
+      "retry_after": "2026-09-16",
+      "status": "entitlement_denied",
+      "symbol": "FN"
     },
     {
       "endpoint": "massive_dividends",
@@ -33,9 +178,9 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-16",
+      "retry_after": "2026-08-18",
       "status": "empty",
-      "symbol": "SMCI"
+      "symbol": "KEYS"
     },
     {
       "endpoint": "massive_dividends",
@@ -51,9 +196,45 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-16",
+      "retry_after": "2026-08-18",
       "status": "empty",
-      "symbol": "AMTM"
+      "symbol": "BILL"
+    },
+    {
+      "endpoint": "massive_dividends",
+      "http_status": 200,
+      "response_shape": {
+        "has_data": false,
+        "kind": "json_object",
+        "row_count": 0,
+        "sample_keys": [],
+        "top_level_keys": [
+          "request_id",
+          "results",
+          "status"
+        ]
+      },
+      "retry_after": "2026-08-18",
+      "status": "empty",
+      "symbol": "BJ"
+    },
+    {
+      "endpoint": "massive_dividends",
+      "http_status": 200,
+      "response_shape": {
+        "has_data": false,
+        "kind": "json_object",
+        "row_count": 0,
+        "sample_keys": [],
+        "top_level_keys": [
+          "request_id",
+          "results",
+          "status"
+        ]
+      },
+      "retry_after": "2026-08-18",
+      "status": "empty",
+      "symbol": "FN"
     },
     {
       "endpoint": "massive_splits",
@@ -69,9 +250,9 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-16",
+      "retry_after": "2026-08-18",
       "status": "empty",
-      "symbol": "AES"
+      "symbol": "HD"
     },
     {
       "endpoint": "massive_splits",
@@ -87,9 +268,9 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-16",
+      "retry_after": "2026-08-18",
       "status": "empty",
-      "symbol": "AMR"
+      "symbol": "ADI"
     },
     {
       "endpoint": "massive_splits",
@@ -105,9 +286,9 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-16",
+      "retry_after": "2026-08-18",
       "status": "empty",
-      "symbol": "AMAT"
+      "symbol": "TGT"
     },
     {
       "endpoint": "massive_splits",
@@ -123,9 +304,9 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-16",
+      "retry_after": "2026-08-18",
       "status": "empty",
-      "symbol": "CSCO"
+      "symbol": "KEYS"
     },
     {
       "endpoint": "massive_splits",
@@ -141,9 +322,9 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-16",
+      "retry_after": "2026-08-18",
       "status": "empty",
-      "symbol": "LITE"
+      "symbol": "AAP"
     },
     {
       "endpoint": "massive_splits",
@@ -159,9 +340,9 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-16",
+      "retry_after": "2026-08-18",
       "status": "empty",
-      "symbol": "SPG"
+      "symbol": "BILL"
     },
     {
       "endpoint": "massive_splits",
@@ -177,9 +358,9 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-16",
+      "retry_after": "2026-08-18",
       "status": "empty",
-      "symbol": "CAH"
+      "symbol": "BJ"
     },
     {
       "endpoint": "massive_splits",
@@ -195,51 +376,33 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-16",
+      "retry_after": "2026-08-18",
       "status": "empty",
-      "symbol": "ACM"
-    },
-    {
-      "endpoint": "massive_splits",
-      "http_status": 200,
-      "response_shape": {
-        "has_data": false,
-        "kind": "json_object",
-        "row_count": 0,
-        "sample_keys": [],
-        "top_level_keys": [
-          "request_id",
-          "results",
-          "status"
-        ]
-      },
-      "retry_after": "2026-08-16",
-      "status": "empty",
-      "symbol": "AMTM"
+      "symbol": "FN"
     }
   ],
-  "generated_at": "2026-08-15T11:46:03.865042+00:00",
-  "planned_calls": 165,
+  "generated_at": "2026-08-17T11:50:16.642417+00:00",
+  "planned_calls": 213,
   "symbols": [
-    "AES",
-    "AMR",
-    "HUBG",
-    "AMAT",
-    "CSCO",
-    "LITE",
-    "COHR",
-    "SPG",
-    "CAH",
-    "SMCI",
-    "TPR",
-    "AAON",
-    "ACM",
-    "AIT",
-    "AMCR",
-    "AMTM"
+    "WMT",
+    "HD",
+    "ADI",
+    "TJX",
+    "DE",
+    "LOW",
+    "ROST",
+    "TGT",
+    "KEYS",
+    "AAP",
+    "BILL",
+    "BJ",
+    "BKE",
+    "EL",
+    "FLO",
+    "FN"
   ],
   "tables": {
-    "company_facts": 40,
+    "company_facts": 89,
     "corporate_actions": 23,
     "earnings_news_signals": 0,
     "live_market_signals": 0,
