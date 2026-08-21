@@ -2,7 +2,7 @@
   "endpoints": {
     "av_cpi": {
       "category": "macro",
-      "checked_at": "2026-08-14T11:52:23.744716+00:00",
+      "checked_at": "2026-08-21T11:37:30.394540+00:00",
       "credit_cost": 1,
       "derived_table": "company_facts",
       "doc_url": "https://www.alphavantage.co/documentation/",
@@ -26,12 +26,12 @@
           "unit"
         ]
       },
-      "retry_after": "2026-08-21",
+      "retry_after": "2026-08-28",
       "status": "ok"
     },
     "av_earnings": {
       "category": "earnings",
-      "checked_at": "2026-08-14T11:52:14.651269+00:00",
+      "checked_at": "2026-08-21T11:37:22.653471+00:00",
       "credit_cost": 1,
       "derived_table": "company_facts",
       "doc_url": "https://www.alphavantage.co/documentation/",
@@ -54,12 +54,12 @@
           "symbol"
         ]
       },
-      "retry_after": "2026-08-21",
+      "retry_after": "2026-08-28",
       "status": "ok"
     },
     "av_federal_funds_rate": {
       "category": "macro",
-      "checked_at": "2026-08-14T11:52:22.265060+00:00",
+      "checked_at": "2026-08-21T11:37:29.125645+00:00",
       "credit_cost": 1,
       "derived_table": "company_facts",
       "doc_url": "https://www.alphavantage.co/documentation/",
@@ -83,12 +83,12 @@
           "unit"
         ]
       },
-      "retry_after": "2026-08-21",
+      "retry_after": "2026-08-28",
       "status": "ok"
     },
     "av_historical_put_call_ratio": {
       "category": "options",
-      "checked_at": "2026-08-14T11:52:19.414858+00:00",
+      "checked_at": "2026-08-21T11:37:26.563772+00:00",
       "credit_cost": 1,
       "derived_table": "options_provider_signals",
       "doc_url": "https://www.alphavantage.co/documentation/",
@@ -109,12 +109,12 @@
           "symbol"
         ]
       },
-      "retry_after": "2026-08-21",
+      "retry_after": "2026-08-28",
       "status": "ok"
     },
     "av_historical_voi": {
       "category": "options",
-      "checked_at": "2026-08-14T11:52:25.332272+00:00",
+      "checked_at": "2026-08-21T11:37:31.671317+00:00",
       "credit_cost": 1,
       "derived_table": "options_provider_signals",
       "doc_url": "https://www.alphavantage.co/documentation/",
@@ -126,7 +126,7 @@
       "response_shape": {
         "has_data": true,
         "kind": "json_object",
-        "row_count": 3526,
+        "row_count": 3546,
         "sample_keys": [
           "contractID",
           "date",
@@ -142,7 +142,7 @@
           "symbol"
         ]
       },
-      "retry_after": "2026-08-21",
+      "retry_after": "2026-08-28",
       "status": "ok"
     },
     "av_ipo_calendar": {
@@ -214,7 +214,7 @@
     },
     "av_realtime_put_call_ratio": {
       "category": "options",
-      "checked_at": "2026-08-14T11:52:16.044147+00:00",
+      "checked_at": "2026-08-21T11:37:23.920165+00:00",
       "credit_cost": 1,
       "derived_table": "options_provider_signals",
       "doc_url": "https://www.alphavantage.co/documentation/",
@@ -234,12 +234,12 @@
           "symbol"
         ]
       },
-      "retry_after": "2026-08-21",
+      "retry_after": "2026-08-28",
       "status": "ok"
     },
     "av_realtime_voi_ratio": {
       "category": "options",
-      "checked_at": "2026-08-14T11:52:17.448193+00:00",
+      "checked_at": "2026-08-21T11:37:25.216685+00:00",
       "credit_cost": 1,
       "derived_table": "options_provider_signals",
       "doc_url": "https://www.alphavantage.co/documentation/",
@@ -251,7 +251,7 @@
       "response_shape": {
         "has_data": true,
         "kind": "json_object",
-        "row_count": 3526,
+        "row_count": 3546,
         "sample_keys": [
           "contractID",
           "date",
@@ -266,12 +266,12 @@
           "symbol"
         ]
       },
-      "retry_after": "2026-08-21",
+      "retry_after": "2026-08-28",
       "status": "ok"
     },
     "av_treasury_yield_10y": {
       "category": "macro",
-      "checked_at": "2026-08-14T11:52:20.790589+00:00",
+      "checked_at": "2026-08-21T11:37:27.852796+00:00",
       "credit_cost": 1,
       "derived_table": "company_facts",
       "doc_url": "https://www.alphavantage.co/documentation/",
@@ -295,12 +295,12 @@
           "unit"
         ]
       },
-      "retry_after": "2026-08-21",
+      "retry_after": "2026-08-28",
       "status": "ok"
     },
     "fmp_analyst_estimates": {
       "category": "analyst",
-      "checked_at": "2026-08-14T11:52:05.283952+00:00",
+      "checked_at": "2026-08-21T11:37:14.887386+00:00",
       "credit_cost": 1,
       "derived_table": "company_facts",
       "doc_url": "https://site.financialmodelingprep.com/developer/docs",
@@ -339,7 +339,7 @@
         ],
         "top_level_keys": []
       },
-      "retry_after": "2026-08-21",
+      "retry_after": "2026-08-28",
       "status": "ok"
     },
     "fmp_batch_aftermarket_quote": {
@@ -374,7 +374,7 @@
     },
     "fmp_delisted_companies": {
       "category": "corporate_actions",
-      "checked_at": "2026-08-14T11:52:13.209420+00:00",
+      "checked_at": "2026-08-21T11:37:21.489128+00:00",
       "credit_cost": 1,
       "derived_table": "corporate_actions",
       "doc_url": "https://site.financialmodelingprep.com/developer/docs",
@@ -396,12 +396,12 @@
         ],
         "top_level_keys": []
       },
-      "retry_after": "2026-08-21",
+      "retry_after": "2026-08-28",
       "status": "ok"
     },
     "fmp_financial_scores": {
       "category": "fundamentals",
-      "checked_at": "2026-08-14T11:52:10.551796+00:00",
+      "checked_at": "2026-08-21T11:37:19.269359+00:00",
       "credit_cost": 1,
       "derived_table": "company_facts",
       "doc_url": "https://site.financialmodelingprep.com/developer/docs",
@@ -429,12 +429,12 @@
         ],
         "top_level_keys": []
       },
-      "retry_after": "2026-08-21",
+      "retry_after": "2026-08-28",
       "status": "ok"
     },
     "fmp_key_metrics_ttm": {
       "category": "fundamentals",
-      "checked_at": "2026-08-14T11:52:07.918791+00:00",
+      "checked_at": "2026-08-21T11:37:17.143748+00:00",
       "credit_cost": 1,
       "derived_table": "company_facts",
       "doc_url": "https://site.financialmodelingprep.com/developer/docs",
@@ -481,7 +481,7 @@
         ],
         "top_level_keys": []
       },
-      "retry_after": "2026-08-21",
+      "retry_after": "2026-08-28",
       "status": "ok"
     },
     "fmp_press_releases": {
@@ -501,7 +501,7 @@
     },
     "fmp_profile": {
       "category": "company_facts",
-      "checked_at": "2026-08-14T11:52:03.952462+00:00",
+      "checked_at": "2026-08-21T11:37:13.417333+00:00",
       "credit_cost": 1,
       "derived_table": "company_facts",
       "doc_url": "https://site.financialmodelingprep.com/developer/docs",
@@ -548,12 +548,12 @@
         ],
         "top_level_keys": []
       },
-      "retry_after": "2026-08-21",
+      "retry_after": "2026-08-28",
       "status": "ok"
     },
     "fmp_ratings_snapshot": {
       "category": "analyst",
-      "checked_at": "2026-08-14T11:52:06.579200+00:00",
+      "checked_at": "2026-08-21T11:37:16.081739+00:00",
       "credit_cost": 1,
       "derived_table": "company_facts",
       "doc_url": "https://site.financialmodelingprep.com/developer/docs",
@@ -579,12 +579,12 @@
         ],
         "top_level_keys": []
       },
-      "retry_after": "2026-08-21",
+      "retry_after": "2026-08-28",
       "status": "ok"
     },
     "fmp_ratios_ttm": {
       "category": "fundamentals",
-      "checked_at": "2026-08-14T11:52:09.227353+00:00",
+      "checked_at": "2026-08-21T11:37:18.203780+00:00",
       "credit_cost": 1,
       "derived_table": "company_facts",
       "doc_url": "https://site.financialmodelingprep.com/developer/docs",
@@ -631,7 +631,7 @@
         ],
         "top_level_keys": []
       },
-      "retry_after": "2026-08-21",
+      "retry_after": "2026-08-28",
       "status": "ok"
     },
     "fmp_stock_news": {
@@ -651,7 +651,7 @@
     },
     "fmp_stock_peers": {
       "category": "reference",
-      "checked_at": "2026-08-14T11:52:11.870629+00:00",
+      "checked_at": "2026-08-21T11:37:20.338123+00:00",
       "credit_cost": 1,
       "derived_table": "company_facts",
       "doc_url": "https://site.financialmodelingprep.com/developer/docs",
@@ -672,7 +672,7 @@
         ],
         "top_level_keys": []
       },
-      "retry_after": "2026-08-21",
+      "retry_after": "2026-08-28",
       "status": "ok"
     },
     "fmp_symbol_changes": {
@@ -692,7 +692,7 @@
     },
     "massive_aggregates_daily": {
       "category": "ohlcv",
-      "checked_at": "2026-08-14T11:53:29.835369+00:00",
+      "checked_at": "2026-08-21T11:38:35.277927+00:00",
       "credit_cost": 1,
       "derived_table": null,
       "doc_url": "https://massive.com/docs/rest",
@@ -726,12 +726,12 @@
           "ticker"
         ]
       },
-      "retry_after": "2026-08-21",
+      "retry_after": "2026-08-28",
       "status": "ok"
     },
     "massive_dividends": {
       "category": "corporate_actions",
-      "checked_at": "2026-08-14T11:52:29.763045+00:00",
+      "checked_at": "2026-08-21T11:37:35.207222+00:00",
       "credit_cost": 1,
       "derived_table": "corporate_actions",
       "doc_url": "https://massive.com/docs/rest",
@@ -763,12 +763,12 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-21",
+      "retry_after": "2026-08-28",
       "status": "ok"
     },
     "massive_financials": {
       "category": "fundamentals",
-      "checked_at": "2026-08-14T11:52:32.219344+00:00",
+      "checked_at": "2026-08-21T11:37:37.351221+00:00",
       "credit_cost": 1,
       "derived_table": "company_facts",
       "doc_url": "https://massive.com/docs/rest",
@@ -800,12 +800,12 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-21",
+      "retry_after": "2026-08-28",
       "status": "ok"
     },
     "massive_ipos": {
       "category": "corporate_actions",
-      "checked_at": "2026-08-14T11:53:32.370635+00:00",
+      "checked_at": "2026-08-21T11:38:37.496555+00:00",
       "credit_cost": 1,
       "derived_table": "corporate_actions",
       "doc_url": "https://massive.com/docs/rest",
@@ -824,6 +824,7 @@
           "final_issue_price",
           "highest_offer_price",
           "ipo_status",
+          "isin",
           "issuer_name",
           "last_updated",
           "lot_size",
@@ -834,7 +835,8 @@
           "security_type",
           "shares_outstanding",
           "ticker",
-          "total_offer_size"
+          "total_offer_size",
+          "us_code"
         ],
         "top_level_keys": [
           "next_url",
@@ -843,12 +845,12 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-21",
+      "retry_after": "2026-08-28",
       "status": "ok"
     },
     "massive_market_status": {
       "category": "reference",
-      "checked_at": "2026-08-14T11:53:31.143402+00:00",
+      "checked_at": "2026-08-21T11:38:36.415260+00:00",
       "credit_cost": 1,
       "derived_table": null,
       "doc_url": "https://massive.com/docs/rest",
@@ -872,12 +874,12 @@
           "serverTime"
         ]
       },
-      "retry_after": "2026-08-21",
+      "retry_after": "2026-08-28",
       "status": "ok"
     },
     "massive_options_snapshot": {
       "category": "options",
-      "checked_at": "2026-08-14T11:53:28.408953+00:00",
+      "checked_at": "2026-08-21T11:38:34.136969+00:00",
       "credit_cost": 1,
       "derived_table": "options_provider_signals",
       "doc_url": "https://massive.com/docs/rest/options/snapshots/option-chain-snapshot",
@@ -904,12 +906,12 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-21",
+      "retry_after": "2026-08-28",
       "status": "ok"
     },
     "massive_related_tickers": {
       "category": "reference",
-      "checked_at": "2026-08-14T11:52:28.469814+00:00",
+      "checked_at": "2026-08-21T11:37:34.105428+00:00",
       "credit_cost": 1,
       "derived_table": "company_facts",
       "doc_url": "https://massive.com/docs/rest",
@@ -932,12 +934,12 @@
           "ticker"
         ]
       },
-      "retry_after": "2026-08-21",
+      "retry_after": "2026-08-28",
       "status": "ok"
     },
     "massive_short_interest": {
       "category": "sentiment",
-      "checked_at": "2026-08-14T11:52:33.451164+00:00",
+      "checked_at": "2026-08-21T11:37:38.418501+00:00",
       "credit_cost": 1,
       "derived_table": "company_facts",
       "doc_url": "https://massive.com/docs/rest",
@@ -964,12 +966,12 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-21",
+      "retry_after": "2026-08-28",
       "status": "ok"
     },
     "massive_splits": {
       "category": "corporate_actions",
-      "checked_at": "2026-08-14T11:52:30.985077+00:00",
+      "checked_at": "2026-08-21T11:37:36.286819+00:00",
       "credit_cost": 1,
       "derived_table": "corporate_actions",
       "doc_url": "https://massive.com/docs/rest",
@@ -995,7 +997,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-21",
+      "retry_after": "2026-08-28",
       "status": "ok"
     },
     "massive_stock_news": {
@@ -1038,7 +1040,7 @@
     },
     "massive_ticker_overview": {
       "category": "company_facts",
-      "checked_at": "2026-08-14T11:52:27.164506+00:00",
+      "checked_at": "2026-08-21T11:37:33.024563+00:00",
       "credit_cost": 1,
       "derived_table": "company_facts",
       "doc_url": "https://massive.com/docs/rest",
@@ -1058,12 +1060,12 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-21",
+      "retry_after": "2026-08-28",
       "status": "ok"
     },
     "td_last_change_profile": {
       "category": "reference",
-      "checked_at": "2026-08-14T11:53:34.832638+00:00",
+      "checked_at": "2026-08-21T11:38:39.779601+00:00",
       "credit_cost": 1,
       "derived_table": "company_facts",
       "doc_url": "https://twelvedata.com/docs",
@@ -1086,12 +1088,12 @@
           "pagination"
         ]
       },
-      "retry_after": "2026-08-21",
+      "retry_after": "2026-08-28",
       "status": "ok"
     },
     "td_last_change_statistics": {
       "category": "reference",
-      "checked_at": "2026-08-14T11:53:33.679283+00:00",
+      "checked_at": "2026-08-21T11:38:38.612704+00:00",
       "credit_cost": 1,
       "derived_table": "company_facts",
       "doc_url": "https://twelvedata.com/docs",
@@ -1114,7 +1116,7 @@
           "pagination"
         ]
       },
-      "retry_after": "2026-08-21",
+      "retry_after": "2026-08-28",
       "status": "ok"
     },
     "td_press_releases": {
@@ -1149,7 +1151,7 @@
     },
     "td_quote": {
       "category": "reference",
-      "checked_at": "2026-08-14T11:53:36.014128+00:00",
+      "checked_at": "2026-08-21T11:38:40.896744+00:00",
       "credit_cost": 1,
       "derived_table": "company_facts",
       "doc_url": "https://twelvedata.com/docs",
@@ -1185,12 +1187,12 @@
           "volume"
         ]
       },
-      "retry_after": "2026-08-21",
+      "retry_after": "2026-08-28",
       "status": "ok"
     },
     "td_rsi_daily": {
       "category": "technical",
-      "checked_at": "2026-08-14T11:53:37.212509+00:00",
+      "checked_at": "2026-08-21T11:38:42.041430+00:00",
       "credit_cost": 1,
       "derived_table": "company_facts",
       "doc_url": "https://twelvedata.com/docs",
@@ -1213,12 +1215,12 @@
           "values"
         ]
       },
-      "retry_after": "2026-08-21",
+      "retry_after": "2026-08-28",
       "status": "ok"
     },
     "td_time_series_daily": {
       "category": "ohlcv",
-      "checked_at": "2026-08-14T11:53:38.331729+00:00",
+      "checked_at": "2026-08-21T11:38:43.102408+00:00",
       "credit_cost": 1,
       "derived_table": null,
       "doc_url": "https://twelvedata.com/docs",
@@ -1245,11 +1247,11 @@
           "values"
         ]
       },
-      "retry_after": "2026-08-21",
+      "retry_after": "2026-08-28",
       "status": "ok"
     }
   },
-  "generated_at": "2026-08-20T11:40:49.707582+00:00",
+  "generated_at": "2026-08-21T11:38:43.166306+00:00",
   "notes": [
     "Entitlement probes store only status/shape metadata, never raw provider payloads.",
     "entitlement_denied endpoints are retried after 30 days by default."
