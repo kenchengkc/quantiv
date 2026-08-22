@@ -12,13 +12,18 @@ describe('splashSession', () => {
 
   it('skips once the intro has played', () => {
     window.sessionStorage.removeItem(SPLASH_SESSION_KEY);
-    window.matchMedia = ((query: string) =>
-      ({
-        matches: false,
-        media: query,
-        addEventListener() {},
-        removeEventListener() {},
-      }) as MediaQueryList);
+    window.matchMedia = (query: string): MediaQueryList => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener() {},
+      removeListener() {},
+      addEventListener() {},
+      removeEventListener() {},
+      dispatchEvent() {
+        return false;
+      },
+    });
     expect(shouldSkipSplash()).toBe(false);
     markSplashPlayed();
     expect(shouldSkipSplash()).toBe(true);
