@@ -1,5 +1,5 @@
 import { Ratelimit } from '@upstash/ratelimit';
-import { getRedis } from '@/lib/redis';
+import { getRedis } from './redis';
 
 export type RateLimitPolicy = Readonly<{
   bucket: string;

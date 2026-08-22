@@ -26,11 +26,15 @@ import {
   PredictRequestSchema,
   nightlyFallbackResponse,
 } from '../_shared';
+import { enforceRateLimit, PUBLIC_RATE_LIMITS } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export async function POST(req: NextRequest) {
+  const rateLimited = await enforceRateLimit(req, PUBLIC_RATE_LIMITS.mlPredict);
+  if (rateLimited) return rateLimited;
+
   let body: unknown;
   try {
     body = await req.json();

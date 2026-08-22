@@ -11,6 +11,9 @@ websockets>=12.0
 
 # Database and caching
 asyncpg>=0.29.0
+# Required by scripts/import_recent_to_postgres.py, which is exercised by the
+# backend pytest suite in CI.
+psycopg2-binary>=2.9.0
 redis>=5.0.0
 
 # Data processing
