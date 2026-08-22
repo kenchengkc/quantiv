@@ -3,8 +3,8 @@
 import { useEffect, useLayoutEffect, useState } from 'react';
 import {
   markSplashPlayed,
-  splashAlreadyPlayed,
-  SPLASH_FIRST_PAINT_ATTRIBUTE,
+  removeSplashFirstPaintCover,
+  shouldSkipSplash,
   SPLASH_SKIP_ATTRIBUTE,
 } from '@/lib/splashSession';
 
@@ -37,12 +37,6 @@ async function decodeSplashAsset(src: string) {
   }
 }
 
-function shouldSkipSplash(): boolean {
-  if (typeof window === 'undefined') return true;
-  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  return reduced || splashAlreadyPlayed();
-}
-
 export function Splash() {
   // Mounted only from the homepage. The initial `hold` state is intentional:
   // it lets SSR send the opaque cover. The head guard in app/layout.tsx covers
@@ -50,9 +44,9 @@ export function Splash() {
   const [phase, setPhase] = useState<'hold' | 'play' | 'done'>('hold');
 
   useLayoutEffect(() => {
-    // The SSR splash is mounted now, so it is safe to remove the temporary
-    // head-created cover without exposing the shared topbar between paints.
-    document.documentElement.removeAttribute(SPLASH_FIRST_PAINT_ATTRIBUTE);
+    // Real splash is in the tree now. Drop the layout/parser cover so the
+    // intro can play instead of sitting under a second opaque layer.
+    removeSplashFirstPaintCover();
 
     if (shouldSkipSplash()) {
       document.documentElement.setAttribute(SPLASH_SKIP_ATTRIBUTE, '1');
