@@ -1,4 +1,5 @@
 import {
+  ArrowRight,
   BookOpen,
   BrainCircuit,
   CircleHelp,
@@ -28,20 +29,33 @@ export function MetricHelp({
       <div className="qv-metric-help-popover">
         <div className="qv-metric-help-eyebrow">Metric guide</div>
         <div className="qv-metric-help-title">{definition.label}</div>
-        <p>{definition.definition}</p>
-        <div className="qv-metric-help-section">
-          <span>How to read it</span>
-          {definition.interpretation}
+        <div
+          className="qv-metric-help-flow"
+          role="img"
+          aria-label={definition.definition}
+        >
+          {definition.visual.map((node, index) => (
+            <div className="qv-metric-help-flow-step" key={node}>
+              {index > 0 && (
+                <ArrowRight
+                  className="qv-metric-help-flow-arrow"
+                  aria-hidden="true"
+                  size={13}
+                  strokeWidth={1.8}
+                />
+              )}
+              <span>{node}</span>
+            </div>
+          ))}
         </div>
-        {definition.formula && (
-          <div className="qv-metric-help-section">
-            <span>Formula</span>
-            <code>{definition.formula}</code>
-          </div>
-        )}
-        {definition.caution && (
-          <div className="qv-metric-help-caution">{definition.caution}</div>
-        )}
+        <div className="qv-metric-help-read">
+          <span>Read</span>
+          <strong>{definition.interpretation}</strong>
+        </div>
+        <div className="qv-metric-help-tags">
+          {definition.formula && <code>{definition.formula}</code>}
+          <span>{definition.caution}</span>
+        </div>
       </div>
     </details>
   );
@@ -51,38 +65,14 @@ function pct(value: number): string {
   return `${(value * 100).toFixed(1)}%`;
 }
 
-function quickRead(
+function modelComparison(
   optionsMovePct: number | null,
   mlMovePct: number | null,
-  ivRank: number | null,
-): string {
-  const parts: string[] = [];
-  if (optionsMovePct != null)
-    parts.push(`Options price about ±${pct(optionsMovePct)} of movement`);
-  if (mlMovePct != null) {
-    if (optionsMovePct != null) {
-      const gap = mlMovePct - optionsMovePct;
-      const relation =
-        Math.abs(gap) < 0.002
-          ? "in line with"
-          : gap > 0
-            ? "wider than"
-            : "tighter than";
-      parts.push(
-        `the ML point estimate is ${pct(mlMovePct)}, ${relation} that benchmark`,
-      );
-    } else {
-      parts.push(`The ML median absolute-move estimate is ${pct(mlMovePct)}`);
-    }
-  }
-  if (ivRank != null) {
-    parts.push(
-      `current IV is ${Math.round(ivRank * 100)}% of the way through its 52-week range`,
-    );
-  }
-  return parts.length > 0
-    ? `${parts.join("; ")}.`
-    : "Read market-implied, model-estimated, and historical numbers as separate evidence layers.";
+): string | null {
+  if (optionsMovePct == null || mlMovePct == null) return null;
+  const gapPoints = Math.abs(mlMovePct - optionsMovePct) * 100;
+  if (gapPoints < 0.2) return "ML ≈ market";
+  return `ML ${gapPoints.toFixed(1)} pts ${mlMovePct > optionsMovePct ? "wider" : "tighter"}`;
 }
 
 export function DashboardReadingGuide({
@@ -96,31 +86,25 @@ export function DashboardReadingGuide({
   ivRank: number | null;
   historyCount: number;
 }) {
+  const comparison = modelComparison(optionsMovePct, mlMovePct);
   const layers = [
     {
       icon: LineChart,
-      label: "Market-implied",
-      title:
-        optionsMovePct != null
-          ? `±${pct(optionsMovePct)} priced move`
-          : "Options pricing",
-      text: "IV and straddles reflect prices traders are paying for magnitude, not direction.",
+      label: "Market",
+      title: optionsMovePct != null ? `±${pct(optionsMovePct)}` : "No snapshot",
+      caption: "Priced magnitude",
     },
     {
       icon: BrainCircuit,
-      label: "Model-estimated",
-      title:
-        mlMovePct != null ? `${pct(mlMovePct)} point estimate` : "ML distribution",
-      text: "P10–P90 are LightGBM estimates of absolute move size from comparable events.",
+      label: "Model",
+      title: mlMovePct != null ? pct(mlMovePct) : "No forecast",
+      caption: "Conditional magnitude",
     },
     {
       icon: History,
-      label: "Observed history",
-      title:
-        historyCount > 0
-          ? `${historyCount} prior reports`
-          : "Realized outcomes",
-      text: "Signed close-to-close reactions show what happened, with EPS as supporting context.",
+      label: "History",
+      title: historyCount > 0 ? `${historyCount} reports` : "No sample",
+      caption: "Observed reactions",
     },
   ];
 
@@ -134,11 +118,8 @@ export function DashboardReadingGuide({
           <BookOpen size={18} strokeWidth={1.8} />
         </div>
         <div>
-          <div className="qv-reading-guide-eyebrow">
-            How to read this dashboard
-          </div>
-          <h2 id="qv-reading-guide-title">Three evidence layers, one event</h2>
-          <p>{quickRead(optionsMovePct, mlMovePct, ivRank)}</p>
+          <div className="qv-reading-guide-eyebrow">Event lens</div>
+          <h2 id="qv-reading-guide-title">Market · Model · History</h2>
         </div>
       </div>
       <div className="qv-reading-guide-grid">
@@ -154,15 +135,19 @@ export function DashboardReadingGuide({
                 <div className="qv-reading-guide-layer-title">
                   {layer.title}
                 </div>
-                <p>{layer.text}</p>
+                <div className="qv-reading-guide-layer-caption">
+                  {layer.caption}
+                </div>
               </div>
             </div>
           );
         })}
       </div>
-      <div className="qv-reading-guide-note">
-        Unless marked signed, move figures describe magnitude. None of these
-        layers predicts direction or guarantees a range.
+      <div className="qv-reading-guide-footer">
+        {comparison && <strong>{comparison}</strong>}
+        {ivRank != null && <span>IV rank {Math.round(ivRank * 100)}%</span>}
+        <span>Magnitude only</span>
+        <span>No direction</span>
       </div>
     </section>
   );
