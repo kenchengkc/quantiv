@@ -334,3 +334,12 @@ def test_redis_rate_limit_failure_fails_open(load_main, monkeypatch):
     )
 
     assert response.status_code == 200
+
+
+def test_rate_limit_exemptions_ignore_internal_router_entries(load_main):
+    main = load_main()
+
+    # FastAPI 0.141 inserts _IncludedRouter objects without `.path`.
+    main._exempt_operational_routes(
+        [SimpleNamespace(), SimpleNamespace(endpoint=lambda: None)]
+    )

@@ -83,7 +83,7 @@ jobs:
       # apps/ml is consumed by apps/backend.services.ml_service. Install
       # it editable so the package layout is honored — no sys.path hacks.
       - run: pip install -e apps/ml
-      - run: pip install ruff pytest
+      - run: pip install ruff==0.14.4 pytest
 
       # Lint the published `ml/` package and the backend. The legacy
       # training entrypoints under apps/ml/*.py are out of scope — they
