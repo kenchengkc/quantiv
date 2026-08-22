@@ -348,6 +348,17 @@
   text-transform: none;
   text-align: left;
 }
+/* Reveal wrappers retain a transform after their entrance animation, which
+   creates sibling stacking contexts. Lift only the wrapper containing an
+   open explainer so its popover paints above the following dashboard card. */
+.reveal:has(.qv-metric-help[open]) {
+  position: relative;
+  z-index: 50;
+}
+.qv-card:has(.qv-metric-help[open]) {
+  position: relative;
+  z-index: 60;
+}
 .qv-metric-help > summary {
   display: grid;
   place-items: center;
@@ -1114,5 +1125,19 @@ tr:hover .qv-m-sticky-cell {
   }
   .qv-metric-help-popover {
     width: min(290px, calc(100vw - 32px));
+  }
+  .qv-card .qv-metric-help {
+    position: static;
+  }
+  .qv-card .qv-metric-help-popover {
+    top: calc(100% + 8px);
+  }
+  .qv-m-2col > :nth-child(odd) .qv-metric-help-popover {
+    right: auto;
+    left: 0;
+  }
+  .qv-m-2col > :nth-child(even) .qv-metric-help-popover {
+    right: 0;
+    left: auto;
   }
 }

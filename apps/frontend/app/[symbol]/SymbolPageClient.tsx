@@ -5,10 +5,13 @@ import { useParams, useRouter } from 'next/navigation';
 import { ChevronLeft } from 'lucide-react';
 import { SignedIn, SignedOut, SignInButton } from '@clerk/nextjs';
 import { companyName } from '@/lib/companyNames';
+import { normalizeForecastQuantiles } from '@/lib/forecastQuantiles';
 import { listingExchangeLabel } from '@/lib/listingExchanges';
+import type { MetricKey } from '@/lib/metricGlossary';
 import { useEnsureCompanyNames } from '@/lib/useCompanyNames';
 import { useEnsureListingExchanges } from '@/lib/useListingExchanges';
 import { useWatchlist } from '@/lib/watchlist';
+import { DashboardReadingGuide, MetricHelp } from '@/components/MetricExplainer';
 import { TickerLogo } from '@/components/TickerLogo';
 
 interface Straddle {
@@ -373,27 +376,6 @@ const EMPTY_LIVE_PREDICTION: LivePredictionState = {
   error: null,
   updatedAt: 0,
 };
-
-function normalizeQuantiles(
-  quantiles: Record<string, number> | null | undefined,
-): { p10: number; p25: number; p50: number; p75: number; p90: number } | null {
-  if (!quantiles) return null;
-  const p10 = quantiles['10'];
-  const p50 = quantiles['50'];
-  const p90 = quantiles['90'];
-  if (![p10, p50, p90].every((v) => typeof v === 'number' && Number.isFinite(v))) {
-    return null;
-  }
-  const p25 = quantiles['25'];
-  const p75 = quantiles['75'];
-  return {
-    p10,
-    p25: typeof p25 === 'number' && Number.isFinite(p25) ? p25 : p10,
-    p50,
-    p75: typeof p75 === 'number' && Number.isFinite(p75) ? p75 : p90,
-    p90,
-  };
-}
 
 function initialSymbolDetail(value: unknown, symbol: string): SymbolDetail | null {
   if (!value || typeof value !== 'object') return null;
@@ -769,12 +751,16 @@ function KpiCard({
   sub,
   accent,
   kicker,
+  metric,
+  helpAlign = 'right',
 }: {
   label: string;
   value: string;
   sub?: string;
   accent?: string;
   kicker?: string;
+  metric: MetricKey;
+  helpAlign?: 'left' | 'right';
 }) {
   return (
     <div
@@ -802,6 +788,7 @@ function KpiCard({
         </span>
       )}
       <div
+        className="qv-metric-label-row"
         style={{
           fontSize: 10,
           letterSpacing: '0.16em',
@@ -810,7 +797,8 @@ function KpiCard({
           marginTop: kicker ? 2 : 0,
         }}
       >
-        {label}
+        <span>{label}</span>
+        <MetricHelp metric={metric} align={helpAlign} />
       </div>
       <div
         className="serif tnum"
@@ -855,11 +843,15 @@ function ProviderSignalMetric({
   value,
   sub,
   tone,
+  metric,
+  helpAlign = 'right',
 }: {
   label: string;
   value: string;
   sub?: string;
   tone?: string;
+  metric: MetricKey;
+  helpAlign?: 'left' | 'right';
 }) {
   return (
     <div
@@ -872,6 +864,7 @@ function ProviderSignalMetric({
       }}
     >
       <div
+        className="qv-metric-label-row"
         style={{
           fontSize: 9.5,
           letterSpacing: '0.14em',
@@ -879,7 +872,8 @@ function ProviderSignalMetric({
           color: 'var(--ink-4)',
         }}
       >
-        {label}
+        <span>{label}</span>
+        <MetricHelp metric={metric} align={helpAlign} />
       </div>
       <div
         className="serif tnum"
@@ -968,8 +962,12 @@ function ProviderSignalsPanel({ enrichment }: { enrichment?: ProviderEnrichment 
           </h3>
         </div>
         {enrichment.signal_score != null && (
-          <div className="mono tnum" style={{ fontSize: 11, color: 'var(--ink-4)', textAlign: 'right' }}>
-            Signal score {(enrichment.signal_score * 100).toFixed(0)}
+          <div
+            className="mono tnum qv-signal-score"
+            style={{ fontSize: 11, color: 'var(--ink-4)', textAlign: 'right' }}
+          >
+            <span>Signal score {(enrichment.signal_score * 100).toFixed(0)}</span>
+            <MetricHelp metric="providerSignalScore" />
           </div>
         )}
       </div>
@@ -986,6 +984,8 @@ function ProviderSignalsPanel({ enrichment }: { enrichment?: ProviderEnrichment 
           value={daysToCover == null ? '–' : daysToCover.toFixed(1)}
           sub={short?.shares != null ? `${compactNumber(short.shares)} shares short` : undefined}
           tone={shortTone}
+          metric="daysToCover"
+          helpAlign="left"
         />
         <ProviderSignalMetric
           label="P/C volume"
@@ -996,6 +996,8 @@ function ProviderSignalsPanel({ enrichment }: { enrichment?: ProviderEnrichment 
               : undefined
           }
           tone={flowTone}
+          metric="putCallVolume"
+          helpAlign="left"
         />
         <ProviderSignalMetric
           label="P/C OI"
@@ -1005,11 +1007,13 @@ function ProviderSignalsPanel({ enrichment }: { enrichment?: ProviderEnrichment 
               ? `${compactNumber(flow?.total_put_open_interest)} puts / ${compactNumber(flow?.total_call_open_interest)} calls`
               : undefined
           }
+          metric="putCallOpenInterest"
         />
         <ProviderSignalMetric
           label="Actions"
           value={`${actions?.dividend_events ?? 0}/${actions?.split_events ?? 0}`}
           sub="dividend / split events"
+          metric="corporateActions"
         />
       </div>
       {sourceText && (
@@ -1215,7 +1219,6 @@ function DetailHero({
   eventLabel,
   quoteLabel,
   intradayBars,
-  intradaySessionPct,
   intradayLoading,
   intradaySessionDate,
   intradayIsCurrentSession,
@@ -1239,9 +1242,6 @@ function DetailHero({
    *  when the API returns no data. The chart renders a neutral placeholder
    *  in that case so it never looks like real red/green price action. */
   intradayBars: SparkBar[] | null;
-  /** Real session % computed from bars (firstBar.c → lastBar.c).
-   *  `null` when bars aren't available. */
-  intradaySessionPct: number | null;
   intradayLoading: boolean;
   intradaySessionDate: string | null;
   intradayIsCurrentSession: boolean | null;
@@ -2065,7 +2065,7 @@ function QuantileBand({
   modelMeta: string;
   unavailableReason: string | null;
 }) {
-  const max = Math.max(q.p90, straddleAbs) * 1.08;
+  const max = Math.max(q.p90, straddleAbs, 0.001) * 1.08;
   const pct = (v: number) => `${Math.min(100, (v / max) * 100)}%`;
   const cells: Array<[string, number, string]> = [
     ['P10', q.p10, 'var(--ink-3)'],
@@ -2094,17 +2094,20 @@ function QuantileBand({
           <span className="qv-pill warm">
             {mode === 'live' && liveStatus === 'ready' ? 'Live re-score' : 'ML model'}
           </span>
-          <h3
-            className="serif"
-            style={{
-              margin: '10px 0 0',
-              fontSize: 20,
-              fontWeight: 700,
-              letterSpacing: '-0.01em',
-            }}
-          >
-            Forecast distribution
-          </h3>
+          <div className="qv-title-with-help">
+            <h3
+              className="serif"
+              style={{
+                margin: '10px 0 0',
+                fontSize: 20,
+                fontWeight: 700,
+                letterSpacing: '-0.01em',
+              }}
+            >
+              Forecast distribution
+            </h3>
+            <MetricHelp metric="forecastDistribution" align="left" />
+          </div>
           <div style={{ fontSize: 14, color: 'var(--ink-3)', marginTop: 4 }}>
             {modelMeta}
           </div>
@@ -2450,17 +2453,20 @@ function TermFan({ rows, spot }: { rows: TermRow[]; spot: number }) {
       >
         <div>
           <span className="qv-pill">Term structure</span>
-          <h3
-            className="serif"
-            style={{
-              margin: '10px 0 0',
-              fontSize: 20,
-              fontWeight: 700,
-              letterSpacing: '-0.01em',
-            }}
-          >
-            Implied range across expiries
-          </h3>
+          <div className="qv-title-with-help">
+            <h3
+              className="serif"
+              style={{
+                margin: '10px 0 0',
+                fontSize: 20,
+                fontWeight: 700,
+                letterSpacing: '-0.01em',
+              }}
+            >
+              Implied range across expiries
+            </h3>
+            <MetricHelp metric="termStructure" align="left" />
+          </div>
           <div style={{ fontSize: 14, color: 'var(--ink-3)', marginTop: 4 }}>
             Spot × (1 ± EM) at each expiry. Hover an expiry for details.
           </div>
@@ -2871,20 +2877,23 @@ function HistoryBlock({ history }: { history: HistoryPoint[] }) {
           >
             Historical
           </span>
-          <h3
-            className="serif"
-            style={{
-              margin: '10px 0 0',
-              fontSize: 20,
-              fontWeight: 700,
-              letterSpacing: '-0.01em',
-            }}
-          >
-            {hasImplied
-              ? 'Implied vs realized · last '
-              : 'Realized moves · last '}
-            {history.length} {history.length === 1 ? 'quarter' : 'quarters'}
-          </h3>
+          <div className="qv-title-with-help">
+            <h3
+              className="serif"
+              style={{
+                margin: '10px 0 0',
+                fontSize: 20,
+                fontWeight: 700,
+                letterSpacing: '-0.01em',
+              }}
+            >
+              {hasImplied
+                ? 'Implied vs realized · last '
+                : 'Realized moves · last '}
+              {history.length} {history.length === 1 ? 'quarter' : 'quarters'}
+            </h3>
+            <MetricHelp metric="history" align="left" />
+          </div>
           <div style={{ fontSize: 14, color: 'var(--ink-3)', marginTop: 4 }}>
             {hasImplied
               ? 'Realized moves overlaid on what options priced going in.'
@@ -3306,17 +3315,20 @@ function GreeksPanel({ rows }: { rows: TermRow[] }) {
           >
             ATM greeks
           </span>
-          <h3
-            className="serif"
-            style={{
-              margin: '10px 0 0',
-              fontSize: 20,
-              fontWeight: 700,
-              letterSpacing: '-0.01em',
-            }}
-          >
-            Greeks by expiry
-          </h3>
+          <div className="qv-title-with-help">
+            <h3
+              className="serif"
+              style={{
+                margin: '10px 0 0',
+                fontSize: 20,
+                fontWeight: 700,
+                letterSpacing: '-0.01em',
+              }}
+            >
+              Greeks by expiry
+            </h3>
+            <MetricHelp metric="greeks" align="left" />
+          </div>
           <div style={{ fontSize: 14, color: 'var(--ink-3)', marginTop: 4 }}>
             ATM call · delta hedge ratios, sensitivity to vol and time.
           </div>
@@ -4012,28 +4024,33 @@ export default function SymbolPage({
   const daysLeft = daysFromToday(earningsDate);
   const eventLabel = eventLabelFor(data, earningsDate);
 
-  const snapshotQuantiles =
-    em?.p10 != null && em?.p50 != null && em?.p90 != null
+  const snapshotQuantiles = normalizeForecastQuantiles(
+    em
       ? {
-          p10: em.p10,
-          p25: em.p25 ?? em.p10,
-          p50: em.p50,
-          p75: em.p75 ?? em.p90,
-          p90: em.p90,
+          '10': em.p10,
+          '25': em.p25,
+          '50': em.p50,
+          '75': em.p75,
+          '90': em.p90,
         }
-      : null;
+      : null,
+  );
   const liveQuantiles =
     livePrediction.status === 'ready'
-      ? normalizeQuantiles(livePrediction.response?.quantiles)
+      ? normalizeForecastQuantiles(livePrediction.response?.quantiles)
       : null;
   const showingLivePrediction =
     predictionMode === 'live' &&
     livePrediction.status === 'ready' &&
     livePrediction.response != null;
   const quantiles = showingLivePrediction && liveQuantiles ? liveQuantiles : snapshotQuantiles;
-  const activePredictionPct = showingLivePrediction
+  const rawActivePredictionPct = showingLivePrediction
     ? livePrediction.response?.em_ml_pct ?? null
     : em?.em_ml_pct ?? null;
+  const activePredictionPct =
+    rawActivePredictionPct != null && Number.isFinite(rawActivePredictionPct)
+      ? Math.max(0, rawActivePredictionPct)
+      : null;
   const quantileMeta = showingLivePrediction
     ? livePrediction.response?.source === 'nightly_fallback'
       ? 'Static nightly fallback · live backend unavailable'
@@ -4080,15 +4097,6 @@ export default function SymbolPage({
           intradayLoading={quotePending || intradayForSymbol === null}
           intradaySessionDate={intradayForSymbol?.sessionDate ?? null}
           intradayIsCurrentSession={intradayForSymbol?.isCurrentSession ?? null}
-          // Real session %: first→last close on the displayed IEX session.
-          intradaySessionPct={(() => {
-            const bars = intradayForSymbol?.bars;
-            if (!bars || bars.length < 2) return null;
-            const first = bars[0].c;
-            const last = bars[bars.length - 1].c;
-            if (!first || !last) return null;
-            return last / first - 1;
-          })()}
           onBack={() => {
             if (window.history.length > 1) router.back();
             else router.push(prevLoc.path);
@@ -4115,24 +4123,29 @@ export default function SymbolPage({
               value={em.atm_iv != null ? `${(em.atm_iv * 100).toFixed(1)}%` : '–'}
               sub={
                 em.term_slope != null
-                  ? `Δ term slope ${(em.term_slope * 100).toFixed(1)} v/30d`
-                  : `Front-month, ${em.dte}d`
+                  ? `Term slope ${(em.term_slope * 100).toFixed(1)} vol pts / 30d`
+                  : `Front-month · ${em.dte} DTE`
               }
               accent="var(--brand-blue-1)"
+              metric="atmIv"
+              helpAlign="left"
             />
             <KpiCard
               label="IV-based EM"
               value={em.iv_pct != null ? `±${(em.iv_pct * 100).toFixed(1)}%` : '–'}
               sub={
                 em.atm_iv != null
-                  ? `σ ${(em.atm_iv * 100).toFixed(0)}% · ${em.dte}d`
+                  ? `${(em.atm_iv * 100).toFixed(0)}% annualized IV · ${em.dte} DTE`
                   : undefined
               }
+              metric="ivExpectedMove"
+              helpAlign="left"
             />
             <KpiCard
               label="ATM Straddle"
               value={em.straddle_abs != null ? `$${em.straddle_abs.toFixed(2)}` : '–'}
-              sub={`Strike $${em.atm_strike.toFixed(2)}`}
+              sub={`Call + put · strike $${em.atm_strike.toFixed(2)}`}
+              metric="atmStraddle"
             />
             <KpiCard
               label={data.vol_regime?.iv_rank != null ? 'IV Rank' : 'ATM Skew'}
@@ -4149,9 +4162,23 @@ export default function SymbolPage({
                     ? `52w ${(data.vol_regime.iv_year_low * 100).toFixed(0)}–${(data.vol_regime.iv_year_high * 100).toFixed(0)}%`
                     : undefined
                   : em.total_vega != null
-                    ? `Vega $${(em.total_vega * 1000).toFixed(0)}`
+                    ? `Combined ATM vega ${em.total_vega.toFixed(3)}`
                     : undefined
               }
+              metric={data.vol_regime?.iv_rank != null ? 'ivRank' : 'atmSkew'}
+            />
+          </div>
+        </Reveal>
+      )}
+
+      {em && (
+        <Reveal delay={90}>
+          <div style={{ marginTop: 16 }}>
+            <DashboardReadingGuide
+              optionsMovePct={em.straddle_pct ?? null}
+              mlMovePct={activePredictionPct}
+              ivRank={data.vol_regime?.iv_rank ?? null}
+              historyCount={historySeries.length}
             />
           </div>
         </Reveal>
@@ -4177,17 +4204,20 @@ export default function SymbolPage({
             >
               <div>
                 <span className="qv-pill">Expected move</span>
-                <h3
-                  className="serif"
-                  style={{
-                    margin: '10px 0 0',
-                    fontSize: 20,
-                    fontWeight: 700,
-                    letterSpacing: '-0.01em',
-                  }}
-                >
-                  Probability density around spot
-                </h3>
+                <div className="qv-title-with-help">
+                  <h3
+                    className="serif"
+                    style={{
+                      margin: '10px 0 0',
+                      fontSize: 20,
+                      fontWeight: 700,
+                      letterSpacing: '-0.01em',
+                    }}
+                  >
+                    Probability density around spot
+                  </h3>
+                  <MetricHelp metric="probabilityDensity" align="left" />
+                </div>
                 <div style={{ fontSize: 14, color: 'var(--ink-3)', marginTop: 4 }}>
                   Log-normal model with ATM IV {(atmIV * 100).toFixed(1)}% over {dte} days.
                   Range ${(spot * (1 - straddlePct)).toFixed(2)}–${(spot * (1 + straddlePct)).toFixed(2)}.
