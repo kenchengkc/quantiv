@@ -417,9 +417,21 @@ async def sync_models(_key: str = Depends(verify_admin_key)):
 rate_limit_exempt_paths = {"/health"}
 if docs_enabled:
     rate_limit_exempt_paths.update({"/docs", "/docs/oauth2-redirect", "/redoc", "/openapi.json"})
-for route in app.routes:
-    if route.path in rate_limit_exempt_paths or route.path.startswith("/api/admin/"):
-        limiter.exempt(route.endpoint)
+
+
+def _exempt_operational_routes(routes) -> None:
+    # FastAPI 0.141+ can include internal router objects without `.path`.
+    # Skip those so module import still completes and /health can listen.
+    for route in routes:
+        route_path = getattr(route, "path", None)
+        route_endpoint = getattr(route, "endpoint", None)
+        if not isinstance(route_path, str) or route_endpoint is None:
+            continue
+        if route_path in rate_limit_exempt_paths or route_path.startswith("/api/admin/"):
+            limiter.exempt(route_endpoint)
+
+
+_exempt_operational_routes(app.routes)
 
 
 if __name__ == "__main__":
