@@ -11,7 +11,7 @@ try {
     : '.env.local';
   const envPath = path.join(repoRoot, 'config', envFile);
   if (fs.existsSync(envPath)) {
-    dotenv.config({ path: envPath });
+    dotenv.config({ path: envPath, quiet: true });
   }
   // Local dev/test envs often keep Clerk dev-instance keys under E2E_*
   // names so they are not confused with production Vercel variables.

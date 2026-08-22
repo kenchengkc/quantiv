@@ -5,9 +5,13 @@ import path from 'node:path';
 // dev-instance Secret Key + a test user email), then fall back to
 // `.env.local` for any other Next.js runtime vars the dev server needs.
 import dotenv from 'dotenv';
-dotenv.config({ path: path.resolve(__dirname, '.env.test.local'), override: false });
-dotenv.config({ path: path.resolve(__dirname, '.env.local'), override: false });
-dotenv.config({ path: path.resolve(__dirname, '..', '..', 'config', '.env.local'), override: false });
+dotenv.config({ path: path.resolve(__dirname, '.env.test.local'), override: false, quiet: true });
+dotenv.config({ path: path.resolve(__dirname, '.env.local'), override: false, quiet: true });
+dotenv.config({
+  path: path.resolve(__dirname, '..', '..', 'config', '.env.local'),
+  override: false,
+  quiet: true,
+});
 
 const CLERK_PUBLISHABLE_KEY =
   process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ??
