@@ -2,9 +2,13 @@ import { defineConfig, devices } from '@playwright/test';
 import path from 'node:path';
 import dotenv from 'dotenv';
 
-dotenv.config({ path: path.resolve(__dirname, '.env.test.local'), override: false });
-dotenv.config({ path: path.resolve(__dirname, '.env.local'), override: false });
-dotenv.config({ path: path.resolve(__dirname, '..', '..', 'config', '.env.local'), override: false });
+dotenv.config({ path: path.resolve(__dirname, '.env.test.local'), override: false, quiet: true });
+dotenv.config({ path: path.resolve(__dirname, '.env.local'), override: false, quiet: true });
+dotenv.config({
+  path: path.resolve(__dirname, '..', '..', 'config', '.env.local'),
+  override: false,
+  quiet: true,
+});
 
 const PORT = Number(process.env.E2E_PORT ?? 3000);
 const BASE_URL = process.env.E2E_BASE_URL ?? `http://localhost:${PORT}`;
