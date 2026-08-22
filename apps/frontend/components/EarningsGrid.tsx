@@ -9,6 +9,7 @@ import { companyName } from '@/lib/companyNames';
 import { useEnsureCompanyNames } from '@/lib/useCompanyNames';
 import { useTickerHover } from '@/components/TickerHoverCard';
 import { CalendarGridSkeleton } from '@/components/EarningsGridSkeleton';
+import { useFitNowrapText } from '@/lib/useFitNowrapText';
 import {
   hasTickerLogoState,
   preloadTickerLogos,
@@ -592,6 +593,7 @@ function WeekHeader({
   setSearch: (s: string) => void;
   marketOpen: boolean;
 }) {
+  const headingRef = useFitNowrapText<HTMLHeadingElement>(windowLabel, 56, 32);
   return (
     <div style={{ padding: '24px 0 20px', borderBottom: '1px solid var(--line)' }}>
       <div
@@ -600,10 +602,10 @@ function WeekHeader({
           justifyContent: 'space-between',
           alignItems: 'flex-end',
           gap: 24,
-          flexWrap: 'wrap',
         }}
+        className="qv-week-header-row"
       >
-        <div className="qv-week-heading-col" style={{ flex: '1 1 auto' }}>
+        <div className="qv-week-heading-col">
           <div
             style={{
               fontSize: 10,
@@ -667,10 +669,10 @@ function WeekHeader({
             </span>
           </div>
           <h1
+            ref={headingRef}
             className="serif qv-m-h1 qv-week-heading"
             style={{
               margin: 0,
-              fontSize: 56,
               fontWeight: 800,
               letterSpacing: '-0.032em',
               lineHeight: 0.94,
@@ -694,7 +696,10 @@ function WeekHeader({
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
+        <div
+          className="qv-week-picker"
+          style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}
+        >
           <button
             className="chip"
             onClick={() => setOffset(Math.max(MIN_OFFSET, offset - 1))}

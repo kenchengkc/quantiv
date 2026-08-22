@@ -1,3 +1,7 @@
+'use client';
+
+import { useFitNowrapText } from '@/lib/useFitNowrapText';
+
 function SkeletonRow({ delayMs }: { delayMs: number }) {
   const bar = (extra: number, h: number, w: string | number, r = 5) => ({
     height: h,
@@ -167,19 +171,20 @@ function formatWindowLabel(days: Date[]) {
 
 function EarningsGridHeaderFallback({ days }: { days: Date[] }) {
   const windowLabel = formatWindowLabel(days);
+  const headingRef = useFitNowrapText<HTMLHeadingElement>(windowLabel, 56, 32);
 
   return (
     <div style={{ padding: '24px 0 20px', borderBottom: '1px solid var(--line)' }}>
       <div
+        className="qv-week-header-row"
         style={{
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'flex-end',
           gap: 24,
-          flexWrap: 'wrap',
         }}
       >
-        <div className="qv-week-heading-col" style={{ flex: '1 1 auto' }}>
+        <div className="qv-week-heading-col">
           <div
             style={{
               fontSize: 10,
@@ -231,10 +236,10 @@ function EarningsGridHeaderFallback({ days }: { days: Date[] }) {
             </span>
           </div>
           <h1
+            ref={headingRef}
             className="serif qv-m-h1 qv-week-heading"
             style={{
               margin: 0,
-              fontSize: 56,
               fontWeight: 800,
               letterSpacing: '-0.032em',
               lineHeight: 0.94,
@@ -258,7 +263,11 @@ function EarningsGridHeaderFallback({ days }: { days: Date[] }) {
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 2 }} aria-hidden="true">
+        <div
+          className="qv-week-picker"
+          style={{ display: 'flex', alignItems: 'center', gap: 2 }}
+          aria-hidden="true"
+        >
           {['‹', 'Last week', 'This week', 'Next week', 'In two weeks', '›'].map((label) => (
             <span
               key={label}

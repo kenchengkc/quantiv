@@ -7,37 +7,38 @@
    (--font-mulish, --font-nunito-sans, --font-jetbrains-mono). The rules
    below reference those variables, so no third-party CDN request is made
    at runtime. KaTeX has no fonts to fetch from a CDN, so its @import stays. */
-@import 'katex/dist/katex.min.css';
+@import "katex/dist/katex.min.css";
 
 /* Palette tuned to the Quantiv logo: pure black page backgrounds, pure white
  * type, and a vivid dodger-blue accent (~#1E90FF) matching the wave through
  * the Q. Hue 248 = the logo blue's true hue in OKLCH. */
 :root {
-  --bg:        #000000;
-  --bg-2:      oklch(0.13 0 0);
-  --bg-3:      oklch(0.17 0 0);
-  --line:      oklch(0.24 0 0);
-  --line-2:    oklch(0.34 0 0);
-  --ink:       oklch(0.99 0 0);          /* pure white, like the wordmark */
-  --ink-2:     oklch(0.88 0 0);
-  --ink-3:     oklch(0.74 0 0);
-  --ink-4:     oklch(0.60 0 0);
-  --paper:     oklch(0.96 0.012 80);
-  --accent:    oklch(0.66 0.18 248);     /* logo wave blue (~#1E90FF) */
-  --accent-2:  oklch(0.52 0.18 248);
+  --bg: #000000;
+  --bg-2: oklch(0.13 0 0);
+  --bg-3: oklch(0.17 0 0);
+  --line: oklch(0.24 0 0);
+  --line-2: oklch(0.34 0 0);
+  --ink: oklch(0.99 0 0); /* pure white, like the wordmark */
+  --ink-2: oklch(0.88 0 0);
+  --ink-3: oklch(0.74 0 0);
+  --ink-4: oklch(0.6 0 0);
+  --paper: oklch(0.96 0.012 80);
+  --accent: oklch(0.66 0.18 248); /* logo wave blue (~#1E90FF) */
+  --accent-2: oklch(0.52 0.18 248);
   --accent-hi: oklch(0.74 0.16 240);
-  --brand-blue-1: #2EA1FE;
-  --brand-blue-2: #2A78FE;
-  --up:        oklch(0.76 0.15 150);
-  --down:      oklch(0.68 0.19 30);
-  --flag:      oklch(0.80 0.12 80);
+  --brand-blue-1: #2ea1fe;
+  --brand-blue-2: #2a78fe;
+  --up: oklch(0.76 0.15 150);
+  --down: oklch(0.68 0.19 30);
+  --flag: oklch(0.8 0.12 80);
 }
 
 @layer base {
-  html, body {
+  html,
+  body {
     background: var(--bg);
     color: var(--ink);
-    font-feature-settings: 'ss01';
+    font-feature-settings: "ss01";
     overflow-x: clip;
   }
   /* Reserve space for the vertical scrollbar so centered layouts don’t
@@ -57,27 +58,42 @@
     line-height: 1.45;
   }
   @supports not (overflow: clip) {
-    html, body {
+    html,
+    body {
       overflow-x: hidden;
     }
   }
-  ::selection { background: color-mix(in oklab, var(--accent) 40%, transparent); }
-  ::-webkit-scrollbar { height: 10px; width: 10px; }
-  ::-webkit-scrollbar-thumb { background: var(--line); border-radius: 10px; }
-  ::-webkit-scrollbar-track { background: transparent; }
+  ::selection {
+    background: color-mix(in oklab, var(--accent) 40%, transparent);
+  }
+  ::-webkit-scrollbar {
+    height: 10px;
+    width: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--line);
+    border-radius: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
 }
 
 @layer components {
   .serif {
-    font-family: var(--font-mulish), var(--font-nunito-sans), ui-sans-serif, sans-serif;
-    font-feature-settings: 'ss01';
+    font-family:
+      var(--font-mulish), var(--font-nunito-sans), ui-sans-serif, sans-serif;
+    font-feature-settings: "ss01";
     letter-spacing: -0.01em;
   }
   .mono {
-    font-family: var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-feature-settings: 'tnum', 'zero';
+    font-family:
+      var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-feature-settings: "tnum", "zero";
   }
-  .tnum { font-variant-numeric: tabular-nums; }
+  .tnum {
+    font-variant-numeric: tabular-nums;
+  }
 
   .chip {
     display: inline-flex;
@@ -90,10 +106,13 @@
     color: var(--ink-2);
     font-size: 12px;
     letter-spacing: 0.01em;
-    transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
+    transition:
+      background 160ms ease,
+      color 160ms ease,
+      border-color 160ms ease;
     background: transparent;
   }
-  .chip[aria-pressed='true'] {
+  .chip[aria-pressed="true"] {
     background: var(--ink);
     color: var(--bg);
     border-color: var(--ink);
@@ -102,8 +121,13 @@
     color: var(--ink);
     border-color: var(--line-2);
   }
-  .chip[aria-pressed='true']:hover { color: var(--bg); }
-  .chip:disabled { opacity: 0.3; cursor: not-allowed; }
+  .chip[aria-pressed="true"]:hover {
+    color: var(--bg);
+  }
+  .chip:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+  }
 
   .kbd {
     font-family: var(--font-jetbrains-mono), monospace;
@@ -122,46 +146,100 @@
 }
 
 @keyframes splash-ring {
-  0%   { transform: scale(0.6); opacity: 0.55; }
-  80%  { transform: scale(2.2); opacity: 0; }
-  100% { transform: scale(2.4); opacity: 0; }
+  0% {
+    transform: scale(0.6);
+    opacity: 0.55;
+  }
+  80% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
 }
 @keyframes splash-dot {
-  0%   { transform: translate(0, 0) scale(1); opacity: 1; }
-  100% { transform: translate(var(--dx), var(--dy)) scale(0); opacity: 0; }
+  0% {
+    transform: translate(0, 0) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--dx), var(--dy)) scale(0);
+    opacity: 0;
+  }
 }
 @keyframes pop-in {
-  0%   { transform: scale(0.5); opacity: 0; }
-  60%  { transform: scale(1.15); opacity: 1; }
-  100% { transform: scale(1); opacity: 1; }
+  0% {
+    transform: scale(0.5);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.15);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 @keyframes check-draw {
-  0%   { stroke-dashoffset: 22; }
-  100% { stroke-dashoffset: 0; }
+  0% {
+    stroke-dashoffset: 22;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
 }
 @keyframes toast-in {
-  0%   { transform: translate(-50%, 12px); opacity: 0; }
-  100% { transform: translate(-50%, 0); opacity: 1; }
+  0% {
+    transform: translate(-50%, 12px);
+    opacity: 0;
+  }
+  100% {
+    transform: translate(-50%, 0);
+    opacity: 1;
+  }
 }
 @keyframes toast-out {
-  0%   { transform: translate(-50%, 0); opacity: 1; }
-  100% { transform: translate(-50%, -8px); opacity: 0; }
+  0% {
+    transform: translate(-50%, 0);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -8px);
+    opacity: 0;
+  }
 }
 
 @keyframes qv-hover-pop {
-  0%   { opacity: 0; transform: translateY(4px) scale(0.96); }
-  100% { opacity: 1; transform: translateY(0) scale(1); }
+  0% {
+    opacity: 0;
+    transform: translateY(4px) scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 @keyframes fade-up {
-  0%   { opacity: 0; transform: translateY(14px); }
-  100% { opacity: 1; transform: translateY(0); }
+  0% {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .reveal {
   opacity: 0;
   transform: translateY(14px);
-  transition: opacity 600ms cubic-bezier(.2,.8,.3,1), transform 600ms cubic-bezier(.2,.8,.3,1);
+  transition:
+    opacity 600ms cubic-bezier(0.2, 0.8, 0.3, 1),
+    transform 600ms cubic-bezier(0.2, 0.8, 0.3, 1);
   will-change: opacity, transform;
 }
 .reveal.in {
@@ -170,25 +248,44 @@
 }
 
 .qv-card {
-  background: linear-gradient(180deg,
+  background: linear-gradient(
+    180deg,
     color-mix(in oklab, var(--bg-2) 92%, transparent),
-    color-mix(in oklab, var(--bg-2) 60%, transparent));
+    color-mix(in oklab, var(--bg-2) 60%, transparent)
+  );
   border: 1px solid var(--line);
   border-radius: 14px;
   color: var(--ink-2);
   padding: 18px 20px;
-  transition: border-color 200ms ease, transform 200ms ease, box-shadow 200ms ease;
+  transition:
+    border-color 200ms ease,
+    transform 200ms ease,
+    box-shadow 200ms ease;
 }
-.qv-card:hover { border-color: var(--line-2); }
-.qv-card :where(h1, h2, h3, h4) { color: var(--ink); }
+.qv-card:hover {
+  border-color: var(--line-2);
+}
+.qv-card :where(h1, h2, h3, h4) {
+  color: var(--ink);
+}
 
 .qv-card-hi {
   background:
-    radial-gradient(120% 140% at 0% 0%, color-mix(in oklab, var(--brand-blue-1) 18%, transparent) 0%, transparent 55%),
-    radial-gradient(80% 100% at 100% 100%, color-mix(in oklab, var(--accent) 10%, transparent) 0%, transparent 60%),
-    linear-gradient(180deg,
+    radial-gradient(
+      120% 140% at 0% 0%,
+      color-mix(in oklab, var(--brand-blue-1) 18%, transparent) 0%,
+      transparent 55%
+    ),
+    radial-gradient(
+      80% 100% at 100% 100%,
+      color-mix(in oklab, var(--accent) 10%, transparent) 0%,
+      transparent 60%
+    ),
+    linear-gradient(
+      180deg,
       color-mix(in oklab, var(--bg-2) 92%, transparent),
-      color-mix(in oklab, var(--bg-3) 70%, transparent));
+      color-mix(in oklab, var(--bg-3) 70%, transparent)
+    );
   border: 1px solid color-mix(in oklab, var(--brand-blue-1) 22%, var(--line));
   border-radius: 18px;
 }
@@ -207,17 +304,253 @@
   border: 1px solid color-mix(in oklab, var(--brand-blue-1) 26%, transparent);
   font-weight: 600;
 }
-.qv-pill.warm { background: color-mix(in oklab, var(--flag) 14%, transparent); color: var(--flag); border-color: color-mix(in oklab, var(--flag) 30%, transparent); }
-.qv-pill.up   { background: color-mix(in oklab, var(--up) 14%, transparent);   color: var(--up);   border-color: color-mix(in oklab, var(--up) 30%, transparent); }
-.qv-pill.down { background: color-mix(in oklab, var(--down) 14%, transparent); color: var(--down); border-color: color-mix(in oklab, var(--down) 30%, transparent); }
+.qv-pill.warm {
+  background: color-mix(in oklab, var(--flag) 14%, transparent);
+  color: var(--flag);
+  border-color: color-mix(in oklab, var(--flag) 30%, transparent);
+}
+.qv-pill.up {
+  background: color-mix(in oklab, var(--up) 14%, transparent);
+  color: var(--up);
+  border-color: color-mix(in oklab, var(--up) 30%, transparent);
+}
+.qv-pill.down {
+  background: color-mix(in oklab, var(--down) 14%, transparent);
+  color: var(--down);
+  border-color: color-mix(in oklab, var(--down) 30%, transparent);
+}
+
+/* Ticker-dashboard interpretation layer. Metric definitions stay behind a
+   small native details control; the page-level guide keeps the three evidence
+   types visible without turning every card into a paragraph. */
+.qv-metric-label-row,
+.qv-title-with-help,
+.qv-signal-score {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.qv-metric-label-row {
+  justify-content: space-between;
+}
+.qv-title-with-help .qv-metric-help {
+  margin-top: 10px;
+}
+.qv-signal-score {
+  justify-content: flex-end;
+}
+.qv-metric-help {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-family: var(--font-nunito-sans), ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: normal;
+  text-transform: none;
+  text-align: left;
+}
+.qv-metric-help > summary {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid color-mix(in oklab, var(--line-2) 72%, transparent);
+  border-radius: 999px;
+  color: var(--ink-4);
+  background: color-mix(in oklab, var(--bg-3) 76%, transparent);
+  cursor: pointer;
+  list-style: none;
+  transition:
+    color 160ms ease,
+    border-color 160ms ease,
+    background 160ms ease;
+}
+.qv-metric-help > summary::-webkit-details-marker {
+  display: none;
+}
+.qv-metric-help > summary:hover,
+.qv-metric-help > summary:focus-visible,
+.qv-metric-help[open] > summary {
+  color: var(--brand-blue-1);
+  border-color: color-mix(in oklab, var(--brand-blue-1) 56%, var(--line));
+  background: color-mix(in oklab, var(--brand-blue-1) 12%, var(--bg-3));
+  outline: none;
+}
+.qv-metric-help > summary:focus-visible {
+  box-shadow: 0 0 0 3px
+    color-mix(in oklab, var(--brand-blue-1) 22%, transparent);
+}
+.qv-metric-help-popover {
+  position: absolute;
+  top: calc(100% + 9px);
+  z-index: 40;
+  width: min(330px, calc(100vw - 40px));
+  padding: 16px;
+  border: 1px solid color-mix(in oklab, var(--brand-blue-1) 24%, var(--line-2));
+  border-radius: 12px;
+  background: color-mix(in oklab, var(--bg-2) 96%, black);
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.58);
+  color: var(--ink-2);
+  font-size: 12.5px;
+  line-height: 1.5;
+  animation: qv-hover-pop 150ms ease both;
+}
+.qv-metric-help-right .qv-metric-help-popover {
+  right: 0;
+}
+.qv-metric-help-left .qv-metric-help-popover {
+  left: 0;
+}
+.qv-metric-help-eyebrow,
+.qv-reading-guide-eyebrow,
+.qv-reading-guide-layer-label {
+  color: var(--brand-blue-1);
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.qv-metric-help-title {
+  margin-top: 5px;
+  color: var(--ink);
+  font-family: var(--font-mulish), var(--font-nunito-sans), sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.qv-metric-help-popover p {
+  margin: 8px 0 0;
+  color: var(--ink-3);
+}
+.qv-metric-help-section {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+.qv-metric-help-section > span {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--ink);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.qv-metric-help-section code {
+  color: var(--accent-hi);
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-size: 11px;
+  white-space: normal;
+}
+.qv-metric-help-caution {
+  margin-top: 11px;
+  padding: 9px 10px;
+  border-radius: 7px;
+  background: color-mix(in oklab, var(--flag) 8%, transparent);
+  color: color-mix(in oklab, var(--flag) 78%, var(--ink-3));
+  font-size: 11.5px;
+}
+
+.qv-reading-guide {
+  overflow: visible;
+  padding: 18px 20px 16px;
+  border: 1px solid color-mix(in oklab, var(--brand-blue-1) 22%, var(--line));
+  border-radius: 14px;
+  background:
+    radial-gradient(
+      90% 180% at 0% 0%,
+      color-mix(in oklab, var(--brand-blue-1) 11%, transparent),
+      transparent 62%
+    ),
+    color-mix(in oklab, var(--bg-2) 88%, transparent);
+}
+.qv-reading-guide-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.qv-reading-guide-icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  border: 1px solid color-mix(in oklab, var(--brand-blue-1) 32%, var(--line));
+  border-radius: 9px;
+  color: var(--brand-blue-1);
+  background: color-mix(in oklab, var(--brand-blue-1) 10%, transparent);
+}
+.qv-reading-guide-heading h2 {
+  margin: 4px 0 0;
+  color: var(--ink);
+  font-family: var(--font-mulish), var(--font-nunito-sans), sans-serif;
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.012em;
+}
+.qv-reading-guide-heading p {
+  margin: 4px 0 0;
+  color: var(--ink-3);
+  font-size: 13px;
+}
+.qv-reading-guide-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 15px;
+}
+.qv-reading-guide-layer {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: flex-start;
+  gap: 9px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  color: var(--ink-4);
+  background: color-mix(in oklab, var(--bg-3) 66%, transparent);
+}
+.qv-reading-guide-layer-label {
+  color: var(--ink-4);
+  font-size: 8.5px;
+}
+.qv-reading-guide-layer-title {
+  margin-top: 4px;
+  color: var(--ink);
+  font-family: var(--font-mulish), var(--font-nunito-sans), sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+}
+.qv-reading-guide-layer p {
+  margin: 4px 0 0;
+  color: var(--ink-4);
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+.qv-reading-guide-note {
+  margin-top: 11px;
+  color: var(--ink-4);
+  font-size: 11px;
+}
 
 @keyframes earnings-grid-pulse {
-  0%, 100% { opacity: 0.34; }
-  50% { opacity: 0.58; }
+  0%,
+  100% {
+    opacity: 0.34;
+  }
+  50% {
+    opacity: 0.58;
+  }
 }
 @keyframes earnings-grid-fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 /* ─── Quantiv splash (once-per-session intro) ──────────────────────────── */
@@ -316,9 +649,18 @@
 }
 
 @keyframes quantiv-splash-ring-in {
-  0%   { transform: scale(0.72); opacity: 0; }
-  58%  { transform: scale(1.035); opacity: 1; }
-  100% { transform: scale(1); opacity: 1; }
+  0% {
+    transform: scale(0.72);
+    opacity: 0;
+  }
+  58% {
+    transform: scale(1.035);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 @keyframes quantiv-splash-slit-arc-open {
@@ -331,8 +673,14 @@
     );
     opacity: 1;
   }
-  90%, 100% {
-    clip-path: polygon(44.11% 54.88%, 52.51% 47.38%, 65.25% 61.63%, 56.85% 69.14%);
+  90%,
+  100% {
+    clip-path: polygon(
+      44.11% 54.88%,
+      52.51% 47.38%,
+      65.25% 61.63%,
+      56.85% 69.14%
+    );
     opacity: 1;
   }
 }
@@ -371,19 +719,34 @@
      biased toward the upper-left of the screen. Percentages here are
      relative to the mark's pre-scale box, so the translate stays a
      fixed visible offset throughout the 1× → 10× burst. */
-  0%   { transform: translate(1.5%, 1%) scale(1); }
-  82%  { transform: translate(1.5%, 1%) scale(1); }
-  88%  { transform: translate(1.5%, 1%) scale(0.94); }
-  100% { transform: translate(1.5%, 1%) scale(10); }
+  0% {
+    transform: translate(1.5%, 1%) scale(1);
+  }
+  82% {
+    transform: translate(1.5%, 1%) scale(1);
+  }
+  88% {
+    transform: translate(1.5%, 1%) scale(0.94);
+  }
+  100% {
+    transform: translate(1.5%, 1%) scale(10);
+  }
 }
 
 @keyframes quantiv-splash-fade {
-  0%, 82% { opacity: 1; }
-  100%    { opacity: 0; }
+  0%,
+  82% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .quantiv-splash { display: none; }
+  .quantiv-splash {
+    display: none;
+  }
 }
 
 /* ─── About page hero glyph — same reveal sequence as the splash, ─────────
@@ -445,9 +808,16 @@
   animation: quantiv-splash-tail-reveal 894ms ease 817ms forwards;
 }
 @media (prefers-reduced-motion: reduce) {
-  .quantiv-hero-q-ring { opacity: 1; }
-  .quantiv-hero-q-slit { display: none; }
-  .quantiv-hero-q-tail-clip { opacity: 1; clip-path: none; }
+  .quantiv-hero-q-ring {
+    opacity: 1;
+  }
+  .quantiv-hero-q-slit {
+    display: none;
+  }
+  .quantiv-hero-q-tail-clip {
+    opacity: 1;
+    clip-path: none;
+  }
 }
 
 /* ─── Mobile (≤ 640px) ──────────────────────────────────────────────────
@@ -504,14 +874,23 @@ tr:hover .qv-m-sticky-cell {
   background: color-mix(in oklab, var(--bg-2) 92%, transparent);
 }
 
-/* Calendar week range (e.g. AUGUST 31 – SEPTEMBER 4, 2026) stays one
-   line on desktop. min-width: 0 on the title column used to shrink it
-   beside the week chips and wrap at the month boundary. */
+/* Calendar week range stays on one line beside the week picker. The
+   heading column shrinks; useFitNowrapText scales the font down from
+   56px only when a cross-month label would otherwise wrap. */
+.qv-week-header-row {
+  flex-wrap: nowrap;
+}
 .qv-week-heading-col {
-  min-width: max-content;
+  flex: 1 1 0;
+  min-width: 0;
 }
 .qv-week-heading {
   white-space: nowrap;
+  font-size: 56px;
+}
+.qv-week-picker {
+  margin-left: auto;
+  flex-shrink: 0;
 }
 
 /* Default-hide on desktop, show on mobile. Counterpart to .qv-m-hide. */
@@ -559,11 +938,18 @@ tr:hover .qv-m-sticky-cell {
   }
 
   /* Page-level headlines */
+  .qv-week-header-row {
+    flex-wrap: wrap;
+  }
   .qv-week-heading-col {
+    flex: 1 1 100%;
     min-width: 0;
   }
   .qv-week-heading {
     white-space: normal;
+  }
+  .qv-week-picker {
+    margin-left: 0;
   }
   .qv-m-h1 {
     font-size: 38px !important;
@@ -715,5 +1101,18 @@ tr:hover .qv-m-sticky-cell {
   }
   .qv-detail-em {
     font-size: 44px !important;
+  }
+
+  .qv-reading-guide {
+    padding: 16px;
+  }
+  .qv-reading-guide-grid {
+    grid-template-columns: 1fr;
+  }
+  .qv-reading-guide-heading p {
+    font-size: 12.5px;
+  }
+  .qv-metric-help-popover {
+    width: min(290px, calc(100vw - 32px));
   }
 }
