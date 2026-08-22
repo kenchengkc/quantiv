@@ -12,6 +12,7 @@ import {
   SPLASH_SESSION_KEY,
   SPLASH_SKIP_ATTRIBUTE,
 } from '@/lib/splashSession';
+import { SplashCoverGuard } from '@/components/SplashCoverGuard';
 import { Analytics } from '@vercel/analytics/next';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 
@@ -122,9 +123,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         style={{ backgroundColor: '#000000', colorScheme: 'dark' }}
       >
         <head>
+          <style
+            dangerouslySetInnerHTML={{
+              __html: 'html,body{background:#000;color-scheme:dark}',
+            }}
+          />
           <SplashFirstPaintGuard />
         </head>
         <body suppressHydrationWarning style={{ backgroundColor: '#000000' }}>
+          <SplashCoverGuard />
           <Providers>
             <ErrorBoundary>
               <div className="min-h-screen flex flex-col quantiv-app-shell">

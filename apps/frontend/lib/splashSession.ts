@@ -12,6 +12,24 @@ export function splashAlreadyPlayed(): boolean {
   }
 }
 
+export function shouldSkipSplash(): boolean {
+  if (typeof window === 'undefined') return true;
+  try {
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    return reduced || splashAlreadyPlayed();
+  } catch {
+    return true;
+  }
+}
+
+export const SPLASH_FIRST_PAINT_COVER_ID = 'qv-fp-cover';
+
+export function removeSplashFirstPaintCover(): void {
+  if (typeof document === 'undefined') return;
+  document.documentElement.removeAttribute(SPLASH_FIRST_PAINT_ATTRIBUTE);
+  document.getElementById(SPLASH_FIRST_PAINT_COVER_ID)?.remove();
+}
+
 export function markSplashPlayed(): void {
   if (typeof window === 'undefined') return;
   try {
