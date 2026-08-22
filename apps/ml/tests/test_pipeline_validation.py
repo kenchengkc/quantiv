@@ -108,9 +108,7 @@ def _write_forecast_artifact(
     now: datetime,
 ) -> pd.DataFrame:
     models_dir.mkdir(parents=True, exist_ok=True)
-    (models_dir / "metadata_T1.json").write_text(
-        json.dumps({"feature_cols": FEATURES})
-    )
+    (models_dir / "metadata_T1.json").write_text(json.dumps({"feature_cols": FEATURES}))
     atm_iv = 0.50
     dte = 7.0
     iv_move = atm_iv * np.sqrt(dte / 365.0)
@@ -169,7 +167,9 @@ def test_training_gate_accepts_consistent_artifacts(tmp_path: Path) -> None:
     assert report["horizons"]["1"]["validation_rows"] > 0
 
 
-def test_training_gate_reports_infinite_features_and_stale_metadata(tmp_path: Path) -> None:
+def test_training_gate_reports_infinite_features_and_stale_metadata(
+    tmp_path: Path,
+) -> None:
     training_dir = tmp_path / "training"
     frame = _write_training_artifacts(training_dir)
     frame.loc[0, FEATURES[0]] = np.inf
@@ -227,7 +227,9 @@ def test_model_gate_rejects_regression_and_missing_quantile(tmp_path: Path) -> N
             min_validation_rows=4,
         )
 
-    assert {"model_fails_baseline", "missing_model_artifact"} <= _issue_codes(error.value)
+    assert {"model_fails_baseline", "missing_model_artifact"} <= _issue_codes(
+        error.value
+    )
 
 
 def test_forecast_gate_accepts_valid_iv_and_model_handoff(tmp_path: Path) -> None:
@@ -244,6 +246,16 @@ def test_forecast_gate_accepts_valid_iv_and_model_handoff(tmp_path: Path) -> Non
 
     assert report["status"] == "passed"
     assert report["rows"] == 1
+    assert report["events"] == 1
+    assert report["data_window"] == {
+        "snapshot_min": "2026-08-22",
+        "snapshot_max": "2026-08-22",
+        "earnings_min": "2026-08-29",
+        "earnings_max": "2026-08-29",
+        "scored_at_min": "2026-08-22T12:00:00+00:00",
+        "scored_at_max": "2026-08-22T12:00:00+00:00",
+    }
+    assert set(report["reconciliation"].values()) == {0}
 
 
 def test_forecast_gate_surfaces_invisible_handoff_failures(tmp_path: Path) -> None:

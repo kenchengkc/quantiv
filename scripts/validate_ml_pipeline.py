@@ -24,6 +24,10 @@ from ml.pipeline_validation import (  # noqa: E402 - standalone script path setu
     validate_model_artifacts,
     validate_training_artifacts,
 )
+from ml.evidence_receipt import (  # noqa: E402 - standalone script path setup
+    build_evidence_receipt,
+    publish_evidence_receipt,
+)
 
 
 def _write_report(path: Path | None, report: dict[str, Any]) -> None:
@@ -35,18 +39,28 @@ def _write_report(path: Path | None, report: dict[str, Any]) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Validate Quantiv ML pipeline artifacts")
+    parser = argparse.ArgumentParser(
+        description="Validate Quantiv ML pipeline artifacts"
+    )
     parser.add_argument("stage", choices=("training", "models", "forecasts", "all"))
     parser.add_argument("--data-dir", type=Path, default=None)
     parser.add_argument("--training-dir", type=Path, default=None)
     parser.add_argument("--models-dir", type=Path, default=None)
     parser.add_argument("--forecast-path", type=Path, default=None)
-    parser.add_argument("--horizons", nargs="+", type=int, default=list(DEFAULT_HORIZONS))
+    parser.add_argument(
+        "--horizons", nargs="+", type=int, default=list(DEFAULT_HORIZONS)
+    )
     parser.add_argument("--min-training-rows", type=int, default=1_000)
     parser.add_argument("--min-symbols", type=int, default=20)
     parser.add_argument("--min-history-days", type=int, default=365)
     parser.add_argument("--max-forecast-age-days", type=int, default=2)
     parser.add_argument("--report", type=Path, default=None)
+    parser.add_argument(
+        "--publish-receipt-dir",
+        type=Path,
+        default=None,
+        help="Also publish an immutable evidence receipt and latest pointer here.",
+    )
     args = parser.parse_args()
 
     data_dir = args.data_dir or Path(os.getenv("DATA_DIR", REPO_ROOT / "data"))
@@ -55,9 +69,7 @@ def main() -> int:
     forecast_path = args.forecast_path or latest_forecast_path(data_dir / "forecasts")
 
     stages = (
-        [args.stage]
-        if args.stage != "all"
-        else ["training", "models", "forecasts"]
+        [args.stage] if args.stage != "all" else ["training", "models", "forecasts"]
     )
     report: dict[str, Any] = {
         "status": "passed",
@@ -105,7 +117,25 @@ def main() -> int:
             else:
                 report["issues"].extend(exc.as_dict()["issues"])
 
+    report["evidence_receipt"] = build_evidence_receipt(
+        report,
+        scope=args.stage,
+        repo_root=REPO_ROOT,
+        data_dir=data_dir,
+        training_dir=training_dir,
+        models_dir=models_dir,
+        forecast_path=forecast_path,
+        horizons=args.horizons,
+    )
     _write_report(args.report, report)
+    if args.publish_receipt_dir is not None:
+        immutable_path, latest_path = publish_evidence_receipt(
+            report,
+            receipt_dir=args.publish_receipt_dir,
+            scope=args.stage,
+            forecast_path=forecast_path,
+        )
+        print(f"Published evidence receipts: {immutable_path}, {latest_path}")
     return 0 if report["status"] == "passed" else 1
 
 

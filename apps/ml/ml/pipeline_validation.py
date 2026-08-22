@@ -30,7 +30,9 @@ class ValidationIssue:
 class PipelineValidationError(RuntimeError):
     def __init__(self, issues: Sequence[ValidationIssue]):
         self.issues = list(issues)
-        super().__init__(f"ML pipeline validation failed with {len(self.issues)} issue(s)")
+        super().__init__(
+            f"ML pipeline validation failed with {len(self.issues)} issue(s)"
+        )
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -89,7 +91,13 @@ def validate_training_artifacts(
         path = training_dir / f"training_T{horizon}.parquet"
         metadata_path = training_dir / f"metadata_T{horizon}.json"
         if not path.exists():
-            _issue(issues, "training", path, "missing_training_artifact", "file does not exist")
+            _issue(
+                issues,
+                "training",
+                path,
+                "missing_training_artifact",
+                "file does not exist",
+            )
             continue
         try:
             frame = pd.read_parquet(path)
@@ -131,7 +139,9 @@ def validate_training_artifacts(
                 f"found {len(feature_cols)} model features; require at least 10",
             )
         non_numeric = [
-            column for column in feature_cols if not pd.api.types.is_numeric_dtype(frame[column])
+            column
+            for column in feature_cols
+            if not pd.api.types.is_numeric_dtype(frame[column])
         ]
         if non_numeric:
             _issue(
@@ -142,7 +152,9 @@ def validate_training_artifacts(
                 f"non-numeric model features: {non_numeric}",
             )
         else:
-            all_null = [column for column in feature_cols if frame[column].notna().sum() == 0]
+            all_null = [
+                column for column in feature_cols if frame[column].notna().sum() == 0
+            ]
             if all_null:
                 _issue(
                     issues,
@@ -151,7 +163,9 @@ def validate_training_artifacts(
                     "all_null_model_features",
                     f"features contain no usable values: {all_null}",
                 )
-            infinity_count = int(np.isinf(frame[feature_cols].to_numpy(dtype=float)).sum())
+            infinity_count = int(
+                np.isinf(frame[feature_cols].to_numpy(dtype=float)).sum()
+            )
             if infinity_count:
                 _issue(
                     issues,
@@ -199,7 +213,9 @@ def validate_training_artifacts(
                 f"history spans {history_days} days; require at least {min_history_days}",
             )
         symbol_count = int(frame["__symbol"].nunique(dropna=True))
-        blank_symbols = int(frame["__symbol"].fillna("").astype(str).str.strip().eq("").sum())
+        blank_symbols = int(
+            frame["__symbol"].fillna("").astype(str).str.strip().eq("").sum()
+        )
         if blank_symbols:
             _issue(
                 issues,
@@ -226,7 +242,9 @@ def validate_training_artifacts(
                 f"found {duplicate_count:,} duplicate symbol/event-date rows",
             )
         if "horizon" in frame.columns:
-            invalid_horizon = int((pd.to_numeric(frame["horizon"], errors="coerce") != horizon).sum())
+            invalid_horizon = int(
+                (pd.to_numeric(frame["horizon"], errors="coerce") != horizon).sum()
+            )
             if invalid_horizon:
                 _issue(
                     issues,
@@ -275,7 +293,13 @@ def validate_training_artifacts(
                         "metadata feature_cols does not exactly match parquet model columns",
                     )
             except Exception as exc:
-                _issue(issues, "training", metadata_path, "invalid_feature_metadata", str(exc))
+                _issue(
+                    issues,
+                    "training",
+                    metadata_path,
+                    "invalid_feature_metadata",
+                    str(exc),
+                )
 
         horizon_summaries[str(horizon)] = {
             "rows": len(frame),
@@ -289,7 +313,11 @@ def validate_training_artifacts(
 
     return _finish(
         issues,
-        {"stage": "training", "horizons": horizon_summaries, "artifact_dir": str(training_dir)},
+        {
+            "stage": "training",
+            "horizons": horizon_summaries,
+            "artifact_dir": str(training_dir),
+        },
     )
 
 
@@ -324,7 +352,13 @@ def validate_model_artifacts(
         metadata_path = models_dir / f"metadata_T{horizon}.json"
         point_path = models_dir / f"lgbm_T{horizon}.joblib"
         if not metadata_path.exists():
-            _issue(issues, "models", metadata_path, "missing_model_metadata", "file does not exist")
+            _issue(
+                issues,
+                "models",
+                metadata_path,
+                "missing_model_metadata",
+                "file does not exist",
+            )
             continue
         try:
             metadata = _load_json(metadata_path)
@@ -342,7 +376,9 @@ def validate_model_artifacts(
             "quantile_crossing_rate_raw",
             "quantile_negative_rate_raw",
         )
-        missing_metrics = [key for key in required_metrics if not _finite_number(metadata.get(key))]
+        missing_metrics = [
+            key for key in required_metrics if not _finite_number(metadata.get(key))
+        ]
         if missing_metrics:
             _issue(
                 issues,
@@ -352,7 +388,10 @@ def validate_model_artifacts(
                 f"missing or non-finite metrics: {missing_metrics}",
             )
         else:
-            if int(metadata["n_train"]) < min_train_rows or int(metadata["n_val"]) < min_validation_rows:
+            if (
+                int(metadata["n_train"]) < min_train_rows
+                or int(metadata["n_val"]) < min_validation_rows
+            ):
                 _issue(
                     issues,
                     "models",
@@ -381,7 +420,10 @@ def validate_model_artifacts(
                 key = f"q{quantile:02d}_coverage"
                 value = metadata.get(key)
                 target = quantile / 100
-                if not _finite_number(value) or abs(float(value) - target) > coverage_tolerance:
+                if (
+                    not _finite_number(value)
+                    or abs(float(value) - target) > coverage_tolerance
+                ):
                     _issue(
                         issues,
                         "models",
@@ -421,7 +463,9 @@ def validate_model_artifacts(
                 validation_start = pd.Timestamp(split["validation_start"])
                 split_purge_days = int(split["purge_days"])
                 if (validation_start - train_end).days <= split_purge_days:
-                    raise ValueError("train/validation date ranges violate the purge window")
+                    raise ValueError(
+                        "train/validation date ranges violate the purge window"
+                    )
                 if int(split["rows_train"]) != int(metadata.get("n_train", -1)):
                     raise ValueError("split rows_train does not match n_train")
                 if int(split["rows_validation"]) != int(metadata.get("n_val", -1)):
@@ -452,10 +496,18 @@ def validate_model_artifacts(
             training_path = training_dir / f"training_T{horizon}.parquet"
             if training_path.exists():
                 try:
-                    training_frame = pd.read_parquet(training_path, columns=feature_cols)
+                    training_frame = pd.read_parquet(
+                        training_path, columns=feature_cols
+                    )
                     sample = training_frame.tail(1).replace([np.inf, -np.inf], np.nan)
                 except Exception as exc:
-                    _issue(issues, "models", training_path, "invalid_inference_sample", str(exc))
+                    _issue(
+                        issues,
+                        "models",
+                        training_path,
+                        "invalid_inference_sample",
+                        str(exc),
+                    )
 
         artifact_paths = [("point", point_path)] + [
             (f"q{quantile:02d}", models_dir / f"lgbm_T{horizon}_q{quantile:02d}.joblib")
@@ -478,14 +530,20 @@ def validate_model_artifacts(
                     raise ValueError("artifact has no estimator")
                 artifact_features = _feature_names(estimator)
                 if artifact_features != feature_cols:
-                    raise ValueError("estimator feature order does not match metadata feature_cols")
+                    raise ValueError(
+                        "estimator feature order does not match metadata feature_cols"
+                    )
                 if sample is not None:
                     prediction = np.asarray(estimator.predict(sample), dtype=float)
                     if prediction.shape != (1,) or not np.isfinite(prediction).all():
-                        raise ValueError("smoke inference did not produce one finite prediction")
+                        raise ValueError(
+                            "smoke inference did not produce one finite prediction"
+                        )
                 loaded_count += 1
             except Exception as exc:
-                _issue(issues, "models", artifact_path, "invalid_model_artifact", str(exc))
+                _issue(
+                    issues, "models", artifact_path, "invalid_model_artifact", str(exc)
+                )
 
         horizon_summaries[str(horizon)] = {
             "features": len(feature_cols),
@@ -499,7 +557,11 @@ def validate_model_artifacts(
 
     return _finish(
         issues,
-        {"stage": "models", "horizons": horizon_summaries, "artifact_dir": str(models_dir)},
+        {
+            "stage": "models",
+            "horizons": horizon_summaries,
+            "artifact_dir": str(models_dir),
+        },
     )
 
 
@@ -533,12 +595,20 @@ def validate_forecast_artifact(
     """Validate the scored handoff before import, upload, or live serving."""
     issues: list[ValidationIssue] = []
     if not forecast_path.exists():
-        _issue(issues, "forecasts", forecast_path, "missing_forecast_artifact", "file does not exist")
+        _issue(
+            issues,
+            "forecasts",
+            forecast_path,
+            "missing_forecast_artifact",
+            "file does not exist",
+        )
         return _finish(issues, {})
     try:
         frame = pd.read_parquet(forecast_path)
     except Exception as exc:
-        _issue(issues, "forecasts", forecast_path, "unreadable_forecast_artifact", str(exc))
+        _issue(
+            issues, "forecasts", forecast_path, "unreadable_forecast_artifact", str(exc)
+        )
         return _finish(issues, {})
 
     required = {
@@ -589,7 +659,9 @@ def validate_forecast_artifact(
             "duplicate_serving_keys",
             f"found {duplicate_count} duplicate serving-key rows",
         )
-    blank_symbols = int(frame["act_symbol"].fillna("").astype(str).str.strip().eq("").sum())
+    blank_symbols = int(
+        frame["act_symbol"].fillna("").astype(str).str.strip().eq("").sum()
+    )
     if blank_symbols:
         _issue(
             issues,
@@ -602,9 +674,7 @@ def validate_forecast_artifact(
     horizon_values = pd.to_numeric(frame["model_horizon"], errors="coerce")
     invalid_horizons = int(
         (
-            horizon_values.isna()
-            | (horizon_values <= 0)
-            | (horizon_values % 1 != 0)
+            horizon_values.isna() | (horizon_values <= 0) | (horizon_values % 1 != 0)
         ).sum()
     )
     if invalid_horizons:
@@ -629,32 +699,48 @@ def validate_forecast_artifact(
         "p75",
         "p90",
     ]
-    numeric = frame[numeric_cols].apply(pd.to_numeric, errors="coerce").to_numpy(dtype=float)
-    if not np.isfinite(numeric).all():
+    numeric = (
+        frame[numeric_cols].apply(pd.to_numeric, errors="coerce").to_numpy(dtype=float)
+    )
+    non_finite_values = int((~np.isfinite(numeric)).sum())
+    invalid_market_input_rows = 0
+    out_of_range_move_rows = 0
+    crossing_count = 0
+    outside_count = 0
+    median_gap: float | None = None
+    absolute_mismatches = 0
+    correction_mismatches = 0
+    if non_finite_values:
         _issue(
             issues,
             "forecasts",
             forecast_path,
             "non_finite_forecast_values",
-            "core forecast columns must all be finite",
+            f"found {non_finite_values} non-finite core forecast values",
         )
     else:
-        if (frame["spot_price"] <= 0).any() or (frame["atm_iv"] <= 0).any():
+        invalid_market_input_rows = int(
+            ((frame["spot_price"] <= 0) | (frame["atm_iv"] <= 0)).sum()
+        )
+        if invalid_market_input_rows:
             _issue(
                 issues,
                 "forecasts",
                 forecast_path,
                 "invalid_market_inputs",
-                "spot_price and ATM IV must be positive",
+                f"found {invalid_market_input_rows} rows without positive spot and ATM IV",
             )
         move_cols = ["em_math_pct", "em_ml_pct", "p10", "p25", "p50", "p75", "p90"]
-        if (frame[move_cols] < 0).any().any() or (frame[move_cols] > 3).any().any():
+        out_of_range_move_rows = int(
+            ((frame[move_cols] < 0) | (frame[move_cols] > 3)).any(axis=1).sum()
+        )
+        if out_of_range_move_rows:
             _issue(
                 issues,
                 "forecasts",
                 forecast_path,
                 "out_of_range_move_forecasts",
-                "move magnitudes must stay between 0% and 300%",
+                f"found {out_of_range_move_rows} rows outside the 0%–300% move range",
             )
         quantiles = frame[["p10", "p25", "p50", "p75", "p90"]].to_numpy(dtype=float)
         crossing_count = int(np.any(np.diff(quantiles, axis=1) < 0, axis=1).sum())
@@ -667,7 +753,10 @@ def validate_forecast_artifact(
                 f"found {crossing_count} rows with non-monotone quantiles",
             )
         outside_count = int(
-            ((frame["em_ml_pct"] < frame["p10"]) | (frame["em_ml_pct"] > frame["p90"])).sum()
+            (
+                (frame["em_ml_pct"] < frame["p10"])
+                | (frame["em_ml_pct"] > frame["p90"])
+            ).sum()
         )
         if outside_count:
             _issue(
@@ -687,22 +776,37 @@ def validate_forecast_artifact(
                 f"maximum point/P50 gap {median_gap:.4f} exceeds {max_point_median_gap:.4f}",
             )
         expected_abs = frame["em_ml_pct"] * frame["spot_price"]
-        if not np.allclose(frame["em_ml_abs"], expected_abs, rtol=1e-6, atol=1e-8):
+        absolute_mismatches = int(
+            (~np.isclose(frame["em_ml_abs"], expected_abs, rtol=1e-6, atol=1e-8)).sum()
+        )
+        if absolute_mismatches:
             _issue(
                 issues,
                 "forecasts",
                 forecast_path,
                 "absolute_forecast_mismatch",
-                "em_ml_abs does not equal em_ml_pct × spot_price",
+                f"found {absolute_mismatches} rows where ML $ move does not match pct × spot",
             )
-        expected_correction = frame["em_ml_pct"] / frame["em_math_pct"].clip(lower=0.001)
-        if not np.allclose(frame["correction_factor"], expected_correction, rtol=1e-6, atol=1e-8):
+        expected_correction = frame["em_ml_pct"] / frame["em_math_pct"].clip(
+            lower=0.001
+        )
+        correction_mismatches = int(
+            (
+                ~np.isclose(
+                    frame["correction_factor"],
+                    expected_correction,
+                    rtol=1e-6,
+                    atol=1e-8,
+                )
+            ).sum()
+        )
+        if correction_mismatches:
             _issue(
                 issues,
                 "forecasts",
                 forecast_path,
                 "correction_factor_mismatch",
-                "correction_factor does not match ML move ÷ straddle move",
+                f"found {correction_mismatches} rows with an inconsistent correction factor",
             )
 
     earnings_dates = pd.to_datetime(frame["earnings_date"], errors="coerce")
@@ -735,8 +839,12 @@ def validate_forecast_artifact(
         )
     elif len(frame):
         reference = now or datetime.now(timezone.utc)
-        reference = reference if reference.tzinfo else reference.replace(tzinfo=timezone.utc)
-        age_days = (reference - scored_at.max().to_pydatetime()).total_seconds() / 86_400
+        reference = (
+            reference if reference.tzinfo else reference.replace(tzinfo=timezone.utc)
+        )
+        age_days = (
+            reference - scored_at.max().to_pydatetime()
+        ).total_seconds() / 86_400
         if age_days > max_age_days or age_days < -1:
             _issue(
                 issues,
@@ -789,14 +897,18 @@ def validate_forecast_artifact(
         # diagnostics do not need to be part of the estimator schema.
         if expected_features and not set(expected_features).issubset(vector):
             schema_mismatches += 1
-        if any(value is not None and not _finite_number(value) for value in vector.values()):
+        if any(
+            value is not None and not _finite_number(value) for value in vector.values()
+        ):
             invalid_feature_values += 1
         try:
             atm_iv = float(vector["atm_iv"])
             dte = float(vector["dte"])
             em_iv_pct = float(vector["em_iv_pct"])
             expected_iv_move = atm_iv * math.sqrt(max(dte, 0.0) / 365.0)
-            if not math.isclose(em_iv_pct, expected_iv_move, rel_tol=1e-6, abs_tol=1e-9):
+            if not math.isclose(
+                em_iv_pct, expected_iv_move, rel_tol=1e-6, abs_tol=1e-9
+            ):
                 iv_formula_mismatches += 1
         except (KeyError, TypeError, ValueError):
             iv_formula_mismatches += 1
@@ -859,6 +971,47 @@ def validate_forecast_artifact(
             "artifact": str(forecast_path),
             "rows": len(frame),
             "symbols": int(frame["act_symbol"].nunique()),
+            "events": int(
+                frame[["act_symbol", "earnings_date"]].drop_duplicates().shape[0]
+            ),
             "horizons": sorted(metadata_by_horizon),
+            "data_window": {
+                "snapshot_min": snapshot_dates.min().date().isoformat()
+                if snapshot_dates.notna().any()
+                else None,
+                "snapshot_max": snapshot_dates.max().date().isoformat()
+                if snapshot_dates.notna().any()
+                else None,
+                "earnings_min": earnings_dates.min().date().isoformat()
+                if earnings_dates.notna().any()
+                else None,
+                "earnings_max": earnings_dates.max().date().isoformat()
+                if earnings_dates.notna().any()
+                else None,
+                "scored_at_min": scored_at.min().isoformat()
+                if scored_at.notna().any()
+                else None,
+                "scored_at_max": scored_at.max().isoformat()
+                if scored_at.notna().any()
+                else None,
+            },
+            "reconciliation": {
+                "duplicate_serving_keys": duplicate_count,
+                "blank_symbols": blank_symbols,
+                "invalid_horizons": invalid_horizons,
+                "non_finite_values": non_finite_values,
+                "invalid_market_input_rows": invalid_market_input_rows,
+                "out_of_range_move_rows": out_of_range_move_rows,
+                "quantile_crossings": crossing_count,
+                "point_outside_band": outside_count,
+                "max_point_median_gap": median_gap,
+                "absolute_move_mismatches": absolute_mismatches,
+                "correction_factor_mismatches": correction_mismatches,
+                "invalid_feature_vectors": invalid_vectors,
+                "feature_schema_mismatches": schema_mismatches,
+                "invalid_feature_values": invalid_feature_values,
+                "iv_formula_mismatches": iv_formula_mismatches,
+                "straddle_handoff_mismatches": straddle_mismatches,
+            },
         },
     )

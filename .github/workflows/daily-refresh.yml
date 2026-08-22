@@ -373,9 +373,12 @@ jobs:
       - name: Gate — validate scored ML and IV forecasts
         # Fail before Neon/R2/frontend publication when forecast magnitudes,
         # quantiles, feature schemas, IV math, or model handoffs are corrupt.
+        # The receipt is stored beside the existing forecast artifacts, so the
+        # existing R2 sync publishes it without Redis/Neon writes or a new job.
         run: |
           python scripts/validate_ml_pipeline.py forecasts \
-            --report data/validation/daily_forecasts.json
+            --report data/validation/daily_forecasts.json \
+            --publish-receipt-dir data/forecasts/receipts
 
       - name: Upload daily forecast validation report
         if: always()
@@ -723,9 +726,12 @@ jobs:
       - name: Gate — validate trained model bundle
         # Load every point/quantile artifact, smoke-predict with the training
         # schema, enforce purged holdouts, calibration, and baseline quality.
+        # Receipts ride the existing model-artifact sync; there is no database
+        # record per prediction or metric.
         run: |
           python scripts/validate_ml_pipeline.py models \
-            --report data/validation/retrain_models.json
+            --report data/validation/retrain_models.json \
+            --publish-receipt-dir data/models/receipts
 
       - name: Upload model validation report
         if: always()
@@ -744,7 +750,8 @@ jobs:
         # their forecast artifact agree end to end.
         run: |
           python scripts/validate_ml_pipeline.py forecasts \
-            --report data/validation/retrain_forecasts.json
+            --report data/validation/retrain_forecasts.json \
+            --publish-receipt-dir data/forecasts/receipts
 
       - name: Upload retrain forecast validation report
         if: always()

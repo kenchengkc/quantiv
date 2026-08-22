@@ -205,6 +205,7 @@ Pull R2 artifacts
 → push Parquet artifacts
 → build DuckDB views
 → score recent observations
+→ validate forecasts and publish a content-addressed evidence receipt
 → import forecasts
 → update market-cap and popularity metadata
 → generate frontend JSON
@@ -213,6 +214,11 @@ Pull R2 artifacts
 ```
 
 Sunday runs may retrain the LightGBM model and synchronize new artifacts to R2 and Railway. Saturday runs perform a Finnhub profile and logo sweep.
+
+ML/model publication is fail-closed and produces a shared run-level evidence
+receipt rather than per-value lineage records. See
+[Evidence receipts](EVIDENCE_RECEIPTS.md) for the contract and zero-database-cost
+publication path.
 
 ## Data behavior and limitations
 
