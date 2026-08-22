@@ -179,7 +179,7 @@ function EarningsGridHeaderFallback({ days }: { days: Date[] }) {
           flexWrap: 'wrap',
         }}
       >
-        <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="qv-week-heading-col" style={{ flex: '1 1 auto' }}>
           <div
             style={{
               fontSize: 10,
@@ -231,7 +231,7 @@ function EarningsGridHeaderFallback({ days }: { days: Date[] }) {
             </span>
           </div>
           <h1
-            className="serif qv-m-h1"
+            className="serif qv-m-h1 qv-week-heading"
             style={{
               margin: 0,
               fontSize: 56,
@@ -239,7 +239,6 @@ function EarningsGridHeaderFallback({ days }: { days: Date[] }) {
               letterSpacing: '-0.032em',
               lineHeight: 0.94,
               color: 'var(--ink)',
-              textWrap: 'balance',
               textTransform: 'uppercase',
             }}
           >

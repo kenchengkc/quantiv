@@ -504,6 +504,16 @@ tr:hover .qv-m-sticky-cell {
   background: color-mix(in oklab, var(--bg-2) 92%, transparent);
 }
 
+/* Calendar week range (e.g. AUGUST 31 – SEPTEMBER 4, 2026) stays one
+   line on desktop. min-width: 0 on the title column used to shrink it
+   beside the week chips and wrap at the month boundary. */
+.qv-week-heading-col {
+  min-width: max-content;
+}
+.qv-week-heading {
+  white-space: nowrap;
+}
+
 /* Default-hide on desktop, show on mobile. Counterpart to .qv-m-hide. */
 .qv-d-hide {
   display: none;
@@ -549,6 +559,12 @@ tr:hover .qv-m-sticky-cell {
   }
 
   /* Page-level headlines */
+  .qv-week-heading-col {
+    min-width: 0;
+  }
+  .qv-week-heading {
+    white-space: normal;
+  }
   .qv-m-h1 {
     font-size: 38px !important;
     letter-spacing: -0.027em !important;
