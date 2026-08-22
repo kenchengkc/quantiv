@@ -1,40 +1,259 @@
 {
-  "error_count": 17,
+  "error_count": 25,
   "errors": [
     {
-      "endpoint": "av_historical_put_call_ratio",
-      "error": "alphavantage daily budget exhausted across 2 key(s)",
-      "status": "quota_blocked",
+      "endpoint": "av_earnings",
+      "error": "We have detected your API key as 9Z452IYR29I21LO5 and our standard API rate limit is 25 requests per day. Please subscribe to any of the premium plans at https://www.alphavantage.co/premium/ to instantly remove all daily rate limits.",
+      "http_status": 200,
+      "response_shape": {
+        "has_data": false,
+        "kind": "json_object",
+        "row_count": 0,
+        "sample_keys": [],
+        "top_level_keys": [
+          "Information"
+        ]
+      },
+      "retry_after": "2026-08-23",
+      "status": "quota_limited",
+      "symbol": "ADI"
+    },
+    {
+      "endpoint": "av_realtime_put_call_ratio",
+      "error": "We have detected your API key as 7NHVPMDQ14N7ZSF1 and our standard API rate limit is 25 requests per day. Please subscribe to any of the premium plans at https://www.alphavantage.co/premium/ to instantly remove all daily rate limits.",
+      "http_status": 200,
+      "response_shape": {
+        "has_data": false,
+        "kind": "json_object",
+        "row_count": 0,
+        "sample_keys": [],
+        "top_level_keys": [
+          "Information"
+        ]
+      },
+      "retry_after": "2026-08-23",
+      "status": "quota_limited",
+      "symbol": "HUBG"
+    },
+    {
+      "endpoint": "av_realtime_put_call_ratio",
+      "error": "We have detected your API key as 9Z452IYR29I21LO5 and our standard API rate limit is 25 requests per day. Please subscribe to any of the premium plans at https://www.alphavantage.co/premium/ to instantly remove all daily rate limits.",
+      "http_status": 200,
+      "response_shape": {
+        "has_data": false,
+        "kind": "json_object",
+        "row_count": 0,
+        "sample_keys": [],
+        "top_level_keys": [
+          "Information"
+        ]
+      },
+      "retry_after": "2026-08-23",
+      "status": "quota_limited",
+      "symbol": "WMT"
+    },
+    {
+      "endpoint": "av_realtime_put_call_ratio",
+      "error": "We have detected your API key as 7NHVPMDQ14N7ZSF1 and our standard API rate limit is 25 requests per day. Please subscribe to any of the premium plans at https://www.alphavantage.co/premium/ to instantly remove all daily rate limits.",
+      "http_status": 200,
+      "response_shape": {
+        "has_data": false,
+        "kind": "json_object",
+        "row_count": 0,
+        "sample_keys": [],
+        "top_level_keys": [
+          "Information"
+        ]
+      },
+      "retry_after": "2026-08-23",
+      "status": "quota_limited",
+      "symbol": "HD"
+    },
+    {
+      "endpoint": "av_realtime_voi_ratio",
+      "error": "We have detected your API key as 9Z452IYR29I21LO5 and our standard API rate limit is 25 requests per day. Please subscribe to any of the premium plans at https://www.alphavantage.co/premium/ to instantly remove all daily rate limits.",
+      "http_status": 200,
+      "response_shape": {
+        "has_data": false,
+        "kind": "json_object",
+        "row_count": 0,
+        "sample_keys": [],
+        "top_level_keys": [
+          "Information"
+        ]
+      },
+      "retry_after": "2026-08-23",
+      "status": "quota_limited",
+      "symbol": "HUBG"
+    },
+    {
+      "endpoint": "av_realtime_voi_ratio",
+      "error": "We have detected your API key as 7NHVPMDQ14N7ZSF1 and our standard API rate limit is 25 requests per day. Please subscribe to any of the premium plans at https://www.alphavantage.co/premium/ to instantly remove all daily rate limits.",
+      "http_status": 200,
+      "response_shape": {
+        "has_data": false,
+        "kind": "json_object",
+        "row_count": 0,
+        "sample_keys": [],
+        "top_level_keys": [
+          "Information"
+        ]
+      },
+      "retry_after": "2026-08-23",
+      "status": "quota_limited",
+      "symbol": "WMT"
+    },
+    {
+      "endpoint": "av_realtime_voi_ratio",
+      "error": "We have detected your API key as 9Z452IYR29I21LO5 and our standard API rate limit is 25 requests per day. Please subscribe to any of the premium plans at https://www.alphavantage.co/premium/ to instantly remove all daily rate limits.",
+      "http_status": 200,
+      "response_shape": {
+        "has_data": false,
+        "kind": "json_object",
+        "row_count": 0,
+        "sample_keys": [],
+        "top_level_keys": [
+          "Information"
+        ]
+      },
+      "retry_after": "2026-08-23",
+      "status": "quota_limited",
       "symbol": "HD"
     },
     {
       "endpoint": "av_historical_put_call_ratio",
-      "error": "alphavantage daily budget exhausted across 2 key(s)",
-      "status": "quota_blocked",
+      "error": "We have detected your API key as 7NHVPMDQ14N7ZSF1 and our standard API rate limit is 25 requests per day. Please subscribe to any of the premium plans at https://www.alphavantage.co/premium/ to instantly remove all daily rate limits.",
+      "http_status": 200,
+      "response_shape": {
+        "has_data": false,
+        "kind": "json_object",
+        "row_count": 0,
+        "sample_keys": [],
+        "top_level_keys": [
+          "Information"
+        ]
+      },
+      "retry_after": "2026-08-23",
+      "status": "quota_limited",
+      "symbol": "HUBG"
+    },
+    {
+      "endpoint": "av_historical_put_call_ratio",
+      "error": "We have detected your API key as 9Z452IYR29I21LO5 and our standard API rate limit is 25 requests per day. Please subscribe to any of the premium plans at https://www.alphavantage.co/premium/ to instantly remove all daily rate limits.",
+      "http_status": 200,
+      "response_shape": {
+        "has_data": false,
+        "kind": "json_object",
+        "row_count": 0,
+        "sample_keys": [],
+        "top_level_keys": [
+          "Information"
+        ]
+      },
+      "retry_after": "2026-08-23",
+      "status": "quota_limited",
+      "symbol": "WMT"
+    },
+    {
+      "endpoint": "av_historical_put_call_ratio",
+      "error": "We have detected your API key as 7NHVPMDQ14N7ZSF1 and our standard API rate limit is 25 requests per day. Please subscribe to any of the premium plans at https://www.alphavantage.co/premium/ to instantly remove all daily rate limits.",
+      "http_status": 200,
+      "response_shape": {
+        "has_data": false,
+        "kind": "json_object",
+        "row_count": 0,
+        "sample_keys": [],
+        "top_level_keys": [
+          "Information"
+        ]
+      },
+      "retry_after": "2026-08-23",
+      "status": "quota_limited",
+      "symbol": "HD"
+    },
+    {
+      "endpoint": "av_historical_put_call_ratio",
+      "error": "We have detected your API key as 9Z452IYR29I21LO5 and our standard API rate limit is 25 requests per day. Please subscribe to any of the premium plans at https://www.alphavantage.co/premium/ to instantly remove all daily rate limits.",
+      "http_status": 200,
+      "response_shape": {
+        "has_data": false,
+        "kind": "json_object",
+        "row_count": 0,
+        "sample_keys": [],
+        "top_level_keys": [
+          "Information"
+        ]
+      },
+      "retry_after": "2026-08-23",
+      "status": "quota_limited",
       "symbol": "ADI"
     },
     {
       "endpoint": "av_historical_voi",
-      "error": "alphavantage daily budget exhausted across 2 key(s)",
-      "status": "quota_blocked",
+      "error": "We have detected your API key as 7NHVPMDQ14N7ZSF1 and our standard API rate limit is 25 requests per day. Please subscribe to any of the premium plans at https://www.alphavantage.co/premium/ to instantly remove all daily rate limits.",
+      "http_status": 200,
+      "response_shape": {
+        "has_data": false,
+        "kind": "json_object",
+        "row_count": 0,
+        "sample_keys": [],
+        "top_level_keys": [
+          "Information"
+        ]
+      },
+      "retry_after": "2026-08-23",
+      "status": "quota_limited",
       "symbol": "HUBG"
     },
     {
       "endpoint": "av_historical_voi",
-      "error": "alphavantage daily budget exhausted across 2 key(s)",
-      "status": "quota_blocked",
+      "error": "We have detected your API key as 9Z452IYR29I21LO5 and our standard API rate limit is 25 requests per day. Please subscribe to any of the premium plans at https://www.alphavantage.co/premium/ to instantly remove all daily rate limits.",
+      "http_status": 200,
+      "response_shape": {
+        "has_data": false,
+        "kind": "json_object",
+        "row_count": 0,
+        "sample_keys": [],
+        "top_level_keys": [
+          "Information"
+        ]
+      },
+      "retry_after": "2026-08-23",
+      "status": "quota_limited",
       "symbol": "WMT"
     },
     {
       "endpoint": "av_historical_voi",
-      "error": "alphavantage daily budget exhausted across 2 key(s)",
-      "status": "quota_blocked",
+      "error": "We have detected your API key as 7NHVPMDQ14N7ZSF1 and our standard API rate limit is 25 requests per day. Please subscribe to any of the premium plans at https://www.alphavantage.co/premium/ to instantly remove all daily rate limits.",
+      "http_status": 200,
+      "response_shape": {
+        "has_data": false,
+        "kind": "json_object",
+        "row_count": 0,
+        "sample_keys": [],
+        "top_level_keys": [
+          "Information"
+        ]
+      },
+      "retry_after": "2026-08-23",
+      "status": "quota_limited",
       "symbol": "HD"
     },
     {
       "endpoint": "av_historical_voi",
-      "error": "alphavantage daily budget exhausted across 2 key(s)",
-      "status": "quota_blocked",
+      "error": "We have detected your API key as 9Z452IYR29I21LO5 and our standard API rate limit is 25 requests per day. Please subscribe to any of the premium plans at https://www.alphavantage.co/premium/ to instantly remove all daily rate limits.",
+      "http_status": 200,
+      "response_shape": {
+        "has_data": false,
+        "kind": "json_object",
+        "row_count": 0,
+        "sample_keys": [],
+        "top_level_keys": [
+          "Information"
+        ]
+      },
+      "retry_after": "2026-08-23",
+      "status": "quota_limited",
       "symbol": "ADI"
     },
     {
@@ -51,7 +270,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-22",
+      "retry_after": "2026-08-23",
       "status": "empty",
       "symbol": "KEYS"
     },
@@ -69,7 +288,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-22",
+      "retry_after": "2026-08-23",
       "status": "empty",
       "symbol": "BILL"
     },
@@ -87,7 +306,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-22",
+      "retry_after": "2026-08-23",
       "status": "empty",
       "symbol": "BJ"
     },
@@ -105,7 +324,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-22",
+      "retry_after": "2026-08-23",
       "status": "empty",
       "symbol": "HD"
     },
@@ -123,7 +342,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-22",
+      "retry_after": "2026-08-23",
       "status": "empty",
       "symbol": "ADI"
     },
@@ -141,7 +360,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-22",
+      "retry_after": "2026-08-23",
       "status": "empty",
       "symbol": "TGT"
     },
@@ -159,7 +378,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-22",
+      "retry_after": "2026-08-23",
       "status": "empty",
       "symbol": "KEYS"
     },
@@ -177,7 +396,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-22",
+      "retry_after": "2026-08-23",
       "status": "empty",
       "symbol": "AAP"
     },
@@ -195,7 +414,7 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-22",
+      "retry_after": "2026-08-23",
       "status": "empty",
       "symbol": "BILL"
     },
@@ -213,18 +432,12 @@
           "status"
         ]
       },
-      "retry_after": "2026-08-22",
+      "retry_after": "2026-08-23",
       "status": "empty",
       "symbol": "BJ"
-    },
-    {
-      "endpoint": "av_ipo_calendar",
-      "error": "alphavantage daily budget exhausted across 2 key(s)",
-      "status": "quota_blocked",
-      "symbol": "__market__"
     }
   ],
-  "generated_at": "2026-08-21T11:52:59.678949+00:00",
+  "generated_at": "2026-08-22T11:44:18.198916+00:00",
   "planned_calls": 165,
   "symbols": [
     "HUBG",
@@ -237,18 +450,18 @@
     "ROST",
     "TGT",
     "KEYS",
+    "EL",
     "AAP",
     "BILL",
     "BJ",
     "BKE",
-    "EL",
     "FLO"
   ],
   "tables": {
-    "company_facts": 44,
-    "corporate_actions": 24,
+    "company_facts": 43,
+    "corporate_actions": 25,
     "earnings_news_signals": 0,
     "live_market_signals": 0,
-    "options_provider_signals": 24
+    "options_provider_signals": 16
   }
 }
