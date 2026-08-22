@@ -23,7 +23,8 @@ import json
 import logging
 import math
 import os
-from datetime import datetime
+import re
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict
 
@@ -381,9 +382,46 @@ def score(df: pd.DataFrame, models: Dict[int, dict]) -> pd.DataFrame:
     return pd.concat(results, ignore_index=True)
 
 
+# Serving (DuckDB view, frontend JSON, Neon import) always reads the newest
+# forecasts_YYYY-MM-DD.parquet. Older snapshots are only useful for a short
+# debug window; without a cap they accumulate forever on R2 via pull+score+sync.
+FORECAST_RETENTION_DAYS = 14
+_FORECAST_SNAPSHOT_RE = re.compile(r"^forecasts_(\d{4}-\d{2}-\d{2})\.parquet$")
+
+
+def prune_forecast_snapshots(
+    forecast_dir: Path,
+    *,
+    keep_days: int = FORECAST_RETENTION_DAYS,
+    today: date | None = None,
+) -> int:
+    """Delete dated forecast snapshots older than keep_days. Returns count removed."""
+    cutoff = (today or date.today()) - timedelta(days=keep_days)
+    removed = 0
+    if not forecast_dir.exists():
+        return 0
+    for path in forecast_dir.glob("forecasts_*.parquet"):
+        match = _FORECAST_SNAPSHOT_RE.match(path.name)
+        if not match:
+            continue
+        try:
+            snapshot_day = date.fromisoformat(match.group(1))
+        except ValueError:
+            continue
+        if snapshot_day < cutoff:
+            path.unlink()
+            removed += 1
+            logger.info("Pruned stale forecast snapshot %s", path.name)
+    return removed
+
+
 def save_forecasts(df: pd.DataFrame, data_dir: Path):
+    forecast_dir = data_dir / "forecasts"
+    forecast_dir.mkdir(parents=True, exist_ok=True)
+
     if df.empty:
         logger.warning("No forecasts to save")
+        prune_forecast_snapshots(forecast_dir)
         return
 
     out_cols = [
@@ -417,12 +455,13 @@ def save_forecasts(df: pd.DataFrame, data_dir: Path):
             out = out.drop_duplicates(serving_key_cols, keep="first")
 
     # Parquet
-    forecast_dir = data_dir / "forecasts"
-    forecast_dir.mkdir(parents=True, exist_ok=True)
     today = datetime.now().strftime("%Y-%m-%d")
     parquet_path = forecast_dir / f"forecasts_{today}.parquet"
     out.to_parquet(parquet_path, index=False)
     logger.info(f"Saved {len(out)} forecasts → {parquet_path}")
+    pruned = prune_forecast_snapshots(forecast_dir)
+    if pruned:
+        logger.info("Pruned %d forecast snapshot(s) older than %d days", pruned, FORECAST_RETENTION_DAYS)
 
     # DuckDB
     db_path = os.getenv("DUCKDB_PATH", str(data_dir / "quantiv.duckdb"))
