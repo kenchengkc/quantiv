@@ -113,7 +113,14 @@ def build_rename_finder(directory_entries: list[tuple[str, str]]):
     BNY. Requires ≥2 shared significant tokens and ≥60% overlap (and picks the
     best overlap) to avoid matching on a single common word like 'American'.
     """
-    corpus = [(sym, toks) for sym, name in directory_entries if (toks := norm_tokens(name))]
+    # NYSE otherlisted encodes preferred/warrant classes with `$` (TWO$A =
+    # TWO PRA). Those are still-listed securities of a going-private or
+    # acquired company, not a successor common ticker.
+    corpus = [
+        (sym, toks)
+        for sym, name in directory_entries
+        if "$" not in sym and (toks := norm_tokens(name))
+    ]
 
     def renamed_symbol(company_name: str) -> str | None:
         a = norm_tokens(company_name)

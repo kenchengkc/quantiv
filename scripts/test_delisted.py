@@ -7,13 +7,47 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
-from delisted import ticker_renames  # noqa: E402
+from delisted import delisted_tickers, ticker_renames  # noqa: E402
 
 
 def test_ticker_renames_includes_iac_and_vsco():
     renames = ticker_renames()
     assert renames.get("IAC") == "PPLI"
     assert renames.get("VSCO") == "VSXY"
+
+
+def test_eqr_avb_two_are_delisted_not_renames():
+    """Merger-of-equals / preferred-class false positives stay delisted."""
+    delisted = delisted_tickers()
+    renames = ticker_renames()
+    for ticker in ("AVB", "EQR", "TWO"):
+        assert ticker in delisted
+        assert ticker not in renames
+    assert "VMRK" not in renames.values()
+    assert renames.get("TWO") != "TWO$A"
+
+
+def test_rename_finder_skips_preferred_dollar_classes():
+    import detect_delistings as dd
+
+    finder = dd.build_rename_finder([
+        (
+            "TWO$A",
+            "Two Harbors Investment Corp. 8.125% Series A Preferred Stock",
+        ),
+        ("AAPL", "Apple Inc. Common Stock"),
+    ])
+    assert finder("Two Harbors Investment") is None
+
+
+def test_rename_finder_still_matches_common_rebrand():
+    import detect_delistings as dd
+
+    finder = dd.build_rename_finder([
+        ("BNY", "The Bank of New York Mellon Corporation"),
+        ("AAPL", "Apple Inc. Common Stock"),
+    ])
+    assert finder("Bank of New York Mellon") == "BNY"
 
 
 def test_detect_delistings_excludes_known_renames_from_missing(tmp_path, monkeypatch):

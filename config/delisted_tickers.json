@@ -12,14 +12,14 @@
       "source": "manual (user-confirmed acquisition)"
     },
     "AVB": {
-      "reason": "Auto-detected: absent from NASDAQ/NYSE exchange directories for \u22653 consecutive days (likely M&A, bankruptcy, or going-private).",
-      "delisted_on": "2026-08-19",
-      "source": "auto: scripts/detect_delistings.py"
+      "reason": "Merged into Vivmark Residential (NYSE: VMRK) in a merger of equals with Equity Residential; closed 2026-08-17. Former AvalonBay holders own ~51% of VMRK. Predecessor retired — do not rename AVB→VMRK (would mix two companies' earnings histories onto the successor).",
+      "delisted_on": "2026-08-17",
+      "source": "manual (user-confirmed merger of equals; successor VMRK is a new ticker)"
     },
     "AVNS": {
-      "reason": "Auto-detected: absent from NASDAQ/NYSE exchange directories for \u22653 consecutive days (likely M&A, bankruptcy, or going-private).",
-      "delisted_on": "2026-07-29",
-      "source": "auto: scripts/detect_delistings.py"
+      "reason": "Taken private by American Industrial Partners at $25.00/share cash; Avanos Medical delisted from NYSE.",
+      "delisted_on": "2026-07-27",
+      "source": "manual (user-confirmed take-private)"
     },
     "BLD": {
       "reason": "Acquired by QXO, Inc.; TopBuild Corp. (NYSE: BLD) delisted.",
@@ -27,9 +27,9 @@
       "source": "manual (user-confirmed acquisition)"
     },
     "CPRX": {
-      "reason": "Auto-detected: absent from NASDAQ/NYSE exchange directories for \u22653 consecutive days (likely M&A, bankruptcy, or going-private).",
-      "delisted_on": "2026-07-18",
-      "source": "auto: scripts/detect_delistings.py"
+      "reason": "Acquired by Angelini Pharma at $31.50/share cash; Catalyst Pharmaceuticals delisted from Nasdaq.",
+      "delisted_on": "2026-07-15",
+      "source": "manual (user-confirmed acquisition)"
     },
     "CSGS": {
       "reason": "Acquired by NEC Corporation; CSG Systems International delisted.",
@@ -42,14 +42,14 @@
       "source": "https://investors.coterra.com/Investors/news/news-details/2026/Devon-Energy-and-Coterra-Energy-to-Combine-Creating-a-Premier-Shale-Operator/default.aspx"
     },
     "EA": {
-      "reason": "Auto-detected: absent from NASDAQ/NYSE exchange directories for \u22653 consecutive days (likely M&A, bankruptcy, or going-private).",
-      "delisted_on": "2026-08-07",
-      "source": "auto: scripts/detect_delistings.py"
+      "reason": "Taken private by a Public Investment Fund / Silver Lake / Affinity Partners consortium at $210.00/share cash; Electronic Arts delisted from Nasdaq.",
+      "delisted_on": "2026-08-04",
+      "source": "manual (user-confirmed take-private)"
     },
     "EQR": {
-      "reason": "Auto-detected: absent from NASDAQ/NYSE exchange directories for \u22653 consecutive days (likely M&A, bankruptcy, or going-private).",
-      "delisted_on": "2026-08-20",
-      "source": "auto: scripts/detect_delistings.py"
+      "reason": "Merged with AvalonBay into Vivmark Residential (NYSE: VMRK) in a merger of equals; closed 2026-08-17, VMRK first trade 2026-08-18. Former Equity Residential holders own ~49% of VMRK. Predecessor retired — do not rename EQR→VMRK (would drop only EQR history onto a ~51/49 combined company).",
+      "delisted_on": "2026-08-17",
+      "source": "manual (user-confirmed merger of equals; successor VMRK is a new ticker)"
     },
     "GDEN": {
       "reason": "Completed going-private transaction; Golden Entertainment delisted from Nasdaq.",
@@ -57,9 +57,9 @@
       "source": "manual (user-confirmed go-private)"
     },
     "GTLS": {
-      "reason": "Auto-detected: absent from NASDAQ/NYSE exchange directories for \u22653 consecutive days (likely M&A, bankruptcy, or going-private).",
-      "delisted_on": "2026-07-18",
-      "source": "auto: scripts/detect_delistings.py"
+      "reason": "Acquired by Baker Hughes at $210.00/share cash; Chart Industries delisted from NYSE.",
+      "delisted_on": "2026-07-16",
+      "source": "manual (user-confirmed acquisition)"
     },
     "MASI": {
       "reason": "Acquired by Danaher Corporation (NYSE: DHR); Masimo delisted from Nasdaq.",
@@ -67,9 +67,9 @@
       "source": "manual (SEC 8-K / Danaher acquisition completed 2026-06-10)"
     },
     "NSA": {
-      "reason": "Auto-detected: absent from NASDAQ/NYSE exchange directories for \u22653 consecutive days (likely M&A, bankruptcy, or going-private).",
-      "delisted_on": "2026-07-24",
-      "source": "auto: scripts/detect_delistings.py"
+      "reason": "Acquired by Public Storage; National Storage Affiliates delisted from NYSE.",
+      "delisted_on": "2026-07-22",
+      "source": "manual (user-confirmed acquisition)"
     },
     "PRA": {
       "reason": "Acquired by The Doctors Company; ProAssurance Corporation (NYSE: PRA) delisted.",
@@ -87,14 +87,19 @@
       "source": "https://www.businesswire.com/news/home/20260505216715/en/Merck-Completes-Acquisition-of-Terns-Pharmaceuticals-Inc."
     },
     "TMHC": {
-      "reason": "Auto-detected: absent from NASDAQ/NYSE exchange directories for \u22653 consecutive days (likely M&A, bankruptcy, or going-private).",
-      "delisted_on": "2026-07-27",
-      "source": "auto: scripts/detect_delistings.py"
+      "reason": "Acquired by Berkshire Hathaway at $72.50/share cash; Taylor Morrison Home delisted from NYSE.",
+      "delisted_on": "2026-07-24",
+      "source": "manual (user-confirmed acquisition)"
+    },
+    "TWO": {
+      "reason": "Two Harbors common is being taken private by CrossCountry Mortgage at $12.00/share (expected close 2026-08-25). Common already absent from NYSE directories. TWO$A is Series A preferred (NYSE: TWO PRA), not a successor common ticker — do not rename TWO→TWO$A.",
+      "delisted_on": "2026-08-03",
+      "source": "manual (user-confirmed go-private; TWO$A is NYSE preferred, not a rename)"
     },
     "WBS": {
-      "reason": "Auto-detected: absent from NASDAQ/NYSE exchange directories for \u22653 consecutive days (likely M&A, bankruptcy, or going-private).",
-      "delisted_on": "2026-08-22",
-      "source": "auto: scripts/detect_delistings.py"
+      "reason": "Acquired by Banco Santander; each Webster common share converted into $48.75 cash plus 2.0548 SAN ADSs. WBS delisted from NYSE.",
+      "delisted_on": "2026-08-20",
+      "source": "manual (user-confirmed acquisition)"
     }
   }
 }
