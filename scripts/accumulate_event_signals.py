@@ -101,9 +101,11 @@ def fetch_options_signal(sym: str, key: str, base: str, sess: requests.Session) 
         vol = (c.get("day") or {}).get("volume") or 0
         is_call = det.get("contract_type") == "call"
         if is_call:
-            coi += oi; cvol += vol
+            coi += oi
+            cvol += vol
         else:
-            poi += oi; pvol += vol
+            poi += oi
+            pvol += vol
         delta = (c.get("greeks") or {}).get("delta")
         iv = c.get("implied_volatility")
         if iv and delta is not None and 0.35 <= abs(delta) <= 0.65:

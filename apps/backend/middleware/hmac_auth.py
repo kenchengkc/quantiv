@@ -13,7 +13,8 @@ Where canonical =
 Symmetric with apps/frontend/lib/backendProxy.ts.
 
 Exempt paths:
-  - /health and /docs / openapi pages (so Railway / browser checks work)
+  - /health (so Railway checks work)
+  - enabled docs/openapi routes supplied by main.py
   - /api/admin/* (those use the X-API-Key header instead — separate threat
     model, separate secret)
 """
@@ -25,7 +26,7 @@ import hmac
 import logging
 import os
 import time
-from typing import Iterable
+from collections.abc import Iterable
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
@@ -38,18 +39,17 @@ logger = logging.getLogger(__name__)
 # skew while making a captured-header replay window impractically small.
 MAX_TIMESTAMP_SKEW_SECONDS = 30
 
-# Paths the middleware skips entirely.
-_EXEMPT_PREFIXES = (
-    "/health",
-    "/docs",
-    "/redoc",
-    "/openapi.json",
-    "/api/admin/",  # X-API-Key on its own dependency
-)
+# Paths the middleware always skips entirely.
+_EXEMPT_PATHS = frozenset({"/health"})
+_EXEMPT_PREFIXES = ("/api/admin/",)  # X-API-Key on its own dependency
 
 
 def _exempt(path: str, extras: Iterable[str] = ()) -> bool:
-    return path.startswith(_EXEMPT_PREFIXES) or any(path.startswith(p) for p in extras)
+    return (
+        path in _EXEMPT_PATHS
+        or path in extras
+        or path.startswith(_EXEMPT_PREFIXES)
+    )
 
 
 def _canonical(method: str, path: str, timestamp: str, body: bytes) -> str:
@@ -115,4 +115,4 @@ class HmacAuthMiddleware(BaseHTTPMiddleware):
         return response
 
 
-__all__ = ["HmacAuthMiddleware", "MAX_TIMESTAMP_SKEW_SECONDS"]
+__all__ = ["MAX_TIMESTAMP_SKEW_SECONDS", "HmacAuthMiddleware"]

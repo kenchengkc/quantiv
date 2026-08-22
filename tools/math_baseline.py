@@ -4,14 +4,12 @@ Math baseline for earnings expected moves.
 Implements ATM straddle % and IV_event calculations at any lead time T-k.
 """
 
-import os
 import sys
 import duckdb
-import pandas as pd
 import numpy as np
 from pathlib import Path
-from datetime import date, datetime, timedelta
-from typing import Dict, Any, Optional, Tuple
+from datetime import date, timedelta
+from typing import Dict, Any, Optional
 import math
 
 def load_env_file(env_path: Path) -> Dict[str, str]:
@@ -282,7 +280,7 @@ def main():
     env_path = repo_root / "config" / ".env.local"
     
     # Load environment variables
-    env_vars = load_env_file(env_path)
+    load_env_file(env_path)
     
     print("🚀 Testing math baseline for earnings expected moves...")
     

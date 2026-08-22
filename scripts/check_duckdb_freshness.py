@@ -20,7 +20,7 @@ With --strict, the script exits non-zero if any of the following:
 import argparse
 import os
 import sys
-from datetime import date, timedelta
+from datetime import date
 from pathlib import Path
 
 import duckdb

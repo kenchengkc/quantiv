@@ -153,7 +153,7 @@ def setup_views(conn: duckdb.DuckDBPyConnection, data_dir: Path):
         ecount = conn.execute("SELECT COUNT(*) FROM v_earnings").fetchone()[0]
         print(f"[views] v_earnings: {ecount:,} rows (from {earnings_csv.name}, fallback)")
     else:
-        print(f"[views] ⚠ No earnings data found (run: python scripts/sync_dolthub.py --earnings)")
+        print("[views] ⚠ No earnings data found (run: python scripts/sync_dolthub.py --earnings)")
 
     # ── Volatility history (prefer Parquet, fall back to CSV) ───────
     volhist_parquet_dir = data_dir / "parquet" / "volatility_history"
@@ -173,7 +173,7 @@ def setup_views(conn: duckdb.DuckDBPyConnection, data_dir: Path):
         vcount = conn.execute("SELECT COUNT(*) FROM v_volhist_raw").fetchone()[0]
         print(f"[views] v_volhist_raw: {vcount:,} rows (from {volhist_csv.name}, fallback)")
     else:
-        print(f"[views] ⚠ Volatility history not found (neither Parquet nor CSV)")
+        print("[views] ⚠ Volatility history not found (neither Parquet nor CSV)")
 
     # ── VIX (CBOE Volatility Index, from FRED) ──────────────────────
     vix_path = data_dir / "parquet" / "vix" / "vix.parquet"
@@ -186,7 +186,7 @@ def setup_views(conn: duckdb.DuckDBPyConnection, data_dir: Path):
         vix_count = conn.execute("SELECT COUNT(*) FROM v_vix").fetchone()[0]
         print(f"[views] v_vix: {vix_count:,} rows")
     else:
-        print(f"[views] ⚠ VIX not found (run: python scripts/sync_vix.py)")
+        print("[views] ⚠ VIX not found (run: python scripts/sync_vix.py)")
 
     # ── OHLCV stock prices ───────────────────────────────────────────
     ohlcv_glob = str(data_dir / "parquet" / "ohlcv" / "year=*" / "month=*" / "*.parquet")
@@ -294,7 +294,7 @@ def setup_views(conn: duckdb.DuckDBPyConnection, data_dir: Path):
         print(f"[views] v_iv_rv_features: {iv_rv_count:,} rows (options + OHLCV joined)")
 
     else:
-        print(f"[views] ⚠ No OHLCV data found (run: python scripts/sync_dolthub.py --ohlcv)")
+        print("[views] ⚠ No OHLCV data found (run: python scripts/sync_dolthub.py --ohlcv)")
 
     # ── Summary ───────────────────────────────────────────────────────
     print("\n[summary] Available views:")
