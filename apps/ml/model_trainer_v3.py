@@ -28,6 +28,8 @@ import numpy as np
 import optuna
 import pandas as pd
 from lightgbm import LGBMRegressor, early_stopping, log_evaluation
+from ml.quantiles import rearrange_quantile_array
+from ml.training_split import chronological_train_val_split
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 # Quiet Optuna's per-trial INFO chatter; we log a one-liner per study instead.
@@ -43,21 +45,6 @@ QUANTILES = [0.10, 0.25, 0.50, 0.75, 0.90]
 
 def get_data_dir() -> Path:
     return Path(os.getenv("DATA_DIR", str(Path(__file__).resolve().parent.parent.parent / "data")))
-
-
-def walk_forward_split(df: pd.DataFrame,
-                       train_frac: float = 0.75,
-                       purge_gap: int = 5) -> Tuple[pd.DataFrame, pd.DataFrame]:
-    """Chronological split with purge gap to prevent information leakage.
-
-    The purge gap removes `purge_gap` rows between train and validation sets
-    to prevent any data leaking across the boundary (e.g. overlapping earnings
-    windows from the same quarter).
-    """
-    n = len(df)
-    split_idx = int(n * train_frac)
-    gap_end = min(split_idx + purge_gap, n)
-    return df.iloc[:split_idx], df.iloc[gap_end:]
 
 
 def pinball_loss(y_true: np.ndarray, y_pred: np.ndarray, alpha: float) -> float:
@@ -208,6 +195,7 @@ def train_quantile_models(X_train: pd.DataFrame, y_train: pd.Series,
 
     models = {}
     metrics = {"horizon": horizon}
+    raw_predictions = {}
 
     # Quantile models share the tuned regularization regime from the point
     # model — same data, same regularization needs. Override n_estimators and
@@ -241,16 +229,26 @@ def train_quantile_models(X_train: pd.DataFrame, y_train: pd.Series,
         models[alpha] = qmodel
 
         y_pred_q = qmodel.predict(X_val)
-        pbl = pinball_loss(y_val.values, y_pred_q, alpha)
-        coverage = float((y_val.values <= y_pred_q).mean())
-        metrics[f"q{int(alpha*100):02d}_pinball"] = pbl
-        metrics[f"q{int(alpha*100):02d}_coverage"] = coverage
+        raw_predictions[alpha] = y_pred_q
 
-    # Interval coverage diagnostics
-    y_p10 = models[0.10].predict(X_val)
-    y_p90 = models[0.90].predict(X_val)
-    y_p25 = models[0.25].predict(X_val)
-    y_p75 = models[0.75].predict(X_val)
+    raw_matrix = np.column_stack([raw_predictions[alpha] for alpha in QUANTILES])
+    rearranged = rearrange_quantile_array(raw_matrix)
+    crossings = np.any(np.diff(raw_matrix, axis=1) < 0, axis=1)
+    metrics["quantile_crossing_rate_raw"] = float(crossings.mean())
+    metrics["quantile_negative_rate_raw"] = float((raw_matrix < 0).any(axis=1).mean())
+
+    for index, alpha in enumerate(QUANTILES):
+        raw_pred = raw_matrix[:, index]
+        deployed_pred = rearranged[:, index]
+        key = f"q{int(alpha*100):02d}"
+        metrics[f"{key}_pinball_raw"] = pinball_loss(y_val.values, raw_pred, alpha)
+        metrics[f"{key}_coverage_raw"] = float((y_val.values <= raw_pred).mean())
+        metrics[f"{key}_pinball"] = pinball_loss(y_val.values, deployed_pred, alpha)
+        metrics[f"{key}_coverage"] = float((y_val.values <= deployed_pred).mean())
+
+    # Interval coverage diagnostics use the same rearranged bands served by
+    # batch and live inference, so offline validation matches production.
+    y_p10, y_p25, _, y_p75, y_p90 = rearranged.T
 
     metrics["coverage_80"] = float(((y_val.values >= y_p10) & (y_val.values <= y_p90)).mean())
     metrics["coverage_50"] = float(((y_val.values >= y_p25) & (y_val.values <= y_p75)).mean())
@@ -261,7 +259,8 @@ def train_quantile_models(X_train: pd.DataFrame, y_train: pd.Series,
 
 
 def run_training(horizons: List[int] = HORIZONS, tune: bool = False,
-                 time_decay_years: float = 0.0, tune_trials: int = 30):
+                 time_decay_years: float = 0.0, tune_trials: int = 30,
+                 train_frac: float = 0.75, purge_days: int = 5):
     data_dir = get_data_dir()
     ml_dir = data_dir / "ml_training"
     models_dir = data_dir / "models"
@@ -289,14 +288,26 @@ def run_training(horizons: List[int] = HORIZONS, tune: bool = False,
         meta_cols = [c for c in df.columns if c.startswith("__")]
         feature_cols = [c for c in df.columns if c != target_col and c not in meta_cols]
 
-        X = df[feature_cols]
-        y = df[target_col]
-        earnings_date = pd.to_datetime(df["__earnings_date"]) if "__earnings_date" in df.columns else None
-
-        X_train, X_val = walk_forward_split(X)
-        y_train, y_val = y.iloc[:len(X_train)], y.iloc[len(X_train):len(X_train) + len(X_val)]
+        train_df, val_df, split_metadata = chronological_train_val_split(
+            df,
+            train_frac=train_frac,
+            purge_days=purge_days,
+        )
+        X_train = train_df[feature_cols]
+        X_val = val_df[feature_cols]
+        y_train = train_df[target_col]
+        y_val = val_df[target_col]
+        earnings_date_train = pd.to_datetime(train_df["__earnings_date"])
 
         logger.info(f"Train: {len(X_train)} | Val: {len(X_val)} | Features: {len(feature_cols)}")
+        logger.info(
+            "Split: %s to %s | %s purged rows | validation %s to %s",
+            split_metadata["train_start"],
+            split_metadata["train_end"],
+            split_metadata["rows_purged"],
+            split_metadata["validation_start"],
+            split_metadata["validation_end"],
+        )
         logger.info(f"Target — train μ={y_train.mean():.4f} σ={y_train.std():.4f} | "
                      f"val μ={y_val.mean():.4f} σ={y_val.std():.4f}")
 
@@ -304,8 +315,8 @@ def run_training(horizons: List[int] = HORIZONS, tune: bool = False,
         # weight = exp(-days_old / (365 * half_life_years))
         # Recent rows weight ≈ 1; rows one half-life back weight ≈ 0.5; etc.
         sample_weight = None
-        if time_decay_years > 0 and earnings_date is not None:
-            ed_train = earnings_date.iloc[:len(X_train)].reset_index(drop=True)
+        if time_decay_years > 0:
+            ed_train = earnings_date_train.reset_index(drop=True)
             max_date = ed_train.max()
             days_old = (max_date - ed_train).dt.days.clip(lower=0).to_numpy()
             sample_weight = np.exp(-days_old / (365.0 * time_decay_years))
@@ -365,6 +376,7 @@ def run_training(horizons: List[int] = HORIZONS, tune: bool = False,
         all_metrics["time_decay_years"] = time_decay_years if time_decay_years > 0 else None
         all_metrics["tuned"] = bool(best_params)
         all_metrics["best_params"] = best_params
+        all_metrics["validation_split"] = split_metadata
 
         # Also compute the old-style residual_std for backward compat
         y_pred_val = model.predict(X_val)
@@ -423,12 +435,26 @@ def main():
             "Affects training only — val MAE stays unweighted for fair comparison."
         ),
     )
+    parser.add_argument(
+        "--train-frac",
+        type=float,
+        default=0.75,
+        help="Approximate chronological training fraction before date grouping (default 0.75).",
+    )
+    parser.add_argument(
+        "--purge-days",
+        type=int,
+        default=5,
+        help="Calendar-day embargo before validation begins (default 5).",
+    )
     args = parser.parse_args()
     run_training(
         args.horizons,
         args.tune,
         time_decay_years=args.time_decay,
         tune_trials=args.tune_trials,
+        train_frac=args.train_frac,
+        purge_days=args.purge_days,
     )
 
 
