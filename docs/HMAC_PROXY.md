@@ -37,7 +37,8 @@ Rules:
 
 ## Exempt paths (no HMAC)
 
-- `/health`, `/docs`, `/redoc`, `/openapi.json`
+- `/health`
+- `/docs`, `/redoc`, and `/openapi.json` only when `DOCS_ENABLED=true`
 - `/api/admin/*` (uses `X-API-Key` + `ADMIN_API_KEY` instead)
 
 ## Environment variables

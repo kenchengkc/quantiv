@@ -37,10 +37,23 @@ if (!process.env.NEXT_PUBLIC_LOGO_DEV_PUBLISHABLE_KEY && process.env.LOGO_DEV_AP
   process.env.NEXT_PUBLIC_LOGO_DEV_PUBLISHABLE_KEY = process.env.LOGO_DEV_API_KEY;
 }
 
+const SECURITY_HEADERS = [
+  { key: 'Strict-Transport-Security', value: 'max-age=31536000' },
+  { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+  { key: 'X-Content-Type-Options', value: 'nosniff' },
+  { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+  { key: 'Permissions-Policy', value: 'camera=(), geolocation=(), microphone=()' },
+  { key: 'X-DNS-Prefetch-Control', value: 'off' },
+];
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   async headers() {
     return [
+      {
+        source: '/:path*',
+        headers: SECURITY_HEADERS,
+      },
       // Static data JSON shipped from /public — built once by
       // tools/build_frontend_data.py during the daily refresh, then
       // unchanged for ~24h. Aggressive CDN caching means returning

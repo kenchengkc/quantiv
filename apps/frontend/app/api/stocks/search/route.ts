@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 export const dynamic = 'force-dynamic';
 import { z } from 'zod';
 import { searchStocks } from '@/lib/data/stocks';
+import { enforceRateLimit, PUBLIC_RATE_LIMITS } from '@/lib/rateLimit';
 
 // Validate query params
 const QuerySchema = z.object({
@@ -12,7 +13,10 @@ const QuerySchema = z.object({
     .transform((v) => (v ? Math.min(20, Math.max(1, parseInt(v))) : 10)),
 });
 
-export function GET(request: NextRequest) {
+export async function GET(request: NextRequest) {
+  const rateLimited = await enforceRateLimit(request, PUBLIC_RATE_LIMITS.stocksSearch);
+  if (rateLimited) return rateLimited;
+
   try {
     const url = new URL(request.url);
     const q = url.searchParams.get('q') ?? '';

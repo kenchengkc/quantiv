@@ -1,0 +1,37 @@
+name: Production smoke
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/production-smoke.yml"
+      - "apps/backend/**"
+      - "apps/frontend/**"
+      - "apps/ml/**"
+      - "lib/**"
+      - "railway.toml"
+      - "scripts/production_smoke.mjs"
+      - "vercel.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-smoke
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: Public frontend and API
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node scripts/production_smoke.mjs
+        env:
+          PRODUCTION_FRONTEND_URL: https://usequantiv.com
+          PRODUCTION_BACKEND_URL: https://api.usequantiv.com
