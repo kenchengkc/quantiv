@@ -6,8 +6,25 @@ import {
   History,
   LineChart,
 } from "lucide-react";
+import type { SyntheticEvent } from "react";
 
 import { METRIC_GLOSSARY, type MetricKey } from "@/lib/metricGlossary";
+
+const METRIC_HELP_GROUP = "qv-ticker-metric-help";
+const CALCULATION_ROLES = ["Input", "Calculation", "Output"] as const;
+
+function closeOtherMetricHelp(event: SyntheticEvent<HTMLDetailsElement>) {
+  const current = event.currentTarget;
+  if (!current.open) return;
+
+  document
+    .querySelectorAll<HTMLDetailsElement>(
+      `details[name="${METRIC_HELP_GROUP}"][open]`,
+    )
+    .forEach((details) => {
+      if (details !== current) details.open = false;
+    });
+}
 
 export function MetricHelp({
   metric,
@@ -19,7 +36,11 @@ export function MetricHelp({
   const definition = METRIC_GLOSSARY[metric];
 
   return (
-    <details className={`qv-metric-help qv-metric-help-${align}`}>
+    <details
+      className={`qv-metric-help qv-metric-help-${align}`}
+      name={METRIC_HELP_GROUP}
+      onToggle={closeOtherMetricHelp}
+    >
       <summary
         aria-label={`Explain ${definition.label}`}
         title={`Explain ${definition.label}`}
@@ -29,32 +50,42 @@ export function MetricHelp({
       <div className="qv-metric-help-popover">
         <div className="qv-metric-help-eyebrow">Metric guide</div>
         <div className="qv-metric-help-title">{definition.label}</div>
+        <div className="qv-metric-help-definition">{definition.definition}</div>
         <div
           className="qv-metric-help-flow"
           role="img"
-          aria-label={definition.definition}
+          aria-label={`${definition.definition} Input: ${definition.calculation[0]}. Calculation: ${definition.calculation[1]}. Output: ${definition.calculation[2]}.`}
         >
-          {definition.visual.map((node, index) => (
+          {definition.calculation.map((node, index) => (
             <div className="qv-metric-help-flow-step" key={node}>
-              {index > 0 && (
+              {index > 0 ? (
                 <ArrowRight
                   className="qv-metric-help-flow-arrow"
                   aria-hidden="true"
                   size={13}
                   strokeWidth={1.8}
                 />
-              )}
-              <span>{node}</span>
+              ) : null}
+              <span className="qv-metric-help-flow-role">
+                {CALCULATION_ROLES[index]}
+              </span>
+              <strong>{node}</strong>
             </div>
           ))}
         </div>
-        <div className="qv-metric-help-read">
-          <span>Read</span>
-          <strong>{definition.interpretation}</strong>
+        <div className="qv-metric-help-formula">
+          <span>Formula</span>
+          <code>{definition.formula}</code>
         </div>
-        <div className="qv-metric-help-tags">
-          {definition.formula && <code>{definition.formula}</code>}
-          <span>{definition.caution}</span>
+        <div className="qv-metric-help-notes">
+          <div>
+            <span>Use</span>
+            <strong>{definition.use}</strong>
+          </div>
+          <div>
+            <span>Watch</span>
+            <strong>{definition.caution}</strong>
+          </div>
         </div>
       </div>
     </details>

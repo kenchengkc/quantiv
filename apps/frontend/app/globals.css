@@ -395,7 +395,7 @@
   position: absolute;
   top: calc(100% + 9px);
   z-index: 40;
-  width: min(330px, calc(100vw - 40px));
+  width: min(390px, calc(100vw - 40px));
   padding: 16px;
   border: 1px solid color-mix(in oklab, var(--brand-blue-1) 24%, var(--line-2));
   border-radius: 12px;
@@ -430,76 +430,104 @@
   font-weight: 700;
   letter-spacing: -0.01em;
 }
+.qv-metric-help-definition {
+  margin-top: 5px;
+  color: var(--ink-3);
+  font-size: 11.5px;
+  line-height: 1.45;
+}
 .qv-metric-help-flow {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-  margin-top: 12px;
+  gap: 14px;
+  margin-top: 14px;
 }
 .qv-metric-help-flow-step {
   position: relative;
-  display: grid;
-  place-items: center;
-  min-height: 48px;
-  padding: 6px;
+  display: flex;
+  min-width: 0;
+  min-height: 72px;
+  padding: 9px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: color-mix(in oklab, var(--bg-3) 72%, transparent);
   color: var(--ink-2);
-  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
-  font-size: 10px;
-  font-weight: 600;
-  line-height: 1.25;
-  text-align: center;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 9px;
 }
 .qv-metric-help-flow-step:last-child {
   border-color: color-mix(in oklab, var(--brand-blue-1) 32%, var(--line));
-  color: var(--brand-blue-1);
   background: color-mix(in oklab, var(--brand-blue-1) 10%, var(--bg-3));
 }
 .qv-metric-help-flow-arrow {
   position: absolute;
-  left: -13px;
+  top: 50%;
+  left: -15px;
+  transform: translateY(-50%);
   color: var(--ink-4);
 }
-.qv-metric-help-read {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 12px;
-}
-.qv-metric-help-read > span {
+.qv-metric-help-flow-role,
+.qv-metric-help-formula > span,
+.qv-metric-help-notes span {
   color: var(--ink-4);
   font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
   font-size: 9px;
-  letter-spacing: 0.12em;
+  font-weight: 600;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
 }
-.qv-metric-help-read > strong {
+.qv-metric-help-flow-step strong {
   color: var(--ink);
-  font-size: 12px;
-  text-align: right;
-}
-.qv-metric-help-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 10px;
-}
-.qv-metric-help-tags > :where(code, span) {
-  padding: 4px 7px;
-  border-radius: 999px;
-  background: color-mix(in oklab, var(--flag) 8%, transparent);
-  color: color-mix(in oklab, var(--flag) 80%, var(--ink-3));
   font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
-  font-size: 9.5px;
+  font-size: 11px;
+  font-weight: 600;
   line-height: 1.35;
 }
-.qv-metric-help-tags > code {
-  background: color-mix(in oklab, var(--brand-blue-1) 8%, transparent);
+.qv-metric-help-flow-step:last-child strong,
+.qv-metric-help-flow-step:last-child .qv-metric-help-flow-role {
+  color: var(--brand-blue-1);
+}
+.qv-metric-help-formula {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 9px 10px;
+  border-left: 2px solid
+    color-mix(in oklab, var(--brand-blue-1) 45%, var(--line));
+  background: color-mix(in oklab, var(--brand-blue-1) 7%, transparent);
+}
+.qv-metric-help-formula code {
   color: var(--accent-hi);
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-size: 10.5px;
+  line-height: 1.45;
   white-space: normal;
+}
+.qv-metric-help-notes {
+  display: grid;
+  gap: 7px;
+  margin-top: 11px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+.qv-metric-help-notes > div {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  align-items: baseline;
+  gap: 8px;
+}
+.qv-metric-help-notes strong {
+  color: var(--ink-2);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.qv-metric-help-notes > div:last-child span,
+.qv-metric-help-notes > div:last-child strong {
+  color: color-mix(in oklab, var(--flag) 78%, var(--ink-3));
 }
 
 .qv-reading-guide {
@@ -1191,7 +1219,17 @@ tr:hover .qv-m-sticky-cell {
     font-size: 10px;
   }
   .qv-metric-help-popover {
-    width: min(290px, calc(100vw - 32px));
+    width: min(330px, calc(100vw - 32px));
+  }
+  .qv-metric-help-flow {
+    gap: 10px;
+  }
+  .qv-metric-help-flow-step {
+    min-height: 78px;
+    padding: 8px;
+  }
+  .qv-metric-help-flow-arrow {
+    left: -11px;
   }
   .qv-card .qv-metric-help {
     position: static;

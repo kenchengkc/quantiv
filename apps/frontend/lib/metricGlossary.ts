@@ -18,9 +18,9 @@ export type MetricKey =
 export interface MetricDefinition {
   label: string;
   definition: string;
-  visual: readonly [string, string, string];
-  interpretation: string;
-  formula?: string;
+  calculation: readonly [string, string, string];
+  formula: string;
+  use: string;
   caution: string;
 }
 
@@ -28,118 +28,161 @@ export const METRIC_GLOSSARY: Record<MetricKey, MetricDefinition> = {
   atmIv: {
     label: "At-the-money implied volatility",
     definition:
-      "Option prices translated into annualized volatility at the nearest strike.",
-    visual: ["Option price", "ATM IV", "Move size"],
-    interpretation: "Higher = more movement priced",
-    caution: "No direction",
+      "The average call/put IV at the nearest strike, back-solved from their option quotes.",
+    calculation: [
+      "ATM call + put mids",
+      "Solve each IV; average",
+      "Annualized ATM IV %",
+    ],
+    formula: "Find each σ where model price = market price; then average",
+    use: "Compare priced volatility across expiries and dates",
+    caution: "Not direction; quote, rate, and dividend inputs matter",
   },
   ivExpectedMove: {
     label: "IV-based expected move",
     definition:
       "A volatility-scaled move range for the selected time to expiry.",
-    visual: ["ATM IV + DTE", "√ time", "± range"],
-    interpretation: "One-sigma range estimate",
+    calculation: ["ATM IV + DTE", "Scale by √time", "± move %"],
     formula: "ATM IV × √(days to expiry ÷ 365)",
-    caution: "Range, not promise",
+    use: "Benchmark the range priced through this expiry",
+    caution: "A one-sigma estimate, not a hard boundary",
   },
   atmStraddle: {
     label: "At-the-money straddle",
     definition: "The nearest-strike call and put midpoint premiums combined.",
-    visual: ["ATM call", "+ ATM put", "Priced move"],
-    interpretation: "Dollar cost of two-sided movement",
+    calculation: ["Call + put mids", "Add; divide by spot", "$ move + move %"],
     formula: "ATM call midpoint + ATM put midpoint",
-    caution: "Before spread + fees",
+    use: "See the market cost of two-sided movement",
+    caution: "Before spread, fees, and the post-event IV drop",
   },
   ivRank: {
     label: "IV rank",
     definition: "Current IV positioned between its 52-week low and high.",
-    visual: ["52w low", "Current IV", "52w high"],
-    interpretation: "Higher = nearer the yearly high",
+    calculation: ["Current + 52w range", "Normalize low to high", "0–100 rank"],
     formula: "(current IV − 52w low) ÷ (52w high − 52w low)",
-    caution: "Rank ≠ percentile",
+    use: "Judge whether this ticker's IV is high versus its own year",
+    caution: "Rank is not the percentage of days below current IV",
   },
   atmSkew: {
     label: "ATM skew",
     definition:
       "The implied-volatility difference between comparable puts and calls.",
-    visual: ["Put IV", "− Call IV", "Skew"],
-    interpretation: "Positive = puts richer",
-    caution: "Context, not forecast",
+    calculation: [
+      "Matched put + call IV",
+      "Put IV − call IV",
+      "Skew in vol points",
+    ],
+    formula: "Mean put IV − mean call IV near ATM",
+    use: "Compare downside-option richness with upside",
+    caution: "Positioning context, not a price forecast",
   },
   daysToCover: {
     label: "Short interest days to cover",
     definition: "Reported short shares scaled by typical daily trading volume.",
-    visual: ["Shares short", "÷ Daily volume", "Days"],
-    interpretation: "Higher = more crowded to unwind",
-    caution: "Reported with lag",
+    calculation: ["Short shares + ADV", "Short shares ÷ ADV", "Trading days"],
+    formula: "Reported shares short ÷ average daily volume",
+    use: "Flag short crowding and potential unwind friction",
+    caution: "Short-interest reports lag current positions",
   },
   putCallVolume: {
     label: "Put/call volume ratio",
     definition: "Observed put contract volume divided by call contract volume.",
-    visual: ["Put volume", "÷ Call volume", "P/C ratio"],
-    interpretation: "> 1 = more puts traded",
-    caution: "Intent unknown",
+    calculation: ["Put + call volume", "Put volume ÷ call", "Session ratio"],
+    formula: "Observed put volume ÷ observed call volume",
+    use: "Spot unusually put- or call-heavy trading",
+    caution: "Does not reveal buy/sell or open/close intent",
   },
   putCallOpenInterest: {
     label: "Put/call open-interest ratio",
     definition:
       "Outstanding put contracts divided by outstanding call contracts.",
-    visual: ["Put OI", "÷ Call OI", "P/C ratio"],
-    interpretation: "> 1 = more put OI",
-    caution: "Position intent unknown",
+    calculation: ["Put + call OI", "Put OI ÷ call OI", "Position ratio"],
+    formula: "Outstanding put contracts ÷ outstanding call contracts",
+    use: "Compare outstanding put and call contract balance",
+    caution: "Multi-leg and hedged positions obscure intent",
   },
   corporateActions: {
     label: "Corporate actions",
     definition: "Dividend and split events found in the provider window.",
-    visual: ["Dividends", "+ Splits", "Adjustments"],
-    interpretation: "Check contract + price continuity",
-    caution: "Not a signal",
+    calculation: [
+      "Dividend + split records",
+      "Count recent events",
+      "Action context",
+    ],
+    formula: "Provider events inside the published data window",
+    use: "Prompt contract and price-continuity checks",
+    caution: "Counts do not prove adjustment; not a trading signal",
   },
   providerSignalScore: {
     label: "Provider signal score",
     definition:
-      "A descriptive blend of crowding, flow, and corporate-action flags.",
-    visual: ["Flow + short", "+ Actions", "Heuristic"],
-    interpretation: "Higher = more flags present",
-    caution: "Heuristic, not ML",
+      "A rule-based average of short crowding and put/call imbalances.",
+    calculation: [
+      "Short DTC + P/C ratios",
+      "Cap + average components",
+      "0–1 context score",
+    ],
+    formula: "Mean[min(DTC/10, 1), min(|ln(P/C)|, 1)]",
+    use: "Prioritize unusual context for review",
+    caution: "Descriptive heuristic, not the LightGBM forecast",
   },
   probabilityDensity: {
     label: "Probability density",
     definition:
       "A smooth log-normal illustration built from spot, IV, and time.",
-    visual: ["Spot + IV", "+ DTE", "Density"],
-    interpretation: "Curve height = relative likelihood",
-    caution: "Earnings have fat tails",
+    calculation: [
+      "Spot + ATM IV + DTE",
+      "Log-normal mapping",
+      "Relative density curve",
+    ],
+    formula: "Return volatility = ATM IV × √(DTE ÷ 365)",
+    use: "Compare where a smooth volatility model places more mass",
+    caution: "Earnings jumps can have fatter, asymmetric tails",
   },
   forecastDistribution: {
     label: "ML forecast distribution",
     definition:
       "LightGBM quantiles for the conditional absolute earnings move.",
-    visual: ["Event features", "LightGBM", "P10 … P90"],
-    interpretation: "P50 = median magnitude",
-    caution: "Magnitude, not direction",
+    calculation: [
+      "Point-in-time features",
+      "LightGBM quantile heads",
+      "P10 · P50 · P90",
+    ],
+    formula: "Pq = qth conditional absolute-move estimate",
+    use: "Size a range of plausible earnings-move magnitudes",
+    caution: "Magnitude only; not direction or guaranteed coverage",
   },
   termStructure: {
     label: "Expected-move term structure",
     definition: "Option-implied ranges compared across expiration dates.",
-    visual: ["Expiry EM", "× Spot", "Price fan"],
-    interpretation: "Find kinks around the event",
+    calculation: ["Each expiry's EM", "Spot × (1 ± EM)", "Price-range fan"],
     formula: "spot × (1 ± expected-move percentage)",
-    caution: "Not path probability",
+    use: "Find kinks around the earnings expiration",
+    caution: "Endpoints are ranges, not path probabilities",
   },
   history: {
     label: "Implied versus realized history",
     definition: "Past priced ranges compared with signed earnings reactions.",
-    visual: ["Implied range", "vs Realized", "Hit / miss"],
-    interpretation: "Outside band = underpriced move",
-    caution: "Small sample",
+    calculation: [
+      "Priced range + closes",
+      "Align each event",
+      "Hit/miss + signed move",
+    ],
+    formula: "Realized = post-event close ÷ pre-event close − 1",
+    use: "Check whether options historically over- or under-priced moves",
+    caution: "Small samples and regime changes limit inference",
   },
   greeks: {
     label: "ATM option Greeks",
     definition:
       "Local option-price sensitivities to spot, volatility, and time.",
-    visual: ["Spot + IV + time", "Option price", "Δ Γ ν Θ"],
-    interpretation: "Local risk, recomputed continuously",
-    caution: "Sensitivity, not P&L",
+    calculation: [
+      "Spot + strike + IV + time",
+      "Differentiate option value",
+      "Δ · Γ · ν · Θ",
+    ],
+    formula: "Greek = ∂ option value ÷ ∂ risk factor",
+    use: "Approximate local hedge and sensitivity exposure",
+    caution: "They move with inputs and are not realized P&L",
   },
 };

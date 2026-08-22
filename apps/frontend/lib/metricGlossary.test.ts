@@ -4,17 +4,19 @@ import { METRIC_GLOSSARY } from "./metricGlossary";
 
 describe("metric glossary", () => {
   it("distinguishes IV rank from a percentile", () => {
-    expect(METRIC_GLOSSARY.ivRank.visual).toEqual([
-      "52w low",
-      "Current IV",
-      "52w high",
+    expect(METRIC_GLOSSARY.ivRank.calculation).toEqual([
+      "Current + 52w range",
+      "Normalize low to high",
+      "0–100 rank",
     ]);
-    expect(METRIC_GLOSSARY.ivRank.caution).toContain("≠ percentile");
+    expect(METRIC_GLOSSARY.ivRank.caution).toContain("not the percentage");
   });
 
   it("labels the provider score as heuristic rather than ML", () => {
-    expect(METRIC_GLOSSARY.providerSignalScore.visual.at(-1)).toBe("Heuristic");
-    expect(METRIC_GLOSSARY.providerSignalScore.caution).toContain("not ML");
+    expect(METRIC_GLOSSARY.providerSignalScore.calculation).toContain(
+      "Cap + average components",
+    );
+    expect(METRIC_GLOSSARY.providerSignalScore.caution).toContain("LightGBM");
   });
 
   it("makes clear that forecast quantiles describe magnitude, not direction", () => {
@@ -26,12 +28,24 @@ describe("metric glossary", () => {
     );
   });
 
-  it("keeps every quick guide visual and scan-friendly", () => {
+  it("gives every metric an explicit input, calculation, output, use, and warning", () => {
     for (const metric of Object.values(METRIC_GLOSSARY)) {
-      expect(metric.visual).toHaveLength(3);
-      expect(metric.visual.every((node) => node.length <= 18)).toBe(true);
-      expect(metric.interpretation.length).toBeLessThanOrEqual(38);
-      expect(metric.caution.length).toBeLessThanOrEqual(24);
+      expect(metric.calculation).toHaveLength(3);
+      expect(metric.calculation.every((node) => node.length <= 28)).toBe(true);
+      expect(metric.formula.length).toBeLessThanOrEqual(62);
+      expect(metric.use.length).toBeLessThanOrEqual(66);
+      expect(metric.caution.length).toBeLessThanOrEqual(62);
     }
+  });
+
+  it("explains that ATM IV is back-solved from an observed option price", () => {
+    expect(METRIC_GLOSSARY.atmIv.calculation).toEqual([
+      "ATM call + put mids",
+      "Solve each IV; average",
+      "Annualized ATM IV %",
+    ]);
+    expect(METRIC_GLOSSARY.atmIv.formula).toContain(
+      "model price = market price",
+    );
   });
 });
