@@ -39,6 +39,7 @@ def load_main(monkeypatch):
 
     def _load(**overrides):
         for name in (
+            "ADMIN_API_KEY",
             "BACKEND_SHARED_SECRET",
             "DOCS_ENABLED",
             "ENVIRONMENT",
