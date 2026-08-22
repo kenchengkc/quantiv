@@ -9,12 +9,11 @@ Usage:
   python scripts/data_healthcheck.py [--duckdb-path /srv/quantiv-data/quantiv.duckdb]
 """
 
-import os
 import sys
 from pathlib import Path
 import argparse
 import duckdb
-from datetime import datetime, timedelta
+from datetime import datetime
 
 def run_basic_counts(conn):
     """Run basic row count checks."""
@@ -255,7 +254,7 @@ def main():
         print("Run setup_duckdb_views.py first to create the database and views.")
         sys.exit(1)
     
-    print(f"QUANTIV DATA HEALTHCHECK")
+    print("QUANTIV DATA HEALTHCHECK")
     print(f"Database: {duckdb_path}")
     print(f"Timestamp: {datetime.now().isoformat()}")
     

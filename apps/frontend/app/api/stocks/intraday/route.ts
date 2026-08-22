@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchIntradayBars, type IntradayPayload } from '@/lib/alpaca';
 import { getRedis } from '@/lib/redis';
+import { enforceRateLimit, PUBLIC_RATE_LIMITS } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -68,6 +69,9 @@ async function writeCached(
 }
 
 export async function GET(req: NextRequest) {
+  const rateLimited = await enforceRateLimit(req, PUBLIC_RATE_LIMITS.stocksIntraday);
+  if (rateLimited) return rateLimited;
+
   const url = new URL(req.url);
   const symbol = (url.searchParams.get('symbol') ?? '').toUpperCase().trim();
   const tfRaw = url.searchParams.get('timeframe') ?? '5Min';

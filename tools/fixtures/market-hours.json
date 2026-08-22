@@ -1,0 +1,138 @@
+{
+  "vectors": [
+    {
+      "name": "one minute before premarket opens",
+      "category": "boundary",
+      "instant": "2026-05-28T11:59:00.000Z",
+      "expected": null
+    },
+    {
+      "name": "premarket open is inclusive",
+      "category": "boundary",
+      "instant": "2026-05-28T12:00:00.000Z",
+      "expected": "premarket"
+    },
+    {
+      "name": "premarket close is inclusive",
+      "category": "boundary",
+      "instant": "2026-05-28T13:24:00.000Z",
+      "expected": "premarket"
+    },
+    {
+      "name": "regular refresh open is inclusive",
+      "category": "boundary",
+      "instant": "2026-05-28T13:25:00.000Z",
+      "expected": "regular"
+    },
+    {
+      "name": "minute before closing bell is regular",
+      "category": "boundary",
+      "instant": "2026-05-28T19:59:00.000Z",
+      "expected": "regular"
+    },
+    {
+      "name": "afterhours takes precedence at closing bell",
+      "category": "precedence",
+      "instant": "2026-05-28T20:00:00.000Z",
+      "expected": "afterhours"
+    },
+    {
+      "name": "afterhours takes precedence at regular refresh close",
+      "category": "precedence",
+      "instant": "2026-05-28T20:45:00.000Z",
+      "expected": "afterhours"
+    },
+    {
+      "name": "afterhours close is inclusive",
+      "category": "boundary",
+      "instant": "2026-05-28T21:00:00.000Z",
+      "expected": "afterhours"
+    },
+    {
+      "name": "one minute after afterhours closes",
+      "category": "boundary",
+      "instant": "2026-05-28T21:01:00.000Z",
+      "expected": null
+    },
+    {
+      "name": "Saturday is closed",
+      "category": "weekend",
+      "instant": "2026-05-30T13:25:00.000Z",
+      "expected": null
+    },
+    {
+      "name": "Sunday is closed",
+      "category": "weekend",
+      "instant": "2026-05-31T13:25:00.000Z",
+      "expected": null
+    },
+    {
+      "name": "New Years Day is closed in EST",
+      "category": "holiday",
+      "instant": "2026-01-01T14:25:00.000Z",
+      "expected": null
+    },
+    {
+      "name": "Good Friday is closed in EDT",
+      "category": "holiday",
+      "instant": "2026-04-03T13:25:00.000Z",
+      "expected": null
+    },
+    {
+      "name": "Memorial Day is closed in EDT",
+      "category": "holiday",
+      "instant": "2026-05-25T13:25:00.000Z",
+      "expected": null
+    },
+    {
+      "name": "Friday before spring DST uses EST",
+      "category": "dst",
+      "instant": "2026-03-06T14:25:00.000Z",
+      "expected": "regular"
+    },
+    {
+      "name": "Monday after spring DST uses EDT",
+      "category": "dst",
+      "instant": "2026-03-09T13:25:00.000Z",
+      "expected": "regular"
+    },
+    {
+      "name": "Friday before fall DST uses EDT",
+      "category": "dst",
+      "instant": "2026-10-30T13:25:00.000Z",
+      "expected": "regular"
+    },
+    {
+      "name": "Monday after fall DST uses EST",
+      "category": "dst",
+      "instant": "2026-11-02T14:25:00.000Z",
+      "expected": "regular"
+    }
+  ],
+  "holidayParity": {
+    "rangeStart": "2026-01-01",
+    "rangeEnd": "2027-12-31",
+    "dates": [
+      "2026-01-01",
+      "2026-01-19",
+      "2026-02-16",
+      "2026-04-03",
+      "2026-05-25",
+      "2026-06-19",
+      "2026-07-03",
+      "2026-09-07",
+      "2026-11-26",
+      "2026-12-25",
+      "2027-01-01",
+      "2027-01-18",
+      "2027-02-15",
+      "2027-03-26",
+      "2027-05-31",
+      "2027-06-18",
+      "2027-07-05",
+      "2027-09-06",
+      "2027-11-25",
+      "2027-12-24"
+    ]
+  }
+}

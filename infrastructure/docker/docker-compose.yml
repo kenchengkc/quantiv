@@ -6,8 +6,10 @@ services:
     networks:
       - quantiv-net
     build:
-      context: ../../apps/backend
-      dockerfile: Dockerfile
+      # Match Railway exactly: the backend image copies apps/ml, lib, and
+      # frontend artifacts from the repository root build context.
+      context: ../..
+      dockerfile: apps/backend/Dockerfile
     ports:
       - "8000:8000"
     env_file:

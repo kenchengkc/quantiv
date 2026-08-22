@@ -369,7 +369,7 @@ def cmd_dry_run(args):
         pending = len(trading_dates(start, remote_max))
         print(f"Pending days:        {pending}")
     else:
-        print(f"Pending days:        unknown (no sync yet)")
+        print("Pending days:        unknown (no sync yet)")
 
     # Quick sample to verify API works
     rows = query(f"SELECT * FROM option_chain WHERE date = '{remote_max}' AND act_symbol = 'AAPL' LIMIT 3")
