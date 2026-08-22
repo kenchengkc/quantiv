@@ -367,6 +367,27 @@ jobs:
         # an upstream sync silently broke.
         run: python scripts/check_duckdb_freshness.py --strict --max-lag-days 5
 
+      - name: Build reconciliation control manifest
+        # Reuses the local DuckDB views and checked-in mapping files. This is
+        # an exception-first JSON artifact, not a Redis/Neon control table.
+        # Critical exceptions fail closed; known instrumentation gaps remain
+        # visible as warnings while their controls are built out.
+        run: |
+          python scripts/build_data_reconciliation.py \
+            --strict \
+            --max-lag-days 5 \
+            --days-ahead 21 \
+            --report data/validation/data_reconciliation.json
+
+      - name: Upload data reconciliation manifest
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: data-reconciliation
+          path: data/validation/data_reconciliation.json
+          if-no-files-found: ignore
+          retention-days: 30
+
       - name: Score upcoming earnings
         run: python scripts/daily_score.py --days-ahead 21
 

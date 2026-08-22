@@ -220,6 +220,11 @@ receipt rather than per-value lineage records. See
 [Evidence receipts](EVIDENCE_RECEIPTS.md) for the contract and zero-database-cost
 publication path.
 
+The data pipeline also emits one exception-first reconciliation manifest from
+the existing DuckDB views and mapping files. Critical exceptions block scoring;
+warnings expose coverage or instrumentation gaps. See
+[Reconciliation control plane](RECONCILIATION_CONTROL_PLANE.md).
+
 ## Data behavior and limitations
 
 - Headline expected move is generally straddle- or IV-derived unless an ML result is available.
