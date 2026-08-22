@@ -31,9 +31,7 @@ jobs:
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
-      # Vitest covers component / unit tests. The script exits 0 even when
-      # the suite is empty (no specs match), so this is a no-op safety
-      # gate today and a real gate once specs land in apps/frontend/**.
+      # Vitest covers route, data-contract, and UI utility regressions.
       - run: npm run test --workspace=apps/frontend -- --run
 
   e2e:
@@ -89,8 +87,8 @@ jobs:
       # training entrypoints under apps/ml/*.py are out of scope — they
       # pre-date this lint gate and are run by hand / by CI scripts, not
       # imported as a library.
-      - run: ruff check apps/backend apps/ml/ml
-      - run: pytest apps/backend/tests -q
+      - run: ruff check apps/backend apps/ml/ml apps/ml/tests
+      - run: pytest apps/backend/tests apps/ml/tests -q
         env:
           # The backend tests stub Postgres/Redis/DuckDB lifespan
           # initialization, but `_validate_env()` still checks shape. The

@@ -370,6 +370,22 @@ jobs:
       - name: Score upcoming earnings
         run: python scripts/daily_score.py --days-ahead 21
 
+      - name: Gate — validate scored ML and IV forecasts
+        # Fail before Neon/R2/frontend publication when forecast magnitudes,
+        # quantiles, feature schemas, IV math, or model handoffs are corrupt.
+        run: |
+          python scripts/validate_ml_pipeline.py forecasts \
+            --report data/validation/daily_forecasts.json
+
+      - name: Upload daily forecast validation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: daily-forecast-validation
+          path: data/validation/daily_forecasts.json
+          if-no-files-found: ignore
+          retention-days: 14
+
       - name: Import recent forecasts to Neon Postgres
         # Pushes the newest forecast snapshot into the em_forecasts table
         # the Railway-hosted FastAPI backend reads from. The script is a
@@ -682,14 +698,62 @@ jobs:
             --start-date 2023-01-01 \
             --end-date "$END"
 
+      - name: Gate — validate training artifacts
+        # Catch stale metadata, leakage-prone date splits, duplicate events,
+        # invalid targets, and unusable features before the expensive tune.
+        run: |
+          python scripts/validate_ml_pipeline.py training \
+            --report data/validation/retrain_training.json
+
+      - name: Upload training validation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: retrain-training-validation
+          path: data/validation/retrain_training.json
+          if-no-files-found: ignore
+          retention-days: 30
+
       - name: Train LightGBM models (v3, tuned + time-decay)
         # Locked-in production settings (settled on after local A/B):
         #   --tune              Optuna search per horizon (30 trials × 6 horizons ≈ 7 min)
         #   --time-decay 0.5    half-life 0.5y — modest recency bias on top of VIX features
         run: python apps/ml/model_trainer_v3.py --tune --time-decay 0.5
 
+      - name: Gate — validate trained model bundle
+        # Load every point/quantile artifact, smoke-predict with the training
+        # schema, enforce purged holdouts, calibration, and baseline quality.
+        run: |
+          python scripts/validate_ml_pipeline.py models \
+            --report data/validation/retrain_models.json
+
+      - name: Upload model validation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: retrain-model-validation
+          path: data/validation/retrain_models.json
+          if-no-files-found: ignore
+          retention-days: 30
+
       - name: Score upcoming earnings with the new models
         run: python scripts/daily_score.py --days-ahead 21
+
+      - name: Gate — validate retrain forecasts
+        # Nothing is pushed or hot-loaded until the freshly trained models and
+        # their forecast artifact agree end to end.
+        run: |
+          python scripts/validate_ml_pipeline.py forecasts \
+            --report data/validation/retrain_forecasts.json
+
+      - name: Upload retrain forecast validation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: retrain-forecast-validation
+          path: data/validation/retrain_forecasts.json
+          if-no-files-found: ignore
+          retention-days: 30
 
       - name: Push models to R2
         env:
