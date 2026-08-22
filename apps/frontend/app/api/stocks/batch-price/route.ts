@@ -18,6 +18,7 @@ import {
   type InterestContext,
 } from '@/lib/quoteInterest';
 import { enrichQuoteTick } from '@/lib/quoteTick';
+import { enforceRateLimit, PUBLIC_RATE_LIMITS } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -282,6 +283,9 @@ const nullTick = (symbol: string): Tick => ({
 });
 
 export async function GET(req: NextRequest) {
+  const rateLimited = await enforceRateLimit(req, PUBLIC_RATE_LIMITS.stocksBatchPrice);
+  if (rateLimited) return rateLimited;
+
   const url = new URL(req.url);
   const symbolsParam = url.searchParams.get('symbols') ?? '';
   const symbols = Array.from(

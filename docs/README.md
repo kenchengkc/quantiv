@@ -11,6 +11,7 @@ Start with the root [README](../README.md), then use the guides below for deeper
 | [HMAC_PROXY.md](HMAC_PROXY.md) | Configure signed Vercel-to-Railway ML requests |
 | [duckdb_architecture.md](duckdb_architecture.md) | Review Parquet layout, DuckDB views, and `DATA_BACKEND` modes |
 | [PERFORMANCE.md](PERFORMANCE.md) | Review frontend bottlenecks and prioritized fixes |
+| [PRODUCTION_HARDENING_PLAN.md](PRODUCTION_HARDENING_PLAN.md) | Track the production hardening scope, rollout, and acceptance criteria |
 
 ## Scripts and workers
 

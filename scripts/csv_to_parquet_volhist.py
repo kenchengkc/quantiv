@@ -92,7 +92,7 @@ def main():
     n_files = sum(1 for _ in parquet_root.rglob("*.parquet"))
     total_size = sum(f.stat().st_size for f in parquet_root.rglob("*.parquet"))
 
-    print(f"\nConversion complete")
+    print("\nConversion complete")
     print(f"   Rows:   {count:,}")
     print(f"   Range:  {date_range[0]} to {date_range[1]}")
     print(f"   Files:  {n_files}")

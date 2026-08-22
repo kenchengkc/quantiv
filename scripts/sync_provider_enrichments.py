@@ -17,7 +17,7 @@ import time
 from datetime import date, datetime, timedelta, timezone
 from io import StringIO
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 import requests
 

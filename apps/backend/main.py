@@ -1,32 +1,35 @@
-#!/usr/bin/env python3
 """
 Quantiv FastAPI Backend - Expected Move Forecasting API
 Slim entrypoint: wires up middleware, lifespan, and routers.
 Models live in models/, backends in backends/, routes in routers/.
 """
 
-from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks, Security
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.security import APIKeyHeader
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
-from slowapi.errors import RateLimitExceeded
-from typing import List, Optional
-import asyncpg
-import redis.asyncio as redis
-import httpx
-import structlog
-import duckdb
 import hmac
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
+
+import asyncpg
+import duckdb
+import httpx
+import redis.asyncio as redis
+import structlog
+from backends import DataBackend, DuckDBBackend, HybridBackend, PostgresBackend
 from dotenv import load_dotenv
-from services.ml_service import MLService
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Security
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import APIKeyHeader
+from middleware.hmac_auth import HmacAuthMiddleware
+from routers.em import init_router as init_em_router
+from routers.em import router as em_router
+from routers.ml_predict import init_router as init_ml_predict_router
+from routers.ml_predict import router as ml_predict_router
 from services import predict_service, r2_models
-from backends import PostgresBackend, DuckDBBackend, HybridBackend, DataBackend
-from routers.em import router as em_router, init_router as init_em_router
-from routers.ml_predict import router as ml_predict_router, init_router as init_ml_predict_router
+from services.ml_service import MLService
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+from slowapi.util import get_remote_address
 
 # Configure structured logging
 logger = structlog.get_logger()
@@ -50,13 +53,35 @@ db_pool: asyncpg.Pool = None
 redis_client: redis.Redis = None
 http_client: httpx.AsyncClient = None
 data_backend: DataBackend = None
-duckdb_conn: Optional[duckdb.DuckDBPyConnection] = None
-ml_service: Optional[MLService] = None
+duckdb_conn: duckdb.DuckDBPyConnection | None = None
+ml_service: MLService | None = None
 DATA_BACKEND_MODE: str = "postgres"
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+def _env_flag(name: str, default: bool) -> bool:
+    """Read a conventional boolean environment flag."""
+    value = os.getenv(name)
+    if value is None:
+        return default
+    normalized = value.strip().lower()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off"}:
+        return False
+    logger.warning("Invalid boolean environment flag; using default", name=name)
+    return default
+
+
+def _is_production() -> bool:
+    return (
+        os.getenv("ENVIRONMENT", "").lower() in {"production", "prod"}
+        or os.getenv("NODE_ENV", "").lower() == "production"
+        or os.getenv("RAILWAY_ENVIRONMENT", "").lower() == "production"
+    )
+
+
 def _ensure_duckdb_em_view(conn: duckdb.DuckDBPyConnection, data_dir: str):
     """Create or replace the em_forecasts view over the latest forecasts Parquet.
 
@@ -100,8 +125,8 @@ def _ensure_duckdb_em_view(conn: duckdb.DuckDBPyConnection, data_dir: str):
 
 def _validate_env():
     """Validate required environment variables before startup."""
-    errors: List[str] = []
-    warnings: List[str] = []
+    errors: list[str] = []
+    warnings: list[str] = []
 
     backend = os.getenv("DATA_BACKEND", "postgres").lower()
     use_pg = backend in ("postgres", "hybrid")
@@ -124,11 +149,7 @@ def _validate_env():
         warnings.append("POLYGON_API_KEY not set — live market data unavailable")
     if not os.getenv("ADMIN_API_KEY"):
         warnings.append("ADMIN_API_KEY not set — admin endpoints will return 503")
-    is_production = (
-        os.getenv("ENVIRONMENT", "").lower() in {"production", "prod"}
-        or os.getenv("RAILWAY_ENVIRONMENT", "").lower() == "production"
-    )
-    if is_production and not os.getenv("BACKEND_SHARED_SECRET"):
+    if _is_production() and not os.getenv("BACKEND_SHARED_SECRET"):
         errors.append("BACKEND_SHARED_SECRET is required in production for HMAC-protected backend routes")
 
     for w in warnings:
@@ -213,7 +234,7 @@ async def lifespan(app: FastAPI):
         try:
             ml_service = MLService(data_dir, data_dir / "quantiv.duckdb")
             logger.info("✅ ML service initialized", available_symbols=len(ml_service.get_available_symbols()))
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - optional ML startup must degrade safely
             logger.warning("Failed to initialize ML service", error=str(e))
 
     # -- Pull serving models from R2 onto the mounted volume -------------
@@ -234,7 +255,7 @@ async def lifespan(app: FastAPI):
                 )
             else:
                 logger.info("R2 sync wrote 0 files and volume is empty; using baked-in models")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - retain baked-in models on any sync failure
             logger.warning("R2 model sync errored; using baked-in models", error=str(e))
     else:
         logger.info("R2 not configured; using image-baked models")
@@ -270,19 +291,45 @@ async def lifespan(app: FastAPI):
             result = cleanup()
             if result and hasattr(result, "__await__"):
                 await result
-        except Exception:
-            pass
+        except Exception as exc:  # noqa: BLE001 - attempt every independent cleanup
+            logger.warning("Service cleanup failed", error=str(exc))
 
 
 # ---------------------------------------------------------------------------
 # App & middleware
 # ---------------------------------------------------------------------------
+docs_enabled = _env_flag("DOCS_ENABLED", not _is_production())
 app = FastAPI(
     title="Quantiv Expected Move API",
     description="ML-powered options expected move forecasting",
     version="2.0.0",
     lifespan=lifespan,
+    docs_url="/docs" if docs_enabled else None,
+    redoc_url="/redoc" if docs_enabled else None,
+    openapi_url="/openapi.json" if docs_enabled else None,
 )
+
+rate_limit_default = os.getenv("RATE_LIMIT_DEFAULT", "60/minute").strip() or "60/minute"
+rate_limit_storage = os.getenv("REDIS_URL") or "memory://"
+limiter = Limiter(
+    key_func=get_remote_address,
+    default_limits=[rate_limit_default],
+    storage_uri=rate_limit_storage,
+    enabled=_env_flag("RATE_LIMIT_ENABLED", True),
+)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# Middleware executes in reverse registration order. Keep CORS outermost so
+# rejected requests still receive browser-safe headers, then authenticate
+# before charging authenticated traffic against the global rate limit.
+app.add_middleware(SlowAPIMiddleware)
+docs_exempt = (
+    ("/docs", "/docs/oauth2-redirect", "/redoc", "/openapi.json")
+    if docs_enabled
+    else ()
+)
+app.add_middleware(HmacAuthMiddleware, extra_exempt=docs_exempt)
 
 allowed_origins = ["http://localhost:3000", "http://localhost:3001", "https://quantiv.vercel.app"]
 custom_domain = os.getenv("FRONTEND_URL")
@@ -292,25 +339,12 @@ if custom_domain:
 app.add_middleware(CORSMiddleware, allow_origins=allowed_origins, allow_credentials=True,
                    allow_methods=["*"], allow_headers=["*"])
 
-# HMAC middleware: reject any non-/health request that doesn't carry a
-# valid X-Quantiv-Signature derived from BACKEND_SHARED_SECRET. The
-# Next.js proxy in apps/frontend/lib/backendProxy.ts mints the header.
-# Skipped automatically if the env var isn't set, so `python main.py`
-# locally still works without a secret.
-from middleware.hmac_auth import HmacAuthMiddleware  # noqa: E402
-app.add_middleware(HmacAuthMiddleware)
-
-# Rate limiting — 60 requests/minute per IP (generous for 5-10 users)
-limiter = Limiter(key_func=get_remote_address, default_limits=["60/minute"])
-app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-
 # ---------------------------------------------------------------------------
 # Admin security
 # ---------------------------------------------------------------------------
 _api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
-async def verify_admin_key(api_key: Optional[str] = Security(_api_key_header)) -> str:
+async def verify_admin_key(api_key: str | None = Security(_api_key_header)) -> str:
     expected = os.getenv("ADMIN_API_KEY")
     if not expected:
         raise HTTPException(status_code=503, detail="Admin API key not configured on server")
@@ -338,7 +372,7 @@ async def refresh_forecasts(background_tasks: BackgroundTasks, _key: str = Depen
             if keys:
                 await redis_client.delete(*keys)
             logger.info("Forecast cache cleared", keys_cleared=len(keys))
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - background admin task reports all failures
             logger.error("Cache clear failed", error=str(e))
     background_tasks.add_task(refresh_task)
     return {"message": "Forecast refresh initiated"}
@@ -365,6 +399,18 @@ async def sync_models(_key: str = Depends(verify_admin_key)):
         "files_written": n,
         "models_dir": os.environ.get("ML_MODELS_DIR", "/app/apps/ml/models"),
     }
+
+
+# Health checks and separately API-key-protected admin operations must remain
+# available even when the global limiter is saturated. Exempt docs only when
+# FastAPI actually registered them.
+rate_limit_exempt_paths = {"/health"}
+if docs_enabled:
+    rate_limit_exempt_paths.update({"/docs", "/docs/oauth2-redirect", "/redoc", "/openapi.json"})
+for route in app.routes:
+    if route.path in rate_limit_exempt_paths or route.path.startswith("/api/admin/"):
+        limiter.exempt(route.endpoint)
+
 
 if __name__ == "__main__":
     import uvicorn

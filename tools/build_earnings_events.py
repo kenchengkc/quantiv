@@ -4,12 +4,9 @@ Build canonical earnings_events table from earnings_calendar.csv
 Creates the backbone for lead-time aware EM calculations.
 """
 
-import os
 import sys
 import duckdb
-import pandas as pd
 from pathlib import Path
-from datetime import date, datetime, timedelta
 from typing import Dict, Any
 
 def load_env_file(env_path: Path) -> Dict[str, str]:
@@ -470,11 +467,10 @@ def main():
     repo_root = Path(__file__).parent.parent
     data_dir = repo_root / "data"
     earnings_csv = data_dir / "earnings_calendar.csv"
-    duckdb_path = data_dir / "quantiv.duckdb"
     env_path = repo_root / "config" / ".env.local"
     
     # Load environment variables
-    env_vars = load_env_file(env_path)
+    load_env_file(env_path)
     
     print("🚀 Building earnings events and DuckDB views...")
     

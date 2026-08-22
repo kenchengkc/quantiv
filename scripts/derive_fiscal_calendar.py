@@ -215,7 +215,7 @@ def main() -> int:
 
     dist = Counter(fye_month.values())
     print(f"\nderived={derived} skipped={skipped} failed={failed}")
-    print(f"FYE-month distribution: "
+    print("FYE-month distribution: "
           + ", ".join(f"{MONTH_NAME[m]}={n}" for m, n in sorted(dist.items())))
     print(f"non-December filers needing naming review: {len(non_dec)} -> {non_dec[:20]}"
           + (" ..." if len(non_dec) > 20 else ""))
