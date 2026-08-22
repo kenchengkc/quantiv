@@ -132,6 +132,48 @@ def _synthetic_feature_vector(feature_names):
     return base
 
 
+class _ConstantEstimator:
+    def __init__(self, value):
+        self.value = value
+
+    def predict(self, _frame):
+        return [self.value]
+
+
+def test_predict_clips_point_and_rearranges_crossed_quantiles(monkeypatch):
+    ps = _import()
+    bundle = ps._ModelBundle(
+        estimator=_ConstantEstimator(-0.02),
+        calibrator=None,
+        feature_names=["log_spot"],
+        quantile_estimators={
+            10: _ConstantEstimator(0.05),
+            25: _ConstantEstimator(-0.01),
+            50: _ConstantEstimator(0.03),
+            75: _ConstantEstimator(0.09),
+            90: _ConstantEstimator(0.07),
+        },
+        loaded_at=ps.datetime.now(ps.timezone.utc),
+        model_version="test",
+        model_trained_at=None,
+        feature_schema_hash="test-schema",
+        val_mae=None,
+    )
+    monkeypatch.setattr(ps, "get_bundle", lambda _horizon: bundle)
+
+    result = ps.predict(
+        feature_vector={"log_spot": math.log(100.0)},
+        snapshot_date=date(2026, 5, 22),
+        horizon=7,
+        spot_override=100.0,
+    )
+
+    assert result is not None
+    assert result.em_ml_pct == 0.0
+    assert result.em_ml_abs == 0.0
+    assert result.quantiles == {10: 0.0, 25: 0.03, 50: 0.05, 75: 0.07, 90: 0.09}
+
+
 @requires_models
 def test_bundle_loads_for_each_horizon():
     ps = _import()

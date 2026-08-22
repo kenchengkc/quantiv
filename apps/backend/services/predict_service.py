@@ -30,6 +30,7 @@ from typing import Any, Dict, List, Optional
 
 import joblib
 import pandas as pd
+from ml.quantiles import rearrange_quantile_mapping
 
 logger = logging.getLogger(__name__)
 
@@ -328,7 +329,7 @@ def predict(
     substituted = _substitute_spot(feature_vector, spot_used) if spot_used else dict(feature_vector)
     X = _build_X(substituted, bundle.feature_names)
 
-    em_pct = float(bundle.estimator.predict(X)[0])
+    em_pct = max(0.0, float(bundle.estimator.predict(X)[0]))
     # Calibration is intentionally skipped to match scripts/daily_score.py,
     # which writes raw model output to em_forecasts.em_ml_pct. Applying it
     # here would cause the live /api/ml/predict number to drift away from
@@ -346,6 +347,7 @@ def predict(
             quantiles[q] = float(q_est.predict(X)[0])
         except Exception as exc:
             logger.warning("Quantile %s predict failed: %s", q, exc)
+    quantiles = rearrange_quantile_mapping(quantiles)
 
     em_abs = em_pct * spot_used if spot_used else 0.0
     return PredictionResult(

@@ -24,6 +24,7 @@ import logging
 import math
 import os
 import re
+import sys
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict
@@ -32,6 +33,13 @@ import duckdb
 import joblib
 import numpy as np
 import pandas as pd
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+ML_PACKAGE_ROOT = REPO_ROOT / "apps" / "ml"
+if str(ML_PACKAGE_ROOT) not in sys.path:
+    sys.path.insert(0, str(ML_PACKAGE_ROOT))
+
+from ml.quantiles import rearrange_quantile_array  # noqa: E402 - standalone script path setup
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
@@ -348,7 +356,7 @@ def score(df: pd.DataFrame, models: Dict[int, dict]) -> pd.DataFrame:
         ]
 
         # Point prediction
-        pred = m["model"].predict(X)
+        pred = np.clip(m["model"].predict(X), 0.0, None)
         hdf["em_ml_pct"] = pred
         hdf["em_ml_abs"] = pred * hdf["spot_price"]
 
@@ -366,6 +374,17 @@ def score(df: pd.DataFrame, models: Dict[int, dict]) -> pd.DataFrame:
             hdf["p50"] = pred
             hdf["p75"] = pred + 0.67 * residual_std
             hdf["p90"] = pred + 1.28 * residual_std
+
+        # Quantile heads are trained independently and can occasionally
+        # cross. The target is an absolute move, so enforce nonnegative,
+        # monotone bands before persisting or serving them.
+        quantile_cols = [
+            col for col in ("p10", "p25", "p50", "p75", "p90") if col in hdf
+        ]
+        if quantile_cols:
+            hdf.loc[:, quantile_cols] = rearrange_quantile_array(
+                hdf[quantile_cols].to_numpy(dtype=float)
+            )
 
         # Math baselines
         hdf["em_math_pct"] = hdf["straddle_pct"]
