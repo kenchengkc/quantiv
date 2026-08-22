@@ -12,7 +12,9 @@ import { useEnsureCompanyNames } from '@/lib/useCompanyNames';
 import { useEnsureListingExchanges } from '@/lib/useListingExchanges';
 import { useWatchlist } from '@/lib/watchlist';
 import { DashboardReadingGuide, MetricHelp } from '@/components/MetricExplainer';
+import { DashboardEvidence } from '@/components/DashboardEvidence';
 import { TickerLogo } from '@/components/TickerLogo';
+import type { ForecastDashboardEvidence } from '@/lib/forecastEvidence';
 
 interface Straddle {
   expiration: string;
@@ -3510,9 +3512,11 @@ function Reveal({
 // ---------- Page ----------
 export default function SymbolPage({
   initialData = null,
+  initialEvidence = null,
   initialSymbol,
 }: {
   initialData?: unknown;
+  initialEvidence?: ForecastDashboardEvidence | null;
   initialSymbol?: string;
 }) {
   // Triggers EDGAR ticker-names fetch + re-render so the header company
@@ -4103,6 +4107,14 @@ export default function SymbolPage({
           }}
           backLabel={prevLoc.label}
           onToast={showToast}
+        />
+      </Reveal>
+
+      <Reveal as="div" style={{ marginTop: 12 }}>
+        <DashboardEvidence
+          evidence={initialEvidence}
+          forecastSnapshotDate={em?.ml_snapshot_date ?? null}
+          optionsAsOf={data.as_of_date}
         />
       </Reveal>
 

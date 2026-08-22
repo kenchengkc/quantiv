@@ -6,7 +6,11 @@ import json
 from datetime import date, timedelta
 from pathlib import Path
 
-from build_frontend_data import WEEK_OFFSETS, build_screener_payload
+from build_frontend_data import (
+    WEEK_OFFSETS,
+    build_dashboard_evidence,
+    build_screener_payload,
+)
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -83,3 +87,51 @@ def test_week_manifest_references_valid_payloads_with_matching_counts():
         assert len(payload["events"]) == week["count"]
         for event in payload["events"]:
             assert REQUIRED_EVENT_KEYS <= event.keys()
+
+
+def test_dashboard_evidence_is_one_compact_run_level_manifest():
+    receipt = {
+        "schema": "quantiv.evidence-receipt.v1",
+        "receipt_id": "sha256:" + "a" * 64,
+        "receipt_file": "forecasts_2026-08-22.aaaaaaaaaaaa.receipt.json",
+        "validated_at": "2026-08-22T20:00:00+00:00",
+        "quality": {"status": "passed", "issue_count": 0, "issue_codes": []},
+        "horizons": [3, 7],
+        "artifacts": [
+            {
+                "name": "model_bundle",
+                "producer": "apps/ml/model_trainer_v3.py",
+                "member_count": 14,
+                "bytes": 1234,
+                "sha256": "b" * 64,
+                "members": [{"path": "must-not-ship-to-dashboard.json"}],
+            }
+        ],
+        "reconciliation": {
+            "forecasts": {
+                "rows": 12,
+                "symbols": 4,
+                "events": 4,
+                "horizons": [3, 7],
+                "data_window": {"snapshot_max": "2026-08-21"},
+                "reconciliation": {
+                    "duplicate_serving_keys": 0,
+                    "quantile_crossings": 0,
+                },
+            }
+        },
+    }
+
+    evidence = build_dashboard_evidence(receipt)
+
+    assert evidence["schema"] == "quantiv.dashboard-evidence.v1"
+    assert evidence["coverage"] == {
+        "rows": 12,
+        "symbols": 4,
+        "events": 4,
+        "horizons": [3, 7],
+    }
+    assert evidence["controls"]["evaluated"] == 2
+    assert evidence["controls"]["exceptions"] == 0
+    assert evidence["artifact_bundles"][0]["sha256"] == "b" * 64
+    assert "members" not in evidence["artifact_bundles"][0]

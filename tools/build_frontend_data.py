@@ -39,6 +39,7 @@ DATA_DIR = REPO_ROOT / "data"
 PUBLIC_DIR = REPO_ROOT / "apps" / "frontend" / "public"
 EARNINGS_CSV = DATA_DIR / "earnings_calendar.csv"
 FORECASTS_DIR = DATA_DIR / "forecasts"
+FORECAST_RECEIPT_PATH = FORECASTS_DIR / "receipts" / "latest_forecasts.json"
 PROVIDER_ENRICHMENTS_DIR = DATA_DIR / "provider_enrichments"
 MODEL_HORIZONS = [1, 2, 3, 7, 14, 21]
 MARKET_HOLIDAYS_TS = REPO_ROOT / "apps" / "frontend" / "lib" / "marketHolidays.generated.ts"
@@ -335,6 +336,79 @@ def write_to_public(relpath: str, content: str) -> None:
     path = PUBLIC_DIR / relpath
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content)
+
+
+def build_dashboard_evidence(receipt: dict) -> dict:
+    """Compress one pipeline receipt into the single manifest used by the UI."""
+    if receipt.get("schema") != "quantiv.evidence-receipt.v1":
+        raise ValueError("unsupported or missing forecast evidence schema")
+    if not str(receipt.get("receipt_id", "")).startswith("sha256:"):
+        raise ValueError("forecast evidence receipt_id must be a SHA-256 identifier")
+
+    forecast = (receipt.get("reconciliation") or {}).get("forecasts")
+    quality = receipt.get("quality")
+    artifacts = receipt.get("artifacts")
+    if not isinstance(forecast, dict) or not isinstance(quality, dict):
+        raise ValueError("forecast evidence is missing reconciliation or quality data")
+    if not isinstance(artifacts, list):
+        raise ValueError("forecast evidence is missing artifact bundles")
+
+    controls = forecast.get("reconciliation") or {}
+    artifact_bundles = [
+        {
+            key: artifact.get(key)
+            for key in ("name", "producer", "member_count", "bytes", "sha256")
+        }
+        for artifact in artifacts
+        if isinstance(artifact, dict)
+    ]
+    return {
+        "schema": "quantiv.dashboard-evidence.v1",
+        "receipt_id": receipt["receipt_id"],
+        "receipt_file": receipt.get("receipt_file"),
+        "validated_at": receipt.get("validated_at"),
+        "quality": {
+            "status": quality.get("status", "failed"),
+            "issue_count": int(quality.get("issue_count", 0)),
+            "issue_codes": quality.get("issue_codes") or [],
+        },
+        "coverage": {
+            "rows": int(forecast.get("rows", 0)),
+            "symbols": int(forecast.get("symbols", 0)),
+            "events": int(forecast.get("events", 0)),
+            "horizons": forecast.get("horizons") or receipt.get("horizons") or [],
+        },
+        "observation_window": forecast.get("data_window") or {},
+        "controls": {
+            "evaluated": len(controls),
+            "exceptions": int(quality.get("issue_count", 0)),
+            "results": controls,
+        },
+        "artifact_bundles": artifact_bundles,
+    }
+
+
+def publish_forecast_evidence() -> bool:
+    """Publish one small UI manifest; never duplicate receipts into symbol JSON."""
+    public_path = PUBLIC_DIR / "evidence" / "forecast.json"
+    if not FORECAST_RECEIPT_PATH.exists():
+        public_path.unlink(missing_ok=True)
+        print("⚠️  No forecast evidence receipt; public trust manifest removed")
+        return False
+    try:
+        receipt = json.loads(FORECAST_RECEIPT_PATH.read_text())
+        evidence = build_dashboard_evidence(receipt)
+    except (OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
+        public_path.unlink(missing_ok=True)
+        raise ValueError(f"invalid forecast evidence receipt: {exc}") from exc
+    write_to_public("evidence/forecast.json", json.dumps(evidence, indent=2))
+    print(
+        "🧾 Forecast evidence → "
+        f"{evidence['quality']['status']} · "
+        f"{evidence['coverage']['rows']} rows · "
+        f"{evidence['controls']['exceptions']} exceptions"
+    )
+    return True
 
 
 def monday_of_week(d: date) -> date:
@@ -1688,6 +1762,7 @@ def main():
 
     (PUBLIC_DIR / "symbols").mkdir(parents=True, exist_ok=True)
     (PUBLIC_DIR / "weeks").mkdir(parents=True, exist_ok=True)
+    publish_forecast_evidence()
 
     conn = duckdb.connect()
     # Cap DuckDB memory so long-running symbol-detail loops don't OOM-segfault.

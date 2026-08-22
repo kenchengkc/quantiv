@@ -1,0 +1,68 @@
+{
+  "schema": "quantiv.dashboard-evidence.v1",
+  "receipt_id": "sha256:5c7f46c414783fa2cb6fa0c84e8f80be15485f239951a634102e73e4e0fddfd9",
+  "receipt_file": "forecasts_2026-08-22.5c7f46c41478.receipt.json",
+  "validated_at": "2026-08-22T21:49:44.254223+00:00",
+  "quality": {
+    "status": "passed",
+    "issue_count": 0,
+    "issue_codes": []
+  },
+  "coverage": {
+    "rows": 196,
+    "symbols": 81,
+    "events": 82,
+    "horizons": [
+      3,
+      7,
+      14,
+      21
+    ]
+  },
+  "observation_window": {
+    "earnings_max": "2026-09-10",
+    "earnings_min": "2026-08-24",
+    "scored_at_max": "2026-08-22T11:46:44.332905+00:00",
+    "scored_at_min": "2026-08-22T11:46:44.287645+00:00",
+    "snapshot_max": "2026-08-21",
+    "snapshot_min": "2026-08-03"
+  },
+  "controls": {
+    "evaluated": 16,
+    "exceptions": 0,
+    "results": {
+      "absolute_move_mismatches": 0,
+      "blank_symbols": 0,
+      "correction_factor_mismatches": 0,
+      "duplicate_serving_keys": 0,
+      "feature_schema_mismatches": 0,
+      "invalid_feature_values": 0,
+      "invalid_feature_vectors": 0,
+      "invalid_horizons": 0,
+      "invalid_market_input_rows": 0,
+      "iv_formula_mismatches": 0,
+      "max_point_median_gap": 0.011893899866404198,
+      "non_finite_values": 0,
+      "out_of_range_move_rows": 0,
+      "point_outside_band": 0,
+      "quantile_crossings": 0,
+      "straddle_handoff_mismatches": 0
+    }
+  },
+  "artifact_bundles": [
+    {
+      "name": "model_bundle",
+      "producer": "apps/ml/model_trainer_v3.py",
+      "member_count": 28,
+      "bytes": 869126,
+      "sha256": "d619693db111cac1323be9192ee5d151ede667dbf36b2a303af19a6dae735bcb"
+    },
+    {
+      "name": "forecast_snapshot",
+      "producer": "scripts/daily_score.py",
+      "member_count": 1,
+      "bytes": 142163,
+      "sha256": "9d7d1ca561d56e8deee7b3dbf06fe48e016b0068396959649ab9cc34266a38bf"
+    }
+  ]
+}
