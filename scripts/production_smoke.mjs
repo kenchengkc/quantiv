@@ -36,11 +36,20 @@ async function fetchOk(url, init) {
 
 await eventually('frontend shell and security headers', async () => {
   const response = await fetchOk(`${frontendUrl}/`);
-  if (response.headers.get('x-content-type-options') !== 'nosniff') {
-    throw new Error('X-Content-Type-Options is missing');
+  const expectedHeaders = {
+    'x-content-type-options': 'nosniff',
+    'x-frame-options': 'SAMEORIGIN',
+    'referrer-policy': 'strict-origin-when-cross-origin',
+    'permissions-policy': 'camera=(), geolocation=(), microphone=()',
+    'x-dns-prefetch-control': 'off',
+  };
+  for (const [name, expected] of Object.entries(expectedHeaders)) {
+    if (response.headers.get(name) !== expected) {
+      throw new Error(`${name} is missing or unexpected`);
+    }
   }
-  if (response.headers.get('x-frame-options') !== 'SAMEORIGIN') {
-    throw new Error('X-Frame-Options is missing');
+  if (!response.headers.get('strict-transport-security')?.includes('max-age=')) {
+    throw new Error('strict-transport-security is missing');
   }
 });
 
@@ -64,5 +73,15 @@ await eventually('backend health', async () => {
   const payload = await response.json();
   if (!['healthy', 'degraded'].includes(payload?.status)) {
     throw new Error(`unexpected health status: ${payload?.status ?? 'missing'}`);
+  }
+});
+
+await eventually('backend documentation is not public', async () => {
+  const response = await fetch(`${backendUrl}/openapi.json`, {
+    headers: { accept: 'application/json' },
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (response.status !== 401 && response.status !== 404) {
+    throw new Error(`${backendUrl}/openapi.json returned ${response.status}`);
   }
 });

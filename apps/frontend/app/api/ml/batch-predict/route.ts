@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { BackendProxyError, backendProxyConfigured, proxyJsonPost } from '@/lib/backendProxy';
+import { enforceRateLimit, PUBLIC_RATE_LIMITS } from '@/lib/rateLimit';
 import {
   NO_STORE,
   PredictRequestSchema,
@@ -46,6 +47,9 @@ function buildFallbackItem(
 }
 
 export async function POST(req: NextRequest) {
+  const rateLimited = await enforceRateLimit(req, PUBLIC_RATE_LIMITS.mlBatchPredict);
+  if (rateLimited) return rateLimited;
+
   let body: unknown;
   try {
     body = await req.json();

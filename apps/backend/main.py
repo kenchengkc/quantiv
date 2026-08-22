@@ -79,6 +79,7 @@ def _is_production() -> bool:
         os.getenv("ENVIRONMENT", "").lower() in {"production", "prod"}
         or os.getenv("NODE_ENV", "").lower() == "production"
         or os.getenv("RAILWAY_ENVIRONMENT", "").lower() == "production"
+        or os.getenv("RAILWAY_ENVIRONMENT_NAME", "").lower() == "production"
     )
 
 
@@ -310,11 +311,20 @@ app = FastAPI(
 )
 
 rate_limit_default = os.getenv("RATE_LIMIT_DEFAULT", "60/minute").strip() or "60/minute"
+rate_limit_outage_fallback = (
+    os.getenv("RATE_LIMIT_OUTAGE_FALLBACK", "1000000/minute").strip()
+    or "1000000/minute"
+)
 rate_limit_storage = os.getenv("REDIS_URL") or "memory://"
 limiter = Limiter(
     key_func=get_remote_address,
     default_limits=[rate_limit_default],
     storage_uri=rate_limit_storage,
+    # SlowAPI's swallow_errors path still tries to inject missing request state.
+    # A permissive in-memory fallback preserves fail-open availability while
+    # retaining a finite emergency ceiling if Redis is unreachable.
+    in_memory_fallback=[rate_limit_outage_fallback],
+    swallow_errors=True,
     enabled=_env_flag("RATE_LIMIT_ENABLED", True),
 )
 app.state.limiter = limiter

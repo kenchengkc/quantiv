@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => ({
   slidingWindow: vi.fn(),
 }));
 
-vi.mock('@/lib/redis', () => ({
+vi.mock('./redis', () => ({
   getRedis: mocks.getRedis,
 }));
 

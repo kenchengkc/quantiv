@@ -15,10 +15,10 @@ from fastapi.testclient import TestClient
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND_DIR))
 
-from middleware import hmac_auth
-from middleware.hmac_auth import _expected_sig
-from models import MLPredictResponse
-from routers import ml_predict
+from middleware import hmac_auth  # noqa: E402
+from middleware.hmac_auth import _expected_sig  # noqa: E402
+from models import MLPredictResponse  # noqa: E402
+from routers import ml_predict  # noqa: E402
 
 SECRET = "test-backend-secret"
 NOW_MS = 1_800_000_000_000
@@ -44,8 +44,10 @@ def load_main(monkeypatch):
             "ENVIRONMENT",
             "NODE_ENV",
             "RAILWAY_ENVIRONMENT",
+            "RAILWAY_ENVIRONMENT_NAME",
             "RATE_LIMIT_DEFAULT",
             "RATE_LIMIT_ENABLED",
+            "RATE_LIMIT_OUTAGE_FALLBACK",
             "REDIS_URL",
         ):
             monkeypatch.delenv(name, raising=False)
@@ -175,6 +177,27 @@ def test_hmac_rejects_body_tampering_and_stale_timestamp(load_main, monkeypatch)
     assert stale_response.json() == {"detail": "timestamp out of window"}
 
 
+def test_hmac_rejections_do_not_consume_rate_limit(load_main, monkeypatch):
+    main = load_main(
+        BACKEND_SHARED_SECRET=SECRET,
+        RATE_LIMIT_DEFAULT="1/minute",
+    )
+
+    async def fake_predict(req):
+        return _prediction(req)
+
+    monkeypatch.setattr(ml_predict, "_predict_response", fake_predict)
+    client = TestClient(main.app)
+    body = b'{"symbol":"AAPL","horizon_days":7}'
+
+    assert client.post("/api/ml/predict", content=body).status_code == 401
+    assert client.post("/api/ml/predict", content=body).status_code == 401
+
+    headers = _signed_headers("POST", "/api/ml/predict", body)
+    assert client.post("/api/ml/predict", content=body, headers=headers).status_code == 200
+    assert client.post("/api/ml/predict", content=body, headers=headers).status_code == 429
+
+
 def test_ml_routes_reject_malformed_symbols(load_main, monkeypatch):
     main = load_main(BACKEND_SHARED_SECRET=SECRET)
     called = False
@@ -203,7 +226,11 @@ def test_ml_routes_reject_malformed_symbols(load_main, monkeypatch):
 
 
 def test_docs_default_off_in_production_and_overrideable(load_main):
-    production = load_main(ENVIRONMENT="production", BACKEND_SHARED_SECRET=SECRET)
+    production = load_main(
+        ENVIRONMENT="",
+        RAILWAY_ENVIRONMENT_NAME="production",
+        BACKEND_SHARED_SECRET=SECRET,
+    )
     production_client = TestClient(production.app)
 
     assert production_client.get("/docs").status_code == 401
@@ -287,3 +314,23 @@ def test_redis_url_selects_shared_rate_limit_storage(load_main):
     )
 
     assert main.limiter._storage_uri == "redis://localhost:6379/9"
+    assert main.limiter._swallow_errors is True
+
+
+def test_redis_rate_limit_failure_fails_open(load_main, monkeypatch):
+    main = load_main(
+        REDIS_URL="redis://127.0.0.1:1/9",
+        RATE_LIMIT_DEFAULT="1/minute",
+    )
+
+    async def fake_predict(req):
+        return _prediction(req)
+
+    monkeypatch.setattr(ml_predict, "_predict_response", fake_predict)
+    response = TestClient(main.app).post(
+        "/api/ml/predict",
+        content=b'{"symbol":"AAPL","horizon_days":7}',
+        headers={"content-type": "application/json"},
+    )
+
+    assert response.status_code == 200
