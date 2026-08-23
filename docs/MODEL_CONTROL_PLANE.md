@@ -17,10 +17,12 @@ Each immutable `models/bundles/<sha256>/` directory contains:
 - a signed manifest with every filename, byte length, SHA-256 digest, source
   revision, and passing validation receipt ID.
 
-R2 synchronization first verifies the signed champion pointer and manifest,
+R2 uploads immutable bundle contents first and replaces the signed champion
+pointer last. Railway synchronization verifies that pointer and manifest,
 downloads only declared filenames into a temporary directory, verifies every
-digest, and atomically changes the `current` symlink. Interrupted, partial,
-unsigned, replayed, or altered downloads leave the previous champion active.
+digest, and native-loads all six point models and thirty quantile heads before
+atomically changing the `current` symlink. Interrupted, partial, unsigned,
+replayed, altered, or unloadable bundles leave the previous champion active.
 
 ## Training and challenger gates
 
@@ -69,6 +71,30 @@ more than 5% or severe 80% interval undercoverage. Rollback creates a new signed
 pointer with the evidence embedded in its decision record; it never mutates an
 old bundle.
 
+## Serving handoff
+
+A promotion or rollback is incomplete until serving activation and forecast
+import prove the same 64-character bundle ID:
+
+```text
+signed control decision
+→ immutable bundle upload
+→ champion pointer promoted last
+→ Railway receives expected bundle ID
+→ digest + native-model preflight
+→ atomic serving-path activation
+→ serving activation receipt
+→ same-bundle forecast import to Neon
+```
+
+`ADMIN_API_KEY` and `DATABASE_URL` are mandatory for this handoff. The workflow
+fails visibly instead of treating either missing secret as a successful skip.
+`scripts/activate_model_bundle.py` writes a content-addressed
+`quantiv.serving-activation.v1` receipt. The Neon importer then rejects mixed
+bundles or a forecast whose `model_bundle_id` differs from the activated
+champion. Rollback rescoring explicitly reads the signed rollback bundle rather
+than the newly trained candidate directory.
+
 ## Main files
 
 - `apps/ml/ml/model_bundle.py`: signing, verification, manifests, pointers, and registry.
@@ -76,3 +102,4 @@ old bundle.
 - `apps/ml/ml/walk_forward_validation.py`: mandatory walk-forward gate.
 - `apps/ml/ml/model_control.py`: common-holdout comparison, drift, shadows, outcomes.
 - `scripts/model_control_plane.py`: workflow-facing decisions, monitoring, and rollback.
+- `scripts/activate_model_bundle.py`: exact-bundle serving activation and receipt.

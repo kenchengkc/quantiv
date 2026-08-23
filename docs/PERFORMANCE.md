@@ -9,7 +9,7 @@ and intentional loading gates dominate.
 | Symptom | Likely cause |
 |---------|----------------|
 | Screener / calendar blank for 1–4s | `contentReady` waits for logos + batch quotes + min skeleton delay |
-| Symbol page slow after navigation | 3.4k-line client bundle + redundant JSON fetches |
+| Symbol page slow after navigation | Chart-heavy client bundle + redundant metadata fetches |
 | Every route feels heavy | Clerk + React Query + 3 Google font families in root layout |
 | Repeat visit faster | `next.config.js` CDN cache on `/screener.json`, `/weekly.json` — helps returns, not first paint |
 
@@ -42,11 +42,17 @@ The table stays on skeleton until **all** of these are true:
 
 | File | Lines |
 |------|------:|
-| `app/[symbol]/SymbolPageClient.tsx` | ~3,400 |
+| `app/[symbol]/SymbolPageClient.tsx` | ~1,160 |
+| `app/[symbol]/SymbolPageHeader.tsx` | ~1,130 |
+| `app/[symbol]/ForecastPanels.tsx` | ~1,105 |
+| `app/[symbol]/HistoryRiskPanels.tsx` | ~760 |
 | `components/EarningsScreener.tsx` | ~2,100 |
 | `components/EarningsGrid.tsx` | ~1,000 |
 
-There are **no** `next/dynamic()` splits. The symbol route server component only validates the ticker, then renders the full client tree.
+The symbol page is now separated by visible surface, so header/KPI, forecast,
+history/risk, and controller work can change independently. These are still
+static client imports, not network-level chunk boundaries; the symbol route
+server component validates the ticker and renders the client tree.
 
 **Quick wins:** `dynamic()` for chart / heavy sections; server-pass props for name/exchange to skip client fetches.
 

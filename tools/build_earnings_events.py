@@ -359,7 +359,7 @@ def create_duckdb_views(conn: duckdb.DuckDBPyConnection, data_dir: Path):
             WHERE 1=0
         """)
 
-    # v_vix — daily VIX close from FRED. Used as a market-regime feature.
+    # v_vix — authoritative daily VIX close from CBOE. Used as a market-regime feature.
     vix_path = data_dir / "parquet" / "vix" / "vix.parquet"
     if vix_path.exists():
         conn.execute(f"""

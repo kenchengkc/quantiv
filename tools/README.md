@@ -13,6 +13,12 @@ or locally via `npm run data:frontend` (which calls `build_frontend_data.py`).
 | `build_earnings_events.py` | Legacy/helper earnings event builder — run manually if needed | No |
 | `math_baseline.py` | EM baseline math experiments | Manual |
 
+`build_frontend_data.py` is a small orchestration entrypoint. Its
+`frontend_data/` package separates forecast/evidence inputs, timing-aware
+realized-move reconciliation, calendar/screener/symbol payload construction,
+and atomic public-file writes. Experimental provider fields are filtered by the
+paired-evidence policy before payload construction.
+
 Env: `DATA_DIR`, `DUCKDB_PATH` in `config/.env.local` (see [`.env.example`](../.env.example)).
 TwelveData fallback requires `TWELVEDATA_API_KEY` in the environment that runs
 `build_frontend_data.py` (GitHub Actions for production). Optional tuning env:

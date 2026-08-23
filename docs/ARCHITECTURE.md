@@ -8,12 +8,12 @@ Quantiv has three independent paths:
 
 1. **Static dashboard generation** — scheduled ingestion, validation, scoring, and JSON publication.
 2. **Live ML inference** — an optional signed Vercel-to-Railway request path.
-3. **Live quotes** — multiple writers sharing an Upstash Redis cache.
+3. **Live quotes** — one lease-elected regular-hours writer with explicit fallbacks.
 
 ```mermaid
 flowchart TB
   subgraph nightly["Nightly data and ML pipeline — GitHub Actions"]
-    PROVIDERS["DoltHub · Finnhub · FMP · FRED"]
+    PROVIDERS["DoltHub · Finnhub · FMP · CBOE"]
     SYNC["Sync and reconcile data"]
     FILES["CSV and Parquet artifacts"]
     GATE["Integrity and freshness checks"]
@@ -45,12 +45,14 @@ flowchart TB
   end
 
   subgraph quotes["Live quote pipeline"]
-    WRITERS["Railway worker · Vercel cron · Polygon refresh"]
+    OWNER["One regular-hours lease owner"]
+    FALLBACKS["Vercel failover · off-hours broad refresh"]
     UPSTASH[(Upstash Redis)]
     BATCH["Vercel batch-price API"]
     INTEREST["quote:interest rankings"]
 
-    WRITERS -->|Write quote keys| UPSTASH
+    OWNER -->|Write quote keys| UPSTASH
+    FALLBACKS -->|Only when primary ownership is absent| OWNER
     UPSTASH -->|Read quotes| BATCH
     BATCH -->|Return prices| VERCEL
     BATCH -->|Record demand| INTEREST
@@ -93,7 +95,8 @@ When configured, symbol and watchlist pages can request live re-inference throug
 Vercel
 → HMAC-signed request
 → Railway FastAPI
-→ Postgres and DuckDB-backed features
+→ persisted Neon feature_vector
+→ latest stock-price substitution
 → prediction response
 ```
 
@@ -101,34 +104,28 @@ The proxy uses `BACKEND_URL` and `BACKEND_SHARED_SECRET`. See [HMAC_PROXY.md](HM
 
 If Railway is unavailable, the frontend can continue displaying ML fields embedded in nightly static JSON.
 
-### Prediction implementations
-
-The current frontend path uses:
+The only production inference path is:
 
 ```text
 POST /api/ml/predict
 → predict_service
-→ Postgres feature_vector
-```
-
-Older DuckDB-backed GET routes remain available for direct backend use:
-
-```text
-GET /em/*
-GET /api/expected-move
-→ MLService
-→ DuckDB
+→ Neon feature_vector
+→ signed native LightGBM champion
 ```
 
 ## Live quote path
 
-All quote writers share Upstash keys in the form `quote:{symbol}`.
+The quote path uses Upstash keys in the form `quote:{symbol}`. During the
+regular quote window, `quote:regular:lease` elects exactly one active writer.
 
 ### Writers
 
-1. **Railway quote worker** — primary scaled writer using Finnhub WebSocket data for high-priority symbols and REST for the long tail.
-2. **Vercel `refresh-prices`** — regular-hours fallback using a rotating Finnhub cursor and selected Alpaca IEX extended-hours data.
-3. **Vercel `refresh-broad`** — off-hours broad refresh using Polygon grouped-daily data.
+1. **Railway quote worker** — preferred lease owner, using Finnhub WebSocket data for high-priority symbols and REST for the long tail.
+2. **Vercel `refresh-prices`** — automatic failover. It must acquire the same lease before writing and never runs as a concurrent regular-hours owner.
+3. **Vercel `refresh-broad`** — off-hours cache warmup using Polygon grouped-daily data; it is not a competing regular-hours writer.
+
+The Cloudflare Worker only invokes the Vercel failover route. It does not fetch
+or write quotes itself.
 
 Client reads go through `/api/stocks/batch-price`. That route reads cached quotes, applies a short in-memory cache, and records context-weighted demand in the `quote:interest` sorted set. The Railway worker reads those rankings to prioritize active symbols.
 
@@ -140,16 +137,16 @@ Protected cron routes use `CRON_SECRET` and `BROAD_REFRESH_SECRET`.
 |---|---|---|
 | Vercel | Next.js app, API routes, and static JSON | Yes for hosted web deployment |
 | Cloudflare R2 | Parquet datasets and model artifacts | Yes for the hosted data pipeline |
-| GitHub Actions | Validation, refresh, enrichment, and model workflows | Yes for automated refreshes |
+| GitHub Actions | Validation, refresh, publication, and model workflows | Yes for automated refreshes |
 | Upstash Redis | Quote cache and interest rankings | Required for live quotes |
 | Finnhub | Earnings overlay and regular-hours quote source | Required for the primary quote workflow |
 | Clerk | Watchlist and admin authentication | Optional |
 | Neon | Watchlists, forecasts, and cron metadata | Optional for public browsing |
-| Railway FastAPI | Live ML inference and legacy backend routes | Optional |
+| Railway FastAPI | Live ML re-inference from persisted feature vectors | Optional |
 | Railway quote worker | Scaled quote ingestion | Optional |
 | Polygon | Off-hours broad quote refresh | Optional |
 | Alpaca IEX | Intraday bars and selected extended-hours data | Optional |
-| Cloudflare Worker | High-frequency Vercel quote trigger | Optional |
+| Cloudflare Worker | Trigger for the lease-gated Vercel quote fallback | Optional |
 
 Production DNS:
 
@@ -167,7 +164,7 @@ See [RAILWAY_SETUP.md](RAILWAY_SETUP.md) for deployment instructions.
 | DoltHub | Historical earnings-calendar baseline |
 | Finnhub | Near-term earnings, profiles, logos, and live quotes |
 | Financial Modeling Prep | Earnings, EPS, and revenue enrichment |
-| FRED | VIX and macro-volatility inputs |
+| CBOE | Authoritative VIX history |
 | SEC EDGAR | Ticker names, exchanges, and company identity metadata |
 | Alpaca IEX | Intraday and selected extended-hours prices |
 | Polygon | Off-hours broad quote refresh |
@@ -194,13 +191,13 @@ See [RAILWAY_SETUP.md](RAILWAY_SETUP.md) for deployment instructions.
 | `daily-refresh.yml` | Nightly | Data refresh, scoring, frontend generation, and optional training |
 | `refresh-broad.yml` | Weekday off-hours | Polygon quote-cache warming |
 | `refresh-ticker-names.yml` | Quarterly | SEC ticker-name and exchange refresh |
-| Enrichment workflows | Scheduled or manual | Provider-specific metadata enrichment |
+| `av-enrichment.yml` | Manual only | Isolated provider-signal research artifact; never writes to `main` |
 
 The nightly workflow broadly performs:
 
 ```text
 Pull R2 artifacts
-→ synchronize and reconcile providers
+→ synchronize core providers and reconcile inputs
 → validate the earnings calendar
 → push Parquet artifacts
 → build DuckDB views
@@ -215,15 +212,21 @@ Pull R2 artifacts
 
 Sunday runs may retrain a signed LightGBM challenger. Mandatory walk-forward,
 baseline, calibration, forecast-handoff, common-holdout, and shadow gates decide
-whether its immutable bundle replaces the champion. Railway atomically activates
-only the signed champion; realized monitoring can sign a rollback to the previous
-bundle. See [Model control plane](MODEL_CONTROL_PLANE.md). Saturday runs perform
+a bundle replaces the champion. R2 publishes bundle contents before its signed
+pointer. Railway verifies digests, preflights all native models, atomically
+activates the exact decision bundle, and writes an activation receipt before
+the same-bundle forecast is allowed into Neon. Realized monitoring can sign a
+rollback to the previous bundle. See [Model control plane](MODEL_CONTROL_PLANE.md). Saturday runs perform
 a Finnhub profile and logo sweep.
 
 ML/model publication is fail-closed and produces a shared run-level evidence
 receipt rather than per-value lineage records. See
 [Evidence receipts](EVIDENCE_RECEIPTS.md) for the contract and zero-database-cost
 publication path.
+
+Experimental vendor signals are frozen across collection, frontend publication,
+and ML admission until a pinned paired walk-forward result passes the no-added-
+cost policy. See [Provider signal promotion policy](PROVIDER_SIGNAL_POLICY.md).
 
 The data pipeline also emits one exception-first reconciliation manifest from
 the existing DuckDB views and mapping files. Critical exceptions block scoring;

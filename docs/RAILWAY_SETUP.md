@@ -12,9 +12,9 @@ Before you start, have these handy:
   generate a new token at Cloudflare → R2 → Manage API tokens.**
 - The Upstash Redis **TCP** URL (not the REST URL the frontend uses).
   Upstash → Details → "TLS-Endpoint" — `rediss://default:<password>@<host>:6379`.
-- Optional: `ADMIN_API_KEY` (`openssl rand -hex 16`) for cache-bust/admin routes.
-  Add the same value as a GitHub Actions secret if you want the weekly model
-  retrain workflow to hot-sync fresh R2 models onto Railway automatically.
+- `ADMIN_API_KEY` (`openssl rand -hex 16`) for model activation/admin routes.
+  Add the same value as a GitHub Actions secret. A promoted or rolled-back
+  model fails its workflow handoff when this secret is absent.
 
 Set `BACKEND_SHARED_SECRET` to match Vercel (see [HMAC_PROXY.md](HMAC_PROXY.md)).
 When set, direct public calls to `/api/ml/predict` return **401** without a
@@ -57,20 +57,17 @@ Service → **Variables**:
 
 | Variable | Value | Notes |
 |---|---|---|
-| `DATA_BACKEND` | `hybrid` | Postgres + DuckDB |
 | `DATA_DIR` | `/data` | Not `./data` |
-| `DUCKDB_PATH` | `/data/quantiv.duckdb` | On the volume |
-| `DATABASE_URL` | `postgres://...` | Same Neon URL as Vercel |
+| `DATABASE_URL` | `postgres://...` | Neon forecast feature vectors and import receipts |
 | `REDIS_URL` | `rediss://default:...@...upstash.io:6379` | TCP, not REST |
 | `R2_ACCOUNT_ID` | Cloudflare account ID | |
 | `R2_ACCESS_KEY_ID` | R2 token | secret |
 | `R2_SECRET_ACCESS_KEY` | R2 token | secret |
 | `R2_BUCKET` | `quantiv` | |
 | `FRONTEND_URL` | `https://usequantiv.com` | CORS |
-| `ADMIN_API_KEY` | `openssl rand -hex 16` | optional |
+| `ADMIN_API_KEY` | `openssl rand -hex 16` | required for production model activation |
 | `BACKEND_SHARED_SECRET` | `openssl rand -hex 32` | must match Vercel |
 | `ENVIRONMENT` | `production` | |
-| `POLYGON_API_KEY` | … | optional live context |
 | `FINNHUB_API_KEY` | … | required for the quote worker service only |
 
 Do **not** put `NEXT_PUBLIC_*`, `POSTGRES_HOST=localhost`, or `ENABLE_ALPACA_*` here — those belong on Vercel.
@@ -86,8 +83,9 @@ python workers/quote_worker.py
 
 Use the same Dockerfile (`apps/backend/Dockerfile`) and the same `REDIS_URL`,
 `DATABASE_URL`, `FINNHUB_API_KEY`, `FRONTEND_URL`, and `ENVIRONMENT=production`
-variables. The worker writes the same `quote:{SYMBOL}` Redis cache records that
-the Vercel cron route writes, so the frontend read path stays unchanged.
+variables. The worker writes `quote:{SYMBOL}` Redis records. The Vercel route
+is an automatic fallback and must acquire the same canonical lease before
+writing, so the read path stays unchanged without concurrent owners.
 
 Optional worker tuning:
 
@@ -173,12 +171,19 @@ is accepted as a fallback.
 Browser entrypoint: `POST https://usequantiv.com/api/ml/predict` (not Railway directly).
 Details: [HMAC_PROXY.md](HMAC_PROXY.md).
 
-For weekly model hot-sync, set these GitHub Actions secrets:
+For weekly model activation, set these GitHub Actions secrets:
 
 | Secret | Value |
 |---|---|
 | `ADMIN_API_KEY` | Same as Railway `ADMIN_API_KEY` |
 | `RAILWAY_BACKEND_URL` | Optional; defaults to `https://api.usequantiv.com` |
+
+The retrain job sends the expected 64-character champion bundle ID to Railway.
+Railway rejects a different R2 pointer, verifies the signed manifest and every
+artifact digest, native-loads all six point models and thirty quantile heads,
+then atomically switches the serving path. GitHub stores a
+`quantiv.serving-activation.v1` receipt and only then imports forecasts whose
+`model_bundle_id` matches that activation.
 
 ---
 
@@ -189,7 +194,7 @@ For weekly model hot-sync, set these GitHub Actions secrets:
 | `404 Application not found` | No healthy deploy; wrong service; domain on frontend service |
 | `502 Application failed to respond` | Port mismatch — set Networking target port = `PORT` from logs; check crash logs |
 | Healthcheck failed / uvicorn crash | Remove `startCommand` from `railway.toml`; redeploy |
-| `hybrid` startup error | Set `DATABASE_URL`; use `/data` not `./data` |
+| Postgres startup error | Set `DATABASE_URL`; use `/data` for the model volume |
 | Empty forecasts | Expected on fresh volume — pull R2 or run `daily_score`; startup no longer hard-fails |
 
 ---
@@ -199,4 +204,5 @@ For weekly model hot-sync, set these GitHub Actions secrets:
 - [ ] `curl https://api.usequantiv.com/health` returns app JSON (not Railway error envelope).
 - [ ] Volume mounted at `/data`; env paths use `/data/...`.
 - [ ] `DATABASE_URL` + `REDIS_URL` set.
+- [ ] `ADMIN_API_KEY` matches the GitHub Actions secret.
 - [ ] Vercel DNS: CNAME `api` → Railway target.

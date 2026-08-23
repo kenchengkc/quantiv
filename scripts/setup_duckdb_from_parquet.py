@@ -417,7 +417,7 @@ def setup_views(conn: duckdb.DuckDBPyConnection, data_dir: Path):
     else:
         print("[views] ⚠ Volatility history not found (neither Parquet nor CSV)")
 
-    # ── VIX (CBOE Volatility Index, from FRED) ──────────────────────
+    # ── VIX (CBOE Volatility Index, authoritative CBOE history) ─────
     vix_path = data_dir / "parquet" / "vix" / "vix.parquet"
     if vix_path.exists():
         conn.execute(f"""

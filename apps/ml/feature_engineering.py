@@ -100,7 +100,7 @@ def connect_duckdb() -> duckdb.DuckDBPyConnection:
                    NULL::DOUBLE AS drift_5d
             WHERE 1=0
         """)
-    # Daily VIX close from FRED. Used for VIX level, change, and rank.
+    # Daily VIX close from CBOE. Used for VIX level, change, and rank.
     if "v_vix" not in views:
         data_root = get_data_dir()
         vix_path = data_root / "parquet" / "vix" / "vix.parquet"

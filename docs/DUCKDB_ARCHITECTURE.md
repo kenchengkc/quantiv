@@ -1,130 +1,96 @@
-# DuckDB + Parquet Architecture (Quantiv)
+# DuckDB and Parquet architecture
 
-This document defines Parquet layout, DuckDB views, and how the backend reads them. History lives in Parquet + DuckDB. Neon holds watchlists and recent forecast rows.
+DuckDB is Quantiv's offline analytical engine. It reads local Parquet during
+scheduled feature engineering, validation, scoring, reconciliation, and static
+JSON generation. It is not a production FastAPI serving mode.
 
-## Goals
-- Keep historical data in columnar Parquet with predictable partitions and filenames.
-- Query via DuckDB views to enforce stable schemas and types.
-- Preserve API contracts while enabling a hybrid backend (DuckDB for history, Postgres/live for most-recent data).
+## Production boundary
 
-## Storage Conventions
-- Root: `data/`
-- Compression: Snappy (canonical for new exports). Legacy exports may use ZSTD.
-- File format: Parquet (pyarrow)
-- Timezone: All timestamps stored as UTC where applicable.
+```text
+R2 immutable Parquet release
+→ local data/parquet files in GitHub Actions
+→ DuckDB views and quality quarantine
+→ LightGBM scoring + frontend artifact build
+→ static JSON on Vercel
 
-### Layout
+Neon feature_vector rows
+→ Railway POST /api/ml/predict
 ```
+
+There is no `DATA_BACKEND` selector and no Postgres/DuckDB/hybrid backend
+abstraction. Railway reads current forecast feature vectors from Neon and loads
+signed native LightGBM bundles from its volume. Historical analytical queries
+stay in the scheduled/local DuckDB process.
+
+## Canonical layout
+
+```text
 data/
-├── options/
-│   └── year=YYYY/
-│       └── month=MM/
-│           └── options_YYYY_MM.parquet
-├── volatility/
-│   └── year=YYYY/
-│       └── volatility_YYYY.parquet
-├── forecasts/
-│   ├── em_forecasts.parquet
-│   ├── atm_features.parquet
-│   └── em_labels.parquet
-└── metadata/
-    ├── symbols_metadata.parquet
-    ├── model_meta.parquet
-    └── model_performance.parquet
+├── parquet/
+│   ├── options_chain/year=YYYY/month=MM/*.parquet
+│   ├── ohlcv/year=YYYY/month=MM/*.parquet
+│   ├── volatility_history/year=YYYY/month=MM/*.parquet
+│   └── vix/vix.parquet
+├── earnings_calendar.csv
+├── earnings_calendar.parquet
+├── forecasts/forecasts_YYYY-MM-DD.parquet
+├── ml_training/training_T{horizon}.parquet
+├── models/
+│   ├── bundles/<sha256>/
+│   ├── control/
+│   └── monitoring/
+└── control/
+    ├── releases/<release-id>.json
+    └── current_data_release.json
 ```
 
-### Partitioning Rules
-- Options: Hive-style `year`, `month` from quote `date`.
-- Volatility: Hive-style `year` from `date`.
-- Forecasts/Metadata: No partitioning (single files), may evolve to partitioned if volumes grow.
+The data-release pointer is signed and promoted only after its immutable
+Parquet members have uploaded and verified. Model bundles use a separate signed
+champion pointer.
 
-### Naming Rules
-- Options: `options_YYYY_MM.parquet` under `year=YYYY/month=MM/`
-- Volatility: `volatility_YYYY.parquet` under `year=YYYY/`
-- Forecasts/Metadata: `<table>.parquet` under respective folders.
+## Views and controls
 
-## Schema and Types
-DuckDB views cast Parquet columns to stable names and types. Current mapping reflects existing files where some columns are stored with numeric names.
+`scripts/setup_duckdb_from_parquet.py` creates the current analytical contract:
 
-### Options schema mapping (view `options_chain`)
-- id BIGINT ← "0"
-- date DATE ← "1"
-- act_symbol VARCHAR ← "2"
-- expiration DATE ← "3"
-- strike DOUBLE ← "4"
-- call_put VARCHAR ← "5"
-- bid DOUBLE ← "6"
-- ask DOUBLE ← "7"
-- vol DOUBLE ← "8"
-- delta DOUBLE ← "9"
-- gamma DOUBLE ← "10"
-- theta DOUBLE ← "11"
-- vega DOUBLE ← "12"
-- open_interest BIGINT ← "13"
-- volume BIGINT ← "14"
-- created_at TIMESTAMP ← "15"
-- Partition columns available in view: `partition_year`, `partition_month` (INTEGER)
+- `v_options_raw`: provider-shaped options rows from Parquet;
+- `v_options`: typed options fields plus quote-quality status;
+- `v_option_quote_quarantine`: crossed, nonpositive, stale, excessive-spread,
+  or otherwise unusable contracts;
+- `v_straddle_candidates`: synchronized call/put pairs and pair-level quality;
+- `v_straddle_quote_quarantine`: commercially unusable pairs;
+- `v_atm_options`: ATM legs selected only from eligible pairs;
+- `v_straddle_features`: straddle, ATM IV, skew, term, and quote evidence;
+- `v_earnings`: canonical earnings events;
+- `v_volhist_raw`: normalized vendor volatility history;
+- `v_vix`: authoritative CBOE VIX history;
+- `v_ohlcv`, `v_realized_vol`, and `v_iv_rv_features`: realized-volatility and
+  IV-versus-realized features when OHLCV is present.
 
-### Volatility schema mapping (view `volatility_history`)
-- id BIGINT ← "0"
-- date DATE ← "1"
-- symbol VARCHAR ← "2"
-- iv DOUBLE ← "3"
-- hv DOUBLE ← "4"
-- iv_rank DOUBLE ← "5"
-- iv_percentile DOUBLE ← "6"
-- created_at TIMESTAMP ← "7"
-- Partition column in view: `partition_year` (INTEGER)
+The same paired options view feeds the math baseline and ML feature extraction,
+so publication cannot silently use a looser quote-quality definition than
+training. Reconciliation and pipeline-validation scripts turn critical
+exceptions into mandatory workflow failures.
 
-Notes:
-- Exporter was updated to preserve column names when constructing DataFrames. Existing files may still have numeric column names; the views normalize these.
-- Dates use DuckDB DATE; timestamps use TIMESTAMP (UTC).
+## Rebuild and validate
 
-## DuckDB Database and Views
-- Database file: `quantiv.duckdb`
-- Created by: `scripts/setup_duckdb_from_parquet.py` (`npm run data:views`)
-- Extensions: `parquet`, `httpfs`
-- Important settings: `memory_limit`, `threads`, `temp_directory`
-
-### Core objects
-- Views from Parquet:
-  - `options_chain` ← `data/options/**/options_*.parquet` (hive_partitioning, union_by_name)
-  - `volatility_history` ← `data/volatility/**/volatility_*.parquet`
-  - ML/Metadata views (if files present): `em_forecasts`, `atm_features`, `em_labels`, `symbols_metadata`, `model_meta`, `model_performance`
-- Analytical views:
-  - `daily_iv_summary` (avg/median IV by `date`, `act_symbol`)
-  - `atm_options` (near-average strike per symbol/day)
-  - `symbol_summary` (per-symbol stats)
-- Materialized tables:
-  - `recent_options` (last 30 trading days from `options_chain`)
-  - `symbols_metadata_computed` (from `symbol_summary`)
-
-### Regeneration runbook
+```bash
+python scripts/setup_duckdb_from_parquet.py \
+  --data-dir ./data \
+  --db-file ./quantiv.duckdb
+python scripts/check_duckdb_freshness.py
+python scripts/reconcile_data_pipeline.py
 ```
-python3 scripts/setup_duckdb_from_parquet.py --data-dir ./data --db-file ./quantiv.duckdb
-```
-- Creates/loads extensions, sets DB settings, creates views/tables, runs light test queries, and exports schema info to `duckdb_schema.txt`.
 
-## Backend Integration
-- Env vars (see [`.env.example`](../.env.example)):
-  - `DATA_DIR` (default `./data`)
-  - `DUCKDB_PATH` (default `./quantiv.duckdb`)
-  - `DATA_BACKEND` = `postgres` | `duckdb` | `hybrid`
-- Backend abstraction implemented in `apps/backend/main.py` selects the active backend at startup and routes reads through DuckDB/Postgres/hybrid accordingly.
+The frontend artifact entrypoint is `tools/build_frontend_data.py`. Its small
+orchestrator delegates forecast/provider inputs, timing-aware realized moves,
+payload construction, and publication to `tools/frontend_data/` modules.
 
-## Performance & Quality
-- DuckDB views use `hive_partitioning=true` and `union_by_name=true` for robust schema handling.
-- Observed coverage (as of latest snapshot):
-  - `options_chain`: 85,706,146 rows (2020-01-04 → 2025-08-14)
-  - `volatility_history`: 1,509,260 rows (2019-02-09 → 2025-08-14)
-- Compression: Snappy for new exports; legacy `data/parquet/options_chains` is ZSTD and not required for production.
+## Operating principles
 
-## Exporter Guidelines
-- Legacy/manual exporters: `scripts/csv_to_parquet.py` (`npm run data:csv-parquet`) and `scripts/csv_to_parquet_volhist.py`
-- Defaults: Snappy compression, partitioning by year/month (options) and year (volatility)
-- Recommended: re-run exports that still have numeric column names when convenient; otherwise rely on DuckDB view casts.
-
-## Future-proofing
-- If ML volumes grow, adopt partitioning for forecasts by `horizon` and/or `quote_year`.
-- Add periodic compaction (coalesce small files) if write patterns produce many tiny Parquet files.
-- Maintain a schema registry (lightweight JSON) if needed for strong validation across pipelines.
+- Parquet members are immutable within a signed data release.
+- New schemas use explicit column names and Snappy compression.
+- DuckDB views normalize legacy provider columns at the analytical boundary.
+- Quote quarantine is preserved as evidence; rejected rows never enter ATM or
+  straddle selection.
+- Research scripts may read these views, but they stay outside the nightly job
+  unless a tested publication control explicitly promotes them.

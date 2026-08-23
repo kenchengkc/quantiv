@@ -1,6 +1,6 @@
 name: Daily data refresh
 
-# Nightly (11:00 UTC): R2 pull → provider sync → R2 push → DuckDB → score →
+# Nightly (11:00 UTC): R2 pull → core data sync → R2 push → DuckDB → score →
 # frontend JSON → commit. Weekly Sunday 12:00 UTC: retrain
 # (feature_engineering → model_trainer → score). Retrain pulls the earnings
 # calendar from R2 because it can start before the daily commit lands.

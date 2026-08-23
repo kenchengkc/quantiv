@@ -5,10 +5,19 @@ existing implied/vol features keep testing null) by adding **new, event-specific
 signals** to the ML model: analyst-estimate dispersion, put/call & options
 volume/OI, and short interest.
 
-## What already exists (don't rebuild)
+## Current production status
 
-`scripts/sync_provider_enrichments.py` already collects all three raw signals and
-writes them into the per-event `provider_enrichment` block on `screener.json`:
+This is a research record, not an active production roadmap. Supplemental
+provider collection, frontend publication, and ML admission are frozen by
+[`config/provider_signal_policy.json`](../config/provider_signal_policy.json).
+No signal below can ship until a pinned paired walk-forward report satisfies
+the no-added-cost policy.
+
+## What already exists in research tooling
+
+`scripts/sync_provider_enrichments.py --research-override` can collect all three
+derived signals into isolated research artifacts. Production frontend JSON does
+not publish them while their policy entries are frozen:
 
 | Signal | Source | Endpoint | Fields already captured |
 |---|---|---|---|
@@ -42,9 +51,9 @@ the pre-earnings snapshot* for every historical event. Two paths:
    going forward. Zero backfill risk, but no signal until ~4–8 quarters accrue.
    Use as the fallback for any source whose history isn't free.
 
-Decision rule: for each signal, spend ≤1 day probing free historical depth
-(`scripts/probe_provider_capabilities.py`); if <~2yr usable history, forward-
-accumulate instead of blocking.
+Decision rule: use a manual research artifact to evaluate existing history.
+Do not add scheduled probes or forward accumulation until the research plan has
+an explicit paired-test design and cost bound.
 
 ### Gap B — ML feature integration
 The enrichment lives in frontend JSON, **not** in DuckDB/`feature_engineering`.
@@ -82,8 +91,8 @@ free-tier walls on FMP:
   signal. Prior: likely null for point MAE.
 - **`limit` ≤ 10**, but **pagination works** (page 1 → 2011-2013), so annual
   history depth back to ~2007 is reachable.
-- **~250 requests/day**, and the nightly `sync_provider_enrichments` cron already
-  spends FMP quota — the backfill 429'd ("Limit Reach") after ~22 symbols. Only
+- **~250 requests/day** on the observed plan; the backfill 429'd ("Limit Reach")
+  after ~22 symbols. Only
   **one** FMP key configured (no key-pool). So a full S&P-500 annual backfill is
   ~4 days of daily-quota accumulation; the 7.6k-symbol universe is ~2 months.
 - AlphaVantage `EARNINGS_ESTIMATES` is the quarterly-granular alternative, but
@@ -102,7 +111,7 @@ The de-bias/calibrated band (shipped) was the realistic free-tier win.
 `scripts/research/backfill_analyst_dispersion.py` stays as the resumable tool if we choose to
 accumulate annual dispersion for an eventual paired test anyway.
 
-## Implemented: forward-accumulation (2026-06-04)
+## Historical experiment: forward accumulation (paused)
 
 Chose path (1). `scripts/accumulate_event_signals.py` snapshots, for every
 UPCOMING reporter (within `--lead-days`, from `weeks/*.json`), the Massive
@@ -110,15 +119,16 @@ options snapshot (put/call vol & OI ratios, VOI, ATM IV) + short interest, and
 appends to the append-only `data/event_signals_panel.jsonl`. Targeting upcoming
 reporters — not the popular-symbol set the enrichment cron uses — is the key:
 Massive has the headroom (58 calls in seconds; the `5/min` budget is self-imposed
-elsewhere). Wired into `daily-refresh.yml` (best-effort step) and `git add -f`'d
-so the panel persists across the stateless CI and grows daily.
+elsewhere). That scheduled step and its automatic commits were removed in
+August 2026. The script remains available for an isolated manual research run;
+it does not grow a production panel by default.
 
 Panel row: `{snapshot_date, act_symbol, earnings_date, timing, lead_days,
 put_call_oi_ratio, put_call_vol_ratio, options_voi, total_{call,put}_{oi,vol},
 atm_iv_snap, short_days_to_cover, short_interest, short_avg_vol, short_settlement}`.
-Note: the nightly run is ~7am ET (pre-market), so `*_vol`/VOI reflect the prior
-session (or are sparse) — OI ratios and short interest are the stable signals;
-the per-event snapshot closest before the print is the one to use.
+Note: the historical scheduled run was ~7am ET (pre-market), so its
+`*_vol`/VOI fields reflect the prior session (or are sparse). Any future paired
+test must use the last point-in-time snapshot before the print.
 
 **When mature (~4-8 quarters):** write `experiment_event_signals.py` (mirrors
 `scripts/research/experiment_garch_feature.py`): for each training event take the last panel

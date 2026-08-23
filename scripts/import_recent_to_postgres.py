@@ -4,8 +4,7 @@ Import the most recent forecast Parquet snapshot into Neon Postgres.
 
 Run by the daily-refresh GitHub Action right after ``scripts/daily_score.py``
 writes ``data/forecasts/forecasts_<YYYY-MM-DD>.parquet``. The FastAPI
-backend (Path B) queries this table for any endpoint that filters across
-the full forecast universe rather than scoring on demand.
+backend reads the stored feature vectors for live re-inference.
 
 Usage:
     DATABASE_URL=postgres://... python scripts/import_recent_to_postgres.py
@@ -23,12 +22,12 @@ Idempotent: rows are upserted on
 the same day's snapshot is a no-op.
 
 Schema notes:
-- Column names mirror the Parquet (act_symbol, earnings_date, ...) rather
-  than the legacy FastAPI Postgres column set (underlying, quote_ts,
-  band68_low, ...). The legacy ``/em/*`` routes in apps/backend/routers/em.py
-  reference the old column names and will need updating before they can
-  query against this table — Path B's ``/api/ml/predict`` route doesn't
-  touch this table at all.
+- Column names mirror the Parquet (`act_symbol`, `earnings_date`, ...).
+- `POST /api/ml/predict` reads the saved `feature_vector`, substitutes the
+  latest stock price, and scores it with the active signed model bundle.
+- Retrain/rollback CI passes `--expected-model-bundle-id` and
+  `--require-database` so serving/import mismatches or missing Neon authority
+  fail before any rows are written.
 """
 
 from __future__ import annotations

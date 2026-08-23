@@ -45,7 +45,7 @@ Quantiv has three primary system paths:
 ```mermaid
 flowchart TB
   subgraph nightly["Nightly data and ML pipeline — GitHub Actions"]
-    PROVIDERS["DoltHub · Finnhub · FMP · FRED"]
+    PROVIDERS["DoltHub · Finnhub · FMP · CBOE"]
     SYNC["Sync and reconcile data"]
     FILES["CSV and Parquet artifacts"]
     GATE["Integrity and freshness checks"]
@@ -77,12 +77,14 @@ flowchart TB
   end
 
   subgraph quotes["Live quote pipeline"]
-    WRITERS["Railway worker · Vercel cron · Polygon refresh"]
+    OWNER["One regular-hours lease owner"]
+    FALLBACKS["Vercel failover · off-hours broad refresh"]
     UPSTASH[(Upstash Redis)]
     BATCH["Vercel batch-price API"]
     INTEREST["quote:interest rankings"]
 
-    WRITERS -->|Write quote keys| UPSTASH
+    OWNER -->|Write quote keys| UPSTASH
+    FALLBACKS -->|Only when primary ownership is absent| OWNER
     UPSTASH -->|Read quotes| BATCH
     BATCH -->|Return prices| VERCEL
     BATCH -->|Record demand| INTEREST
@@ -104,8 +106,8 @@ See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for provider roles, API route
 | ML | LightGBM |
 | Persistence | Neon Postgres, Upstash Redis |
 | Authentication | Clerk |
-| Automation | GitHub Actions, Cloudflare Workers |
-| Market data | DoltHub, Finnhub, FMP, FRED, SEC EDGAR, Alpaca, Polygon |
+| Automation | GitHub Actions; Cloudflare triggers for the leased Vercel quote fallback |
+| Market data | DoltHub, Finnhub, FMP, CBOE, SEC EDGAR, Alpaca, Polygon |
 
 ## Repository structure
 

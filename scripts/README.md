@@ -11,13 +11,13 @@ See [`.github/workflows/daily-refresh.yml`](../.github/workflows/daily-refresh.y
 | `sync_dolthub.py` | Options, earnings, OHLCV, vol history from DoltHub | `data:sync*`, nightly |
 | `sync_finnhub_earnings.py` | Near-term earnings overlay into `data/earnings_calendar.csv` | `data:earnings:finnhub`, nightly |
 | `sync_fmp_earnings.py` | Date-window FMP EPS/revenue overlay into `data/earnings_calendar.csv` | `data:earnings:fmp`, nightly |
-| `backfill_fmp_earnings_by_symbol.py` | Free-tier-safe one-symbol FMP EPS/revenue history backfill | `data:earnings:fmp-backfill`, nightly |
+| `backfill_fmp_earnings_by_symbol.py` | One-symbol FMP EPS/revenue history research backfill | `data:earnings:fmp-backfill`, manually enabled only |
 | `apply_earnings_overrides.py` | Re-applies `config/earnings_overrides.json` (manual date/timing/fiscal corrections) on top of provider syncs so they survive the nightly re-pull | `data:earnings:overrides`, nightly (after earnings syncs, before build) |
 | `sync_finnhub_profiles.py` | Market-hours-guarded Finnhub profile/logo cache for `ticker-logos.json` | `data:profiles:finnhub`, weekly/manual |
-| `sync_vix.py` | FRED VIX → Parquet | Nightly |
-| `probe_alphavantage_voi.py` | Persistent multi-day Alpha Vantage V/OI entitlement and coverage audit | `data:probe:alphavantage-voi`, nightly |
-| `probe_provider_capabilities.py` | Quota-managed entitlement/shape probes for FMP, Alpha Vantage, Massive/Polygon, and TwelveData additive endpoints | `data:probe:providers`, nightly |
-| `sync_provider_enrichments.py` | Product enrichment tables used by frontend JSON: news signals, company facts, options provider signals, corporate actions | `data:providers:enrich`, nightly |
+| `sync_vix.py` | Authoritative CBOE VIX history → Parquet | Nightly |
+| `probe_alphavantage_voi.py` | Alpha Vantage V/OI entitlement research | Manual research only |
+| `probe_provider_capabilities.py` | Additive-provider entitlement/shape research | Manual research only |
+| `sync_provider_enrichments.py` | Derived provider-signal research tables, production-policy gated | Manual research workflow |
 | `detect_delistings.py` | Flags forecast-universe tickers gone from NASDAQ/NYSE directories; auto-adds confirmed delistings to `config/delisted_tickers.json` after N days (renames excluded) | Nightly (before integrity gate) |
 | `delisted.py` | Loader for `config/delisted_tickers.json` + `config/ticker_renames.json` (delistings & old→new symbol remaps; shared by the gates + `sync_dolthub`) | import-only |
 | `check_earnings_calendar_integrity.py` | Guardrails before committing calendar CSV (honors `delisted_tickers.json`) | Nightly (blocks commit on failure) |
@@ -33,6 +33,7 @@ See [`.github/workflows/daily-refresh.yml`](../.github/workflows/daily-refresh.y
 | `build_ticker_names.mjs` | SEC EDGAR → `ticker-names.json` + exchanges | Quarterly workflow |
 | `migrate.mjs` | Watchlist DDL against Neon `DATABASE_URL` | Manual (not in CI) |
 | `r2_pull.sh` / `r2_push.sh` / `r2_bootstrap.sh` | R2 sync | Nightly + [R2_SETUP.md](../docs/R2_SETUP.md) |
+| `activate_model_bundle.py` | Exact-bundle Railway activation + receipt | Retrain/rollback handoff |
 
 Frontend JSON build lives in [`tools/`](../tools/README.md) (`build_frontend_data.py`, `build_popular_weights.py`, `pull_market_caps.py`).
 
@@ -85,55 +86,39 @@ progress to `data/fmp_earnings_backfill_state.json` and merges
 fill-missing-only by default. Do not use this as a source of truth for earnings
 dates until provider disagreements are explicitly reviewed; FMP-only dates are
 skipped unless `--insert-new-events` is passed.
+## Provider-signal research
 
-## Provider Enrichments
+Core production sources remain narrowly scoped: DoltHub options/earnings/OHLCV,
+Finnhub near-term earnings and regular quotes, FMP EPS/revenue overlay, CBOE VIX,
+SEC identity metadata, and the explicit quote fallbacks.
 
-The additive provider layer is intentionally non-redundant with local OHLCV:
+Additive vendor signals—options flow, short interest, supplemental fundamentals,
+corporate actions, macro, live-market cross-checks, and news sentiment—are frozen
+by [`config/provider_signal_policy.json`](../config/provider_signal_policy.json).
+They do not run nightly, publish into frontend JSON, or enter an ML feature
+schema until a pinned paired walk-forward report proves incremental value at no
+additional monthly cost.
 
-- FMP: earnings EPS/revenue overlay plus fundamentals, analyst estimates
-  (with low/high dispersion), ratings, and the single retained press-release
-  news feed.
-- Alpha Vantage: scarce 25/day-per-key budget reserved for the unique numeric
-  option-flow endpoints (historical/realtime put-call and volume-to-OI ratios),
-  earnings validation, and the IPO calendar. Macro series (treasury/fed-funds/
-  CPI) moved to a `monthly` cadence; news sentiment retired in favor of FMP.
-- Massive/Polygon: uses the existing `POLYGON_API_KEY`; primary external source
-  for current option-chain snapshots, short interest, splits, dividends,
-  financials, and only narrow OHLCV gap fills. Ticker overview is a `weekly`
-  profile cross-check (Finnhub owns the profile role).
-- TwelveData: tertiary realized-move OHLCV fallback plus Basic-tier
-  `last_change` and technical-indicator validation. Quote/52-week context is a
-  `weekly` cross-check; press releases retired in favor of FMP.
+The `Manual provider-signal research` workflow runs
+`sync_provider_enrichments.py --research-override` and uploads a 14-day artifact;
+it never commits research output to `main`. A normal run without that explicit
+override filters every endpoint through the production policy and leaves prior
+research artifacts untouched when none are approved.
 
-Each endpoint carries a `cadence` (`daily`/`weekly`/`monthly`/`off`) in
-`provider_specs.py`. The nightly run is `--cadences daily`; schedule
-`weekly`/`monthly` on matching days to refresh slow-changing reference and macro
-data. `off` endpoints stay in the catalog for manual/probe use but never
-auto-run.
+See [Provider signal promotion policy](../docs/PROVIDER_SIGNAL_POLICY.md) for the
+evidence schema and promotion gates.
 
-API key-pool stacking: set numbered key variants (e.g. `ALPHAVANTAGE_API_KEY_2`,
-`..._3`) to multiply a provider's free-tier budget. The usage ledger accounts
-for each key separately and fails over when one is exhausted — highest value for
-Alpha Vantage's 25/day-per-key cap.
-
-`probe_provider_capabilities.py` writes `data/provider_capabilities.json` with
-status and response-shape metadata only. `sync_provider_enrichments.py` then
-uses only endpoints that probed `ok` and writes derived JSON tables under
-`data/provider_enrichments/`. `tools/build_frontend_data.py` publishes a compact
-subset into week/screener/symbol JSON so these calls directly power product
-signals. Raw provider payloads are not persisted or published in frontend JSON.
-
-Quota defaults are conservative: `FMP_DAILY_CALL_LIMIT=225`,
-`ALPHAVANTAGE_DAILY_CALL_LIMIT=25`, `TWELVEDATA_DAILY_CREDIT_LIMIT=792`, and
-`MASSIVE_MINUTE_CALL_LIMIT=5`. The nightly workflow lowers the new enrichment
-budgets to leave room for existing FMP, Alpha Vantage, and TwelveData jobs.
-
-Dry-run examples:
+Manual dry-run examples:
 
 ```bash
 npm run data:probe:providers -- --dry-run --max-calls 35
-npm run data:providers:enrich -- --dry-run --max-symbols 8 --max-total-calls 60
+python scripts/sync_provider_enrichments.py \
+  --research-override \
+  --dry-run \
+  --max-symbols 8 \
+  --max-total-calls 60
 ```
+
 
 ## Env
 
