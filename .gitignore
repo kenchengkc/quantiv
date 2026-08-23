@@ -137,6 +137,7 @@ config/docker/.env.compose
 
 # SSH Keys & Certificates
 *.pem
+!apps/ml/ml/model_bundle_public_key.pem
 *.key
 *.p12
 *.pfx

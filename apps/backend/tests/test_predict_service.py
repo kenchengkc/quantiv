@@ -21,14 +21,14 @@ MODELS_DIR = REPO_ROOT / "apps" / "ml" / "models"
 # drift, large-file storage moved out of band, fresh clone in a sandbox),
 # skip the model-dependent tests rather than failing CI loudly. The math
 # layer tests below that don't touch models still run.
-_REQUIRED_MODEL_FILES = [MODELS_DIR / f"lgbm_T{h}.joblib" for h in [1, 2, 3, 7, 14, 21]]
+_REQUIRED_MODEL_FILES = [MODELS_DIR / f"lgbm_T{h}.txt" for h in [1, 2, 3, 7, 14, 21]]
 _MODELS_AVAILABLE = all(p.exists() for p in _REQUIRED_MODEL_FILES)
 requires_models = pytest.mark.skipif(
     not _MODELS_AVAILABLE,
     reason=(
         "LightGBM serving models not found under apps/ml/models/. "
         "Restore from R2 (`scripts/r2_pull.sh`) or check the .gitignore exception "
-        "for apps/ml/models/*.joblib before re-running these tests."
+        "for apps/ml/models/*.txt before re-running these tests."
     ),
 )
 
@@ -144,7 +144,6 @@ def test_predict_clips_point_and_rearranges_crossed_quantiles(monkeypatch):
     ps = _import()
     bundle = ps._ModelBundle(
         estimator=_ConstantEstimator(-0.02),
-        calibrator=None,
         feature_names=["log_spot"],
         quantile_estimators={
             10: _ConstantEstimator(0.05),

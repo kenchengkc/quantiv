@@ -28,14 +28,14 @@ from pathlib import Path
 from threading import Lock
 from typing import Any, Dict, List, Optional
 
-import joblib
 import pandas as pd
+from ml.model_artifact import load_native_model, point_model_name, quantile_model_name
 from ml.quantiles import rearrange_quantile_mapping
 
 logger = logging.getLogger(__name__)
 
 
-# Where the .joblib model files live inside the container. The Dockerfile
+# Where native LightGBM model files live inside the container. The Dockerfile
 # bakes `apps/ml/models/` into the image at this path, so cold starts don't
 # pay an R2 fetch. Override via env if you ever move the models to the
 # mounted volume.
@@ -48,13 +48,19 @@ def _models_dir() -> Path:
 
 # Quantile suffixes we expect alongside the point model file.
 _QUANTILES = [10, 25, 50, 75, 90]
+_HORIZONS = (1, 2, 3, 7, 14, 21)
+_POINT_MODEL_NAMES = {horizon: point_model_name(horizon) for horizon in _HORIZONS}
+_QUANTILE_MODEL_NAMES = {
+    (horizon, quantile): quantile_model_name(horizon, quantile)
+    for horizon in _HORIZONS
+    for quantile in _QUANTILES
+}
 
 
 @dataclass
 class _ModelBundle:
     """One horizon's loaded artifacts. Created lazily on first request."""
     estimator: Any                          # fitted LightGBM regressor
-    calibrator: Any                          # optional isotonic calibrator
     feature_names: List[str]                 # exact column order the model wants
     quantile_estimators: Dict[int, Any]      # {10: model, 25: model, ...}
     loaded_at: datetime
@@ -104,18 +110,6 @@ def _mtime(path: Path) -> Optional[datetime]:
         return None
 
 
-def _unwrap(payload: Any) -> tuple[Any, Any, List[str]]:
-    """Pull (estimator, calibrator, feature_names) out of whatever joblib loads."""
-    if isinstance(payload, dict):
-        estimator = payload.get("model")
-        calibrator = payload.get("calibrator")
-        feature_names = list(payload.get("feature_names") or [])
-        return estimator, calibrator, feature_names
-    estimator = payload
-    feature_names = list(getattr(estimator, "feature_name_", []) or [])
-    return estimator, None, feature_names
-
-
 def get_bundle(horizon: int) -> Optional[_ModelBundle]:
     """Lazy-load and cache the point + quantile estimators for `horizon`.
 
@@ -131,13 +125,18 @@ def get_bundle(horizon: int) -> Optional[_ModelBundle]:
         if cached is not None:
             return cached
 
+        point_name = _POINT_MODEL_NAMES.get(horizon)
+        if point_name is None:
+            logger.warning("Unsupported model horizon: %s", horizon)
+            return None
         models_dir = _models_dir()
-        point_path = models_dir / f"lgbm_T{horizon}.joblib"
+        point_path = models_dir / point_name
         if not point_path.exists():
             logger.warning("No model file for horizon %s at %s", horizon, point_path)
             return None
 
-        estimator, calibrator, feature_names = _unwrap(joblib.load(point_path))
+        estimator = load_native_model(point_path)
+        feature_names = list(estimator.feature_name())
         if estimator is None or not feature_names:
             logger.error("T-%s model is unusable (no estimator/feature_names)", horizon)
             return None
@@ -145,16 +144,16 @@ def get_bundle(horizon: int) -> Optional[_ModelBundle]:
 
         quantile_estimators: Dict[int, Any] = {}
         for q in _QUANTILES:
-            q_path = models_dir / f"lgbm_T{horizon}_q{q:02d}.joblib"
+            q_path = models_dir / _QUANTILE_MODEL_NAMES[(horizon, q)]
             if not q_path.exists():
                 continue
-            q_est, _, _ = _unwrap(joblib.load(q_path))
-            if q_est is not None:
-                quantile_estimators[q] = q_est
+            q_est = load_native_model(q_path)
+            if list(q_est.feature_name()) != feature_names:
+                raise ValueError(f"T-{horizon} q{q:02d} schema mismatch")
+            quantile_estimators[q] = q_est
 
         bundle = _ModelBundle(
             estimator=estimator,
-            calibrator=calibrator,
             feature_names=feature_names,
             quantile_estimators=quantile_estimators,
             loaded_at=datetime.now(timezone.utc),
@@ -183,12 +182,12 @@ def loaded_horizons() -> List[int]:
 
 def model_inventory() -> List[Dict[str, Any]]:
     """Return file/metadata status for all model horizons without forcing
-    LightGBM joblib loads. Used by `/api/ml/status` so health checks stay
+    LightGBM loads. Used by `/api/ml/status` so health checks stay
     cheap and don't mutate the model cache.
     """
     models_dir = _models_dir()
     horizons = set()
-    for path in models_dir.glob("lgbm_T*.joblib"):
+    for path in models_dir.glob("lgbm_T*.txt"):
         suffix = path.stem.replace("lgbm_T", "")
         if suffix.isdigit():
             horizons.add(int(suffix))
@@ -199,7 +198,9 @@ def model_inventory() -> List[Dict[str, Any]]:
 
     rows: List[Dict[str, Any]] = []
     for horizon in sorted(horizons):
-        point_path = models_dir / f"lgbm_T{horizon}.joblib"
+        if horizon not in _POINT_MODEL_NAMES:
+            continue
+        point_path = models_dir / _POINT_MODEL_NAMES[horizon]
         meta_path = models_dir / f"metadata_T{horizon}.json"
         metadata = _metadata_for_horizon(models_dir, horizon)
         feature_names = list(metadata.get("feature_cols") or [])
@@ -207,7 +208,9 @@ def model_inventory() -> List[Dict[str, Any]]:
         if cached is not None:
             feature_names = cached.feature_names
         quantile_count = sum(
-            1 for q in _QUANTILES if (models_dir / f"lgbm_T{horizon}_q{q:02d}.joblib").exists()
+            1
+            for q in _QUANTILES
+            if (models_dir / _QUANTILE_MODEL_NAMES[(horizon, q)]).exists()
         )
         rows.append({
             "horizon_days": horizon,
@@ -330,17 +333,6 @@ def predict(
     X = _build_X(substituted, bundle.feature_names)
 
     em_pct = max(0.0, float(bundle.estimator.predict(X)[0]))
-    # Calibration is intentionally skipped to match scripts/daily_score.py,
-    # which writes raw model output to em_forecasts.em_ml_pct. Applying it
-    # here would cause the live /api/ml/predict number to drift away from
-    # the static-JSON value shown in the calendar / ticker page. The bundled
-    # IsotonicRegression calibrators were also pickled under sklearn 1.4.2;
-    # the runtime is 1.8+, so even when the call succeeds it triggers
-    # InconsistentVersionWarning and may produce subtly wrong outputs. Once
-    # the v3 models get retrained on the current sklearn, we can turn
-    # calibration on in BOTH the nightly batch and this route.
-    _ = bundle.calibrator  # keep loaded so we can ship it again later
-
     quantiles: Dict[int, float] = {}
     for q, q_est in bundle.quantile_estimators.items():
         try:

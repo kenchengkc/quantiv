@@ -9,10 +9,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Sequence
 
-import joblib
 import numpy as np
 import pandas as pd
 
+from ml.model_artifact import load_native_model, point_model_name, quantile_model_name
 from ml.training_split import chronological_train_val_split
 
 DEFAULT_HORIZONS = (1, 2, 3, 7, 14, 21)
@@ -321,16 +321,9 @@ def validate_training_artifacts(
     )
 
 
-def _unwrap_estimator(payload: Any) -> Any:
-    return payload.get("model") if isinstance(payload, dict) else payload
-
-
 def _feature_names(estimator: Any) -> list[str]:
-    return list(
-        getattr(estimator, "feature_name_", None)
-        or getattr(estimator, "feature_names_in_", None)
-        or []
-    )
+    feature_name = getattr(estimator, "feature_name", None)
+    return list(feature_name()) if callable(feature_name) else []
 
 
 def validate_model_artifacts(
@@ -350,7 +343,7 @@ def validate_model_artifacts(
 
     for horizon in horizons:
         metadata_path = models_dir / f"metadata_T{horizon}.json"
-        point_path = models_dir / f"lgbm_T{horizon}.joblib"
+        point_path = models_dir / point_model_name(horizon)
         if not metadata_path.exists():
             _issue(
                 issues,
@@ -510,7 +503,7 @@ def validate_model_artifacts(
                     )
 
         artifact_paths = [("point", point_path)] + [
-            (f"q{quantile:02d}", models_dir / f"lgbm_T{horizon}_q{quantile:02d}.joblib")
+            (f"q{quantile:02d}", models_dir / quantile_model_name(horizon, quantile))
             for quantile in QUANTILE_LEVELS
         ]
         loaded_count = 0
@@ -525,9 +518,7 @@ def validate_model_artifacts(
                 )
                 continue
             try:
-                estimator = _unwrap_estimator(joblib.load(artifact_path))
-                if estimator is None:
-                    raise ValueError("artifact has no estimator")
+                estimator = load_native_model(artifact_path)
                 artifact_features = _feature_names(estimator)
                 if artifact_features != feature_cols:
                     raise ValueError(

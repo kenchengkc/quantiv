@@ -7,6 +7,8 @@ import json
 from pathlib import Path
 from typing import Any, Iterable, Sequence
 
+from ml.model_artifact import point_model_name, quantile_model_name
+
 
 RECEIPT_SCHEMA = "quantiv.evidence-receipt.v1"
 
@@ -75,9 +77,9 @@ def _model_paths(models_dir: Path, horizons: Sequence[int]) -> list[Path]:
     paths: list[Path] = []
     for horizon in sorted(set(horizons)):
         paths.append(models_dir / f"metadata_T{horizon}.json")
-        paths.append(models_dir / f"lgbm_T{horizon}.joblib")
+        paths.append(models_dir / point_model_name(horizon))
         paths.extend(
-            models_dir / f"lgbm_T{horizon}_q{quantile:02d}.joblib"
+            models_dir / quantile_model_name(horizon, quantile)
             for quantile in (10, 25, 50, 75, 90)
         )
     return paths

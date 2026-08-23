@@ -35,9 +35,9 @@ def _build(tmp_path: Path, report: dict) -> dict:
     (models_dir / "metadata_T1.json").write_text(
         json.dumps({"feature_cols": ["atm_iv"]})
     )
-    (models_dir / "lgbm_T1.joblib").write_bytes(b"point-model")
+    (models_dir / "lgbm_T1.txt").write_bytes(b"point-model")
     for quantile in (10, 25, 50, 75, 90):
-        (models_dir / f"lgbm_T1_q{quantile:02d}.joblib").write_bytes(
+        (models_dir / f"lgbm_T1_q{quantile:02d}.txt").write_bytes(
             f"quantile-{quantile}".encode()
         )
     forecast_path.write_bytes(b"forecast-snapshot")

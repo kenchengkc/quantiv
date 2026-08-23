@@ -239,23 +239,24 @@ async def lifespan(app: FastAPI):
             logger.warning("Failed to initialize ML service", error=str(e))
 
     # -- Pull serving models from R2 onto the mounted volume -------------
-    # The weekly retrain in daily-refresh.yml writes fresh joblibs to R2.
-    # Without this sync, every Railway deploy after a retrain serves the
-    # baked-in models from the last Docker build until a new image is
-    # pushed. The volume copy persists across restarts so subsequent boots
-    # only download files that R2 has touched since.
+    # The weekly retrain publishes an immutable signed bundle and a signed
+    # champion pointer. Downloads are verified and atomically activated; an
+    # interrupted or altered transfer leaves the previous champion untouched.
     if r2_models.configured():
         models_volume = Path(os.getenv("DATA_DIR", "./data")) / "models"
         try:
-            n = r2_models.sync_models_from_r2(models_volume)
-            if n > 0 or any(models_volume.glob("lgbm_T*.joblib")):
-                os.environ["ML_MODELS_DIR"] = str(models_volume)
+            result = r2_models.sync_models_from_r2(models_volume)
+            if result.activated and result.models_dir is not None:
+                os.environ["ML_MODELS_DIR"] = str(result.models_dir)
                 predict_service.reset_cache()
                 logger.info(
-                    "ML models resolved via volume", path=str(models_volume), synced=n,
+                    "ML champion activated",
+                    path=str(result.models_dir),
+                    bundle_id=result.bundle_id,
+                    downloaded=result.downloaded_files,
                 )
             else:
-                logger.info("R2 sync wrote 0 files and volume is empty; using baked-in models")
+                logger.warning("No verified R2 champion activated; using baked-in models")
         except Exception as e:  # noqa: BLE001 - retain baked-in models on any sync failure
             logger.warning("R2 model sync errored; using baked-in models", error=str(e))
     else:
@@ -395,18 +396,19 @@ async def sync_models(_key: str = Depends(verify_admin_key)):
     the new files. Run this after the Sunday retrain lands fresh models
     in R2 — avoids waiting for the next Railway deploy.
 
-    Returns the number of files actually written (size-mismatched) and
-    the path predict_service is now reading from.
+    Returns the activated bundle identity and serving path.
     """
     if not r2_models.configured():
         raise HTTPException(status_code=503, detail="R2 is not configured on this instance")
     models_volume = Path(os.getenv("DATA_DIR", "./data")) / "models"
-    n = r2_models.sync_models_from_r2(models_volume)
-    if any(models_volume.glob("lgbm_T*.joblib")):
-        os.environ["ML_MODELS_DIR"] = str(models_volume)
+    result = r2_models.sync_models_from_r2(models_volume)
+    if not result.activated or result.models_dir is None:
+        raise HTTPException(status_code=503, detail="No verified model bundle was activated")
+    os.environ["ML_MODELS_DIR"] = str(result.models_dir)
     predict_service.reset_cache()
     return {
-        "files_written": n,
+        "bundle_id": result.bundle_id,
+        "files_written": result.downloaded_files,
         "models_dir": os.environ.get("ML_MODELS_DIR", "/app/apps/ml/models"),
     }
 

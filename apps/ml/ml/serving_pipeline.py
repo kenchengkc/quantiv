@@ -8,10 +8,11 @@ from datetime import datetime, date
 import pandas as pd
 import numpy as np
 import duckdb
-import joblib
 from typing import Dict, List, Tuple, Optional, Any
 import logging
 import json
+
+from ml.model_artifact import load_native_model, point_model_name
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -100,12 +101,15 @@ class MLServingPipeline:
         horizons = [1, 2, 3, 7, 14, 21]
         
         for horizon in horizons:
-            model_path = self.models_dir / f"lgbm_T{horizon}.joblib"
+            model_path = self.models_dir / point_model_name(horizon)
             
             if model_path.exists():
                 try:
-                    model_data = joblib.load(model_path)
-                    self.models[horizon] = model_data
+                    model = load_native_model(model_path)
+                    self.models[horizon] = {
+                        "model": model,
+                        "feature_names": list(model.feature_name()),
+                    }
                     logger.info(f"Loaded T-{horizon} model")
                 except Exception as e:
                     logger.warning(f"Failed to load T-{horizon} model: {e}")
@@ -362,11 +366,6 @@ class MLServingPipeline:
             # Predict correction factor
             model = model_data['model']
             correction_factor = model.predict(X)[0]
-            
-            # Apply calibration if available
-            if 'calibrator' in model_data:
-                calibrator = model_data['calibrator']
-                correction_factor = calibrator.predict([correction_factor])[0]
             
             # Confidence based on model performance
             metadata_path = self.models_dir / f"metadata_T{closest_horizon}.json"

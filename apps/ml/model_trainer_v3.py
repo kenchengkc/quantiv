@@ -17,17 +17,17 @@ Usage:
 
 import argparse
 import json
+import logging
 import os
-import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
-import joblib
 import numpy as np
 import optuna
 import pandas as pd
 from lightgbm import LGBMRegressor, early_stopping, log_evaluation
+from ml.model_artifact import save_native_model
 from ml.quantiles import rearrange_quantile_array
 from ml.training_split import chronological_train_val_split
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
@@ -35,7 +35,6 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 # Quiet Optuna's per-trial INFO chatter; we log a one-liner per study instead.
 optuna.logging.set_verbosity(optuna.logging.WARNING)
 
-import logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
@@ -358,13 +357,13 @@ def run_training(horizons: List[int] = HORIZONS, tune: bool = False,
                      f"50% interval width: {q_metrics['interval_width_50_mean']:.4f}")
 
         # ── Save point model ──
-        model_path = models_dir / f"lgbm_T{horizon}.joblib"
-        joblib.dump(model, model_path)
+        model_path = models_dir / f"lgbm_T{horizon}.txt"
+        save_native_model(model, model_path)
 
         # ── Save quantile models ──
         for alpha, qm in q_models.items():
-            q_path = models_dir / f"lgbm_T{horizon}_q{int(alpha*100):02d}.joblib"
-            joblib.dump(qm, q_path)
+            q_path = models_dir / f"lgbm_T{horizon}_q{int(alpha*100):02d}.txt"
+            save_native_model(qm, q_path)
 
         # ── Save combined metadata ──
         all_metrics = {**metrics, **q_metrics}

@@ -38,6 +38,10 @@ on:
           - full
           - skip
         default: auto
+      run_retrain:
+        description: "Run the complete gated ML retraining and signed model promotion cycle."
+        type: boolean
+        default: false
 
 concurrency:
   group: daily-refresh
@@ -656,10 +660,12 @@ jobs:
             bash scripts/git_push_with_retry.sh origin main
           fi
 
-  # Weekly only — see `on.schedule` second cron. Does not commit to git; uploads
-  # new joblibs + metadata to R2 under data/models (see scripts/r2_push.sh).
+  # Weekly or explicitly dispatched. Does not commit model artifacts to git;
+  # uploads signed native-LightGBM bundles to R2 under data/models.
   weekly-retrain:
-    if: github.event_name == 'schedule' && github.event.schedule == '0 12 * * 0'
+    if: >-
+      (github.event_name == 'schedule' && github.event.schedule == '0 12 * * 0') ||
+      (github.event_name == 'workflow_dispatch' && inputs.run_retrain)
     runs-on: ubuntu-latest
     timeout-minutes: 120
     permissions:
@@ -782,6 +788,16 @@ jobs:
           path: data/validation/retrain_forecasts.json
           if-no-files-found: ignore
           retention-days: 30
+
+      - name: Package and promote signed model bundle
+        # The private signing key exists only in GitHub Actions. Railway ships
+        # the pinned public key and refuses altered, partial, or unsigned files.
+        env:
+          MODEL_BUNDLE_SIGNING_KEY: ${{ secrets.MODEL_BUNDLE_SIGNING_KEY }}
+        run: |
+          python scripts/package_model_bundle.py \
+            --source-revision "$GITHUB_SHA" \
+            --promote
 
       - name: Push models to R2
         env:

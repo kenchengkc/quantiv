@@ -4,11 +4,12 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-import joblib
 import numpy as np
 import pandas as pd
 import pytest
+from lightgbm import LGBMRegressor
 
+from ml.model_artifact import save_native_model
 from ml.pipeline_validation import (
     PipelineValidationError,
     validate_forecast_artifact,
@@ -20,15 +21,6 @@ from ml.pipeline_validation import (
 FEATURES = ["atm_iv", "dte", "em_iv_pct", "straddle_pct"] + [
     f"feature_{index}" for index in range(6)
 ]
-
-
-class ConstantEstimator:
-    def __init__(self, feature_names: list[str], prediction: float = 0.07):
-        self.feature_name_ = feature_names
-        self.prediction = prediction
-
-    def predict(self, frame: pd.DataFrame) -> np.ndarray:
-        return np.full(len(frame), self.prediction, dtype=float)
 
 
 def _issue_codes(exc: PipelineValidationError) -> set[str]:
@@ -93,12 +85,15 @@ def _model_metadata() -> dict[str, object]:
 def _write_model_artifacts(directory: Path, *, horizon: int = 1) -> None:
     directory.mkdir(parents=True, exist_ok=True)
     (directory / f"metadata_T{horizon}.json").write_text(json.dumps(_model_metadata()))
+    frame = pd.DataFrame(
+        {feature: np.linspace(index, index + 1, 20) for index, feature in enumerate(FEATURES)}
+    )
+    target = np.linspace(0.04, 0.10, len(frame))
+    estimator = LGBMRegressor(n_estimators=2, min_child_samples=2, verbose=-1)
+    estimator.fit(frame, target)
     suffixes = [""] + [f"_q{quantile:02d}" for quantile in (10, 25, 50, 75, 90)]
     for suffix in suffixes:
-        joblib.dump(
-            ConstantEstimator(FEATURES),
-            directory / f"lgbm_T{horizon}{suffix}.joblib",
-        )
+        save_native_model(estimator, directory / f"lgbm_T{horizon}{suffix}.txt")
 
 
 def _write_forecast_artifact(
@@ -217,7 +212,7 @@ def test_model_gate_rejects_regression_and_missing_quantile(tmp_path: Path) -> N
     metadata = _model_metadata()
     metadata["val_mae"] = 0.04
     (models_dir / "metadata_T1.json").write_text(json.dumps(metadata))
-    (models_dir / "lgbm_T1_q90.joblib").unlink()
+    (models_dir / "lgbm_T1_q90.txt").unlink()
 
     with pytest.raises(PipelineValidationError) as error:
         validate_model_artifacts(

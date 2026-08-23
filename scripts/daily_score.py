@@ -30,7 +30,6 @@ from pathlib import Path
 from typing import Any, Dict
 
 import duckdb
-import joblib
 import numpy as np
 import pandas as pd
 
@@ -39,6 +38,11 @@ ML_PACKAGE_ROOT = REPO_ROOT / "apps" / "ml"
 if str(ML_PACKAGE_ROOT) not in sys.path:
     sys.path.insert(0, str(ML_PACKAGE_ROOT))
 
+from ml.model_artifact import (  # noqa: E402 - standalone script path setup
+    load_native_model,
+    point_model_name,
+    quantile_model_name,
+)
 from ml.quantiles import rearrange_quantile_array  # noqa: E402 - standalone script path setup
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -71,54 +75,36 @@ def load_models(models_dir: Path) -> Dict[int, dict]:
         with open(meta_path) as f:
             meta = json.load(f)
         horizon = meta["horizon"]
-        model_path = models_dir / f"lgbm_T{horizon}.joblib"
+        model_path = models_dir / point_model_name(horizon)
         if not model_path.exists():
             continue
 
-        # Model joblib is a dict {model, calibrator, hyperparameters, feature_names, ...}.
-        # Unwrap the actual estimator so score() can call .predict(). Older metadata
-        # JSONs included a `feature_cols` field, but the post-2025-Q4 retrain dropped
-        # it — use the joblib's `feature_names` as the source of truth and only fall
-        # back to the metadata's `feature_importance` keys for very old artifacts.
-        model_data = joblib.load(model_path)
-        if isinstance(model_data, dict):
-            estimator = model_data.get("model")
-            calibrator = model_data.get("calibrator")
-            joblib_features = list(model_data.get("feature_names") or [])
-        else:
-            estimator = model_data
-            calibrator = None
-            joblib_features = list(getattr(estimator, "feature_name_", []) or [])
-
-        feature_cols = (
-            joblib_features
-            or list((meta.get("feature_importance") or {}).keys())
-            or meta.get("feature_cols")
-        )
-        if estimator is None or not feature_cols:
+        estimator = load_native_model(model_path)
+        native_features = list(estimator.feature_name())
+        feature_cols = list(meta.get("feature_cols") or native_features)
+        if not feature_cols:
             logger.warning(f"T-{horizon} model unusable (no estimator or feature schema) — skipping")
             continue
+        if feature_cols != native_features:
+            raise ValueError(f"T-{horizon} native model schema does not match metadata")
 
         entry = {
             "model": estimator,
-            "calibrator": calibrator,
             "metadata": meta,
             "feature_cols": feature_cols,
             "residual_std": meta.get("residual_std", 0.03),
             "quantile_models": {},
         }
 
-        # Load quantile models if available. Same wrap pattern as the point
-        # model — joblib payload may be a dict or a raw estimator.
         quantiles = meta.get("quantiles", [0.10, 0.25, 0.50, 0.75, 0.90])
         for alpha in quantiles:
-            q_path = models_dir / f"lgbm_T{horizon}_q{int(alpha*100):02d}.joblib"
+            q_path = models_dir / quantile_model_name(horizon, int(alpha * 100))
             if not q_path.exists():
                 continue
-            q_payload = joblib.load(q_path)
-            q_estimator = q_payload.get("model") if isinstance(q_payload, dict) else q_payload
-            if q_estimator is not None:
-                entry["quantile_models"][alpha] = q_estimator
+            q_estimator = load_native_model(q_path)
+            if list(q_estimator.feature_name()) != feature_cols:
+                raise ValueError(f"T-{horizon} q{int(alpha * 100):02d} schema mismatch")
+            entry["quantile_models"][alpha] = q_estimator
 
         models[horizon] = entry
         q_str = f" + {len(entry['quantile_models'])} quantile" if entry["quantile_models"] else ""
