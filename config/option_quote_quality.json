@@ -1,0 +1,21 @@
+{
+  "schema": "quantiv.option-quote-quality.v1",
+  "market_data_mode": "end_of_day",
+  "timestamp_precision": "date",
+  "max_quote_date_lag_days": 0,
+  "max_leg_relative_spread": 0.5,
+  "max_straddle_relative_spread": 0.5,
+  "min_bid": 0.01,
+  "min_ask": 0.01,
+  "min_iv": 0.0001,
+  "max_iv": 5.0,
+  "min_dte": 1,
+  "max_dte": 60,
+  "source_capabilities": {
+    "intraday_quote_timestamp": false,
+    "option_volume": false,
+    "open_interest": false
+  },
+  "decision_scope": "end_of_day_research",
+  "live_trading_eligible": false
+}

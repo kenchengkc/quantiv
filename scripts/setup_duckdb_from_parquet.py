@@ -19,6 +19,7 @@ Usage:
 """
 
 import argparse
+import json
 import os
 from pathlib import Path
 import duckdb
@@ -34,7 +35,40 @@ def get_duckdb_path(args_path: str | None = None) -> Path:
     return Path(os.getenv("DUCKDB_PATH", str(get_data_dir() / "quantiv.duckdb")))
 
 
+def quote_quality_policy() -> dict[str, object]:
+    """Load the checked-in EOD market-data acceptance contract."""
+    path = Path(__file__).resolve().parent.parent / "config" / "option_quote_quality.json"
+    policy = json.loads(path.read_text())
+    required = {
+        "market_data_mode",
+        "timestamp_precision",
+        "max_leg_relative_spread",
+        "max_straddle_relative_spread",
+        "min_bid",
+        "min_ask",
+        "min_iv",
+        "max_iv",
+        "min_dte",
+        "max_dte",
+    }
+    missing = sorted(required - set(policy))
+    if missing:
+        raise ValueError(f"quote-quality policy is missing keys: {missing}")
+    return policy
+
+
 def setup_views(conn: duckdb.DuckDBPyConnection, data_dir: Path):
+    policy = quote_quality_policy()
+    min_bid = float(policy["min_bid"])
+    min_ask = float(policy["min_ask"])
+    min_iv = float(policy["min_iv"])
+    max_iv = float(policy["max_iv"])
+    min_dte = int(policy["min_dte"])
+    max_dte = int(policy["max_dte"])
+    max_leg_spread = float(policy["max_leg_relative_spread"])
+    max_straddle_spread = float(policy["max_straddle_relative_spread"])
+    timestamp_precision = str(policy["timestamp_precision"])
+    market_data_mode = str(policy["market_data_mode"])
     parquet_glob = str(data_dir / "parquet" / "options_chain" / "year=*" / "month=*" / "*.parquet")
     earnings_csv = data_dir / "earnings_calendar.csv"
     volhist_csv = data_dir / "volatility_history.csv"
@@ -50,9 +84,10 @@ def setup_views(conn: duckdb.DuckDBPyConnection, data_dir: Path):
     print(f"[views] v_options_raw: {count:,} rows")
 
     # ── Cleaned options view with computed columns ────────────────────
-    conn.execute("""
+    conn.execute(f"""
         CREATE OR REPLACE VIEW v_options AS
-        SELECT
+        WITH normalized AS (
+          SELECT
             date,
             act_symbol,
             expiration,
@@ -67,35 +102,173 @@ def setup_views(conn: duckdb.DuckDBPyConnection, data_dir: Path):
             theta,
             vega,
             rho,
-            -- Days to expiration
             DATE_DIFF('day', date, expiration) AS dte,
-            -- Moneyness (rough proxy: strike vs mid of bid/ask for ATM detection)
+            CAST(NULL AS TIMESTAMP) AS source_quote_timestamp,
+            CAST(NULL AS BIGINT) AS option_volume,
+            CAST(NULL AS BIGINT) AS open_interest,
+            '{timestamp_precision}'::VARCHAR AS quote_timestamp_precision,
+            '{market_data_mode}'::VARCHAR AS market_data_mode,
+            CASE
+                WHEN bid IS NOT NULL AND ask IS NOT NULL AND (bid + ask) > 0
+                THEN (ask - bid) / ((bid + ask) / 2.0)
+                ELSE NULL
+            END AS relative_spread,
             CASE WHEN vol IS NOT NULL AND vol > 0 THEN vol ELSE NULL END AS iv_clean
         FROM v_options_raw
         WHERE act_symbol IS NOT NULL
           AND strike > 0
+        )
+        SELECT
+            *,
+            CASE
+                WHEN bid IS NULL OR ask IS NULL THEN 'missing_market_side'
+                WHEN bid < 0 OR ask < 0 THEN 'negative_market_side'
+                WHEN bid < {min_bid} OR ask < {min_ask} THEN 'zero_or_noncommercial_side'
+                WHEN ask < bid THEN 'crossed_market'
+                WHEN iv IS NULL OR iv < {min_iv} OR iv > {max_iv} THEN 'invalid_iv'
+                WHEN dte < {min_dte} OR dte > {max_dte} THEN 'dte_out_of_policy'
+                WHEN relative_spread > {max_leg_spread} THEN 'excessive_leg_spread'
+                ELSE NULL
+            END AS quote_rejection_reason,
+            CASE
+                WHEN bid IS NULL OR ask IS NULL
+                  OR bid < {min_bid} OR ask < {min_ask}
+                  OR ask < bid
+                  OR iv IS NULL OR iv < {min_iv} OR iv > {max_iv}
+                  OR dte < {min_dte} OR dte > {max_dte}
+                  OR relative_spread > {max_leg_spread}
+                THEN 'rejected'
+                ELSE 'eligible'
+            END AS quote_quality_status,
+            CASE
+                WHEN relative_spread <= 0.10 THEN 'tight'
+                WHEN relative_spread <= 0.25 THEN 'standard'
+                WHEN relative_spread <= {max_leg_spread} THEN 'wide_accepted'
+                ELSE 'rejected'
+            END AS liquidity_tier,
+            'quote_spread_proxy'::VARCHAR AS liquidity_tier_method
+        FROM normalized
     """)
     print("[views] v_options: created")
 
-    # ── ATM options (per symbol/date/expiration) ──────────────────────
+    # ── Quote quarantine (row-level failures and unpaired contracts) ──
+    conn.execute("""
+        CREATE OR REPLACE VIEW v_option_quote_quarantine AS
+        SELECT *, quote_rejection_reason AS rejection_reason
+        FROM v_options
+        WHERE quote_quality_status = 'rejected'
+        UNION ALL BY NAME
+        SELECT q.*, 'missing_same_strike_opposite_leg' AS rejection_reason
+        FROM v_options q
+        WHERE q.quote_quality_status = 'eligible'
+          AND NOT EXISTS (
+              SELECT 1
+              FROM v_options opposite
+              WHERE opposite.date = q.date
+                AND opposite.act_symbol = q.act_symbol
+                AND opposite.expiration = q.expiration
+                AND opposite.strike = q.strike
+                AND opposite.call_put != q.call_put
+                AND opposite.call_put IN ('Call', 'Put')
+          )
+    """)
+    print("[views] v_option_quote_quarantine: created")
+
+    # Pair first, then rank. Calls and puts can never come from different strikes.
+    conn.execute(f"""
+        CREATE OR REPLACE VIEW v_straddle_candidates AS
+        WITH pairs AS (
+            SELECT
+                c.date,
+                c.act_symbol,
+                c.expiration,
+                c.dte,
+                c.strike,
+                c.bid AS call_bid,
+                c.ask AS call_ask,
+                c.mid AS call_mid,
+                c.relative_spread AS call_relative_spread,
+                c.iv AS call_iv,
+                c.delta AS call_delta,
+                c.gamma AS call_gamma,
+                c.vega AS call_vega,
+                c.theta AS call_theta,
+                c.option_volume AS call_volume,
+                c.open_interest AS call_open_interest,
+                p.bid AS put_bid,
+                p.ask AS put_ask,
+                p.mid AS put_mid,
+                p.relative_spread AS put_relative_spread,
+                p.iv AS put_iv,
+                p.delta AS put_delta,
+                p.option_volume AS put_volume,
+                p.open_interest AS put_open_interest,
+                c.bid + p.bid AS straddle_bid,
+                c.ask + p.ask AS straddle_ask,
+                c.mid + p.mid AS straddle_mid,
+                (c.ask + p.ask - c.bid - p.bid)
+                    / NULLIF(c.mid + p.mid, 0) AS straddle_relative_spread,
+                ABS(COALESCE(c.delta, 0.5) - 0.5)
+                    + ABS(COALESCE(p.delta, -0.5) + 0.5) AS atm_delta_distance,
+                c.quote_timestamp_precision,
+                c.market_data_mode,
+                CASE
+                    WHEN c.quote_quality_status != 'eligible'
+                        THEN 'call_' || c.quote_rejection_reason
+                    WHEN p.quote_quality_status != 'eligible'
+                        THEN 'put_' || p.quote_rejection_reason
+                    WHEN (c.ask + p.ask - c.bid - p.bid)
+                           / NULLIF(c.mid + p.mid, 0) > {max_straddle_spread}
+                        THEN 'excessive_straddle_spread'
+                    ELSE NULL
+                END AS pair_rejection_reason
+            FROM v_options c
+            JOIN v_options p
+              ON p.date = c.date
+             AND p.act_symbol = c.act_symbol
+             AND p.expiration = c.expiration
+             AND p.strike = c.strike
+             AND c.call_put = 'Call'
+             AND p.call_put = 'Put'
+        ), ranked AS (
+            SELECT *,
+                CASE WHEN pair_rejection_reason IS NULL
+                     THEN 'eligible' ELSE 'rejected' END AS pair_quality_status,
+                ROW_NUMBER() OVER (
+                    PARTITION BY date, act_symbol, expiration
+                    ORDER BY
+                        CASE WHEN pair_rejection_reason IS NULL THEN 0 ELSE 1 END,
+                        atm_delta_distance,
+                        straddle_relative_spread,
+                        strike
+                ) AS pair_rank
+            FROM pairs
+        )
+        SELECT * FROM ranked
+    """)
+    print("[views] v_straddle_candidates: created")
+
+    conn.execute("""
+        CREATE OR REPLACE VIEW v_straddle_quote_quarantine AS
+        SELECT *
+        FROM v_straddle_candidates
+        WHERE pair_quality_status = 'rejected'
+    """)
+    print("[views] v_straddle_quote_quarantine: created")
+
+    # Backward-compatible selected-leg view, sourced from one common-strike pair.
     conn.execute("""
         CREATE OR REPLACE VIEW v_atm_options AS
-        WITH ranked AS (
-            SELECT
-                *,
-                -- Approximate ATM: use the strike where |delta| is closest to 0.5
-                -- Fallback: use the strike closest to the midpoint of all strikes
-                ROW_NUMBER() OVER (
-                    PARTITION BY date, act_symbol, expiration, call_put
-                    ORDER BY ABS(COALESCE(delta, 0) - CASE WHEN call_put = 'Call' THEN 0.5 ELSE -0.5 END)
-                ) AS atm_rank
-            FROM v_options
-            WHERE dte BETWEEN 1 AND 60
-              AND iv_clean IS NOT NULL
-        )
-        SELECT * EXCLUDE(atm_rank)
-        FROM ranked
-        WHERE atm_rank = 1
+        SELECT q.*
+        FROM v_options q
+        JOIN v_straddle_candidates selected
+          ON selected.date = q.date
+         AND selected.act_symbol = q.act_symbol
+         AND selected.expiration = q.expiration
+         AND selected.strike = q.strike
+         AND selected.pair_rank = 1
+         AND selected.pair_quality_status = 'eligible'
+        WHERE q.call_put IN ('Call', 'Put')
     """)
     print("[views] v_atm_options: created")
 
@@ -103,36 +276,54 @@ def setup_views(conn: duckdb.DuckDBPyConnection, data_dir: Path):
     conn.execute("""
         CREATE OR REPLACE VIEW v_straddle_features AS
         SELECT
-            c.date,
-            c.act_symbol,
-            c.expiration,
-            c.dte,
-            c.strike AS atm_strike,
-            c.iv AS atm_call_iv,
-            p.iv AS atm_put_iv,
-            (COALESCE(c.iv, 0) + COALESCE(p.iv, 0)) / 2.0 AS atm_iv,
-            c.mid AS call_mid,
-            p.mid AS put_mid,
-            COALESCE(c.mid, 0) + COALESCE(p.mid, 0) AS straddle_mid,
+            date,
+            act_symbol,
+            expiration,
+            dte,
+            strike AS atm_strike,
+            call_iv AS atm_call_iv,
+            put_iv AS atm_put_iv,
+            (call_iv + put_iv) / 2.0 AS atm_iv,
+            call_bid,
+            call_ask,
+            call_mid,
+            call_relative_spread,
+            call_volume,
+            call_open_interest,
+            put_bid,
+            put_ask,
+            put_mid,
+            put_relative_spread,
+            put_volume,
+            put_open_interest,
+            straddle_bid,
+            straddle_ask,
+            straddle_mid,
+            straddle_relative_spread,
+            quote_timestamp_precision,
+            market_data_mode,
+            'passed'::VARCHAR AS quote_quality_status,
+            CASE
+                WHEN GREATEST(call_relative_spread, put_relative_spread) <= 0.10 THEN 'tight'
+                WHEN GREATEST(call_relative_spread, put_relative_spread) <= 0.25 THEN 'standard'
+                ELSE 'wide_accepted'
+            END AS liquidity_tier,
+            'quote_spread_proxy'::VARCHAR AS liquidity_tier_method,
+            CAST(NULL AS VARCHAR) AS quote_rejection_reason,
             -- Expected move (straddle method): EM ≈ straddle_mid
-            COALESCE(c.mid, 0) + COALESCE(p.mid, 0) AS em_straddle,
+            straddle_mid AS em_straddle,
             -- Expected move (IV method): EM ≈ S * σ * √(T/365)
             -- We don't have spot price directly, so use strike as proxy for ATM
-            c.strike * ((COALESCE(c.iv, 0) + COALESCE(p.iv, 0)) / 2.0)
-                     * SQRT(c.dte / 365.0) AS em_iv,
+            strike * ((call_iv + put_iv) / 2.0) * SQRT(dte / 365.0) AS em_iv,
             -- Greeks
-            c.delta AS call_delta,
-            p.delta AS put_delta,
-            c.gamma AS call_gamma,
-            c.vega AS call_vega,
-            c.theta AS call_theta
-        FROM v_atm_options c
-        JOIN v_atm_options p
-            ON  c.date = p.date
-            AND c.act_symbol = p.act_symbol
-            AND c.expiration = p.expiration
-            AND c.call_put = 'Call'
-            AND p.call_put = 'Put'
+            call_delta,
+            put_delta,
+            call_gamma,
+            call_vega,
+            call_theta
+        FROM v_straddle_candidates
+        WHERE pair_rank = 1
+          AND pair_quality_status = 'eligible'
     """)
     print("[views] v_straddle_features: created")
 
