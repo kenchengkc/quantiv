@@ -171,19 +171,21 @@ jobs:
           python scripts/sync_finnhub_market_holidays.py --allow-missing-key $EXTRA_ARGS
 
       - name: Sunday full-universe Finnhub sweep
-        # Walks every ticker that reported in the last 2 years (~6,600
-        # symbols) with a 1-call-per-symbol per-symbol query. Catches the
-        # "last reported" actuals that the broad daily fetch misses
-        # (broad only returns ~7 days of historical events).
+        # Walks every ticker page in the decision universe (~1,500 symbols),
+        # not the ~6,500-symbol multi-year earnings archive. The free tier
+        # exposes one month of historical calendar data, so this deliberately
+        # requests a single 31-day historical chunk per symbol. Catches
+        # recently reported actuals that the broad daily fetch can omit.
         #
         # Only runs on Sundays since market is closed → no contention with
         # intraday live-quote workers for the 60/min rate budget. At
-        # delay=1.05s the sweep stays under ~57/min with margin and
-        # finishes in ~2 hours.
+        # delay=1.05s the sweep stays under ~57/min with margin and should
+        # finish in roughly 27 minutes. Budget exhaustion fails closed and
+        # never writes a misleading alphabetical-prefix result.
         #
-        # Free-tier per-symbol query is forward-only — past quarters can't
-        # be backfilled. This step is what makes EPS-surprise history fill
-        # in over weeks instead of leaving stale tickers permanently null.
+        # Free-tier history is limited to the latest month, so older quarters
+        # cannot be repaired here. Repeating this bounded sweep each week fills
+        # recent actuals without turning the daily publication into a backfill.
         env:
           FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
         run: |
@@ -197,9 +199,11 @@ jobs:
             EXTRA_ARGS="--allow-market-hours"
           fi
           python scripts/sync_finnhub_earnings.py \
-            --all-recent \
+            --frontend-universe \
+            --past-days 30 \
+            --future-days 0 \
             --delay 1.05 \
-            --max-calls 8000 \
+            --max-calls 2000 \
             --allow-missing-key \
             $EXTRA_ARGS
 

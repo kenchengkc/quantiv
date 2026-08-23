@@ -23,6 +23,7 @@ import pyarrow.parquet as pq
 import requests
 
 from provider_market_hours import block_finnhub_reserved_window
+from delisted import canonical_ticker, is_delisted
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -30,6 +31,7 @@ DEFAULT_DATA_DIR = REPO_ROOT / "data"
 BASE_URL = "https://finnhub.io/api/v1/calendar/earnings"
 REQUEST_DELAY_S = 0.25
 MAX_REQUEST_DAYS = 31
+FRONTEND_SYMBOLS_DIR = REPO_ROOT / "apps" / "frontend" / "public" / "symbols"
 
 OUTPUT_COLUMNS = [
     "act_symbol",
@@ -244,13 +246,18 @@ def normalize_existing(df: pd.DataFrame) -> pd.DataFrame:
     if "act_symbol" not in out.columns or "date" not in out.columns:
         raise ValueError("Existing earnings file must contain act_symbol and date columns")
 
-    out["act_symbol"] = out["act_symbol"].astype(str).str.strip().str.upper()
+    out["act_symbol"] = out["act_symbol"].map(canonical_ticker)
     out["date"] = pd.to_datetime(out["date"], errors="coerce").dt.date
     out = out[out["act_symbol"].ne("") & out["date"].notna()].copy()
     # Drop foreign-exchange tickers at the boundary so they never
     # accumulate in the CSV (no forecast pipeline, no Finnhub free-tier
     # coverage). See is_us_symbol() for the convention.
     out = out[out["act_symbol"].map(is_us_symbol)].copy()
+    # Every provider boundary must honor the canonical lifecycle ledger.
+    # Otherwise a later Finnhub overlay can reinsert a company that the
+    # DoltHub sync deliberately removed (the 2026-08-23 failure reintroduced
+    # AMWD, TMHC, and WBS this way).
+    out = out[~out["act_symbol"].map(is_delisted)].copy()
     if "timing" not in out.columns:
         out["timing"] = "unknown"
     out["timing"] = out["timing"].map(normalize_timing)
@@ -369,6 +376,23 @@ def parse_symbol_list(value: str | None) -> list[str]:
         return []
     parts = [p.strip().upper() for p in value.replace(",", " ").split()]
     return [p for p in parts if p]
+
+
+def load_frontend_symbol_universe(symbols_dir: Path = FRONTEND_SYMBOLS_DIR) -> list[str]:
+    """Return the current decision universe represented by ticker pages.
+
+    The earnings archive contains roughly 6,500 recently observed symbols,
+    while the options/forecast product renders about 1,500.  A weekly
+    per-symbol reference sweep should spend Finnhub calls on the latter.
+    """
+    if not symbols_dir.exists():
+        return []
+    symbols = {
+        canonical_ticker(path.stem)
+        for path in symbols_dir.glob("*.json")
+        if is_us_symbol(path.stem) and not is_delisted(path.stem)
+    }
+    return sorted(symbol for symbol in symbols if symbol)
 
 
 def normalize_finnhub(rows: list[dict[str, Any]]) -> pd.DataFrame:
@@ -629,6 +653,15 @@ def main() -> int:
             "reported >~7 days ago."
         ),
     )
+    parser.add_argument(
+        "--frontend-universe",
+        action="store_true",
+        help=(
+            "Use the current generated ticker-page universe. This is the "
+            "production weekly-sweep mode: it covers every displayed decision "
+            "symbol without spending calls on the multi-year earnings archive."
+        ),
+    )
     parser.add_argument("--data-dir", type=Path, default=None)
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument(
@@ -643,9 +676,14 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    mutually_exclusive = sum(bool(x) for x in (args.symbol, args.symbols, args.all_recent))
+    mutually_exclusive = sum(
+        bool(x)
+        for x in (args.symbol, args.symbols, args.all_recent, args.frontend_universe)
+    )
     if mutually_exclusive > 1:
-        parser.error("--symbol, --symbols, and --all-recent are mutually exclusive")
+        parser.error(
+            "--symbol, --symbols, --all-recent, and --frontend-universe are mutually exclusive"
+        )
 
     start = args.from_date or (today - timedelta(days=args.past_days))
     end = args.to_date or (today + timedelta(days=args.future_days))
@@ -690,13 +728,24 @@ def main() -> int:
         if not symbols:
             print("⚠ --all-recent: no US tickers found in existing earnings_calendar", file=sys.stderr)
             return 1
+    elif args.frontend_universe:
+        symbols = load_frontend_symbol_universe()
+        if not symbols:
+            print(
+                "✗ --frontend-universe: no generated ticker pages found",
+                file=sys.stderr,
+            )
+            return 1
 
     print(f"Finnhub earnings overlay: {start} → {end}")
     if symbols:
-        eta_s = len(symbols) * args.delay
+        calls_per_symbol = len(date_chunks(start, end))
+        planned_calls = len(symbols) * calls_per_symbol
+        eta_s = planned_calls * args.delay
         print(
             f"per-symbol mode: {len(symbols)} symbols "
             f"({', '.join(symbols[:8])}{'…' if len(symbols) > 8 else ''})"
+            f"  {calls_per_symbol} call(s)/symbol · {planned_calls} planned calls"
             f"  delay={args.delay}s  ETA≈{eta_s / 60:.0f} min"
         )
     data_dir = args.data_dir or default_data_dir()
@@ -736,7 +785,11 @@ def main() -> int:
         print(f"⚠ {exc}", file=sys.stderr)
         if budget.used == 0:
             return 1
-        print("  proceeding with partial data already fetched")
+        # A partial all-universe sweep is not a successful control-plane run.
+        # Do not merge or publish an alphabetical prefix while claiming the
+        # weekly sweep completed.
+        print("  refusing to publish partial per-symbol results", file=sys.stderr)
+        return 1
     if skipped_errors:
         print(f"  skipped {sum(skipped_errors.values())} symbols due to per-symbol errors:")
         for key, count in sorted(skipped_errors.items(), key=lambda kv: -kv[1]):
