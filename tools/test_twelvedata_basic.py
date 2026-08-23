@@ -3,7 +3,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-import build_frontend_data as frontend
+import frontend_data.realized_moves as frontend
 from twelvedata_basic import (
     TwelveDataConfig,
     TwelveDataUsageLedger,
