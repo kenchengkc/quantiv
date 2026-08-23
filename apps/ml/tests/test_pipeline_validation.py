@@ -249,6 +249,33 @@ def test_training_gate_reports_infinite_features_and_stale_metadata(
     )
 
 
+def test_training_gate_rejects_unapproved_provider_feature(tmp_path: Path) -> None:
+    training_dir = tmp_path / "training"
+    frame = _write_training_artifacts(training_dir)
+    frame["put_call_volume_ratio"] = np.linspace(0.7, 1.3, len(frame))
+    frame.to_parquet(training_dir / "training_T1.parquet", index=False)
+    (training_dir / "metadata_T1.json").write_text(
+        json.dumps(
+            {
+                "n_samples": len(frame),
+                "feature_cols": [*FEATURES, "put_call_volume_ratio"],
+            }
+        )
+    )
+
+    with pytest.raises(PipelineValidationError) as error:
+        validate_training_artifacts(
+            training_dir,
+            horizons=[1],
+            min_rows=10,
+            min_symbols=10,
+            min_history_days=30,
+            purge_days=1,
+        )
+
+    assert "unapproved_provider_features" in _issue_codes(error.value)
+
+
 def test_model_gate_loads_every_model_and_smoke_predicts(tmp_path: Path) -> None:
     training_dir = tmp_path / "training"
     models_dir = tmp_path / "models"

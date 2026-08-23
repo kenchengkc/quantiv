@@ -1,0 +1,108 @@
+{
+  "schema": "quantiv.provider-signal-policy.v1",
+  "default": "blocked",
+  "requirements": {
+    "minimum_events": 250,
+    "minimum_walk_forward_folds": 3,
+    "minimum_mae_improvement_pct": 0.5,
+    "maximum_straddle_relative_mae": 1.0,
+    "maximum_worst_slice_regression_pct": 5.0,
+    "maximum_incremental_monthly_cost_usd": 0.0
+  },
+  "signals": {
+    "options_flow": {
+      "description": "Put/call volume, open interest, and contract-level options summaries.",
+      "endpoint_ids": [
+        "massive_options_snapshot",
+        "av_realtime_put_call_ratio",
+        "av_realtime_voi_ratio",
+        "av_historical_put_call_ratio",
+        "av_historical_voi"
+      ],
+      "feature_prefixes": ["put_call_", "options_flow_", "provider_options_"],
+      "allow_collection": false,
+      "allow_publication": false,
+      "allow_ml": false,
+      "evidence": null
+    },
+    "short_interest": {
+      "description": "Short-interest shares and days-to-cover observations.",
+      "endpoint_ids": ["massive_short_interest"],
+      "feature_prefixes": ["short_interest_", "short_days_to_cover", "days_to_cover"],
+      "allow_collection": false,
+      "allow_publication": false,
+      "allow_ml": false,
+      "evidence": null
+    },
+    "vendor_fundamentals": {
+      "description": "Supplemental profiles, ratios, ratings, and analyst estimates.",
+      "endpoint_ids": [
+        "av_earnings",
+        "fmp_profile",
+        "fmp_key_metrics_ttm",
+        "fmp_ratios_ttm",
+        "fmp_ratings_snapshot",
+        "fmp_analyst_estimates",
+        "massive_ticker_overview"
+      ],
+      "feature_prefixes": ["vendor_fundamental_", "analyst_estimate_", "rating_"],
+      "allow_collection": false,
+      "allow_publication": false,
+      "allow_ml": false,
+      "evidence": null
+    },
+    "corporate_actions": {
+      "description": "Supplemental dividend, split, IPO, symbol-change, and delisting feeds.",
+      "endpoint_ids": [
+        "massive_dividends",
+        "massive_splits",
+        "av_ipo_calendar",
+        "massive_ipos",
+        "fmp_symbol_changes",
+        "fmp_delisted_companies"
+      ],
+      "feature_prefixes": ["provider_corporate_action_", "recent_split_", "recent_dividend_"],
+      "allow_collection": false,
+      "allow_publication": false,
+      "allow_ml": false,
+      "evidence": null
+    },
+    "live_market_enrichment": {
+      "description": "Supplemental quotes, trades, and technical indicators outside the canonical quote path.",
+      "endpoint_ids": [
+        "fmp_batch_aftermarket_quote",
+        "fmp_batch_aftermarket_trade",
+        "td_quote",
+        "td_rsi_daily"
+      ],
+      "feature_prefixes": ["provider_live_", "td_rsi_"],
+      "allow_collection": false,
+      "allow_publication": false,
+      "allow_ml": false,
+      "evidence": null
+    },
+    "macro_enrichment": {
+      "description": "Supplemental macro series outside the canonical model feature set.",
+      "endpoint_ids": ["av_treasury_yield_10y", "av_federal_funds_rate", "av_cpi"],
+      "feature_prefixes": ["provider_macro_", "av_treasury_", "av_federal_funds_", "av_cpi_"],
+      "allow_collection": false,
+      "allow_publication": false,
+      "allow_ml": false,
+      "evidence": null
+    },
+    "news_sentiment": {
+      "description": "News, press-release, and sentiment summaries.",
+      "endpoint_ids": [
+        "av_news_sentiment",
+        "td_press_releases",
+        "fmp_press_releases",
+        "massive_stock_news"
+      ],
+      "feature_prefixes": ["news_", "sentiment_", "press_release_"],
+      "allow_collection": false,
+      "allow_publication": false,
+      "allow_ml": false,
+      "evidence": null
+    }
+  }
+}

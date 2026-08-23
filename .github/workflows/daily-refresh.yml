@@ -151,96 +151,6 @@ jobs:
             --delay 0.25 \
             --refresh-after-days 90
 
-      - name: Probe Alpha Vantage V/OI coverage
-        # Low-priority options enrichment audit. Free tier is small, so this
-        # advances a persistent queue slowly and skips symbols checked recently.
-        # The output is informational only; the app and ML path do not consume
-        # V/OI until coverage is proven useful.
-        env:
-          ALPHAVANTAGE_API_KEY: ${{ secrets.ALPHAVANTAGE_API_KEY }}
-          ALPHAVANTAGE_API_KEY_2: ${{ secrets.ALPHAVANTAGE_API_KEY_2 }}
-        run: |
-          python scripts/probe_alphavantage_voi.py \
-            --allow-missing-key \
-            --universe priority \
-            --max-calls 5 \
-            --delay 15 \
-            --refresh-after-days 30
-
-      - name: Probe additive provider capabilities
-        # Entitlement/shape probe for non-redundant provider data: options
-        # snapshots, short interest, fundamentals, analyst/revision data,
-        # press releases/news, macro, and corporate actions. Stores only
-        # status + response-shape metadata in provider_capabilities.json.
-        env:
-          FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
-          ALPHAVANTAGE_API_KEY: ${{ secrets.ALPHAVANTAGE_API_KEY }}
-          ALPHAVANTAGE_API_KEY_2: ${{ secrets.ALPHAVANTAGE_API_KEY_2 }}
-          POLYGON_API_KEY: ${{ secrets.POLYGON_API_KEY }}
-          TWELVEDATA_API_KEY: ${{ secrets.TWELVEDATA_API_KEY }}
-          FMP_DAILY_CALL_LIMIT: "215"          # leaves room for FMP earnings overlay
-          # AV enforces ~25/day per IP, not per key (verified 06-10 + 06-11:
-          # runs from one runner got exactly ~25 calls total before BOTH keys
-          # were refused, regardless of per-key usage). Stacked keys in one
-          # run do NOT multiply quota. 10/key × 2 keys = 20 ledgered + 5
-          # unledgered V/OI-probe calls = the 25/IP physical ceiling.
-          # To actually use both keys' quotas, AV work must be split across
-          # separate workflow runs (different runner IPs).
-          ALPHAVANTAGE_DAILY_CALL_LIMIT: "10"
-          TWELVEDATA_DAILY_CREDIT_LIMIT: "72" # leaves 720 credits for frontend fallback
-          MASSIVE_MINUTE_CALL_LIMIT: "5"
-        run: |
-          python scripts/probe_provider_capabilities.py \
-            --allow-missing-key \
-            --max-calls 35 \
-            --delay 1 \
-            --respect-minute-limits
-
-      - name: Sync backend-only provider enrichments
-        # Writes derived summaries only under data/provider_enrichments.
-        # Public frontend JSON is not changed by this step.
-        env:
-          FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
-          ALPHAVANTAGE_API_KEY: ${{ secrets.ALPHAVANTAGE_API_KEY }}
-          ALPHAVANTAGE_API_KEY_2: ${{ secrets.ALPHAVANTAGE_API_KEY_2 }}
-          POLYGON_API_KEY: ${{ secrets.POLYGON_API_KEY }}
-          TWELVEDATA_API_KEY: ${{ secrets.TWELVEDATA_API_KEY }}
-          FMP_DAILY_CALL_LIMIT: "215"
-          ALPHAVANTAGE_DAILY_CALL_LIMIT: "10"
-          TWELVEDATA_DAILY_CREDIT_LIMIT: "72"
-          MASSIVE_MINUTE_CALL_LIMIT: "5"
-        run: |
-          # Daily run skips slow-changing reference/macro endpoints. Add the
-          # weekly cadence on Mondays (profile cross-checks) and the monthly
-          # cadence on the 1st (treasury/fed-funds/CPI) so that data still
-          # refreshes without paying for it in the daily AV budget.
-          CADENCES=daily
-          if [ "$(date -u +%u)" = "1" ]; then CADENCES="$CADENCES,weekly"; fi
-          if [ "$(date -u +%d)" = "01" ]; then CADENCES="$CADENCES,monthly"; fi
-          echo "provider enrichment cadences: $CADENCES"
-          # 220 covers the full plan on the heaviest day (Monday on the 1st:
-          # 216 calls — massive 81, fmp 81, td 32, av 22) so the planner never
-          # truncates WORK_ORDER; per-provider ledgers and minute limits are
-          # the real governors. Massive pacing adds ~16 min at 5/min.
-          python scripts/sync_provider_enrichments.py \
-            --allow-missing-key \
-            --max-symbols 16 \
-            --max-total-calls 220 \
-            --cadences "$CADENCES" \
-            --respect-minute-limits
-
-      - name: Accumulate pre-earnings event signals
-        # Snapshots put/call, options VOI and short interest for every UPCOMING
-        # reporter (Massive has the headroom) and appends to an append-only
-        # JSONL panel. Builds the historical event-signal training set going
-        # forward — the only free path past the point-MAE wall (quarterly
-        # estimate dispersion is paywalled). Best-effort: never fail the run.
-        continue-on-error: true
-        env:
-          POLYGON_API_KEY: ${{ secrets.POLYGON_API_KEY }}
-        run: |
-          python scripts/accumulate_event_signals.py --lead-days 12 --max-symbols 80
-
       - name: Refresh cached US market holidays
         # Non-price Finnhub call. A scheduled run can be delayed by GitHub into
         # the 09:25-16:45 ET quote window (happened 2026-06-15, a ~2h delay put
@@ -551,7 +461,7 @@ jobs:
           # with [ -f ... ] guards so a missing file (e.g. the changes
           # log on the very first run, before any diff entries land)
           # doesn't tank the commit step with a pathspec error.
-          for f in data/popular_snapshot.json data/popular_changes.jsonl data/fmp_earnings_metadata.json data/fmp_earnings_backfill_state.json data/alpha_vantage_voi_probe.json data/provider_capabilities.json data/provider_usage_ledger.json data/event_signals_panel.jsonl data/provider_enrichments/metadata.json data/provider_enrichments/earnings_news_signals.json data/provider_enrichments/company_facts.json data/provider_enrichments/options_provider_signals.json data/provider_enrichments/corporate_actions.json data/provider_enrichments/live_market_signals.json data/provider_enrichments/fmp_symbol_blocks.json data/delisting_watch.json; do
+          for f in data/popular_snapshot.json data/popular_changes.jsonl data/fmp_earnings_metadata.json data/fmp_earnings_backfill_state.json data/delisting_watch.json; do
             if [ -f "$f" ]; then
               git add -f "$f"
             else

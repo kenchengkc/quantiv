@@ -19,6 +19,7 @@ from pathlib import Path
 import duckdb
 
 sys.path.append(str(Path(__file__).parent))
+sys.path.append(str(Path(__file__).resolve().parent.parent / "apps" / "ml"))
 from build_earnings_events import build_earnings_events_table, create_duckdb_views
 from frontend_data.forecast_artifacts import (
     build_dashboard_evidence as build_dashboard_evidence,

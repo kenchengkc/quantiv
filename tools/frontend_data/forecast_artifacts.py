@@ -5,6 +5,12 @@ from __future__ import annotations
 import json
 import math
 
+from ml.provider_signal_policy import (
+    DEFAULT_POLICY_PATH,
+    load_provider_signal_policy,
+    permitted_signals,
+)
+
 from .shared import (
     FORECAST_RECEIPT_PATH,
     FORECASTS_DIR,
@@ -167,12 +173,18 @@ def _provider_signal_score(enrichment: dict) -> float | None:
     return round(score / count, 6) if count else None
 
 
-def load_provider_enrichments() -> dict[str, dict]:
+def load_provider_enrichments(policy_path=DEFAULT_POLICY_PATH) -> dict[str, dict]:
     """Load derived provider tables and compact them into per-symbol signals.
 
     Raw provider payloads are intentionally not published. This emits only
     normalized fields useful to product surfaces and future ML features.
     """
+    policy = load_provider_signal_policy(policy_path)
+    allowed_publication = permitted_signals(policy, "allow_publication")
+    if not allowed_publication:
+        print("🧊 Provider enrichment publication frozen pending paired evidence")
+        return {}
+
     generated_at: dict[str, str] = {}
     tables: dict[str, list[dict]] = {}
     for table, filename in {
@@ -193,65 +205,68 @@ def load_provider_enrichments() -> dict[str, dict]:
         symbol = symbol.upper()
         return by_symbol.setdefault(symbol, {})
 
-    facts_by_symbol: dict[str, list[dict]] = {}
-    for row in tables["company_facts"]:
-        symbol = str(row.get("symbol") or "").upper()
-        if symbol:
-            facts_by_symbol.setdefault(symbol, []).append(row)
-    for symbol, rows in facts_by_symbol.items():
-        short_rows = [r for r in rows if r.get("days_to_cover") is not None or r.get("short_interest") is not None]
-        short = _latest_row(short_rows, date_keys=("settlement_date", "collected_at"))
-        if short:
-            slot(symbol)["short_interest"] = {
-                **_row_source(short),
-                "shares": jsonable(short.get("short_interest")),
-                "avg_daily_volume": jsonable(short.get("avg_daily_volume")),
-                "days_to_cover": jsonable(short.get("days_to_cover")),
-                "settlement_date": short.get("settlement_date"),
+    if "short_interest" in allowed_publication:
+        facts_by_symbol: dict[str, list[dict]] = {}
+        for row in tables["company_facts"]:
+            symbol = str(row.get("symbol") or "").upper()
+            if symbol:
+                facts_by_symbol.setdefault(symbol, []).append(row)
+        for symbol, rows in facts_by_symbol.items():
+            short_rows = [r for r in rows if r.get("days_to_cover") is not None or r.get("short_interest") is not None]
+            short = _latest_row(short_rows, date_keys=("settlement_date", "collected_at"))
+            if short:
+                slot(symbol)["short_interest"] = {
+                    **_row_source(short),
+                    "shares": jsonable(short.get("short_interest")),
+                    "avg_daily_volume": jsonable(short.get("avg_daily_volume")),
+                    "days_to_cover": jsonable(short.get("days_to_cover")),
+                    "settlement_date": short.get("settlement_date"),
+                }
+
+    if "options_flow" in allowed_publication:
+        option_by_symbol: dict[str, list[dict]] = {}
+        for row in tables["options_provider_signals"]:
+            symbol = str(row.get("symbol") or "").upper()
+            if symbol:
+                option_by_symbol.setdefault(symbol, []).append(row)
+        for symbol, rows in option_by_symbol.items():
+            row = _latest_row(rows)
+            if not row:
+                continue
+            slot(symbol)["options_flow"] = {
+                **_row_source(row),
+                "contract_count": jsonable(row.get("contract_count")),
+                "call_count": jsonable(row.get("call_count")),
+                "put_count": jsonable(row.get("put_count")),
+                "total_call_volume": jsonable(row.get("total_call_volume")),
+                "total_put_volume": jsonable(row.get("total_put_volume")),
+                "total_call_open_interest": jsonable(row.get("total_call_open_interest")),
+                "total_put_open_interest": jsonable(row.get("total_put_open_interest")),
+                "put_call_volume_ratio": jsonable(row.get("put_call_volume_ratio")),
+                "put_call_open_interest_ratio": jsonable(row.get("put_call_open_interest_ratio")),
+                "iv_coverage_pct": jsonable(row.get("iv_coverage_pct")),
+                "greeks_coverage_pct": jsonable(row.get("greeks_coverage_pct")),
             }
 
-    option_by_symbol: dict[str, list[dict]] = {}
-    for row in tables["options_provider_signals"]:
-        symbol = str(row.get("symbol") or "").upper()
-        if symbol:
-            option_by_symbol.setdefault(symbol, []).append(row)
-    for symbol, rows in option_by_symbol.items():
-        row = _latest_row(rows)
-        if not row:
-            continue
-        slot(symbol)["options_flow"] = {
-            **_row_source(row),
-            "contract_count": jsonable(row.get("contract_count")),
-            "call_count": jsonable(row.get("call_count")),
-            "put_count": jsonable(row.get("put_count")),
-            "total_call_volume": jsonable(row.get("total_call_volume")),
-            "total_put_volume": jsonable(row.get("total_put_volume")),
-            "total_call_open_interest": jsonable(row.get("total_call_open_interest")),
-            "total_put_open_interest": jsonable(row.get("total_put_open_interest")),
-            "put_call_volume_ratio": jsonable(row.get("put_call_volume_ratio")),
-            "put_call_open_interest_ratio": jsonable(row.get("put_call_open_interest_ratio")),
-            "iv_coverage_pct": jsonable(row.get("iv_coverage_pct")),
-            "greeks_coverage_pct": jsonable(row.get("greeks_coverage_pct")),
-        }
-
-    actions_by_symbol: dict[str, list[dict]] = {}
-    for row in tables["corporate_actions"]:
-        symbol = str(row.get("symbol") or "").upper()
-        if symbol:
-            actions_by_symbol.setdefault(symbol, []).append(row)
-    for symbol, rows in actions_by_symbol.items():
-        dividends = [r for r in rows if "dividend" in str(r.get("source_endpoint") or "")]
-        splits = [r for r in rows if "split" in str(r.get("source_endpoint") or "")]
-        latest_div = _latest_row(dividends, date_keys=("latest_event_date", "collected_at"))
-        latest_split = _latest_row(splits, date_keys=("latest_event_date", "collected_at"))
-        if latest_div or latest_split:
-            slot(symbol)["corporate_actions"] = {
-                "dividend_events": jsonable(sum(int(r.get("event_count") or 0) for r in dividends)),
-                "latest_dividend_date": latest_div.get("latest_event_date") if latest_div else None,
-                "split_events": jsonable(sum(int(r.get("event_count") or 0) for r in splits)),
-                "latest_split_date": latest_split.get("latest_event_date") if latest_split else None,
-                "sources": [src for src in (_row_source(r) for r in [latest_div, latest_split] if r) if src],
-            }
+    if "corporate_actions" in allowed_publication:
+        actions_by_symbol: dict[str, list[dict]] = {}
+        for row in tables["corporate_actions"]:
+            symbol = str(row.get("symbol") or "").upper()
+            if symbol:
+                actions_by_symbol.setdefault(symbol, []).append(row)
+        for symbol, rows in actions_by_symbol.items():
+            dividends = [r for r in rows if "dividend" in str(r.get("source_endpoint") or "")]
+            splits = [r for r in rows if "split" in str(r.get("source_endpoint") or "")]
+            latest_div = _latest_row(dividends, date_keys=("latest_event_date", "collected_at"))
+            latest_split = _latest_row(splits, date_keys=("latest_event_date", "collected_at"))
+            if latest_div or latest_split:
+                slot(symbol)["corporate_actions"] = {
+                    "dividend_events": jsonable(sum(int(r.get("event_count") or 0) for r in dividends)),
+                    "latest_dividend_date": latest_div.get("latest_event_date") if latest_div else None,
+                    "split_events": jsonable(sum(int(r.get("event_count") or 0) for r in splits)),
+                    "latest_split_date": latest_split.get("latest_event_date") if latest_split else None,
+                    "sources": [src for src in (_row_source(r) for r in [latest_div, latest_split] if r) if src],
+                }
 
     for symbol, enrichment in list(by_symbol.items()):
         flags = _provider_signal_flags(enrichment)

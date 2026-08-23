@@ -21,9 +21,18 @@ from typing import Any
 
 import requests
 
-from provider_probe import CAPABILITIES_PATH, capability_is_ok, classify_response, load_capabilities
-from provider_specs import EndpointSpec, endpoint_specs_by_id
-from provider_utils import (
+REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.append(str(REPO_ROOT / "apps" / "ml"))
+
+from ml.provider_signal_policy import (  # noqa: E402
+    DEFAULT_POLICY_PATH,
+    ProviderSignalPolicyError,
+    load_provider_signal_policy,
+    permitted_endpoint_ids,
+)
+from provider_probe import CAPABILITIES_PATH, capability_is_ok, classify_response, load_capabilities  # noqa: E402
+from provider_specs import EndpointSpec, endpoint_specs_by_id  # noqa: E402
+from provider_utils import (  # noqa: E402
     DEFAULT_LEDGER_PATH,
     ProviderQuotaError,
     ProviderUsageLedger,
@@ -34,7 +43,6 @@ from provider_utils import (
 )
 
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
 PUBLIC_DIR = REPO_ROOT / "apps" / "frontend" / "public"
 POPULAR_WEIGHTS_PATH = REPO_ROOT / "apps" / "frontend" / "lib" / "popular.ts"
 OUTPUT_DIR = default_data_dir() / "provider_enrichments"
@@ -755,6 +763,15 @@ def main() -> int:
     parser.add_argument("--ignore-capabilities", action="store_true")
     parser.add_argument("--respect-minute-limits", action="store_true")
     parser.add_argument("--allow-missing-key", action="store_true")
+    parser.add_argument("--policy", type=Path, default=DEFAULT_POLICY_PATH)
+    parser.add_argument(
+        "--research-override",
+        action="store_true",
+        help=(
+            "Permit manual research collection even when production collection is frozen. "
+            "Never use this flag from a scheduled production workflow."
+        ),
+    )
     args = parser.parse_args()
     if args.max_symbols < 1:
         parser.error("--max-symbols must be at least 1")
@@ -786,10 +803,25 @@ def main() -> int:
         cadences=cadences,
         providers=providers,
     )
+    if not args.research_override:
+        try:
+            policy = load_provider_signal_policy(args.policy)
+            allowed_endpoints = permitted_endpoint_ids(policy)
+        except (OSError, json.JSONDecodeError, ProviderSignalPolicyError) as exc:
+            print(f"provider signal policy is invalid: {exc}", file=sys.stderr)
+            return 2
+        blocked_count = sum(spec.id not in allowed_endpoints for _, spec in work)
+        work = [item for item in work if item[1].id in allowed_endpoints]
+        if blocked_count:
+            print(
+                f"provider signal policy froze {blocked_count} planned call(s) "
+                "pending paired evidence"
+            )
     print(
         "Provider enrichment sync: "
         f"{len(symbols)} symbol(s), {len(work)} planned call(s), "
-        f"capability_gate={'off' if args.ignore_capabilities else 'on'}"
+        f"capability_gate={'off' if args.ignore_capabilities else 'on'}, "
+        f"policy_gate={'research_override' if args.research_override else 'on'}"
     )
     if args.dry_run:
         by_provider: dict[str, int] = {}
@@ -798,6 +830,9 @@ def main() -> int:
             print(f"would fetch {spec.provider}:{spec.id} for {symbol}")
         print(f"planned calls/credits by provider: {by_provider}")
         print("dry run: no API calls made and no files written")
+        return 0
+    if not work:
+        print("no provider calls approved; existing research artifacts were left unchanged")
         return 0
 
     ledger = ProviderUsageLedger(args.ledger)

@@ -13,6 +13,12 @@ import numpy as np
 import pandas as pd
 
 from ml.model_artifact import load_native_model, point_model_name, quantile_model_name
+from ml.provider_signal_policy import (
+    DEFAULT_POLICY_PATH,
+    ProviderSignalPolicyError,
+    blocked_model_features,
+    load_provider_signal_policy,
+)
 from ml.training_split import chronological_train_val_split
 
 DEFAULT_HORIZONS = (1, 2, 3, 7, 14, 21)
@@ -86,6 +92,17 @@ def validate_training_artifacts(
     """Validate feature/target artifacts before spending time on training."""
     issues: list[ValidationIssue] = []
     horizon_summaries: dict[str, Any] = {}
+    provider_policy: dict[str, Any] | None = None
+    try:
+        provider_policy = load_provider_signal_policy()
+    except (OSError, json.JSONDecodeError, ProviderSignalPolicyError) as exc:
+        _issue(
+            issues,
+            "training",
+            DEFAULT_POLICY_PATH,
+            "invalid_provider_signal_policy",
+            str(exc),
+        )
 
     for horizon in horizons:
         path = training_dir / f"training_T{horizon}.parquet"
@@ -130,6 +147,30 @@ def validate_training_artifacts(
             for column in frame.columns
             if column != "target" and not column.startswith("__")
         ]
+        if provider_policy is not None:
+            try:
+                blocked_features = blocked_model_features(feature_cols, provider_policy)
+            except ProviderSignalPolicyError as exc:
+                _issue(
+                    issues,
+                    "training",
+                    DEFAULT_POLICY_PATH,
+                    "invalid_provider_signal_evidence",
+                    str(exc),
+                )
+            else:
+                if blocked_features:
+                    detail = ", ".join(
+                        f"{feature} ({signal})"
+                        for feature, signal in sorted(blocked_features.items())
+                    )
+                    _issue(
+                        issues,
+                        "training",
+                        path,
+                        "unapproved_provider_features",
+                        f"provider-derived features lack approved paired evidence: {detail}",
+                    )
         if len(feature_cols) < 10:
             _issue(
                 issues,
