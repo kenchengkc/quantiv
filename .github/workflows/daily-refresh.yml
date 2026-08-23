@@ -781,8 +781,13 @@ jobs:
           steps.outcome-control.outputs.rolled_back == 'true' &&
           steps.model-decision.outputs.promoted != 'true'
         run: |
-          python scripts/daily_score.py --days-ahead 21
+          ROLLBACK_BUNDLE_ID=$(jq -r .champion_bundle_id data/validation/model_decision.json)
+          ROLLBACK_MODELS_DIR="data/models/bundles/$ROLLBACK_BUNDLE_ID"
+          python scripts/daily_score.py \
+            --days-ahead 21 \
+            --models-dir "$ROLLBACK_MODELS_DIR"
           python scripts/validate_ml_pipeline.py forecasts \
+            --models-dir "$ROLLBACK_MODELS_DIR" \
             --report data/validation/rollback_forecasts.json \
             --publish-receipt-dir data/forecasts/receipts
 
@@ -808,59 +813,40 @@ jobs:
         if: >-
           steps.model-decision.outputs.promoted == 'true' ||
           steps.outcome-control.outputs.rolled_back == 'true'
-        # Hot-load the freshly trained model bundle onto Railway's /data
-        # volume so /api/ml/predict can serve it without waiting for a
-        # Docker rebuild. Skips cleanly when the admin secret is absent
-        # (forks / local mirrors).
+        # Hot-load the exact signed champion onto Railway's /data volume.
+        # This step fails unless the backend preflights every native point and
+        # quantile model and returns the same bundle ID as the control decision.
         env:
           RAILWAY_BACKEND_URL: ${{ secrets.RAILWAY_BACKEND_URL }}
           ADMIN_API_KEY: ${{ secrets.ADMIN_API_KEY }}
         run: |
           if [ -z "$ADMIN_API_KEY" ]; then
-            echo "ADMIN_API_KEY secret not set; skipping Railway model sync."
-            echo "synced=false" >> "$GITHUB_OUTPUT"
-            exit 0
+            echo "::error::ADMIN_API_KEY is required to activate a promoted or rolled-back model."
+            exit 1
           fi
-          python - <<'PY'
-          import json
-          import os
-          import urllib.error
-          import urllib.request
-
-          url = os.environ.get("RAILWAY_BACKEND_URL") or "https://api.usequantiv.com"
-          url = url.rstrip("/") + "/api/admin/sync-models"
-          req = urllib.request.Request(
-              url,
-              data=b"{}",
-              method="POST",
-              headers={
-                  "Content-Type": "application/json",
-                  "X-API-Key": os.environ["ADMIN_API_KEY"],
-              },
-          )
-          try:
-              with urllib.request.urlopen(req, timeout=60) as res:
-                  body = res.read().decode("utf-8")
-          except urllib.error.HTTPError as exc:
-              print(f"Railway sync failed with HTTP {exc.code}: {exc.read().decode('utf-8')}")
-              raise SystemExit(1)
-          except Exception as exc:
-              print(f"Railway sync failed: {exc}")
-              raise SystemExit(1)
-
-          try:
-              payload = json.loads(body)
-          except json.JSONDecodeError:
-              payload = {"raw": body}
-          print("Railway model sync response:", json.dumps(payload, sort_keys=True))
-          PY
+          python scripts/activate_model_bundle.py \
+            --decision data/validation/model_decision.json \
+            --receipt data/validation/serving_activation.json
           echo "synced=true" >> "$GITHUB_OUTPUT"
 
+      - name: Upload serving activation receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: model-serving-activation
+          path: data/validation/serving_activation.json
+          if-no-files-found: ignore
+          retention-days: 90
+
       - name: Import retrain forecasts to Neon Postgres
-        # Only import weekly forecasts when Railway has hot-loaded the same
-        # freshly trained models. Otherwise the next daily refresh will import
-        # after the deployment/model-sync path catches up.
+        # Import only after exact-bundle activation. The importer independently
+        # rejects a forecast file whose bundle ID differs from the decision.
         if: steps.sync-railway-models.outputs.synced == 'true'
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        run: python -u scripts/import_recent_to_postgres.py --full
+        run: |
+          EXPECTED_BUNDLE_ID=$(jq -r .champion_bundle_id data/validation/model_decision.json)
+          python -u scripts/import_recent_to_postgres.py \
+            --full \
+            --require-database \
+            --expected-model-bundle-id "$EXPECTED_BUNDLE_ID"

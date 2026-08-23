@@ -26,6 +26,7 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from slowapi.util import get_remote_address
+from pydantic import BaseModel, Field
 
 # Configure structured logging
 logger = structlog.get_logger()
@@ -143,7 +144,10 @@ async def lifespan(app: FastAPI):
     if r2_models.configured():
         models_volume = Path(os.getenv("DATA_DIR", "./data")) / "models"
         try:
-            result = r2_models.sync_models_from_r2(models_volume)
+            result = r2_models.sync_models_from_r2(
+                models_volume,
+                pre_activate=predict_service.validate_models_dir,
+            )
             if result.activated and result.models_dir is not None:
                 os.environ["ML_MODELS_DIR"] = str(result.models_dir)
                 predict_service.reset_cache()
@@ -260,6 +264,15 @@ app.include_router(ml_predict_router)
 # ---------------------------------------------------------------------------
 # Admin endpoint (kept in main so it can reference verify_admin_key directly)
 # ---------------------------------------------------------------------------
+class ModelSyncRequest(BaseModel):
+    expected_bundle_id: str | None = Field(
+        default=None,
+        min_length=64,
+        max_length=64,
+        pattern=r"^[0-9a-f]{64}$",
+    )
+
+
 @app.post("/api/admin/refresh-forecasts")
 async def refresh_forecasts(background_tasks: BackgroundTasks, _key: str = Depends(verify_admin_key)):
     """Trigger forecast refresh (admin endpoint)"""
@@ -278,7 +291,10 @@ async def refresh_forecasts(background_tasks: BackgroundTasks, _key: str = Depen
 
 
 @app.post("/api/admin/sync-models")
-async def sync_models(_key: str = Depends(verify_admin_key)):
+async def sync_models(
+    request: ModelSyncRequest,
+    _key: str = Depends(verify_admin_key),
+):
     """Force-pull the latest LightGBM models from R2 onto the volume,
     then reset the in-process model cache so subsequent predictions use
     the new files. Run this after the Sunday retrain lands fresh models
@@ -289,15 +305,28 @@ async def sync_models(_key: str = Depends(verify_admin_key)):
     if not r2_models.configured():
         raise HTTPException(status_code=503, detail="R2 is not configured on this instance")
     models_volume = Path(os.getenv("DATA_DIR", "./data")) / "models"
-    result = r2_models.sync_models_from_r2(models_volume)
+    if request.expected_bundle_id is None:
+        raise HTTPException(status_code=400, detail="expected_bundle_id is required")
+    preflight: list[dict] = []
+
+    def validate_before_activation(models_dir: Path) -> None:
+        preflight.extend(predict_service.validate_models_dir(models_dir))
+
+    result = r2_models.sync_models_from_r2(
+        models_volume,
+        expected_bundle_id=request.expected_bundle_id,
+        pre_activate=validate_before_activation,
+    )
     if not result.activated or result.models_dir is None:
         raise HTTPException(status_code=503, detail="No verified model bundle was activated")
     os.environ["ML_MODELS_DIR"] = str(result.models_dir)
     predict_service.reset_cache()
     return {
+        "status": "activated",
         "bundle_id": result.bundle_id,
         "files_written": result.downloaded_files,
         "models_dir": os.environ.get("ML_MODELS_DIR", "/app/apps/ml/models"),
+        "preflight": preflight,
     }
 
 

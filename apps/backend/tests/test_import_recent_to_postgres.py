@@ -87,3 +87,19 @@ def test_load_and_filter_rejects_mixed_model_bundles(tmp_path):
         assert "multiple model bundle IDs" in str(exc)
     else:
         raise AssertionError("mixed-model import should fail closed")
+
+
+def test_import_bundle_must_match_activated_serving_bundle(tmp_path):
+    parquet_path = tmp_path / "forecasts_2026-05-24.parquet"
+    pd.DataFrame([_forecast_row(model_bundle_id="bundle-a")]).to_parquet(
+        parquet_path, index=False
+    )
+    df, _stats = importer.load_and_filter(parquet_path, days=7, full=True)
+
+    importer.verify_expected_model_bundle(df, "bundle-a")
+    try:
+        importer.verify_expected_model_bundle(df, "bundle-b")
+    except ValueError as exc:
+        assert "does not match the activated serving bundle" in str(exc)
+    else:
+        raise AssertionError("mismatched serving/import bundles must fail closed")

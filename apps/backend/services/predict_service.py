@@ -118,12 +118,69 @@ def _mtime(path: Path) -> Optional[datetime]:
         return None
 
 
-def get_bundle(horizon: int) -> Optional[_ModelBundle]:
-    """Lazy-load and cache the point + quantile estimators for `horizon`.
+def _load_bundle_from_dir(models_dir: Path, horizon: int) -> Optional[_ModelBundle]:
+    """Deserialize and validate one horizon from an explicit verified directory."""
+    point_name = _POINT_MODEL_NAMES.get(horizon)
+    if point_name is None:
+        logger.warning("Unsupported model horizon requested")
+        return None
+    point_path = models_dir / point_name
+    if not point_path.exists():
+        logger.warning("Allowlisted model file is missing")
+        return None
 
-    Returns None if the horizon has no model file on disk — the route layer
-    surfaces that as a 404 rather than a 500.
-    """
+    estimator = load_native_model(point_path)
+    feature_names = list(estimator.feature_name())
+    if not feature_names:
+        logger.error("Loaded model is unusable (no feature_names)")
+        return None
+    metadata = _metadata_for_horizon(models_dir, horizon)
+
+    quantile_estimators: Dict[int, Any] = {}
+    for q in _QUANTILES:
+        q_path = models_dir / _QUANTILE_MODEL_NAMES[(horizon, q)]
+        if not q_path.exists():
+            continue
+        q_est = load_native_model(q_path)
+        if list(q_est.feature_name()) != feature_names:
+            raise ValueError(f"T-{horizon} q{q:02d} schema mismatch")
+        quantile_estimators[q] = q_est
+
+    return _ModelBundle(
+        estimator=estimator,
+        feature_names=feature_names,
+        quantile_estimators=quantile_estimators,
+        loaded_at=datetime.now(timezone.utc),
+        model_version=metadata.get("version"),
+        model_trained_at=_parse_datetime(metadata.get("trained_at")),
+        feature_schema_hash=_feature_schema_hash(feature_names),
+        val_mae=float(metadata["val_mae"]) if metadata.get("val_mae") is not None else None,
+    )
+
+
+def validate_models_dir(models_dir: Path) -> List[Dict[str, Any]]:
+    """Preflight every required native model before a directory is activated."""
+    verified: List[Dict[str, Any]] = []
+    for horizon in _HORIZONS:
+        bundle = _load_bundle_from_dir(models_dir, horizon)
+        if bundle is None:
+            raise ValueError(f"T-{horizon} point model is unavailable")
+        missing_quantiles = sorted(set(_QUANTILES) - set(bundle.quantile_estimators))
+        if missing_quantiles:
+            raise ValueError(f"T-{horizon} is missing quantile heads: {missing_quantiles}")
+        verified.append(
+            {
+                "horizon_days": horizon,
+                "feature_count": len(bundle.feature_names),
+                "quantile_model_count": len(bundle.quantile_estimators),
+                "feature_schema_hash": bundle.feature_schema_hash,
+            }
+        )
+    return verified
+
+
+def get_bundle(horizon: int) -> Optional[_ModelBundle]:
+    """Lazy-load and cache the point + quantile estimators for `horizon`."""
     cached = _BUNDLE_CACHE.get(horizon)
     if cached is not None:
         return cached
@@ -132,48 +189,14 @@ def get_bundle(horizon: int) -> Optional[_ModelBundle]:
         cached = _BUNDLE_CACHE.get(horizon)
         if cached is not None:
             return cached
-
-        point_name = _POINT_MODEL_NAMES.get(horizon)
-        if point_name is None:
-            logger.warning("Unsupported model horizon requested")
-            return None
         models_dir = _models_dir()
-        point_path = models_dir / point_name
-        if not point_path.exists():
-            logger.warning("Allowlisted model file is missing")
+        bundle = _load_bundle_from_dir(models_dir, horizon)
+        if bundle is None:
             return None
-
-        estimator = load_native_model(point_path)
-        feature_names = list(estimator.feature_name())
-        if estimator is None or not feature_names:
-            logger.error("Loaded model is unusable (no estimator/feature_names)")
-            return None
-        metadata = _metadata_for_horizon(models_dir, horizon)
-
-        quantile_estimators: Dict[int, Any] = {}
-        for q in _QUANTILES:
-            q_path = models_dir / _QUANTILE_MODEL_NAMES[(horizon, q)]
-            if not q_path.exists():
-                continue
-            q_est = load_native_model(q_path)
-            if list(q_est.feature_name()) != feature_names:
-                raise ValueError(f"T-{horizon} q{q:02d} schema mismatch")
-            quantile_estimators[q] = q_est
-
-        bundle = _ModelBundle(
-            estimator=estimator,
-            feature_names=feature_names,
-            quantile_estimators=quantile_estimators,
-            loaded_at=datetime.now(timezone.utc),
-            model_version=metadata.get("version"),
-            model_trained_at=_parse_datetime(metadata.get("trained_at")),
-            feature_schema_hash=_feature_schema_hash(feature_names),
-            val_mae=float(metadata["val_mae"]) if metadata.get("val_mae") is not None else None,
-        )
         _BUNDLE_CACHE[horizon] = bundle
         logger.info(
             "Loaded allowlisted model bundle (%d features, %d quantile heads)",
-            len(feature_names), len(quantile_estimators),
+            len(bundle.feature_names), len(bundle.quantile_estimators),
         )
         return bundle
 

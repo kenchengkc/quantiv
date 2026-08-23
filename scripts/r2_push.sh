@@ -33,8 +33,23 @@ push_parquet() {
 }
 
 push_models() {
+  # Upload immutable/versioned bundles and supporting state first. The signed
+  # champion pointer is the only serving promotion step and is replaced last,
+  # so an R2 reader never observes a pointer to a partially uploaded bundle.
   rclone sync "$DATA_DIR/models" "$REMOTE/models" \
+    --exclude "/control/**" \
     --fast-list --transfers=8 --progress
+  if [ -d "$DATA_DIR/models/control" ]; then
+    rclone sync "$DATA_DIR/models/control" "$REMOTE/models/control" \
+      --exclude "/champion.json" \
+      --fast-list --transfers=4 --progress
+    if [ -f "$DATA_DIR/models/control/champion.json" ]; then
+      rclone copyto \
+        "$DATA_DIR/models/control/champion.json" \
+        "$REMOTE/models/control/champion.json"
+      echo "✅ Promoted atomic model champion pointer"
+    fi
+  fi
 }
 
 push_forecasts() {

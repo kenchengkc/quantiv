@@ -344,6 +344,15 @@ def _single_model_bundle_id(df: pd.DataFrame) -> str | None:
     return bundle_ids[0] if bundle_ids else None
 
 
+def verify_expected_model_bundle(df: pd.DataFrame, expected_bundle_id: str) -> None:
+    observed = _single_model_bundle_id(df)
+    if observed != expected_bundle_id:
+        raise ValueError(
+            "Forecast import bundle does not match the activated serving bundle: "
+            f"expected {expected_bundle_id}, observed {observed or 'none'}"
+        )
+
+
 def record_import(
     conn,
     parquet_path: Path,
@@ -453,6 +462,16 @@ def main() -> int:
                     help="Ignore --days; import every row in the Parquet")
     ap.add_argument("--file", default=None,
                     help="Specific Parquet file (default: newest forecasts_*.parquet)")
+    ap.add_argument(
+        "--expected-model-bundle-id",
+        default=None,
+        help="Fail unless the selected forecast contains exactly this promoted bundle ID.",
+    )
+    ap.add_argument(
+        "--require-database",
+        action="store_true",
+        help="Fail when DATABASE_URL is missing instead of treating the import as optional.",
+    )
     args = ap.parse_args()
 
     url = os.getenv("DATABASE_URL")
@@ -460,11 +479,16 @@ def main() -> int:
         # The daily-refresh workflow runs this step unconditionally so a
         # missing DATABASE_URL (forks / preview branches without Neon
         # access) is a no-op rather than a workflow failure.
+        if args.require_database:
+            print("DATABASE_URL not set — required forecast import cannot run.", file=sys.stderr)
+            return 2
         print("DATABASE_URL not set — skipping em_forecasts import.")
         return 0
 
     parquet_path = pick_parquet(args.file)
     df, stats = load_and_filter(parquet_path, args.days, args.full)
+    if args.expected_model_bundle_id:
+        verify_expected_model_bundle(df, args.expected_model_bundle_id)
     import_mode = "full" if args.full else f"days:{args.days}"
     print(f"import_recent_to_postgres: {parquet_path.name} → {len(df)} rows "
           f"({import_mode})")

@@ -10,7 +10,7 @@ import tempfile
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Callable, Mapping
 
 from ml.model_artifact import sha256_file
 from ml.model_bundle import (
@@ -147,7 +147,12 @@ def _download_bundle(
     return destination, downloaded
 
 
-def sync_models_from_r2(target_dir: Path) -> ModelSyncResult:
+def sync_models_from_r2(
+    target_dir: Path,
+    *,
+    expected_bundle_id: str | None = None,
+    pre_activate: Callable[[Path], Any] | None = None,
+) -> ModelSyncResult:
     """Verify, install, and activate one complete champion bundle.
 
     No downloaded artifact becomes visible to inference until the signed pointer,
@@ -167,14 +172,20 @@ def sync_models_from_r2(target_dir: Path) -> ModelSyncResult:
         pointer = verify_control_pointer(pointer_envelope)
         _reject_pointer_replay(target_dir, pointer)
         bundle_id = pointer["champion_bundle_id"]
+        if expected_bundle_id is not None and bundle_id != expected_bundle_id:
+            raise ModelBundleError(
+                "R2 champion does not match the expected promotion decision"
+            )
         manifest_key = f"{R2_MODEL_PREFIX}bundles/{bundle_id}/manifest.json"
         manifest = _get_json(client, bucket, manifest_key)
         manifest_payload = verify_bundle_manifest(manifest)
         if manifest_payload["bundle_id"] != bundle_id:
             raise ModelBundleError("control pointer and bundle manifest disagree")
-        _, downloaded = _download_bundle(
+        bundle_dir, downloaded = _download_bundle(
             client, bucket, target_dir, bundle_id, manifest
         )
+        if pre_activate is not None:
+            pre_activate(bundle_dir)
         models_dir = _atomic_activate(target_dir, bundle_id, pointer_envelope)
         logger.info(
             "Activated verified model bundle %s (%d downloaded files)",

@@ -141,3 +141,41 @@ def test_corrupt_download_never_replaces_active_bundle(tmp_path: Path, monkeypat
     assert result.activated is False
     assert (target / "current").resolve() == current_before
     assert current_before.name == bundle_id
+
+
+def test_expected_bundle_mismatch_never_activates(tmp_path: Path, monkeypatch) -> None:
+    objects, _bundle_id, public_path, _ = _remote_objects(tmp_path)
+    monkeypatch.setenv("R2_BUCKET", "test")
+    monkeypatch.setenv("MODEL_BUNDLE_PUBLIC_KEY", str(public_path))
+    monkeypatch.setattr(r2_models, "_build_client", lambda: _FakeR2(objects))
+    target = tmp_path / "volume"
+
+    result = r2_models.sync_models_from_r2(
+        target,
+        expected_bundle_id="f" * 64,
+    )
+
+    assert result.activated is False
+    assert result.error == "R2 champion does not match the expected promotion decision"
+    assert not (target / "current").exists()
+
+
+def test_native_preflight_failure_never_activates(tmp_path: Path, monkeypatch) -> None:
+    objects, bundle_id, public_path, _ = _remote_objects(tmp_path)
+    monkeypatch.setenv("R2_BUCKET", "test")
+    monkeypatch.setenv("MODEL_BUNDLE_PUBLIC_KEY", str(public_path))
+    monkeypatch.setattr(r2_models, "_build_client", lambda: _FakeR2(objects))
+    target = tmp_path / "volume"
+
+    def reject(_models_dir: Path) -> None:
+        raise ValueError("native preflight failed")
+
+    result = r2_models.sync_models_from_r2(
+        target,
+        expected_bundle_id=bundle_id,
+        pre_activate=reject,
+    )
+
+    assert result.activated is False
+    assert result.error == "native preflight failed"
+    assert not (target / "current").exists()
