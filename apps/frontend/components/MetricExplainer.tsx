@@ -6,7 +6,7 @@ import {
   LineChart,
   Scale,
 } from "lucide-react";
-import type { SyntheticEvent } from "react";
+import { useEffect, useRef, useState, type SyntheticEvent } from "react";
 
 import { METRIC_GLOSSARY, type MetricKey } from "@/lib/metricGlossary";
 
@@ -34,12 +34,40 @@ export function MetricHelp({
   align?: "left" | "right";
 }) {
   const definition = METRIC_GLOSSARY[metric];
+  const detailsRef = useRef<HTMLDetailsElement>(null);
+  const [isOpen, setIsOpen] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const closeOnOutsidePointer = (event: PointerEvent) => {
+      const details = detailsRef.current;
+      if (
+        details &&
+        event.target instanceof Node &&
+        !details.contains(event.target)
+      ) {
+        details.open = false;
+      }
+    };
+
+    document.addEventListener("pointerdown", closeOnOutsidePointer);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsidePointer);
+    };
+  }, [isOpen]);
+
+  const handleToggle = (event: SyntheticEvent<HTMLDetailsElement>) => {
+    closeOtherMetricHelp(event);
+    setIsOpen(event.currentTarget.open);
+  };
 
   return (
     <details
+      ref={detailsRef}
       className={`qv-metric-help qv-metric-help-${align}`}
       name={METRIC_HELP_GROUP}
-      onToggle={closeOtherMetricHelp}
+      onToggle={handleToggle}
     >
       <summary
         aria-label={`Explain ${definition.label}`}
