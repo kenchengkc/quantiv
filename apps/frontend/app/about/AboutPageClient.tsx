@@ -1540,7 +1540,7 @@ export default function AboutPageClient() {
             kicker="ATM IV"
             title="From an option quote to volatility"
             tex={String.raw`\sigma_{\mathrm{ATM}} \;=\; \tfrac{1}{2}\bigl(\sigma_C + \sigma_P\bigr)`}
-            body="We match a call and put with the same symbol, expiry, and strike (nearest to delta ≈ 0.5), then average the two annualized IVs from the chain. Crossed, zero-sided, and excessively wide quotes are rejected before this step."
+            body="We match a call and put with the same symbol, expiry, and strike (nearest to delta ≈ 0.5), then average the two annualized IVs from the chain. Zero-sided and crossed markets are excluded before selection; the nightly scoring run also rejects stale, illiquid, and excessive-spread quotes."
           />
           <FormulaCard
             id="methodology-straddle"
