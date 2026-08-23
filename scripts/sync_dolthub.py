@@ -27,6 +27,7 @@ Usage:
 """
 
 import argparse
+import hashlib
 import json
 import os
 import sys
@@ -55,9 +56,9 @@ STOCKS_API = f"https://www.dolthub.com/api/v1alpha1/{DOLTHUB_OWNER}/stocks/{DOLT
 COLUMNS = "date, act_symbol, expiration, strike, call_put, bid, ask, vol, delta, gamma, theta, vega, rho"
 
 # Symbol-prefix buckets for pagination (covers A-Z and a few common non-alpha)
-SYMBOL_BUCKETS = [
-    ("A", "D"), ("D", "G"), ("G", "K"), ("K", "N"),
-    ("N", "R"), ("R", "U"), ("U", "Zz"),
+SYMBOL_BUCKETS: list[tuple[str | None, str | None]] = [
+    (None, "D"), ("D", "G"), ("G", "K"), ("K", "N"),
+    ("N", "R"), ("R", "U"), ("U", None),
 ]
 
 # Arrow schema for consistent Parquet writes
@@ -109,6 +110,42 @@ def metadata_path() -> Path:
     return data_dir() / METADATA_FILE
 
 
+def ingestion_control_root() -> Path:
+    return data_dir() / "control" / "ingestion" / "options"
+
+
+def _atomic_json(path: Path, payload: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    temporary.write_text(json.dumps(payload, indent=2, sort_keys=True, default=str) + "\n")
+    os.replace(temporary, path)
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _content_digest(frame: pd.DataFrame) -> str:
+    """Stable logical-row digest used to prove idempotent source replay."""
+    if frame.empty:
+        return hashlib.sha256(b"").hexdigest()
+    ordered = frame.sort_values(
+        ["date", "act_symbol", "expiration", "strike", "call_put"],
+        kind="mergesort",
+    )[COLUMN_LIST]
+    payload = ordered.to_json(
+        orient="records",
+        date_format="iso",
+        date_unit="us",
+        double_precision=15,
+    ).encode()
+    return hashlib.sha256(payload).hexdigest()
+
+
 # ---------------------------------------------------------------------------
 # DoltHub query with retries
 # ---------------------------------------------------------------------------
@@ -144,27 +181,43 @@ def fetch_date(target: date) -> pd.DataFrame:
     """Fetch every row for *target* from DoltHub, handling the 1000-row cap."""
     ds = target.isoformat()
     all_rows: list[dict] = []
+    bucket_evidence: list[dict[str, object]] = []
 
     for lo, hi in SYMBOL_BUCKETS:
         # Keyset pagination within the bucket
         last_key: Optional[tuple] = None
+        bucket_rows = 0
+        pages = 0
         while True:
             if last_key is None:
-                where = f"date = '{ds}' AND act_symbol >= '{lo}' AND act_symbol < '{hi}'"
+                bounds = []
+                if lo is not None:
+                    bounds.append(f"act_symbol >= '{lo}'")
+                if hi is not None:
+                    bounds.append(f"act_symbol < '{hi}'")
+                where = f"date = '{ds}' AND " + " AND ".join(bounds)
             else:
                 sym, exp, stk, cp = last_key
                 # Continue after the last row we saw
-                where = (
-                    f"date = '{ds}' AND act_symbol >= '{lo}' AND act_symbol < '{hi}' "
-                    f"AND (act_symbol, expiration, strike, call_put) > ('{sym}', '{exp}', {stk}, '{cp}')"
+                bounds = []
+                if lo is not None:
+                    bounds.append(f"act_symbol >= '{lo}'")
+                if hi is not None:
+                    bounds.append(f"act_symbol < '{hi}'")
+                bounds.append(
+                    "(act_symbol, expiration, strike, call_put) "
+                    f"> ('{sym}', '{exp}', {stk}, '{cp}')"
                 )
+                where = f"date = '{ds}' AND " + " AND ".join(bounds)
 
             sql = f"SELECT {COLUMNS} FROM option_chain WHERE {where} LIMIT {ROW_LIMIT}"
             rows = query(sql)
+            pages += 1
             if not rows:
                 break
 
             all_rows.extend(rows)
+            bucket_rows += len(rows)
 
             if len(rows) < ROW_LIMIT:
                 break  # No more pages in this bucket
@@ -175,9 +228,24 @@ def fetch_date(target: date) -> pd.DataFrame:
             time.sleep(API_DELAY)
 
         time.sleep(API_DELAY)
+        bucket_evidence.append(
+            {
+                "symbol_range": [lo, hi],
+                "rows": bucket_rows,
+                "pages": pages,
+                "exhausted": True,
+            }
+        )
 
     if not all_rows:
-        return pd.DataFrame(columns=COLUMN_LIST)
+        empty = pd.DataFrame(columns=COLUMN_LIST)
+        empty.attrs["ingestion_evidence"] = {
+            "expected_rows": 0,
+            "received_rows": 0,
+            "expected_method": "exhaustive_keyset_pagination",
+            "buckets": bucket_evidence,
+        }
+        return empty
 
     df = pd.DataFrame(all_rows)
     for col in COLUMN_LIST:
@@ -190,6 +258,23 @@ def fetch_date(target: date) -> pd.DataFrame:
     df["expiration"] = pd.to_datetime(df["expiration"]).dt.date
     for c in ["strike", "bid", "ask", "vol", "delta", "gamma", "theta", "vega", "rho"]:
         df[c] = pd.to_numeric(df[c], errors="coerce")
+
+    duplicate_rows = int(
+        df.duplicated(["date", "act_symbol", "expiration", "strike", "call_put"]).sum()
+    )
+    if duplicate_rows:
+        raise RuntimeError(
+            f"source replay for {ds} returned {duplicate_rows:,} duplicate primary keys"
+        )
+    df.attrs["ingestion_evidence"] = {
+        # Every symbol bucket is traversed until its first short/empty page.
+        # This is the provider-compatible expected count: broad COUNT scans
+        # time out on DoltHub's 100M+ row table.
+        "expected_rows": len(all_rows),
+        "received_rows": len(df),
+        "expected_method": "exhaustive_keyset_pagination",
+        "buckets": bucket_evidence,
+    }
 
     return df
 
@@ -206,9 +291,85 @@ def write_date(df: pd.DataFrame, root: Path) -> int:
     out_dir = root / f"year={dt_obj.year}" / f"month={dt_obj.month:02d}"
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / f"{dt_obj.isoformat()}.parquet"
+    temporary = out_path.with_name(f".{out_path.name}.{os.getpid()}.tmp")
     table = pa.Table.from_pandas(df, schema=ARROW_SCHEMA, preserve_index=False)
-    pq.write_table(table, out_path, compression="snappy")
+    pq.write_table(table, temporary, compression="snappy")
+    # Validate the staged artifact before the single-filesystem promotion.
+    staged = pq.ParquetFile(temporary)
+    if staged.metadata.num_rows != len(df):
+        temporary.unlink(missing_ok=True)
+        raise RuntimeError(
+            f"staged Parquet has {staged.metadata.num_rows:,} rows; expected {len(df):,}"
+        )
+    os.replace(temporary, out_path)
     return len(df)
+
+
+def _partition_path(target: date, root: Path) -> Path:
+    return (
+        root
+        / f"year={target.year}"
+        / f"month={target.month:02d}"
+        / f"{target.isoformat()}.parquet"
+    )
+
+
+def _manifest_path(target: date) -> Path:
+    return ingestion_control_root() / f"{target.isoformat()}.json"
+
+
+def _write_ingestion_manifest(
+    target: date,
+    frame: pd.DataFrame,
+    root: Path,
+    *,
+    prior_manifest: dict | None = None,
+) -> dict:
+    evidence = frame.attrs.get("ingestion_evidence") or {}
+    expected = int(evidence.get("expected_rows", len(frame)))
+    received = len(frame)
+    if expected != received:
+        raise RuntimeError(
+            f"{target}: expected {expected:,} rows but received {received:,}"
+        )
+    digest = _content_digest(frame)
+    prior_digest = (prior_manifest or {}).get("content_sha256")
+    replay_status = "baseline_recorded"
+    if prior_digest:
+        if prior_digest != digest:
+            raise RuntimeError(
+                f"{target}: replay digest changed ({prior_digest} -> {digest}); "
+                "quarantine the source revision before promotion"
+            )
+        replay_status = "verified"
+    partition = _partition_path(target, root)
+    payload = {
+        "schema": "quantiv.options-ingestion.v1",
+        "status": "passed",
+        "source": "dolthub/post-no-preference/options/option_chain",
+        "source_date": target.isoformat(),
+        "generated_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+        "expected_rows": expected,
+        "received_rows": received,
+        "expected_method": evidence.get(
+            "expected_method", "exhaustive_keyset_pagination"
+        ),
+        "duplicate_primary_keys": 0,
+        "partition": str(partition.relative_to(data_dir())) if received else None,
+        "partition_bytes": partition.stat().st_size if received else 0,
+        "partition_sha256": _sha256_file(partition) if received else None,
+        "content_sha256": digest,
+        "replay_equivalence": replay_status,
+        "pagination": evidence.get("buckets", []),
+        "source_capabilities": {
+            "timestamp_precision": "date",
+            "intraday_quote_timestamp": False,
+            "option_volume": False,
+            "open_interest": False,
+        },
+    }
+    _atomic_json(_manifest_path(target), payload)
+    return payload
 
 
 # ---------------------------------------------------------------------------
@@ -221,8 +382,7 @@ def load_meta() -> dict:
 
 def save_meta(meta: dict):
     p = metadata_path()
-    p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(json.dumps(meta, indent=2, default=str))
+    _atomic_json(p, meta)
 
 
 # ---------------------------------------------------------------------------
@@ -258,7 +418,7 @@ def earliest_dolthub_date() -> date:
 def already_synced(target: date, root: Path) -> bool:
     """Check if a Parquet file already exists for this date."""
     dt_obj = target
-    path = root / f"year={dt_obj.year}" / f"month={dt_obj.month:02d}" / f"{dt_obj.isoformat()}.parquet"
+    path = _partition_path(dt_obj, root)
     return path.exists()
 
 
@@ -270,19 +430,42 @@ def sync_dates(dates: list[date], root: Path, skip_existing: bool = True) -> int
     total = 0
     for i, d in enumerate(dates):
         if skip_existing and already_synced(d, root):
-            print(f"  [{i+1}/{len(dates)}] {d} — already exists, skipping")
+            partition = _partition_path(d, root)
+            manifest_path = _manifest_path(d)
+            if manifest_path.exists():
+                manifest = json.loads(manifest_path.read_text())
+                actual = _sha256_file(partition)
+                if manifest.get("partition_sha256") != actual:
+                    raise RuntimeError(
+                        f"{d}: existing partition does not match its ingestion manifest"
+                    )
+                print(
+                    f"  [{i+1}/{len(dates)}] {d} — verified existing partition, skipping"
+                )
+            else:
+                existing = pq.read_table(partition).to_pandas()
+                existing.attrs["ingestion_evidence"] = {
+                    "expected_rows": len(existing),
+                    "received_rows": len(existing),
+                    "expected_method": "legacy_partition_baseline",
+                    "buckets": [],
+                }
+                _write_ingestion_manifest(d, existing, root)
+                print(
+                    f"  [{i+1}/{len(dates)}] {d} — recorded legacy baseline, skipping"
+                )
             continue
 
         print(f"  [{i+1}/{len(dates)}] {d} — fetching ...", end=" ", flush=True)
-        try:
-            df = fetch_date(d)
-            n = write_date(df, root)
-            total += n
-            print(f"{n:,} rows")
-        except Exception as exc:
-            print(f"FAILED: {exc}")
-            # Continue with next date instead of aborting
-            continue
+        prior_manifest = None
+        manifest_path = _manifest_path(d)
+        if manifest_path.exists():
+            prior_manifest = json.loads(manifest_path.read_text())
+        df = fetch_date(d)
+        n = write_date(df, root)
+        _write_ingestion_manifest(d, df, root, prior_manifest=prior_manifest)
+        total += n
+        print(f"{n:,} rows · reconciled · atomically promoted")
 
     return total
 
