@@ -76,7 +76,7 @@ Raise Quantiv's production confidence without changing its product architecture:
 
 ## Phase 4: Configuration and repository cleanup
 
-- Make Docker Compose use the same repository-root backend build context as Railway.
+- Align the Railway backend image (`apps/backend/Dockerfile`) with production `DATABASE_URL` (Neon).
 - Standardize local and CI Node.js images on Node 20.
 - Align Python ABI-sensitive NumPy/Pandas constraints.
 - Remove only dependencies proven unused by runtime imports.
@@ -121,7 +121,7 @@ npm run test --workspace=apps/frontend -- --run
 npm run build --workspace=apps/frontend
 npm run test:e2e --workspace=apps/frontend
 
-ruff check apps/backend apps/ml/ml apps/ml/model_trainer_v3.py apps/ml/tests scripts tools
+ruff check apps/backend apps/ml/ml apps/ml/model_trainer.py apps/ml/tests scripts tools
 pytest apps/backend/tests apps/ml/tests scripts tools -q
 
 npm ci --prefix workers/refresh-prices

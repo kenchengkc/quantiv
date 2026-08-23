@@ -17,6 +17,10 @@ folds×seeds and report mean, std, and a t-stat; an improvement only counts if
 ΔMAE < 0 and |t| >= 2.
 
 Round is chosen with --round: objectives | validate | ensemble | skew | dist.
+
+Usage:
+  python scripts/research/experiment_model_improvements.py --round objectives
+  python scripts/research/experiment_model_improvements.py --round validate --oos-offset 150
 """
 
 from __future__ import annotations

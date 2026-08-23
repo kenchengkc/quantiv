@@ -31,7 +31,7 @@ class BiasPoint:
     market_cap: Optional[float] = None
     vix_level: Optional[float] = None
 
-class BiaseCurveBuilder:
+class BiasCurveBuilder:
     """Builds historical bias curves for EM_math calibration"""
     
     def __init__(self, data_dir: str = "data"):
@@ -359,7 +359,7 @@ def main():
     """Build and save historical bias curves"""
     
     # Initialize builder
-    builder = BiaseCurveBuilder()
+    builder = BiasCurveBuilder()
     
     # Extract historical bias points
     bias_points = builder.extract_historical_bias_points(

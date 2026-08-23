@@ -130,10 +130,7 @@ config/.env.local
 config/.env.development
 config/.env.production
 config/.env.test
-config/docker/.env.docker
-config/docker/.env.compose
-# but keep an example file tracked
-!config/.env.example
+# Tracked example env file lives at the repo root: .env.example
 
 # SSH Keys & Certificates
 *.pem

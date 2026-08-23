@@ -40,8 +40,8 @@ asymmetry hypothesis; it is intentionally NOT wired into the UI.
 ═══════════════════════════════════════════════════════════════════════════════
 
 Usage:
-  python apps/ml/implied_pdf.py demo --symbol AAPL
-  python apps/ml/implied_pdf.py validate --n 900 --center forward
+  python scripts/research/implied_pdf.py demo --symbol AAPL
+  python scripts/research/implied_pdf.py validate --n 900 --center forward
 """
 from __future__ import annotations
 

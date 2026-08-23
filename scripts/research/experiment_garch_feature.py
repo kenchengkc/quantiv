@@ -9,7 +9,7 @@ model with vs without it — same folds, seeds, and decay weights as
 experiment_model_improvements. Prior is null: the model already carries
 cc_rv_10d/20d, parkinson_rv_10/20/60d, vol_of_vol_20d, hv_current, iv_current.
 
-Usage: python scripts/experiment_garch_feature.py --ml-dir /tmp/ml_garch [--oos-offset 150]
+Usage: python scripts/research/experiment_garch_feature.py --ml-dir /tmp/ml_garch [--oos-offset 150]
 """
 from __future__ import annotations
 

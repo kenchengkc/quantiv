@@ -1,6 +1,6 @@
 # DuckDB + Parquet Architecture (Quantiv)
 
-This document defines the canonical storage conventions, DuckDB views, and integration points used by Quantiv after migrating historical data from PostgreSQL to Parquet + DuckDB.
+This document defines the canonical storage conventions, DuckDB views, and integration points used by Quantiv. Historical options and OHLCV live in Parquet + DuckDB. Neon Postgres holds watchlists and imported forecast serving rows — not a local Docker Postgres warehouse.
 
 ## Goals
 - Keep historical data in columnar Parquet with predictable partitions and filenames.
@@ -106,7 +106,7 @@ python3 scripts/setup_duckdb_from_parquet.py --data-dir ./data --db-file ./quant
 - Creates/loads extensions, sets DB settings, creates views/tables, runs light test queries, and exports schema info to `duckdb_schema.txt`.
 
 ## Backend Integration
-- Env vars (see `config/.env.example`):
+- Env vars (see [`.env.example`](../.env.example)):
   - `DATA_DIR` (default `./data`)
   - `DUCKDB_PATH` (default `./quantiv.duckdb`)
   - `DATA_BACKEND` = `postgres` | `duckdb` | `hybrid`

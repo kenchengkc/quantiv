@@ -125,7 +125,7 @@ def load_models(models_dir: Path) -> Dict[int, dict]:
 def get_upcoming_features(conn: duckdb.DuckDBPyConnection, days_ahead: int) -> pd.DataFrame:
     """Get features for symbols with upcoming earnings.
 
-    Uses the same feature set as feature_engineering_v3:
+    Uses the same feature set as feature_engineering.py:
     - Core options features from v_straddle_features
     - Event vol decomposition from front/back month IV
     - Historical earnings patterns
@@ -565,7 +565,7 @@ def main():
 
     models = load_models(models_dir)
     if not models:
-        logger.error(f"No models found in {models_dir}. Run model_trainer_v3.py first.")
+        logger.error(f"No models found in {models_dir}. Run model_trainer.py first.")
         return
 
     db_path = os.getenv("DUCKDB_PATH", str(data_dir / "quantiv.duckdb"))

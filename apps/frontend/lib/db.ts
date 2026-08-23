@@ -4,10 +4,11 @@ import { neon, type NeonQueryFunction } from '@neondatabase/serverless';
 // missing DATABASE_URL. The handlers that use this are all dynamic, so this
 // only runs at request time on a real deploy.
 //
-// Schema migrations live in scripts/migrate.mjs and run as a one-time CI
-// step before the deploy lands — NOT inside route handlers. Putting DDL
-// in the request path adds first-cold-instance latency and requires
-// production credentials to carry CREATE privileges.
+// Schema migrations live in scripts/migrate.mjs. Run that script with a
+// privileged Neon role when the schema changes — not from CI, and not
+// inside route handlers. Putting DDL in the request path adds
+// first-cold-instance latency and requires production credentials to
+// carry CREATE privileges.
 let _sql: NeonQueryFunction<false, false> | null = null;
 
 function getSql(): NeonQueryFunction<false, false> {

@@ -90,7 +90,7 @@ rclone size r2:quantiv-data
 ## 5. Enable the workflow
 
 ```bash
-git add .github/workflows/daily-refresh.yml scripts/r2_{pull,push,bootstrap}.sh scripts/r2_setup.md
+git add .github/workflows/daily-refresh.yml scripts/r2_{pull,push,bootstrap}.sh docs/R2_SETUP.md
 git commit -m "Add daily R2-backed refresh workflow"
 git push
 ```

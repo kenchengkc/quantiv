@@ -47,17 +47,17 @@ Decision rule: for each signal, spend ≤1 day probing free historical depth
 accumulate instead of blocking.
 
 ### Gap B — ML feature integration
-The enrichment lives in frontend JSON, **not** in DuckDB/`feature_engineering_v3`.
+The enrichment lives in frontend JSON, **not** in DuckDB/`feature_engineering`.
 To test these as model features:
 1. Land the historical panel as a parquet keyed `(act_symbol, snapshot_date)` →
    new view `v_event_signals`.
-2. As-of LEFT JOIN into the snapshots CTE in `feature_engineering_v3.py` (same
+2. As-of LEFT JOIN into the snapshots CTE in `feature_engineering.py` (same
    pattern as `v_volhist`), exposing columns:
    - `eps_dispersion`, `rev_dispersion`, `num_analysts_eps`
    - `put_call_vol_ratio`, `put_call_oi_ratio`, `options_voi`
    - `short_days_to_cover`, `short_pct_float` (if float available)
 3. Add the names to `feature_cols`; rebuild to a temp dir; **paired-test** with
-   `experiment_model_improvements.py` (new `events` round: baseline = drop the new
+   `scripts/research/experiment_model_improvements.py` (new `events` round: baseline = drop the new
    cols, variant = keep) on both OOS windows. Ship only if ΔMAE<0 **and** |t|≥2.
 
 ## Expected value & order
@@ -75,7 +75,7 @@ quality is already addressed by the calibrated ML quantile bands.
 
 ## Probe results (executed 2026-06-04)
 
-Built `scripts/backfill_analyst_dispersion.py` (resumable) and ran it. Hard
+Built `scripts/research/backfill_analyst_dispersion.py` (resumable) and ran it. Hard
 free-tier walls on FMP:
 - **`period=quarter` is premium** → only **annual** dispersion is free. Annual is
   one value per fiscal year (shared by that year's 4 prints) → weak per-event
@@ -99,7 +99,7 @@ is low. Two honest paths instead of grinding it:
    accuracy is a priority — the free plan has likely hit its point-MAE ceiling
    (realized↔implied corr ≈ 0.26; every free-feature transform tests null).
 The de-bias/calibrated band (shipped) was the realistic free-tier win.
-`backfill_analyst_dispersion.py` stays as the resumable tool if we choose to
+`scripts/research/backfill_analyst_dispersion.py` stays as the resumable tool if we choose to
 accumulate annual dispersion for an eventual paired test anyway.
 
 ## Implemented: forward-accumulation (2026-06-04)
@@ -121,7 +121,7 @@ session (or are sparse) — OI ratios and short interest are the stable signals;
 the per-event snapshot closest before the print is the one to use.
 
 **When mature (~4-8 quarters):** write `experiment_event_signals.py` (mirrors
-`experiment_garch_feature.py`): for each training event take the last panel
+`scripts/research/experiment_garch_feature.py`): for each training event take the last panel
 snapshot before its `earnings_date`, as-of join the columns, and paired-test L1
 ±signals on both OOS windows (ship only if ΔMAE<0 and |t|≥2). Until then the
 panel just accumulates; no model change.
@@ -130,7 +130,7 @@ panel just accumulates; no model change.
 
 Short interest is the one signal with free *historical* depth (Massive serves
 ~15 months of FINRA settlements), so it could be tested now without waiting.
-`scripts/probe_signal_effectiveness.py` aligned 796 historical events to the
+`scripts/research/probe_signal_effectiveness.py` aligned 796 historical events to the
 settlement before each print: **days-to-cover is NULL** for both magnitude
 (Spearman rho=−0.02, p=0.61) and direction (rho=−0.02, p=0.64), with a flat
 quintile table. So short interest is unlikely to help the model — deprioritize

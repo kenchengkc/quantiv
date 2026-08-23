@@ -440,7 +440,7 @@ def _drop_stale_dolthub_ghosts(
     Historical rows (date < today) are untouched — the actual report
     already happened, so neither side is "stale" by date. If the two
     disagreed on a past date, that's a different cleanup problem
-    (manual `tools/patch_timing.py`-style overrides)."""
+    (manual `config/earnings_overrides.json` via apply_earnings_overrides.py)."""
     today_dt = pd.Timestamp.today().date()
     finnhub_by_sym: dict[str, list] = (
         merged[

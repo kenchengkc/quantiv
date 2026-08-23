@@ -30,10 +30,9 @@ See [`.github/workflows/daily-refresh.yml`](../.github/workflows/daily-refresh.y
 | `data_healthcheck.py` | Local data quality checks | `ml:validate` |
 | `csv_to_parquet.py` | CSV → Parquet | `data:csv-parquet` |
 | `csv_to_parquet_volhist.py` | Vol history CSV → Parquet | Manual |
-| `walk_forward.py` | Walk-forward validation (research) | `ml:walk-forward` |
 | `build_ticker_names.mjs` | SEC EDGAR → `ticker-names.json` + exchanges | Quarterly workflow |
-| `migrate.mjs` | Watchlist DDL against `DATABASE_URL` | Manual pre-deploy (not in CI) |
-| `r2_pull.sh` / `r2_push.sh` / `r2_bootstrap.sh` | R2 sync | Nightly + [r2_setup.md](r2_setup.md) |
+| `migrate.mjs` | Watchlist DDL against Neon `DATABASE_URL` | Manual (not in CI) |
+| `r2_pull.sh` / `r2_push.sh` / `r2_bootstrap.sh` | R2 sync | Nightly + [R2_SETUP.md](../docs/R2_SETUP.md) |
 
 Frontend JSON build lives in [`tools/`](../tools/README.md) (`build_frontend_data.py`, `build_popular_weights.py`, `pull_market_caps.py`).
 
@@ -46,7 +45,7 @@ over-predict realized moves, and realized-vs-implied cross-sectional
 correlation is low enough that most transforms of existing implied features
 should be expected to test null.
 
-Use [`experiment_model_improvements.py`](experiment_model_improvements.py) for
+Use [`research/experiment_model_improvements.py`](research/experiment_model_improvements.py) for
 paired searches. It uses expanding walk-forward folds, production-style
 half-life decay weights (`0.5y` by default), identical folds/seeds for
 variant-vs-baseline comparisons, and a strict verdict: a variant only counts as
@@ -148,7 +147,21 @@ npm run data:providers:enrich -- --dry-run --max-symbols 8 --max-total-calls 60
 
 `DATA_DIR`, `DUCKDB_PATH`, `DATABASE_URL` in **`config/.env.local`** — see [`.env.example`](../.env.example).
 
-## Archive
+## Archive and research
 
 Older one-off provider and retrain experiments live under `scripts/archive/`
 and `scripts/research/`. Keep active CI entrypoints in the inventory above.
+
+Research (not CI):
+
+| Script | Purpose |
+|--------|---------|
+| `research/walk_forward.py` | Diagnostic MAE plot (`npm run ml:walk-forward`) |
+| `research/experiment_model_improvements.py` | Paired feature/model search |
+| `research/experiment_garch_feature.py` | GARCH/EWMA feature test |
+| `research/experiment_retrain_cadence.py` | Retrain-frequency experiment |
+| `research/probe_signal_effectiveness.py` | Short-interest vs realized-move probe |
+| `research/backfill_analyst_dispersion.py` | FMP annual dispersion panel |
+| `research/implied_pdf.py` | Breeden-Litzenberger density research |
+
+CI walk-forward remains `scripts/validate_walk_forward.py` (see nightly retrain).

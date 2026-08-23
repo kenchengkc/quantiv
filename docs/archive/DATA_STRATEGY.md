@@ -1,11 +1,11 @@
 # ML Data Strategy: Current vs Optimal
 
 > Archived: historical notes kept for context. The active training path is
-> `apps/ml/feature_engineering_v3.py`, `apps/ml/model_trainer_v3.py`, and
-> `scripts/walk_forward.py`.
+> `apps/ml/feature_engineering.py`, `apps/ml/model_trainer.py`, and
+> `scripts/research/walk_forward.py`.
 
 **Date:** October 5, 2025 · **Status:** historical strategy notes. For the live
-walk-forward entrypoint use [`scripts/walk_forward.py`](../../scripts/walk_forward.py)
+walk-forward entrypoint use [`scripts/research/walk_forward.py`](../../scripts/research/walk_forward.py)
 (`npm run ml:walk-forward`). The old `run_walk_forward_validation.py` script was removed.
 
 ---
@@ -72,7 +72,7 @@ Train:  2023-01-01 ────────────────────�
 
 ### Step 1: Walk-Forward Validation (THIS FIRST)
 
-**Run:** `python scripts/walk_forward.py`
+**Run:** `python scripts/research/walk_forward.py`
 
 **What it does:**
 1. Loads current models (trained on 2023-2024 H1)
@@ -141,7 +141,7 @@ Total                32      ~17,000  Using 18 months     Use ALL 32 months
 
 ```bash
 cd apps/ml
-python scripts/walk_forward.py
+python scripts/research/walk_forward.py
 ```
 
 **What you'll learn:**
@@ -233,7 +233,7 @@ if actual_mae > expected_mae * 1.5:
 
 ### Priority 1: Validate Current Models
 ```bash
-python scripts/walk_forward.py
+python scripts/research/walk_forward.py
 ```
 **Time:** 5 minutes  
 **Purpose:** Know if current models actually work on unseen data

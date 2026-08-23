@@ -118,7 +118,6 @@ quantiv/
 ├── config/                # Local environment files; gitignored
 ├── data/                  # CSV, Parquet, and DuckDB data
 ├── docs/                  # Architecture, deployment, proxy, and performance guides
-├── infrastructure/        # Docker Compose and legacy database infrastructure
 ├── lib/                   # Shared ticker and S&P 500 metadata
 ├── scripts/               # Synchronization, scoring, validation, and R2 utilities
 ├── tools/                 # Frontend-data, market-cap, and popularity builders
@@ -136,7 +135,7 @@ Archived and experimental code is kept outside the main production path under lo
 - Node.js 20+
 - npm
 - Python 3.11
-- Docker for the optional local container stack
+- A Neon Postgres database (`DATABASE_URL`) for watchlists and imported forecasts
 - Local data artifacts or access to the configured R2 bucket
 
 Optional integrations require credentials for services such as Finnhub, Upstash, Clerk, Neon, Railway, Polygon, and Alpaca.
@@ -187,12 +186,19 @@ npm run dev:backend
 
 Open `http://localhost:8000/docs` for the API documentation.
 
-Start or stop the local Docker stack with:
+## Neon Postgres
+
+Watchlists and imported forecast rows live in Neon. There is no local Docker
+Postgres stack.
+
+1. Create a Neon project and put the connection string in `config/.env.local` as `DATABASE_URL` (same variable Vercel and Railway use in production).
+2. Apply the watchlist schema once:
 
 ```bash
-npm run docker:up
-npm run docker:down
+node scripts/migrate.mjs
 ```
+
+Nightly `scripts/import_recent_to_postgres.py` writes recent forecast rows into the same database. Local backend (`npm run dev:backend`) and the Railway image (`apps/backend/Dockerfile`) both read `DATABASE_URL`.
 
 ## Data workflow
 
@@ -258,7 +264,8 @@ See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for schedules and the full pr
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | System architecture, services, routes, providers, and automation |
 | [`docs/RAILWAY_SETUP.md`](docs/RAILWAY_SETUP.md) | Railway API and quote-worker deployment |
 | [`docs/HMAC_PROXY.md`](docs/HMAC_PROXY.md) | Signed Vercel-to-Railway requests |
-| [`docs/duckdb_architecture.md`](docs/duckdb_architecture.md) | DuckDB and hybrid backend details |
+| [`docs/DUCKDB_ARCHITECTURE.md`](docs/DUCKDB_ARCHITECTURE.md) | DuckDB and hybrid backend details |
+| [`docs/R2_SETUP.md`](docs/R2_SETUP.md) | Cloudflare R2 and rclone for the nightly pipeline |
 | [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md) | Frontend performance audit and priorities |
 | [`scripts/README.md`](scripts/README.md) | Data-provider and pipeline runbook |
 | [`tools/README.md`](tools/README.md) | Frontend-data generation tooling |

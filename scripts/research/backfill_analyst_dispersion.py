@@ -12,8 +12,8 @@ dispersion_panel.parquet keyed (act_symbol, fiscal_end). Resumable: symbols in
 the existing panel are skipped unless --refresh.
 
 Usage:
-  python scripts/backfill_analyst_dispersion.py --symbols sp500 --pages 2
-  python scripts/backfill_analyst_dispersion.py --symbols-file syms.txt
+  python scripts/research/backfill_analyst_dispersion.py --symbols sp500 --pages 2
+  python scripts/research/backfill_analyst_dispersion.py --symbols-file syms.txt
 """
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ from pathlib import Path
 import pandas as pd
 import requests
 
-REPO = Path(__file__).resolve().parent.parent
+REPO = Path(__file__).resolve().parents[2]  # scripts/research/ → repo root
 OUT_DIR = REPO / "data" / "parquet" / "analyst_estimates"
 PANEL = OUT_DIR / "dispersion_panel.parquet"
 URL = "https://financialmodelingprep.com/stable/analyst-estimates"

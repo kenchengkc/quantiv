@@ -5,7 +5,7 @@ Archived legacy retrain entrypoint.
 Full Retrain: Train models on ALL available data (2023-2025)
 This maximizes model learning for production deployment
 
-The active training path is feature_engineering_v3.py + model_trainer_v3.py.
+The active training path is feature_engineering.py + model_trainer.py.
 """
 
 import os
@@ -14,12 +14,14 @@ import logging
 from pathlib import Path
 from datetime import datetime
 
-# Add parent to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent))
+ARCHIVE_DIR = Path(__file__).resolve().parent
+ML_ROOT = ARCHIVE_DIR.parent
+REPO_ROOT = ML_ROOT.parent.parent  # apps/ml → apps → repo root
+DEFAULT_DATA_DIR = str(REPO_ROOT / "data")
+sys.path.insert(0, str(ARCHIVE_DIR))
+sys.path.insert(0, str(ML_ROOT))
 
-from ml.bias_curve_builder import BiaseCurveBuilder
-from ml.feature_engineering import FeatureEngineer
-from ml.model_trainer import ModelTrainer
+from bias_curve_builder import BiasCurveBuilder
 from ml.serving_pipeline import MLServingPipeline
 
 logging.basicConfig(
@@ -29,7 +31,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 def run_full_retrain(
-    data_dir: str = "../../data",
+    data_dir: str = DEFAULT_DATA_DIR,
     n_trials: int = 50,
     train_start: str = "2023-01-01",
     train_end: str = "2025-08-15"
@@ -67,7 +69,7 @@ def run_full_retrain(
         
         # Rebuild bias curves with full dataset
         logger.info("Rebuilding bias curves with full 2023-2025 data...")
-        builder = BiaseCurveBuilder(data_dir)
+        builder = BiasCurveBuilder(data_dir)
         
         # Extract historical bias points
         bias_points = builder.extract_historical_bias_points(
@@ -85,92 +87,50 @@ def run_full_retrain(
         else:
             logger.warning("No bias points extracted, using existing curves if available")
         
-        # Step 2: Feature Engineering on FULL dataset
-        logger.info(f"\nStep 2: Feature engineering on FULL dataset ({train_start} to {train_end})...")
-        engineer = FeatureEngineer(data_dir)
-        feature_sets = engineer.extract_training_data(train_start, train_end)
-        
-        if not feature_sets:
-            logger.error("No training data extracted - pipeline cannot continue")
+        import subprocess
+
+        logger.info(
+            "\nStep 2: Feature engineering via apps/ml/feature_engineering.py "
+            f"({train_start} to {train_end})..."
+        )
+        fe = subprocess.run(
+            [
+                sys.executable,
+                str(ML_ROOT / "feature_engineering.py"),
+                "--start-date",
+                train_start,
+                "--end-date",
+                train_end,
+            ],
+            check=False,
+        )
+        if fe.returncode != 0:
+            logger.error("Feature engineering failed")
             return False
-        
-        training_paths = engineer.save_training_data(feature_sets)
-        
-        # Log training data statistics
-        logger.info(f"\n✅ Training data extracted for {len(feature_sets)} horizons:")
-        total_samples = 0
-        for horizon, feature_set in sorted(feature_sets.items()):
-            samples = len(feature_set.features)
-            total_samples += samples
-            logger.info(f"  T-{horizon}: {samples} samples, "
-                       f"{len(feature_set.features.columns)} features")
-        
-        logger.info(f"\n📈 Total training samples: {total_samples:,}")
-        logger.info(f"🎯 Expected improvement from previous 18-month training")
-        
-        # Step 3: Hyperparameter Optimization & Training
-        logger.info(f"\nStep 3: Training models with hyperparameter optimization...")
-        logger.info(f"Using Optuna with {n_trials} trials per model")
-        logger.info("⏱️  Estimated time: 5-10 minutes per model (30-60 min total)\n")
-        
-        training_dir = os.path.join(data_dir, "ml_training")
-        trainer = ModelTrainer(training_dir)
-        
-        # Train with optimization enabled
-        model_results = trainer.train_all_models(optimize=True)
-        
-        if not model_results:
+
+        logger.info("\nStep 3: Training via apps/ml/model_trainer.py --tune")
+        tr = subprocess.run(
+            [sys.executable, str(ML_ROOT / "model_trainer.py"), "--tune"],
+            check=False,
+        )
+        if tr.returncode != 0:
             logger.error("Model training failed")
             return False
-        
-        # Log optimization results
-        logger.info(f"\n✅ Optimization completed for {len(model_results)} models:")
-        for horizon, result in sorted(model_results.items()):
-            metrics = result['metrics']
-            params = result['hyperparameters']
-            logger.info(f"\nT-{horizon}:")
-            logger.info(f"  Val MAE:  {metrics['val_mae']:.4f}")
-            logger.info(f"  Val RMSE: {metrics['val_rmse']:.4f}")
-            logger.info(f"  Best params: learning_rate={params.get('learning_rate', 'N/A'):.3f}, "
-                       f"num_leaves={params.get('num_leaves', 'N/A')}")
-        
-        # Save optimized models
-        saved_paths = trainer.save_models(model_results)
-        logger.info(f"\n✅ Saved {len(saved_paths)} optimized models to production directory")
-        
-        # Step 4: Validation
+
         logger.info("\nStep 4: Validating serving pipeline...")
         serving = MLServingPipeline(data_dir)
-        
-        logger.info(f"✅ Serving pipeline loaded:")
+        logger.info("Serving pipeline loaded:")
         logger.info(f"  - {len(serving.models)} models")
         logger.info(f"  - {len(serving.bias_curves)} bias curve entities")
-        
-        # Summary
+
         duration = (datetime.now() - start_time).total_seconds()
         logger.info("\n" + "=" * 80)
-        logger.info(f"✅ FULL RETRAIN COMPLETED in {duration:.1f}s")
+        logger.info(f"FULL RETRAIN COMPLETED in {duration:.1f}s")
         logger.info("=" * 80)
-        
-        logger.info("\n📊 Training Summary:")
-        logger.info(f"  Period: {train_start} to {train_end} (32 months)")
-        logger.info(f"  Total samples: {total_samples:,}")
-        logger.info(f"  Optimization: {n_trials} trials per model")
-        logger.info(f"  Models trained: {len(model_results)}")
-        
-        logger.info("\n✅ Production Models Ready:")
-        for horizon in sorted(model_results.keys()):
-            metrics = model_results[horizon]['metrics']
-            logger.info(f"  T-{horizon}: MAE={metrics['val_mae']:.4f}, RMSE={metrics['val_rmse']:.4f}")
-        
-        logger.info("\n🚀 Next Steps:")
-        logger.info("  1. Restart backend to load new models")
-        logger.info("  2. Models will automatically serve predictions")
-        logger.info("  3. Monitor performance vs realized moves")
-        logger.info("  4. Consider monthly retraining schedule")
-        
+        logger.info(f"  Period: {train_start} to {train_end}")
+        logger.info(f"  Optimization trials requested: {n_trials}")
         return True
-        
+
     except Exception as e:
         logger.error(f"Pipeline failed with error: {e}", exc_info=True)
         return False
@@ -179,7 +139,7 @@ if __name__ == "__main__":
     import argparse
     
     parser = argparse.ArgumentParser(description="Full Retrain on 2023-2025 Data")
-    parser.add_argument("--data-dir", default="../../data", help="Data directory path")
+    parser.add_argument("--data-dir", default=DEFAULT_DATA_DIR, help="Data directory path")
     parser.add_argument("--n-trials", type=int, default=50, help="Optuna trials per model")
     parser.add_argument("--train-start", default="2023-01-01", help="Training start date")
     parser.add_argument("--train-end", default="2025-08-15", help="Training end date")

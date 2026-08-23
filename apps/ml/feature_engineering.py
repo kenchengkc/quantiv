@@ -13,8 +13,8 @@ Key improvements over v2:
 Target: realized_move_pct = |close_post / close_pre - 1|
 
 Usage:
-  python apps/ml/feature_engineering_v3.py
-  python apps/ml/feature_engineering_v3.py --start-date 2019-06-01 --end-date 2026-03-31
+  python apps/ml/feature_engineering.py
+  python apps/ml/feature_engineering.py --start-date 2019-06-01 --end-date 2026-03-31
 """
 
 import argparse
@@ -707,7 +707,7 @@ def save_training_data(feature_sets: Dict[int, FeatureSet], output_dir: Path):
     for horizon, fs in feature_sets.items():
         training_df = fs.features.copy()
         training_df["target"] = fs.target
-        # Sidecar — used by model_trainer_v3 to derive sample weights.
+        # Sidecar — used by model_trainer.py to derive sample weights.
         # Trainer pops it before fitting; never seen by LightGBM as a feature.
         if len(fs.earnings_date) == len(fs.features):
             training_df["__earnings_date"] = fs.earnings_date.values

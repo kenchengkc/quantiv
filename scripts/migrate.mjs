@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
  * One-shot schema migrations for the Neon Postgres database that backs the
- * watchlist API. Run from CI before each deploy:
+ * watchlist API. Run locally (or from a privileged shell) when the schema
+ * changes:
  *
  *   node scripts/migrate.mjs
  *
@@ -14,8 +15,8 @@
  *   - First request on every cold serverless instance no longer pays the
  *     CREATE TABLE round-trip latency.
  *   - The production app role only needs DML (SELECT/INSERT/UPDATE/DELETE),
- *     not DDL — CI uses a higher-privilege role just for this script.
- *   - Migration failures fail the deploy, not user requests.
+ *     not DDL — run this script with a higher-privilege Neon role.
+ *   - Migration failures should be caught before user requests, not inside them.
  */
 
 import { neon } from '@neondatabase/serverless';

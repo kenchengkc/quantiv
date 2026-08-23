@@ -12,11 +12,11 @@ Example (matches a 3Q-train / 1Q-val narrative for 2024):
   - Val 2025Q2 with train = 2024Q3–2025Q1  (not "Q2'24–Q1'25" — use --train-quarters 4 for that)
 
 Usage (from repo root, ML venv with lightgbm + matplotlib):
-  python scripts/walk_forward.py
-  python scripts/walk_forward.py --horizon 7 --train-quarters 4 --first-val 2025-2
-  python scripts/walk_forward.py --output /tmp/wf_mae.png
+  python scripts/research/walk_forward.py
+  python scripts/research/walk_forward.py --horizon 7 --train-quarters 4 --first-val 2025-2
+  python scripts/research/walk_forward.py --output /tmp/wf_mae.png
 
-Requires training parquet from feature_engineering_v3 (ml_training/training_T*.parquet).
+Requires training parquet from feature_engineering.py (ml_training/training_T*.parquet).
 """
 
 from __future__ import annotations
@@ -31,8 +31,8 @@ import pandas as pd
 from lightgbm import LGBMRegressor, early_stopping, log_evaluation
 from sklearn.metrics import mean_absolute_error
 
-# Keep in sync with apps/ml/model_trainer_v3.py DEFAULT_PARAMS (avoid importing
-# model_trainer_v3, which pulls in Optuna).
+# Keep in sync with apps/ml/model_trainer.py DEFAULT_PARAMS (avoid importing
+# model_trainer, which pulls in Optuna).
 DEFAULT_PARAMS: Dict[str, Any] = {
     "n_estimators": 2000,
     "learning_rate": 0.03,
@@ -45,7 +45,7 @@ DEFAULT_PARAMS: Dict[str, Any] = {
 }
 
 
-_REPO = Path(__file__).resolve().parents[1]
+_REPO = Path(__file__).resolve().parents[2]  # scripts/research/ → repo root
 
 
 def get_data_dir() -> Path:
@@ -121,7 +121,7 @@ class FoldResult:
 def load_training_frame(ml_dir: Path, horizon: int) -> pd.DataFrame:
     path = ml_dir / f"training_T{horizon}.parquet"
     if not path.exists():
-        raise FileNotFoundError(f"Missing {path} — run apps/ml/feature_engineering_v3.py first.")
+        raise FileNotFoundError(f"Missing {path} — run apps/ml/feature_engineering.py first.")
     df = pd.read_parquet(path)
     if "__earnings_date" not in df.columns:
         raise ValueError("Parquet must include __earnings_date for calendar splits.")
@@ -148,7 +148,7 @@ def train_one_fold_quick(
     y_val: pd.Series,
     quick_trees: int,
 ) -> float:
-    """Fit a single diagnostic model; return val MAE (same metric as model_trainer_v3)."""
+    """Fit a single diagnostic model; return val MAE (same metric as model_trainer)."""
     p = dict(DEFAULT_PARAMS)
     p["n_estimators"] = quick_trees
     p.setdefault("min_child_samples", max(10, len(X_train) // 50))

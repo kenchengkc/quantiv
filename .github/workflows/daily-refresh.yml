@@ -9,7 +9,7 @@ name: Daily data refresh
 #   5. Commit JSON + push → Vercel auto-deploys
 #
 # Weekly ML retrain (cron `0 12 * * 0` — Sunday 12:00 UTC):
-#   Pull R2 → DuckDB → feature_engineering_v3 → model_trainer_v3 → score with
+#   Pull R2 → DuckDB → feature_engineering → model_trainer → score with
 #   new models → push models/forecasts. It opts into pulling the earnings
 #   calendar from R2 because the Sunday daily refresh can finish and push its
 #   refreshed calendar after the weekly workflow was already queued.
@@ -743,7 +743,7 @@ jobs:
         # the WHERE filter inside the SQL.
         run: |
           END=$(date -u +%Y-%m-%d)
-          python apps/ml/feature_engineering_v3.py \
+          python apps/ml/feature_engineering.py \
             --start-date 2023-01-01 \
             --end-date "$END"
 
@@ -790,7 +790,7 @@ jobs:
         # Locked-in production settings (settled on after local A/B):
         #   --tune              Optuna search per horizon (30 trials × 6 horizons ≈ 7 min)
         #   --time-decay 0.5    half-life 0.5y — modest recency bias on top of VIX features
-        run: python apps/ml/model_trainer_v3.py --tune --time-decay 0.5
+        run: python apps/ml/model_trainer.py --tune --time-decay 0.5
 
       - name: Gate — mandatory purged walk-forward validation
         # Retrains each horizon across four unseen 60-day windows. Publication

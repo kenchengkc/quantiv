@@ -100,7 +100,7 @@ def test_dashboard_evidence_is_one_compact_run_level_manifest():
         "artifacts": [
             {
                 "name": "model_bundle",
-                "producer": "apps/ml/model_trainer_v3.py",
+                "producer": "apps/ml/model_trainer.py",
                 "member_count": 14,
                 "bytes": 1234,
                 "sha256": "b" * 64,

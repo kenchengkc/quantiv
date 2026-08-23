@@ -141,7 +141,7 @@ def build_evidence_receipt(
     if "training" in validated_stages or "models" in validated_stages:
         bundle = _artifact_bundle(
             "training_bundle",
-            "apps/ml/feature_engineering_v3.py",
+            "apps/ml/feature_engineering.py",
             _training_paths(training_dir, receipt_horizons),
             repo_root=repo_root,
             data_dir=data_dir,
@@ -152,7 +152,7 @@ def build_evidence_receipt(
     if "models" in validated_stages or "forecasts" in validated_stages:
         bundle = _artifact_bundle(
             "model_bundle",
-            "apps/ml/model_trainer_v3.py",
+            "apps/ml/model_trainer.py",
             _model_paths(models_dir, receipt_horizons),
             repo_root=repo_root,
             data_dir=data_dir,

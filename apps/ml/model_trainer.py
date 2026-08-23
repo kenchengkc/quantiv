@@ -7,12 +7,12 @@ Key improvements over v2:
      (replaces Gaussian residual_std assumption — earnings tails are NOT normal)
   2. Improved hyperparameters with Optuna search (optional)
   3. Better calibration diagnostics: quantile coverage, Pinball loss
-  4. Event vol decomposition features from feature_engineering_v3
+  4. Event vol decomposition features from feature_engineering.py
   5. Walk-forward validation with purged gap to prevent leakage
 
 Usage:
-  python apps/ml/model_trainer_v3.py
-  python apps/ml/model_trainer_v3.py --horizons 1 7 14 --tune
+  python apps/ml/model_trainer.py
+  python apps/ml/model_trainer.py --horizons 1 7 14 --tune
 """
 
 import argparse

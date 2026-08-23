@@ -9,7 +9,7 @@ crowded-borrow proxy) relates to the realized earnings move in magnitude or
 direction. This is an effectiveness probe, NOT a model change: it reports rank
 correlations + a decile table so we know if the signal is worth wiring later.
 
-Usage: python scripts/probe_signal_effectiveness.py --n 700
+Usage: python scripts/research/probe_signal_effectiveness.py --n 700
 """
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ import numpy as np
 import pandas as pd
 import requests
 
-REPO = Path(__file__).resolve().parent.parent
+REPO = Path(__file__).resolve().parents[2]  # scripts/research/ → repo root
 
 
 def _load_env():
