@@ -22,6 +22,7 @@
 // Docs: https://docs.alpaca.markets/reference/stocksnapshots-1
 
 import { etDateIso } from './marketHours';
+import { parseMarketSymbol } from './marketSymbol';
 
 const BASE_URL = 'https://data.alpaca.markets';
 
@@ -157,6 +158,8 @@ export async function fetchIntradayBars(
   symbol: string,
   timeframe: '1Min' | '5Min' | '15Min' = '5Min',
 ): Promise<IntradayPayload> {
+  const safeSymbol = parseMarketSymbol(symbol);
+  if (!safeSymbol) throw new Error('Invalid market symbol');
   // Alpaca rejects start dates in the future, so we anchor on `now` and walk
   // back far enough to always include the previous session's close plus the
   // most recent session, regardless of intervening weekends/holidays.
@@ -173,7 +176,7 @@ export async function fetchIntradayBars(
     limit: '1000',
   });
   const data = (await alpacaFetch(
-    `/v2/stocks/${encodeURIComponent(symbol)}/bars?${params.toString()}`,
+    `/v2/stocks/${encodeURIComponent(safeSymbol)}/bars?${params.toString()}`,
   )) as { bars?: Array<{ t: string; o: number; h: number; l: number; c: number; v: number }> };
 
   const rawBars = Array.isArray(data?.bars) ? data.bars : [];
@@ -252,16 +255,22 @@ export async function fetchExtendedHoursSnapshot(
   symbols: string[],
 ): Promise<Map<string, Tick>> {
   const out = new Map<string, Tick>();
-  if (symbols.length === 0) return out;
+  const safeSymbols = Array.from(new Set(
+    symbols
+      .map(parseMarketSymbol)
+      .filter((symbol): symbol is NonNullable<typeof symbol> => symbol !== null),
+  ));
+  if (safeSymbols.length === 0) return out;
 
-  const symbolsCsv = symbols.map((s) => encodeURIComponent(s)).join(',');
+  const symbolsCsv = safeSymbols.map((s) => encodeURIComponent(s)).join(',');
   const data = (await alpacaFetch(
     `/v2/stocks/snapshots?symbols=${symbolsCsv}&feed=iex`,
   )) as AlpacaSnapshotResponse;
 
   const nowMs = Date.now();
   for (const [rawSymbol, snap] of Object.entries(data)) {
-    const symbol = rawSymbol.toUpperCase();
+    const symbol = parseMarketSymbol(rawSymbol);
+    if (!symbol) continue;
     const trade = snap.latestTrade;
     const quote = snap.latestQuote;
 

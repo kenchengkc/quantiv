@@ -17,6 +17,7 @@ import {
   type RailwayOwnershipState,
 } from '@/lib/quoteWorkerLease';
 import { enrichQuoteTick } from '@/lib/quoteTick';
+import { parseMarketSymbol, type MarketSymbol } from '@/lib/marketSymbol';
 
 // Cron-driven Finnhub price refresher. Triggered every 5 min by an external
 // scheduler (Cloudflare Worker). Walks a rotating cursor through a priority-
@@ -200,7 +201,7 @@ async function loadWatchlistSymbols(): Promise<string[]> {
   }
 }
 
-async function buildSymbolList(): Promise<string[]> {
+async function buildSymbolList(): Promise<MarketSymbol[]> {
   const thisMon = mondayOf(new Date());
   const lastMon = new Date(thisMon); lastMon.setDate(thisMon.getDate() - 7);
   const nextMon = new Date(thisMon); nextMon.setDate(thisMon.getDate() + 7);
@@ -220,20 +221,21 @@ async function buildSymbolList(): Promise<string[]> {
     loadWeekFile(`${isoDay(lastMon)}.json`),
   ];
 
-  const ordered: string[] = [];
+  const ordered: MarketSymbol[] = [];
   const seen = new Set<string>();
   for (const tier of tiers) {
-    for (const s of tier) {
-      if (!seen.has(s)) {
-        seen.add(s);
-        ordered.push(s);
+    for (const rawSymbol of tier) {
+      const symbol = parseMarketSymbol(rawSymbol);
+      if (symbol && !seen.has(symbol)) {
+        seen.add(symbol);
+        ordered.push(symbol);
       }
     }
   }
   return ordered;
 }
 
-async function fetchQuote(symbol: string, apiKey: string): Promise<Tick | null> {
+async function fetchQuote(symbol: MarketSymbol, apiKey: string): Promise<Tick | null> {
   const url = `https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(symbol)}&token=${apiKey}`;
   const res = await fetch(url, { cache: 'no-store' });
   if (!res.ok) return null;
@@ -507,7 +509,7 @@ async function runRegularHours(
     const raw = await redis.get(CURSOR_KEY);
     const cursor = Number.isFinite(Number(raw)) ? Number(raw) % symbols.length : 0;
     const end = cursor + BATCH_SIZE;
-    const batch: string[] = [];
+    const batch: MarketSymbol[] = [];
     for (let i = cursor; i < end; i++) batch.push(symbols[i % symbols.length]);
     const nextCursor = end % symbols.length;
 
