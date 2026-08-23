@@ -38,6 +38,10 @@ push_forecasts() {
   else
     echo "⚠️  $DATA_DIR/forecasts missing — skipping forecast sync"
   fi
+  if [ -d "$DATA_DIR/models/monitoring" ]; then
+    rclone sync "$DATA_DIR/models/monitoring" "$REMOTE/models/monitoring" \
+      --fast-list --transfers=4 --progress
+  fi
 }
 
 push_small_files() {

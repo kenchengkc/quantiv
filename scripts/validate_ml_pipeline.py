@@ -28,6 +28,10 @@ from ml.evidence_receipt import (  # noqa: E402 - standalone script path setup
     build_evidence_receipt,
     publish_evidence_receipt,
 )
+from ml.model_bundle import (  # noqa: E402 - standalone script path setup
+    ModelBundleError,
+    resolve_champion_bundle,
+)
 
 
 def _write_report(path: Path | None, report: dict[str, Any]) -> None:
@@ -65,7 +69,16 @@ def main() -> int:
 
     data_dir = args.data_dir or Path(os.getenv("DATA_DIR", REPO_ROOT / "data"))
     training_dir = args.training_dir or data_dir / "ml_training"
-    models_dir = args.models_dir or data_dir / "models"
+    models_root = data_dir / "models"
+    if args.models_dir is not None:
+        models_dir = args.models_dir
+    elif args.stage == "forecasts":
+        try:
+            models_dir = resolve_champion_bundle(models_root)
+        except ModelBundleError:
+            models_dir = models_root
+    else:
+        models_dir = models_root
     forecast_path = args.forecast_path or latest_forecast_path(data_dir / "forecasts")
 
     stages = (

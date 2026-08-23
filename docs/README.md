@@ -9,6 +9,7 @@ Start with the root [README](../README.md), then use the guides below for deeper
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Understand the production data flow, services, API routes, quote pipeline, automation, and data limitations |
 | [RAILWAY_SETUP.md](RAILWAY_SETUP.md) | Deploy FastAPI and the quote worker on Railway |
 | [HMAC_PROXY.md](HMAC_PROXY.md) | Configure signed Vercel-to-Railway ML requests |
+| [MODEL_CONTROL_PLANE.md](MODEL_CONTROL_PLANE.md) | Review signed model bundles, challenger promotion, drift monitoring, and automatic rollback |
 | [duckdb_architecture.md](duckdb_architecture.md) | Review Parquet layout, DuckDB views, and `DATA_BACKEND` modes |
 | [PERFORMANCE.md](PERFORMANCE.md) | Review frontend bottlenecks and prioritized fixes |
 | [PRODUCTION_HARDENING_PLAN.md](PRODUCTION_HARDENING_PLAN.md) | Track the production hardening scope, rollout, and acceptance criteria |

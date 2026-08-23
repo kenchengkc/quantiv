@@ -213,7 +213,12 @@ Pull R2 artifacts
 → redeploy Vercel
 ```
 
-Sunday runs may retrain the LightGBM model and synchronize new artifacts to R2 and Railway. Saturday runs perform a Finnhub profile and logo sweep.
+Sunday runs may retrain a signed LightGBM challenger. Mandatory walk-forward,
+baseline, calibration, forecast-handoff, common-holdout, and shadow gates decide
+whether its immutable bundle replaces the champion. Railway atomically activates
+only the signed champion; realized monitoring can sign a rollback to the previous
+bundle. See [Model control plane](MODEL_CONTROL_PLANE.md). Saturday runs perform
+a Finnhub profile and logo sweep.
 
 ML/model publication is fail-closed and produces a shared run-level evidence
 receipt rather than per-value lineage records. See

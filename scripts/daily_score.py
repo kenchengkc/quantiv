@@ -43,6 +43,10 @@ from ml.model_artifact import (  # noqa: E402 - standalone script path setup
     point_model_name,
     quantile_model_name,
 )
+from ml.model_bundle import (  # noqa: E402 - standalone script path setup
+    ModelBundleError,
+    resolve_champion_bundle,
+)
 from ml.quantiles import rearrange_quantile_array  # noqa: E402 - standalone script path setup
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -71,6 +75,10 @@ def get_data_dir() -> Path:
 def load_models(models_dir: Path) -> Dict[int, dict]:
     """Load point + quantile models for each horizon."""
     models = {}
+    bundle_id = None
+    manifest_path = models_dir / "manifest.json"
+    if manifest_path.exists():
+        bundle_id = json.loads(manifest_path.read_text()).get("bundle_id")
     for meta_path in sorted(models_dir.glob("metadata_T*.json")):
         with open(meta_path) as f:
             meta = json.load(f)
@@ -94,6 +102,7 @@ def load_models(models_dir: Path) -> Dict[int, dict]:
             "feature_cols": feature_cols,
             "residual_std": meta.get("residual_std", 0.03),
             "quantile_models": {},
+            "bundle_id": bundle_id,
         }
 
         quantiles = meta.get("quantiles", [0.10, 0.25, 0.50, 0.75, 0.90])
@@ -377,6 +386,11 @@ def score(df: pd.DataFrame, models: Dict[int, dict]) -> pd.DataFrame:
         hdf["em_event_vol_pct"] = hdf.get("event_move_implied", np.nan)
         hdf["correction_factor"] = pred / hdf["straddle_pct"].clip(lower=0.001)
         hdf["model_horizon"] = horizon
+        hdf["model_bundle_id"] = (
+            m.get("bundle_id")
+            or (m.get("metadata") or {}).get("version")
+            or "unversioned"
+        )
         hdf["scored_at"] = datetime.now().isoformat()
 
         results.append(hdf)
@@ -420,18 +434,24 @@ def prune_forecast_snapshots(
     return removed
 
 
-def save_forecasts(df: pd.DataFrame, data_dir: Path):
+def save_forecasts(
+    df: pd.DataFrame,
+    data_dir: Path,
+    *,
+    output_path: Path | None = None,
+):
     forecast_dir = data_dir / "forecasts"
     forecast_dir.mkdir(parents=True, exist_ok=True)
 
     if df.empty:
         logger.warning("No forecasts to save")
-        prune_forecast_snapshots(forecast_dir)
+        if output_path is None:
+            prune_forecast_snapshots(forecast_dir)
         return
 
     out_cols = [
         "act_symbol", "earnings_date", "timing", "snapshot_date",
-        "model_horizon", "spot_price", "atm_iv",
+        "model_horizon", "model_bundle_id", "spot_price", "atm_iv",
         "em_math_pct", "em_event_vol_pct", "em_ml_pct", "em_ml_abs",
         "correction_factor",
         "p10", "p25", "p50", "p75", "p90",
@@ -459,7 +479,15 @@ def save_forecasts(df: pd.DataFrame, data_dir: Path):
             )
             out = out.drop_duplicates(serving_key_cols, keep="first")
 
-    # Parquet
+    if output_path is not None:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = output_path.with_suffix(output_path.suffix + ".tmp")
+        out.to_parquet(temporary, index=False)
+        temporary.replace(output_path)
+        logger.info("Saved %d candidate forecasts → %s", len(out), output_path)
+        return
+
+    # Production Parquet
     today = datetime.now().strftime("%Y-%m-%d")
     parquet_path = forecast_dir / f"forecasts_{today}.parquet"
     out.to_parquet(parquet_path, index=False)
@@ -481,10 +509,26 @@ def save_forecasts(df: pd.DataFrame, data_dir: Path):
 def main():
     parser = argparse.ArgumentParser(description="Daily scoring pipeline v3")
     parser.add_argument("--days-ahead", type=int, default=14)
+    parser.add_argument("--models-dir", type=Path, default=None)
+    parser.add_argument(
+        "--output-path",
+        type=Path,
+        default=None,
+        help="Write a candidate snapshot without changing production forecasts or DuckDB.",
+    )
     args = parser.parse_args()
 
     data_dir = get_data_dir()
-    models_dir = data_dir / "models"
+    models_root = data_dir / "models"
+    if args.models_dir is not None:
+        models_dir = args.models_dir
+    else:
+        try:
+            models_dir = resolve_champion_bundle(models_root)
+            logger.info("Scoring with signed champion bundle %s", models_dir.name)
+        except ModelBundleError:
+            models_dir = models_root
+            logger.warning("No signed champion exists; using repository bootstrap models")
 
     models = load_models(models_dir)
     if not models:
@@ -530,7 +574,7 @@ def main():
     forecasts = score(df, models)
     logger.info(f"Generated {len(forecasts)} forecasts")
 
-    save_forecasts(forecasts, data_dir)
+    save_forecasts(forecasts, data_dir, output_path=args.output_path)
 
     if not forecasts.empty:
         # Print the clean dashboard output

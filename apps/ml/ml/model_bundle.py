@@ -31,6 +31,8 @@ from ml.model_artifact import point_model_name, quantile_model_name, sha256_file
 
 BUNDLE_SCHEMA = "quantiv.model-bundle.v1"
 CONTROL_SCHEMA = "quantiv.model-control.v1"
+REGISTRY_SCHEMA = "quantiv.model-registry.v1"
+MONITOR_SCHEMA = "quantiv.model-monitor.v1"
 SIGNATURE_ALGORITHM = "ed25519"
 DEFAULT_HORIZONS = (1, 2, 3, 7, 14, 21)
 DEFAULT_QUANTILES = (10, 25, 50, 75, 90)
@@ -303,17 +305,137 @@ def verify_control_pointer(
     return payload
 
 
+def create_signed_registry(
+    *,
+    champion_bundle_id: str,
+    challenger_bundle_id: str | None,
+    previous_bundle_id: str | None,
+    decision: Mapping[str, Any],
+    history: Sequence[Mapping[str, Any]] = (),
+    private_key: str | bytes | None = None,
+) -> dict[str, Any]:
+    for label, bundle_id in (
+        ("champion", champion_bundle_id),
+        ("challenger", challenger_bundle_id),
+        ("previous", previous_bundle_id),
+    ):
+        if bundle_id is not None and not _BUNDLE_ID_RE.fullmatch(bundle_id):
+            raise ModelBundleError(f"invalid {label} bundle id")
+    return _sign(
+        {
+            "schema": REGISTRY_SCHEMA,
+            "champion_bundle_id": champion_bundle_id,
+            "challenger_bundle_id": challenger_bundle_id,
+            "previous_bundle_id": previous_bundle_id,
+            "updated_at": _utc_now(),
+            "decision": dict(decision),
+            "history": [dict(item) for item in list(history)[-20:]],
+        },
+        private_key,
+    )
+
+
+def verify_registry(
+    registry: Mapping[str, Any], *, public_key: str | bytes | None = None
+) -> dict[str, Any]:
+    payload = verify_signed_payload(registry, public_key=public_key)
+    if payload.get("schema") != REGISTRY_SCHEMA:
+        raise ModelBundleError("unsupported model registry schema")
+    for label, key in (
+        ("champion", "champion_bundle_id"),
+        ("challenger", "challenger_bundle_id"),
+        ("previous", "previous_bundle_id"),
+    ):
+        bundle_id = payload.get(key)
+        if bundle_id is not None and not _BUNDLE_ID_RE.fullmatch(str(bundle_id)):
+            raise ModelBundleError(f"registry has an invalid {label} bundle id")
+    if not isinstance(payload.get("history"), list):
+        raise ModelBundleError("registry history must be a list")
+    return payload
+
+
+def resolve_champion_bundle(models_root: Path) -> Path:
+    pointer_path = models_root / "control" / "champion.json"
+    if not pointer_path.exists():
+        raise ModelBundleError("signed champion pointer does not exist")
+    try:
+        envelope = json.loads(pointer_path.read_text())
+    except (OSError, ValueError) as exc:
+        raise ModelBundleError("cannot read signed champion pointer") from exc
+    pointer = verify_control_pointer(envelope)
+    bundle_dir = models_root / "bundles" / pointer["champion_bundle_id"]
+    verify_bundle_dir(bundle_dir)
+    return bundle_dir
+
+
+def create_signed_monitor_receipt(
+    *,
+    ledger_path: Path,
+    report_path: Path,
+    snapshot_date: str,
+    private_key: str | bytes | None = None,
+) -> dict[str, Any]:
+    return _sign(
+        {
+            "schema": MONITOR_SCHEMA,
+            "snapshot_date": snapshot_date,
+            "created_at": _utc_now(),
+            "ledger": {
+                "name": ledger_path.name,
+                "bytes": ledger_path.stat().st_size,
+                "sha256": sha256_file(ledger_path),
+            },
+            "report": {
+                "name": report_path.name,
+                "bytes": report_path.stat().st_size,
+                "sha256": sha256_file(report_path),
+            },
+        },
+        private_key,
+    )
+
+
+def verify_monitor_receipt(
+    receipt: Mapping[str, Any],
+    *,
+    ledger_path: Path,
+    report_path: Path,
+    public_key: str | bytes | None = None,
+) -> dict[str, Any]:
+    payload = verify_signed_payload(receipt, public_key=public_key)
+    if payload.get("schema") != MONITOR_SCHEMA:
+        raise ModelBundleError("unsupported model monitoring receipt schema")
+    for label, path in (("ledger", ledger_path), ("report", report_path)):
+        artifact = payload.get(label)
+        if not isinstance(artifact, Mapping):
+            raise ModelBundleError(f"monitoring receipt has no {label} artifact")
+        if artifact.get("name") != path.name:
+            raise ModelBundleError(f"monitoring {label} name mismatch")
+        if int(artifact.get("bytes", -1)) != path.stat().st_size:
+            raise ModelBundleError(f"monitoring {label} size mismatch")
+        if artifact.get("sha256") != sha256_file(path):
+            raise ModelBundleError(f"monitoring {label} digest mismatch")
+    return payload
+
+
 __all__ = [
     "BUNDLE_SCHEMA",
     "CONTROL_SCHEMA",
+    "REGISTRY_SCHEMA",
+    "MONITOR_SCHEMA",
     "DEFAULT_HORIZONS",
     "DEFAULT_QUANTILES",
     "ModelBundleError",
     "create_signed_bundle",
     "create_signed_control_pointer",
+    "create_signed_monitor_receipt",
+    "create_signed_registry",
     "required_artifact_names",
+    "resolve_champion_bundle",
     "verify_bundle_dir",
     "verify_bundle_manifest",
     "verify_control_pointer",
+    "verify_monitor_receipt",
+    "verify_registry",
     "verify_signed_payload",
 ]

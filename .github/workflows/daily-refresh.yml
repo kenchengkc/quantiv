@@ -414,6 +414,18 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
+      - name: Monitor champion, shadows, and feature drift
+        # A compact signed Parquet ledger in R2 replaces a new Redis/Neon
+        # workload. Critical feature drift fails before forecast publication.
+        env:
+          MODEL_BUNDLE_SIGNING_KEY: ${{ secrets.MODEL_BUNDLE_SIGNING_KEY }}
+        run: |
+          if [ -f data/models/control/champion.json ]; then
+            python scripts/model_control_plane.py monitor
+          else
+            echo "No signed champion yet; monitoring begins after the first gated retrain."
+          fi
+
       - name: Import recent forecasts to Neon Postgres
         # Pushes the newest forecast snapshot into the em_forecasts table
         # the Railway-hosted FastAPI backend reads from. The script is a
@@ -600,7 +612,7 @@ jobs:
         run: |
           set -euo pipefail
           MODE="$PROFILE_REFRESH"
-          ARGS=""
+          ARGS=()
           case "$MODE" in
             auto)
               DOW=$(date -u +%u)  # 1=Mon … 6=Sat … 7=Sun
@@ -612,13 +624,13 @@ jobs:
               # so bypass the script's internal freshness guard (which is borderline
               # at exactly 7d between Saturdays and can skip on schedule jitter).
               # missing-only keeps it cheap — only newly-added earners are fetched.
-              ARGS="--missing-only --force"
+              ARGS=(--missing-only --force)
               ;;
             missing-only)
-              ARGS="--missing-only --force"
+              ARGS=(--missing-only --force)
               ;;
             full)
-              ARGS="--full --force"
+              ARGS=(--full --force)
               ;;
             skip)
               echo "Profile sweep skipped by workflow input."
@@ -630,7 +642,7 @@ jobs:
               ;;
           esac
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            ARGS="$ARGS --allow-market-hours"
+            ARGS+=(--allow-market-hours)
           fi
           # frontend universe = symbol pages + weeks + weekly + screener (~1.5k
           # rendered tickers, incl. upcoming earnings weeks). The `earnings`
@@ -641,7 +653,7 @@ jobs:
           python -u scripts/sync_finnhub_profiles.py \
             --allow-missing-key \
             --universe frontend \
-            $ARGS
+            "${ARGS[@]}"
           # Data-quality lint only — the profile/logo cache above already wrote
           # successfully. Warn (don't abort) so a residual foreign-venue leak or
           # a cosmetic SEC-vs-Finnhub name diff can't fail the whole daily
@@ -728,6 +740,29 @@ jobs:
             --start-date 2023-01-01 \
             --end-date "$END"
 
+      - name: Evaluate realized champion outcomes and automatic rollback
+        id: outcome-control
+        env:
+          MODEL_BUNDLE_SIGNING_KEY: ${{ secrets.MODEL_BUNDLE_SIGNING_KEY }}
+        run: |
+          if [ -f data/models/control/champion.json ]; then
+            python scripts/model_control_plane.py evaluate-outcomes \
+              --report data/validation/model_outcomes.json
+            echo "rolled_back=$(jq -r .rolled_back data/validation/model_outcomes.json)" >> "$GITHUB_OUTPUT"
+          else
+            echo "rolled_back=false" >> "$GITHUB_OUTPUT"
+            echo "No signed champion exists; skipping realized-outcome evaluation."
+          fi
+
+      - name: Upload realized model outcome report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: model-realized-outcomes
+          path: data/validation/model_outcomes.json
+          if-no-files-found: ignore
+          retention-days: 90
+
       - name: Gate — validate training artifacts
         # Catch stale metadata, leakage-prone date splits, duplicate events,
         # invalid targets, and unusable features before the expensive tune.
@@ -786,16 +821,35 @@ jobs:
           if-no-files-found: ignore
           retention-days: 30
 
-      - name: Score upcoming earnings with the new models
-        run: python scripts/daily_score.py --days-ahead 21
+      - name: Package signed challenger bundle
+        id: package-challenger
+        # The private signing key exists only in GitHub Actions. Runtime
+        # services ship the pinned public key and cannot mint artifacts.
+        env:
+          MODEL_BUNDLE_SIGNING_KEY: ${{ secrets.MODEL_BUNDLE_SIGNING_KEY }}
+        run: |
+          python scripts/package_model_bundle.py \
+            --source-revision "$GITHUB_SHA" \
+            --output-manifest data/validation/candidate_bundle.json
+          BUNDLE_ID=$(jq -r .bundle_id data/validation/candidate_bundle.json)
+          echo "bundle_dir=data/models/bundles/$BUNDLE_ID" >> "$GITHUB_OUTPUT"
+
+      - name: Shadow-score upcoming earnings with the challenger
+        run: |
+          python scripts/daily_score.py \
+            --days-ahead 21 \
+            --models-dir "${{ steps.package-challenger.outputs.bundle_dir }}" \
+            --output-path data/validation/candidate_forecasts.parquet
 
       - name: Gate — validate retrain forecasts
         # Nothing is pushed or hot-loaded until the freshly trained models and
         # their forecast artifact agree end to end.
         run: |
           python scripts/validate_ml_pipeline.py forecasts \
+            --forecast-path data/validation/candidate_forecasts.parquet \
+            --models-dir "${{ steps.package-challenger.outputs.bundle_dir }}" \
             --report data/validation/retrain_forecasts.json \
-            --publish-receipt-dir data/forecasts/receipts
+            --publish-receipt-dir data/validation/candidate_receipts
 
       - name: Upload retrain forecast validation report
         if: always()
@@ -806,15 +860,48 @@ jobs:
           if-no-files-found: ignore
           retention-days: 30
 
-      - name: Package and promote signed model bundle
-        # The private signing key exists only in GitHub Actions. Railway ships
-        # the pinned public key and refuses altered, partial, or unsigned files.
+      - name: Champion/challenger promotion decision
+        id: model-decision
         env:
           MODEL_BUNDLE_SIGNING_KEY: ${{ secrets.MODEL_BUNDLE_SIGNING_KEY }}
         run: |
-          python scripts/package_model_bundle.py \
-            --source-revision "$GITHUB_SHA" \
-            --promote
+          python scripts/model_control_plane.py decide \
+            --candidate-manifest data/validation/candidate_bundle.json \
+            --candidate-forecast data/validation/candidate_forecasts.parquet \
+            --report data/validation/model_decision.json
+          echo "promoted=$(jq -r .promoted data/validation/model_decision.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Gate — validate promoted production forecast
+        if: steps.model-decision.outputs.promoted == 'true'
+        run: |
+          FORECAST_PATH=$(jq -r .production_forecast data/validation/model_decision.json)
+          python scripts/validate_ml_pipeline.py forecasts \
+            --forecast-path "$FORECAST_PATH" \
+            --models-dir "${{ steps.package-challenger.outputs.bundle_dir }}" \
+            --report data/validation/promoted_forecasts.json \
+            --publish-receipt-dir data/forecasts/receipts
+
+      - name: Rescore production after automatic rollback
+        if: >-
+          steps.outcome-control.outputs.rolled_back == 'true' &&
+          steps.model-decision.outputs.promoted != 'true'
+        run: |
+          python scripts/daily_score.py --days-ahead 21
+          python scripts/validate_ml_pipeline.py forecasts \
+            --report data/validation/rollback_forecasts.json \
+            --publish-receipt-dir data/forecasts/receipts
+
+      - name: Upload model control decision
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: model-control-decision
+          path: |
+            data/validation/model_decision.json
+            data/validation/candidate_bundle.json
+            data/validation/promoted_forecasts.json
+          if-no-files-found: ignore
+          retention-days: 90
 
       - name: Push models to R2
         env:
@@ -823,6 +910,9 @@ jobs:
 
       - name: Sync Railway serving models
         id: sync-railway-models
+        if: >-
+          steps.model-decision.outputs.promoted == 'true' ||
+          steps.outcome-control.outputs.rolled_back == 'true'
         # Hot-load the freshly trained model bundle onto Railway's /data
         # volume so /api/ml/predict can serve it without waiting for a
         # Docker rebuild. Skips cleanly when the admin secret is absent

@@ -16,8 +16,6 @@ if str(ML_PACKAGE_ROOT) not in sys.path:
 
 from ml.model_bundle import (  # noqa: E402 - standalone script path setup
     create_signed_bundle,
-    create_signed_control_pointer,
-    verify_control_pointer,
 )
 
 
@@ -43,9 +41,10 @@ def main() -> int:
     )
     parser.add_argument("--source-revision", default=os.getenv("GITHUB_SHA", "local"))
     parser.add_argument(
-        "--promote",
-        action="store_true",
-        help="Atomically update the signed champion pointer after packaging.",
+        "--output-manifest",
+        type=Path,
+        default=None,
+        help="Write the verified bundle id and local path for later workflow stages.",
     )
     args = parser.parse_args()
 
@@ -57,25 +56,16 @@ def main() -> int:
         source_revision=args.source_revision,
     )
     print(f"Packaged signed model bundle: {manifest['bundle_id']}")
-
-    if args.promote:
-        control_path = args.models_dir / "control" / "champion.json"
-        previous: str | None = None
-        if control_path.exists():
-            previous = verify_control_pointer(json.loads(control_path.read_text())).get(
-                "champion_bundle_id"
-            )
-        pointer = create_signed_control_pointer(
-            bundle_id=manifest["bundle_id"],
-            previous_bundle_id=previous,
-            decision={
-                "action": "promote",
-                "reason": "all mandatory model publication gates passed",
+    if args.output_manifest is not None:
+        _atomic_json(
+            args.output_manifest,
+            {
+                "bundle_id": manifest["bundle_id"],
+                "bundle_dir": str(bundle_dir),
                 "receipt_id": manifest["receipt_id"],
             },
         )
-        _atomic_json(control_path, pointer)
-        print(f"Promoted champion pointer: {bundle_dir.name}")
+
     return 0
 
 

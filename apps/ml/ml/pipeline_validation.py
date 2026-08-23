@@ -677,6 +677,7 @@ def validate_forecast_artifact(
         "earnings_date",
         "snapshot_date",
         "model_horizon",
+        "model_bundle_id",
         "spot_price",
         "atm_iv",
         "em_math_pct",
@@ -709,6 +710,35 @@ def validate_forecast_artifact(
             "insufficient_forecast_rows",
             f"found {len(frame)} rows; require at least {min_rows}",
         )
+    bundle_ids = sorted(
+        value
+        for value in frame["model_bundle_id"].dropna().astype(str).str.strip().unique()
+        if value
+    )
+    if len(bundle_ids) != 1:
+        _issue(
+            issues,
+            "forecasts",
+            forecast_path,
+            "mixed_model_bundles",
+            f"forecast snapshot must reference exactly one model bundle; found {bundle_ids}",
+        )
+    manifest_path = models_dir / "manifest.json"
+    if manifest_path.exists() and len(bundle_ids) == 1:
+        try:
+            manifest_bundle_id = str(_load_json(manifest_path)["bundle_id"])
+            if bundle_ids[0] != manifest_bundle_id:
+                raise ValueError(
+                    f"forecast references {bundle_ids[0]} but models_dir is {manifest_bundle_id}"
+                )
+        except Exception as exc:
+            _issue(
+                issues,
+                "forecasts",
+                forecast_path,
+                "model_bundle_handoff_mismatch",
+                str(exc),
+            )
 
     key_cols = ["act_symbol", "earnings_date", "snapshot_date", "model_horizon"]
     duplicate_count = int(frame.duplicated(key_cols).sum())

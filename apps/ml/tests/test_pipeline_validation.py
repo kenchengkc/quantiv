@@ -156,6 +156,7 @@ def _write_forecast_artifact(
                 "earnings_date": "2026-08-29",
                 "snapshot_date": "2026-08-22",
                 "model_horizon": 1,
+                "model_bundle_id": "test-bundle",
                 "spot_price": 100.0,
                 "atm_iv": atm_iv,
                 "em_math_pct": em_math,
