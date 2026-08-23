@@ -19,6 +19,7 @@ Usage:
 
 import argparse
 import json
+import logging
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -28,7 +29,6 @@ import duckdb
 import numpy as np
 import pandas as pd
 
-import logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
@@ -47,11 +47,31 @@ class FeatureSet:
     # (trainer strips all __ cols); used by symbol-keyed feature experiments and
     # leakage audits that need to join external panels (OHLCV, sector, etc.).
     symbol: pd.Series = field(default_factory=pd.Series)
+    sector: pd.Series = field(default_factory=pd.Series)
+    dollar_volume: pd.Series = field(default_factory=pd.Series)
+    market_cap: pd.Series = field(default_factory=pd.Series)
     metadata: Dict[str, Any] = field(default_factory=dict)
 
 
 def get_data_dir() -> Path:
     return Path(os.getenv("DATA_DIR", str(Path(__file__).resolve().parent.parent.parent / "data")))
+
+
+def _profile_metadata() -> dict[str, dict[str, Any]]:
+    default_path = (
+        Path(__file__).resolve().parent.parent
+        / "frontend"
+        / "public"
+        / "ticker-logos.json"
+    )
+    path = Path(os.getenv("TICKER_PROFILE_PATH", str(default_path)))
+    try:
+        payload = json.loads(path.read_text())
+        profiles = payload.get("profiles", {})
+        return profiles if isinstance(profiles, dict) else {}
+    except (OSError, ValueError, TypeError):
+        logger.warning("Ticker profile metadata unavailable at %s", path)
+        return {}
 
 
 def connect_duckdb() -> duckdb.DuckDBPyConnection:
@@ -86,7 +106,8 @@ def connect_duckdb() -> duckdb.DuckDBPyConnection:
                    NULL::DOUBLE AS parkinson_rv_60d,
                    NULL::DOUBLE AS cc_rv_10d, NULL::DOUBLE AS cc_rv_20d,
                    NULL::DOUBLE AS vol_of_vol_20d,
-                   NULL::DOUBLE AS volume_ratio_20d, NULL::DOUBLE AS drift_5d
+                   NULL::DOUBLE AS volume, NULL::DOUBLE AS volume_ratio_20d,
+                   NULL::DOUBLE AS drift_5d
             WHERE 1=0
         """)
     # v_vix — daily CBOE VIX close from FRED. Used to derive market regime
@@ -460,6 +481,8 @@ def extract_training_data(conn: duckdb.DuckDBPyConnection,
             rv.cc_rv_10d,
             rv.cc_rv_20d,
             rv.vol_of_vol_20d,
+            rv.volume,
+            rv.close * rv.volume AS dollar_volume,
 
             -- IV / RV ratios (NULL pre-2023)
             sf.atm_iv / NULLIF(rv.parkinson_rv_20d, 0) AS iv_rv_ratio_20d,
@@ -564,6 +587,7 @@ def extract_training_data(conn: duckdb.DuckDBPyConnection,
     logger.info(f"Realized move sources: {df['realized_source'].value_counts().to_dict()}")
 
     # ---------- Build per-horizon feature sets ----------
+    profiles = _profile_metadata()
     feature_sets: Dict[int, FeatureSet] = {}
 
     for horizon in HORIZONS:
@@ -611,6 +635,13 @@ def extract_training_data(conn: duckdb.DuckDBPyConnection,
         ed = pd.to_datetime(hdf["earnings_date"]).dt.date
         sym = (hdf["act_symbol"].astype(str)
                if "act_symbol" in hdf.columns else pd.Series([""] * len(hdf)))
+        sector = sym.map(
+            lambda value: str((profiles.get(value) or {}).get("finnhubIndustry") or "Unknown")
+        )
+        market_cap = sym.map(
+            lambda value: (profiles.get(value) or {}).get("marketCapitalization")
+        )
+        dollar_volume = pd.to_numeric(hdf.get("dollar_volume"), errors="coerce")
 
         # LightGBM handles NaN natively — only remove inf and extreme outliers
         X = X.replace([np.inf, -np.inf], np.nan)
@@ -619,6 +650,9 @@ def extract_training_data(conn: duckdb.DuckDBPyConnection,
         y = y[valid].reset_index(drop=True)
         ed = ed[valid].reset_index(drop=True)
         sym = sym[valid].reset_index(drop=True)
+        sector = sector[valid].reset_index(drop=True)
+        market_cap = pd.to_numeric(market_cap[valid], errors="coerce").reset_index(drop=True)
+        dollar_volume = dollar_volume[valid].reset_index(drop=True)
 
         if len(X) < 30:
             logger.warning(f"T-{horizon}: only {len(X)} valid samples after cleaning")
@@ -636,6 +670,9 @@ def extract_training_data(conn: duckdb.DuckDBPyConnection,
             target=y,
             earnings_date=ed,
             symbol=sym,
+            sector=sector,
+            dollar_volume=dollar_volume,
+            market_cap=market_cap,
             metadata={
                 "n_samples": len(X),
                 "target_mean": float(y.mean()),
@@ -676,6 +713,12 @@ def save_training_data(feature_sets: Dict[int, FeatureSet], output_dir: Path):
             training_df["__earnings_date"] = fs.earnings_date.values
         if len(fs.symbol) == len(fs.features):
             training_df["__symbol"] = fs.symbol.values
+        if len(fs.sector) == len(fs.features):
+            training_df["__sector"] = fs.sector.values
+        if len(fs.dollar_volume) == len(fs.features):
+            training_df["__dollar_volume"] = fs.dollar_volume.values
+        if len(fs.market_cap) == len(fs.features):
+            training_df["__market_cap"] = fs.market_cap.values
         path = output_dir / f"training_T{horizon}.parquet"
         training_df.to_parquet(path, index=False)
 

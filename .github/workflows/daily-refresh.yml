@@ -750,6 +750,23 @@ jobs:
         #   --time-decay 0.5    half-life 0.5y — modest recency bias on top of VIX features
         run: python apps/ml/model_trainer_v3.py --tune --time-decay 0.5
 
+      - name: Gate — mandatory purged walk-forward validation
+        # Retrains each horizon across four unseen 60-day windows. Publication
+        # requires aggregate improvement over the options/straddle baseline,
+        # at least three usable folds, and no catastrophic fold regression.
+        run: |
+          python scripts/validate_walk_forward.py \
+            --report data/validation/retrain_walk_forward.json
+
+      - name: Upload walk-forward validation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: retrain-walk-forward-validation
+          path: data/validation/retrain_walk_forward.json
+          if-no-files-found: ignore
+          retention-days: 30
+
       - name: Gate — validate trained model bundle
         # Load every point/quantile artifact, smoke-predict with the training
         # schema, enforce purged holdouts, calibration, and baseline quality.

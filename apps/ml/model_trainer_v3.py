@@ -52,6 +52,136 @@ def pinball_loss(y_true: np.ndarray, y_pred: np.ndarray, alpha: float) -> float:
     return float(np.mean(np.where(residual >= 0, alpha * residual, (alpha - 1) * residual)))
 
 
+def _broad_sector(industry: Any) -> str:
+    value = str(industry or "").strip().lower()
+    rules = (
+        ("Health Care", ("health", "biotech", "pharma", "life science", "medical")),
+        ("Financials", ("bank", "financial", "insurance", "capital market", "mortgage")),
+        ("Technology", ("technology", "software", "semiconductor", "electronic")),
+        ("Energy", ("energy", "oil", "gas", "coal")),
+        ("Utilities", ("utilities", "utility")),
+        ("Real Estate", ("real estate", "reit")),
+        ("Materials", ("metal", "mining", "chemical", "paper", "materials")),
+        ("Communication", ("telecom", "media", "entertainment", "communication")),
+        ("Consumer Staples", ("food", "beverage", "tobacco", "household products")),
+        ("Consumer Discretionary", ("retail", "automobile", "hotel", "leisure", "apparel")),
+        ("Industrials", ("industrial", "machinery", "construction", "transport", "aerospace")),
+    )
+    for sector, keywords in rules:
+        if any(keyword in value for keyword in keywords):
+            return sector
+    return "Other / Unknown"
+
+
+def _feature_reference(frame: pd.DataFrame) -> dict[str, Any]:
+    """Compact training distribution used for zero-database-cost drift checks."""
+    reference: dict[str, Any] = {}
+    for column in frame.columns:
+        values = pd.to_numeric(frame[column], errors="coerce").replace([np.inf, -np.inf], np.nan)
+        finite = values.dropna().to_numpy(dtype=float)
+        if not len(finite):
+            reference[column] = {"rows": len(values), "missing_rate": 1.0, "cuts": [], "probabilities": []}
+            continue
+        cuts = np.unique(np.quantile(finite, np.linspace(0.1, 0.9, 9))).astype(float)
+        probabilities, _ = np.histogram(finite, bins=np.r_[-np.inf, cuts, np.inf])
+        probabilities = probabilities / max(1, probabilities.sum())
+        reference[column] = {
+            "rows": len(values),
+            "missing_rate": float(values.isna().mean()),
+            "mean": float(np.mean(finite)),
+            "std": float(np.std(finite)),
+            "p05": float(np.quantile(finite, 0.05)),
+            "median": float(np.quantile(finite, 0.50)),
+            "p95": float(np.quantile(finite, 0.95)),
+            "cuts": cuts.tolist(),
+            "probabilities": probabilities.astype(float).tolist(),
+        }
+    return reference
+
+
+def _validation_slice_report(
+    val_frame: pd.DataFrame,
+    X_val: pd.DataFrame,
+    y_val: pd.Series,
+    point_predictions: np.ndarray,
+    quantile_predictions: np.ndarray,
+    *,
+    min_rows: int = 20,
+) -> dict[str, Any]:
+    def numeric_column(frame: pd.DataFrame, name: str) -> pd.Series:
+        values = frame[name] if name in frame else pd.Series(np.nan, index=frame.index)
+        return pd.to_numeric(values, errors="coerce")
+
+    sector = val_frame.get("__sector", pd.Series("Unknown", index=val_frame.index)).map(_broad_sector)
+    vix = numeric_column(X_val, "vix_current")
+    volatility_regime = pd.Series(
+        np.select(
+            [vix < 15, vix.between(15, 25, inclusive="left"), vix >= 25],
+            ["low VIX (<15)", "normal VIX (15–25)", "high VIX (≥25)"],
+            default="VIX unavailable",
+        ),
+        index=X_val.index,
+    )
+    dollar_volume = numeric_column(val_frame, "__dollar_volume")
+    liquidity = pd.Series(
+        np.select(
+            [dollar_volume < 20_000_000, dollar_volume.between(20_000_000, 100_000_000, inclusive="left"), dollar_volume >= 100_000_000],
+            ["lower (<$20m/day)", "medium ($20m–$100m/day)", "higher (≥$100m/day)"],
+            default="liquidity unavailable",
+        ),
+        index=val_frame.index,
+    )
+    dte = numeric_column(X_val, "dte")
+    dte_bucket = pd.Series(
+        np.select(
+            [dte <= 3, dte.between(4, 7), dte.between(8, 14), dte.between(15, 30), dte > 30],
+            ["0–3 DTE", "4–7 DTE", "8–14 DTE", "15–30 DTE", ">30 DTE"],
+            default="DTE unavailable",
+        ),
+        index=X_val.index,
+    )
+    dimensions = {
+        "sector": sector,
+        "volatility_regime": volatility_regime,
+        "liquidity": liquidity,
+        "dte": dte_bucket,
+    }
+    actual = y_val.to_numpy(dtype=float)
+    baseline = numeric_column(X_val, "straddle_pct").to_numpy(dtype=float)
+    report: dict[str, Any] = {}
+    for dimension, labels in dimensions.items():
+        cohorts: dict[str, Any] = {}
+        label_values = labels.astype(str).to_numpy()
+        for label in sorted(set(label_values)):
+            mask = label_values == label
+            n = int(mask.sum())
+            payload: dict[str, Any] = {"rows": n, "status": "reported" if n >= min_rows else "low_sample"}
+            if n:
+                y = actual[mask]
+                point = point_predictions[mask]
+                quantiles = quantile_predictions[mask]
+                payload.update(
+                    {
+                        "mae": float(mean_absolute_error(y, point)),
+                        "residual_mean": float(np.mean(y - point)),
+                        "coverage_80": float(np.mean((y >= quantiles[:, 0]) & (y <= quantiles[:, 4]))),
+                        "coverage_50": float(np.mean((y >= quantiles[:, 1]) & (y <= quantiles[:, 3]))),
+                        **{
+                            f"q{int(alpha * 100):02d}_coverage": float(np.mean(y <= quantiles[:, index]))
+                            for index, alpha in enumerate(QUANTILES)
+                        },
+                    }
+                )
+                valid_baseline = np.isfinite(baseline[mask])
+                if valid_baseline.any():
+                    payload["baseline_straddle_mae"] = float(
+                        mean_absolute_error(y[valid_baseline], baseline[mask][valid_baseline])
+                    )
+            cohorts[label] = payload
+        report[dimension] = {"cohorts": cohorts, "minimum_reported_rows": min_rows}
+    return report
+
+
 # Default LightGBM hyperparameters used when tuning is off. Reasonable
 # starting point for ~10–30k row tabular regression.
 DEFAULT_PARAMS: Dict[str, Any] = {
@@ -382,6 +512,25 @@ def run_training(horizons: List[int] = HORIZONS, tune: bool = False,
         residuals = y_val - y_pred_val
         all_metrics["residual_std"] = float(residuals.std())
         all_metrics["residual_mean"] = float(residuals.mean())
+        all_metrics["residual_reference"] = {
+            "rows": len(residuals),
+            "mean": float(residuals.mean()),
+            "std": float(residuals.std()),
+            "p05": float(residuals.quantile(0.05)),
+            "median": float(residuals.quantile(0.50)),
+            "p95": float(residuals.quantile(0.95)),
+        }
+        all_metrics["feature_reference"] = _feature_reference(X_train)
+        q_val_matrix = rearrange_quantile_array(
+            np.column_stack([q_models[alpha].predict(X_val) for alpha in QUANTILES])
+        )
+        all_metrics["validation_slices"] = _validation_slice_report(
+            val_df,
+            X_val,
+            y_val,
+            np.asarray(y_pred_val, dtype=float),
+            q_val_matrix,
+        )
 
         meta_path = models_dir / f"metadata_T{horizon}.json"
         with open(meta_path, "w") as f:

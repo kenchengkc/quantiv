@@ -60,6 +60,39 @@ def _model_metadata() -> dict[str, object]:
         "quantile_crossing_rate_raw": 0.05,
         "quantile_negative_rate_raw": 0.01,
         "feature_cols": FEATURES,
+        "feature_reference": {
+            feature: {
+                "rows": 12,
+                "missing_rate": 0.0,
+                "mean": 1.0,
+                "std": 0.1,
+                "p05": 0.8,
+                "median": 1.0,
+                "p95": 1.2,
+                "cuts": [0.9, 1.0, 1.1],
+                "probabilities": [0.25, 0.25, 0.25, 0.25],
+            }
+            for feature in FEATURES
+        },
+        "residual_reference": {
+            "rows": 4,
+            "mean": 0.0,
+            "std": 0.01,
+            "p05": -0.01,
+            "median": 0.0,
+            "p95": 0.01,
+        },
+        "validation_slices": {
+            dimension: {"cohorts": {"test": {"rows": 4, "status": "low_sample"}}}
+            for dimension in ("sector", "volatility_regime", "liquidity", "dte")
+        },
+        "walk_forward_validation": {
+            "status": "passed",
+            "fold_count": 4,
+            "purge_days": 5,
+            "model_mae": 0.02,
+            "baseline_straddle_mae": 0.03,
+        },
         "validation_split": {
             "purge_days": 1,
             "rows_total": 18,

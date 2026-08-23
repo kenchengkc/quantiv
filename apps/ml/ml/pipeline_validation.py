@@ -484,6 +484,76 @@ def validate_model_artifacts(
             )
             continue
 
+        feature_reference = metadata.get("feature_reference")
+        if not isinstance(feature_reference, dict) or set(feature_reference) != set(feature_cols):
+            _issue(
+                issues,
+                "models",
+                metadata_path,
+                "missing_feature_drift_reference",
+                "feature_reference must cover the exact deployed feature schema",
+            )
+        residual_reference = metadata.get("residual_reference")
+        if not isinstance(residual_reference, dict) or not all(
+            _finite_number(residual_reference.get(key))
+            for key in ("rows", "mean", "std", "p05", "median", "p95")
+        ):
+            _issue(
+                issues,
+                "models",
+                metadata_path,
+                "missing_residual_drift_reference",
+                "residual_reference must contain finite distribution statistics",
+            )
+        slices = metadata.get("validation_slices")
+        required_slices = {"sector", "volatility_regime", "liquidity", "dte"}
+        if not isinstance(slices, dict) or not required_slices <= set(slices):
+            _issue(
+                issues,
+                "models",
+                metadata_path,
+                "missing_calibration_slices",
+                f"validation_slices must include {sorted(required_slices)}",
+            )
+        else:
+            for dimension in sorted(required_slices):
+                cohorts = slices[dimension].get("cohorts") if isinstance(slices[dimension], dict) else None
+                if not isinstance(cohorts, dict) or not cohorts:
+                    _issue(
+                        issues,
+                        "models",
+                        metadata_path,
+                        "empty_calibration_slice",
+                        f"validation_slices.{dimension} has no cohorts",
+                    )
+        walk_forward = metadata.get("walk_forward_validation")
+        if not isinstance(walk_forward, dict) or walk_forward.get("status") != "passed":
+            _issue(
+                issues,
+                "models",
+                metadata_path,
+                "walk_forward_gate_failed",
+                "a passing mandatory walk-forward validation is required",
+            )
+        else:
+            try:
+                if int(walk_forward["fold_count"]) < 3:
+                    raise ValueError("at least three walk-forward folds are required")
+                if int(walk_forward["purge_days"]) < 1:
+                    raise ValueError("walk-forward validation must use a purge window")
+                if float(walk_forward["model_mae"]) >= float(
+                    walk_forward["baseline_straddle_mae"]
+                ):
+                    raise ValueError("walk-forward MAE does not beat the straddle baseline")
+            except (KeyError, TypeError, ValueError) as exc:
+                _issue(
+                    issues,
+                    "models",
+                    metadata_path,
+                    "invalid_walk_forward_audit",
+                    str(exc),
+                )
+
         sample: pd.DataFrame | None = None
         if training_dir is not None:
             training_path = training_dir / f"training_T{horizon}.parquet"
