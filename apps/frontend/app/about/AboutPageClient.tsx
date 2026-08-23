@@ -793,7 +793,7 @@ function Pipeline() {
     {
       kicker: "02",
       title: "Math",
-      body: "Black–Scholes with dividend yield. Brent solver for IV to 1e-6. Term IV, ATM skew, vega, straddle EM and 80% bands on the print expiry.",
+      body: "ATM IV, straddle and IV-scaled expected move, skew, term structure, and published Greeks from the chain. Density bands and the LightGBM 80% forecast on the print expiry.",
       tone: "var(--accent-hi)",
       icon: "math",
     },
@@ -1539,21 +1539,15 @@ export default function AboutPageClient() {
             id="methodology-atm-iv"
             kicker="ATM IV"
             title="From an option quote to volatility"
-            tex={String.raw`\begin{aligned}
-              C_{\mathrm{BS}}(S,K,T,r,q,\sigma_C) &= C_{\mathrm{mid}} \\[2pt]
-              P_{\mathrm{BS}}(S,K,T,r,q,\sigma_P) &= P_{\mathrm{mid}} \\[2pt]
-              \sigma_{\mathrm{ATM}} &= \tfrac{1}{2}(\sigma_C+\sigma_P)
-              \end{aligned}`}
-            body="We first match a call and put with the same symbol, expiry, and strike. We solve the pricing equation separately for each midpoint, then average the two annualized IVs. Crossed, zero-sided, and excessively wide quotes are rejected before this step."
+            tex={String.raw`\sigma_{\mathrm{ATM}} \;=\; \tfrac{1}{2}\bigl(\sigma_C + \sigma_P\bigr)`}
+            body="We match a call and put with the same symbol, expiry, and strike (nearest to delta ≈ 0.5), then average the two annualized IVs from the chain. Crossed, zero-sided, and excessively wide quotes are rejected before this step."
           />
           <FormulaCard
             id="methodology-straddle"
             kicker="Straddle EM"
             title="What dealers are pricing"
-            tex={String.raw`\mathrm{EM}_{\text{straddle}} \;=\; \frac{c_{\mathrm{ATM}} \,+\, p_{\mathrm{ATM}}}{S_0}`}
-            body="ATM straddle mid divided by spot. The print-expiry straddle prices a ±1σ
-              move at expiry. Collect it if you think the stock will move less than
-              implied; pay it if you think more."
+            tex={String.raw`\mathrm{EM}_{\text{straddle}} \;=\; \frac{C_{\mathrm{mid}} \,+\, P_{\mathrm{mid}}}{S_0}`}
+            body="ATM call mid plus put mid, divided by spot. That is the market's dollar cost of a two-sided move through expiry, expressed as a percent of the stock. Collect the straddle if you expect a smaller move than that price implies; pay it if you expect more."
           />
           <FormulaCard
             id="methodology-iv-move"
@@ -1573,10 +1567,7 @@ export default function AboutPageClient() {
               \Delta_{\text{call}} &= e^{-qT}\,N(d_1) \qquad \Gamma = \tfrac{e^{-qT}\,\varphi(d_1)}{S\,\sigma\sqrt{T}} \\[2pt]
               \nu &= S\,e^{-qT}\,\varphi(d_1)\,\sqrt{T}
               \end{aligned}`}
-            body="IV is solved with Brent's method to 1e-6 tolerance from mid quotes.
-              Greeks are surfaced per expiry so you can see how delta-flat your
-              position is, how much it'll move on a 1-vol jump, and how fast
-              theta accelerates into print."
+            body="Standard Black–Scholes–Merton sensitivities (continuous dividend yield). We surface the chain’s published ATM Greeks per expiry — delta, gamma, vega, theta — so you can see how delta-flat a position is, how much it moves on a 1-vol jump, and how fast theta accelerates into print."
           />
           <FormulaCard
             id="methodology-density"
