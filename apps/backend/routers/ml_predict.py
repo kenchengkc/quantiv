@@ -504,6 +504,7 @@ async def status_endpoint(req: MLStatusRequest) -> MLStatusResponse:
                       distinct_events,
                       min_snapshot_date,
                       max_snapshot_date,
+                      model_bundle_id,
                       horizons
                     FROM em_forecast_imports
                     ORDER BY imported_at DESC
@@ -544,6 +545,7 @@ async def status_endpoint(req: MLStatusRequest) -> MLStatusResponse:
             distinct_events=latest_import["distinct_events"],
             min_snapshot_date=latest_import["min_snapshot_date"],
             max_snapshot_date=latest_import["max_snapshot_date"],
+            model_bundle_id=latest_import["model_bundle_id"],
             horizons=_json_object(latest_import["horizons"]),
         )
         if latest_import is not None

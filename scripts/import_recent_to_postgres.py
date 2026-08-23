@@ -66,6 +66,7 @@ COLUMNS = [
     "timing",
     "snapshot_date",
     "model_horizon",
+    "model_bundle_id",
     "spot_price",
     "atm_iv",
     "em_math_pct",
@@ -117,6 +118,7 @@ CREATE TABLE IF NOT EXISTS em_forecasts (
     timing                 TEXT,
     snapshot_date          DATE NOT NULL,
     model_horizon          INTEGER NOT NULL,
+    model_bundle_id        TEXT,
     spot_price             DOUBLE PRECISION,
     atm_iv                 DOUBLE PRECISION,
     em_math_pct            DOUBLE PRECISION,
@@ -143,10 +145,13 @@ CREATE TABLE IF NOT EXISTS em_forecasts (
 -- feature_vector may be missing on rows written by an older daily_score
 -- run; the API treats NULL as "re-inference unavailable for this snapshot".
 ALTER TABLE em_forecasts ADD COLUMN IF NOT EXISTS feature_vector JSONB;
+ALTER TABLE em_forecasts ADD COLUMN IF NOT EXISTS model_bundle_id TEXT;
 CREATE INDEX IF NOT EXISTS em_forecasts_symbol_date_idx
     ON em_forecasts (act_symbol, earnings_date);
 CREATE INDEX IF NOT EXISTS em_forecasts_snapshot_idx
     ON em_forecasts (snapshot_date DESC);
+CREATE INDEX IF NOT EXISTS em_forecasts_bundle_idx
+    ON em_forecasts (model_bundle_id);
 
 CREATE TABLE IF NOT EXISTS em_forecast_imports (
     id                    BIGSERIAL PRIMARY KEY,
@@ -163,8 +168,10 @@ CREATE TABLE IF NOT EXISTS em_forecast_imports (
     distinct_events       INTEGER NOT NULL,
     min_snapshot_date     DATE,
     max_snapshot_date     DATE,
+    model_bundle_id       TEXT,
     horizons              JSONB NOT NULL DEFAULT '{}'::jsonb
 );
+ALTER TABLE em_forecast_imports ADD COLUMN IF NOT EXISTS model_bundle_id TEXT;
 CREATE INDEX IF NOT EXISTS em_forecast_imports_imported_at_idx
     ON em_forecast_imports (imported_at DESC);
 """
@@ -188,11 +195,12 @@ def pick_parquet(explicit: str | None) -> Path:
 def load_and_filter(parquet_path: Path, days: int, full: bool) -> tuple[pd.DataFrame, ImportStats]:
     df = pd.read_parquet(parquet_path)
     source_rows = len(df)
-    # `feature_vector` is the only column allowed to be missing — older
-    # daily_score runs (pre-Phase 1) didn't emit it. Backfill with NULL so
-    # the existing schema gate still catches truly broken Parquet files.
-    if "feature_vector" not in df.columns:
-        df["feature_vector"] = None
+    # Older daily_score runs predate these serving/audit fields. Backfill only
+    # those explicitly compatible columns; all core forecast columns remain
+    # fail-closed below.
+    for backward_compatible_column in ("feature_vector", "model_bundle_id"):
+        if backward_compatible_column not in df.columns:
+            df[backward_compatible_column] = None
     missing = [c for c in COLUMNS if c not in df.columns]
     if missing:
         raise SystemExit(
@@ -228,6 +236,9 @@ def load_and_filter(parquet_path: Path, days: int, full: bool) -> tuple[pd.DataF
 
     # Replace pandas NaN/NaT with Python None for psycopg2's adapter.
     out = df.astype(object).where(df.notna(), None)
+    # A serving snapshot must be attributable to at most one promoted bundle.
+    # Reject mixed-model files before opening a production database connection.
+    _single_model_bundle_id(out)
     return out, ImportStats(
         source_rows=source_rows,
         selected_rows=selected_rows,
@@ -316,6 +327,23 @@ def _feature_vector_count(df: pd.DataFrame) -> int:
     return int(df["feature_vector"].notna().sum())
 
 
+def _single_model_bundle_id(df: pd.DataFrame) -> str | None:
+    """Return the imported bundle ID and reject mixed-model snapshots."""
+    if df.empty or "model_bundle_id" not in df.columns:
+        return None
+    bundle_ids = sorted({
+        str(value).strip()
+        for value in df["model_bundle_id"].dropna()
+        if str(value).strip()
+    })
+    if len(bundle_ids) > 1:
+        raise ValueError(
+            "Forecast import contains multiple model bundle IDs: "
+            + ", ".join(bundle_ids)
+        )
+    return bundle_ids[0] if bundle_ids else None
+
+
 def record_import(
     conn,
     parquet_path: Path,
@@ -361,9 +389,10 @@ def record_import(
             distinct_events,
             min_snapshot_date,
             max_snapshot_date,
+            model_bundle_id,
             horizons
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     """
     with conn.cursor() as cur:
         cur.execute(
@@ -381,6 +410,7 @@ def record_import(
                 distinct_events,
                 min_snapshot,
                 max_snapshot,
+                _single_model_bundle_id(df),
                 psycopg2.extras.Json(_horizon_counts(df)),
             ),
         )

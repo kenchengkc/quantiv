@@ -127,6 +127,7 @@ class _StatusConn:
                 "distinct_events": 190,
                 "min_snapshot_date": date(2026, 5, 12),
                 "max_snapshot_date": date(2026, 5, 24),
+                "model_bundle_id": "bundle-2026-05-24",
                 "horizons": {"7": 100, "14": 140, "21": 174},
             }
         return {
@@ -255,6 +256,7 @@ async def test_status_endpoint_returns_model_and_data_metadata(monkeypatch):
     assert response.latest_import.parquet_file == "forecasts_2026-05-24.parquet"
     assert response.latest_import.source_rows == 424
     assert response.latest_import.rows_upserted == 414
+    assert response.latest_import.model_bundle_id == "bundle-2026-05-24"
     assert response.latest_import.horizons["21"] == 174
     assert response.supported_horizons == [1, 2, 3, 7, 14, 21]
     assert response.available_model_horizons == [7]

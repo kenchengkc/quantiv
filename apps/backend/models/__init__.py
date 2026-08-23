@@ -333,6 +333,7 @@ class MLStatusImportRow(BaseModel):
     distinct_events: int
     min_snapshot_date: date | None = None
     max_snapshot_date: date | None = None
+    model_bundle_id: str | None = None
     horizons: dict[str, int] = Field(default_factory=dict)
 
 
