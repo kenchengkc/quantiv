@@ -104,12 +104,6 @@ Optional worker tuning:
 | `QUOTE_WORKER_QUOTE_FLUSH_S` | `5` | Dirty-quote batch flush interval when batching is enabled. |
 | `QUOTE_WORKER_BATCH_WRITES` | `0` | Set to `1` only after the lease heartbeat is healthy; batches dirty quote keys with `MSET`. |
 
-Once the worker is healthy, set this on Vercel production:
-
-| Variable | Value | Effect |
-|---|---|---|
-| `QUOTE_REFRESH_PROVIDER` | `railway` | Makes `/api/cron/refresh-prices?window=regular` return a no-op so Vercel stops doing regular-hours Finnhub polling. Premarket/after-hours Alpaca reporter refreshes still run. |
-
 The worker writes a heartbeat to Redis key `quote:worker:status` with counts,
 top universe size, lease protocol, batch metrics, and last REST/WebSocket
 symbols. During the regular quote window it also owns
@@ -117,8 +111,10 @@ symbols. During the regular quote window it also owns
 heartbeats so weekends do not generate idle Redis traffic. Once the
 lease-protocol marker is present, the Vercel route automatically acquires the
 same lease and fails over only when Railway's heartbeat/ownership is stale.
-Before that marker exists, the route retains the legacy manual-failback
-behavior to avoid running two Finnhub producers during deployment.
+There is no provider-selection environment flag: missing configuration cannot
+silently turn Vercel into an uncoordinated second regular-hours writer. A fresh
+pre-protocol worker retains ownership during rollout; when no worker is live,
+Vercel takes the canonical lease before writing.
 
 ---
 

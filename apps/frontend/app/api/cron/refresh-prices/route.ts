@@ -19,9 +19,10 @@ import {
 import { enrichQuoteTick } from '@/lib/quoteTick';
 import { parseMarketSymbol, type MarketSymbol } from '@/lib/marketSymbol';
 
-// Cron-driven Finnhub price refresher. Triggered every 5 min by an external
-// scheduler (Cloudflare Worker). Walks a rotating cursor through a priority-
-// ordered symbol list and writes per-ticker quote entries to Upstash Redis.
+// Quote refresh controller triggered by the Cloudflare scheduler. Railway owns
+// the regular-hours feed while healthy; this route takes the same Redis lease
+// only as an automatic fallback. Alpaca extended-hours refresh is a distinct
+// session adapter and never owns the regular-hours universe.
 //
 // Auth: must send `Authorization: Bearer ${CRON_SECRET}` (or
 // `?secret=${CRON_SECRET}` query param). Without it → 401.
@@ -253,30 +254,15 @@ async function fetchQuote(symbol: MarketSymbol, apiKey: string): Promise<Tick | 
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
-function railwayIsPreferred(): boolean {
-  return (
-    process.env.QUOTE_REFRESH_PROVIDER === 'railway' ||
-    process.env.DISABLE_VERCEL_REGULAR_QUOTE_REFRESH === '1'
-  );
-}
-
 type RailwayRefreshState =
   | RailwayOwnershipState
   | {
-      deferToRailway: false;
-      leaseProtocolEnabled: false;
-      reason: 'vercel_primary';
+      deferToRailway: true;
+      requireRegularLease: false;
+      reason: 'coordination_unavailable';
     };
 
 async function railwayRefreshState(redis: Redis): Promise<RailwayRefreshState> {
-  if (!railwayIsPreferred()) {
-    return {
-      deferToRailway: false,
-      leaseProtocolEnabled: false,
-      reason: 'vercel_primary',
-    };
-  }
-
   try {
     const [statusRaw, leaseOwner, protocolRaw] =
       (await redis.mget<unknown[]>(
@@ -286,12 +272,12 @@ async function railwayRefreshState(redis: Redis): Promise<RailwayRefreshState> {
       )) ?? [];
     return classifyRailwayOwnership(statusRaw, leaseOwner, protocolRaw);
   } catch {
-    // Preserve the current single-writer behavior if Redis cannot confirm
-    // that the new lease protocol is active.
+    // Fail closed when ownership state cannot be read. A stale quote is safer
+    // than two writers producing a time-traveling cache entry.
     return {
       deferToRailway: true,
-      leaseProtocolEnabled: false,
-      reason: 'legacy_railway',
+      requireRegularLease: false,
+      reason: 'coordination_unavailable',
     };
   }
 }
@@ -396,7 +382,7 @@ export async function GET(req: NextRequest) {
       const regularSettle = await runRegularHours(
         ready.redis,
         new Set(),
-        railwayState.leaseProtocolEnabled,
+        railwayState.requireRegularLease,
       );
       const regularBody = await responseJson(regularSettle);
       return NextResponse.json(
@@ -438,7 +424,7 @@ export async function GET(req: NextRequest) {
       const regularSettlePromise = runRegularHours(
         redis,
         amcReporters,
-        railwayState.leaseProtocolEnabled,
+        railwayState.requireRegularLease,
       );
       const extended = await runExtendedHours(kind, redis);
       const regularSettle = await regularSettlePromise;
@@ -470,7 +456,7 @@ export async function GET(req: NextRequest) {
   return runRegularHours(
     redis,
     new Set(),
-    railwayState.leaseProtocolEnabled,
+    railwayState.requireRegularLease,
   );
 }
 
@@ -480,7 +466,7 @@ export async function GET(req: NextRequest) {
 async function runRegularHours(
   redis: Redis,
   excludeSymbols: ReadonlySet<string> = new Set(),
-  requireLease = false,
+  requireLease = true,
 ): Promise<NextResponse> {
   let leaseOwner: string | null = null;
   if (requireLease) {

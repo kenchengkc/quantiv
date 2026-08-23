@@ -7,8 +7,12 @@ export type RailwayWorkerStatus = {
 
 export type RailwayOwnershipState = {
   deferToRailway: boolean;
-  leaseProtocolEnabled: boolean;
-  reason: "legacy_railway" | "railway_healthy" | "railway_stale";
+  requireRegularLease: boolean;
+  reason:
+    | "legacy_railway"
+    | "railway_healthy"
+    | "railway_stale"
+    | "railway_unavailable";
 };
 
 export function parseWorkerStatus(raw: unknown): RailwayWorkerStatus | null {
@@ -49,10 +53,15 @@ export function classifyRailwayOwnership(
     protocolRaw === "1" || protocolRaw === 1 || status?.lease_protocol === 1;
 
   if (!protocolEnabled) {
+    // A fresh pre-protocol worker may still write without a lease. Preserve
+    // exclusive ownership until it is upgraded. With no live worker, Vercel
+    // may take over, but it must acquire the canonical lease so a Railway
+    // worker that starts mid-run cannot write concurrently.
+    const legacyWorkerIsFresh = isFreshRailwayHeartbeat(statusRaw, nowMs);
     return {
-      deferToRailway: true,
-      leaseProtocolEnabled: false,
-      reason: "legacy_railway",
+      deferToRailway: legacyWorkerIsFresh,
+      requireRegularLease: !legacyWorkerIsFresh,
+      reason: legacyWorkerIsFresh ? "legacy_railway" : "railway_unavailable",
     };
   }
 
@@ -64,7 +73,7 @@ export function classifyRailwayOwnership(
     railwayOwnsLease && isFreshRailwayHeartbeat(statusRaw, nowMs);
   return {
     deferToRailway: healthy,
-    leaseProtocolEnabled: true,
+    requireRegularLease: true,
     reason: healthy ? "railway_healthy" : "railway_stale",
   };
 }

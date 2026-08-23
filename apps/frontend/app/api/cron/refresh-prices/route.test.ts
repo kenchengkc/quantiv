@@ -27,7 +27,7 @@ describe("Railway quote-worker heartbeat", () => {
     expect(isFreshRailwayHeartbeat(null, now)).toBe(false);
   });
 
-  it("preserves legacy manual failback until the lease protocol is present", () => {
+  it("defers to a fresh legacy worker until the lease protocol is present", () => {
     expect(
       classifyRailwayOwnership(
         { updated_at: "2026-06-08T13:59:00Z" },
@@ -37,8 +37,16 @@ describe("Railway quote-worker heartbeat", () => {
       ),
     ).toEqual({
       deferToRailway: true,
-      leaseProtocolEnabled: false,
+      requireRegularLease: false,
       reason: "legacy_railway",
+    });
+  });
+
+  it("uses the shared lease when Railway is absent", () => {
+    expect(classifyRailwayOwnership(null, null, null, now)).toEqual({
+      deferToRailway: false,
+      requireRegularLease: true,
+      reason: "railway_unavailable",
     });
   });
 
@@ -55,7 +63,7 @@ describe("Railway quote-worker heartbeat", () => {
       ),
     ).toEqual({
       deferToRailway: true,
-      leaseProtocolEnabled: true,
+      requireRegularLease: true,
       reason: "railway_healthy",
     });
     expect(
@@ -70,7 +78,7 @@ describe("Railway quote-worker heartbeat", () => {
       ),
     ).toEqual({
       deferToRailway: false,
-      leaseProtocolEnabled: true,
+      requireRegularLease: true,
       reason: "railway_stale",
     });
   });
@@ -88,7 +96,7 @@ describe("Railway quote-worker heartbeat", () => {
       ),
     ).toEqual({
       deferToRailway: false,
-      leaseProtocolEnabled: true,
+      requireRegularLease: true,
       reason: "railway_stale",
     });
   });
