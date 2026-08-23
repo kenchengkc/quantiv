@@ -253,7 +253,7 @@
   min-height: 42px;
   padding: 0 12px;
   display: grid;
-  grid-template-columns: minmax(170px, 1fr) auto auto auto 18px;
+  grid-template-columns: minmax(170px, 1fr) auto auto 18px;
   gap: 16px;
   align-items: center;
   list-style: none;
@@ -267,7 +267,6 @@
 
 .qv-evidence-summary-status,
 .qv-evidence-summary-fact,
-.qv-evidence-fingerprints,
 .qv-evidence-node-role {
   display: inline-flex;
   align-items: center;
@@ -379,13 +378,6 @@
   text-align: center;
 }
 
-.qv-evidence-fingerprints {
-  gap: 12px;
-  margin-top: 10px;
-  color: var(--ink-4);
-  font-size: 9px;
-}
-
 .qv-evidence-empty {
   color: var(--flag);
   font-size: 11px;
@@ -404,7 +396,7 @@
 
   .qv-evidence-chevron {
     grid-column: 2;
-    grid-row: 1 / span 4;
+    grid-row: 1 / span 3;
   }
 
   .qv-evidence-flow {
@@ -414,12 +406,6 @@
   .qv-evidence-arrow {
     transform: rotate(90deg);
     line-height: 10px;
-  }
-
-  .qv-evidence-fingerprints {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 4px;
   }
 }
 
@@ -1396,16 +1382,24 @@ tr:hover .qv-m-sticky-cell {
     padding: 16px;
   }
   .qv-reading-guide-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 6px;
+    grid-template-columns: 1fr;
+    gap: 7px;
   }
   .qv-reading-guide-layer {
-    grid-template-columns: 1fr;
-    gap: 6px;
-    padding: 10px 8px;
+    grid-template-columns: 18px minmax(0, 1fr);
+    gap: 9px;
+    padding: 10px;
+  }
+  .qv-reading-guide-layer:not(:last-child)::after {
+    top: auto;
+    right: auto;
+    bottom: -8px;
+    left: 18px;
+    width: 1px;
+    height: 7px;
   }
   .qv-reading-guide-layer-caption {
-    font-size: 10px;
+    font-size: 11px;
   }
   .qv-metric-help-popover {
     width: min(330px, calc(100vw - 32px));

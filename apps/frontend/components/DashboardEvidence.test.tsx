@@ -71,8 +71,9 @@ describe("DashboardEvidence", () => {
     expect(container.textContent).toContain("Decision evidence");
     expect(container.textContent).toContain("Validated");
     expect(container.textContent).toContain("Forecast Aug 19, 2026");
-    expect(container.textContent).toContain("Receipt 5c7f46c41478");
     expect(container.textContent).toContain("16 controls · 0 exceptions");
+    expect(container.textContent).not.toContain("5c7f46c41478");
+    expect(container.textContent).not.toContain("modelhash");
     expect(
       Array.from(
         container.querySelectorAll(".qv-evidence-node-role span"),

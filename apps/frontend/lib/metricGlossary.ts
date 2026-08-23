@@ -114,7 +114,7 @@ export const METRIC_GLOSSARY: Record<MetricKey, MetricDefinition> = {
     caution: "Counts do not prove adjustment; not a trading signal",
   },
   providerSignalScore: {
-    label: "Provider signal score",
+    label: "Positioning score",
     definition:
       "A rule-based average of short crowding and put/call imbalances.",
     calculation: [

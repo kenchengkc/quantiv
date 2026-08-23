@@ -3,7 +3,7 @@ import { flushSync } from "react-dom";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { MetricHelp } from "./MetricExplainer";
+import { ExpectedMoveComparison, MetricHelp } from "./MetricExplainer";
 
 const roots: Root[] = [];
 
@@ -58,5 +58,35 @@ describe("MetricHelp", () => {
     expect(container.textContent).toContain(
       "Find each σ where model price = market price; then average",
     );
+  });
+});
+
+describe("ExpectedMoveComparison", () => {
+  it("compares options, model, and realized moves in plain language", () => {
+    const container = renderMetricHelp(
+      <ExpectedMoveComparison
+        optionsMovePct={0.072}
+        mlMovePct={0.037}
+        historicalMovePct={0.051}
+        historyCount={8}
+        ivRank={0.36}
+      />,
+    );
+
+    expect(container.textContent).toContain("Expected move comparison");
+    expect(container.textContent).toContain("Options-implied±7.2%ATM straddle");
+    expect(container.textContent).toContain(
+      "Model forecast±3.7%Expected absolute move",
+    );
+    expect(container.textContent).toContain(
+      "Historical median±5.1%Last 8 earnings",
+    );
+    expect(container.textContent).toContain(
+      "Model 3.5 percentage points below options-implied",
+    );
+    expect(container.textContent).toContain(
+      "Absolute move only; not direction",
+    );
+    expect(container.textContent).not.toContain("Event lens");
   });
 });

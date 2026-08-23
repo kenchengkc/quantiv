@@ -5,10 +5,8 @@ import {
   Clock3,
   Cpu,
   Database,
-  Fingerprint,
 } from "lucide-react";
 import type { ForecastDashboardEvidence } from "@/lib/forecastEvidence";
-import { shortEvidenceHash } from "@/lib/forecastEvidence";
 
 const UTC_DATE_FORMAT = new Intl.DateTimeFormat("en-US", {
   month: "short",
@@ -86,13 +84,9 @@ export function DashboardEvidence({
     evidence?.quality.status === "passed" &&
     evidence.quality.issue_count === 0 &&
     evidence.controls.exceptions === 0;
-  const receiptHash = shortEvidenceHash(evidence?.receipt_id);
   const window = evidence?.observation_window;
   const modelBundle = evidence?.artifact_bundles.find(
     (artifact) => artifact.name === "model_bundle",
-  );
-  const forecastBundle = evidence?.artifact_bundles.find(
-    (artifact) => artifact.name === "forecast_snapshot",
   );
   const horizons = evidence?.coverage.horizons
     .map((horizon) => `T${horizon}`)
@@ -115,9 +109,6 @@ export function DashboardEvidence({
         </span>
         <span className="qv-evidence-summary-fact">
           Forecast <b>{formatUtcDate(forecastSnapshotDate)}</b>
-        </span>
-        <span className="qv-evidence-summary-fact mono">
-          Receipt <b>{receiptHash}</b>
         </span>
         <ChevronDown
           className="qv-evidence-chevron"
@@ -156,7 +147,7 @@ export function DashboardEvidence({
             <EvidenceNode
               role="Computed"
               title={`LightGBM move · ${horizons ?? ""}`.trim()}
-              detail={`daily_score.py · ${modelBundle?.member_count ?? 0} fingerprinted model files`}
+              detail={`daily_score.py · ${modelBundle?.member_count ?? 0} versioned model files`}
               icon={<Cpu size={14} aria-hidden="true" />}
             />
             <span className="qv-evidence-arrow" aria-hidden="true">
@@ -176,14 +167,6 @@ export function DashboardEvidence({
                 )
               }
             />
-          </div>
-          <div className="qv-evidence-fingerprints mono">
-            <Fingerprint size={13} aria-hidden="true" />
-            <span>Model {shortEvidenceHash(modelBundle?.sha256, 10)}</span>
-            <span>
-              Forecast {shortEvidenceHash(forecastBundle?.sha256, 10)}
-            </span>
-            <span>Receipt {receiptHash}</span>
           </div>
         </div>
       ) : (

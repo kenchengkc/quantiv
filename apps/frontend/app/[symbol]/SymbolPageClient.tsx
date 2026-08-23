@@ -11,7 +11,7 @@ import type { MetricKey } from '@/lib/metricGlossary';
 import { useEnsureCompanyNames } from '@/lib/useCompanyNames';
 import { useEnsureListingExchanges } from '@/lib/useListingExchanges';
 import { useWatchlist } from '@/lib/watchlist';
-import { DashboardReadingGuide, MetricHelp } from '@/components/MetricExplainer';
+import { ExpectedMoveComparison, MetricHelp } from '@/components/MetricExplainer';
 import { DashboardEvidence } from '@/components/DashboardEvidence';
 import { TickerLogo } from '@/components/TickerLogo';
 import type { ForecastDashboardEvidence } from '@/lib/forecastEvidence';
@@ -950,7 +950,7 @@ function ProviderSignalsPanel({ enrichment }: { enrichment?: ProviderEnrichment 
         }}
       >
         <div>
-          <span className="qv-pill">Provider signals</span>
+          <span className="qv-pill">Market context</span>
           <h3
             className="serif"
             style={{
@@ -960,7 +960,7 @@ function ProviderSignalsPanel({ enrichment }: { enrichment?: ProviderEnrichment 
               letterSpacing: '-0.01em',
             }}
           >
-            Crowding and flow context
+            Short interest, options flow, and corporate actions
           </h3>
         </div>
         {enrichment.signal_score != null && (
@@ -968,7 +968,7 @@ function ProviderSignalsPanel({ enrichment }: { enrichment?: ProviderEnrichment 
             className="mono tnum qv-signal-score"
             style={{ fontSize: 11, color: 'var(--ink-4)', textAlign: 'right' }}
           >
-            <span>Signal score {(enrichment.signal_score * 100).toFixed(0)}</span>
+            <span>Positioning score {(enrichment.signal_score * 100).toFixed(0)}/100</span>
             <MetricHelp metric="providerSignalScore" />
           </div>
         )}
@@ -982,7 +982,7 @@ function ProviderSignalsPanel({ enrichment }: { enrichment?: ProviderEnrichment 
         }}
       >
         <ProviderSignalMetric
-          label="Short days"
+          label="Days to cover"
           value={daysToCover == null ? '–' : daysToCover.toFixed(1)}
           sub={short?.shares != null ? `${compactNumber(short.shares)} shares short` : undefined}
           tone={shortTone}
@@ -1012,9 +1012,9 @@ function ProviderSignalsPanel({ enrichment }: { enrichment?: ProviderEnrichment 
           metric="putCallOpenInterest"
         />
         <ProviderSignalMetric
-          label="Actions"
+          label="Dividends / splits"
           value={`${actions?.dividend_events ?? 0}/${actions?.split_events ?? 0}`}
-          sub="dividend / split events"
+          sub="recent provider events"
           metric="corporateActions"
         />
       </div>
@@ -2802,6 +2802,15 @@ function buildHistorySeries(
   return usable.slice(-8);
 }
 
+function medianAbsoluteHistoryMove(history: HistoryPoint[]): number | null {
+  if (history.length === 0) return null;
+  const moves = history.map((point) => Math.abs(point.actual)).sort((a, b) => a - b);
+  const middle = Math.floor(moves.length / 2);
+  return moves.length % 2 === 0
+    ? (moves[middle - 1] + moves[middle]) / 2
+    : moves[middle];
+}
+
 // EPS surprise strip — one bar per quarter, sharing column positions with
 // HistoryChart so beats / misses line up vertically with their realized
 // dots. Bars are green for beat, red for miss, hollow gray for missing.
@@ -4074,6 +4083,7 @@ export default function SymbolPage({
     em?.expiration ?? null,
   );
   const historySeries = buildHistorySeries(data.earnings_history);
+  const historicalMedianMovePct = medianAbsoluteHistoryMove(historySeries);
 
   return (
     <div className="qv-m-pad qv-symbol-page-shell" style={{ maxWidth: 1100, margin: '0 auto', padding: '0 28px 80px' }}>
@@ -4143,7 +4153,7 @@ export default function SymbolPage({
               helpAlign="left"
             />
             <KpiCard
-              label="IV-based EM"
+              label="IV-based expected move"
               value={em.iv_pct != null ? `±${(em.iv_pct * 100).toFixed(1)}%` : '–'}
               sub={
                 em.atm_iv != null
@@ -4183,28 +4193,9 @@ export default function SymbolPage({
         </Reveal>
       )}
 
-      {em && (
-        <Reveal delay={90}>
-          <div style={{ marginTop: 16 }}>
-            <DashboardReadingGuide
-              optionsMovePct={em.straddle_pct ?? null}
-              mlMovePct={activePredictionPct}
-              ivRank={data.vol_regime?.iv_rank ?? null}
-              historyCount={historySeries.length}
-            />
-          </div>
-        </Reveal>
-      )}
-
-      {data.provider_enrichment && (
-        <Reveal delay={100}>
-          <ProviderSignalsPanel enrichment={data.provider_enrichment} />
-        </Reveal>
-      )}
-
       {/* Interactive density bar */}
       {em && spot > 0 && straddlePct > 0 && (
-        <Reveal delay={120}>
+        <Reveal delay={100}>
           <div className="qv-card" style={{ marginTop: 22 }}>
             <div
               style={{
@@ -4249,7 +4240,7 @@ export default function SymbolPage({
 
       {/* Quantile band + Term fan side-by-side on wide; stacked otherwise */}
       {(quantiles != null || termRows.length > 0) && (
-        <Reveal delay={160}>
+        <Reveal delay={140}>
           <div
             className="qv-m-stack"
             style={{
@@ -4279,12 +4270,32 @@ export default function SymbolPage({
         </Reveal>
       )}
 
+      {em && (
+        <Reveal delay={180}>
+          <div style={{ marginTop: 18 }}>
+            <ExpectedMoveComparison
+              optionsMovePct={em.straddle_pct ?? null}
+              mlMovePct={activePredictionPct}
+              ivRank={data.vol_regime?.iv_rank ?? null}
+              historicalMovePct={historicalMedianMovePct}
+              historyCount={historySeries.length}
+            />
+          </div>
+        </Reveal>
+      )}
+
       {/* History + EPS surprise */}
       {historySeries.length >= 2 && (
         <Reveal delay={200}>
           <div style={{ marginTop: 18 }}>
             <HistoryBlock history={historySeries} />
           </div>
+        </Reveal>
+      )}
+
+      {data.provider_enrichment && (
+        <Reveal delay={220}>
+          <ProviderSignalsPanel enrichment={data.provider_enrichment} />
         </Reveal>
       )}
 

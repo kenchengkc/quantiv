@@ -1,10 +1,10 @@
 import {
   ArrowRight,
-  BookOpen,
   BrainCircuit,
   CircleHelp,
   History,
   LineChart,
+  Scale,
 } from "lucide-react";
 import type { SyntheticEvent } from "react";
 
@@ -102,55 +102,61 @@ function modelComparison(
 ): string | null {
   if (optionsMovePct == null || mlMovePct == null) return null;
   const gapPoints = Math.abs(mlMovePct - optionsMovePct) * 100;
-  if (gapPoints < 0.2) return "ML ≈ market";
-  return `ML ${gapPoints.toFixed(1)} pts ${mlMovePct > optionsMovePct ? "wider" : "tighter"}`;
+  if (gapPoints < 0.2) return "Model and options-implied moves agree";
+  return `Model ${gapPoints.toFixed(1)} percentage points ${mlMovePct > optionsMovePct ? "above" : "below"} options-implied`;
 }
 
-export function DashboardReadingGuide({
+export function ExpectedMoveComparison({
   optionsMovePct,
   mlMovePct,
   ivRank,
+  historicalMovePct,
   historyCount,
 }: {
   optionsMovePct: number | null;
   mlMovePct: number | null;
   ivRank: number | null;
+  historicalMovePct: number | null;
   historyCount: number;
 }) {
   const comparison = modelComparison(optionsMovePct, mlMovePct);
   const layers = [
     {
       icon: LineChart,
-      label: "Market",
+      label: "Options-implied",
       title: optionsMovePct != null ? `±${pct(optionsMovePct)}` : "No snapshot",
-      caption: "Priced magnitude",
+      caption: "ATM straddle",
     },
     {
       icon: BrainCircuit,
-      label: "Model",
-      title: mlMovePct != null ? pct(mlMovePct) : "No forecast",
-      caption: "Conditional magnitude",
+      label: "Model forecast",
+      title: mlMovePct != null ? `±${pct(mlMovePct)}` : "No forecast",
+      caption: "Expected absolute move",
     },
     {
       icon: History,
-      label: "History",
-      title: historyCount > 0 ? `${historyCount} reports` : "No sample",
-      caption: "Observed reactions",
+      label: "Historical median",
+      title:
+        historicalMovePct != null ? `±${pct(historicalMovePct)}` : "No sample",
+      caption:
+        historyCount > 0 ? `Last ${historyCount} earnings` : "Realized moves",
     },
   ];
 
   return (
     <section
       className="qv-reading-guide"
-      aria-labelledby="qv-reading-guide-title"
+      aria-labelledby="qv-expected-move-comparison-title"
     >
       <div className="qv-reading-guide-heading">
         <div className="qv-reading-guide-icon" aria-hidden="true">
-          <BookOpen size={18} strokeWidth={1.8} />
+          <Scale size={18} strokeWidth={1.8} />
         </div>
         <div>
-          <div className="qv-reading-guide-eyebrow">Event lens</div>
-          <h2 id="qv-reading-guide-title">Market · Model · History</h2>
+          <div className="qv-reading-guide-eyebrow">Earnings move</div>
+          <h2 id="qv-expected-move-comparison-title">
+            Expected move comparison
+          </h2>
         </div>
       </div>
       <div className="qv-reading-guide-grid">
@@ -177,8 +183,7 @@ export function DashboardReadingGuide({
       <div className="qv-reading-guide-footer">
         {comparison && <strong>{comparison}</strong>}
         {ivRank != null && <span>IV rank {Math.round(ivRank * 100)}%</span>}
-        <span>Magnitude only</span>
-        <span>No direction</span>
+        <span>Absolute move only; not direction</span>
       </div>
     </section>
   );
