@@ -46,43 +46,54 @@ def build_release(data_dir: Path) -> tuple[Path, Path, dict[str, Any]]:
     files: list[dict[str, Any]] = []
     for path in paths:
         relative = path.relative_to(data_dir).as_posix()
-        stat = path.stat()
         digest = _sha256_file(path)
         files.append(
             {
                 "path": relative,
-                "bytes": stat.st_size,
-                "mtime_ns": stat.st_mtime_ns,
+                "bytes": path.stat().st_size,
                 "sha256": digest,
             }
         )
-    identity_files = [
-        {key: item[key] for key in ("path", "bytes", "sha256")} for item in files
-    ]
     core = {
         "schema": RELEASE_SCHEMA,
-        "files": identity_files,
+        "files": files,
         "file_count": len(files),
         "total_bytes": sum(int(item["bytes"]) for item in files),
     }
     release_id = _canonical_id(core)
-    generated_at = datetime.now(timezone.utc).isoformat()
-    manifest = {
-        "release_id": release_id,
-        "generated_at": generated_at,
-        "schema": RELEASE_SCHEMA,
-        "files": files,
-        "file_count": core["file_count"],
-        "total_bytes": core["total_bytes"],
-    }
     manifest_rel = f"control/releases/{release_id}.json"
     manifest_path = data_dir / manifest_rel
-    _atomic_json(manifest_path, manifest)
+    if manifest_path.exists():
+        # R2 partitions and their release manifests are immutable. Preserve an
+        # already-pulled manifest byte-for-byte when the logical release is
+        # unchanged; rewriting timestamps under the same content address makes
+        # an idempotent retry look like a supply-chain collision.
+        manifest = json.loads(manifest_path.read_text())
+        existing_files = [
+            {key: item[key] for key in ("path", "bytes", "sha256")}
+            for item in manifest.get("files") or []
+        ]
+        existing_core = {
+            "schema": manifest.get("schema"),
+            "files": existing_files,
+            "file_count": manifest.get("file_count"),
+            "total_bytes": manifest.get("total_bytes"),
+        }
+        if _canonical_id(existing_core) != release_id:
+            raise RuntimeError(
+                f"release manifest collision at {manifest_path}; refusing overwrite"
+            )
+    else:
+        # Versioned manifests contain only content identity. Operational time
+        # belongs on the mutable pointer, not inside an immutable object.
+        manifest = {"release_id": release_id, **core}
+        _atomic_json(manifest_path, manifest)
+    promoted_at = datetime.now(timezone.utc).isoformat()
     pointer = {
         "schema": POINTER_SCHEMA,
         "release_id": release_id,
         "manifest": manifest_rel,
-        "promoted_at": generated_at,
+        "promoted_at": promoted_at,
     }
     pointer_path = data_dir / "control" / "current_data_release.json"
     _atomic_json(pointer_path, pointer)

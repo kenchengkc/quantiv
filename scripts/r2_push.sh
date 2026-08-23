@@ -34,8 +34,7 @@ push_parquet() {
 
 push_models() {
   # Upload immutable/versioned bundles and supporting state first. The signed
-  # champion pointer is the only serving promotion step and is replaced last,
-  # so an R2 reader never observes a pointer to a partially uploaded bundle.
+  # champion pointer is promoted separately after every other upload succeeds.
   rclone sync "$DATA_DIR/models" "$REMOTE/models" \
     --exclude "/control/**" \
     --fast-list --transfers=8 --progress
@@ -43,12 +42,17 @@ push_models() {
     rclone sync "$DATA_DIR/models/control" "$REMOTE/models/control" \
       --exclude "/champion.json" \
       --fast-list --transfers=4 --progress
-    if [ -f "$DATA_DIR/models/control/champion.json" ]; then
-      rclone copyto \
-        "$DATA_DIR/models/control/champion.json" \
-        "$REMOTE/models/control/champion.json"
-      echo "✅ Promoted atomic model champion pointer"
-    fi
+  fi
+}
+
+promote_model_champion() {
+  local pointer="$DATA_DIR/models/control/champion.json"
+  if [ -f "$pointer" ]; then
+    # This is deliberately the final R2 mutation in a full push. A model
+    # reader can never observe a new champion before its bundle, validation
+    # receipts, forecasts, and data-release pointer are durable.
+    rclone copyto "$pointer" "$REMOTE/models/control/champion.json"
+    echo "✅ Promoted atomic model champion pointer"
   fi
 }
 
@@ -112,6 +116,7 @@ elif [ "$MODE" = "--skip-forecasts" ]; then
   push_small_files
   push_controls
   promote_data_release
+  promote_model_champion
 else
   "$PYTHON_BIN" scripts/data_release.py build --data-dir "$DATA_DIR"
   push_parquet
@@ -120,6 +125,7 @@ else
   push_small_files
   push_controls
   promote_data_release
+  promote_model_champion
 fi
 
 echo "✅ Push complete ($MODE)"

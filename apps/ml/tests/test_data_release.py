@@ -37,6 +37,29 @@ def test_release_id_is_stable_when_data_is_unchanged(tmp_path: Path) -> None:
     partition = tmp_path / "parquet" / "options_chain" / "one.parquet"
     partition.parent.mkdir(parents=True)
     partition.write_bytes(b"same-data")
-    _, _, first = build_release(tmp_path)
+    first_path, _, first = build_release(tmp_path)
+    first_bytes = first_path.read_bytes()
     _, _, second = build_release(tmp_path)
     assert first["release_id"] == second["release_id"]
+    assert first_path.read_bytes() == first_bytes
+    assert "generated_at" not in first
+    assert "mtime_ns" not in first["files"][0]
+
+
+def test_existing_release_manifest_is_never_rewritten(tmp_path: Path) -> None:
+    partition = tmp_path / "parquet" / "options_chain" / "one.parquet"
+    partition.parent.mkdir(parents=True)
+    partition.write_bytes(b"same-data")
+    manifest_path, _, manifest = build_release(tmp_path)
+    legacy = {
+        **manifest,
+        "generated_at": "2026-08-22T00:00:00+00:00",
+        "files": [{**manifest["files"][0], "mtime_ns": 123}],
+    }
+    manifest_path.write_text(json.dumps(legacy, indent=2, sort_keys=True) + "\n")
+    legacy_bytes = manifest_path.read_bytes()
+
+    rebuilt_path, _, rebuilt = build_release(tmp_path)
+
+    assert rebuilt_path.read_bytes() == legacy_bytes
+    assert rebuilt["generated_at"] == "2026-08-22T00:00:00+00:00"
