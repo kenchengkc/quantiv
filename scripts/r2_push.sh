@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Push the local data/ dir back to Cloudflare R2. Only changed files transfer
-# (rclone sync compares size + mtime). CI calls this twice:
+# Push the local data/ dir back to Cloudflare R2. Raw partitions are immutable;
+# a versioned manifest pointer is copied last and is the only promotion step.
+# CI calls this twice:
 #   1. After DoltHub sync (--skip-forecasts) — parquet + models
 #   2. After daily_score (--forecasts-only) — forecasts_YYYY-MM-DD.parquet
 
@@ -8,6 +9,7 @@ set -euo pipefail
 
 DATA_DIR="${DATA_DIR:-data}"
 REMOTE="${R2_REMOTE:-r2:${R2_BUCKET:-quantiv-data}}"
+PYTHON_BIN="${PYTHON_BIN:-python}"
 
 MODE="${1:-all}"
 case "$MODE" in
@@ -21,9 +23,13 @@ esac
 echo "📤 Pushing $DATA_DIR/ → $REMOTE (mode=$MODE)"
 
 push_parquet() {
-  rclone sync "$DATA_DIR/parquet" "$REMOTE/parquet" \
+  # Existing dated partitions may never be overwritten. New files remain
+  # inactive until current_data_release.json is promoted below.
+  rclone copy "$DATA_DIR/parquet" "$REMOTE/parquet" --immutable \
     --fast-list --transfers=16 --checkers=16 \
     --progress
+  rclone check "$DATA_DIR/parquet" "$REMOTE/parquet" \
+    --one-way --checkers=16
 }
 
 push_models() {
@@ -55,11 +61,12 @@ push_small_files() {
 
 push_controls() {
   if [ -d "$DATA_DIR/control" ]; then
-    rclone sync "$DATA_DIR/control" "$REMOTE/control" \
+    rclone copy "$DATA_DIR/control" "$REMOTE/control" --immutable \
+      --exclude "current_data_release.json" \
       --fast-list --transfers=4 --progress
   fi
   if [ -d "$DATA_DIR/quarantine" ]; then
-    rclone sync "$DATA_DIR/quarantine" "$REMOTE/quarantine" \
+    rclone copy "$DATA_DIR/quarantine" "$REMOTE/quarantine" --immutable \
       --fast-list --transfers=4 --progress
   fi
   if [ -d "$DATA_DIR/validation" ]; then
@@ -68,19 +75,36 @@ push_controls() {
   fi
 }
 
+promote_data_release() {
+  local pointer="$DATA_DIR/control/current_data_release.json"
+  if [ ! -f "$pointer" ]; then
+    echo "Missing data-release pointer; refusing R2 promotion" >&2
+    exit 1
+  fi
+  "$PYTHON_BIN" scripts/data_release.py verify --data-dir "$DATA_DIR"
+  # R2 object replacement is atomic. Consumers either see the prior complete
+  # release or this complete release, never the upload in between.
+  rclone copyto "$pointer" "$REMOTE/control/current_data_release.json"
+  echo "✅ Promoted atomic data-release pointer"
+}
+
 if [ "$MODE" = "--forecasts-only" ]; then
   push_forecasts
 elif [ "$MODE" = "--skip-forecasts" ]; then
+  "$PYTHON_BIN" scripts/data_release.py build --data-dir "$DATA_DIR"
   push_parquet
   push_models
   push_small_files
   push_controls
+  promote_data_release
 else
+  "$PYTHON_BIN" scripts/data_release.py build --data-dir "$DATA_DIR"
   push_parquet
   push_models
   push_forecasts
   push_small_files
   push_controls
+  promote_data_release
 fi
 
 echo "✅ Push complete ($MODE)"

@@ -1,19 +1,21 @@
 #!/usr/bin/env bash
-# Pull parquet + models from Cloudflare R2 into the local data/ dir.
-# Used at the start of each GitHub Actions run to restore pipeline inputs.
-#
-# Requires rclone with an `r2` remote configured (see docs/R2_SETUP.md).
-# When running in GHA the remote is configured on the fly from env vars.
+# Restore data/ from R2. Used at the start of GitHub Actions.
+# Needs an `r2` rclone remote (docs/R2_SETUP.md). CI builds it from env.
 
 set -euo pipefail
 
 DATA_DIR="${DATA_DIR:-data}"
 REMOTE="${R2_REMOTE:-r2:${R2_BUCKET:-quantiv-data}}"
+PYTHON_BIN="${PYTHON_BIN:-python}"
 
 echo "📥 Pulling from $REMOTE → $DATA_DIR/"
 
-# Parquet trees — options chain, ohlcv, volatility history
-rclone sync "$REMOTE/parquet" "$DATA_DIR/parquet" \
+# Versioned release pointer first (optional until the first promotion).
+rclone copy "$REMOTE/control" "$DATA_DIR/control" \
+  --fast-list --transfers=4 --progress 2>/dev/null || true
+
+# Options, OHLCV, and vol history.
+rclone copy "$REMOTE/parquet" "$DATA_DIR/parquet" \
   --fast-list --transfers=16 --checkers=16 \
   --progress
 
@@ -21,25 +23,22 @@ rclone sync "$REMOTE/parquet" "$DATA_DIR/parquet" \
 rclone sync "$REMOTE/models" "$DATA_DIR/models" \
   --fast-list --transfers=8 --progress
 
-# Compact control evidence is needed to verify source revisions and replay
-# equivalence before the next promotion. Missing paths are expected on the
-# first controlled run.
-rclone sync "$REMOTE/control" "$DATA_DIR/control" \
-  --fast-list --transfers=4 --progress 2>/dev/null || true
+# Quarantine logs. Missing on the first run is fine.
 rclone sync "$REMOTE/quarantine" "$DATA_DIR/quarantine" \
   --fast-list --transfers=4 --progress 2>/dev/null || true
 
-# Forecasts (small, but keeping them in sync means daily_score finds the
-# previous run's parquet and build_frontend_data has them on hand).
+if [ -f "$DATA_DIR/control/current_data_release.json" ]; then
+  "$PYTHON_BIN" scripts/data_release.py verify --data-dir "$DATA_DIR"
+else
+  echo "⚠️  No versioned data-release pointer yet; first controlled push will create it"
+fi
+
+# Forecasts from the last run (scoring + frontend build).
 rclone sync "$REMOTE/forecasts" "$DATA_DIR/forecasts" \
   --fast-list --transfers=8 --progress 2>/dev/null || true
 
-# Small files
-#
-# By default, earnings_calendar.csv remains git-canonical. Weekly retrain
-# can opt into R2 via R2_PULL_EARNINGS=1 because that run may be queued before
-# the daily refresh auto-commit lands, but should train/score against the
-# just-refreshed calendar that daily pushed to R2.
+# Earnings calendar stays in git unless R2_PULL_EARNINGS=1 (weekly retrain
+# may start before the daily commit lands).
 if [ "${R2_PULL_EARNINGS:-0}" = "1" ]; then
   rclone copy "$REMOTE/earnings_calendar.csv"     "$DATA_DIR/" 2>/dev/null || true
   rclone copy "$REMOTE/earnings_calendar.parquet" "$DATA_DIR/" 2>/dev/null || true
