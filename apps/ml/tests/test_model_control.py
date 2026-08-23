@@ -196,3 +196,33 @@ def test_drift_and_realized_outcomes_drive_a_conservative_rollback(tmp_path: Pat
 
     assert result["rollback_recommended"] is True
     assert result["rollback_reasons"]["comparison_materially_better"] is True
+
+
+def test_drift_blocks_large_missingness_shift_below_psi_sample_floor(tmp_path: Path) -> None:
+    forecast = pd.DataFrame(
+        {
+            "feature_vector": [json.dumps({"feature": None}) for _ in range(25)],
+            "model_horizon": [1] * 25,
+        }
+    )
+    bundle = tmp_path / "bundle"
+    bundle.mkdir()
+    (bundle / "metadata_T1.json").write_text(
+        json.dumps(
+            {
+                "feature_reference": {
+                    "feature": {
+                        "missing_rate": 0.0,
+                        "cuts": [0.4, 0.6],
+                        "probabilities": [0.3, 0.4, 0.3],
+                    }
+                }
+            }
+        )
+    )
+
+    result = feature_drift_report(forecast, bundle, horizons=[1], min_rows=100)
+
+    assert result["status"] == "critical"
+    assert result["critical_features"] == 1
+    assert result["horizons"]["1"]["features"]["feature"]["status"] == "critical"

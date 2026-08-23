@@ -180,10 +180,12 @@ def feature_drift_report(
     warning_psi: float = 0.20,
     critical_psi: float = 0.35,
     min_rows: int = 100,
+    min_missingness_rows: int = 20,
 ) -> dict[str, Any]:
     vectors = _parse_feature_vectors(forecast_frame)
     report: dict[str, Any] = {"status": "passed", "horizons": {}}
     total_critical = 0
+    total_hard_missing = 0
     total_features = 0
     for horizon in horizons:
         rows = forecast_frame["model_horizon"].astype(int) == horizon
@@ -192,42 +194,62 @@ def feature_drift_report(
         horizon_rows = int(rows.sum())
         features: dict[str, Any] = {}
         critical = 0
+        hard_missing = 0
         warning = 0
         for feature, reference in references.items():
             current = vectors.loc[rows, feature] if feature in vectors else pd.Series(np.nan, index=vectors.index[rows])
             psi = _population_stability_index(current, reference)
             missing_rate = float(current.isna().mean()) if len(current) else 1.0
-            missing_delta = abs(missing_rate - float(reference.get("missing_rate", 0.0)))
+            training_missing_rate = float(reference.get("missing_rate", 0.0))
+            missing_delta = abs(missing_rate - training_missing_rate)
+            is_hard_missing = (
+                horizon_rows >= min_missingness_rows
+                and missing_rate >= 0.999
+                and training_missing_rate <= 0.50
+            )
             status = "passed"
-            if horizon_rows < min_rows:
-                status = "low_sample"
-            elif (psi is not None and psi >= critical_psi) or missing_delta >= 0.25:
+            if is_hard_missing:
                 status = "critical"
                 critical += 1
-            elif (psi is not None and psi >= warning_psi) or missing_delta >= 0.15:
+                hard_missing += 1
+            elif horizon_rows >= min_missingness_rows and missing_delta >= 0.25:
+                status = "critical"
+                critical += 1
+            elif horizon_rows >= min_missingness_rows and missing_delta >= 0.15:
+                status = "warning"
+                warning += 1
+            elif horizon_rows < min_rows:
+                status = "low_sample" if horizon_rows else "no_data"
+            elif psi is not None and psi >= critical_psi:
+                status = "critical"
+                critical += 1
+            elif psi is not None and psi >= warning_psi:
                 status = "warning"
                 warning += 1
             features[feature] = {
                 "psi": psi,
                 "missing_rate": missing_rate,
-                "training_missing_rate": reference.get("missing_rate"),
+                "training_missing_rate": training_missing_rate,
                 "status": status,
             }
-        if horizon_rows >= min_rows:
+        if horizon_rows >= min_missingness_rows:
             total_features += len(features)
             total_critical += critical
+            total_hard_missing += hard_missing
         report["horizons"][str(horizon)] = {
             "rows": horizon_rows,
             "critical_features": critical,
+            "hard_missing_features": hard_missing,
             "warning_features": warning,
             "features": features,
         }
     critical_limit = max(2, math.ceil(total_features * 0.10))
-    if total_critical >= critical_limit:
+    if total_hard_missing or total_critical >= critical_limit:
         report["status"] = "critical"
     elif any(row["warning_features"] or row["critical_features"] for row in report["horizons"].values()):
         report["status"] = "warning"
     report["critical_features"] = total_critical
+    report["hard_missing_features"] = total_hard_missing
     report["critical_limit"] = critical_limit
     return report
 

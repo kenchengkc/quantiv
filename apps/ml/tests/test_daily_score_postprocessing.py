@@ -74,6 +74,30 @@ def test_upcoming_features_carries_raw_straddle_mid_into_forecasts():
     assert "sf.straddle_mid," in connection.sql
 
 
+def test_upcoming_features_matches_training_only_feature_families():
+    connection = _CapturingConnection()
+
+    get_upcoming_features(connection, 21)
+
+    for expression in (
+        "ts.hist_move_p75_8q",
+        "ts.hist_move_p90_8q",
+        "ts.hist_move_max_12q",
+        "ts.hist_move_kurt_8q",
+        "ts.hist_move_last",
+        "mc.vix_current",
+        "mc.vix_change_30d",
+        "mc.vix_pct_252d",
+        "mc.spy_drift_60d",
+        "mc.tlt_spy_ratio_30d",
+        "END AS iv_rank",
+        "END AS hv_rank",
+        "AS iv_mom_week",
+        "AS iv_mom_month",
+    ):
+        assert expression in connection.sql
+
+
 def test_save_forecasts_rejects_incomplete_artifact_before_writing(tmp_path):
     row = {column: 1 for column in FORECAST_REQUIRED_COLUMNS}
     row.pop("straddle_mid")

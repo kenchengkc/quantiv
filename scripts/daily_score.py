@@ -141,34 +141,46 @@ def get_upcoming_features(conn: duckdb.DuckDBPyConnection, days_ahead: int) -> p
             PARTITION BY e.act_symbol, e.date ORDER BY pre.date DESC, post.date ASC
         ) = 1
     ),
-    trailing_stats AS (
+    history_for_upcoming AS (
         SELECT
             u.act_symbol,
             u.earnings_date,
-            AVG(p.realized_move_pct) AS hist_move_avg_4q,
-            MEDIAN(p.realized_move_pct) AS hist_move_med_4q,
-            STDDEV(p.realized_move_pct) AS hist_move_std_4q,
-            (SELECT AVG(x.realized_move_pct) FROM (
-                SELECT p2.realized_move_pct
-                FROM past_realized_ohlcv p2
-                WHERE p2.act_symbol = u.act_symbol
-                  AND p2.earnings_date < u.earnings_date
-                ORDER BY p2.earnings_date DESC LIMIT 8
-             ) x) AS hist_move_avg_8q,
-            (SELECT MEDIAN(x.realized_move_pct) FROM (
-                SELECT p2.realized_move_pct
-                FROM past_realized_ohlcv p2
-                WHERE p2.act_symbol = u.act_symbol
-                  AND p2.earnings_date < u.earnings_date
-                ORDER BY p2.earnings_date DESC LIMIT 8
-             ) x) AS hist_move_med_8q,
-            COUNT(p.realized_move_pct) AS hist_event_count
+            p.earnings_date AS historical_earnings_date,
+            p.realized_move_pct,
+            ROW_NUMBER() OVER (
+                PARTITION BY u.act_symbol, u.earnings_date
+                ORDER BY p.earnings_date DESC
+            ) AS recency_rank
         FROM upcoming u
         LEFT JOIN past_realized_ohlcv p
             ON p.act_symbol = u.act_symbol
             AND p.earnings_date < u.earnings_date
-            AND p.earnings_date >= u.earnings_date - INTERVAL '2' YEAR
-        GROUP BY u.act_symbol, u.earnings_date
+    ),
+    trailing_stats AS (
+        SELECT
+            act_symbol,
+            earnings_date,
+            AVG(realized_move_pct) FILTER (WHERE recency_rank <= 4) AS hist_move_avg_4q,
+            MEDIAN(realized_move_pct) FILTER (WHERE recency_rank <= 4) AS hist_move_med_4q,
+            STDDEV(realized_move_pct) FILTER (WHERE recency_rank <= 4) AS hist_move_std_4q,
+            AVG(realized_move_pct) FILTER (WHERE recency_rank <= 8) AS hist_move_avg_8q,
+            MEDIAN(realized_move_pct) FILTER (WHERE recency_rank <= 8) AS hist_move_med_8q,
+            QUANTILE_CONT(realized_move_pct, 0.75) FILTER (
+                WHERE recency_rank <= 8
+            ) AS hist_move_p75_8q,
+            QUANTILE_CONT(realized_move_pct, 0.90) FILTER (
+                WHERE recency_rank <= 8
+            ) AS hist_move_p90_8q,
+            KURTOSIS(realized_move_pct) FILTER (
+                WHERE recency_rank <= 8
+            ) AS hist_move_kurt_8q,
+            MAX(realized_move_pct) FILTER (
+                WHERE recency_rank <= 12
+            ) AS hist_move_max_12q,
+            ARG_MAX(realized_move_pct, historical_earnings_date) AS hist_move_last,
+            COUNT(realized_move_pct) AS hist_event_count
+        FROM history_for_upcoming
+        GROUP BY act_symbol, earnings_date
     ),
 
     -- Event vol decomposition
@@ -211,6 +223,32 @@ def get_upcoming_features(conn: duckdb.DuckDBPyConnection, days_ahead: int) -> p
             PARTITION BY sf.act_symbol, sf.date, u.earnings_date
             ORDER BY sf.expiration ASC, back.dte ASC
         ) = 1
+    ),
+
+    -- Same point-in-time macro context used during training.
+    macro AS (
+        WITH spy AS (SELECT date, close FROM v_ohlcv WHERE act_symbol = 'SPY'),
+             tlt AS (SELECT date, close FROM v_ohlcv WHERE act_symbol = 'TLT')
+        SELECT
+            spy.date,
+            vix.vix_close AS vix_current,
+            vix.vix_close
+              - LAG(vix.vix_close, 21) OVER (ORDER BY spy.date) AS vix_change_30d,
+            PERCENT_RANK() OVER (
+                ORDER BY vix.vix_close
+                ROWS BETWEEN 252 PRECEDING AND CURRENT ROW
+            ) AS vix_pct_252d,
+            spy.close
+              / NULLIF(LAG(spy.close, 60) OVER (ORDER BY spy.date), 0) - 1
+              AS spy_drift_60d,
+            (tlt.close
+              / NULLIF(LAG(tlt.close, 30) OVER (ORDER BY spy.date), 0))
+              / NULLIF(spy.close
+              / NULLIF(LAG(spy.close, 30) OVER (ORDER BY spy.date), 0), 0) - 1
+              AS tlt_spy_ratio_30d
+        FROM spy
+        LEFT JOIN v_vix vix ON vix.date = spy.date
+        LEFT JOIN tlt ON tlt.date = spy.date
     )
 
     SELECT
@@ -291,12 +329,39 @@ def get_upcoming_features(conn: duckdb.DuckDBPyConnection, days_ahead: int) -> p
         ts.hist_move_std_4q,
         ts.hist_move_avg_8q,
         ts.hist_move_med_8q,
+        ts.hist_move_p75_8q,
+        ts.hist_move_p90_8q,
+        ts.hist_move_max_12q,
+        ts.hist_move_kurt_8q,
+        ts.hist_move_last,
         ts.hist_event_count,
         CASE WHEN ts.hist_move_avg_4q > 0
              AND sf.straddle_mid / NULLIF(sf.atm_strike, 0) > 0
              THEN ts.hist_move_avg_4q / (sf.straddle_mid / NULLIF(sf.atm_strike, 0))
              ELSE NULL
-        END AS hist_straddle_accuracy
+        END AS hist_straddle_accuracy,
+
+        -- Market conditions and volatility-history features must match the
+        -- training matrix; omitting them silently changes live inference.
+        mc.vix_current,
+        mc.vix_change_30d,
+        mc.vix_pct_252d,
+        mc.spy_drift_60d,
+        mc.tlt_spy_ratio_30d,
+        CASE
+            WHEN vh.iv_year_high > vh.iv_year_low
+            THEN (vh.iv_current - vh.iv_year_low)
+                 / NULLIF(vh.iv_year_high - vh.iv_year_low, 0)
+            ELSE NULL
+        END AS iv_rank,
+        CASE
+            WHEN vh.hv_year_high > vh.hv_year_low
+            THEN (vh.hv_current - vh.hv_year_low)
+                 / NULLIF(vh.hv_year_high - vh.hv_year_low, 0)
+            ELSE NULL
+        END AS hv_rank,
+        (vh.iv_current - vh.iv_week_ago) AS iv_mom_week,
+        (vh.iv_current - vh.iv_month_ago) AS iv_mom_month
 
     FROM upcoming u
     JOIN v_straddle_features sf
@@ -316,6 +381,9 @@ def get_upcoming_features(conn: duckdb.DuckDBPyConnection, days_ahead: int) -> p
     LEFT JOIN trailing_stats ts
         ON ts.act_symbol = u.act_symbol
         AND ts.earnings_date = u.earnings_date
+    LEFT JOIN macro mc ON mc.date = sf.date
+    LEFT JOIN v_volhist vh
+        ON vh.act_symbol = sf.act_symbol AND vh.date = sf.date
     WHERE sf.atm_iv > 0 AND sf.atm_strike > 0
     QUALIFY ROW_NUMBER() OVER (
         PARTITION BY sf.act_symbol, sf.date, u.earnings_date
@@ -596,6 +664,62 @@ def main():
                    NULL::DOUBLE AS volume_ratio_20d, NULL::DOUBLE AS drift_5d
             WHERE 1=0
         """)
+    if "v_vix" not in views:
+        vix_path = data_dir / "parquet" / "vix" / "vix.parquet"
+        if vix_path.exists():
+            conn.execute(f"""
+                CREATE OR REPLACE VIEW v_vix AS
+                SELECT CAST(date AS DATE) AS date,
+                       CAST(vix_close AS DOUBLE) AS vix_close
+                FROM read_parquet('{vix_path}')
+            """)
+        else:
+            logger.warning("v_vix not found — VIX/macro features will be empty")
+            conn.execute("""
+                CREATE OR REPLACE VIEW v_vix AS
+                SELECT NULL::DATE AS date, NULL::DOUBLE AS vix_close
+                WHERE 1=0
+            """)
+    if "v_volhist" not in views:
+        volhist_glob = (
+            data_dir / "parquet" / "volatility_history" / "year=*" / "month=*" / "*.parquet"
+        )
+        if "v_volhist_raw" in views:
+            conn.execute("""
+                CREATE OR REPLACE VIEW v_volhist AS
+                SELECT * EXCLUDE (month, year) FROM v_volhist_raw
+            """)
+        elif list(data_dir.glob("parquet/volatility_history/year=*/month=*/*.parquet")):
+            conn.execute(f"""
+                CREATE OR REPLACE VIEW v_volhist AS
+                SELECT
+                    CAST(date AS DATE) AS date,
+                    act_symbol,
+                    CAST(hv_current AS DOUBLE) AS hv_current,
+                    CAST(hv_week_ago AS DOUBLE) AS hv_week_ago,
+                    CAST(hv_month_ago AS DOUBLE) AS hv_month_ago,
+                    CAST(hv_year_high AS DOUBLE) AS hv_year_high,
+                    CAST(hv_year_low AS DOUBLE) AS hv_year_low,
+                    CAST(iv_current AS DOUBLE) AS iv_current,
+                    CAST(iv_week_ago AS DOUBLE) AS iv_week_ago,
+                    CAST(iv_month_ago AS DOUBLE) AS iv_month_ago,
+                    CAST(iv_year_high AS DOUBLE) AS iv_year_high,
+                    CAST(iv_year_low AS DOUBLE) AS iv_year_low
+                FROM read_parquet('{volhist_glob}')
+            """)
+        else:
+            logger.warning("v_volhist not found — volatility-history features will be empty")
+            conn.execute("""
+                CREATE OR REPLACE VIEW v_volhist AS
+                SELECT NULL::DATE AS date, NULL::VARCHAR AS act_symbol,
+                       NULL::DOUBLE AS hv_current, NULL::DOUBLE AS hv_week_ago,
+                       NULL::DOUBLE AS hv_month_ago, NULL::DOUBLE AS hv_year_high,
+                       NULL::DOUBLE AS hv_year_low,
+                       NULL::DOUBLE AS iv_current, NULL::DOUBLE AS iv_week_ago,
+                       NULL::DOUBLE AS iv_month_ago, NULL::DOUBLE AS iv_year_high,
+                       NULL::DOUBLE AS iv_year_low
+                WHERE 1=0
+            """)
 
     df = get_upcoming_features(conn, args.days_ahead)
     conn.close()
