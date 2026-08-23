@@ -98,8 +98,10 @@ async def _cached_get(key: str) -> Optional[Dict[str, Any]]:
         return None
     try:
         raw = await redis.get(key)
-    except Exception as exc:
-        logger.warning("Redis GET failed for %s: %s", key, exc)
+    except Exception:
+        # Cache keys contain request data. Do not copy them (or provider
+        # exception strings that may echo them) into operational logs.
+        logger.warning("Redis prediction-cache read failed", exc_info=True)
         return None
     if raw is None:
         return None
@@ -117,8 +119,8 @@ async def _cached_set(key: str, payload: Dict[str, Any]) -> None:
         return
     try:
         await redis.setex(key, RESPONSE_TTL_SECONDS, json.dumps(payload, default=str))
-    except Exception as exc:
-        logger.warning("Redis SETEX failed for %s: %s", key, exc)
+    except Exception:
+        logger.warning("Redis prediction-cache write failed", exc_info=True)
 
 
 async def _predict_response(req: MLPredictRequest) -> MLPredictResponse:

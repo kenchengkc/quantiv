@@ -50,6 +50,7 @@ def _models_dir() -> Path:
 _QUANTILES = [10, 25, 50, 75, 90]
 _HORIZONS = (1, 2, 3, 7, 14, 21)
 _POINT_MODEL_NAMES = {horizon: point_model_name(horizon) for horizon in _HORIZONS}
+_METADATA_NAMES = {horizon: f"metadata_T{horizon}.json" for horizon in _HORIZONS}
 _QUANTILE_MODEL_NAMES = {
     (horizon, quantile): quantile_model_name(horizon, quantile)
     for horizon in _HORIZONS
@@ -93,13 +94,21 @@ def _parse_datetime(value: Any) -> Optional[datetime]:
 
 
 def _metadata_for_horizon(models_dir: Path, horizon: int) -> Dict[str, Any]:
-    meta_path = models_dir / f"metadata_T{horizon}.json"
+    """Read metadata through the same closed horizon allowlist as model files.
+
+    Horizons originate at the HTTP boundary.  Never interpolate that value
+    into a filesystem path, even though Pydantic also constrains it upstream.
+    """
+    metadata_name = _METADATA_NAMES.get(horizon)
+    if metadata_name is None:
+        return {}
+    meta_path = models_dir / metadata_name
     if not meta_path.exists():
         return {}
     try:
         return json.loads(meta_path.read_text())
     except (OSError, ValueError, TypeError):
-        logger.warning("Failed to read model metadata at %s", meta_path)
+        logger.warning("Failed to read allowlisted model metadata")
         return {}
 
 
@@ -127,18 +136,18 @@ def get_bundle(horizon: int) -> Optional[_ModelBundle]:
 
         point_name = _POINT_MODEL_NAMES.get(horizon)
         if point_name is None:
-            logger.warning("Unsupported model horizon: %s", horizon)
+            logger.warning("Unsupported model horizon requested")
             return None
         models_dir = _models_dir()
         point_path = models_dir / point_name
         if not point_path.exists():
-            logger.warning("No model file for horizon %s at %s", horizon, point_path)
+            logger.warning("Allowlisted model file is missing")
             return None
 
         estimator = load_native_model(point_path)
         feature_names = list(estimator.feature_name())
         if estimator is None or not feature_names:
-            logger.error("T-%s model is unusable (no estimator/feature_names)", horizon)
+            logger.error("Loaded model is unusable (no estimator/feature_names)")
             return None
         metadata = _metadata_for_horizon(models_dir, horizon)
 
@@ -164,8 +173,8 @@ def get_bundle(horizon: int) -> Optional[_ModelBundle]:
         )
         _BUNDLE_CACHE[horizon] = bundle
         logger.info(
-            "Loaded T-%s bundle (%d features, %d quantile heads)",
-            horizon, len(feature_names), len(quantile_estimators),
+            "Loaded allowlisted model bundle (%d features, %d quantile heads)",
+            len(feature_names), len(quantile_estimators),
         )
         return bundle
 
@@ -201,7 +210,7 @@ def model_inventory() -> List[Dict[str, Any]]:
         if horizon not in _POINT_MODEL_NAMES:
             continue
         point_path = models_dir / _POINT_MODEL_NAMES[horizon]
-        meta_path = models_dir / f"metadata_T{horizon}.json"
+        meta_path = models_dir / _METADATA_NAMES[horizon]
         metadata = _metadata_for_horizon(models_dir, horizon)
         feature_names = list(metadata.get("feature_cols") or [])
         cached = _BUNDLE_CACHE.get(horizon)
