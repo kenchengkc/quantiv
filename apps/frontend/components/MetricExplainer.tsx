@@ -6,7 +6,7 @@ import {
   LineChart,
   Scale,
 } from "lucide-react";
-import { useEffect, useRef, useState, type SyntheticEvent } from "react";
+import { useEffect, useRef, type SyntheticEvent } from "react";
 
 import { METRIC_GLOSSARY, type MetricKey } from "@/lib/metricGlossary";
 
@@ -35,31 +35,41 @@ export function MetricHelp({
 }) {
   const definition = METRIC_GLOSSARY[metric];
   const detailsRef = useRef<HTMLDetailsElement>(null);
-  const [isOpen, setIsOpen] = useState(false);
+  const outsidePointerListenerRef = useRef<
+    ((event: PointerEvent) => void) | null
+  >(null);
 
-  useEffect(() => {
-    if (!isOpen) return;
+  const removeOutsidePointerListener = () => {
+    const listener = outsidePointerListenerRef.current;
+    if (!listener) return;
+    document.removeEventListener("pointerdown", listener);
+    outsidePointerListenerRef.current = null;
+  };
 
-    const closeOnOutsidePointer = (event: PointerEvent) => {
-      const details = detailsRef.current;
+  useEffect(
+    () => () => {
+      const listener = outsidePointerListenerRef.current;
+      if (listener) document.removeEventListener("pointerdown", listener);
+    },
+    [],
+  );
+
+  const handleToggle = (event: SyntheticEvent<HTMLDetailsElement>) => {
+    closeOtherMetricHelp(event);
+    removeOutsidePointerListener();
+    if (!event.currentTarget.open) return;
+
+    const details = event.currentTarget;
+    const closeOnOutsidePointer = (pointerEvent: PointerEvent) => {
       if (
-        details &&
-        event.target instanceof Node &&
-        !details.contains(event.target)
+        pointerEvent.target instanceof Node &&
+        !details.contains(pointerEvent.target)
       ) {
         details.open = false;
       }
     };
-
+    outsidePointerListenerRef.current = closeOnOutsidePointer;
     document.addEventListener("pointerdown", closeOnOutsidePointer);
-    return () => {
-      document.removeEventListener("pointerdown", closeOnOutsidePointer);
-    };
-  }, [isOpen]);
-
-  const handleToggle = (event: SyntheticEvent<HTMLDetailsElement>) => {
-    closeOtherMetricHelp(event);
-    setIsOpen(event.currentTarget.open);
   };
 
   return (

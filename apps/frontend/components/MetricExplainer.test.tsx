@@ -45,7 +45,7 @@ describe("MetricHelp", () => {
     expect(moveDetails.open).toBe(true);
   });
 
-  it("closes when the user clicks outside the metric guide", async () => {
+  it("closes when the user clicks outside the metric guide", () => {
     const container = renderMetricHelp(<MetricHelp metric="atmIv" />);
     const details = container.querySelector("details") as HTMLDetailsElement;
     const popover = container.querySelector(
@@ -56,7 +56,6 @@ describe("MetricHelp", () => {
       details.open = true;
       details.dispatchEvent(new Event("toggle", { bubbles: true }));
     });
-    await new Promise((resolve) => setTimeout(resolve, 0));
 
     popover.dispatchEvent(new Event("pointerdown", { bubbles: true }));
     expect(details.open).toBe(true);
