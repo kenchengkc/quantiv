@@ -78,8 +78,8 @@ jobs:
           cache: pip
 
       - run: pip install -r apps/backend/requirements.txt
-      # apps/ml is consumed by apps/backend.services.ml_service. Install
-      # it editable so the package layout is honored — no sys.path hacks.
+      # The current prediction service consumes the published ml package.
+      # Install it editable so the package layout is honored.
       - run: pip install -e apps/ml
       - run: pip install ruff==0.14.4 pytest
 
@@ -90,9 +90,6 @@ jobs:
       - run: ruff check apps/backend apps/ml/ml apps/ml/tests
       - run: pytest apps/backend/tests apps/ml/tests -q
         env:
-          # The backend tests stub Postgres/Redis/DuckDB lifespan
-          # initialization, but `_validate_env()` still checks shape. The
-          # values below satisfy the validator without being real.
-          DATA_BACKEND: duckdb
-          DUCKDB_PATH: ":memory:"
+          # Tests do not open the lifespan connections, but the environment
+          # still documents the only supported live-serving database.
           DATABASE_URL: postgres://ci@localhost:5432/ci

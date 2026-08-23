@@ -37,9 +37,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY apps/backend/requirements.txt /tmp/backend-requirements.txt
 RUN pip install -r /tmp/backend-requirements.txt
 
-# 2) ML serving package. Installed editable so its `ml` package is
-#    importable via `from ml.serving_pipeline import MLServingPipeline`
-#    without sys.path hacks.
+# 2) ML serving package. Installed editable so the native LightGBM artifact
+#    loader and bundle-verification modules are importable without path hacks.
 COPY apps/ml /app/apps/ml
 RUN pip install -e /app/apps/ml
 

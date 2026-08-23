@@ -10,9 +10,8 @@ it scored with into `em_forecasts.feature_vector` (JSONB). This service:
 4. Returns point + quantile predictions and the freshness metadata the
    route layer needs to label the response.
 
-Why not reuse `MLService`/`MLServingPipeline`: those expect a populated
-DuckDB chain-data view at predict time. We deliberately avoid the chain
-parquet on Railway — the persisted `feature_vector` is the snapshot.
+The production service deliberately avoids reconstructing chain features on
+Railway: the persisted `feature_vector` is the immutable scoring snapshot.
 """
 
 from __future__ import annotations

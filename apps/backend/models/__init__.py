@@ -18,60 +18,10 @@ def _normalize_ml_symbol(value: Any) -> Any:
     return symbol
 
 
-class ExpectedMoveRequest(BaseModel):
-    symbol: str = Field(..., description="Stock symbol (e.g., AAPL)")
-    horizons: list[str] = Field(default=["to_exp", "1d", "5d"], description="Forecast horizons")
-    include_live: bool = Field(default=True, description="Include live market data")
-
-
-class ExpectedMoveResponse(BaseModel):
-    symbol: str
-    timestamp: datetime
-    forecasts: list[dict[str, Any]]
-    live_data: dict[str, Any] | None = None
-    metadata: dict[str, Any]
-
-
 class HealthResponse(BaseModel):
     status: str
     timestamp: datetime
     services: dict[str, str]
-
-
-class EmForecastLatestResponse(BaseModel):
-    symbol: str
-    exp: date
-    quote_ts: datetime
-    horizon: str
-    em_baseline: float | None = None
-    band68_low: float | None = None
-    band68_high: float | None = None
-    band95_low: float | None = None
-    band95_high: float | None = None
-    metadata: dict[str, Any]
-
-
-class EmHistoryItem(BaseModel):
-    quote_ts: datetime
-    em_baseline: float | None = None
-    band68_low: float | None = None
-    band68_high: float | None = None
-    band95_low: float | None = None
-    band95_high: float | None = None
-
-
-class EmHistoryResponse(BaseModel):
-    symbol: str
-    exp: date
-    window: str
-    items: list[EmHistoryItem]
-    metadata: dict[str, Any]
-
-
-class EmExpiriesResponse(BaseModel):
-    symbol: str
-    expiries: list[date]
-    metadata: dict[str, Any]
 
 
 # ─── /api/ml/predict (Phase 1) ────────────────────────────────────────────

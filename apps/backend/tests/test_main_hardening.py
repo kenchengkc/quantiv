@@ -257,6 +257,23 @@ def test_docs_default_off_in_production_and_overrideable(load_main):
     assert TestClient(development.app).get("/docs").status_code == 200
 
 
+def test_legacy_expected_move_routes_are_not_registered(load_main):
+    main = load_main(BACKEND_SHARED_SECRET=SECRET)
+    client = TestClient(main.app)
+
+    for path in (
+        "/api/expected-move",
+        "/em/forecast",
+        "/em/history",
+        "/em/expiries",
+        "/em/ml-forecast",
+        "/em/ml-info",
+        "/api/ml/predict/AAPL",
+    ):
+        response = client.get(path, headers=_signed_headers("GET", path))
+        assert response.status_code == 404
+
+
 def test_global_rate_limit_and_exempt_operational_routes(load_main, monkeypatch):
     main = load_main(RATE_LIMIT_DEFAULT="2/minute")
 

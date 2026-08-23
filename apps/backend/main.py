@@ -10,22 +10,18 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 import asyncpg
-import duckdb
-import httpx
 import redis.asyncio as redis
 import structlog
-from backends import DataBackend, DuckDBBackend, HybridBackend, PostgresBackend
 from dotenv import load_dotenv
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Security
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import APIKeyHeader
 from middleware.hmac_auth import HmacAuthMiddleware
-from routers.em import init_router as init_em_router
-from routers.em import router as em_router
+from routers.health import init_router as init_health_router
+from routers.health import router as health_router
 from routers.ml_predict import init_router as init_ml_predict_router
 from routers.ml_predict import router as ml_predict_router
 from services import predict_service, r2_models
-from services.ml_service import MLService
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
@@ -51,11 +47,6 @@ if env_path.exists():
 # ---------------------------------------------------------------------------
 db_pool: asyncpg.Pool = None
 redis_client: redis.Redis = None
-http_client: httpx.AsyncClient = None
-data_backend: DataBackend = None
-duckdb_conn: duckdb.DuckDBPyConnection | None = None
-ml_service: MLService | None = None
-DATA_BACKEND_MODE: str = "postgres"
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -83,71 +74,20 @@ def _is_production() -> bool:
     )
 
 
-def _ensure_duckdb_em_view(conn: duckdb.DuckDBPyConnection, data_dir: str):
-    """Create or replace the em_forecasts view over the latest forecasts Parquet.
-
-    The daily-score script writes `forecasts_<YYYY-MM-DD>.parquet` snapshots
-    into `data_dir/forecasts/`. We point the view at the newest snapshot so
-    the API serves the same numbers as the nightly batch. Falls back to the
-    legacy single-file `em_forecasts.parquet` for older deploys.
-
-    On a fresh Railway volume (or any deploy that hasn't pulled R2 yet),
-    the forecasts directory is empty. In that case we log a warning and
-    skip view creation rather than crashing startup. The first time
-    `tools/build_frontend_data.py` or the Phase 2 lazy-fetch helper drops
-    a parquet here, callers can re-invoke this function (or restart the
-    service) to wire the view up.
-
-    Until then, downstream queries against `em_forecasts` will fail with
-    "Catalog Error: view does not exist" — that's by design. The
-    alternative (a silently-empty view) hid an em_forecasts vs
-    em_forecasts_view rename bug for months.
-    """
-    forecasts_dir = Path(data_dir) / "forecasts"
-    candidates = sorted(forecasts_dir.glob("forecasts_*.parquet"), reverse=True)
-    legacy = forecasts_dir / "em_forecasts.parquet"
-    target = candidates[0] if candidates else (legacy if legacy.exists() else None)
-    if target is None:
-        logger.warning(
-            "em_forecasts parquet not found — skipping view creation",
-            forecasts_dir=str(forecasts_dir),
-            remediation=(
-                "Pull data/forecasts/ from R2, run scripts/daily_score.py, "
-                "or wait for the Phase 2 lazy-fetch helper to populate it."
-            ),
-        )
-        return
-    parquet_path = str(target.resolve())
-    conn.execute(
-        f"CREATE OR REPLACE VIEW em_forecasts AS SELECT * FROM read_parquet('{parquet_path}')"
-    )
-    logger.info("Ensured DuckDB em_forecasts view", path=parquet_path)
-
-
 def _validate_env():
     """Validate required environment variables before startup."""
     errors: list[str] = []
     warnings: list[str] = []
 
-    backend = os.getenv("DATA_BACKEND", "postgres").lower()
-    use_pg = backend in ("postgres", "hybrid")
-    use_duck = backend in ("duckdb", "hybrid")
-
-    if use_pg:
-        has_url = bool(os.getenv("DATABASE_URL"))
-        has_discrete = bool(os.getenv("POSTGRES_USER")) and bool(os.getenv("POSTGRES_PASSWORD"))
-        if not has_url and not has_discrete:
-            errors.append("Postgres backend requires DATABASE_URL or both POSTGRES_USER and POSTGRES_PASSWORD")
-
-    if use_duck:
-        duck_path = os.getenv("DUCKDB_PATH", "./quantiv.duckdb")
-        if not Path(duck_path).exists():
-            warnings.append(f"DUCKDB_PATH '{duck_path}' does not exist yet")
+    has_url = bool(os.getenv("DATABASE_URL"))
+    has_discrete = bool(os.getenv("POSTGRES_USER")) and bool(os.getenv("POSTGRES_PASSWORD"))
+    if not has_url and not has_discrete:
+        errors.append(
+            "Live prediction requires DATABASE_URL or both POSTGRES_USER and POSTGRES_PASSWORD"
+        )
 
     if not os.getenv("REDIS_URL"):
         warnings.append("REDIS_URL not set — caching will connect to localhost:6379")
-    if not os.getenv("POLYGON_API_KEY"):
-        warnings.append("POLYGON_API_KEY not set — live market data unavailable")
     if not os.getenv("ADMIN_API_KEY"):
         warnings.append("ADMIN_API_KEY not set — admin endpoints will return 503")
     if _is_production() and not os.getenv("BACKEND_SHARED_SECRET"):
@@ -166,77 +106,35 @@ def _validate_env():
 # ---------------------------------------------------------------------------
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global db_pool, redis_client, http_client, data_backend, duckdb_conn, ml_service, DATA_BACKEND_MODE
+    global db_pool, redis_client
 
     logger.info("🚀 Starting Quantiv API...")
     _validate_env()
 
-    DATA_BACKEND_MODE = os.getenv("DATA_BACKEND", "postgres").lower()
-    use_pg = DATA_BACKEND_MODE in ("postgres", "hybrid")
-    use_duck = DATA_BACKEND_MODE in ("duckdb", "hybrid")
-
     # -- Postgres --------------------------------------------------------
-    pg_ready = False
-    if use_pg:
-        db_url = os.getenv("DATABASE_URL")
-        if db_url:
-            logger.info("Connecting to Postgres via DATABASE_URL")
-            db_pool = await asyncpg.create_pool(dsn=db_url, min_size=2, max_size=10)
-        else:
-            pg_user = os.getenv("POSTGRES_USER")
-            pg_password = os.getenv("POSTGRES_PASSWORD")
-            if not pg_user or not pg_password:
-                raise RuntimeError("POSTGRES_USER and POSTGRES_PASSWORD must be set when DATABASE_URL is not provided")
-            db_pool = await asyncpg.create_pool(
-                host=os.getenv("POSTGRES_HOST", "localhost"),
-                port=int(os.getenv("POSTGRES_PORT", "5432")),
-                user=pg_user, password=pg_password,
-                database=os.getenv("POSTGRES_DB", "quantiv_options"),
-                min_size=2, max_size=10,
-            )
-        pg_ready = True
-
-    # -- DuckDB ----------------------------------------------------------
-    duck_ready = False
-    if use_duck:
-        duck_path = os.getenv("DUCKDB_PATH", "./quantiv.duckdb")
-        logger.info("Connecting to DuckDB", path=duck_path)
-        duckdb_conn = duckdb.connect(duck_path, read_only=False)
-        # parquet support is built into duckdb >= 0.9, so no INSTALL/LOAD
-        # needed. The explicit INSTALL parquet + LOAD parquet calls that
-        # used to live here triggered "ImportError: cannot load module
-        # more than once per process" on Railway because the wheel's
-        # bundled extension would attempt a second register against the
-        # already-registered builtin.
-        _ensure_duckdb_em_view(duckdb_conn, os.getenv("DATA_DIR", "./data"))
-        duck_ready = True
-
-    # -- Backend selection -----------------------------------------------
-    if DATA_BACKEND_MODE == "postgres":
-        data_backend = PostgresBackend(db_pool)
-    elif DATA_BACKEND_MODE == "duckdb":
-        data_backend = DuckDBBackend(duckdb_conn)
+    db_url = os.getenv("DATABASE_URL")
+    if db_url:
+        logger.info("Connecting to Postgres via DATABASE_URL")
+        db_pool = await asyncpg.create_pool(dsn=db_url, min_size=2, max_size=10)
     else:
-        data_backend = HybridBackend(DuckDBBackend(duckdb_conn), PostgresBackend(db_pool),
-                                     int(os.getenv("HYBRID_LAST_DAYS", "1")))
+        pg_user = os.getenv("POSTGRES_USER")
+        pg_password = os.getenv("POSTGRES_PASSWORD")
+        if not pg_user or not pg_password:
+            raise RuntimeError(
+                "POSTGRES_USER and POSTGRES_PASSWORD must be set when DATABASE_URL is not provided"
+            )
+        db_pool = await asyncpg.create_pool(
+            host=os.getenv("POSTGRES_HOST", "localhost"),
+            port=int(os.getenv("POSTGRES_PORT", "5432")),
+            user=pg_user,
+            password=pg_password,
+            database=os.getenv("POSTGRES_DB", "quantiv_options"),
+            min_size=2,
+            max_size=10,
+        )
 
     # -- Redis -----------------------------------------------------------
     redis_client = redis.from_url(os.getenv("REDIS_URL", "redis://localhost:6379"), decode_responses=True)
-
-    # -- HTTP client (Polygon) -------------------------------------------
-    http_client = httpx.AsyncClient(
-        timeout=httpx.Timeout(30.0),
-        headers={"Authorization": f"Bearer {os.getenv('POLYGON_API_KEY', '')}"},
-    )
-
-    # -- ML service ------------------------------------------------------
-    if use_duck:
-        data_dir = Path(os.getenv("DATA_DIR", "./data"))
-        try:
-            ml_service = MLService(data_dir, data_dir / "quantiv.duckdb")
-            logger.info("✅ ML service initialized", available_symbols=len(ml_service.get_available_symbols()))
-        except Exception as e:  # noqa: BLE001 - optional ML startup must degrade safely
-            logger.warning("Failed to initialize ML service", error=str(e))
 
     # -- Pull serving models from R2 onto the mounted volume -------------
     # The weekly retrain publishes an immutable signed bundle and a signed
@@ -262,17 +160,10 @@ async def lifespan(app: FastAPI):
     else:
         logger.info("R2 not configured; using image-baked models")
 
-    logger.info("✅ Services initialized", backend=DATA_BACKEND_MODE, postgres=pg_ready, duckdb=duck_ready, ml_ready=ml_service is not None)
+    logger.info("✅ Services initialized", postgres=True, redis=True)
 
     # Wire up router shared state
-    init_em_router({
-        "data_backend": data_backend, "redis_client": redis_client,
-        "http_client": http_client, "ml_service": ml_service,
-        "db_pool": db_pool, "duckdb_conn": duckdb_conn,
-        "DATA_BACKEND_MODE": DATA_BACKEND_MODE,
-    })
-    # Phase 1 re-inference router. Only needs Postgres (for the feature
-    # snapshot) + Upstash (for the response cache).
+    init_health_router({"db_pool": db_pool, "redis_client": redis_client})
     init_ml_predict_router({
         "db_pool": db_pool,
         "redis_client": redis_client,
@@ -283,11 +174,8 @@ async def lifespan(app: FastAPI):
     # -- Cleanup ---------------------------------------------------------
     logger.info("🔄 Shutting down services...")
     for cleanup in [
-        lambda: db_pool.close() if use_pg and db_pool else None,
+        lambda: db_pool.close() if db_pool else None,
         lambda: redis_client.aclose(),
-        lambda: http_client.aclose(),
-        lambda: duckdb_conn.close() if use_duck and duckdb_conn else None,
-        lambda: ml_service.close() if ml_service else None,
     ]:
         try:
             result = cleanup()
@@ -366,7 +254,7 @@ async def verify_admin_key(api_key: str | None = Security(_api_key_header)) -> s
 # ---------------------------------------------------------------------------
 # Include routers
 # ---------------------------------------------------------------------------
-app.include_router(em_router)
+app.include_router(health_router)
 app.include_router(ml_predict_router)
 
 # ---------------------------------------------------------------------------

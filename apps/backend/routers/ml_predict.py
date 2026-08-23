@@ -5,8 +5,7 @@ Phase 1 of the Path B backend build. The route reads the most recent
 substitutes the caller's live spot into the two spot-derived features, and
 re-runs the LightGBM point + quantile heads.
 
-Wired into `apps/backend/main.py` via `init_router({...})`, same pattern as
-`routers.em`.
+Wired into `apps/backend/main.py` via `init_router({...})`.
 
 Caching:
   - Read-through Upstash cache keyed by (symbol, horizon, rounded spot).
