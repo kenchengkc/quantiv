@@ -7,7 +7,7 @@ import json
 from typing import Any
 
 
-RECONCILIATION_SCHEMA = "quantiv.data-reconciliation.v1"
+RECONCILIATION_SCHEMA = "quantiv.data-reconciliation.v2"
 
 
 def _canonical_id(payload: dict[str, Any]) -> str:
@@ -50,6 +50,8 @@ def build_reconciliation_manifest(
     symbol_mappings: dict[str, Any],
     corporate_actions: dict[str, Any],
     pipeline_controls: dict[str, Any],
+    quote_quality: dict[str, Any] | None = None,
+    source_reconciliation: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build one exception-first manifest from already-computed local controls."""
     exceptions: list[dict[str, Any]] = []
@@ -97,6 +99,51 @@ def build_reconciliation_manifest(
             )
         )
 
+    if event_coverage.get("status") == "failed":
+        exceptions.append(
+            _exception(
+                "event_quote_coverage_below_limit",
+                "critical",
+                "Decision-eligible option coverage is below the publication limit",
+                count=missing_events,
+                sample=event_coverage.get("missing_sample") or [],
+            )
+        )
+    horizon_coverage = event_coverage.get("horizon_coverage") or {}
+    if horizon_coverage.get("status") == "failed":
+        exceptions.append(
+            _exception(
+                "forecast_horizon_coverage_below_limit",
+                "critical",
+                "One or more model horizons lack sufficient eligible option coverage",
+                count=int(horizon_coverage.get("missing_events", 0)),
+                sample=horizon_coverage.get("failed_horizons") or [],
+            )
+        )
+
+    quote_quality = quote_quality or {"status": "not_enforced"}
+    if quote_quality.get("status") != "passed":
+        exceptions.append(
+            _exception(
+                "option_quote_quality_below_limit",
+                "critical",
+                "Option quote or same-strike pair rejection exceeds the publication limit",
+                count=int(quote_quality.get("rejected_contracts", 0)),
+                sample=quote_quality.get("top_rejection_reasons") or [],
+            )
+        )
+
+    source_reconciliation = source_reconciliation or {"status": "not_enforced"}
+    if source_reconciliation.get("status") != "passed":
+        exceptions.append(
+            _exception(
+                "source_partition_reconciliation_failed",
+                "critical",
+                "The newest source partition is missing expected/received, hash, or replay proof",
+                sample=source_reconciliation.get("errors") or [],
+            )
+        )
+
     stale_symbols = symbol_mappings.get("stale_source_symbols") or []
     if stale_symbols:
         exceptions.append(
@@ -123,8 +170,8 @@ def build_reconciliation_manifest(
         exceptions.append(
             _exception(
                 "record_quarantine_not_instrumented",
-                "warning",
-                "Invalid records fail publication but are not yet retained in a quarantine ledger",
+                "critical",
+                "Rejected records are not retained in the required quarantine ledger",
             )
         )
 
@@ -156,6 +203,8 @@ def build_reconciliation_manifest(
         },
         "datasets": datasets,
         "event_coverage": event_coverage,
+        "quote_quality": quote_quality,
+        "source_reconciliation": source_reconciliation,
         "duplicates": duplicates,
         "symbol_mappings": symbol_mappings,
         "corporate_actions": corporate_actions,

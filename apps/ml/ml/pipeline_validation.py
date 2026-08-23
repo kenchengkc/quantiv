@@ -680,6 +680,27 @@ def validate_forecast_artifact(
         "model_bundle_id",
         "spot_price",
         "atm_iv",
+        "atm_strike",
+        "call_strike",
+        "put_strike",
+        "call_bid",
+        "call_ask",
+        "call_mid",
+        "call_relative_spread",
+        "put_bid",
+        "put_ask",
+        "put_mid",
+        "put_relative_spread",
+        "straddle_bid",
+        "straddle_ask",
+        "straddle_mid",
+        "straddle_relative_spread",
+        "quote_timestamp_precision",
+        "market_data_mode",
+        "quote_quality_status",
+        "liquidity_tier",
+        "liquidity_tier_method",
+        "quote_rejection_reason",
         "em_math_pct",
         "em_ml_pct",
         "em_ml_abs",
@@ -776,6 +797,118 @@ def validate_forecast_artifact(
             "invalid_model_horizons",
             f"found {invalid_horizons} non-positive or non-integer model horizons",
         )
+
+    quote_policy_path = Path(__file__).resolve().parents[3] / "config" / "option_quote_quality.json"
+    try:
+        quote_policy = _load_json(quote_policy_path)
+        max_leg_spread = float(quote_policy["max_leg_relative_spread"])
+        max_straddle_spread = float(quote_policy["max_straddle_relative_spread"])
+    except Exception as exc:
+        _issue(
+            issues,
+            "forecasts",
+            quote_policy_path,
+            "invalid_quote_quality_policy",
+            str(exc),
+        )
+        max_leg_spread = max_straddle_spread = 0.0
+
+    quote_numeric_cols = [
+        "atm_strike", "call_strike", "put_strike",
+        "call_bid", "call_ask", "call_mid", "call_relative_spread",
+        "put_bid", "put_ask", "put_mid", "put_relative_spread",
+        "straddle_bid", "straddle_ask", "straddle_mid",
+        "straddle_relative_spread",
+    ]
+    quote_numeric = frame[quote_numeric_cols].apply(pd.to_numeric, errors="coerce")
+    invalid_quote_evidence = int((~np.isfinite(quote_numeric.to_numpy(dtype=float))).any(axis=1).sum())
+    crossed_or_zero_quotes = int(
+        (
+            (quote_numeric["call_bid"] <= 0)
+            | (quote_numeric["call_ask"] <= 0)
+            | (quote_numeric["put_bid"] <= 0)
+            | (quote_numeric["put_ask"] <= 0)
+            | (quote_numeric["call_ask"] < quote_numeric["call_bid"])
+            | (quote_numeric["put_ask"] < quote_numeric["put_bid"])
+        ).sum()
+    )
+    strike_mismatches = int(
+        (
+            ~np.isclose(quote_numeric["call_strike"], quote_numeric["put_strike"])
+            | ~np.isclose(quote_numeric["atm_strike"], quote_numeric["call_strike"])
+        ).sum()
+    )
+    leg_mid_mismatches = int(
+        (
+            ~np.isclose(
+                quote_numeric["call_mid"],
+                (quote_numeric["call_bid"] + quote_numeric["call_ask"]) / 2.0,
+                rtol=1e-6,
+                atol=1e-9,
+            )
+            | ~np.isclose(
+                quote_numeric["put_mid"],
+                (quote_numeric["put_bid"] + quote_numeric["put_ask"]) / 2.0,
+                rtol=1e-6,
+                atol=1e-9,
+            )
+        ).sum()
+    )
+    straddle_market_mismatches = int(
+        (
+            ~np.isclose(
+                quote_numeric["straddle_bid"],
+                quote_numeric["call_bid"] + quote_numeric["put_bid"],
+                rtol=1e-6,
+                atol=1e-9,
+            )
+            | ~np.isclose(
+                quote_numeric["straddle_ask"],
+                quote_numeric["call_ask"] + quote_numeric["put_ask"],
+                rtol=1e-6,
+                atol=1e-9,
+            )
+            | ~np.isclose(
+                quote_numeric["straddle_mid"],
+                quote_numeric["call_mid"] + quote_numeric["put_mid"],
+                rtol=1e-6,
+                atol=1e-9,
+            )
+        ).sum()
+    )
+    excessive_spreads = int(
+        (
+            (quote_numeric["call_relative_spread"] > max_leg_spread)
+            | (quote_numeric["put_relative_spread"] > max_leg_spread)
+            | (quote_numeric["straddle_relative_spread"] > max_straddle_spread)
+        ).sum()
+    )
+    invalid_quality_labels = int(
+        (
+            frame["quote_quality_status"].fillna("").ne("passed")
+            | frame["quote_timestamp_precision"].fillna("").ne("date")
+            | frame["market_data_mode"].fillna("").ne("end_of_day")
+            | frame["liquidity_tier_method"].fillna("").ne("quote_spread_proxy")
+            | frame["quote_rejection_reason"].notna()
+        ).sum()
+    )
+    for code, count, detail in (
+        ("invalid_quote_evidence", invalid_quote_evidence, "non-finite quote evidence"),
+        ("crossed_or_zero_market", crossed_or_zero_quotes, "crossed or zero-sided markets"),
+        ("straddle_strike_mismatch", strike_mismatches, "non-identical call/put strikes"),
+        ("leg_mid_mismatch", leg_mid_mismatches, "bid/ask values inconsistent with leg mids"),
+        ("straddle_market_mismatch", straddle_market_mismatches, "leg markets inconsistent with the straddle"),
+        ("quote_spread_limit_breach", excessive_spreads, "quotes beyond configured spread limits"),
+        ("invalid_quote_quality_label", invalid_quality_labels, "quotes not labeled as eligible EOD evidence"),
+    ):
+        if count:
+            _issue(
+                issues,
+                "forecasts",
+                forecast_path,
+                code,
+                f"found {count} rows with {detail}",
+            )
 
     numeric_cols = [
         "spot_price",
@@ -1090,6 +1223,13 @@ def validate_forecast_artifact(
                 "duplicate_serving_keys": duplicate_count,
                 "blank_symbols": blank_symbols,
                 "invalid_horizons": invalid_horizons,
+                "invalid_quote_evidence": invalid_quote_evidence,
+                "crossed_or_zero_quotes": crossed_or_zero_quotes,
+                "strike_mismatches": strike_mismatches,
+                "leg_mid_mismatches": leg_mid_mismatches,
+                "straddle_market_mismatches": straddle_market_mismatches,
+                "excessive_spreads": excessive_spreads,
+                "invalid_quote_quality_labels": invalid_quality_labels,
                 "non_finite_values": non_finite_values,
                 "invalid_market_input_rows": invalid_market_input_rows,
                 "out_of_range_move_rows": out_of_range_move_rows,

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import sys
@@ -22,6 +23,10 @@ if str(ML_PACKAGE_ROOT) not in sys.path:
 from ml.data_reconciliation import (  # noqa: E402 - standalone script path setup
     build_reconciliation_manifest,
 )
+from export_quote_quarantine import export_quarantine  # noqa: E402
+
+
+MODEL_HORIZONS = (1, 2, 3, 7, 14, 21)
 
 
 def _view_stats(
@@ -148,16 +153,218 @@ def _event_coverage(
     ).fetchall()
     expected = int(expected or 0)
     covered = int(covered or 0)
+    overall_coverage = round(covered / expected, 6) if expected else None
+    policy = json.loads(
+        (REPO_ROOT / "config" / "option_quote_quality.json").read_text()
+    )
+    min_event_coverage = float(policy["min_upcoming_event_coverage"])
+    horizon_rows = conn.execute(
+        """
+        WITH latest AS (SELECT MAX(date) AS snapshot_date FROM v_options),
+        expected AS (
+            SELECT e.act_symbol, CAST(e.date AS DATE) AS earnings_date,
+                   (CAST(e.date AS DATE) - l.snapshot_date) AS horizon,
+                   e.timing, l.snapshot_date
+            FROM v_earnings e CROSS JOIN latest l
+            WHERE (CAST(e.date AS DATE) - l.snapshot_date) IN (1, 2, 3, 7, 14, 21)
+        ), covered AS (
+            SELECT DISTINCT e.act_symbol, e.earnings_date, e.horizon
+            FROM expected e
+            JOIN v_straddle_features sf
+              ON sf.act_symbol = e.act_symbol
+             AND sf.date = e.snapshot_date
+             AND (
+                  (LOWER(COALESCE(CAST(e.timing AS VARCHAR), '')) = 'amc'
+                   AND sf.expiration > e.earnings_date)
+                  OR
+                  (LOWER(COALESCE(CAST(e.timing AS VARCHAR), '')) != 'amc'
+                   AND sf.expiration >= e.earnings_date)
+             )
+        )
+        SELECT e.horizon, COUNT(*) AS expected,
+               COUNT(c.act_symbol) AS covered
+        FROM expected e
+        LEFT JOIN covered c
+          ON c.act_symbol = e.act_symbol
+         AND c.earnings_date = e.earnings_date
+         AND c.horizon = e.horizon
+        GROUP BY e.horizon
+        ORDER BY e.horizon
+        """
+    ).fetchall()
+    min_horizon_coverage = float(policy["min_horizon_coverage"])
+    by_horizon = {}
+    failed_horizons = []
+    horizon_expected = 0
+    horizon_covered = 0
+    for horizon, horizon_expected_rows, horizon_covered_rows in horizon_rows:
+        horizon_expected_rows = int(horizon_expected_rows)
+        horizon_covered_rows = int(horizon_covered_rows)
+        coverage = horizon_covered_rows / horizon_expected_rows if horizon_expected_rows else 1.0
+        by_horizon[str(int(horizon))] = {
+            "expected_events": horizon_expected_rows,
+            "covered_events": horizon_covered_rows,
+            "coverage_pct": round(coverage, 6),
+        }
+        horizon_expected += horizon_expected_rows
+        horizon_covered += horizon_covered_rows
+        if coverage < min_horizon_coverage:
+            failed_horizons.append(
+                {"horizon": int(horizon), "coverage_pct": round(coverage, 6)}
+            )
     return {
+        "status": (
+            "passed"
+            if expected == 0 or (overall_coverage or 0.0) >= min_event_coverage
+            else "failed"
+        ),
         "window_days": days_ahead,
         "expected_events": expected,
         "covered_events": covered,
         "missing_events": max(expected - covered, 0),
-        "coverage_pct": round(covered / expected, 6) if expected else None,
+        "coverage_pct": overall_coverage,
+        "minimum_coverage_pct": min_event_coverage,
         "missing_sample": [
             {"symbol": symbol, "earnings_date": earnings_date.isoformat()}
             for symbol, earnings_date in missing_rows
         ],
+        "horizon_coverage": {
+            "status": "failed" if failed_horizons else "passed",
+            "minimum_coverage_pct": min_horizon_coverage,
+            "expected_events": horizon_expected,
+            "covered_events": horizon_covered,
+            "missing_events": max(horizon_expected - horizon_covered, 0),
+            "by_horizon": by_horizon,
+            "failed_horizons": failed_horizons,
+        },
+    }
+
+
+def _quote_quality(conn: duckdb.DuckDBPyConnection) -> dict[str, Any]:
+    policy = json.loads(
+        (REPO_ROOT / "config" / "option_quote_quality.json").read_text()
+    )
+    latest, contracts, rejected = conn.execute(
+        """
+        WITH latest AS (SELECT MAX(date) AS date FROM v_options)
+        SELECT l.date, COUNT(*),
+               COUNT(*) FILTER (WHERE quote_quality_status = 'rejected')
+        FROM v_options CROSS JOIN latest l
+        WHERE v_options.date = l.date
+        GROUP BY l.date
+        """
+    ).fetchone()
+    pairs, rejected_pairs, eligible_groups = conn.execute(
+        """
+        WITH latest AS (SELECT MAX(date) AS date FROM v_options)
+        SELECT COUNT(*),
+               COUNT(*) FILTER (WHERE pair_quality_status = 'rejected'),
+               COUNT(DISTINCT (act_symbol, expiration))
+                   FILTER (WHERE pair_quality_status = 'eligible')
+        FROM v_straddle_candidates
+        WHERE date = (SELECT date FROM latest)
+        """
+    ).fetchone()
+    reason_rows = conn.execute(
+        """
+        SELECT quote_rejection_reason, COUNT(*) AS rows
+        FROM v_options
+        WHERE date = (SELECT MAX(date) FROM v_options)
+          AND quote_rejection_reason IS NOT NULL
+        GROUP BY quote_rejection_reason
+        ORDER BY rows DESC, quote_rejection_reason
+        LIMIT 10
+        """
+    ).fetchall()
+    contracts = int(contracts or 0)
+    rejected = int(rejected or 0)
+    pairs = int(pairs or 0)
+    rejected_pairs = int(rejected_pairs or 0)
+    contract_rate = rejected / contracts if contracts else 1.0
+    pair_rate = rejected_pairs / pairs if pairs else 1.0
+    max_contract = float(policy["max_contract_rejection_rate"])
+    max_pair = float(policy["max_pair_rejection_rate"])
+    return {
+        "status": (
+            "passed"
+            if contracts and pairs and contract_rate <= max_contract and pair_rate <= max_pair
+            else "failed"
+        ),
+        "source_date": latest.isoformat() if latest else None,
+        "contracts": contracts,
+        "eligible_contracts": contracts - rejected,
+        "rejected_contracts": rejected,
+        "contract_rejection_rate": round(contract_rate, 6),
+        "max_contract_rejection_rate": max_contract,
+        "same_strike_pairs": pairs,
+        "eligible_pairs": pairs - rejected_pairs,
+        "rejected_pairs": rejected_pairs,
+        "pair_rejection_rate": round(pair_rate, 6),
+        "max_pair_rejection_rate": max_pair,
+        "eligible_symbol_expirations": int(eligible_groups or 0),
+        "top_rejection_reasons": [
+            {"reason": str(reason), "rows": int(rows)} for reason, rows in reason_rows
+        ],
+        "timestamp_precision": policy["timestamp_precision"],
+        "source_capabilities": policy["source_capabilities"],
+        "decision_scope": policy["decision_scope"],
+        "live_trading_eligible": bool(policy["live_trading_eligible"]),
+    }
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _source_reconciliation(
+    conn: duckdb.DuckDBPyConnection, data_dir: Path
+) -> dict[str, Any]:
+    latest = conn.execute("SELECT MAX(date) FROM v_options").fetchone()[0]
+    errors: list[str] = []
+    if latest is None:
+        return {"status": "failed", "errors": ["options view is empty"]}
+    manifest_path = data_dir / "control" / "ingestion" / "options" / f"{latest}.json"
+    try:
+        manifest = json.loads(manifest_path.read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        return {
+            "status": "failed",
+            "source_date": latest.isoformat(),
+            "manifest": str(manifest_path),
+            "errors": [f"ingestion manifest unavailable: {exc}"],
+        }
+    expected = int(manifest.get("expected_rows", -1))
+    received = int(manifest.get("received_rows", -2))
+    view_rows = int(
+        conn.execute("SELECT COUNT(*) FROM v_options_raw WHERE date = ?", [latest]).fetchone()[0]
+    )
+    if expected != received:
+        errors.append(f"expected_rows={expected} received_rows={received}")
+    if received != view_rows:
+        errors.append(f"manifest rows={received} DuckDB rows={view_rows}")
+    partition_value = manifest.get("partition")
+    partition = data_dir / str(partition_value) if partition_value else None
+    if partition is None or not partition.exists():
+        errors.append("canonical partition is missing")
+    elif _sha256_file(partition) != manifest.get("partition_sha256"):
+        errors.append("canonical partition hash does not match manifest")
+    if manifest.get("replay_equivalence") != "verified":
+        errors.append("idempotent replay equivalence is not verified")
+    return {
+        "status": "failed" if errors else "passed",
+        "source_date": latest.isoformat(),
+        "manifest": str(manifest_path),
+        "expected_rows": expected,
+        "received_rows": received,
+        "duckdb_rows": view_rows,
+        "partition_sha256": manifest.get("partition_sha256"),
+        "content_sha256": manifest.get("content_sha256"),
+        "replay_equivalence": manifest.get("replay_equivalence"),
+        "errors": errors,
     }
 
 
@@ -312,6 +519,11 @@ def main() -> int:
                 "quarantine": {"status": "not_instrumented", "mode": "fail_closed"},
                 "idempotent_replay": {"status": "contract_only"},
             },
+            quote_quality={"status": "not_enforced"},
+            source_reconciliation={
+                "status": "failed",
+                "errors": ["DuckDB is unavailable"],
+            },
         )
         return _publish_manifest(
             manifest,
@@ -319,6 +531,26 @@ def main() -> int:
             strict=args.strict,
         )
     try:
+        quote_quality = _quote_quality(conn)
+        source_reconciliation = _source_reconciliation(conn, data_dir)
+        try:
+            quarantine_path, quarantine_rows = export_quarantine(
+                conn, data_dir / "quarantine" / "options"
+            )
+            quarantine = {
+                "status": "enforced",
+                "mode": "compact_parquet_ledger",
+                "records": quarantine_rows,
+                "artifact": str(quarantine_path),
+                "retention_days": 30,
+            }
+        except Exception as exc:
+            quarantine = {
+                "status": "failed",
+                "mode": "compact_parquet_ledger",
+                "records": 0,
+                "error": str(exc),
+            }
         datasets = {
             "options": _view_stats(conn, "v_options", max_lag_days=args.max_lag_days),
             "ohlcv": _view_stats(conn, "v_ohlcv", max_lag_days=args.max_lag_days),
@@ -332,22 +564,22 @@ def main() -> int:
             symbol_mappings=_symbol_mappings(conn),
             corporate_actions=_corporate_actions(data_dir),
             pipeline_controls={
-                "quarantine": {
-                    "status": "not_instrumented",
-                    "mode": "fail_closed",
-                    "records": 0,
-                },
+                "quarantine": quarantine,
                 "idempotent_replay": {
-                    "status": "contract_only",
+                    "status": source_reconciliation.get("replay_equivalence"),
                     "serving_key": [
                         "act_symbol",
                         "earnings_date",
                         "snapshot_date",
                         "model_horizon",
                     ],
-                    "mechanism": "Parquet snapshots plus conflict-safe forecast upsert",
+                    "mechanism": (
+                        "deterministic logical-row digest plus atomic Parquet promotion"
+                    ),
                 },
             },
+            quote_quality=quote_quality,
+            source_reconciliation=source_reconciliation,
         )
     finally:
         conn.close()

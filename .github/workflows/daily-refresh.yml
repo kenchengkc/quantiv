@@ -362,12 +362,6 @@ jobs:
         continue-on-error: true
         run: python scripts/sync_vix.py
 
-      # Parquet + models only — forecasts are written later by daily_score.
-      - name: Push parquet and models to R2
-        env:
-          R2_BUCKET: ${{ secrets.R2_BUCKET }}
-        run: bash scripts/r2_push.sh --skip-forecasts
-
       - name: Rebuild DuckDB views
         run: python scripts/setup_duckdb_from_parquet.py
 
@@ -397,6 +391,13 @@ jobs:
           path: data/validation/data_reconciliation.json
           if-no-files-found: ignore
           retention-days: 30
+
+      # Publication happens only after source counts, hashes, replay,
+      # quote quality, quarantine, freshness, and event coverage pass.
+      - name: Promote reconciled parquet and controls to R2
+        env:
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+        run: bash scripts/r2_push.sh --skip-forecasts
 
       - name: Score upcoming earnings
         run: python scripts/daily_score.py --days-ahead 21

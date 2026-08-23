@@ -333,16 +333,25 @@ def _write_ingestion_manifest(
             f"{target}: expected {expected:,} rows but received {received:,}"
         )
     digest = _content_digest(frame)
+    partition = _partition_path(target, root)
+    if received:
+        persisted = pq.read_table(partition).to_pandas()
+        persisted_digest = _content_digest(persisted)
+        if persisted_digest != digest:
+            raise RuntimeError(
+                f"{target}: persisted partition is not replay-equivalent to source rows"
+            )
+    else:
+        persisted_digest = digest
     prior_digest = (prior_manifest or {}).get("content_sha256")
-    replay_status = "baseline_recorded"
+    source_revision_status = "baseline_recorded"
     if prior_digest:
         if prior_digest != digest:
             raise RuntimeError(
                 f"{target}: replay digest changed ({prior_digest} -> {digest}); "
                 "quarantine the source revision before promotion"
             )
-        replay_status = "verified"
-    partition = _partition_path(target, root)
+        source_revision_status = "unchanged"
     payload = {
         "schema": "quantiv.options-ingestion.v1",
         "status": "passed",
@@ -359,7 +368,9 @@ def _write_ingestion_manifest(
         "partition_bytes": partition.stat().st_size if received else 0,
         "partition_sha256": _sha256_file(partition) if received else None,
         "content_sha256": digest,
-        "replay_equivalence": replay_status,
+        "replay_equivalence": "verified",
+        "persisted_content_sha256": persisted_digest,
+        "source_revision_status": source_revision_status,
         "pagination": evidence.get("buckets", []),
         "source_capabilities": {
             "timestamp_precision": "date",
@@ -506,6 +517,9 @@ def cmd_incremental(args):
         print(f"No previous sync, looking back {args.days} days")
 
     if start > end:
+        # A fresh runner may have pulled a canonical partition without its
+        # control manifest. Verify/backfill the latest partition before exit.
+        sync_dates([end], parquet_root(), skip_existing=True)
         print(f"Already up to date (synced through {last}, DoltHub has through {end})")
         return
 

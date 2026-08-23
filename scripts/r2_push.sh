@@ -53,17 +53,34 @@ push_small_files() {
     rclone copy "$DATA_DIR/bias_curves.parquet" "$REMOTE/"
 }
 
+push_controls() {
+  if [ -d "$DATA_DIR/control" ]; then
+    rclone sync "$DATA_DIR/control" "$REMOTE/control" \
+      --fast-list --transfers=4 --progress
+  fi
+  if [ -d "$DATA_DIR/quarantine" ]; then
+    rclone sync "$DATA_DIR/quarantine" "$REMOTE/quarantine" \
+      --fast-list --transfers=4 --progress
+  fi
+  if [ -d "$DATA_DIR/validation" ]; then
+    rclone sync "$DATA_DIR/validation" "$REMOTE/validation" \
+      --fast-list --transfers=4 --progress
+  fi
+}
+
 if [ "$MODE" = "--forecasts-only" ]; then
   push_forecasts
 elif [ "$MODE" = "--skip-forecasts" ]; then
   push_parquet
   push_models
   push_small_files
+  push_controls
 else
   push_parquet
   push_models
   push_forecasts
   push_small_files
+  push_controls
 fi
 
 echo "✅ Push complete ($MODE)"

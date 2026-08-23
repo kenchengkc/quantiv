@@ -56,17 +56,19 @@ def test_partition_promotion_and_replay_equivalence(
     assert sync_dolthub.write_date(frame, root) == 1
     baseline = sync_dolthub._write_ingestion_manifest(target, frame, root)
     assert baseline["expected_rows"] == baseline["received_rows"] == 1
-    assert baseline["replay_equivalence"] == "baseline_recorded"
+    assert baseline["replay_equivalence"] == "verified"
+    assert baseline["source_revision_status"] == "baseline_recorded"
     assert not list(root.rglob("*.tmp"))
 
     replay = sync_dolthub._write_ingestion_manifest(
         target, frame, root, prior_manifest=baseline
     )
     assert replay["replay_equivalence"] == "verified"
+    assert replay["source_revision_status"] == "unchanged"
     stored = json.loads(sync_dolthub._manifest_path(target).read_text())
     assert stored["partition_sha256"] == replay["partition_sha256"]
 
-    with pytest.raises(RuntimeError, match="replay digest changed"):
+    with pytest.raises(RuntimeError, match="replay-equivalent|replay digest changed"):
         sync_dolthub._write_ingestion_manifest(
             target, _frame(bid=1.1), root, prior_manifest=baseline
         )

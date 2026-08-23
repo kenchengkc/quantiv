@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import os
 import subprocess
 import sys
@@ -28,17 +29,37 @@ def _write_fresh_database(path: Path) -> None:
                 act_symbol VARCHAR,
                 expiration DATE,
                 strike DOUBLE,
-                call_put VARCHAR
+                call_put VARCHAR,
+                bid DOUBLE,
+                ask DOUBLE,
+                mid DOUBLE,
+                relative_spread DOUBLE,
+                iv DOUBLE,
+                delta DOUBLE,
+                option_volume BIGINT,
+                open_interest BIGINT,
+                quote_timestamp_precision VARCHAR,
+                market_data_mode VARCHAR,
+                quote_quality_status VARCHAR,
+                quote_rejection_reason VARCHAR
             )
             """
         )
         conn.executemany(
-            "INSERT INTO v_options VALUES (?, 'ACME', ?, 100, ?)",
+            """
+            INSERT INTO v_options VALUES (
+                ?, ?, ?, 100, ?, 1.0, 1.1, 1.05, 0.095, 0.5, ?,
+                NULL, NULL, 'date', 'end_of_day', 'eligible', NULL
+            )
+            """,
             [
-                (snapshot, expiration, "Call"),
-                (snapshot, expiration, "Put"),
+                (snapshot, "ACME", expiration, "Call", 0.5),
+                (snapshot, "ACME", expiration, "Put", -0.5),
+                (snapshot, "MISS", expiration, "Call", 0.5),
+                (snapshot, "MISS", expiration, "Put", -0.5),
             ],
         )
+        conn.execute("CREATE TABLE v_options_raw AS SELECT * FROM v_options")
         conn.execute("CREATE TABLE v_ohlcv (date DATE, act_symbol VARCHAR)")
         conn.execute("INSERT INTO v_ohlcv VALUES (?, 'ACME')", [snapshot])
         conn.execute(
@@ -57,9 +78,53 @@ def _write_fresh_database(path: Path) -> None:
             )
             """
         )
+        conn.executemany(
+            "INSERT INTO v_straddle_features VALUES (?, ?, ?)",
+            [(snapshot, "ACME", expiration), (snapshot, "MISS", expiration)],
+        )
         conn.execute(
-            "INSERT INTO v_straddle_features VALUES (?, 'ACME', ?)",
-            [snapshot, expiration],
+            """
+            CREATE TABLE v_straddle_candidates (
+                date DATE, act_symbol VARCHAR, expiration DATE, dte INTEGER,
+                strike DOUBLE, call_bid DOUBLE, call_ask DOUBLE, call_mid DOUBLE,
+                call_relative_spread DOUBLE, call_iv DOUBLE, call_delta DOUBLE,
+                call_gamma DOUBLE, call_vega DOUBLE, call_theta DOUBLE,
+                call_volume BIGINT, call_open_interest BIGINT,
+                put_bid DOUBLE, put_ask DOUBLE, put_mid DOUBLE,
+                put_relative_spread DOUBLE, put_iv DOUBLE, put_delta DOUBLE,
+                put_volume BIGINT, put_open_interest BIGINT,
+                straddle_bid DOUBLE, straddle_ask DOUBLE, straddle_mid DOUBLE,
+                straddle_relative_spread DOUBLE, atm_delta_distance DOUBLE,
+                quote_timestamp_precision VARCHAR, market_data_mode VARCHAR,
+                pair_rejection_reason VARCHAR, pair_quality_status VARCHAR,
+                pair_rank INTEGER
+            )
+            """
+        )
+        conn.executemany(
+            """
+            INSERT INTO v_straddle_candidates VALUES (
+                ?, ?, ?, 7, 100, 1, 1.1, 1.05, .095, .5, .5,
+                .1, .1, -.1, NULL, NULL,
+                1, 1.1, 1.05, .095, .5, -.5, NULL, NULL,
+                2, 2.2, 2.1, .095, 0,
+                'date', 'end_of_day', NULL, 'eligible', 1
+            )
+            """,
+            [(snapshot, "ACME", expiration), (snapshot, "MISS", expiration)],
+        )
+        conn.execute(
+            """
+            CREATE VIEW v_option_quote_quarantine AS
+            SELECT *, CAST(NULL AS VARCHAR) AS rejection_reason
+            FROM v_options WHERE FALSE
+            """
+        )
+        conn.execute(
+            """
+            CREATE VIEW v_straddle_quote_quarantine AS
+            SELECT * FROM v_straddle_candidates WHERE FALSE
+            """
         )
     finally:
         conn.close()
@@ -67,7 +132,30 @@ def _write_fresh_database(path: Path) -> None:
 
 def _run(tmp_path: Path, db_path: Path) -> subprocess.CompletedProcess[str]:
     report_path = tmp_path / "reconciliation.json"
-    env = {**os.environ, "DATA_DIR": str(tmp_path / "data")}
+    data_dir = tmp_path / "data"
+    snapshot = date.today() - timedelta(days=1)
+    partition = (
+        data_dir / "parquet" / "options_chain" / f"year={snapshot.year}"
+        / f"month={snapshot.month:02d}" / f"{snapshot}.parquet"
+    )
+    partition.parent.mkdir(parents=True, exist_ok=True)
+    partition.write_bytes(b"reconciled-test-partition")
+    partition_hash = hashlib.sha256(partition.read_bytes()).hexdigest()
+    manifest_path = data_dir / "control" / "ingestion" / "options" / f"{snapshot}.json"
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "expected_rows": 4,
+                "received_rows": 4,
+                "partition": str(partition.relative_to(data_dir)),
+                "partition_sha256": partition_hash,
+                "content_sha256": "test-content",
+                "replay_equivalence": "verified",
+            }
+        )
+    )
+    env = {**os.environ, "DATA_DIR": str(data_dir)}
     return subprocess.run(
         [
             sys.executable,
@@ -85,7 +173,7 @@ def _run(tmp_path: Path, db_path: Path) -> subprocess.CompletedProcess[str]:
     )
 
 
-def test_script_reconciles_expected_and_received_events(tmp_path: Path) -> None:
+def test_script_reconciles_source_quotes_and_events(tmp_path: Path) -> None:
     db_path = tmp_path / "fresh.duckdb"
     _write_fresh_database(db_path)
 
@@ -95,19 +183,12 @@ def test_script_reconciles_expected_and_received_events(tmp_path: Path) -> None:
     assert result.returncode == 0, result.stdout + result.stderr
     assert report["quality"]["decision_safe"] is True
     assert report["quality"]["status"] == "degraded"
-    assert report["event_coverage"] == {
-        "window_days": 21,
-        "expected_events": 2,
-        "covered_events": 1,
-        "missing_events": 1,
-        "coverage_pct": 0.5,
-        "missing_sample": [
-            {
-                "symbol": "MISS",
-                "earnings_date": (date.today() + timedelta(days=3)).isoformat(),
-            }
-        ],
-    }
+    assert report["event_coverage"]["expected_events"] == 2
+    assert report["event_coverage"]["covered_events"] == 2
+    assert report["event_coverage"]["status"] == "passed"
+    assert report["quote_quality"]["status"] == "passed"
+    assert report["source_reconciliation"]["status"] == "passed"
+    assert report["pipeline_controls"]["quarantine"]["status"] == "enforced"
     assert report["duplicates"]["options"]["duplicate_rows"] == 0
 
 
@@ -119,5 +200,5 @@ def test_script_writes_a_fail_closed_manifest_when_database_is_missing(
 
     assert result.returncode == 1
     assert report["quality"]["decision_safe"] is False
-    assert report["quality"]["critical_exceptions"] == 1
-    assert report["exceptions"][0]["code"] == "duckdb_unavailable"
+    assert report["quality"]["critical_exceptions"] >= 1
+    assert "duckdb_unavailable" in {issue["code"] for issue in report["exceptions"]}

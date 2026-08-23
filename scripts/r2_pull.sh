@@ -21,6 +21,14 @@ rclone sync "$REMOTE/parquet" "$DATA_DIR/parquet" \
 rclone sync "$REMOTE/models" "$DATA_DIR/models" \
   --fast-list --transfers=8 --progress
 
+# Compact control evidence is needed to verify source revisions and replay
+# equivalence before the next promotion. Missing paths are expected on the
+# first controlled run.
+rclone sync "$REMOTE/control" "$DATA_DIR/control" \
+  --fast-list --transfers=4 --progress 2>/dev/null || true
+rclone sync "$REMOTE/quarantine" "$DATA_DIR/quarantine" \
+  --fast-list --transfers=4 --progress 2>/dev/null || true
+
 # Forecasts (small, but keeping them in sync means daily_score finds the
 # previous run's parquet and build_frontend_data has them on hand).
 rclone sync "$REMOTE/forecasts" "$DATA_DIR/forecasts" \

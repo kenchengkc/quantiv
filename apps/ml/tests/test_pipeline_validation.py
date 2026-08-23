@@ -159,6 +159,31 @@ def _write_forecast_artifact(
                 "model_bundle_id": "test-bundle",
                 "spot_price": 100.0,
                 "atm_iv": atm_iv,
+                "atm_strike": 100.0,
+                "call_strike": 100.0,
+                "put_strike": 100.0,
+                "call_bid": 2.9,
+                "call_ask": 3.1,
+                "call_mid": 3.0,
+                "call_relative_spread": 0.2 / 3.0,
+                "call_volume": None,
+                "call_open_interest": None,
+                "put_bid": 2.9,
+                "put_ask": 3.1,
+                "put_mid": 3.0,
+                "put_relative_spread": 0.2 / 3.0,
+                "put_volume": None,
+                "put_open_interest": None,
+                "straddle_bid": 5.8,
+                "straddle_ask": 6.2,
+                "straddle_mid": 6.0,
+                "straddle_relative_spread": 0.4 / 6.0,
+                "quote_timestamp_precision": "date",
+                "market_data_mode": "end_of_day",
+                "quote_quality_status": "passed",
+                "liquidity_tier": "tight",
+                "liquidity_tier_method": "quote_spread_proxy",
+                "quote_rejection_reason": None,
                 "em_math_pct": em_math,
                 "em_ml_pct": em_ml,
                 "em_ml_abs": 7.0,
@@ -310,4 +335,29 @@ def test_forecast_gate_surfaces_invisible_handoff_failures(tmp_path: Path) -> No
         "crossed_served_quantiles",
         "iv_expected_move_mismatch",
         "invalid_feature_values",
+    } <= _issue_codes(error.value)
+
+
+def test_forecast_gate_rejects_commercially_unusable_quote(tmp_path: Path) -> None:
+    now = datetime(2026, 8, 22, 12, tzinfo=timezone.utc)
+    forecast_path = tmp_path / "forecasts" / "forecasts_2026-08-22.parquet"
+    models_dir = tmp_path / "models"
+    frame = _write_forecast_artifact(forecast_path, models_dir, now=now)
+    frame.loc[0, "call_bid"] = 0.0
+    frame.loc[0, "call_strike"] = 105.0
+    frame.loc[0, "quote_quality_status"] = "rejected"
+    frame.loc[0, "quote_rejection_reason"] = "zero_or_noncommercial_side"
+    frame.to_parquet(forecast_path, index=False)
+
+    with pytest.raises(PipelineValidationError) as error:
+        validate_forecast_artifact(
+            forecast_path,
+            models_dir=models_dir,
+            now=now,
+        )
+
+    assert {
+        "crossed_or_zero_market",
+        "straddle_strike_mismatch",
+        "invalid_quote_quality_label",
     } <= _issue_codes(error.value)
