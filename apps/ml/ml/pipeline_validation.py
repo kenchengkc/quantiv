@@ -685,35 +685,8 @@ def latest_forecast_path(forecast_dir: Path) -> Path | None:
     return paths[-1] if paths else None
 
 
-def validate_forecast_artifact(
-    forecast_path: Path,
-    *,
-    models_dir: Path,
-    min_rows: int = 1,
-    max_age_days: int = 2,
-    now: datetime | None = None,
-    max_point_median_gap: float = 0.05,
-) -> dict[str, Any]:
-    """Validate the scored handoff before import, upload, or live serving."""
-    issues: list[ValidationIssue] = []
-    if not forecast_path.exists():
-        _issue(
-            issues,
-            "forecasts",
-            forecast_path,
-            "missing_forecast_artifact",
-            "file does not exist",
-        )
-        return _finish(issues, {})
-    try:
-        frame = pd.read_parquet(forecast_path)
-    except Exception as exc:
-        _issue(
-            issues, "forecasts", forecast_path, "unreadable_forecast_artifact", str(exc)
-        )
-        return _finish(issues, {})
-
-    required = {
+FORECAST_REQUIRED_COLUMNS = frozenset(
+    {
         "act_symbol",
         "earnings_date",
         "snapshot_date",
@@ -756,7 +729,38 @@ def validate_forecast_artifact(
         "scored_at",
         "feature_vector",
     }
-    missing = sorted(required - set(frame.columns))
+)
+
+
+def validate_forecast_artifact(
+    forecast_path: Path,
+    *,
+    models_dir: Path,
+    min_rows: int = 1,
+    max_age_days: int = 2,
+    now: datetime | None = None,
+    max_point_median_gap: float = 0.05,
+) -> dict[str, Any]:
+    """Validate the scored handoff before import, upload, or live serving."""
+    issues: list[ValidationIssue] = []
+    if not forecast_path.exists():
+        _issue(
+            issues,
+            "forecasts",
+            forecast_path,
+            "missing_forecast_artifact",
+            "file does not exist",
+        )
+        return _finish(issues, {})
+    try:
+        frame = pd.read_parquet(forecast_path)
+    except Exception as exc:
+        _issue(
+            issues, "forecasts", forecast_path, "unreadable_forecast_artifact", str(exc)
+        )
+        return _finish(issues, {})
+
+    missing = sorted(FORECAST_REQUIRED_COLUMNS - set(frame.columns))
     if missing:
         _issue(
             issues,

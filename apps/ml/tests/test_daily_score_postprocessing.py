@@ -1,7 +1,9 @@
 import numpy as np
 import pandas as pd
+import pytest
 
-from scripts.daily_score import score
+from ml.pipeline_validation import FORECAST_REQUIRED_COLUMNS
+from scripts.daily_score import get_upcoming_features, save_forecasts, score
 
 
 class _ConstantModel:
@@ -10,6 +12,18 @@ class _ConstantModel:
 
     def predict(self, frame: pd.DataFrame) -> np.ndarray:
         return np.full(len(frame), self.value)
+
+
+class _CapturingConnection:
+    def __init__(self):
+        self.sql = ""
+
+    def execute(self, sql: str):
+        self.sql = sql
+        return self
+
+    def fetchdf(self) -> pd.DataFrame:
+        return pd.DataFrame()
 
 
 def test_batch_score_clips_point_and_rearranges_crossed_quantiles():
@@ -50,3 +64,25 @@ def test_batch_score_clips_point_and_rearranges_crossed_quantiles():
         0.07,
         0.09,
     ]
+
+
+def test_upcoming_features_carries_raw_straddle_mid_into_forecasts():
+    connection = _CapturingConnection()
+
+    get_upcoming_features(connection, 21)
+
+    assert "sf.straddle_mid," in connection.sql
+
+
+def test_save_forecasts_rejects_incomplete_artifact_before_writing(tmp_path):
+    row = {column: 1 for column in FORECAST_REQUIRED_COLUMNS}
+    row.pop("straddle_mid")
+
+    with pytest.raises(ValueError, match="straddle_mid"):
+        save_forecasts(
+            pd.DataFrame([row]),
+            tmp_path,
+            output_path=tmp_path / "candidate.parquet",
+        )
+
+    assert not (tmp_path / "candidate.parquet").exists()

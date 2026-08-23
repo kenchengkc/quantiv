@@ -37,6 +37,9 @@ from ml.model_bundle import (  # noqa: E402 - standalone script path setup
     ModelBundleError,
     resolve_champion_bundle,
 )
+from ml.pipeline_validation import (  # noqa: E402 - standalone script path setup
+    FORECAST_REQUIRED_COLUMNS,
+)
 from ml.quantiles import rearrange_quantile_array  # noqa: E402 - standalone script path setup
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -273,6 +276,7 @@ def get_upcoming_features(conn: duckdb.DuckDBPyConnection, days_ahead: int) -> p
         sf.put_quote_timestamp,
         sf.straddle_bid,
         sf.straddle_ask,
+        sf.straddle_mid,
         sf.straddle_relative_spread,
         sf.quote_timestamp_precision,
         sf.market_data_mode,
@@ -460,6 +464,13 @@ def save_forecasts(
         if output_path is None:
             prune_forecast_snapshots(forecast_dir)
         return
+
+    missing_required = sorted(FORECAST_REQUIRED_COLUMNS - set(df.columns))
+    if missing_required:
+        raise ValueError(
+            "Refusing to persist an incomplete forecast artifact; "
+            f"missing required columns: {missing_required}"
+        )
 
     out_cols = [
         "act_symbol", "earnings_date", "timing", "snapshot_date",
