@@ -1,34 +1,35 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import katex from 'katex';
+import Link from "next/link";
+import { useEffect, useMemo, useRef, useState } from "react";
+
+import { MathFormula } from "@/components/MathFormula";
 
 const ABOUT_PAGE_SETTLE_DELAY_MS = 360;
 const COUNT_UP_DURATION_MS = 2600;
 
 function prefersReducedMotion() {
   return (
-    typeof window !== 'undefined' &&
-    typeof window.matchMedia === 'function' &&
-    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches
   );
 }
 
 function waitForWindowLoad() {
-  if (typeof window === 'undefined' || typeof document === 'undefined') {
+  if (typeof window === "undefined" || typeof document === "undefined") {
     return Promise.resolve();
   }
-  if (document.readyState === 'complete') {
+  if (document.readyState === "complete") {
     return Promise.resolve();
   }
   return new Promise<void>((resolve) => {
-    window.addEventListener('load', () => resolve(), { once: true });
+    window.addEventListener("load", () => resolve(), { once: true });
   });
 }
 
 function waitForFonts() {
-  if (typeof document === 'undefined' || !('fonts' in document)) {
+  if (typeof document === "undefined" || !("fonts" in document)) {
     return Promise.resolve();
   }
   return document.fonts.ready.then(() => undefined).catch(() => undefined);
@@ -36,7 +37,10 @@ function waitForFonts() {
 
 function waitForImage(img: HTMLImageElement) {
   const decode = () =>
-    img.decode?.().then(() => undefined).catch(() => undefined) ?? Promise.resolve();
+    img
+      .decode?.()
+      .then(() => undefined)
+      .catch(() => undefined) ?? Promise.resolve();
 
   if (img.complete) {
     return decode();
@@ -44,12 +48,12 @@ function waitForImage(img: HTMLImageElement) {
 
   return new Promise<void>((resolve) => {
     const done = () => {
-      img.removeEventListener('load', done);
-      img.removeEventListener('error', done);
+      img.removeEventListener("load", done);
+      img.removeEventListener("error", done);
       resolve();
     };
-    img.addEventListener('load', done, { once: true });
-    img.addEventListener('error', done, { once: true });
+    img.addEventListener("load", done, { once: true });
+    img.addEventListener("error", done, { once: true });
   }).then(decode);
 }
 
@@ -58,7 +62,7 @@ function waitForImages(container: HTMLElement | null) {
     return Promise.resolve();
   }
 
-  const images = Array.from(container.querySelectorAll('img'));
+  const images = Array.from(container.querySelectorAll("img"));
   return Promise.all(images.map(waitForImage)).then(() => undefined);
 }
 
@@ -120,7 +124,7 @@ function Reveal({
 
     const el = ref.current;
     if (!el) return;
-    if (typeof IntersectionObserver === 'undefined') {
+    if (typeof IntersectionObserver === "undefined") {
       setShown(true);
       return;
     }
@@ -134,7 +138,7 @@ function Reveal({
           }
         }
       },
-      { threshold: 0.05, rootMargin: '0px 0px -40px 0px' },
+      { threshold: 0.05, rootMargin: "0px 0px -40px 0px" },
     );
     io.observe(el);
     return () => io.disconnect();
@@ -142,7 +146,7 @@ function Reveal({
   return (
     <div
       ref={ref}
-      className={`reveal${shown ? ' in' : ''}`}
+      className={`reveal${shown ? " in" : ""}`}
       style={{ transitionDelay: `${delay}ms`, ...style }}
     >
       {children}
@@ -158,9 +162,9 @@ function CountUp({
   from = 0,
   duration = COUNT_UP_DURATION_MS,
   enabled = true,
-  suffix = '',
+  suffix = "",
   decimals = 0,
-  prefix = '',
+  prefix = "",
 }: {
   value: number;
   // Optional starting value. Defaults to 0 (count up). Passing a value
@@ -183,7 +187,7 @@ function CountUp({
 
     const el = ref.current;
     if (!el) return;
-    if (prefersReducedMotion() || typeof IntersectionObserver === 'undefined') {
+    if (prefersReducedMotion() || typeof IntersectionObserver === "undefined") {
       setCurrent(value);
       return;
     }
@@ -245,15 +249,15 @@ function HeroGlyph({ enabled = true }: { enabled?: boolean }) {
 
     const el = ref.current;
     if (!el) return;
-    if (typeof IntersectionObserver === 'undefined') {
-      el.classList.add('in');
+    if (typeof IntersectionObserver === "undefined") {
+      el.classList.add("in");
       return;
     }
     const io = new IntersectionObserver(
       (entries) => {
         for (const e of entries) {
           if (e.isIntersecting) {
-            el.classList.add('in');
+            el.classList.add("in");
             io.disconnect();
             break;
           }
@@ -292,27 +296,100 @@ function HeroGlyph({ enabled = true }: { enabled?: boolean }) {
 // ──────────────────────────────────────────────────────────────────────────
 function MiniStraddleBar() {
   return (
-    <svg viewBox="0 0 200 64" style={{ width: '100%', height: 64, display: 'block' }} aria-hidden="true">
+    <svg
+      viewBox="0 0 200 64"
+      style={{ width: "100%", height: 64, display: "block" }}
+      aria-hidden="true"
+    >
       <defs>
         <linearGradient id="mini-stradd" x1="0" x2="1" y1="0" y2="0">
           <stop offset="0%" stopColor="var(--brand-blue-2)" />
           <stop offset="100%" stopColor="var(--brand-blue-1)" />
         </linearGradient>
         <linearGradient id="mini-density" x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%" stopColor="var(--brand-blue-1)" stopOpacity="0.45" />
+          <stop
+            offset="0%"
+            stopColor="var(--brand-blue-1)"
+            stopOpacity="0.45"
+          />
           <stop offset="100%" stopColor="var(--brand-blue-1)" stopOpacity="0" />
         </linearGradient>
       </defs>
-      <path d="M 0 50 Q 100 -5 200 50 L 200 50 L 0 50 Z" fill="url(#mini-density)" />
-      <path d="M 0 50 Q 100 -5 200 50" fill="none" stroke="var(--brand-blue-1)" strokeOpacity="0.6" strokeWidth="0.8" />
-      <line x1="0" x2="200" y1="50" y2="50" stroke="var(--line)" strokeWidth="1" />
-      <rect x="50" y="45" width="100" height="10" rx="5" fill="url(#mini-stradd)">
-        <animate attributeName="opacity" values="0.4;1;0.4" dur="2400ms" repeatCount="indefinite" />
+      <path
+        d="M 0 50 Q 100 -5 200 50 L 200 50 L 0 50 Z"
+        fill="url(#mini-density)"
+      />
+      <path
+        d="M 0 50 Q 100 -5 200 50"
+        fill="none"
+        stroke="var(--brand-blue-1)"
+        strokeOpacity="0.6"
+        strokeWidth="0.8"
+      />
+      <line
+        x1="0"
+        x2="200"
+        y1="50"
+        y2="50"
+        stroke="var(--line)"
+        strokeWidth="1"
+      />
+      <rect
+        x="50"
+        y="45"
+        width="100"
+        height="10"
+        rx="5"
+        fill="url(#mini-stradd)"
+      >
+        <animate
+          attributeName="opacity"
+          values="0.4;1;0.4"
+          dur="2400ms"
+          repeatCount="indefinite"
+        />
       </rect>
-      <line x1="100" x2="100" y1="40" y2="56" stroke="var(--ink)" strokeWidth="1.5" />
-      <text x="100" y="64" textAnchor="middle" fontSize="8" fill="var(--ink-2)" letterSpacing="0.1em" fontFamily="ui-monospace, monospace">SPOT</text>
-      <text x="50" y="40" textAnchor="middle" fontSize="9" fill="var(--down)" fontFamily="ui-monospace, monospace" fontWeight="700">−6%</text>
-      <text x="150" y="40" textAnchor="middle" fontSize="9" fill="var(--up)" fontFamily="ui-monospace, monospace" fontWeight="700">+6%</text>
+      <line
+        x1="100"
+        x2="100"
+        y1="40"
+        y2="56"
+        stroke="var(--ink)"
+        strokeWidth="1.5"
+      />
+      <text
+        x="100"
+        y="64"
+        textAnchor="middle"
+        fontSize="8"
+        fill="var(--ink-2)"
+        letterSpacing="0.1em"
+        fontFamily="ui-monospace, monospace"
+      >
+        SPOT
+      </text>
+      <text
+        x="50"
+        y="40"
+        textAnchor="middle"
+        fontSize="9"
+        fill="var(--down)"
+        fontFamily="ui-monospace, monospace"
+        fontWeight="700"
+      >
+        −6%
+      </text>
+      <text
+        x="150"
+        y="40"
+        textAnchor="middle"
+        fontSize="9"
+        fill="var(--up)"
+        fontFamily="ui-monospace, monospace"
+        fontWeight="700"
+      >
+        +6%
+      </text>
     </svg>
   );
 }
@@ -327,7 +404,7 @@ function MiniHistory() {
       { i: 0.055, a: -0.024 },
       { i: 0.058, a: 0.068 },
       { i: 0.062, a: -0.041 },
-      { i: 0.060, a: 0.023 },
+      { i: 0.06, a: 0.023 },
       { i: 0.061, a: -0.037 },
       { i: 0.063, a: 0.044 },
       { i: 0.065, a: -0.052 },
@@ -341,7 +418,11 @@ function MiniHistory() {
   const max = 0.085;
   const y = (v: number) => H / 2 - (v / max) * (H / 2 - 8);
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 64, display: 'block' }} aria-hidden="true">
+    <svg
+      viewBox={`0 0 ${W} ${H}`}
+      style={{ width: "100%", height: 64, display: "block" }}
+      aria-hidden="true"
+    >
       <line x1={P} x2={W - P} y1={H / 2} y2={H / 2} stroke="var(--line)" />
       {rows.map((r, i) => {
         const cx = P + colW * i + colW / 2;
@@ -356,23 +437,56 @@ function MiniHistory() {
               fill="color-mix(in oklab, var(--brand-blue-1) 22%, transparent)"
               rx="1"
             >
-              <animate attributeName="opacity" from="0" to="1" dur="600ms" begin={`${i * 80}ms`} fill="freeze" />
+              <animate
+                attributeName="opacity"
+                from="0"
+                to="1"
+                dur="600ms"
+                begin={`${i * 80}ms`}
+                fill="freeze"
+              />
             </rect>
-            <line x1={cx - 5} x2={cx + 5} y1={y(r.i)} y2={y(r.i)} stroke="var(--brand-blue-1)" strokeWidth="0.8" />
-            <line x1={cx - 5} x2={cx + 5} y1={y(-r.i)} y2={y(-r.i)} stroke="var(--brand-blue-1)" strokeWidth="0.8" />
+            <line
+              x1={cx - 5}
+              x2={cx + 5}
+              y1={y(r.i)}
+              y2={y(r.i)}
+              stroke="var(--brand-blue-1)"
+              strokeWidth="0.8"
+            />
+            <line
+              x1={cx - 5}
+              x2={cx + 5}
+              y1={y(-r.i)}
+              y2={y(-r.i)}
+              stroke="var(--brand-blue-1)"
+              strokeWidth="0.8"
+            />
             {beat && (
               <circle
                 cx={cx}
                 cy={y(r.a)}
                 r="4.5"
                 fill="none"
-                stroke={r.a >= 0 ? 'var(--up)' : 'var(--down)'}
+                stroke={r.a >= 0 ? "var(--up)" : "var(--down)"}
                 strokeWidth="0.9"
                 opacity="0.45"
               />
             )}
-            <circle cx={cx} cy={y(r.a)} r="2.6" fill={r.a >= 0 ? 'var(--up)' : 'var(--down)'}>
-              <animate attributeName="r" from="0" to="2.6" dur="320ms" begin={`${400 + i * 80}ms`} fill="freeze" />
+            <circle
+              cx={cx}
+              cy={y(r.a)}
+              r="2.6"
+              fill={r.a >= 0 ? "var(--up)" : "var(--down)"}
+            >
+              <animate
+                attributeName="r"
+                from="0"
+                to="2.6"
+                dur="320ms"
+                begin={`${400 + i * 80}ms`}
+                fill="freeze"
+              />
             </circle>
           </g>
         );
@@ -386,7 +500,11 @@ function MiniHistory() {
 // ──────────────────────────────────────────────────────────────────────────
 function MiniQuantile() {
   return (
-    <svg viewBox="0 0 200 64" style={{ width: '100%', height: 64, display: 'block' }} aria-hidden="true">
+    <svg
+      viewBox="0 0 200 64"
+      style={{ width: "100%", height: 64, display: "block" }}
+      aria-hidden="true"
+    >
       <defs>
         <linearGradient id="mini-q-out" x1="0" x2="1" y1="0" y2="0">
           <stop offset="0%" stopColor="var(--flag)" stopOpacity="0.15" />
@@ -397,12 +515,39 @@ function MiniQuantile() {
           <stop offset="100%" stopColor="var(--flag)" stopOpacity="0.75" />
         </linearGradient>
       </defs>
-      <rect x="14" y="28" width="172" height="14" rx="7" fill="color-mix(in oklab, var(--bg-3) 80%, transparent)" />
-      <rect x="34" y="28" width="132" height="14" rx="7" fill="url(#mini-q-out)">
-        <animate attributeName="width" from="0" to="132" dur="800ms" fill="freeze" />
+      <rect
+        x="14"
+        y="28"
+        width="172"
+        height="14"
+        rx="7"
+        fill="color-mix(in oklab, var(--bg-3) 80%, transparent)"
+      />
+      <rect
+        x="34"
+        y="28"
+        width="132"
+        height="14"
+        rx="7"
+        fill="url(#mini-q-out)"
+      >
+        <animate
+          attributeName="width"
+          from="0"
+          to="132"
+          dur="800ms"
+          fill="freeze"
+        />
       </rect>
       <rect x="62" y="28" width="76" height="14" rx="7" fill="url(#mini-q-in)">
-        <animate attributeName="width" from="0" to="76" dur="800ms" begin="200ms" fill="freeze" />
+        <animate
+          attributeName="width"
+          from="0"
+          to="76"
+          dur="800ms"
+          begin="200ms"
+          fill="freeze"
+        />
       </rect>
       <line
         x1="100"
@@ -411,14 +556,69 @@ function MiniQuantile() {
         y2="48"
         stroke="var(--flag)"
         strokeWidth="2"
-        style={{ filter: 'drop-shadow(0 0 4px var(--flag))' }}
+        style={{ filter: "drop-shadow(0 0 4px var(--flag))" }}
       />
-      <text x="34" y="20" textAnchor="middle" fontSize="8.5" fill="var(--ink-3)" fontFamily="ui-monospace, monospace">P10</text>
-      <text x="100" y="20" textAnchor="middle" fontSize="9" fill="var(--flag)" fontFamily="ui-monospace, monospace" fontWeight="700">P50</text>
-      <text x="166" y="20" textAnchor="middle" fontSize="8.5" fill="var(--ink-3)" fontFamily="ui-monospace, monospace">P90</text>
-      <text x="34" y="60" textAnchor="middle" fontSize="8" fill="var(--ink-4)" fontFamily="ui-monospace, monospace">2.1%</text>
-      <text x="100" y="60" textAnchor="middle" fontSize="8" fill="var(--ink-4)" fontFamily="ui-monospace, monospace">6.3%</text>
-      <text x="166" y="60" textAnchor="middle" fontSize="8" fill="var(--ink-4)" fontFamily="ui-monospace, monospace">9.9%</text>
+      <text
+        x="34"
+        y="20"
+        textAnchor="middle"
+        fontSize="8.5"
+        fill="var(--ink-3)"
+        fontFamily="ui-monospace, monospace"
+      >
+        P10
+      </text>
+      <text
+        x="100"
+        y="20"
+        textAnchor="middle"
+        fontSize="9"
+        fill="var(--flag)"
+        fontFamily="ui-monospace, monospace"
+        fontWeight="700"
+      >
+        P50
+      </text>
+      <text
+        x="166"
+        y="20"
+        textAnchor="middle"
+        fontSize="8.5"
+        fill="var(--ink-3)"
+        fontFamily="ui-monospace, monospace"
+      >
+        P90
+      </text>
+      <text
+        x="34"
+        y="60"
+        textAnchor="middle"
+        fontSize="8"
+        fill="var(--ink-4)"
+        fontFamily="ui-monospace, monospace"
+      >
+        2.1%
+      </text>
+      <text
+        x="100"
+        y="60"
+        textAnchor="middle"
+        fontSize="8"
+        fill="var(--ink-4)"
+        fontFamily="ui-monospace, monospace"
+      >
+        6.3%
+      </text>
+      <text
+        x="166"
+        y="60"
+        textAnchor="middle"
+        fontSize="8"
+        fill="var(--ink-4)"
+        fontFamily="ui-monospace, monospace"
+      >
+        9.9%
+      </text>
     </svg>
   );
 }
@@ -431,43 +631,125 @@ type Step = {
   title: string;
   body: string;
   tone: string;
-  icon: 'chain' | 'math' | 'history' | 'score';
+  icon: "chain" | "math" | "history" | "score";
 };
 
-function StepIcon({ kind, color }: { kind: Step['icon']; color: string }) {
+function StepIcon({ kind, color }: { kind: Step["icon"]; color: string }) {
   const ICON_SIZE = 26;
-  if (kind === 'chain') {
+  if (kind === "chain") {
     return (
-      <svg width={ICON_SIZE} height={ICON_SIZE} viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <rect x="3" y="4" width="18" height="3" rx="1" stroke={color} strokeWidth="1.6" />
-        <rect x="3" y="10.5" width="18" height="3" rx="1" stroke={color} strokeWidth="1.6" />
-        <rect x="3" y="17" width="18" height="3" rx="1" stroke={color} strokeWidth="1.6" />
+      <svg
+        width={ICON_SIZE}
+        height={ICON_SIZE}
+        viewBox="0 0 24 24"
+        fill="none"
+        aria-hidden="true"
+      >
+        <rect
+          x="3"
+          y="4"
+          width="18"
+          height="3"
+          rx="1"
+          stroke={color}
+          strokeWidth="1.6"
+        />
+        <rect
+          x="3"
+          y="10.5"
+          width="18"
+          height="3"
+          rx="1"
+          stroke={color}
+          strokeWidth="1.6"
+        />
+        <rect
+          x="3"
+          y="17"
+          width="18"
+          height="3"
+          rx="1"
+          stroke={color}
+          strokeWidth="1.6"
+        />
       </svg>
     );
   }
-  if (kind === 'math') {
+  if (kind === "math") {
     return (
-      <svg width={ICON_SIZE} height={ICON_SIZE} viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <path d="M5 12c2-7 5-7 7 0s5 7 7 0" stroke={color} strokeWidth="1.6" strokeLinecap="round" />
+      <svg
+        width={ICON_SIZE}
+        height={ICON_SIZE}
+        viewBox="0 0 24 24"
+        fill="none"
+        aria-hidden="true"
+      >
+        <path
+          d="M5 12c2-7 5-7 7 0s5 7 7 0"
+          stroke={color}
+          strokeWidth="1.6"
+          strokeLinecap="round"
+        />
         <circle cx="5" cy="12" r="1.4" fill={color} />
         <circle cx="19" cy="12" r="1.4" fill={color} />
       </svg>
     );
   }
-  if (kind === 'history') {
+  if (kind === "history") {
     return (
-      <svg width={ICON_SIZE} height={ICON_SIZE} viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <rect x="4" y="13" width="3" height="7" rx="0.5" fill={color} opacity="0.5" />
-        <rect x="9" y="9" width="3" height="11" rx="0.5" fill={color} opacity="0.7" />
-        <rect x="14" y="6" width="3" height="14" rx="0.5" fill={color} opacity="0.85" />
+      <svg
+        width={ICON_SIZE}
+        height={ICON_SIZE}
+        viewBox="0 0 24 24"
+        fill="none"
+        aria-hidden="true"
+      >
+        <rect
+          x="4"
+          y="13"
+          width="3"
+          height="7"
+          rx="0.5"
+          fill={color}
+          opacity="0.5"
+        />
+        <rect
+          x="9"
+          y="9"
+          width="3"
+          height="11"
+          rx="0.5"
+          fill={color}
+          opacity="0.7"
+        />
+        <rect
+          x="14"
+          y="6"
+          width="3"
+          height="14"
+          rx="0.5"
+          fill={color}
+          opacity="0.85"
+        />
         <rect x="19" y="3" width="3" height="17" rx="0.5" fill={color} />
       </svg>
     );
   }
   return (
-    <svg width={ICON_SIZE} height={ICON_SIZE} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <svg
+      width={ICON_SIZE}
+      height={ICON_SIZE}
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
       <circle cx="12" cy="12" r="8" stroke={color} strokeWidth="1.6" />
-      <path d="M12 8v4l3 2" stroke={color} strokeWidth="1.6" strokeLinecap="round" />
+      <path
+        d="M12 8v4l3 2"
+        stroke={color}
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
     </svg>
   );
 }
@@ -478,7 +760,7 @@ function Pipeline() {
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    if (typeof IntersectionObserver === 'undefined') {
+    if (typeof IntersectionObserver === "undefined") {
       setShown(true);
       return;
     }
@@ -500,38 +782,34 @@ function Pipeline() {
 
   const steps: Step[] = [
     {
-      kicker: '01',
-      title: 'Chain',
+      kicker: "01",
+      title: "Chain",
       // Real pipeline: Polygon/Finnhub option chains land in DuckDB-backed
       // parquet via scripts/sync_dolthub.py and the hourly daily_score job.
-      body:
-        'Hourly OPRA chain snapshots covering every listed expiry and every strike. Landed into a DuckDB-backed parquet warehouse.',
-      tone: 'var(--brand-blue-1)',
-      icon: 'chain',
+      body: "Hourly OPRA chain snapshots covering every listed expiry and every strike. Landed into a DuckDB-backed parquet warehouse.",
+      tone: "var(--brand-blue-1)",
+      icon: "chain",
     },
     {
-      kicker: '02',
-      title: 'Math',
-      body:
-        'Black–Scholes with dividend yield. Brent solver for IV to 1e-6. Term IV, ATM skew, vega, straddle EM and 80% bands on the print expiry.',
-      tone: 'var(--accent-hi)',
-      icon: 'math',
+      kicker: "02",
+      title: "Math",
+      body: "Black–Scholes with dividend yield. Brent solver for IV to 1e-6. Term IV, ATM skew, vega, straddle EM and 80% bands on the print expiry.",
+      tone: "var(--accent-hi)",
+      icon: "math",
     },
     {
-      kicker: '03',
-      title: 'History',
-      body:
-        'Realized close-to-close moves bracketed by Finnhub-grade earnings timing (BMO/AMC). Twelve quarters per name; EPS / revenue overlay where available.',
-      tone: 'var(--up)',
-      icon: 'history',
+      kicker: "03",
+      title: "History",
+      body: "Realized close-to-close moves bracketed by Finnhub-grade earnings timing (BMO/AMC). Twelve quarters per name; EPS / revenue overlay where available.",
+      tone: "var(--up)",
+      icon: "history",
     },
     {
-      kicker: '04',
-      title: 'Score',
-      body:
-        'Rich-vs-hist edge, IV rank vs trailing 52w, and the LightGBM ensemble’s edge over options. Names ranked so the interesting ones rise to the top of the screener.',
-      tone: 'var(--flag)',
-      icon: 'score',
+      kicker: "04",
+      title: "Score",
+      body: "Rich-vs-hist edge, IV rank vs trailing 52w, and the LightGBM ensemble’s edge over options. Names ranked so the interesting ones rise to the top of the screener.",
+      tone: "var(--flag)",
+      icon: "score",
     },
   ];
 
@@ -539,10 +817,23 @@ function Pipeline() {
     <div ref={ref}>
       <svg
         viewBox="0 0 760 100"
-        style={{ width: '100%', height: 100, display: 'block', marginBottom: 14 }}
+        style={{
+          width: "100%",
+          height: 100,
+          display: "block",
+          marginBottom: 14,
+        }}
         aria-hidden="true"
       >
-        <line x1="80" x2="680" y1="50" y2="50" stroke="var(--line)" strokeWidth="1" strokeDasharray="3 5" />
+        <line
+          x1="80"
+          x2="680"
+          y1="50"
+          y2="50"
+          stroke="var(--line)"
+          strokeWidth="1"
+          strokeDasharray="3 5"
+        />
         <line
           x1="80"
           x2="680"
@@ -552,7 +843,10 @@ function Pipeline() {
           strokeWidth="2.5"
           strokeDasharray="600"
           strokeDashoffset={shown ? 0 : 600}
-          style={{ transition: 'stroke-dashoffset 1800ms cubic-bezier(.4,0,.2,1) 200ms' }}
+          style={{
+            transition:
+              "stroke-dashoffset 1800ms cubic-bezier(.4,0,.2,1) 200ms",
+          }}
         />
         <defs>
           <linearGradient id="pipeline-grad" x1="0" x2="1" y1="0" y2="0">
@@ -566,7 +860,14 @@ function Pipeline() {
           const cx = 80 + i * 200;
           return (
             <g key={s.kicker}>
-              <circle cx={cx} cy="50" r="22" fill="var(--bg-2)" stroke="var(--line)" strokeWidth="1" />
+              <circle
+                cx={cx}
+                cy="50"
+                r="22"
+                fill="var(--bg-2)"
+                stroke="var(--line)"
+                strokeWidth="1"
+              />
               <circle
                 cx={cx}
                 cy="50"
@@ -597,8 +898,17 @@ function Pipeline() {
         })}
         {shown && (
           <circle r="4" fill="var(--ink)" opacity="0.8">
-            <animateMotion dur="4500ms" repeatCount="indefinite" path="M 80 50 L 680 50" />
-            <animate attributeName="opacity" values="0;1;0" dur="4500ms" repeatCount="indefinite" />
+            <animateMotion
+              dur="4500ms"
+              repeatCount="indefinite"
+              path="M 80 50 L 680 50"
+            />
+            <animate
+              attributeName="opacity"
+              values="0;1;0"
+              dur="4500ms"
+              repeatCount="indefinite"
+            />
           </circle>
         )}
       </svg>
@@ -606,8 +916,8 @@ function Pipeline() {
       <div
         className="qv-m-2col"
         style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+          display: "grid",
+          gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
           gap: 10,
           marginTop: 4,
         }}
@@ -616,29 +926,36 @@ function Pipeline() {
           <div
             key={s.kicker}
             style={{
-              padding: '16px 16px 18px',
+              padding: "16px 16px 18px",
               background: `linear-gradient(180deg,
                 color-mix(in oklab, ${s.tone} 8%, var(--bg-2)),
                 var(--bg-2))`,
               borderRadius: 12,
-              border: '1px solid var(--line)',
+              border: "1px solid var(--line)",
               transition:
-                'transform 600ms cubic-bezier(.2,.8,.3,1) ' +
+                "transform 600ms cubic-bezier(.2,.8,.3,1) " +
                 (200 + i * 180) +
-                'ms, opacity 600ms ease ' +
+                "ms, opacity 600ms ease " +
                 (200 + i * 180) +
-                'ms',
-              transform: shown ? 'translateY(0)' : 'translateY(10px)',
+                "ms",
+              transform: shown ? "translateY(0)" : "translateY(10px)",
               opacity: shown ? 1 : 0,
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                marginBottom: 10,
+              }}
+            >
               <StepIcon kind={s.icon} color={s.tone} />
               <span
                 style={{
                   fontSize: 10,
-                  letterSpacing: '0.18em',
-                  textTransform: 'uppercase',
+                  letterSpacing: "0.18em",
+                  textTransform: "uppercase",
                   color: s.tone,
                   fontWeight: 700,
                 }}
@@ -652,13 +969,20 @@ function Pipeline() {
                 margin: 0,
                 fontSize: 18,
                 fontWeight: 700,
-                color: 'var(--ink)',
-                letterSpacing: '-0.01em',
+                color: "var(--ink)",
+                letterSpacing: "-0.01em",
               }}
             >
               {s.title}
             </h3>
-            <p style={{ margin: '8px 0 0', fontSize: 12, color: 'var(--ink-3)', lineHeight: 1.5 }}>
+            <p
+              style={{
+                margin: "8px 0 0",
+                fontSize: 12,
+                color: "var(--ink-3)",
+                lineHeight: 1.5,
+              }}
+            >
               {s.body}
             </p>
           </div>
@@ -671,24 +995,24 @@ function Pipeline() {
 function PublicationControls() {
   const controls = [
     {
-      step: '01',
-      title: 'Point-in-time inputs',
-      body: 'Market and earnings features retain the observation time used for scoring.',
+      step: "01",
+      title: "Point-in-time inputs",
+      body: "Market and earnings features retain the observation time used for scoring.",
     },
     {
-      step: '02',
-      title: 'Reconcile',
-      body: 'Schema, duplicate-key, missing-record, and coverage checks run before scoring.',
+      step: "02",
+      title: "Reconcile",
+      body: "Schema, duplicate-key, missing-record, and coverage checks run before scoring.",
     },
     {
-      step: '03',
-      title: 'Score and verify',
-      body: 'Versioned model artifacts must pass calibration, baseline, and IV checks.',
+      step: "03",
+      title: "Score and verify",
+      body: "Versioned model artifacts must pass calibration, baseline, and IV checks.",
     },
     {
-      step: '04',
-      title: 'Publish or stop',
-      body: 'A snapshot is published only when every required control passes.',
+      step: "04",
+      title: "Publish or stop",
+      body: "A snapshot is published only when every required control passes.",
     },
   ] as const;
 
@@ -727,28 +1051,6 @@ function PublicationControls() {
 }
 
 // ──────────────────────────────────────────────────────────────────────────
-// Tex · KaTeX-rendered LaTeX. Render to HTML string once per formula and
-// drop into a span. Display mode for block equations, inline otherwise.
-// ──────────────────────────────────────────────────────────────────────────
-function Tex({ math, displayMode = true }: { math: string; displayMode?: boolean }) {
-  const html = useMemo(
-    () =>
-      katex.renderToString(math, {
-        displayMode,
-        throwOnError: false,
-        output: 'html',
-      }),
-    [math, displayMode],
-  );
-  return (
-    <span
-      className="qv-tex"
-      dangerouslySetInnerHTML={{ __html: html }}
-    />
-  );
-}
-
-// ──────────────────────────────────────────────────────────────────────────
 // Methodology · formula card row
 // ──────────────────────────────────────────────────────────────────────────
 function FormulaCard({
@@ -756,30 +1058,34 @@ function FormulaCard({
   title,
   body,
   tex,
+  id,
 }: {
   kicker: string;
   title: string;
   body: string;
   tex: string;
+  id: string;
 }) {
   return (
     <div
+      id={id}
+      className="qv-about-formula-card"
       style={{
-        padding: '20px 22px',
+        padding: "20px 22px",
         borderRadius: 14,
-        border: '1px solid var(--line)',
-        background: 'var(--bg-2)',
-        display: 'flex',
-        flexDirection: 'column',
+        border: "1px solid var(--line)",
+        background: "var(--bg-2)",
+        display: "flex",
+        flexDirection: "column",
         gap: 10,
       }}
     >
       <div
         style={{
           fontSize: 10,
-          letterSpacing: '0.18em',
-          textTransform: 'uppercase',
-          color: 'var(--ink-3)',
+          letterSpacing: "0.18em",
+          textTransform: "uppercase",
+          color: "var(--ink-3)",
           fontWeight: 700,
         }}
       >
@@ -791,25 +1097,39 @@ function FormulaCard({
           margin: 0,
           fontSize: 18,
           fontWeight: 700,
-          color: 'var(--ink)',
-          letterSpacing: '-0.01em',
+          color: "var(--ink)",
+          letterSpacing: "-0.01em",
         }}
       >
         {title}
       </h3>
       <div
         style={{
-          padding: '14px 16px',
+          padding: "14px 16px",
           borderRadius: 8,
-          background: 'color-mix(in oklab, var(--bg-3) 50%, transparent)',
-          border: '1px solid color-mix(in oklab, var(--line) 60%, transparent)',
-          color: 'var(--ink)',
-          overflowX: 'auto',
+          background: "color-mix(in oklab, var(--bg-3) 50%, transparent)",
+          border: "1px solid color-mix(in oklab, var(--line) 60%, transparent)",
+          color: "var(--ink)",
+          overflowX: "auto",
         }}
       >
-        <Tex math={tex} />
+        <MathFormula
+          className="qv-tex"
+          displayMode
+          label={`${title} formula`}
+          math={tex}
+        />
       </div>
-      <p style={{ margin: 0, fontSize: 12.5, color: 'var(--ink-3)', lineHeight: 1.55 }}>{body}</p>
+      <p
+        style={{
+          margin: 0,
+          fontSize: 12.5,
+          color: "var(--ink-3)",
+          lineHeight: 1.55,
+        }}
+      >
+        {body}
+      </p>
     </div>
   );
 }
@@ -829,43 +1149,71 @@ export default function AboutPageClient() {
   //    universe level than the 12 quarters we persist per name.
   //  · refresh: chain-to-UI latency target, capped at the cron interval.
   const stats = [
-    { v: 1424, from: 0,    suf: '', dec: 0, kicker: 'Names', label: 'tracked across our universe' },
-    { v: 12.4, from: 0,    suf: 'K', dec: 1, kicker: 'Chains', label: 'snapped per week' },
-    { v: 8,    from: 0,    suf: ' yrs', dec: 0, kicker: 'History', label: 'of realized data' },
+    {
+      v: 1424,
+      from: 0,
+      suf: "",
+      dec: 0,
+      kicker: "Names",
+      label: "tracked across our universe",
+    },
+    {
+      v: 12.4,
+      from: 0,
+      suf: "K",
+      dec: 1,
+      kicker: "Chains",
+      label: "snapped per week",
+    },
+    {
+      v: 8,
+      from: 0,
+      suf: " yrs",
+      dec: 0,
+      kicker: "History",
+      label: "of realized data",
+    },
     // Counts DOWN from a one-day-in-minutes (1440) ceiling toward the
     // 60-minute target so the stat reads as latency collapsing, not
     // climbing — conveys "fast" rather than "growing."
-    { v: 60,   from: 1440, suf: ' min', dec: 0, kicker: 'Refresh', label: 'chain to UI latency' },
+    {
+      v: 60,
+      from: 1440,
+      suf: " min",
+      dec: 0,
+      kicker: "Refresh",
+      label: "chain to UI latency",
+    },
   ];
 
   return (
     <div
       ref={pageRef}
       className="qv-m-pad"
-      style={{ maxWidth: 980, margin: '0 auto', padding: '0 28px 80px' }}
+      style={{ maxWidth: 980, margin: "0 auto", padding: "0 28px 80px" }}
     >
       {/* Hero */}
       <Reveal enabled={pageSettled}>
         <div
           className="qv-m-stack qv-about-hero"
           style={{
-            padding: '44px 0 32px',
-            display: 'grid',
-            gridTemplateColumns: 'minmax(0, 1.4fr) minmax(0, 1fr)',
+            padding: "44px 0 32px",
+            display: "grid",
+            gridTemplateColumns: "minmax(0, 1.4fr) minmax(0, 1fr)",
             gap: 32,
-            alignItems: 'center',
+            alignItems: "center",
           }}
         >
           <div>
             <div
               style={{
-                display: 'flex',
-                alignItems: 'center',
+                display: "flex",
+                alignItems: "center",
                 gap: 10,
                 fontSize: 10.5,
-                letterSpacing: '0.2em',
-                textTransform: 'uppercase',
-                color: 'var(--ink-3)',
+                letterSpacing: "0.2em",
+                textTransform: "uppercase",
+                color: "var(--ink-3)",
                 marginBottom: 18,
                 fontWeight: 600,
               }}
@@ -877,13 +1225,13 @@ export default function AboutPageClient() {
                 width={18}
                 height={18}
                 style={{
-                  display: 'inline-block',
-                  objectFit: 'contain',
-                  mixBlendMode: 'screen',
+                  display: "inline-block",
+                  objectFit: "contain",
+                  mixBlendMode: "screen",
                 }}
               />
               <span>About</span>
-              <span style={{ color: 'var(--ink-4)' }}>·</span>
+              <span style={{ color: "var(--ink-4)" }}>·</span>
               <span>Quantiv</span>
             </div>
             <h1
@@ -892,10 +1240,10 @@ export default function AboutPageClient() {
                 margin: 0,
                 fontSize: 76,
                 fontWeight: 800,
-                letterSpacing: '-0.04em',
+                letterSpacing: "-0.04em",
                 lineHeight: 0.9,
-                color: 'var(--ink)',
-                textTransform: 'uppercase',
+                color: "var(--ink)",
+                textTransform: "uppercase",
               }}
             >
               What options
@@ -903,10 +1251,10 @@ export default function AboutPageClient() {
               <span
                 style={{
                   background:
-                    'linear-gradient(135deg, var(--brand-blue-1), var(--accent-hi))',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                  backgroundClip: 'text',
+                    "linear-gradient(135deg, var(--brand-blue-1), var(--accent-hi))",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                  backgroundClip: "text",
                 }}
               >
                 are saying.
@@ -916,19 +1264,19 @@ export default function AboutPageClient() {
               style={{
                 marginTop: 24,
                 fontSize: 18,
-                color: 'var(--ink-2)',
+                color: "var(--ink-2)",
                 lineHeight: 1.55,
-                letterSpacing: '-0.005em',
+                letterSpacing: "-0.005em",
                 maxWidth: 520,
               }}
             >
               Quantiv reads the options chain like a tape. For every print we
-              measure what the market is paying for movement, what the stock
-              has actually delivered across the last twelve quarters, and where
+              measure what the market is paying for movement, what the stock has
+              actually delivered across the last twelve quarters, and where
               today&apos;s premium sits inside its own 52-week history.
             </p>
           </div>
-          <div style={{ justifySelf: 'end' }}>
+          <div style={{ justifySelf: "end" }}>
             <HeroGlyph enabled={pageSettled} />
           </div>
         </div>
@@ -939,27 +1287,27 @@ export default function AboutPageClient() {
         <div
           className="qv-m-2col qv-about-stats"
           style={{
-            borderTop: '1px solid var(--line)',
-            borderBottom: '1px solid var(--line)',
-            display: 'grid',
-            gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
-            padding: '20px 0',
+            borderTop: "1px solid var(--line)",
+            borderBottom: "1px solid var(--line)",
+            display: "grid",
+            gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+            padding: "20px 0",
           }}
         >
           {stats.map((s, i) => (
             <div
               key={s.kicker}
               style={{
-                padding: '0 22px',
-                borderLeft: i === 0 ? 'none' : '1px solid var(--line)',
+                padding: "0 22px",
+                borderLeft: i === 0 ? "none" : "1px solid var(--line)",
               }}
             >
               <div
                 style={{
                   fontSize: 9.5,
-                  letterSpacing: '0.2em',
-                  textTransform: 'uppercase',
-                  color: 'var(--ink-3)',
+                  letterSpacing: "0.2em",
+                  textTransform: "uppercase",
+                  color: "var(--ink-3)",
                   fontWeight: 600,
                   marginBottom: 8,
                 }}
@@ -970,8 +1318,8 @@ export default function AboutPageClient() {
                 style={{
                   fontSize: 38,
                   fontWeight: 800,
-                  letterSpacing: '-0.03em',
-                  color: 'var(--ink)',
+                  letterSpacing: "-0.03em",
+                  color: "var(--ink)",
                   lineHeight: 1,
                 }}
               >
@@ -984,7 +1332,11 @@ export default function AboutPageClient() {
                   duration={COUNT_UP_DURATION_MS + i * 240}
                 />
               </div>
-              <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 6 }}>{s.label}</div>
+              <div
+                style={{ fontSize: 11, color: "var(--ink-3)", marginTop: 6 }}
+              >
+                {s.label}
+              </div>
             </div>
           ))}
         </div>
@@ -992,13 +1344,13 @@ export default function AboutPageClient() {
 
       {/* What we measure · three lenses with mini visualizations */}
       <Reveal enabled={pageSettled} delay={100}>
-        <div style={{ padding: '44px 0 16px' }}>
+        <div style={{ padding: "44px 0 16px" }}>
           <div
             style={{
               fontSize: 10,
-              letterSpacing: '0.18em',
-              textTransform: 'uppercase',
-              color: 'var(--ink-3)',
+              letterSpacing: "0.18em",
+              textTransform: "uppercase",
+              color: "var(--ink-3)",
               fontWeight: 600,
               marginBottom: 10,
             }}
@@ -1011,9 +1363,9 @@ export default function AboutPageClient() {
               margin: 0,
               fontSize: 36,
               fontWeight: 800,
-              letterSpacing: '-0.025em',
+              letterSpacing: "-0.025em",
               lineHeight: 1,
-              color: 'var(--ink)',
+              color: "var(--ink)",
             }}
           >
             Three lenses on every print.
@@ -1023,35 +1375,32 @@ export default function AboutPageClient() {
           className="qv-m-stack"
           style={{
             marginTop: 16,
-            display: 'grid',
-            gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+            display: "grid",
+            gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
             gap: 14,
           }}
         >
           {(
             [
               {
-                kicker: 'Pricing',
-                title: 'Implied move',
-                body:
-                  'The print-expiry ATM straddle prices a ±1σ move. We surface both straddle-implied EM and the IV-implied EM (S₀·σ_ATM·√T) side-by-side. When they diverge, the gap is the skew premium dealers are charging.',
-                tone: 'var(--brand-blue-1)',
+                kicker: "Pricing",
+                title: "Implied move",
+                body: "The print-expiry ATM straddle prices a ±1σ move. We surface both straddle-implied EM and the IV-implied EM (S₀·σ_ATM·√T) side-by-side. When they diverge, the gap is the skew premium dealers are charging.",
+                tone: "var(--brand-blue-1)",
                 viz: <MiniStraddleBar />,
               },
               {
-                kicker: 'History',
-                title: 'Realized track record',
-                body:
-                  'Close-to-close moves over the last twelve quarters, bracketed by BMO/AMC timing. Hist edge = (straddle EM − 4Q realized avg) / 4Q realized avg. Positive when options are pricing it richer than the stock has delivered.',
-                tone: 'var(--up)',
+                kicker: "History",
+                title: "Realized track record",
+                body: "Close-to-close moves over the last twelve quarters, bracketed by BMO/AMC timing. Hist edge = (straddle EM − 4Q realized avg) / 4Q realized avg. Positive when options are pricing it richer than the stock has delivered.",
+                tone: "var(--up)",
                 viz: <MiniHistory />,
               },
               {
-                kicker: 'Model',
-                title: 'ML forecast',
-                body:
-                  'A LightGBM ensemble trained walk-forward on chain features (term IV, skew, vega, DTE) and realized history. Outputs P10–P90 quantiles of |move|. Tight 80% bands = the model is confident; wide bands = priced uncertainty.',
-                tone: 'var(--flag)',
+                kicker: "Model",
+                title: "ML forecast",
+                body: "A LightGBM ensemble trained walk-forward on chain features (term IV, skew, vega, DTE) and realized history. Outputs P10–P90 quantiles of |move|. Tight 80% bands = the model is confident; wide bands = priced uncertainty.",
+                tone: "var(--flag)",
                 viz: <MiniQuantile />,
               },
             ] as const
@@ -1060,21 +1409,21 @@ export default function AboutPageClient() {
               key={c.title}
               style={{
                 borderRadius: 14,
-                border: '1px solid var(--line)',
+                border: "1px solid var(--line)",
                 background: `linear-gradient(180deg,
                   color-mix(in oklab, ${c.tone} 7%, var(--bg-2)) 0%,
                   var(--bg-2) 70%)`,
-                padding: '20px 22px 22px',
-                display: 'flex',
-                flexDirection: 'column',
+                padding: "20px 22px 22px",
+                display: "flex",
+                flexDirection: "column",
                 gap: 12,
               }}
             >
               <div
                 style={{
                   fontSize: 10,
-                  letterSpacing: '0.18em',
-                  textTransform: 'uppercase',
+                  letterSpacing: "0.18em",
+                  textTransform: "uppercase",
                   color: c.tone,
                   fontWeight: 700,
                 }}
@@ -1083,10 +1432,12 @@ export default function AboutPageClient() {
               </div>
               <div
                 style={{
-                  background: 'color-mix(in oklab, var(--bg-3) 30%, transparent)',
+                  background:
+                    "color-mix(in oklab, var(--bg-3) 30%, transparent)",
                   borderRadius: 10,
-                  padding: '10px 12px 8px',
-                  border: '1px solid color-mix(in oklab, var(--line) 60%, transparent)',
+                  padding: "10px 12px 8px",
+                  border:
+                    "1px solid color-mix(in oklab, var(--line) 60%, transparent)",
                 }}
               >
                 {c.viz}
@@ -1098,14 +1449,21 @@ export default function AboutPageClient() {
                     margin: 0,
                     fontSize: 19,
                     fontWeight: 700,
-                    letterSpacing: '-0.01em',
-                    color: 'var(--ink)',
+                    letterSpacing: "-0.01em",
+                    color: "var(--ink)",
                     lineHeight: 1.1,
                   }}
                 >
                   {c.title}
                 </h3>
-                <div style={{ marginTop: 6, fontSize: 12.5, color: 'var(--ink-3)', lineHeight: 1.5 }}>
+                <div
+                  style={{
+                    marginTop: 6,
+                    fontSize: 12.5,
+                    color: "var(--ink-3)",
+                    lineHeight: 1.5,
+                  }}
+                >
                   {c.body}
                 </div>
               </div>
@@ -1117,18 +1475,19 @@ export default function AboutPageClient() {
       {/* Models & math · formulas + plain-English notes */}
       <Reveal enabled={pageSettled} delay={120}>
         <div
+          id="models-and-math"
           style={{
-            padding: '44px 0 8px',
-            borderTop: '1px solid var(--line)',
+            padding: "44px 0 8px",
+            borderTop: "1px solid var(--line)",
             marginTop: 40,
           }}
         >
           <div
             style={{
               fontSize: 10,
-              letterSpacing: '0.18em',
-              textTransform: 'uppercase',
-              color: 'var(--ink-3)',
+              letterSpacing: "0.18em",
+              textTransform: "uppercase",
+              color: "var(--ink-3)",
               fontWeight: 600,
               marginBottom: 10,
             }}
@@ -1141,29 +1500,29 @@ export default function AboutPageClient() {
               margin: 0,
               fontSize: 36,
               fontWeight: 800,
-              letterSpacing: '-0.025em',
+              letterSpacing: "-0.025em",
               lineHeight: 1,
-              color: 'var(--ink)',
+              color: "var(--ink)",
             }}
           >
             The pricing engine, in seven lines.
           </h2>
           <p
             style={{
-              margin: '14px 0 0',
+              margin: "14px 0 0",
               // Widened from 660 → 820 so the right edge sits close to
               // the formula-card row below it, without letting body
               // copy run past ~115 characters per line.
               maxWidth: 820,
               fontSize: 14,
-              color: 'var(--ink-3)',
+              color: "var(--ink-3)",
               lineHeight: 1.6,
             }}
           >
             Every chart on the ticker page traces back to one of these formulas.
             We show the math because the assumptions behind it (log-normal
-            returns, constant volatility over the horizon) matter for how
-            you read the output.
+            returns, constant volatility over the horizon) matter for how you
+            read the output.
           </p>
         </div>
 
@@ -1171,12 +1530,24 @@ export default function AboutPageClient() {
           className="qv-m-stack"
           style={{
             marginTop: 18,
-            display: 'grid',
-            gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+            display: "grid",
+            gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
             gap: 14,
           }}
         >
           <FormulaCard
+            id="methodology-atm-iv"
+            kicker="ATM IV"
+            title="From an option quote to volatility"
+            tex={String.raw`\begin{aligned}
+              C_{\mathrm{BS}}(S,K,T,r,q,\sigma_C) &= C_{\mathrm{mid}} \\[2pt]
+              P_{\mathrm{BS}}(S,K,T,r,q,\sigma_P) &= P_{\mathrm{mid}} \\[2pt]
+              \sigma_{\mathrm{ATM}} &= \tfrac{1}{2}(\sigma_C+\sigma_P)
+              \end{aligned}`}
+            body="We first match a call and put with the same symbol, expiry, and strike. We solve the pricing equation separately for each midpoint, then average the two annualized IVs. Crossed, zero-sided, and excessively wide quotes are rejected before this step."
+          />
+          <FormulaCard
+            id="methodology-straddle"
             kicker="Straddle EM"
             title="What dealers are pricing"
             tex={String.raw`\mathrm{EM}_{\text{straddle}} \;=\; \frac{c_{\mathrm{ATM}} \,+\, p_{\mathrm{ATM}}}{S_0}`}
@@ -1185,6 +1556,7 @@ export default function AboutPageClient() {
               implied; pay it if you think more."
           />
           <FormulaCard
+            id="methodology-iv-move"
             kicker="IV-based EM"
             title="Scale IV to the horizon"
             tex={String.raw`\mathrm{EM}_{\mathrm{IV}} \;=\; \sigma_{\mathrm{ATM}} \,\cdot\, \sqrt{\tfrac{\mathrm{DTE}}{365}}`}
@@ -1193,6 +1565,7 @@ export default function AboutPageClient() {
               risk; the next expiry is your &lsquo;quieter&rsquo; reference."
           />
           <FormulaCard
+            id="methodology-greeks"
             kicker="Greeks"
             title="Black–Scholes with dividends"
             tex={String.raw`\begin{aligned}
@@ -1200,12 +1573,13 @@ export default function AboutPageClient() {
               \Delta_{\text{call}} &= e^{-qT}\,N(d_1) \qquad \Gamma = \tfrac{e^{-qT}\,\varphi(d_1)}{S\,\sigma\sqrt{T}} \\[2pt]
               \nu &= S\,e^{-qT}\,\varphi(d_1)\,\sqrt{T}
               \end{aligned}`}
-            body="IV is solved with Brent&apos;s method to 1e-6 tolerance from mid quotes.
+            body="IV is solved with Brent's method to 1e-6 tolerance from mid quotes.
               Greeks are surfaced per expiry so you can see how delta-flat your
-              position is, how much it&apos;ll move on a 1-vol jump, and how fast
+              position is, how much it'll move on a 1-vol jump, and how fast
               theta accelerates into print."
           />
           <FormulaCard
+            id="methodology-density"
             kicker="Density"
             title="Two-sided log-normal probability"
             tex={String.raw`\begin{aligned}
@@ -1217,6 +1591,7 @@ export default function AboutPageClient() {
               downside in simple-return space is fatter than the upside."
           />
           <FormulaCard
+            id="methodology-history"
             kicker="Hist edge"
             title="Rich versus what actually printed"
             tex={String.raw`\text{hist\_edge} \;=\; \frac{\mathrm{EM}_{\text{straddle}} \,-\, \mu_{4\mathrm{Q},\,|\Delta|}}{\mu_{4\mathrm{Q},\,|\Delta|}}`}
@@ -1226,12 +1601,13 @@ export default function AboutPageClient() {
               quick prior, not a signal."
           />
           <FormulaCard
+            id="methodology-forecast"
             kicker="Forecast"
             title="LightGBM quantile ensemble"
             tex={String.raw`\hat{y}_{\tau} \;=\; \arg\min_{\hat{y}}\,\sum_{i} \rho_{\tau}\!\bigl(y_{i} - \hat{y}\bigr),\quad \tau \in \{0.10,\,0.25,\,0.50,\,0.75,\,0.90\}`}
             body="Five gradient-boosted models, one per quantile of |move|, trained
               walk-forward across every observed earnings event in the universe with
-              no look-ahead. The 80% band P10–P90 is the model&apos;s confidence
+              no look-ahead. The 80% band P10–P90 is the model's confidence
               interval, not a guarantee."
           />
         </div>
@@ -1241,17 +1617,17 @@ export default function AboutPageClient() {
       <Reveal enabled={pageSettled} delay={160}>
         <div
           style={{
-            padding: '44px 0 8px',
-            borderTop: '1px solid var(--line)',
+            padding: "44px 0 8px",
+            borderTop: "1px solid var(--line)",
             marginTop: 40,
           }}
         >
           <div
             style={{
               fontSize: 10,
-              letterSpacing: '0.18em',
-              textTransform: 'uppercase',
-              color: 'var(--ink-3)',
+              letterSpacing: "0.18em",
+              textTransform: "uppercase",
+              color: "var(--ink-3)",
               fontWeight: 600,
               marginBottom: 10,
             }}
@@ -1264,9 +1640,9 @@ export default function AboutPageClient() {
               margin: 0,
               fontSize: 36,
               fontWeight: 800,
-              letterSpacing: '-0.025em',
+              letterSpacing: "-0.025em",
               lineHeight: 1,
-              color: 'var(--ink)',
+              color: "var(--ink)",
             }}
           >
             From chains to decisions, hourly.
@@ -1285,24 +1661,25 @@ export default function AboutPageClient() {
           style={{
             marginTop: 40,
             borderRadius: 18,
-            padding: '32px 34px',
+            padding: "32px 34px",
             background:
-              'radial-gradient(120% 140% at 0% 0%, color-mix(in oklab, var(--brand-blue-1) 16%, transparent) 0%, transparent 55%), radial-gradient(80% 100% at 100% 100%, color-mix(in oklab, var(--accent) 10%, transparent) 0%, transparent 60%), linear-gradient(180deg, color-mix(in oklab, var(--bg-2) 92%, transparent), color-mix(in oklab, var(--bg-3) 70%, transparent))',
-            border: '1px solid color-mix(in oklab, var(--brand-blue-1) 22%, var(--line))',
-            display: 'grid',
-            gridTemplateColumns: 'auto 1fr',
+              "radial-gradient(120% 140% at 0% 0%, color-mix(in oklab, var(--brand-blue-1) 16%, transparent) 0%, transparent 55%), radial-gradient(80% 100% at 100% 100%, color-mix(in oklab, var(--accent) 10%, transparent) 0%, transparent 60%), linear-gradient(180deg, color-mix(in oklab, var(--bg-2) 92%, transparent), color-mix(in oklab, var(--bg-3) 70%, transparent))",
+            border:
+              "1px solid color-mix(in oklab, var(--brand-blue-1) 22%, var(--line))",
+            display: "grid",
+            gridTemplateColumns: "auto 1fr",
             gap: 28,
-            alignItems: 'center',
+            alignItems: "center",
           }}
         >
           <div
             style={{
-              fontFamily: 'Mulish, serif',
+              fontFamily: "Mulish, serif",
               fontSize: 120,
               fontWeight: 800,
-              color: 'var(--brand-blue-1)',
+              color: "var(--brand-blue-1)",
               lineHeight: 0.6,
-              letterSpacing: '-0.05em',
+              letterSpacing: "-0.05em",
               opacity: 0.85,
             }}
           >
@@ -1314,15 +1691,15 @@ export default function AboutPageClient() {
               style={{
                 fontSize: 22,
                 fontWeight: 600,
-                color: 'var(--ink)',
-                letterSpacing: '-0.01em',
+                color: "var(--ink)",
+                letterSpacing: "-0.01em",
                 lineHeight: 1.35,
               }}
             >
               Quantiv is a research tool, not a recommendation. The same option
-              chain can support opposite trades depending on conviction, position,
-              and risk tolerance. We surface signal; you bring judgement, and
-              read the small print on every formula above.
+              chain can support opposite trades depending on conviction,
+              position, and risk tolerance. We surface signal; you bring
+              judgement, and read the small print on every formula above.
             </div>
           </div>
         </div>
@@ -1334,15 +1711,17 @@ export default function AboutPageClient() {
           style={{
             marginTop: 44,
             paddingTop: 24,
-            borderTop: '1px solid var(--line)',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            flexWrap: 'wrap',
+            borderTop: "1px solid var(--line)",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            flexWrap: "wrap",
             gap: 16,
           }}
         >
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
+          <div
+            style={{ display: "inline-flex", alignItems: "center", gap: 10 }}
+          >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/brand/QuantivIcon.webp"
@@ -1350,9 +1729,9 @@ export default function AboutPageClient() {
               width={24}
               height={24}
               style={{
-                display: 'inline-block',
-                objectFit: 'contain',
-                mixBlendMode: 'screen',
+                display: "inline-block",
+                objectFit: "contain",
+                mixBlendMode: "screen",
               }}
             />
             <span
@@ -1360,8 +1739,8 @@ export default function AboutPageClient() {
               style={{
                 fontSize: 17,
                 fontWeight: 700,
-                color: 'var(--ink)',
-                letterSpacing: '-0.01em',
+                color: "var(--ink)",
+                letterSpacing: "-0.01em",
               }}
             >
               Quantiv
@@ -1375,24 +1754,25 @@ export default function AboutPageClient() {
               // lives near the bottom of /about). Queueing a manual
               // scroll for the next tick forces the calendar to land
               // at its title.
-              if (typeof window !== 'undefined') {
+              if (typeof window !== "undefined") {
                 setTimeout(() => window.scrollTo({ top: 0, left: 0 }), 0);
               }
             }}
             style={{
-              padding: '11px 20px',
+              padding: "11px 20px",
               borderRadius: 999,
-              border: '1px solid var(--brand-blue-1)',
+              border: "1px solid var(--brand-blue-1)",
               fontSize: 13.5,
-              color: 'var(--ink)',
+              color: "var(--ink)",
               fontWeight: 600,
-              letterSpacing: '-0.005em',
-              background: 'color-mix(in oklab, var(--brand-blue-1) 18%, transparent)',
-              textDecoration: 'none',
-              display: 'inline-flex',
-              alignItems: 'center',
+              letterSpacing: "-0.005em",
+              background:
+                "color-mix(in oklab, var(--brand-blue-1) 18%, transparent)",
+              textDecoration: "none",
+              display: "inline-flex",
+              alignItems: "center",
               gap: 8,
-              transition: 'background 140ms ease',
+              transition: "background 140ms ease",
             }}
           >
             Open the Earnings Calendar
@@ -1407,15 +1787,15 @@ export default function AboutPageClient() {
           style={{
             marginTop: 22,
             padding: 18,
-            border: '1px solid var(--line)',
+            border: "1px solid var(--line)",
             borderRadius: 10,
             fontSize: 12.5,
-            color: 'var(--ink-3)',
+            color: "var(--ink-3)",
             lineHeight: 1.55,
           }}
         >
-          <strong style={{ color: 'var(--ink-2)' }}>Disclaimer.</strong> Quantiv is
-          for educational and informational use only. Options trading carries
+          <strong style={{ color: "var(--ink-2)" }}>Disclaimer.</strong> Quantiv
+          is for educational and informational use only. Options trading carries
           substantial risk including loss of principal. Implied volatility,
           model quantiles, and historical realized moves are descriptive
           statistics, not predictions. Past performance does not guarantee

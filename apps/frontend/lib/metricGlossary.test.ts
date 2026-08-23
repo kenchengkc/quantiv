@@ -33,6 +33,8 @@ describe("metric glossary", () => {
       expect(metric.calculation).toHaveLength(3);
       expect(metric.calculation.every((node) => node.length <= 28)).toBe(true);
       expect(metric.formula.length).toBeLessThanOrEqual(62);
+      expect(metric.formulaTex.length).toBeGreaterThan(4);
+      expect(metric.methodologyHref).toMatch(/^\/about#/);
       expect(metric.use.length).toBeLessThanOrEqual(66);
       expect(metric.caution.length).toBeLessThanOrEqual(62);
     }

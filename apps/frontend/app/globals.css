@@ -501,7 +501,7 @@
   position: absolute;
   top: calc(100% + 9px);
   z-index: 40;
-  width: min(390px, calc(100vw - 40px));
+  width: min(440px, calc(100vw - 40px));
   padding: 16px;
   border: 1px solid color-mix(in oklab, var(--brand-blue-1) 24%, var(--line-2));
   border-radius: 12px;
@@ -574,7 +574,7 @@
   color: var(--ink-4);
 }
 .qv-metric-help-flow-role,
-.qv-metric-help-formula > span,
+.qv-metric-help-formula > span:first-child,
 .qv-metric-help-notes span {
   color: var(--ink-4);
   font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
@@ -590,27 +590,43 @@
   font-weight: 600;
   line-height: 1.35;
 }
+.qv-metric-help-flow-detail {
+  color: var(--ink-4);
+  font-size: 9.5px;
+  line-height: 1.35;
+}
 .qv-metric-help-flow-step:last-child strong,
 .qv-metric-help-flow-step:last-child .qv-metric-help-flow-role {
   color: var(--brand-blue-1);
 }
 .qv-metric-help-formula {
-  display: grid;
-  grid-template-columns: 52px minmax(0, 1fr);
-  align-items: baseline;
-  gap: 8px;
+  display: block;
   margin-top: 12px;
   padding: 9px 10px;
   border-left: 2px solid
     color-mix(in oklab, var(--brand-blue-1) 45%, var(--line));
   background: color-mix(in oklab, var(--brand-blue-1) 7%, transparent);
 }
-.qv-metric-help-formula code {
-  color: var(--accent-hi);
-  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+.qv-metric-help-math {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  margin-top: 5px;
+  color: color-mix(in oklab, var(--ink) 90%, var(--brand-blue-1));
+  font-size: 17px;
+  line-height: 1.5;
+}
+.qv-metric-help-math .katex {
+  font-size: 1em;
+}
+.qv-metric-help-math .katex-display {
+  margin: 0.2em 0;
+}
+.qv-metric-help-math-loading {
+  display: block;
+  margin-top: 5px;
+  color: var(--ink-4);
   font-size: 10.5px;
-  line-height: 1.45;
-  white-space: normal;
 }
 .qv-metric-help-notes {
   display: grid;
@@ -634,6 +650,24 @@
 .qv-metric-help-notes > div:last-child span,
 .qv-metric-help-notes > div:last-child strong {
   color: color-mix(in oklab, var(--flag) 78%, var(--ink-3));
+}
+.qv-metric-help-methodology {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 11px;
+  color: var(--brand-blue-1);
+  font-size: 10.5px;
+  font-weight: 700;
+  text-decoration: none;
+}
+.qv-metric-help-methodology:hover,
+.qv-metric-help-methodology:focus-visible {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.qv-about-formula-card {
+  scroll-margin-top: 96px;
 }
 
 .qv-reading-guide {
