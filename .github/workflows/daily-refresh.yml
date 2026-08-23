@@ -30,6 +30,10 @@ on:
           - full
           - skip
         default: auto
+      run_sunday_finnhub_sweep:
+        description: "Also run the bounded earnings sweep during a manual Sunday refresh. Leave off for ordinary manual refreshes."
+        type: boolean
+        default: false
       run_retrain:
         description: "Run the complete gated ML retraining and signed model promotion cycle."
         type: boolean
@@ -49,9 +53,9 @@ jobs:
       (github.event_name == 'workflow_dispatch' && inputs.run_refresh) ||
       (github.event_name == 'schedule' && github.event.schedule == '0 11 * * *')
     runs-on: ubuntu-latest
-    # 45 min covers Mon-Sat. Sunday triggers the full-universe Finnhub
-    # sweep below (~110 min @ 60 calls/min for 6.6k tickers) → bumped to
-    # 180 min to leave headroom for build_frontend_data + R2 push too.
+    # 45 min covers ordinary refreshes. The scheduled Sunday run adds the
+    # bounded ~1,500-symbol Finnhub sweep (~27 min), so retain headroom for
+    # provider delays, frontend generation, and R2 promotion.
     timeout-minutes: 180
     env:
       # Schedule-dispatch jitter + a slow DoltHub merge can push the non-price
@@ -189,6 +193,11 @@ jobs:
         env:
           FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
         run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && \
+             [ "${{ inputs.run_sunday_finnhub_sweep }}" != "true" ]; then
+            echo "Manual refresh did not opt into the Sunday Finnhub sweep; skipping."
+            exit 0
+          fi
           DOW=$(date -u +%u)  # 1=Mon … 7=Sun
           if [ "$DOW" != "7" ]; then
             echo "Not Sunday (UTC weekday=$DOW); skipping full-universe Finnhub sweep."
