@@ -668,6 +668,64 @@ function Pipeline() {
   );
 }
 
+function PublicationControls() {
+  const controls = [
+    {
+      step: '01',
+      title: 'Point-in-time inputs',
+      body: 'Market and earnings features retain the observation time used for scoring.',
+    },
+    {
+      step: '02',
+      title: 'Reconcile',
+      body: 'Schema, duplicate-key, missing-record, and coverage checks run before scoring.',
+    },
+    {
+      step: '03',
+      title: 'Score and verify',
+      body: 'Versioned model artifacts must pass calibration, baseline, and IV checks.',
+    },
+    {
+      step: '04',
+      title: 'Publish or stop',
+      body: 'A snapshot is published only when every required control passes.',
+    },
+  ] as const;
+
+  return (
+    <section
+      className="qv-about-publication-controls"
+      aria-labelledby="publication-controls-title"
+    >
+      <div className="qv-about-publication-controls-heading">
+        <div>
+          <div className="qv-about-publication-controls-eyebrow">
+            Publication controls
+          </div>
+          <h3 id="publication-controls-title">
+            Only validated snapshots reach the product.
+          </h3>
+        </div>
+        <span>Fail closed</span>
+      </div>
+      <div
+        className="qv-about-publication-controls-flow"
+        aria-label="Forecast publication control flow"
+      >
+        {controls.map((control) => (
+          <div className="qv-about-publication-control" key={control.step}>
+            <div className="qv-about-publication-control-step">
+              {control.step}
+            </div>
+            <strong>{control.title}</strong>
+            <p>{control.body}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 // ──────────────────────────────────────────────────────────────────────────
 // Tex · KaTeX-rendered LaTeX. Render to HTML string once per formula and
 // drop into a span. Display mode for block equations, inline otherwise.
@@ -1217,6 +1275,7 @@ export default function AboutPageClient() {
         <div style={{ marginTop: 18 }}>
           <Pipeline />
         </div>
+        <PublicationControls />
       </Reveal>
 
       {/* Closing note */}

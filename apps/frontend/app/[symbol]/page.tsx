@@ -3,9 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { notFound } from 'next/navigation';
 import { companyName, stripLegalSuffix } from '@/lib/companyNames';
-import type { ForecastDashboardEvidence } from '@/lib/forecastEvidence';
 import tickerNames from '../../public/ticker-names.json';
-import forecastEvidence from '../../public/evidence/forecast.json';
 import SymbolPageClient from './SymbolPageClient';
 
 type SymbolPageProps = {
@@ -99,7 +97,6 @@ export default async function SymbolPage({ params }: SymbolPageProps) {
     <SymbolPageClient
       initialSymbol={symbol}
       initialData={readSymbolPayload(symbol)}
-      initialEvidence={forecastEvidence as ForecastDashboardEvidence}
     />
   );
 }

@@ -108,4 +108,25 @@ describe("ExpectedMoveComparison", () => {
     );
     expect(container.textContent).not.toContain("Event lens");
   });
+
+  it("omits an unavailable model instead of presenting it as broken", () => {
+    const container = renderMetricHelp(
+      <ExpectedMoveComparison
+        optionsMovePct={0.039}
+        mlMovePct={null}
+        historicalMovePct={0.019}
+        historyCount={8}
+        ivRank={0.46}
+      />,
+    );
+
+    expect(container.querySelectorAll(".qv-reading-guide-layer")).toHaveLength(
+      2,
+    );
+    expect(container.textContent).toContain("Options-implied±3.9%");
+    expect(container.textContent).toContain("Historical median±1.9%");
+    expect(container.textContent).not.toContain("Model forecast");
+    expect(container.textContent).not.toContain("No forecast");
+    expect(container.textContent).not.toContain("Unavailable");
+  });
 });

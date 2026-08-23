@@ -54,9 +54,22 @@ test("ticker dashboard presents market, model, comparison, then history", async 
   expect(historyIndex).toBeGreaterThan(comparisonIndex);
   await expect(page.getByText("Event lens")).toHaveCount(0);
 
-  const evidence = page.locator(".qv-evidence-strip");
-  await expect(evidence).not.toContainText(/Receipt\s+[a-z0-9]{10,}/i);
-  await expect(evidence).not.toContainText(/Model\s+[a-z0-9]{10,}/i);
-  await evidence.locator("summary").click();
-  await expect(evidence.getByText("Publication gates passed")).toBeVisible();
+  await expect(page.locator(".qv-evidence-strip")).toHaveCount(0);
+  await expect(page.getByText("Decision evidence")).toHaveCount(0);
+});
+
+test("About documents the platform-wide publication controls", async ({
+  page,
+}) => {
+  await page.goto("/about");
+
+  const controls = page.getByRole("region", {
+    name: "Only validated snapshots reach the product.",
+  });
+  await expect(controls).toBeVisible({ timeout: 60_000 });
+  await expect(controls.getByText("Point-in-time inputs")).toBeVisible();
+  await expect(controls.getByText("Reconcile")).toBeVisible();
+  await expect(controls.getByText("Score and verify")).toBeVisible();
+  await expect(controls.getByText("Publish or stop")).toBeVisible();
+  await expect(controls.getByText("Fail closed")).toBeVisible();
 });

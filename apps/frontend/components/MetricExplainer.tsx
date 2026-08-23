@@ -6,7 +6,12 @@ import {
   LineChart,
   Scale,
 } from "lucide-react";
-import { useEffect, useRef, type SyntheticEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  type CSSProperties,
+  type SyntheticEvent,
+} from "react";
 
 import { METRIC_GLOSSARY, type MetricKey } from "@/lib/metricGlossary";
 
@@ -159,27 +164,42 @@ export function ExpectedMoveComparison({
 }) {
   const comparison = modelComparison(optionsMovePct, mlMovePct);
   const layers = [
-    {
-      icon: LineChart,
-      label: "Options-implied",
-      title: optionsMovePct != null ? `±${pct(optionsMovePct)}` : "No snapshot",
-      caption: "ATM straddle",
-    },
-    {
-      icon: BrainCircuit,
-      label: "Model forecast",
-      title: mlMovePct != null ? `±${pct(mlMovePct)}` : "No forecast",
-      caption: "Expected absolute move",
-    },
-    {
-      icon: History,
-      label: "Historical median",
-      title:
-        historicalMovePct != null ? `±${pct(historicalMovePct)}` : "No sample",
-      caption:
-        historyCount > 0 ? `Last ${historyCount} earnings` : "Realized moves",
-    },
+    ...(optionsMovePct != null
+      ? [
+          {
+            icon: LineChart,
+            label: "Options-implied",
+            title: `±${pct(optionsMovePct)}`,
+            caption: "ATM straddle",
+          },
+        ]
+      : []),
+    ...(mlMovePct != null
+      ? [
+          {
+            icon: BrainCircuit,
+            label: "Model forecast",
+            title: `±${pct(mlMovePct)}`,
+            caption: "Expected absolute move",
+          },
+        ]
+      : []),
+    ...(historicalMovePct != null
+      ? [
+          {
+            icon: History,
+            label: "Historical median",
+            title: `±${pct(historicalMovePct)}`,
+            caption:
+              historyCount > 0
+                ? `Last ${historyCount} earnings`
+                : "Realized moves",
+          },
+        ]
+      : []),
   ];
+
+  if (layers.length < 2) return null;
 
   return (
     <section
@@ -197,7 +217,14 @@ export function ExpectedMoveComparison({
           </h2>
         </div>
       </div>
-      <div className="qv-reading-guide-grid">
+      <div
+        className="qv-reading-guide-grid"
+        style={
+          {
+            "--qv-reading-guide-columns": layers.length,
+          } as CSSProperties
+        }
+      >
         {layers.map((layer) => {
           const Icon = layer.icon;
           return (
