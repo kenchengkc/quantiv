@@ -53,7 +53,16 @@ OPTIONS_API = f"https://www.dolthub.com/api/v1alpha1/{DOLTHUB_OWNER}/options/{DO
 EARNINGS_API = f"https://www.dolthub.com/api/v1alpha1/{DOLTHUB_OWNER}/earnings/{DOLTHUB_BRANCH}"
 STOCKS_API = f"https://www.dolthub.com/api/v1alpha1/{DOLTHUB_OWNER}/stocks/{DOLTHUB_BRANCH}"
 
-COLUMNS = "date, act_symbol, expiration, strike, call_put, bid, ask, vol, delta, gamma, theta, vega, rho"
+# DoltHub currently exposes only EOD quote dates, prices, IV, and Greeks. The
+# nullable microstructure columns are materialized in every new partition so a
+# richer provider can populate them without another lake/schema migration.
+COLUMNS = (
+    "date, act_symbol, expiration, strike, call_put, bid, ask, vol, "
+    "delta, gamma, theta, vega, rho, "
+    "CAST(NULL AS DATETIME) AS quote_timestamp, "
+    "CAST(NULL AS SIGNED) AS option_volume, "
+    "CAST(NULL AS SIGNED) AS open_interest"
+)
 
 # Symbol-prefix buckets for pagination (covers A-Z and a few common non-alpha)
 SYMBOL_BUCKETS: list[tuple[str | None, str | None]] = [
@@ -76,6 +85,9 @@ ARROW_SCHEMA = pa.schema([
     ("theta", pa.float64()),
     ("vega", pa.float64()),
     ("rho", pa.float64()),
+    ("quote_timestamp", pa.timestamp("us")),
+    ("option_volume", pa.int64()),
+    ("open_interest", pa.int64()),
 ])
 
 COLUMN_LIST = [f.name for f in ARROW_SCHEMA]
@@ -133,10 +145,20 @@ def _content_digest(frame: pd.DataFrame) -> str:
     """Stable logical-row digest used to prove idempotent source replay."""
     if frame.empty:
         return hashlib.sha256(b"").hexdigest()
-    ordered = frame.sort_values(
+    normalized = frame.copy()
+    for column in COLUMN_LIST:
+        if column not in normalized:
+            normalized[column] = None
+    digest_columns = [
+        column
+        for column in COLUMN_LIST
+        if column not in {"quote_timestamp", "option_volume", "open_interest"}
+        or normalized[column].notna().any()
+    ]
+    ordered = normalized.sort_values(
         ["date", "act_symbol", "expiration", "strike", "call_put"],
         kind="mergesort",
-    )[COLUMN_LIST]
+    )[digest_columns]
     payload = ordered.to_json(
         orient="records",
         date_format="iso",
@@ -256,8 +278,11 @@ def fetch_date(target: date) -> pd.DataFrame:
     # Type coercion
     df["date"] = pd.to_datetime(df["date"]).dt.date
     df["expiration"] = pd.to_datetime(df["expiration"]).dt.date
+    df["quote_timestamp"] = pd.to_datetime(df["quote_timestamp"], errors="coerce")
     for c in ["strike", "bid", "ask", "vol", "delta", "gamma", "theta", "vega", "rho"]:
         df[c] = pd.to_numeric(df[c], errors="coerce")
+    for c in ["option_volume", "open_interest"]:
+        df[c] = pd.to_numeric(df[c], errors="coerce").astype("Int64")
 
     duplicate_rows = int(
         df.duplicated(["date", "act_symbol", "expiration", "strike", "call_put"]).sum()
@@ -292,7 +317,13 @@ def write_date(df: pd.DataFrame, root: Path) -> int:
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / f"{dt_obj.isoformat()}.parquet"
     temporary = out_path.with_name(f".{out_path.name}.{os.getpid()}.tmp")
-    table = pa.Table.from_pandas(df, schema=ARROW_SCHEMA, preserve_index=False)
+    normalized = df.copy()
+    for column in COLUMN_LIST:
+        if column not in normalized:
+            normalized[column] = None
+    table = pa.Table.from_pandas(
+        normalized[COLUMN_LIST], schema=ARROW_SCHEMA, preserve_index=False
+    )
     pq.write_table(table, temporary, compression="snappy")
     # Validate the staged artifact before the single-filesystem promotion.
     staged = pq.ParquetFile(temporary)

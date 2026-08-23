@@ -38,6 +38,7 @@ def _write_fresh_database(path: Path) -> None:
                 delta DOUBLE,
                 option_volume BIGINT,
                 open_interest BIGINT,
+                source_quote_timestamp TIMESTAMP,
                 quote_timestamp_precision VARCHAR,
                 market_data_mode VARCHAR,
                 quote_quality_status VARCHAR,
@@ -49,7 +50,7 @@ def _write_fresh_database(path: Path) -> None:
             """
             INSERT INTO v_options VALUES (
                 ?, ?, ?, 100, ?, 1.0, 1.1, 1.05, 0.095, 0.5, ?,
-                NULL, NULL, 'date', 'end_of_day', 'eligible', NULL
+                NULL, NULL, NULL, 'date', 'end_of_day', 'eligible', NULL
             )
             """,
             [
@@ -90,9 +91,11 @@ def _write_fresh_database(path: Path) -> None:
                 call_relative_spread DOUBLE, call_iv DOUBLE, call_delta DOUBLE,
                 call_gamma DOUBLE, call_vega DOUBLE, call_theta DOUBLE,
                 call_volume BIGINT, call_open_interest BIGINT,
+                call_quote_timestamp TIMESTAMP,
                 put_bid DOUBLE, put_ask DOUBLE, put_mid DOUBLE,
                 put_relative_spread DOUBLE, put_iv DOUBLE, put_delta DOUBLE,
                 put_volume BIGINT, put_open_interest BIGINT,
+                put_quote_timestamp TIMESTAMP,
                 straddle_bid DOUBLE, straddle_ask DOUBLE, straddle_mid DOUBLE,
                 straddle_relative_spread DOUBLE, atm_delta_distance DOUBLE,
                 quote_timestamp_precision VARCHAR, market_data_mode VARCHAR,
@@ -105,8 +108,8 @@ def _write_fresh_database(path: Path) -> None:
             """
             INSERT INTO v_straddle_candidates VALUES (
                 ?, ?, ?, 7, 100, 1, 1.1, 1.05, .095, .5, .5,
-                .1, .1, -.1, NULL, NULL,
-                1, 1.1, 1.05, .095, .5, -.5, NULL, NULL,
+                .1, .1, -.1, NULL, NULL, NULL,
+                1, 1.1, 1.05, .095, .5, -.5, NULL, NULL, NULL,
                 2, 2.2, 2.1, .095, 0,
                 'date', 'end_of_day', NULL, 'eligible', 1
             )

@@ -687,10 +687,12 @@ def validate_forecast_artifact(
         "call_ask",
         "call_mid",
         "call_relative_spread",
+        "call_quote_timestamp",
         "put_bid",
         "put_ask",
         "put_mid",
         "put_relative_spread",
+        "put_quote_timestamp",
         "straddle_bid",
         "straddle_ask",
         "straddle_mid",
@@ -888,8 +890,32 @@ def validate_forecast_artifact(
             frame["quote_quality_status"].fillna("").ne("passed")
             | frame["quote_timestamp_precision"].fillna("").ne("date")
             | frame["market_data_mode"].fillna("").ne("end_of_day")
-            | frame["liquidity_tier_method"].fillna("").ne("quote_spread_proxy")
+            | ~frame["liquidity_tier_method"].fillna("").isin(
+                {"quote_spread_proxy", "spread_volume_open_interest"}
+            )
             | frame["quote_rejection_reason"].notna()
+        ).sum()
+    )
+    call_quote_times = pd.to_datetime(
+        frame["call_quote_timestamp"], errors="coerce", utc=True
+    )
+    put_quote_times = pd.to_datetime(
+        frame["put_quote_timestamp"], errors="coerce", utc=True
+    )
+    timestamp_rows = frame["quote_timestamp_precision"].eq("timestamp")
+    timestamp_evidence_failures = int(
+        (
+            timestamp_rows
+            & (
+                call_quote_times.isna()
+                | put_quote_times.isna()
+                | (
+                    (call_quote_times - put_quote_times)
+                    .abs()
+                    .dt.total_seconds()
+                    .gt(float(quote_policy.get("max_quote_time_skew_seconds", 60)))
+                )
+            )
         ).sum()
     )
     for code, count, detail in (
@@ -900,6 +926,7 @@ def validate_forecast_artifact(
         ("straddle_market_mismatch", straddle_market_mismatches, "leg markets inconsistent with the straddle"),
         ("quote_spread_limit_breach", excessive_spreads, "quotes beyond configured spread limits"),
         ("invalid_quote_quality_label", invalid_quality_labels, "quotes not labeled as eligible EOD evidence"),
+        ("unsynchronized_quote_timestamps", timestamp_evidence_failures, "missing or unsynchronized quote timestamps"),
     ):
         if count:
             _issue(
@@ -1230,6 +1257,7 @@ def validate_forecast_artifact(
                 "straddle_market_mismatches": straddle_market_mismatches,
                 "excessive_spreads": excessive_spreads,
                 "invalid_quote_quality_labels": invalid_quality_labels,
+                "timestamp_evidence_failures": timestamp_evidence_failures,
                 "non_finite_values": non_finite_values,
                 "invalid_market_input_rows": invalid_market_input_rows,
                 "out_of_range_move_rows": out_of_range_move_rows,

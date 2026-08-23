@@ -67,6 +67,9 @@ def setup_views(conn: duckdb.DuckDBPyConnection, data_dir: Path):
     max_dte = int(policy["max_dte"])
     max_leg_spread = float(policy["max_leg_relative_spread"])
     max_straddle_spread = float(policy["max_straddle_relative_spread"])
+    max_quote_time_skew_seconds = int(policy["max_quote_time_skew_seconds"])
+    min_option_volume = int(policy["min_option_volume_when_available"])
+    min_open_interest = int(policy["min_open_interest_when_available"])
     timestamp_precision = str(policy["timestamp_precision"])
     market_data_mode = str(policy["market_data_mode"])
     parquet_glob = str(data_dir / "parquet" / "options_chain" / "year=*" / "month=*" / "*.parquet")
@@ -76,9 +79,28 @@ def setup_views(conn: duckdb.DuckDBPyConnection, data_dir: Path):
     print(f"[views] Parquet glob: {parquet_glob}")
 
     # ── Raw options view ──────────────────────────────────────────────
+    parquet_scan = (
+        f"read_parquet('{parquet_glob}', "
+        "hive_partitioning=true, union_by_name=true)"
+    )
+    parquet_columns = {
+        str(row[0])
+        for row in conn.execute(f"DESCRIBE SELECT * FROM {parquet_scan}").fetchall()
+    }
+    compatibility_columns = {
+        "quote_timestamp": "CAST(NULL AS TIMESTAMP)",
+        "option_volume": "CAST(NULL AS BIGINT)",
+        "open_interest": "CAST(NULL AS BIGINT)",
+    }
+    missing_expressions = [
+        f"{expression} AS {name}"
+        for name, expression in compatibility_columns.items()
+        if name not in parquet_columns
+    ]
+    select_list = "*, " + ", ".join(missing_expressions) if missing_expressions else "*"
     conn.execute(f"""
         CREATE OR REPLACE VIEW v_options_raw AS
-        SELECT * FROM read_parquet('{parquet_glob}', hive_partitioning=true)
+        SELECT {select_list} FROM {parquet_scan}
     """)
     count = conn.execute("SELECT COUNT(*) FROM v_options_raw").fetchone()[0]
     print(f"[views] v_options_raw: {count:,} rows")
@@ -103,10 +125,11 @@ def setup_views(conn: duckdb.DuckDBPyConnection, data_dir: Path):
             vega,
             rho,
             DATE_DIFF('day', date, expiration) AS dte,
-            CAST(NULL AS TIMESTAMP) AS source_quote_timestamp,
-            CAST(NULL AS BIGINT) AS option_volume,
-            CAST(NULL AS BIGINT) AS open_interest,
-            '{timestamp_precision}'::VARCHAR AS quote_timestamp_precision,
+            quote_timestamp AS source_quote_timestamp,
+            option_volume,
+            open_interest,
+            CASE WHEN quote_timestamp IS NULL THEN '{timestamp_precision}'
+                 ELSE 'timestamp' END::VARCHAR AS quote_timestamp_precision,
             '{market_data_mode}'::VARCHAR AS market_data_mode,
             CASE
                 WHEN bid IS NOT NULL AND ask IS NOT NULL AND (bid + ask) > 0
@@ -126,6 +149,11 @@ def setup_views(conn: duckdb.DuckDBPyConnection, data_dir: Path):
                 WHEN bid < {min_bid} OR ask < {min_ask} THEN 'zero_or_noncommercial_side'
                 WHEN ask < bid THEN 'crossed_market'
                 WHEN iv IS NULL OR iv < {min_iv} OR iv > {max_iv} THEN 'invalid_iv'
+                WHEN source_quote_timestamp IS NOT NULL
+                  AND CAST(source_quote_timestamp AS DATE) != date THEN 'stale_quote_timestamp'
+                WHEN option_volume IS NOT NULL AND open_interest IS NOT NULL
+                  AND option_volume < {min_option_volume}
+                  AND open_interest < {min_open_interest} THEN 'illiquid_contract'
                 WHEN dte < {min_dte} OR dte > {max_dte} THEN 'dte_out_of_policy'
                 WHEN relative_spread > {max_leg_spread} THEN 'excessive_leg_spread'
                 ELSE NULL
@@ -135,18 +163,27 @@ def setup_views(conn: duckdb.DuckDBPyConnection, data_dir: Path):
                   OR bid < {min_bid} OR ask < {min_ask}
                   OR ask < bid
                   OR iv IS NULL OR iv < {min_iv} OR iv > {max_iv}
+                  OR (source_quote_timestamp IS NOT NULL
+                      AND CAST(source_quote_timestamp AS DATE) != date)
+                  OR (option_volume IS NOT NULL AND open_interest IS NOT NULL
+                      AND option_volume < {min_option_volume}
+                      AND open_interest < {min_open_interest})
                   OR dte < {min_dte} OR dte > {max_dte}
                   OR relative_spread > {max_leg_spread}
                 THEN 'rejected'
                 ELSE 'eligible'
             END AS quote_quality_status,
             CASE
-                WHEN relative_spread <= 0.10 THEN 'tight'
+                WHEN relative_spread <= 0.10
+                  AND (open_interest IS NULL OR open_interest >= 500)
+                  AND (option_volume IS NULL OR option_volume >= 100) THEN 'tight'
                 WHEN relative_spread <= 0.25 THEN 'standard'
                 WHEN relative_spread <= {max_leg_spread} THEN 'wide_accepted'
                 ELSE 'rejected'
             END AS liquidity_tier,
-            'quote_spread_proxy'::VARCHAR AS liquidity_tier_method
+            CASE WHEN option_volume IS NOT NULL OR open_interest IS NOT NULL
+                 THEN 'spread_volume_open_interest'
+                 ELSE 'quote_spread_proxy' END::VARCHAR AS liquidity_tier_method
         FROM normalized
     """)
     print("[views] v_options: created")
@@ -195,6 +232,7 @@ def setup_views(conn: duckdb.DuckDBPyConnection, data_dir: Path):
                 c.theta AS call_theta,
                 c.option_volume AS call_volume,
                 c.open_interest AS call_open_interest,
+                c.source_quote_timestamp AS call_quote_timestamp,
                 p.bid AS put_bid,
                 p.ask AS put_ask,
                 p.mid AS put_mid,
@@ -203,6 +241,7 @@ def setup_views(conn: duckdb.DuckDBPyConnection, data_dir: Path):
                 p.delta AS put_delta,
                 p.option_volume AS put_volume,
                 p.open_interest AS put_open_interest,
+                p.source_quote_timestamp AS put_quote_timestamp,
                 c.bid + p.bid AS straddle_bid,
                 c.ask + p.ask AS straddle_ask,
                 c.mid + p.mid AS straddle_mid,
@@ -217,6 +256,13 @@ def setup_views(conn: duckdb.DuckDBPyConnection, data_dir: Path):
                         THEN 'call_' || c.quote_rejection_reason
                     WHEN p.quote_quality_status != 'eligible'
                         THEN 'put_' || p.quote_rejection_reason
+                    WHEN (c.source_quote_timestamp IS NULL)
+                         != (p.source_quote_timestamp IS NULL)
+                        THEN 'unsynchronized_quote_timestamp_availability'
+                    WHEN c.source_quote_timestamp IS NOT NULL
+                     AND ABS(EPOCH(c.source_quote_timestamp)
+                             - EPOCH(p.source_quote_timestamp)) > {max_quote_time_skew_seconds}
+                        THEN 'quote_timestamp_skew'
                     WHEN (c.ask + p.ask - c.bid - p.bid)
                            / NULLIF(c.mid + p.mid, 0) > {max_straddle_spread}
                         THEN 'excessive_straddle_spread'
@@ -290,12 +336,14 @@ def setup_views(conn: duckdb.DuckDBPyConnection, data_dir: Path):
             call_relative_spread,
             call_volume,
             call_open_interest,
+            call_quote_timestamp,
             put_bid,
             put_ask,
             put_mid,
             put_relative_spread,
             put_volume,
             put_open_interest,
+            put_quote_timestamp,
             straddle_bid,
             straddle_ask,
             straddle_mid,
@@ -308,7 +356,10 @@ def setup_views(conn: duckdb.DuckDBPyConnection, data_dir: Path):
                 WHEN GREATEST(call_relative_spread, put_relative_spread) <= 0.25 THEN 'standard'
                 ELSE 'wide_accepted'
             END AS liquidity_tier,
-            'quote_spread_proxy'::VARCHAR AS liquidity_tier_method,
+            CASE WHEN call_volume IS NOT NULL OR call_open_interest IS NOT NULL
+                       OR put_volume IS NOT NULL OR put_open_interest IS NOT NULL
+                 THEN 'spread_volume_open_interest'
+                 ELSE 'quote_spread_proxy' END::VARCHAR AS liquidity_tier_method,
             CAST(NULL AS VARCHAR) AS quote_rejection_reason,
             -- Expected move (straddle method): EM ≈ straddle_mid
             straddle_mid AS em_straddle,
