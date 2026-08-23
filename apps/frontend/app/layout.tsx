@@ -140,9 +140,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <Footer />
               </div>
               <TickerHoverHost />
-              <Analytics />
-              <SpeedInsights />
             </ErrorBoundary>
+            <Analytics />
+            <SpeedInsights />
           </Providers>
         </body>
       </html>
