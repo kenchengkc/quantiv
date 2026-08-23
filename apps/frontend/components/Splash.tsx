@@ -1,124 +1,87 @@
 'use client';
 
 import { useEffect, useLayoutEffect, useState } from 'react';
+import Image from 'next/image';
 import {
   markSplashPlayed,
-  removeSplashFirstPaintCover,
   shouldSkipSplash,
   SPLASH_SKIP_ATTRIBUTE,
 } from '@/lib/splashSession';
 
-// Once-per-session intro. The sequence starts with a closed ring, opens the
-// bottom-right slit, then reveals the exact logo tail through it.
-const TOTAL_MS = 2327;
-const READY_HOLD_MS = 280;
-const MAX_ASSET_WAIT_MS = 900;
-const SPLASH_ASSETS = [
-  '/brand/QuantivSplashQClosed.webp',
-  '/brand/QuantivSplashTail.webp',
-];
-
-function wait(ms: number) {
-  return new Promise<void>((resolve) => {
-    window.setTimeout(resolve, ms);
-  });
-}
-
-async function decodeSplashAsset(src: string) {
-  const img = new Image();
-  img.decoding = 'async';
-  img.src = src;
-  if (img.complete) return;
-  try {
-    await img.decode();
-  } catch {
-    // A decode failure should not trap the user on a black screen. The
-    // normal <img> below will still make a best effort to render.
-  }
-}
+// The visual sequence used to begin only after hydration and asset decoding.
+// It now starts from server-rendered markup, and is 23% shorter than the old
+// 2.327-second sequence without removing any of its visual beats.
+const TOTAL_MS = 1_800;
 
 export function Splash() {
-  // Mounted only from the homepage. The initial `hold` state is intentional:
-  // it lets SSR send the opaque cover. The head guard in app/layout.tsx covers
-  // the parser gap before this node arrives and pre-hides returning sessions.
-  const [phase, setPhase] = useState<'hold' | 'play' | 'done'>('hold');
+  const [done, setDone] = useState(false);
 
   useLayoutEffect(() => {
-    // Real splash is in the tree now. Drop the layout/parser cover so the
-    // intro can play instead of sitting under a second opaque layer.
-    removeSplashFirstPaintCover();
-
     if (shouldSkipSplash()) {
       document.documentElement.setAttribute(SPLASH_SKIP_ATTRIBUTE, '1');
-      setPhase('done');
+      setDone(true);
     }
   }, []);
 
   useEffect(() => {
-    if (phase !== 'hold') return;
-    if (shouldSkipSplash()) {
-      document.documentElement.setAttribute(SPLASH_SKIP_ATTRIBUTE, '1');
-      setPhase('done');
-      return;
-    }
+    if (done || shouldSkipSplash()) return;
 
-    let cancelled = false;
-    const ready = Promise.all(SPLASH_ASSETS.map(decodeSplashAsset));
-    const cappedReady = Promise.race([ready, wait(MAX_ASSET_WAIT_MS)]);
+    const navigation = performance.getEntriesByType('navigation')[0] as
+      | PerformanceNavigationTiming
+      | undefined;
+    const elapsedSinceFirstByte = navigation
+      ? Math.max(0, performance.now() - navigation.responseStart)
+      : 0;
+    const remainingMs = Math.max(0, TOTAL_MS - elapsedSinceFirstByte);
 
-    Promise.all([cappedReady, wait(READY_HOLD_MS)]).then(() => {
-      if (cancelled) return;
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          if (!cancelled) setPhase('play');
-        });
-      });
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [phase]);
-
-  useEffect(() => {
-    if (phase !== 'play') return;
-    const t = window.setTimeout(() => {
+    const timeoutId = window.setTimeout(() => {
       markSplashPlayed();
       document.documentElement.setAttribute(SPLASH_SKIP_ATTRIBUTE, '1');
-      setPhase('done');
-    }, TOTAL_MS);
-    return () => window.clearTimeout(t);
-  }, [phase]);
+      setDone(true);
+    }, remainingMs);
 
-  if (phase === 'done') return null;
+    return () => window.clearTimeout(timeoutId);
+  }, [done]);
+
+  if (done) return null;
 
   return (
     <div
       role="status"
-      aria-label="Loading Quantiv"
-      className={`quantiv-splash${phase === 'play' ? ' quantiv-splash--play' : ''}`}
+      aria-label="Opening Quantiv"
+      className="quantiv-splash quantiv-splash--play"
     >
-      {phase === 'play' && (
-        <div className="quantiv-splash-mark" aria-hidden="true">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/brand/QuantivSplashQClosed.webp"
+      <div className="quantiv-splash-mark" aria-hidden="true">
+        {/* These source WebPs are already compact. `priority` emits resource
+            hints from the server HTML; `unoptimized` avoids a cold image-
+            transformation request in the high percentile. */}
+        <Image
+          src="/brand/QuantivSplashQClosed.webp"
+          alt=""
+          width={4096}
+          height={4096}
+          priority
+          unoptimized
+          className="quantiv-splash-layer quantiv-splash-closed-ring"
+          draggable={false}
+        />
+        <div className="quantiv-splash-slit-arc" />
+        <div className="quantiv-splash-tail-clip">
+          <Image
+            src="/brand/QuantivSplashTail.webp"
             alt=""
-            className="quantiv-splash-layer quantiv-splash-closed-ring"
+            width={4096}
+            height={4096}
+            priority
+            unoptimized
+            className="quantiv-splash-layer"
             draggable={false}
           />
-          <div className="quantiv-splash-slit-arc" />
-          <div className="quantiv-splash-tail-clip">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/brand/QuantivSplashTail.webp"
-              alt=""
-              className="quantiv-splash-layer"
-              draggable={false}
-            />
-          </div>
         </div>
-      )}
+      </div>
+      <span className="quantiv-splash-wordmark" aria-hidden="true">
+        QUANTIV
+      </span>
     </div>
   );
 }

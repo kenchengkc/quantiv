@@ -796,25 +796,18 @@
   }
 }
 
-/* ─── Quantiv splash (once-per-session intro) ──────────────────────────── */
-:root[data-quantiv-splash-first-paint="1"] body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: 10000;
-  background: #000000;
-  pointer-events: auto;
-}
-
+/* ─── Quantiv splash (once-per-session intro) ────────────────────────────
+   The wordmark is deliberately visible in the server-rendered first frame.
+   That makes the branded intro itself eligible for FCP; React hydration is
+   only responsible for remembering completion and removing the overlay. */
 .quantiv-splash {
   position: fixed;
   inset: 0;
   z-index: 9999;
   display: grid;
   place-items: center;
+  overflow: hidden;
   background: #000000;
-  /* Disable interactions while the splash is up so a fast click doesn't
-     register on the dashboard before it's revealed. */
   pointer-events: auto;
 }
 
@@ -823,9 +816,7 @@
 }
 
 .quantiv-splash--play {
-  /* Hold the black backdrop opaque almost to the end, then dissolve in
-     sync with the mark's zoom-forward to reveal the dashboard underneath. */
-  animation: quantiv-splash-fade 2327ms ease-in-out forwards;
+  animation: quantiv-splash-fade 1800ms ease-in-out forwards;
 }
 
 .quantiv-splash-mark {
@@ -833,9 +824,7 @@
   width: min(440px, 76vw);
   aspect-ratio: 1 / 1;
   transform-origin: center center;
-  /* Phase 4 — Batman-style burst: the entire mark scales toward the
-     viewer, growing past the viewport while the backdrop fades out. */
-  animation: quantiv-splash-burst 2327ms cubic-bezier(0.55, 0, 0.2, 1) forwards;
+  animation: quantiv-splash-burst 1800ms cubic-bezier(0.55, 0, 0.2, 1) forwards;
 }
 
 .quantiv-splash-layer {
@@ -850,10 +839,10 @@
 }
 
 .quantiv-splash-closed-ring {
-  transform-origin: center center;
   z-index: 1;
-  animation: quantiv-splash-ring-in 473ms cubic-bezier(0.2, 1, 0.3, 1) forwards;
   opacity: 0;
+  transform-origin: center center;
+  animation: quantiv-splash-ring-in 360ms cubic-bezier(0.2, 1, 0.3, 1) forwards;
 }
 
 .quantiv-splash-slit-arc {
@@ -862,10 +851,6 @@
   z-index: 2;
   background: #000000;
   opacity: 1;
-  /* Four distinct corners (was two pairs of duplicates). A collapsed “line”
-     polygon can make engines hit a discontinuous interpolation path ~midway.
-     The final visual shape lands before the nominal end of the animation so
-     the ring is already settled when the tail layer becomes visible. */
   clip-path: polygon(
     48.31% 51.13%,
     48.34% 51.16%,
@@ -874,7 +859,7 @@
   );
   transform: translateZ(0);
   backface-visibility: hidden;
-  animation: quantiv-splash-slit-arc-open 327ms linear 473ms forwards;
+  animation: quantiv-splash-slit-arc-open 250ms linear 360ms forwards;
 }
 
 .quantiv-splash-tail-clip {
@@ -885,10 +870,22 @@
   opacity: 0;
   transform: translateZ(0);
   backface-visibility: hidden;
-  /* Start one 60fps frame after the slit animation's nominal end. The initial
-     clip sits just outside the tail asset's alpha bounds, avoiding a first-
-     frame white tail pop while the ring is completing. */
-  animation: quantiv-splash-tail-reveal 894ms ease 817ms forwards;
+  animation: quantiv-splash-tail-reveal 660ms ease 620ms forwards;
+}
+
+.quantiv-splash-wordmark {
+  position: absolute;
+  bottom: max(7vh, 32px);
+  left: 50%;
+  transform: translateX(-50%);
+  color: rgba(250, 251, 253, 0.76);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.34em;
+  line-height: 1;
+  text-indent: 0.34em;
+  animation: quantiv-splash-wordmark 1800ms ease-in-out forwards;
 }
 
 @keyframes quantiv-splash-ring-in {
@@ -948,27 +945,11 @@
 }
 
 @keyframes quantiv-splash-burst {
-  /* Hold the assembled mark in place while the wave finishes drawing,
-     then a quick anticipation dip, then the launch to ~10× scale.
-     Hold ends at 82% (= ~1908ms of 2327ms), dip at 88% (= ~2048ms),
-     final scale at 100% — same relative burst window as before.
-
-     The translate(1.5%, 1%) on every keyframe nudges the mark
-     down-and-right by ~6.6px / ~4.4px (at the 440px box) so the full
-     Q glyph (ring + tail) sits at the viewport's optical center.
-     The source PNGs have the glyph placed slightly upper-left of the
-     4096×4096 canvas center because the tail consumes more empty
-     space on the right; without the nudge, the assembled Q reads as
-     biased toward the upper-left of the screen. Percentages here are
-     relative to the mark's pre-scale box, so the translate stays a
-     fixed visible offset throughout the 1× → 10× burst. */
-  0% {
+  0%,
+  76% {
     transform: translate(1.5%, 1%) scale(1);
   }
-  82% {
-    transform: translate(1.5%, 1%) scale(1);
-  }
-  88% {
+  84% {
     transform: translate(1.5%, 1%) scale(0.94);
   }
   100% {
@@ -978,9 +959,20 @@
 
 @keyframes quantiv-splash-fade {
   0%,
-  82% {
+  76% {
     opacity: 1;
   }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes quantiv-splash-wordmark {
+  0%,
+  68% {
+    opacity: 0.76;
+  }
+  88%,
   100% {
     opacity: 0;
   }

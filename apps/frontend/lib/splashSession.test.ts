@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { SPLASH_SESSION_KEY, markSplashPlayed, shouldSkipSplash, splashAlreadyPlayed } from './splashSession';
+import {
+  SPLASH_SESSION_KEY,
+  markSplashPlayed,
+  shouldSkipSplash,
+  splashAlreadyPlayed,
+} from './splashSession';
 
 describe('splashSession', () => {
   it('round-trips the played flag through sessionStorage', () => {

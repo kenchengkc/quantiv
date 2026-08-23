@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { Sun, Moon, Info, ChevronLeft, ChevronRight, Search, Circle, Clock } from 'lucide-react';
 import { POPULAR_WEIGHT } from '@/lib/popular';
 import { companyName } from '@/lib/companyNames';
@@ -29,7 +28,7 @@ import {
   writeWeekCache,
   type LiveQuoteMap,
 } from '@/lib/earningsCalendarCache';
-import type { HomeCalendarFilter } from '@/lib/homeSearchParams';
+import { parseHomeSearchParams, type HomeCalendarFilter } from '@/lib/homeSearchParams';
 import sp500Constituents from '../../../lib/data/sp500-constituents.json';
 
 // Full S&P 500 (503 constituents incl. dual-class). Used for the "S&P 500"
@@ -840,29 +839,47 @@ export default function EarningsGrid({
 
   // Persist (offset, filter) in the URL so that navigating to a ticker and
   // hitting back returns the user to the same week + filter they were on.
-  const router = useRouter();
   const [offset, setOffset] = useState(initialOffset);
   const [filter, setFilter] = useState<Filter>(initialFilter);
+  const [urlStateReady, setUrlStateReady] = useState(false);
   const [search, setSearch] = useState('');
 
-  // Browser back/forward can change the server-provided URL params without
-  // remounting this client component — mirror those into local state.
+  // The homepage itself is statically rendered for a fast edge-cached first
+  // paint. Apply a non-default week/filter from the URL only after hydration,
+  // then keep browser history navigation in sync without turning `/` back into
+  // a per-request server render.
   useEffect(() => {
-    setOffset(initialOffset);
-    setFilter(initialFilter);
-  }, [initialOffset, initialFilter]);
+    const syncFromUrl = () => {
+      const params = new URLSearchParams(window.location.search);
+      const next = parseHomeSearchParams({
+        offset: params.get('offset') ?? undefined,
+        filter: params.get('filter') ?? undefined,
+      });
+      setOffset(next.initialOffset);
+      setFilter(next.initialFilter);
+      setUrlStateReady(true);
+    };
+
+    syncFromUrl();
+    window.addEventListener('popstate', syncFromUrl);
+    return () => window.removeEventListener('popstate', syncFromUrl);
+  }, []);
 
   // Mirror state → URL query. Omit default values so a fresh landing stays
   // on a clean `/` URL.
   useEffect(() => {
+    if (!urlStateReady) return;
     const next = new URLSearchParams();
     if (offset !== 0) next.set('offset', String(offset));
     if (filter !== 'popular') next.set('filter', filter);
     const qs = next.toString();
     const url = qs ? `/?${qs}` : '/';
-    // replace (not push) so state updates don't pollute back-button history.
-    router.replace(url, { scroll: false });
-  }, [offset, filter, router]);
+    // The URL is display state, not new server data. Preserve Next's existing
+    // history state and avoid an RSC navigation/refetch for every filter click.
+    if (`${window.location.pathname}${window.location.search}` !== url) {
+      window.history.replaceState(window.history.state, '', url);
+    }
+  }, [offset, filter, urlStateReady]);
   // Seed from the module cache so a back-nav / bfcache remount paints the
   // last-good week + quotes on the first frame (no skeleton, no label-less gap).
   const initialWeekIso = (() => {

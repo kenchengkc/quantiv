@@ -7,12 +7,7 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Topbar } from '@/components/Topbar';
 import { Footer } from '@/components/Footer';
 import { TickerHoverHost } from '@/components/TickerHoverCard';
-import {
-  SPLASH_FIRST_PAINT_ATTRIBUTE,
-  SPLASH_SESSION_KEY,
-  SPLASH_SKIP_ATTRIBUTE,
-} from '@/lib/splashSession';
-import { SplashCoverGuard } from '@/components/SplashCoverGuard';
+import { SPLASH_SESSION_KEY, SPLASH_SKIP_ATTRIBUTE } from '@/lib/splashSession';
 import { Analytics } from '@vercel/analytics/next';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 
@@ -72,7 +67,7 @@ export const viewport = {
   maximumScale: 5,
 };
 
-function SplashFirstPaintGuard() {
+function SplashSessionGuard() {
   const script = `
     (() => {
       if (window.location.pathname !== '/') return;
@@ -83,21 +78,19 @@ function SplashFirstPaintGuard() {
         const played = window.sessionStorage.getItem(${JSON.stringify(SPLASH_SESSION_KEY)}) === '1';
         if (reduced || played) {
           root.setAttribute(${JSON.stringify(SPLASH_SKIP_ATTRIBUTE)}, '1');
-          root.removeAttribute(${JSON.stringify(SPLASH_FIRST_PAINT_ATTRIBUTE)});
         } else {
           root.removeAttribute(${JSON.stringify(SPLASH_SKIP_ATTRIBUTE)});
-          root.setAttribute(${JSON.stringify(SPLASH_FIRST_PAINT_ATTRIBUTE)}, '1');
         }
       } catch {
         root.setAttribute(${JSON.stringify(SPLASH_SKIP_ATTRIBUTE)}, '1');
-        root.removeAttribute(${JSON.stringify(SPLASH_FIRST_PAINT_ATTRIBUTE)});
       }
     })();
   `;
 
-  // This must execute in <head>, before the browser can parse and paint the
-  // shared layout's topbar. The real splash remains homepage-only.
-  return <script id="quantiv-splash-first-paint" dangerouslySetInnerHTML={{ __html: script }} />;
+  // Returning sessions must be hidden before the server-rendered splash can
+  // paint. First visits keep the splash markup visible immediately, so FCP no
+  // longer waits for React hydration.
+  return <script id="quantiv-splash-session" dangerouslySetInnerHTML={{ __html: script }} />;
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -128,10 +121,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               __html: 'html,body{background:#000;color-scheme:dark}',
             }}
           />
-          <SplashFirstPaintGuard />
+          <SplashSessionGuard />
         </head>
         <body suppressHydrationWarning style={{ backgroundColor: '#000000' }}>
-          <SplashCoverGuard />
           <Providers>
             <ErrorBoundary>
               <div className="min-h-screen flex flex-col quantiv-app-shell">

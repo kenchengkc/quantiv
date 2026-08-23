@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 import { Splash } from '@/components/Splash';
 import EarningsGrid, { type WeeklyData } from '@/components/EarningsGrid';
-import { parseHomeSearchParams } from '@/lib/homeSearchParams';
 // Bundled at build time from the daily refresh. Rendered into the initial HTML
 // for the default "this week" view so the calendar (the LCP element) paints
 // without waiting on the client bundle + a /weeks fetch. The client revalidates
@@ -14,33 +13,18 @@ export const metadata: Metadata = {
   },
 };
 
-// The homepage passes searchParams from the server so EarningsGrid does not
-// need useSearchParams() (which forced a Suspense fallback and a skeleton
-// flash on every back navigation).
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
+// This page is a static artifact: daily refresh builds and deploys weekly.json,
+// while non-default week/filter URL state is applied by the client after the
+// first calendar paint. Keeping the initial route static avoids a serverless
+// render for every landing and lets Vercel's edge cache serve the first byte.
+export const dynamic = 'force-static';
 
-export default async function Home({
-  searchParams,
-}: {
-  searchParams: Promise<{ offset?: string; filter?: string }>;
-}) {
-  const sp = await searchParams;
-  const { initialOffset, initialFilter } = parseHomeSearchParams(sp);
-
-  // weekly.json only describes "this week" (offset 0); other offsets keep the
-  // existing client-fetch path.
-  const initialData = initialOffset === 0 ? (weeklyData as WeeklyData) : null;
-
+export default function Home() {
   return (
     <>
       <Splash />
       <div className="qv-m-pad" style={{ maxWidth: 1240, margin: '0 auto', padding: '0 28px 60px' }}>
-        <EarningsGrid
-          initialOffset={initialOffset}
-          initialFilter={initialFilter}
-          initialData={initialData}
-        />
+        <EarningsGrid initialData={weeklyData as WeeklyData} />
       </div>
     </>
   );
