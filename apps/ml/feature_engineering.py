@@ -22,6 +22,11 @@ import duckdb
 import numpy as np
 import pandas as pd
 
+from ml.corporate_actions import (
+    adjusted_post_price_sql,
+    ensure_corporate_action_views,
+)
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
@@ -118,6 +123,7 @@ def connect_duckdb() -> duckdb.DuckDBPyConnection:
                 SELECT NULL::DATE AS date, NULL::DOUBLE AS vix_close
                 WHERE 1=0
             """)
+    ensure_corporate_action_views(conn)
 
     # Historical and implied vol snapshots. Empty stand-in if the files are missing.
     if "v_volhist" not in views:
@@ -168,7 +174,19 @@ def extract_training_data(conn: duckdb.DuckDBPyConnection,
 
     logger.info(f"Extracting features: {start_date} → {end_date}")
 
-    sql = """
+    adjusted_ohlcv_post = adjusted_post_price_sql(
+        symbol="pre.act_symbol",
+        pre_date="pre.pre_date",
+        post_date="post.post_date",
+        post_price="post.post_price",
+    )
+    adjusted_shat_post = adjusted_post_price_sql(
+        symbol="pre.act_symbol",
+        pre_date="pre.pre_date",
+        post_date="post.post_date",
+        post_price="post.post_price",
+    )
+    sql = f"""
     WITH earnings AS (
         SELECT
             act_symbol,
@@ -185,7 +203,7 @@ def extract_training_data(conn: duckdb.DuckDBPyConnection,
     -- Method 1: realized move from daily closes (most accurate, 2023+)
     pre_close_ohlcv AS (
         SELECT e.act_symbol, e.earnings_date,
-               rv.close AS pre_price,
+               rv.close AS pre_price, rv.date AS pre_date,
                ROW_NUMBER() OVER (
                    PARTITION BY e.act_symbol, e.earnings_date
                    ORDER BY rv.date DESC
@@ -198,7 +216,7 @@ def extract_training_data(conn: duckdb.DuckDBPyConnection,
     ),
     post_close_ohlcv AS (
         SELECT e.act_symbol, e.earnings_date,
-               rv.close AS post_price,
+               rv.close AS post_price, rv.date AS post_date,
                ROW_NUMBER() OVER (
                    PARTITION BY e.act_symbol, e.earnings_date
                    ORDER BY rv.date ASC
@@ -212,7 +230,8 @@ def extract_training_data(conn: duckdb.DuckDBPyConnection,
     realized_ohlcv AS (
         SELECT pre.act_symbol, pre.earnings_date,
                pre.pre_price, post.post_price,
-               ABS(post.post_price / NULLIF(pre.pre_price, 0) - 1.0) AS realized_move_pct,
+               ABS({adjusted_ohlcv_post} / NULLIF(pre.pre_price, 0) - 1.0)
+                   AS realized_move_pct,
                'ohlcv' AS realized_source
         FROM pre_close_ohlcv pre
         JOIN post_close_ohlcv post USING (act_symbol, earnings_date)
@@ -233,7 +252,7 @@ def extract_training_data(conn: duckdb.DuckDBPyConnection,
     ),
     pre_shat AS (
         SELECT e.act_symbol, e.earnings_date,
-               s.s_hat AS pre_price,
+               s.s_hat AS pre_price, s.date AS pre_date,
                ROW_NUMBER() OVER (
                    PARTITION BY e.act_symbol, e.earnings_date
                    ORDER BY s.date DESC
@@ -246,7 +265,7 @@ def extract_training_data(conn: duckdb.DuckDBPyConnection,
     ),
     post_shat AS (
         SELECT e.act_symbol, e.earnings_date,
-               s.s_hat AS post_price,
+               s.s_hat AS post_price, s.date AS post_date,
                ROW_NUMBER() OVER (
                    PARTITION BY e.act_symbol, e.earnings_date
                    ORDER BY s.date ASC
@@ -260,7 +279,8 @@ def extract_training_data(conn: duckdb.DuckDBPyConnection,
     realized_shat AS (
         SELECT pre.act_symbol, pre.earnings_date,
                pre.pre_price, post.post_price,
-               ABS(post.post_price / NULLIF(pre.pre_price, 0) - 1.0) AS realized_move_pct,
+               ABS({adjusted_shat_post} / NULLIF(pre.pre_price, 0) - 1.0)
+                   AS realized_move_pct,
                'shat' AS realized_source
         FROM pre_shat pre
         JOIN post_shat post USING (act_symbol, earnings_date)

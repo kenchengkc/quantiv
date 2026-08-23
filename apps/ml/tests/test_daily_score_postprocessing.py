@@ -22,6 +22,9 @@ class _CapturingConnection:
         self.sql = sql
         return self
 
+    def fetchall(self):
+        return []
+
     def fetchdf(self) -> pd.DataFrame:
         return pd.DataFrame()
 

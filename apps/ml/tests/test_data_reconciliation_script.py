@@ -9,6 +9,8 @@ from datetime import date, timedelta
 from pathlib import Path
 
 import duckdb
+import pyarrow as pa
+import pyarrow.parquet as pq
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -155,6 +157,99 @@ def _run(tmp_path: Path, db_path: Path) -> subprocess.CompletedProcess[str]:
                 "partition_sha256": partition_hash,
                 "content_sha256": "test-content",
                 "replay_equivalence": "verified",
+            }
+        )
+    )
+    action_dir = data_dir / "parquet" / "corporate_actions"
+    action_dir.mkdir(parents=True, exist_ok=True)
+    empty_content_hash = hashlib.sha256(b"").hexdigest()
+    split_path = action_dir / "splits" / f"{empty_content_hash}.parquet"
+    dividend_path = action_dir / "dividends" / f"{empty_content_hash}.parquet"
+    split_path.parent.mkdir(parents=True, exist_ok=True)
+    dividend_path.parent.mkdir(parents=True, exist_ok=True)
+    pq.write_table(
+        pa.table(
+            {
+                "act_symbol": pa.array([], type=pa.string()),
+                "ex_date": pa.array([], type=pa.date32()),
+                "to_factor": pa.array([], type=pa.float64()),
+                "for_factor": pa.array([], type=pa.float64()),
+            }
+        ),
+        split_path,
+    )
+    pq.write_table(
+        pa.table(
+            {
+                "act_symbol": pa.array([], type=pa.string()),
+                "ex_date": pa.array([], type=pa.date32()),
+                "amount": pa.array([], type=pa.float64()),
+            }
+        ),
+        dividend_path,
+    )
+    action_manifest_path = (
+        data_dir
+        / "control"
+        / "ingestion"
+        / "corporate_actions"
+        / f"{snapshot}.json"
+    )
+    action_manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    action_manifest_path.write_text(
+        json.dumps(
+            {
+                "schema": "quantiv.corporate-action-ingestion.v1",
+                "generated_at": f"{date.today()}T00:00:00Z",
+                "source": "dolthub:post-no-preference/stocks",
+                "source_options_date": snapshot.isoformat(),
+                "query_start": "2019-01-01",
+                "query_end": date.today().isoformat(),
+                "universe": {
+                    "symbols": 2,
+                    "symbols_sha256": hashlib.sha256(b"ACME\nMISS").hexdigest(),
+                    "method": "latest_options_partition_excluding_retired_symbols",
+                },
+                "datasets": {
+                    "splits": {
+                        "rows": 0,
+                        "partition": str(split_path.relative_to(data_dir)),
+                        "partition_sha256": hashlib.sha256(
+                            split_path.read_bytes()
+                        ).hexdigest(),
+                        "content_sha256": hashlib.sha256(b"").hexdigest(),
+                        "batches": [
+                            {
+                                "completion": "short_page",
+                                "pages": 1,
+                                "rows": 0,
+                                "symbols": 2,
+                            }
+                        ],
+                    },
+                    "dividends": {
+                        "rows": 0,
+                        "partition": str(dividend_path.relative_to(data_dir)),
+                        "partition_sha256": hashlib.sha256(
+                            dividend_path.read_bytes()
+                        ).hexdigest(),
+                        "content_sha256": hashlib.sha256(b"").hexdigest(),
+                        "batches": [
+                            {
+                                "completion": "short_page",
+                                "pages": 1,
+                                "rows": 0,
+                                "symbols": 2,
+                            }
+                        ],
+                    },
+                },
+                "replay_equivalence": "verified",
+                "adjustment_contract": {
+                    "split": "test",
+                    "dividend": "test",
+                    "scope": "test",
+                },
             }
         )
     )

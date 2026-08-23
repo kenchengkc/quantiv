@@ -184,9 +184,10 @@ def build_reconciliation_manifest(
     if corporate_actions.get("continuity_status") != "enforced":
         exceptions.append(
             _exception(
-                "corporate_action_continuity_not_enforced",
-                "warning",
-                "Corporate actions are observed but split/dividend continuity is not yet gated",
+                "corporate_action_continuity_failed",
+                "critical",
+                "Split/dividend continuity is missing, stale, or does not match the active options universe",
+                sample=corporate_actions.get("errors") or [],
             )
         )
 

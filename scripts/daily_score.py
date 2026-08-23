@@ -37,6 +37,10 @@ from ml.model_bundle import (  # noqa: E402 - standalone script path setup
     ModelBundleError,
     resolve_champion_bundle,
 )
+from ml.corporate_actions import (  # noqa: E402 - standalone script path setup
+    adjusted_post_price_sql,
+    ensure_corporate_action_views,
+)
 from ml.pipeline_validation import (  # noqa: E402 - standalone script path setup
     FORECAST_REQUIRED_COLUMNS,
 )
@@ -120,6 +124,13 @@ def get_upcoming_features(conn: duckdb.DuckDBPyConnection, days_ahead: int) -> p
 
     Same columns as feature_engineering.py (options, past earnings, realized vol).
     """
+    ensure_corporate_action_views(conn)
+    adjusted_post = adjusted_post_price_sql(
+        symbol="pre.act_symbol",
+        pre_date="pre.pre_date",
+        post_date="post.post_date",
+        post_price="post.post_price",
+    )
     sql = f"""
     WITH upcoming AS (
         SELECT act_symbol, date AS earnings_date, timing
@@ -128,18 +139,35 @@ def get_upcoming_features(conn: duckdb.DuckDBPyConnection, days_ahead: int) -> p
     ),
 
     -- Past earnings moves for history features
-    past_realized_ohlcv AS (
+    pre_close_ohlcv AS (
         SELECT e.act_symbol, e.date AS earnings_date,
-               ABS(post.close / NULLIF(pre.close, 0) - 1.0) AS realized_move_pct
+               pre.date AS pre_date, pre.close AS pre_price,
+               ROW_NUMBER() OVER (
+                   PARTITION BY e.act_symbol, e.date ORDER BY pre.date DESC
+               ) AS rn
         FROM v_earnings e
         JOIN v_ohlcv pre ON pre.act_symbol = e.act_symbol
             AND pre.date < e.date AND pre.date >= e.date - INTERVAL '5' DAY
+        WHERE e.date < CURRENT_DATE AND pre.close > 0
+    ),
+    post_close_ohlcv AS (
+        SELECT e.act_symbol, e.date AS earnings_date,
+               post.date AS post_date, post.close AS post_price,
+               ROW_NUMBER() OVER (
+                   PARTITION BY e.act_symbol, e.date ORDER BY post.date ASC
+               ) AS rn
+        FROM v_earnings e
         JOIN v_ohlcv post ON post.act_symbol = e.act_symbol
             AND post.date > e.date AND post.date <= e.date + INTERVAL '5' DAY
-        WHERE e.date < CURRENT_DATE AND pre.close > 0 AND post.close > 0
-        QUALIFY ROW_NUMBER() OVER (
-            PARTITION BY e.act_symbol, e.date ORDER BY pre.date DESC, post.date ASC
-        ) = 1
+        WHERE e.date < CURRENT_DATE AND post.close > 0
+    ),
+    past_realized_ohlcv AS (
+        SELECT pre.act_symbol, pre.earnings_date,
+               ABS({adjusted_post} / NULLIF(pre.pre_price, 0) - 1.0)
+                   AS realized_move_pct
+        FROM pre_close_ohlcv pre
+        JOIN post_close_ohlcv post USING (act_symbol, earnings_date)
+        WHERE pre.rn = 1 AND post.rn = 1
     ),
     history_for_upcoming AS (
         SELECT

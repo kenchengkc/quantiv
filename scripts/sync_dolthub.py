@@ -126,6 +126,20 @@ def ingestion_control_root() -> Path:
     return data_dir() / "control" / "ingestion" / "options"
 
 
+def corporate_action_root() -> Path:
+    return data_dir() / "parquet" / "corporate_actions"
+
+
+def corporate_action_manifest_path(source_date: date) -> Path:
+    return (
+        data_dir()
+        / "control"
+        / "ingestion"
+        / "corporate_actions"
+        / f"{source_date}.json"
+    )
+
+
 def _atomic_json(path: Path, payload: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
@@ -801,6 +815,252 @@ OHLCV_SCHEMA = pa.schema([
     ("volume", pa.int64()),
 ])
 
+SPLIT_SCHEMA = pa.schema([
+    ("act_symbol", pa.string()),
+    ("ex_date", pa.date32()),
+    ("to_factor", pa.float64()),
+    ("for_factor", pa.float64()),
+])
+
+DIVIDEND_SCHEMA = pa.schema([
+    ("act_symbol", pa.string()),
+    ("ex_date", pa.date32()),
+    ("amount", pa.float64()),
+])
+
+CORPORATE_ACTION_START = date(2019, 1, 1)
+CORPORATE_ACTION_BATCH_SIZE = 75
+
+
+def _latest_option_universe() -> tuple[date, list[str]]:
+    """Read the active symbol set from the latest already-reconciled partition."""
+    meta = load_meta()
+    latest_value = meta.get("last_sync_date")
+    if not latest_value:
+        raise RuntimeError("options metadata lacks last_sync_date")
+    latest = date.fromisoformat(str(latest_value))
+    partition = _partition_path(latest, parquet_root())
+    if not partition.exists():
+        raise RuntimeError(f"latest options partition is missing: {partition}")
+    frame = pq.read_table(partition, columns=["act_symbol"]).to_pandas()
+    symbols = sorted(
+        {
+            canonical_ticker(symbol)
+            for symbol in frame["act_symbol"].dropna().astype(str)
+            if not is_delisted(symbol)
+        }
+    )
+    symbols = [symbol for symbol in symbols if symbol]
+    if not symbols:
+        raise RuntimeError("latest options partition has no active symbols")
+    return latest, symbols
+
+
+def _sql_literal(value: str) -> str:
+    return "'" + value.replace("'", "''") + "'"
+
+
+def _action_content_digest(frame: pd.DataFrame, columns: list[str]) -> str:
+    if frame.empty:
+        return hashlib.sha256(b"").hexdigest()
+    ordered = frame.sort_values(["act_symbol", "ex_date"], kind="mergesort")[columns]
+    records: list[dict[str, object]] = []
+    for row in ordered.to_dict(orient="records"):
+        canonical: dict[str, object] = {}
+        for column in columns:
+            value = row[column]
+            if column == "ex_date":
+                canonical[column] = pd.Timestamp(value).date().isoformat()
+            elif column == "act_symbol":
+                canonical[column] = str(value)
+            else:
+                canonical[column] = float(value)
+        records.append(canonical)
+    payload = json.dumps(
+        records, sort_keys=True, separators=(",", ":"), allow_nan=False
+    ).encode()
+    return hashlib.sha256(payload).hexdigest()
+
+
+def _fetch_action_table(
+    table_name: str,
+    value_columns: list[str],
+    symbols: list[str],
+    start: date,
+    end: date,
+) -> tuple[pd.DataFrame, list[dict[str, object]]]:
+    """Exhaust every PK-ordered page for bounded active-universe batches."""
+    columns = ["act_symbol", "ex_date", *value_columns]
+    all_rows: list[dict] = []
+    evidence: list[dict[str, object]] = []
+    for batch_index in range(0, len(symbols), CORPORATE_ACTION_BATCH_SIZE):
+        batch = symbols[batch_index:batch_index + CORPORATE_ACTION_BATCH_SIZE]
+        symbol_list = ", ".join(_sql_literal(symbol) for symbol in batch)
+        last_key: tuple[str, str] | None = None
+        batch_rows = 0
+        pages = 0
+        while True:
+            keyset = ""
+            if last_key is not None:
+                keyset = (
+                    " AND (act_symbol, ex_date) > "
+                    f"({_sql_literal(last_key[0])}, {_sql_literal(last_key[1])})"
+                )
+            sql = (
+                f"SELECT {', '.join(columns)} FROM {table_name} "
+                f"WHERE act_symbol IN ({symbol_list}) "
+                f"AND ex_date BETWEEN {_sql_literal(start.isoformat())} "
+                f"AND {_sql_literal(end.isoformat())}{keyset} "
+                f"ORDER BY act_symbol, ex_date LIMIT {ROW_LIMIT}"
+            )
+            rows = query(sql, STOCKS_API)
+            pages += 1
+            all_rows.extend(rows)
+            batch_rows += len(rows)
+            if len(rows) < ROW_LIMIT:
+                break
+            last = rows[-1]
+            last_key = (str(last["act_symbol"]), str(last["ex_date"]))
+            time.sleep(API_DELAY)
+        evidence.append(
+            {
+                "batch": batch_index // CORPORATE_ACTION_BATCH_SIZE,
+                "symbols": len(batch),
+                "rows": batch_rows,
+                "pages": pages,
+                "completion": "short_page",
+            }
+        )
+        print(
+            f"  {table_name} batch {batch_index // CORPORATE_ACTION_BATCH_SIZE + 1}: "
+            f"{len(batch)} symbols · {batch_rows:,} rows · {pages} page(s)",
+            flush=True,
+        )
+        time.sleep(API_DELAY)
+    frame = pd.DataFrame(all_rows, columns=columns)
+    if frame.empty:
+        return frame, evidence
+    frame["act_symbol"] = frame["act_symbol"].map(canonical_ticker)
+    frame["ex_date"] = pd.to_datetime(frame["ex_date"], errors="raise").dt.date
+    for column in value_columns:
+        frame[column] = pd.to_numeric(frame[column], errors="raise")
+    duplicates = int(frame.duplicated(["act_symbol", "ex_date"]).sum())
+    if duplicates:
+        raise RuntimeError(f"{table_name} returned {duplicates:,} duplicate primary keys")
+    return frame.sort_values(["act_symbol", "ex_date"]).reset_index(drop=True), evidence
+
+
+def _write_action_parquet(path: Path, frame: pd.DataFrame, schema: pa.Schema) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    table = pa.Table.from_pandas(frame, schema=schema, preserve_index=False)
+    pq.write_table(table, temporary, compression="snappy")
+    if pq.ParquetFile(temporary).metadata.num_rows != len(frame):
+        temporary.unlink(missing_ok=True)
+        raise RuntimeError(f"staged {path.name} row count does not match source")
+    os.replace(temporary, path)
+
+
+def sync_corporate_actions(
+    start_date_str: Optional[str] = None,
+    end_date_str: Optional[str] = None,
+) -> dict:
+    """Snapshot split/dividend history for the current options universe."""
+    source_date, symbols = _latest_option_universe()
+    start = date.fromisoformat(start_date_str) if start_date_str else CORPORATE_ACTION_START
+    end = date.fromisoformat(end_date_str) if end_date_str else date.today()
+    if end < start:
+        raise ValueError("corporate-action end date precedes start date")
+    print(
+        f"CORPORATE ACTION SYNC: {len(symbols):,} active symbols · {start} → {end}"
+    )
+    splits, split_batches = _fetch_action_table(
+        "split", ["to_factor", "for_factor"], symbols, start, end
+    )
+    dividends, dividend_batches = _fetch_action_table(
+        "dividend", ["amount"], symbols, start, end
+    )
+    if not splits.empty and (
+        (splits["to_factor"] <= 0).any() or (splits["for_factor"] <= 0).any()
+    ):
+        raise RuntimeError("split feed contains a non-positive adjustment factor")
+    if not dividends.empty and (dividends["amount"] < 0).any():
+        raise RuntimeError("dividend feed contains a negative cash amount")
+
+    split_digest = _action_content_digest(
+        splits, ["act_symbol", "ex_date", "to_factor", "for_factor"]
+    )
+    dividend_digest = _action_content_digest(
+        dividends, ["act_symbol", "ex_date", "amount"]
+    )
+    root = corporate_action_root()
+    split_path = root / "splits" / f"{split_digest}.parquet"
+    dividend_path = root / "dividends" / f"{dividend_digest}.parquet"
+    if not split_path.exists():
+        _write_action_parquet(split_path, splits, SPLIT_SCHEMA)
+    if not dividend_path.exists():
+        _write_action_parquet(dividend_path, dividends, DIVIDEND_SCHEMA)
+
+    persisted_splits = pq.read_table(split_path).to_pandas()
+    persisted_dividends = pq.read_table(dividend_path).to_pandas()
+    if split_digest != _action_content_digest(
+        persisted_splits, ["act_symbol", "ex_date", "to_factor", "for_factor"]
+    ) or dividend_digest != _action_content_digest(
+        persisted_dividends, ["act_symbol", "ex_date", "amount"]
+    ):
+        raise RuntimeError("corporate-action Parquet replay digest mismatch")
+
+    symbol_digest = hashlib.sha256("\n".join(symbols).encode()).hexdigest()
+    manifest = {
+        "schema": "quantiv.corporate-action-ingestion.v1",
+        "source": "dolthub:post-no-preference/stocks",
+        "source_options_date": source_date.isoformat(),
+        "query_start": start.isoformat(),
+        "query_end": end.isoformat(),
+        "universe": {
+            "symbols": len(symbols),
+            "symbols_sha256": symbol_digest,
+            "method": "latest_options_partition_excluding_retired_symbols",
+        },
+        "datasets": {
+            "splits": {
+                "rows": len(splits),
+                "partition": str(split_path.relative_to(data_dir())),
+                "partition_sha256": _sha256_file(split_path),
+                "content_sha256": split_digest,
+                "batches": split_batches,
+            },
+            "dividends": {
+                "rows": len(dividends),
+                "partition": str(dividend_path.relative_to(data_dir())),
+                "partition_sha256": _sha256_file(dividend_path),
+                "content_sha256": dividend_digest,
+                "batches": dividend_batches,
+            },
+        },
+        "replay_equivalence": "verified",
+        "promotion": "atomic_current_data_release_pointer",
+        "adjustment_contract": {
+            "split": "post price multiplied by cumulative to_factor/for_factor",
+            "dividend": "cash distributions added back before realized-return calculation",
+            "scope": "earnings realized moves and trailing realized-move features",
+        },
+    }
+    manifest_path = corporate_action_manifest_path(source_date)
+    if manifest_path.exists():
+        existing = json.loads(manifest_path.read_text())
+        if existing != manifest:
+            raise RuntimeError(
+                "corporate-action receipt changed for an immutable options source date"
+            )
+    else:
+        _atomic_json(manifest_path, manifest)
+    print(
+        f"✅ Corporate actions: {len(splits):,} splits · {len(dividends):,} dividends · "
+        "replay verified"
+    )
+    return manifest
+
 
 def sync_ohlcv(start_date_str: Optional[str] = None, end_date_str: Optional[str] = None,
                days: int = 30, full: bool = False):
@@ -1019,6 +1279,11 @@ def main():
     parser.add_argument("--ohlcv", action="store_true", help="Sync OHLCV stock prices")
     parser.add_argument("--volhist", action="store_true",
                         help="Sync volatility history (HV/IV current + week/month/year snapshots)")
+    parser.add_argument(
+        "--corporate-actions",
+        action="store_true",
+        help="Sync split/dividend controls for the latest active options universe",
+    )
 
     args = parser.parse_args()
 
@@ -1032,6 +1297,10 @@ def main():
 
     if args.volhist:
         sync_volhist(args.start_date, args.end_date, args.days, args.full)
+        return
+
+    if args.corporate_actions:
+        sync_corporate_actions(args.start_date, args.end_date)
         return
 
     print(f"Parquet root: {parquet_root()}\n")

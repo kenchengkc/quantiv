@@ -253,6 +253,13 @@ jobs:
       - name: Sync OHLCV
         run: python scripts/sync_dolthub.py --ohlcv
 
+      - name: Sync split and dividend controls
+        # Uses the same public DoltHub stocks source and the latest options
+        # partition's active symbols. No new vendor, Redis, or database cost.
+        # Exhaustive PK pagination and replay hashes become a mandatory input
+        # to realized-move construction and the reconciliation gate below.
+        run: python scripts/sync_dolthub.py --corporate-actions
+
       - name: Sync volatility history
         run: python scripts/sync_dolthub.py --volhist
 

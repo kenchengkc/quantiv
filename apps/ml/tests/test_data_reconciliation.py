@@ -3,7 +3,12 @@ from __future__ import annotations
 from ml.data_reconciliation import build_reconciliation_manifest
 
 
-def _manifest(generated_at: str, *, duplicate_rows: int = 0) -> dict:
+def _manifest(
+    generated_at: str,
+    *,
+    duplicate_rows: int = 0,
+    corporate_actions_enforced: bool = True,
+) -> dict:
     return build_reconciliation_manifest(
         generated_at=generated_at,
         datasets={
@@ -29,7 +34,10 @@ def _manifest(generated_at: str, *, duplicate_rows: int = 0) -> dict:
         corporate_actions={
             "rows": 12,
             "symbols": 4,
-            "continuity_status": "observed_only",
+            "continuity_status": (
+                "enforced" if corporate_actions_enforced else "not_enforced"
+            ),
+            "errors": [] if corporate_actions_enforced else ["receipt missing"],
         },
         pipeline_controls={
             "quarantine": {"status": "enforced", "mode": "compact_parquet_ledger"},
@@ -40,7 +48,7 @@ def _manifest(generated_at: str, *, duplicate_rows: int = 0) -> dict:
     )
 
 
-def test_manifest_is_reproducible_and_surfaces_instrumentation_gaps() -> None:
+def test_manifest_is_reproducible_and_surfaces_coverage_gaps() -> None:
     first = _manifest("2026-08-22T12:00:00+00:00")
     second = _manifest("2026-08-22T13:00:00+00:00")
 
@@ -49,11 +57,10 @@ def test_manifest_is_reproducible_and_surfaces_instrumentation_gaps() -> None:
         "status": "degraded",
         "decision_safe": True,
         "critical_exceptions": 0,
-        "warnings": 2,
+        "warnings": 1,
     }
     assert {issue["code"] for issue in first["exceptions"]} == {
         "upcoming_events_without_option_chain",
-        "corporate_action_continuity_not_enforced",
     }
 
 
@@ -84,5 +91,16 @@ def test_quote_quality_failure_makes_manifest_fail_closed() -> None:
     )
     assert failed["quality"]["decision_safe"] is False
     assert "option_quote_quality_below_limit" in {
+        issue["code"] for issue in failed["exceptions"]
+    }
+
+
+def test_missing_corporate_action_receipt_makes_manifest_fail_closed() -> None:
+    failed = _manifest(
+        "2026-08-22T12:00:00+00:00", corporate_actions_enforced=False
+    )
+
+    assert failed["quality"]["decision_safe"] is False
+    assert "corporate_action_continuity_failed" in {
         issue["code"] for issue in failed["exceptions"]
     }

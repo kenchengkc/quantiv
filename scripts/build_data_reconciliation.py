@@ -483,27 +483,215 @@ def _symbol_mappings(conn: duckdb.DuckDBPyConnection) -> dict[str, Any]:
     }
 
 
-def _corporate_actions(data_dir: Path) -> dict[str, Any]:
-    path = data_dir / "provider_enrichments" / "corporate_actions.json"
+def _corporate_actions(
+    conn: duckdb.DuckDBPyConnection, data_dir: Path
+) -> dict[str, Any]:
+    """Verify the canonical split/dividend snapshot and its active-universe receipt."""
+    latest = conn.execute("SELECT MAX(date) FROM v_options").fetchone()[0]
+    receipt_name = f"{latest}.json" if latest is not None else "missing.json"
+    path = data_dir / "control" / "ingestion" / "corporate_actions" / receipt_name
+    errors: list[str] = []
+
+    def receipt_int(value: object, label: str) -> int:
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            errors.append(f"{label} is not an integer")
+            return -1
     try:
         payload = json.loads(path.read_text())
-    except (OSError, json.JSONDecodeError):
+    except (OSError, json.JSONDecodeError) as exc:
         return {
             "status": "unavailable",
-            "rows": 0,
-            "symbols": 0,
-            "events": 0,
+            "manifest": str(path),
             "continuity_status": "not_enforced",
+            "errors": [f"corporate-action receipt unavailable: {exc}"],
         }
-    rows = payload.get("rows") if isinstance(payload, dict) else []
-    rows = [row for row in rows or [] if isinstance(row, dict)]
+
+    if payload.get("schema") != "quantiv.corporate-action-ingestion.v1":
+        errors.append("corporate-action receipt schema is unsupported")
+    if payload.get("source") != "dolthub:post-no-preference/stocks":
+        errors.append("corporate-action source is not the canonical DoltHub stock feed")
+    if payload.get("replay_equivalence") != "verified":
+        errors.append("corporate-action replay equivalence is not verified")
+
+    source_options_date = payload.get("source_options_date")
+    if latest is None or source_options_date != latest.isoformat():
+        errors.append(
+            "corporate-action universe does not match the latest options partition"
+        )
+    try:
+        query_start = date.fromisoformat(str(payload.get("query_start")))
+        query_end = date.fromisoformat(str(payload.get("query_end")))
+        if latest is not None and query_end < latest:
+            errors.append("corporate-action query ends before the options source date")
+        if query_start > date(2019, 1, 1):
+            errors.append("corporate-action history does not cover the ML training window")
+    except ValueError:
+        errors.append("corporate-action query window is invalid")
+
+    active_filter = _retired_symbol_sql("act_symbol")
+    symbols = [
+        str(row[0])
+        for row in conn.execute(
+            f"""
+            SELECT DISTINCT act_symbol
+            FROM v_options
+            WHERE date = (SELECT MAX(date) FROM v_options)
+              AND {active_filter}
+            ORDER BY act_symbol
+            """
+        ).fetchall()
+    ]
+    symbol_digest = hashlib.sha256("\n".join(symbols).encode()).hexdigest()
+    universe = payload.get("universe") or {}
+    if receipt_int(universe.get("symbols"), "corporate-action universe count") != len(symbols):
+        errors.append("corporate-action universe row count does not match active options")
+    if universe.get("symbols_sha256") != symbol_digest:
+        errors.append("corporate-action universe hash does not match active options")
+
+    verified_paths: dict[str, Path] = {}
+    dataset_summary: dict[str, Any] = {}
+    expected_columns = {
+        "splits": ("to_factor > 0 AND for_factor > 0",),
+        "dividends": ("amount >= 0",),
+    }
+    for name, valid_predicates in expected_columns.items():
+        dataset = (payload.get("datasets") or {}).get(name) or {}
+        partition_value = dataset.get("partition")
+        partition = (data_dir / str(partition_value)).resolve() if partition_value else None
+        if (
+            partition is None
+            or data_dir.resolve() not in partition.parents
+            or not partition.exists()
+        ):
+            errors.append(f"{name} canonical partition is missing")
+            continue
+        verified_paths[name] = partition
+        if _sha256_file(partition) != dataset.get("partition_sha256"):
+            errors.append(f"{name} partition hash does not match receipt")
+        try:
+            rows, duplicates, invalid = conn.execute(
+                f"""
+                SELECT COUNT(*),
+                       COUNT(*) - COUNT(DISTINCT (act_symbol, ex_date)),
+                       COUNT(*) FILTER (
+                           WHERE ({' AND '.join(valid_predicates)}) IS NOT TRUE
+                       )
+                FROM read_parquet(?)
+                """,
+                [str(partition)],
+            ).fetchone()
+            rows = int(rows or 0)
+            duplicates = int(duplicates or 0)
+            invalid = int(invalid or 0)
+            receipt_rows = receipt_int(
+                dataset.get("rows"), f"{name} receipt row count"
+            )
+            if rows != receipt_rows:
+                errors.append(f"{name} Parquet row count does not match receipt")
+            if duplicates:
+                errors.append(f"{name} contains {duplicates} duplicate action keys")
+            if invalid:
+                errors.append(f"{name} contains {invalid} invalid action values")
+            dataset_summary[name] = {
+                "rows": rows,
+                "partition": str(partition),
+                "partition_sha256": dataset.get("partition_sha256"),
+                "content_sha256": dataset.get("content_sha256"),
+            }
+        except Exception as exc:
+            errors.append(f"{name} partition cannot be inspected: {exc}")
+        batches = dataset.get("batches") or []
+        if not batches or any(
+            batch.get("completion") != "short_page"
+            or receipt_int(batch.get("pages"), f"{name} batch page count") < 1
+            for batch in batches
+        ):
+            errors.append(f"{name} does not prove exhaustive pagination")
+        if batches:
+            batch_rows = sum(
+                receipt_int(batch.get("rows"), f"{name} batch row count")
+                for batch in batches
+            )
+            batch_symbols = sum(
+                receipt_int(batch.get("symbols"), f"{name} batch symbol count")
+                for batch in batches
+            )
+            if batch_rows != receipt_int(dataset.get("rows"), f"{name} row count"):
+                errors.append(f"{name} batch rows do not reconcile to the receipt")
+            if batch_symbols != len(symbols):
+                errors.append(f"{name} batches do not cover the active universe")
+        if partition is not None and partition.stem != dataset.get("content_sha256"):
+            errors.append(f"{name} content address does not match the receipt")
+
+    split_crossings = 0
+    dividend_crossings = 0
+    if set(verified_paths) == {"splits", "dividends"}:
+        try:
+            split_crossings, dividend_crossings = conn.execute(
+                """
+                WITH historical AS (
+                    SELECT act_symbol, CAST(date AS DATE) AS earnings_date
+                    FROM v_earnings
+                    WHERE CAST(date AS DATE) < CURRENT_DATE
+                ), pre AS (
+                    SELECT e.act_symbol, e.earnings_date, p.date AS pre_date,
+                           ROW_NUMBER() OVER (
+                               PARTITION BY e.act_symbol, e.earnings_date
+                               ORDER BY p.date DESC
+                           ) AS rn
+                    FROM historical e
+                    JOIN v_ohlcv p ON p.act_symbol = e.act_symbol
+                     AND p.date < e.earnings_date
+                     AND p.date >= e.earnings_date - INTERVAL '5' DAY
+                ), post AS (
+                    SELECT e.act_symbol, e.earnings_date, p.date AS post_date,
+                           ROW_NUMBER() OVER (
+                               PARTITION BY e.act_symbol, e.earnings_date
+                               ORDER BY p.date ASC
+                           ) AS rn
+                    FROM historical e
+                    JOIN v_ohlcv p ON p.act_symbol = e.act_symbol
+                     AND p.date > e.earnings_date
+                     AND p.date <= e.earnings_date + INTERVAL '5' DAY
+                ), windows AS (
+                    SELECT pre.act_symbol, pre.pre_date, post.post_date
+                    FROM pre JOIN post USING (act_symbol, earnings_date)
+                    WHERE pre.rn = 1 AND post.rn = 1
+                )
+                SELECT
+                    (SELECT COUNT(*) FROM windows w JOIN read_parquet(?) s
+                       ON s.act_symbol = w.act_symbol
+                      AND s.ex_date > w.pre_date AND s.ex_date <= w.post_date),
+                    (SELECT COUNT(*) FROM windows w JOIN read_parquet(?) d
+                       ON d.act_symbol = w.act_symbol
+                      AND d.ex_date > w.pre_date AND d.ex_date <= w.post_date)
+                """,
+                [str(verified_paths["splits"]), str(verified_paths["dividends"])],
+            ).fetchone()
+            split_crossings = int(split_crossings or 0)
+            dividend_crossings = int(dividend_crossings or 0)
+        except Exception as exc:
+            errors.append(f"corporate-action event-window audit failed: {exc}")
+
     return {
-        "status": "observed",
+        "status": "failed" if errors else "passed",
+        "manifest": str(path),
         "generated_at": payload.get("generated_at"),
-        "rows": len(rows),
-        "symbols": len({row.get("symbol") for row in rows if row.get("symbol")}),
-        "events": sum(int(row.get("event_count") or 0) for row in rows),
-        "continuity_status": "observed_only",
+        "source": payload.get("source"),
+        "source_options_date": source_options_date,
+        "query_start": payload.get("query_start"),
+        "query_end": payload.get("query_end"),
+        "universe_symbols": len(symbols),
+        "universe_sha256": symbol_digest,
+        "datasets": dataset_summary,
+        "split_event_window_crossings": split_crossings,
+        "dividend_event_window_crossings": dividend_crossings,
+        "replay_equivalence": payload.get("replay_equivalence"),
+        "adjustment_contract": payload.get("adjustment_contract"),
+        "continuity_status": "enforced" if not errors else "not_enforced",
+        "errors": errors,
     }
 
 
@@ -631,7 +819,7 @@ def main() -> int:
             event_coverage=_event_coverage(conn, days_ahead=args.days_ahead),
             duplicates=_duplicate_stats(conn),
             symbol_mappings=_symbol_mappings(conn),
-            corporate_actions=_corporate_actions(data_dir),
+            corporate_actions=_corporate_actions(conn, data_dir),
             pipeline_controls={
                 "quarantine": quarantine,
                 "idempotent_replay": {
