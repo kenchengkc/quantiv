@@ -29,6 +29,17 @@ from export_quote_quarantine import export_quarantine  # noqa: E402
 MODEL_HORIZONS = (1, 2, 3, 7, 14, 21)
 
 
+def _retired_symbol_sql(column: str) -> str:
+    """SQL predicate excluding configured delistings and renamed-away symbols."""
+    renames = _config_items(REPO_ROOT / "config" / "ticker_renames.json", "renames")
+    retired = _config_items(REPO_ROOT / "config" / "delisted_tickers.json", "tickers")
+    symbols = sorted({*renames, *retired})
+    if not symbols:
+        return "TRUE"
+    literals = ", ".join("'" + symbol.replace("'", "''") + "'" for symbol in symbols)
+    return f"{column} NOT IN ({literals})"
+
+
 def _view_stats(
     conn: duckdb.DuckDBPyConnection,
     view: str,
@@ -101,20 +112,32 @@ def _duplicate_stats(conn: duckdb.DuckDBPyConnection) -> dict[str, Any]:
 
 
 def _coverage_ctes(days_ahead: int) -> str:
+    active_symbol_filter = _retired_symbol_sql("act_symbol")
     return f"""
-        WITH upcoming AS (
+        WITH latest AS (
+            SELECT MAX(date) AS snapshot_date FROM v_options
+        ), calendar_upcoming AS (
             SELECT DISTINCT act_symbol, CAST(date AS DATE) AS earnings_date, timing
             FROM v_earnings
             WHERE CAST(date AS DATE) BETWEEN CURRENT_DATE
                 AND CURRENT_DATE + INTERVAL '{days_ahead}' DAY
+        ), active_symbols AS (
+            SELECT DISTINCT act_symbol
+            FROM v_options CROSS JOIN latest
+            WHERE date = latest.snapshot_date
+              AND {active_symbol_filter}
+        ), expected AS (
+            SELECT u.*, latest.snapshot_date
+            FROM calendar_upcoming u
+            JOIN active_symbols a USING (act_symbol)
+            CROSS JOIN latest
         ),
         covered AS (
             SELECT DISTINCT u.act_symbol, u.earnings_date
-            FROM upcoming u
+            FROM expected u
             JOIN v_straddle_features sf
               ON sf.act_symbol = u.act_symbol
-             AND sf.date < u.earnings_date
-             AND (u.earnings_date - sf.date) BETWEEN 1 AND 25
+             AND sf.date = u.snapshot_date
              AND (
                   (LOWER(COALESCE(CAST(u.timing AS VARCHAR), '')) = 'amc'
                    AND sf.expiration > u.earnings_date)
@@ -132,40 +155,65 @@ def _event_coverage(
     days_ahead: int,
 ) -> dict[str, Any]:
     ctes = _coverage_ctes(days_ahead)
-    expected, covered = conn.execute(
+    calendar_events, expected, covered, active_symbols = conn.execute(
         ctes
         + """
         SELECT
-            (SELECT COUNT(*) FROM upcoming),
-            (SELECT COUNT(*) FROM covered)
+            (SELECT COUNT(*) FROM calendar_upcoming),
+            (SELECT COUNT(*) FROM expected),
+            (SELECT COUNT(*) FROM covered),
+            (SELECT COUNT(*) FROM active_symbols)
         """
     ).fetchone()
     missing_rows = conn.execute(
         ctes
         + """
         SELECT u.act_symbol, u.earnings_date
-        FROM upcoming u
+        FROM expected u
         LEFT JOIN covered c USING (act_symbol, earnings_date)
         WHERE c.act_symbol IS NULL
         ORDER BY u.earnings_date, u.act_symbol
         LIMIT 25
         """
     ).fetchall()
+    outside_rows = conn.execute(
+        ctes
+        + """
+        SELECT u.act_symbol, u.earnings_date
+        FROM calendar_upcoming u
+        LEFT JOIN active_symbols a USING (act_symbol)
+        WHERE a.act_symbol IS NULL
+        ORDER BY u.earnings_date, u.act_symbol
+        LIMIT 25
+        """
+    ).fetchall()
+    calendar_events = int(calendar_events or 0)
     expected = int(expected or 0)
     covered = int(covered or 0)
+    active_symbols = int(active_symbols or 0)
+    outside_universe = max(calendar_events - expected, 0)
     overall_coverage = round(covered / expected, 6) if expected else None
     policy = json.loads(
         (REPO_ROOT / "config" / "option_quote_quality.json").read_text()
     )
     min_event_coverage = float(policy["min_upcoming_event_coverage"])
+    active_symbol_filter = _retired_symbol_sql("act_symbol")
     horizon_rows = conn.execute(
-        """
+        f"""
         WITH latest AS (SELECT MAX(date) AS snapshot_date FROM v_options),
+        active_symbols AS (
+            SELECT DISTINCT act_symbol
+            FROM v_options CROSS JOIN latest
+            WHERE date = latest.snapshot_date
+              AND {active_symbol_filter}
+        ),
         expected AS (
             SELECT e.act_symbol, CAST(e.date AS DATE) AS earnings_date,
                    (CAST(e.date AS DATE) - l.snapshot_date) AS horizon,
                    e.timing, l.snapshot_date
-            FROM v_earnings e CROSS JOIN latest l
+            FROM v_earnings e
+            JOIN active_symbols a USING (act_symbol)
+            CROSS JOIN latest l
             WHERE (CAST(e.date AS DATE) - l.snapshot_date) IN (1, 2, 3, 7, 14, 21)
         ), covered AS (
             SELECT DISTINCT e.act_symbol, e.earnings_date, e.horizon
@@ -219,6 +267,13 @@ def _event_coverage(
             else "failed"
         ),
         "window_days": days_ahead,
+        "calendar_events": calendar_events,
+        "decision_universe_symbols": active_symbols,
+        "outside_option_universe_events": outside_universe,
+        "outside_option_universe_sample": [
+            {"symbol": symbol, "earnings_date": earnings_date.isoformat()}
+            for symbol, earnings_date in outside_rows
+        ],
         "expected_events": expected,
         "covered_events": covered,
         "missing_events": max(expected - covered, 0),
@@ -380,37 +435,51 @@ def _config_items(path: Path, key: str) -> dict[str, Any]:
 def _active_stale_symbols(
     conn: duckdb.DuckDBPyConnection,
     symbols: list[str],
-) -> list[str]:
+) -> dict[str, list[str]]:
     if not symbols:
-        return []
+        return {"earnings": [], "latest_options": []}
     placeholders = ", ".join("?" for _ in symbols)
-    rows = conn.execute(
+    earnings_rows = conn.execute(
         f"""
         SELECT DISTINCT act_symbol
-        FROM (
-            SELECT act_symbol FROM v_earnings
-            WHERE CAST(date AS DATE) >= CURRENT_DATE
-              AND act_symbol IN ({placeholders})
-            UNION ALL
-            SELECT act_symbol FROM v_options
-            WHERE date = (SELECT MAX(date) FROM v_options)
-              AND act_symbol IN ({placeholders})
-        )
+        FROM v_earnings
+        WHERE CAST(date AS DATE) >= CURRENT_DATE
+          AND act_symbol IN ({placeholders})
         ORDER BY act_symbol
         """,
-        [*symbols, *symbols],
+        symbols,
     ).fetchall()
-    return [str(row[0]) for row in rows]
+    option_rows = conn.execute(
+        f"""
+        SELECT DISTINCT act_symbol
+        FROM v_options
+        WHERE date = (SELECT MAX(date) FROM v_options)
+          AND act_symbol IN ({placeholders})
+        ORDER BY act_symbol
+        """,
+        symbols,
+    ).fetchall()
+    return {
+        "earnings": [str(row[0]) for row in earnings_rows],
+        "latest_options": [str(row[0]) for row in option_rows],
+    }
 
 
 def _symbol_mappings(conn: duckdb.DuckDBPyConnection) -> dict[str, Any]:
     renames = _config_items(REPO_ROOT / "config" / "ticker_renames.json", "renames")
     retired = _config_items(REPO_ROOT / "config" / "delisted_tickers.json", "tickers")
     old_symbols = sorted({*renames, *retired})
+    active = _active_stale_symbols(conn, old_symbols)
     return {
         "rename_rules": len(renames),
         "retired_symbols": len(retired),
-        "stale_source_symbols": _active_stale_symbols(conn, old_symbols),
+        # A retired symbol with a future event can enter scoring and is a hard
+        # mapping failure. A quote lingering in the immutable latest source
+        # partition is retained for audit/history but explicitly quarantined
+        # from the decision-universe denominator.
+        "stale_source_symbols": active["earnings"],
+        "stale_earnings_symbols": active["earnings"],
+        "quarantined_latest_option_symbols": active["latest_options"],
     }
 
 

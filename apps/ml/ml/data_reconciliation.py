@@ -87,13 +87,27 @@ def build_reconciliation_manifest(
                 )
             )
 
+    outside_universe_events = int(
+        event_coverage.get("outside_option_universe_events", 0)
+    )
+    if outside_universe_events:
+        exceptions.append(
+            _exception(
+                "upcoming_events_outside_option_universe",
+                "warning",
+                "Calendar events fall outside the current options decision universe",
+                count=outside_universe_events,
+                sample=event_coverage.get("outside_option_universe_sample") or [],
+            )
+        )
+
     missing_events = int(event_coverage.get("missing_events", 0))
     if missing_events:
         exceptions.append(
             _exception(
                 "upcoming_events_without_option_chain",
                 "warning",
-                "Upcoming earnings events have no decision-eligible option chain",
+                "In-universe earnings events have no decision-eligible option chain",
                 count=missing_events,
                 sample=event_coverage.get("missing_sample") or [],
             )
@@ -153,6 +167,17 @@ def build_reconciliation_manifest(
                 "Retired or renamed-away symbols remain in active pipeline views",
                 count=len(stale_symbols),
                 sample=stale_symbols,
+            )
+        )
+    quarantined_symbols = symbol_mappings.get("quarantined_latest_option_symbols") or []
+    if quarantined_symbols:
+        exceptions.append(
+            _exception(
+                "retired_source_symbols_quarantined",
+                "warning",
+                "Latest source quotes for retired symbols are excluded from the decision universe",
+                count=len(quarantined_symbols),
+                sample=quarantined_symbols,
             )
         )
 
