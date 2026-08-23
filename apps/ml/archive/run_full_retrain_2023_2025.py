@@ -1,12 +1,5 @@
 #!/usr/bin/env python3
-"""
-Archived legacy retrain entrypoint.
-
-Full Retrain: Train models on ALL available data (2023-2025)
-This maximizes model learning for production deployment
-
-The active training path is feature_engineering.py + model_trainer.py.
-"""
+"""Archived full-history retrain. Prefer feature_engineering.py + model_trainer.py."""
 
 import os
 import sys
@@ -36,54 +29,24 @@ def run_full_retrain(
     train_start: str = "2023-01-01",
     train_end: str = "2025-08-15"
 ):
-    """
-    Train production models on ALL available data
-    
-    Previous training: 2023-01-01 to 2024-06-30 (18 months)
-    New training:      2023-01-01 to 2025-08-15 (32 months!)
-    
-    Benefits:
-    - 78% more training data
-    - Models learn recent 2024-2025 market conditions
-    - Better calibrated to current volatility regime
-    """
+    """Rebuild bias curves, features, and models for train_start..train_end."""
     start_time = datetime.now()
     
-    logger.info("=" * 80)
-    logger.info("FULL RETRAIN ON ALL AVAILABLE DATA (2023-2025)")
-    logger.info("=" * 80)
-    logger.info(f"Training period: {train_start} to {train_end}")
-    logger.info(f"Duration: ~32 months of data")
-    logger.info(f"Optuna trials per model: {n_trials}")
-    logger.info("")
-    logger.info("📊 This will include:")
-    logger.info("  - Original 18 months (2023-2024 H1)")
-    logger.info("  - New 14 months (2024 H2 - 2025 Aug)")
-    logger.info("  - 78% more training samples!")
-    logger.info("")
-    
+    logger.info("Full retrain %s to %s (%s trials/model)", train_start, train_end, n_trials)
+
     try:
-        # Step 1: Bias Curves (use cached if available)
-        logger.info("Step 1: Loading/rebuilding bias curves...")
+        logger.info("Step 1: bias curves")
         bias_curve_path = os.path.join(data_dir, "bias_curves.parquet")
-        
-        # Rebuild bias curves with full dataset
-        logger.info("Rebuilding bias curves with full 2023-2025 data...")
         builder = BiasCurveBuilder(data_dir)
-        
-        # Extract historical bias points
         bias_points = builder.extract_historical_bias_points(
             start_date=train_start,
             end_date=train_end
         )
-        
+
         if bias_points:
             logger.info(f"Extracted {len(bias_points)} historical bias points")
-            # Build bias curves from points
             bias_curves = builder.build_bias_curves(bias_points)
-            # Save to disk
             builder.save_bias_curves(bias_curves, bias_curve_path)
-            logger.info(f"✅ Bias curves rebuilt with full historical data")
         else:
             logger.warning("No bias points extracted, using existing curves if available")
         

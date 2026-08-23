@@ -1,16 +1,9 @@
 #!/usr/bin/env python3
-"""
-Feature Engineering v3 — Professional-grade earnings move prediction features.
+"""Build training tables for each days-until-earnings target.
 
-Key improvements over v2:
-  1. IV Event Decomposition — strips diffusive vol from earnings event vol
-     using front/back month IV term structure (σ²_event = T*(IV²_front - IV²_back))
-  2. Historical earnings move features — per-symbol trailing realized moves
-  3. Straddle accuracy history — how well has the straddle predicted past moves?
-  4. Extended date range — uses options-only features for 2019-2023 (no OHLCV needed)
-  5. Proper realized move from OHLCV where available, options-inferred S_hat otherwise
-
-Target: realized_move_pct = |close_post / close_pre - 1|
+What we predict: how much the stock moved, as a percent. Features mix the
+options chain (including implied vol on the near vs far expiration), past
+earnings moves, and daily prices when we have them.
 
 Usage:
   python apps/ml/feature_engineering.py
@@ -40,12 +33,9 @@ class FeatureSet:
     horizon: int
     features: pd.DataFrame
     target: pd.Series
-    # Held alongside features but not used as a model input. Lets the trainer
-    # compute sample weights (e.g. time-decay) without re-querying source data.
+    # Not a model input. Lets training put more weight on recent rows.
     earnings_date: pd.Series = field(default_factory=pd.Series)
-    # Per-row ticker, written as the __symbol meta column. Never a model input
-    # (trainer strips all __ cols); used by symbol-keyed feature experiments and
-    # leakage audits that need to join external panels (OHLCV, sector, etc.).
+    # Not a model input. Kept as __symbol for lookups and checks.
     symbol: pd.Series = field(default_factory=pd.Series)
     sector: pd.Series = field(default_factory=pd.Series)
     dollar_volume: pd.Series = field(default_factory=pd.Series)
@@ -85,10 +75,10 @@ def connect_duckdb() -> duckdb.DuckDBPyConnection:
         if v not in views:
             raise RuntimeError(f"Required view '{v}' missing. Run: python scripts/setup_duckdb_from_parquet.py")
 
-    # v_ohlcv and v_realized_vol are optional — create empty stubs if missing
-    # so LEFT JOINs work even without OHLCV data
+    # Daily prices and realized-vol views are optional. If they are missing,
+    # add empty stand-ins so the later joins still run.
     if "v_ohlcv" not in views:
-        logger.warning("v_ohlcv not found — realized moves will use S_hat fallback only")
+        logger.warning("v_ohlcv not found — realized moves will use spot estimated from options")
         conn.execute("""
             CREATE OR REPLACE VIEW v_ohlcv AS
             SELECT NULL::VARCHAR AS act_symbol, NULL::DATE AS date,
@@ -110,8 +100,7 @@ def connect_duckdb() -> duckdb.DuckDBPyConnection:
                    NULL::DOUBLE AS drift_5d
             WHERE 1=0
         """)
-    # v_vix — daily CBOE VIX close from FRED. Used to derive market regime
-    # features (vix level, change, percentile rank) at each snapshot date.
+    # Daily VIX close from FRED. Used for VIX level, change, and rank.
     if "v_vix" not in views:
         data_root = get_data_dir()
         vix_path = data_root / "parquet" / "vix" / "vix.parquet"
@@ -130,9 +119,7 @@ def connect_duckdb() -> duckdb.DuckDBPyConnection:
                 WHERE 1=0
             """)
 
-    # v_volhist — daily HV/IV snapshots (current + week/month/year-ago) joined
-    # per (snapshot_date, act_symbol) to give vol-regime context features.
-    # Empty stub when the parquet tree isn't present so LEFT JOINs still work.
+    # Historical and implied vol snapshots. Empty stand-in if the files are missing.
     if "v_volhist" not in views:
         data_root = get_data_dir()
         volhist_glob = str(data_root / "parquet" / "volatility_history" / "year=*" / "month=*" / "*.parquet")
@@ -173,11 +160,10 @@ def connect_duckdb() -> duckdb.DuckDBPyConnection:
 
 def extract_training_data(conn: duckdb.DuckDBPyConnection,
                           start_date: str, end_date: str) -> Dict[int, FeatureSet]:
-    """Build feature sets using professional-grade feature engineering.
+    """Build the training tables.
 
-    Works in two phases:
-      Phase A: Options-only features (works for full 2019-2026 range)
-      Phase B: OHLCV-enriched features (2023+ only, joined where available)
+    Options features cover the full date range. Daily prices join in where
+    they exist (mostly 2023 onward).
     """
 
     logger.info(f"Extracting features: {start_date} → {end_date}")
@@ -193,10 +179,10 @@ def extract_training_data(conn: duckdb.DuckDBPyConnection,
     ),
 
     -- ═══════════════════════════════════════════════════════════════
-    -- REALIZED MOVE: prefer OHLCV close prices, fall back to S_hat
+    -- REALIZED MOVE: prefer daily close prices; if missing, use spot estimated from options
     -- ═══════════════════════════════════════════════════════════════
 
-    -- Method 1: OHLCV-based realized move (most accurate, 2023+)
+    -- Method 1: realized move from daily closes (most accurate, 2023+)
     pre_close_ohlcv AS (
         SELECT e.act_symbol, e.earnings_date,
                rv.close AS pre_price,
@@ -234,8 +220,8 @@ def extract_training_data(conn: duckdb.DuckDBPyConnection,
           AND pre.pre_price > 0 AND post.post_price > 0
     ),
 
-    -- Method 2: Options S_hat based realized move (2019-2022 fallback)
-    -- S_hat = strike where |call_delta| ≈ 0.5
+    -- Method 2: realized move from the options chain (2019–2022 fallback)
+    -- Spot ≈ strike where call delta is about 0.5
     s_hat_estimates AS (
         SELECT
             act_symbol,
@@ -282,7 +268,7 @@ def extract_training_data(conn: duckdb.DuckDBPyConnection,
           AND pre.pre_price > 0 AND post.post_price > 0
     ),
 
-    -- Combine: prefer OHLCV, fall back to S_hat
+    -- Combine: prefer daily closes, else spot estimated from options
     realized AS (
         SELECT * FROM realized_ohlcv
         UNION ALL
@@ -354,10 +340,9 @@ def extract_training_data(conn: duckdb.DuckDBPyConnection,
     ),
 
     -- ═══════════════════════════════════════════════════════════════
-    -- IV EVENT DECOMPOSITION
-    -- Strips diffusive vol from earnings event vol using term structure.
-    -- σ²_event_daily = IV²_front - IV²_back (annualized IVs squared)
-    -- event_move = σ_event * √(DTE_front / 365)
+    -- IMPLIED MOVE FROM NEAR VS FAR EXPIRATION
+    -- Near IV includes the earnings jump; far IV is mostly everyday vol.
+    -- event_move = earnings-jump vol × sqrt(days to near expiration / 365)
     -- ═══════════════════════════════════════════════════════════════
     event_vol AS (
         SELECT
@@ -370,10 +355,7 @@ def extract_training_data(conn: duckdb.DuckDBPyConnection,
             -- Find back-month IV (next expiry after the front one)
             back.atm_iv AS back_iv,
             back.dte AS back_dte,
-            -- Event vol decomposition (professional term-structure method)
-            -- Total variance = σ²_diffusive × T + σ²_event
-            -- Front expiry contains event: IV²_front × T_front = σ²_diff × T_front + σ²_event
-            -- Back expiry is pure diffusive: IV²_back × T_back = σ²_diff × T_back
+            -- Near expiration IV includes the earnings jump; far expiration is mostly everyday vol.
             -- Therefore: σ²_event = IV²_front × T_front - IV²_back × T_front
             --                     ≈ (IV²_front - IV²_back) × T_front
             -- event_move = √(σ²_event)
@@ -415,9 +397,8 @@ def extract_training_data(conn: duckdb.DuckDBPyConnection,
         ) = 1
     ),
 
-    -- Market regime: VIX level + 30d change + 252d percentile, plus SPY
-    -- 60d drift and TLT/SPY 30d ratio (risk-off proxy). LightGBM uses
-    -- these to condition predictions on the prevailing vol regime.
+    -- VIX level, 30-day change, and 1-year rank, plus SPY 60-day drift
+    -- and TLT/SPY 30-day ratio (risk-off). Used as market-condition features.
     macro AS (
         WITH spy AS (SELECT date, close FROM v_ohlcv WHERE act_symbol = 'SPY'),
              tlt AS (SELECT date, close FROM v_ohlcv WHERE act_symbol = 'TLT')
@@ -445,8 +426,8 @@ def extract_training_data(conn: duckdb.DuckDBPyConnection,
 
     -- ═══════════════════════════════════════════════════════════════
     -- MAIN FEATURE ASSEMBLY
-    -- Uses v_straddle_features (options-only, full 2019-2026 range)
-    -- LEFT JOINs v_realized_vol (OHLCV, 2023+ only — NULL pre-2023)
+    -- Uses v_straddle_features (options, full 2019–2026 range)
+    -- Joins realized vol from daily prices (2023+; empty before that)
     -- ═══════════════════════════════════════════════════════════════
     snapshots AS (
         SELECT
@@ -515,14 +496,14 @@ def extract_training_data(conn: duckdb.DuckDBPyConnection,
                  ELSE NULL
             END AS hist_straddle_accuracy,
 
-            -- Market regime (VIX + SPY/TLT macro context)
+            -- Market conditions (VIX, SPY, TLT)
             mc.vix_current,
             mc.vix_change_30d,
             mc.vix_pct_252d,
             mc.spy_drift_60d,
             mc.tlt_spy_ratio_30d,
 
-            -- Volatility regime (from v_volhist; NULL pre-2019 or where missing)
+            -- Vol vs its own history (empty on older dates or where missing)
             CASE
                 WHEN vh.iv_year_high > vh.iv_year_low
                 THEN (vh.iv_current - vh.iv_year_low) / NULLIF(vh.iv_year_high - vh.iv_year_low, 0)
@@ -581,12 +562,12 @@ def extract_training_data(conn: duckdb.DuckDBPyConnection,
     logger.info(f"Raw snapshot rows: {len(df):,}")
 
     if df.empty:
-        logger.warning("No data returned — check that options + OHLCV + earnings overlap")
+        logger.warning("No data returned — check that options, daily prices, and earnings overlap")
         return {}
 
     logger.info(f"Realized move sources: {df['realized_source'].value_counts().to_dict()}")
 
-    # ---------- Build per-horizon feature sets ----------
+    # Build a table for each days-until-earnings target
     profiles = _profile_metadata()
     feature_sets: Dict[int, FeatureSet] = {}
 
@@ -597,26 +578,26 @@ def extract_training_data(conn: duckdb.DuckDBPyConnection,
             continue
 
         feature_cols = [
-            # Core options
+            # Options
             "atm_iv", "straddle_pct", "em_iv_pct", "dte",
-            # Event vol decomposition (professional-grade)
+            # Implied move from near vs far expiration
             "event_move_implied", "iv_crush_pct", "event_vol_fraction",
-            # Realized vol (Parkinson + close-to-close)
+            # Realized vol (high-low range and close-to-close)
             "parkinson_rv_10d", "parkinson_rv_20d", "parkinson_rv_60d",
             "cc_rv_10d", "cc_rv_20d", "vol_of_vol_20d",
-            # IV / RV ratios (vol risk premium)
+            # Implied vol vs realized vol
             "iv_rv_ratio_20d", "iv_rv_ratio_60d", "iv_cc_rv_ratio_20d",
             "rv_term_ratio",
             # Market context
             "volume_ratio_20d", "drift_5d",
-            # Historical earnings pattern
+            # Past earnings moves
             "hist_move_avg_4q", "hist_move_med_4q", "hist_move_std_4q",
             "hist_move_avg_8q", "hist_move_med_8q", "hist_event_count",
             "hist_move_p75_8q", "hist_move_p90_8q", "hist_move_max_12q",
             "hist_move_kurt_8q", "hist_move_last", "hist_straddle_accuracy",
-            # Vol regime (from v_volhist — NULL if volatility_history parquet absent)
+            # Vol vs its own history (empty if vol-history files are missing)
             "iv_rank", "hv_rank", "iv_mom_week", "iv_mom_month",
-            # Market regime (from VIX + SPY/TLT — NULL pre-1990 or pre-2023)
+            # VIX, SPY, TLT (empty on older dates)
             "vix_current", "vix_change_30d", "vix_pct_252d",
             "spy_drift_60d", "tlt_spy_ratio_30d",
         ]
@@ -643,7 +624,7 @@ def extract_training_data(conn: duckdb.DuckDBPyConnection,
         )
         dollar_volume = pd.to_numeric(hdf.get("dollar_volume"), errors="coerce")
 
-        # LightGBM handles NaN natively — only remove inf and extreme outliers
+        # LightGBM can use missing values. Only drop infinities and extreme outliers.
         X = X.replace([np.inf, -np.inf], np.nan)
         valid = y.notna() & (y > 0) & (y < 1.0)
         X = X[valid].reset_index(drop=True)
@@ -707,8 +688,7 @@ def save_training_data(feature_sets: Dict[int, FeatureSet], output_dir: Path):
     for horizon, fs in feature_sets.items():
         training_df = fs.features.copy()
         training_df["target"] = fs.target
-        # Sidecar — used by model_trainer.py to derive sample weights.
-        # Trainer pops it before fitting; never seen by LightGBM as a feature.
+        # __ columns are metadata. The trainer drops them before fitting.
         if len(fs.earnings_date) == len(fs.features):
             training_df["__earnings_date"] = fs.earnings_date.values
         if len(fs.symbol) == len(fs.features):
@@ -730,9 +710,12 @@ def save_training_data(feature_sets: Dict[int, FeatureSet], output_dir: Path):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Extract ML training features (v3)")
-    parser.add_argument("--start-date", default="2019-06-01",
-                        help="Start date (default: 2019-06-01 to allow trailing history)")
+    parser = argparse.ArgumentParser(description="Extract ML training features")
+    parser.add_argument(
+        "--start-date",
+        default="2019-06-01",
+        help="Start date (leave enough history for past-earnings features)",
+    )
     parser.add_argument("--end-date", default="2026-03-31")
     parser.add_argument("--output-dir", default=None)
     args = parser.parse_args()
@@ -749,7 +732,7 @@ def main():
     save_training_data(feature_sets, output_dir)
 
     print(f"\n{'='*70}")
-    print("TRAINING DATA SUMMARY (v3)")
+    print("TRAINING DATA SUMMARY")
     print(f"{'='*70}")
     for h, fs in sorted(feature_sets.items()):
         m = fs.metadata

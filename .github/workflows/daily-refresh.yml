@@ -1,27 +1,15 @@
 name: Daily data refresh
 
-# Nightly pipeline (cron `0 11 * * *`):
-#   1. Pull parquet + models from Cloudflare R2
-#   2. sync_dolthub — pull the latest options_chain / earnings / ohlcv rows
-#      then overlay near-term earnings from Finnhub when FINNHUB_API_KEY exists
-#   3. Push parquet/models to R2, then after daily_score push forecasts/
-#   4. setup_duckdb → daily_score → build_frontend_data
-#   5. Commit JSON + push → Vercel auto-deploys
-#
-# Weekly ML retrain (cron `0 12 * * 0` — Sunday 12:00 UTC):
-#   Pull R2 → DuckDB → feature_engineering → model_trainer → score with
-#   new models → push models/forecasts. It opts into pulling the earnings
-#   calendar from R2 because the Sunday daily refresh can finish and push its
-#   refreshed calendar after the weekly workflow was already queued.
-#
-# Designed for public repo (unlimited free runner minutes). Runtime per run
-# ≈ 15–25 min dominated by build_frontend_data + DuckDB parquet scans.
+# Nightly (11:00 UTC): R2 pull → provider sync → R2 push → DuckDB → score →
+# frontend JSON → commit. Weekly Sunday 12:00 UTC: retrain
+# (feature_engineering → model_trainer → score). Retrain pulls the earnings
+# calendar from R2 because it can start before the daily commit lands.
 
 on:
   schedule:
     # 11:00 UTC = 07:00 ET. Runs after US markets close + DoltHub has caught up.
     - cron: '0 11 * * *'
-    # Sunday 12:00 UTC — weekly LightGBM retrain (v3 features + point/quantile).
+    # Sunday 12:00 UTC — weekly model retrain.
     - cron: '0 12 * * 0'
   workflow_dispatch:
     inputs:
@@ -736,11 +724,8 @@ jobs:
       - name: Gate — verify data freshness before ML
         run: python scripts/check_duckdb_freshness.py --strict --max-lag-days 5
 
-      - name: Build ML training parquet (v3)
-        # Window matches what you A/B-tested locally. start-date 2023-01-01
-        # = full options + OHLCV coverage. end-date = today so we capture the
-        # latest earnings; pre-earnings rows older than today still survive
-        # the WHERE filter inside the SQL.
+      - name: Build ML training parquet
+        # 2023-01-01 is when options and daily prices are both complete; end date is today.
         run: |
           END=$(date -u +%Y-%m-%d)
           python apps/ml/feature_engineering.py \
@@ -786,16 +771,12 @@ jobs:
           if-no-files-found: ignore
           retention-days: 30
 
-      - name: Train LightGBM models (v3, tuned + time-decay)
-        # Locked-in production settings (settled on after local A/B):
-        #   --tune              Optuna search per horizon (30 trials × 6 horizons ≈ 7 min)
-        #   --time-decay 0.5    half-life 0.5y — modest recency bias on top of VIX features
+      - name: Train LightGBM models
+        # --tune searches settings; --time-decay 0.5 puts more weight on the last six months.
         run: python apps/ml/model_trainer.py --tune --time-decay 0.5
 
       - name: Gate — mandatory purged walk-forward validation
-        # Retrains each horizon across four unseen 60-day windows. Publication
-        # requires aggregate improvement over the options/straddle baseline,
-        # at least three usable folds, and no catastrophic fold regression.
+        # Test on four later 60-day windows. Average error must beat the straddle.
         run: |
           python scripts/validate_walk_forward.py \
             --report data/validation/retrain_walk_forward.json
@@ -810,10 +791,7 @@ jobs:
           retention-days: 30
 
       - name: Gate — validate trained model bundle
-        # Load every point/quantile artifact, smoke-predict with the training
-        # schema, enforce purged holdouts, calibration, and baseline quality.
-        # Receipts ride the existing model-artifact sync; there is no database
-        # record per prediction or metric.
+        # Load the models, run a test prediction, and check that the bands are the right width.
         run: |
           python scripts/validate_ml_pipeline.py models \
             --report data/validation/retrain_models.json \

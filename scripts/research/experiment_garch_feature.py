@@ -1,13 +1,9 @@
 #!/usr/bin/env python3
-"""Does a GARCH/EWMA conditional-vol feature buy point accuracy?
+"""Test whether a recent-weighted daily-vol feature improves average error.
 
-GARCH(1,1) one-step-ahead vol with the usual (α≈0.06, β≈0.92) is, to first
-order, a RiskMetrics EWMA of squared daily log-returns (λ≈0.94). We compute that
-EWMA daily vol per ticker as-of each earnings snapshot (leakage-safe: only
-returns strictly before the snapshot), annualize it, and paired-test the L1
-model with vs without it — same folds, seeds, and decay weights as
-experiment_model_improvements. Prior is null: the model already carries
-cc_rv_10d/20d, parkinson_rv_10/20/60d, vol_of_vol_20d, hv_current, iv_current.
+At each earnings date, uses only prior closes. Then compares the model with
+vs without the feature on the same splits. The model already has several vol
+features, so the expected result is no gain.
 
 Usage: python scripts/research/experiment_garch_feature.py --ml-dir /tmp/ml_garch [--oos-offset 150]
 """
@@ -29,13 +25,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from experiment_model_improvements import BASE, decay_w, make_folds  # noqa: E402
 from walk_forward import feature_target_split, load_training_frame  # noqa: E402
 
-LAMBDA = 0.94  # RiskMetrics daily decay ≈ GARCH(1,1) persistence
-MIN_OBS = 20   # need a minimal return history for a stable EWMA
+LAMBDA = 0.94  # daily decay
+MIN_OBS = 20
 
 
 def ewma_vol_panel(lam: float = LAMBDA) -> pd.DataFrame:
-    """Per (symbol, date) annualized EWMA vol of daily log returns, shifted so a
-    given date's value uses only returns up to the PRIOR close (no look-ahead)."""
+    """Recent-weighted annualized vol per (symbol, date), using only prior closes."""
     g = sorted(glob.glob("data/parquet/ohlcv/**/*.parquet", recursive=True))
     con = duckdb.connect()
     px = con.execute(

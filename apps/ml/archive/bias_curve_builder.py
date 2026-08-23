@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
-"""
-Historical Bias Curve Conditioning by Lead Time
-Builds calibrated multipliers α̂(T-k, ticker, sector) for EM_math baseline
-"""
+"""Historical multipliers that adjust the straddle expected move by ticker, sector, and days to earnings."""
 import os
 import sys
 from pathlib import Path
@@ -14,13 +11,12 @@ from typing import Dict, List, Tuple, Optional
 import logging
 from dataclasses import dataclass
 
-# Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 @dataclass
 class BiasPoint:
-    """Single bias observation for curve fitting"""
+    """One earnings event: implied move vs what actually happened."""
     symbol: str
     earnings_date: date
     lead_time_days: int
@@ -32,7 +28,7 @@ class BiasPoint:
     vix_level: Optional[float] = None
 
 class BiasCurveBuilder:
-    """Builds historical bias curves for EM_math calibration"""
+    """Fit those historical multipliers from past earnings events."""
     
     def __init__(self, data_dir: str = "data"):
         self.data_dir = Path(data_dir)
@@ -40,7 +36,7 @@ class BiasCurveBuilder:
         self._setup_duckdb()
     
     def _setup_duckdb(self):
-        """Initialize DuckDB connection with Parquet data"""
+        """Open DuckDB and point it at the Parquet files."""
         try:
             self.conn = duckdb.connect(":memory:")
             self.conn.execute("INSTALL parquet")

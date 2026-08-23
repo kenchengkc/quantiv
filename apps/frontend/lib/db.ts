@@ -1,14 +1,7 @@
 import { neon, type NeonQueryFunction } from '@neondatabase/serverless';
 
-// Lazy-init so `next build`'s page-data collection doesn't blow up on a
-// missing DATABASE_URL. The handlers that use this are all dynamic, so this
-// only runs at request time on a real deploy.
-//
-// Schema migrations live in scripts/migrate.mjs. Run that script with a
-// privileged Neon role when the schema changes — not from CI, and not
-// inside route handlers. Putting DDL in the request path adds
-// first-cold-instance latency and requires production credentials to
-// carry CREATE privileges.
+// Connect on first query so `next build` can run without DATABASE_URL.
+// Schema changes: node scripts/migrate.mjs (not here, not in CI).
 let _sql: NeonQueryFunction<false, false> | null = null;
 
 function getSql(): NeonQueryFunction<false, false> {
@@ -21,7 +14,7 @@ function getSql(): NeonQueryFunction<false, false> {
   return _sql;
 }
 
-// Tagged-template proxy: call sites write `sql\`SELECT ...\`` as usual.
+// Call sites write sql`SELECT ...` as usual.
 export const sql: NeonQueryFunction<false, false> = ((
   strings: TemplateStringsArray,
   ...values: unknown[]

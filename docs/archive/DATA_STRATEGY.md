@@ -1,12 +1,7 @@
 # ML Data Strategy: Current vs Optimal
 
-> Archived: historical notes kept for context. The active training path is
-> `apps/ml/feature_engineering.py`, `apps/ml/model_trainer.py`, and
-> `scripts/research/walk_forward.py`.
-
-**Date:** October 5, 2025 · **Status:** historical strategy notes. For the live
-walk-forward entrypoint use [`scripts/research/walk_forward.py`](../../scripts/research/walk_forward.py)
-(`npm run ml:walk-forward`). The old `run_walk_forward_validation.py` script was removed.
+> Archived. Active training: `apps/ml/feature_engineering.py` and
+> `apps/ml/model_trainer.py`. Research plot: `scripts/research/walk_forward.py`.
 
 ---
 

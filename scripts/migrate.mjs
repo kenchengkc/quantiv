@@ -1,22 +1,12 @@
 #!/usr/bin/env node
 /**
- * One-shot schema migrations for the Neon Postgres database that backs the
- * watchlist API. Run locally (or from a privileged shell) when the schema
- * changes:
+ * Apply watchlist schema changes to Neon.
  *
  *   node scripts/migrate.mjs
  *
- * Expects DATABASE_URL in env. Idempotent — re-running is a no-op if every
- * statement already succeeded once. Add new migrations by appending to the
- * MIGRATIONS array; statements should be CREATE … IF NOT EXISTS or
- * ALTER … IF NOT EXISTS so they're safe to re-run.
- *
- * Why this is not inline in route handlers:
- *   - First request on every cold serverless instance no longer pays the
- *     CREATE TABLE round-trip latency.
- *   - The production app role only needs DML (SELECT/INSERT/UPDATE/DELETE),
- *     not DDL — run this script with a higher-privilege Neon role.
- *   - Migration failures should be caught before user requests, not inside them.
+ * Needs DATABASE_URL. Safe to re-run. Append to MIGRATIONS using
+ * CREATE/ALTER … IF NOT EXISTS. Use a role that can change schema;
+ * do not run this from request handlers or CI.
  */
 
 import { neon } from '@neondatabase/serverless';
@@ -48,8 +38,6 @@ async function main() {
     const statement = MIGRATIONS[i].trim();
     process.stdout.write(`migrate[${i + 1}/${MIGRATIONS.length}] … `);
     try {
-      // Tagged-template helper expects template literal, but accepts
-      // ([sql])-shaped invocation as well for prebuilt strings.
       await sql([statement]);
       console.log('ok');
     } catch (err) {

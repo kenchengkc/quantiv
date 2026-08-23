@@ -1,22 +1,15 @@
 #!/usr/bin/env python3
-"""
-Walk-forward validation (diagnostic only — does not write production models).
+"""Plot average error as training rolls forward through time.
 
-Trains a point-estimate LightGBM on a rolling calendar train window, evaluates
-MAE on the next quarter, steps forward one quarter at a time, and plots val
-MAE vs validation quarter.
+Does not save production models. Trains on a window of quarters, scores the
+next quarter, then steps forward.
 
-Example (matches a 3Q-train / 1Q-val narrative for 2024):
-  - Val 2024Q4 with train = 2024Q1–Q3
-  - Val 2025Q1 with train = 2024Q2–Q4
-  - Val 2025Q2 with train = 2024Q3–2025Q1  (not "Q2'24–Q1'25" — use --train-quarters 4 for that)
-
-Usage (from repo root, ML venv with lightgbm + matplotlib):
+Usage (from repo root):
   python scripts/research/walk_forward.py
   python scripts/research/walk_forward.py --horizon 7 --train-quarters 4 --first-val 2025-2
   python scripts/research/walk_forward.py --output /tmp/wf_mae.png
 
-Requires training parquet from feature_engineering.py (ml_training/training_T*.parquet).
+Needs training files from feature_engineering.py (data/ml_training/training_T*.parquet).
 """
 
 from __future__ import annotations
@@ -31,8 +24,7 @@ import pandas as pd
 from lightgbm import LGBMRegressor, early_stopping, log_evaluation
 from sklearn.metrics import mean_absolute_error
 
-# Keep in sync with apps/ml/model_trainer.py DEFAULT_PARAMS (avoid importing
-# model_trainer, which pulls in Optuna).
+# Copied from model_trainer.py so this script does not import Optuna.
 DEFAULT_PARAMS: Dict[str, Any] = {
     "n_estimators": 2000,
     "learning_rate": 0.03,
@@ -148,7 +140,7 @@ def train_one_fold_quick(
     y_val: pd.Series,
     quick_trees: int,
 ) -> float:
-    """Fit a single diagnostic model; return val MAE (same metric as model_trainer)."""
+    """Fit one model; return average error on the validation quarter."""
     p = dict(DEFAULT_PARAMS)
     p["n_estimators"] = quick_trees
     p.setdefault("min_child_samples", max(10, len(X_train) // 50))
@@ -244,8 +236,8 @@ def plot_mae(results: List[FoldResult], out_path: Path, title: str) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Walk-forward val MAE by quarter (diagnostic).")
-    parser.add_argument("--horizon", type=int, default=7, help="Horizon T (default 7).")
+    parser = argparse.ArgumentParser(description="Plot average error by quarter as training rolls forward.")
+    parser.add_argument("--horizon", type=int, default=7, help="Days until earnings (default 7).")
     parser.add_argument(
         "--train-quarters",
         type=int,

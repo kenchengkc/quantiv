@@ -1,18 +1,8 @@
 #!/usr/bin/env python3
-"""Research experiment: does retraining more frequently improve out-of-sample accuracy?
+"""Does retraining more often improve error on later data?
 
-Controlled walk-forward: over a fixed recent test window, predict every OOS
-earnings event exactly once, varying ONLY how fresh the training cutoff is
-(i.e. how often we "retrain"). Hyperparameters are fixed (no Optuna) so the
-comparison isolates retrain *frequency* from tuning noise, and production-style
-time-decay weighting (half-life 0.5y) is applied so "recent matters" is already
-baked in — exactly like the weekly job.
-
-For cadence D days: partition the test window into D-day bins by earnings_date;
-for each bin [t, t+D) train on all events with earnings_date < t (expanding,
-decay-weighted) and predict that bin. Smaller D = fresher model per event =
-"retrain every D days". A single bin spanning the whole window = "train once,
-never retrain" (the staleness extreme).
+Over a fixed test window, each event is predicted once. Retrain every D days
+on all earlier events. Model settings stay fixed.
 
 Usage:
   python scripts/research/experiment_retrain_cadence.py --horizons 1 2 3 7 --test-days 150

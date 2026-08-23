@@ -1,4 +1,4 @@
-"""Deterministic, run-level provenance receipts for validated ML artifacts."""
+"""Hashes of the training files and models from one validation run."""
 
 from __future__ import annotations
 
@@ -133,7 +133,7 @@ def build_evidence_receipt(
     forecast_path: Path | None,
     horizons: Sequence[int],
 ) -> dict[str, Any]:
-    """Build one receipt for a validation run, not one record per metric."""
+    """Hashes of the files from this run."""
     validated_stages = set((report.get("stages") or {}).keys())
     receipt_horizons = _receipt_horizons(report, horizons)
     artifacts: list[dict[str, Any]] = []

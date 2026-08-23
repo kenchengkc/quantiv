@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Restore data/ from R2. Used at the start of GitHub Actions.
-# Needs an `r2` rclone remote (docs/R2_SETUP.md). CI builds it from env.
+# Restore data/ from R2 at the start of GitHub Actions.
+# Needs rclone pointed at R2 (docs/R2_SETUP.md). Actions builds that from secrets.
 
 set -euo pipefail
 
@@ -10,11 +10,11 @@ PYTHON_BIN="${PYTHON_BIN:-python}"
 
 echo "📥 Pulling from $REMOTE → $DATA_DIR/"
 
-# Versioned release pointer first (optional until the first promotion).
+# Which data version to use. Fine if this is the first run.
 rclone copy "$REMOTE/control" "$DATA_DIR/control" \
   --fast-list --transfers=4 --progress 2>/dev/null || true
 
-# Options, OHLCV, and vol history.
+# Options, daily prices, and vol history.
 rclone copy "$REMOTE/parquet" "$DATA_DIR/parquet" \
   --fast-list --transfers=16 --checkers=16 \
   --progress
@@ -23,17 +23,17 @@ rclone copy "$REMOTE/parquet" "$DATA_DIR/parquet" \
 rclone sync "$REMOTE/models" "$DATA_DIR/models" \
   --fast-list --transfers=8 --progress
 
-# Quarantine logs. Missing on the first run is fine.
+# Rejected-quote logs. Missing on the first run is fine.
 rclone sync "$REMOTE/quarantine" "$DATA_DIR/quarantine" \
   --fast-list --transfers=4 --progress 2>/dev/null || true
 
 if [ -f "$DATA_DIR/control/current_data_release.json" ]; then
   "$PYTHON_BIN" scripts/data_release.py verify --data-dir "$DATA_DIR"
 else
-  echo "⚠️  No versioned data-release pointer yet; first controlled push will create it"
+  echo "⚠️  No published data version yet; the first successful push will create it"
 fi
 
-# Forecasts from the last run (scoring + frontend build).
+# Forecasts from the last run (scoring and the frontend build).
 rclone sync "$REMOTE/forecasts" "$DATA_DIR/forecasts" \
   --fast-list --transfers=8 --progress 2>/dev/null || true
 

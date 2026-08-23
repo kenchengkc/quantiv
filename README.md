@@ -188,17 +188,13 @@ Open `http://localhost:8000/docs` for the API documentation.
 
 ## Neon Postgres
 
-Watchlists and imported forecast rows live in Neon. There is no local Docker
-Postgres stack.
-
-1. Create a Neon project and put the connection string in `config/.env.local` as `DATABASE_URL` (same variable Vercel and Railway use in production).
-2. Apply the watchlist schema once:
+Watchlists and imported forecasts use Neon (`DATABASE_URL` in `config/.env.local`).
 
 ```bash
 node scripts/migrate.mjs
 ```
 
-Nightly `scripts/import_recent_to_postgres.py` writes recent forecast rows into the same database. Local backend (`npm run dev:backend`) and the Railway image (`apps/backend/Dockerfile`) both read `DATABASE_URL`.
+`scripts/import_recent_to_postgres.py` writes recent forecast rows. Local backend and the Railway image both read `DATABASE_URL`.
 
 ## Data workflow
 
@@ -236,7 +232,7 @@ npm run ml:score
 npm run ml:validate
 ```
 
-The walk-forward workflow is for research rather than the main production pipeline:
+The walk-forward plot is for research, not the production pipeline:
 
 ```bash
 npm run ml:walk-forward

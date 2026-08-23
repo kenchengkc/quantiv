@@ -1,17 +1,7 @@
 #!/usr/bin/env python3
-"""
-Daily scoring pipeline v3 — generate expected move predictions for upcoming earnings.
+"""Score upcoming earnings with the trained models.
 
-Steps:
-  1. Load trained LightGBM point + quantile models
-  2. Query features for upcoming earnings (next 14 days)
-  3. Generate predictions with true quantile confidence bands
-  4. Compute em_math using both straddle and event vol decomposition
-  5. Write results to DuckDB table + Parquet
-
-Output columns:
-  act_symbol, earnings_date, spot, em_math, em_event_vol, em_ml,
-  correction, p10, p25, p50, p75, p90
+Writes a best-guess expected move plus high/low bands to Parquet and DuckDB.
 
 Usage:
   python scripts/daily_score.py
@@ -73,7 +63,7 @@ def get_data_dir() -> Path:
 
 
 def load_models(models_dir: Path) -> Dict[int, dict]:
-    """Load point + quantile models for each horizon."""
+    """Load the best-guess model and the high/low band models for each target."""
     models = {}
     bundle_id = None
     manifest_path = models_dir / "manifest.json"
@@ -123,13 +113,9 @@ def load_models(models_dir: Path) -> Dict[int, dict]:
 
 
 def get_upcoming_features(conn: duckdb.DuckDBPyConnection, days_ahead: int) -> pd.DataFrame:
-    """Get features for symbols with upcoming earnings.
+    """Features for symbols with earnings in the next `days_ahead` days.
 
-    Uses the same feature set as feature_engineering.py:
-    - Core options features from v_straddle_features
-    - Event vol decomposition from front/back month IV
-    - Historical earnings patterns
-    - Realized vol features (where OHLCV available)
+    Same columns as feature_engineering.py (options, past earnings, realized vol).
     """
     sql = f"""
     WITH upcoming AS (
@@ -138,7 +124,7 @@ def get_upcoming_features(conn: duckdb.DuckDBPyConnection, days_ahead: int) -> p
         WHERE date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '{days_ahead}' DAY
     ),
 
-    -- Historical realized moves for trailing stats
+    -- Past earnings moves for history features
     past_realized_ohlcv AS (
         SELECT e.act_symbol, e.date AS earnings_date,
                ABS(post.close / NULLIF(pre.close, 0) - 1.0) AS realized_move_pct
@@ -335,7 +321,7 @@ def get_upcoming_features(conn: duckdb.DuckDBPyConnection, days_ahead: int) -> p
 
 
 def score(df: pd.DataFrame, models: Dict[int, dict]) -> pd.DataFrame:
-    """Generate predictions with point estimate + quantile bands."""
+    """Best-guess expected move plus high/low bands."""
     results = []
 
     for horizon, m in models.items():
@@ -540,7 +526,7 @@ def save_forecasts(
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Daily scoring pipeline v3")
+    parser = argparse.ArgumentParser(description="Score upcoming earnings with trained models")
     parser.add_argument("--days-ahead", type=int, default=14)
     parser.add_argument("--models-dir", type=Path, default=None)
     parser.add_argument(
@@ -571,19 +557,19 @@ def main():
     db_path = os.getenv("DUCKDB_PATH", str(data_dir / "quantiv.duckdb"))
     conn = duckdb.connect(db_path, read_only=False)
 
-    # Ensure optional views exist (empty stubs if no OHLCV data)
+    # Optional views: empty stand-ins if daily prices are missing.
     views = [r[0] for r in conn.execute(
         "SELECT table_name FROM information_schema.tables WHERE table_type='VIEW'"
     ).fetchall()]
     if "v_ohlcv" not in views:
-        logger.warning("v_ohlcv not found — will skip OHLCV-based trailing stats")
+        logger.warning("v_ohlcv not found — skipping past-move stats that need daily prices")
         conn.execute("""
             CREATE OR REPLACE VIEW v_ohlcv AS
             SELECT NULL::VARCHAR AS act_symbol, NULL::DATE AS date,
                    NULL::DOUBLE AS close WHERE 1=0
         """)
     if "v_realized_vol" not in views:
-        logger.warning("v_realized_vol not found — RV features will be NULL")
+        logger.warning("v_realized_vol not found — realized-vol features will be empty")
         conn.execute("""
             CREATE OR REPLACE VIEW v_realized_vol AS
             SELECT NULL::VARCHAR AS act_symbol, NULL::DATE AS date,
@@ -610,7 +596,6 @@ def main():
     save_forecasts(forecasts, data_dir, output_path=args.output_path)
 
     if not forecasts.empty:
-        # Print the clean dashboard output
         has_quantiles = "p10" in forecasts.columns and "p90" in forecasts.columns
         summary = (
             forecasts.groupby(["act_symbol", "earnings_date"])
@@ -630,7 +615,7 @@ def main():
             .head(30)
         )
         print(f"\n{'='*90}")
-        print("UPCOMING EARNINGS FORECASTS (v3)")
+        print("UPCOMING EARNINGS FORECASTS")
         print(f"{'='*90}")
         pd.set_option("display.float_format", "{:.4f}".format)
         pd.set_option("display.max_columns", 20)

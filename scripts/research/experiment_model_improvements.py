@@ -1,22 +1,12 @@
 #!/usr/bin/env python3
-"""Rigorous, paired search for model improvements (not noise).
+"""Compare model changes on the same train/test splits.
 
-The target is realized_move_pct. Raw straddle/implied move is never treated as
-truth; it is the naive benchmark the model must beat against realized outcomes.
-In this data, straddles structurally over-predict realized moves and the
-realized-vs-implied cross-sectional correlation is low, so most transforms of
-existing implied features should be expected to test null unless they add real
-information.
+What we predict is the realized move. The straddle is the simple baseline,
+not the answer. Each change trains and tests on the same splits and random
+seeds as the baseline. Count a win only if average error drops and the
+drop is clearly bigger than noise.
 
-For each monthly walk-forward fold (expanding train, production half-life
-decay weights by default) and each random seed, every variant is trained on the
-SAME (X_train, y_train, w) and evaluated on the SAME X_test. So the
-variant-vs-baseline delta per (fold,seed) is paired — it removes seed/fold
-variance and isolates the change. We aggregate the paired ΔMAE across
-folds×seeds and report mean, std, and a t-stat; an improvement only counts if
-ΔMAE < 0 and |t| >= 2.
-
-Round is chosen with --round: objectives | validate | ensemble | skew | dist.
+--round: objectives | validate | ensemble | skew | dist.
 
 Usage:
   python scripts/research/experiment_model_improvements.py --round objectives

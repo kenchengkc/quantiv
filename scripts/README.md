@@ -36,21 +36,13 @@ See [`.github/workflows/daily-refresh.yml`](../.github/workflows/daily-refresh.y
 
 Frontend JSON build lives in [`tools/`](../tools/README.md) (`build_frontend_data.py`, `build_popular_weights.py`, `pull_market_caps.py`).
 
-## ML Experiment Guardrails
+## ML experiments
 
-Feature experiments must score predictions against realized moves. The raw
-straddle/implied move is the naive benchmark, not the truth target. This matters
-because the current data has a stable variance-risk-premium shape: straddles
-over-predict realized moves, and realized-vs-implied cross-sectional
-correlation is low enough that most transforms of existing implied features
-should be expected to test null.
-
-Use [`research/experiment_model_improvements.py`](research/experiment_model_improvements.py) for
-paired searches. It uses expanding walk-forward folds, production-style
-half-life decay weights (`0.5y` by default), identical folds/seeds for
-variant-vs-baseline comparisons, and a strict verdict: a variant only counts as
-better when paired `ΔMAE < 0` and `|t| >= 2`. Run a second OOS window with
-`--oos-offset` before promoting a feature.
+Score against realized moves. The straddle is the simple baseline, not the
+answer. Use [`research/experiment_model_improvements.py`](research/experiment_model_improvements.py):
+same train/test splits for each change vs the baseline. Ship only if average
+error drops and the drop is clearly bigger than noise. Confirm on a later
+window with `--oos-offset`.
 
 ## Python environment
 
@@ -156,12 +148,12 @@ Research (not CI):
 
 | Script | Purpose |
 |--------|---------|
-| `research/walk_forward.py` | Diagnostic MAE plot (`npm run ml:walk-forward`) |
-| `research/experiment_model_improvements.py` | Paired feature/model search |
-| `research/experiment_garch_feature.py` | GARCH/EWMA feature test |
-| `research/experiment_retrain_cadence.py` | Retrain-frequency experiment |
-| `research/probe_signal_effectiveness.py` | Short-interest vs realized-move probe |
-| `research/backfill_analyst_dispersion.py` | FMP annual dispersion panel |
-| `research/implied_pdf.py` | Breeden-Litzenberger density research |
+| `research/walk_forward.py` | Plot of average error over time (`npm run ml:walk-forward`) |
+| `research/experiment_model_improvements.py` | Test whether a model change actually helps |
+| `research/experiment_garch_feature.py` | Recent-weighted vol feature test |
+| `research/experiment_retrain_cadence.py` | How often to retrain |
+| `research/probe_signal_effectiveness.py` | Days-to-cover vs realized move |
+| `research/backfill_analyst_dispersion.py` | Yearly analyst high–low range |
+| `research/implied_pdf.py` | Up/down bands from implied vol by strike |
 
-CI walk-forward remains `scripts/validate_walk_forward.py` (see nightly retrain).
+Nightly retrain still uses `scripts/validate_walk_forward.py`.

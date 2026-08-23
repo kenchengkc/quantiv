@@ -1,15 +1,12 @@
 #!/usr/bin/env python3
-"""Backfill historical analyst-estimate DISPERSION from FMP (free tier).
+"""Pull yearly analyst high–low range from FMP (free tier).
 
-Free-tier reality (probed): `period=quarter` is premium and `limit`≤10, but
-annual estimates paginate back to ~2007, so we pull ANNUAL dispersion only:
+Quarterly estimates are paid. Yearly:
   eps_dispersion = (epsHigh − epsLow) / |epsAvg|
   rev_dispersion = (revHigh − revLow) / |revAvg|
-This is coarse (one value per fiscal year, shared by that year's 4 prints), so
-it's a weak per-event signal — we backfill it to TEST whether it moves MAE at all
-before paying for quarterly. Output panel: data/parquet/analyst_estimates/
-dispersion_panel.parquet keyed (act_symbol, fiscal_end). Resumable: symbols in
-the existing panel are skipped unless --refresh.
+One value per fiscal year, reused for that year's earnings reports. Writes
+data/parquet/analyst_estimates/dispersion_panel.parquet. Skips symbols
+already in the file unless --refresh.
 
 Usage:
   python scripts/research/backfill_analyst_dispersion.py --symbols sp500 --pages 2

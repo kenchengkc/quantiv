@@ -1,16 +1,8 @@
 #!/usr/bin/env python3
-"""
-Overlay near-term earnings calendar data from Finnhub onto the existing
-DoltHub earnings baseline.
+"""Merge Finnhub near-term earnings onto the DoltHub calendar.
 
-Why this exists:
-  - DoltHub remains the long-history source used by historical move features.
-  - Finnhub's free earnings calendar gives fresher near-term dates/timing and
-    EPS/revenue estimates, but its free historical entitlement is limited.
-  - We merge a rolling window into data/earnings_calendar.{csv,parquet} so the
-    rest of the pipeline keeps reading the same files.
-
-Default window: today - 30 days through today + 60 days.
+DoltHub is the long history. Finnhub is fresher for upcoming dates.
+Writes data/earnings_calendar.{csv,parquet}. Default window: today − 30d to +60d.
 """
 
 from __future__ import annotations
@@ -415,32 +407,12 @@ def normalize_finnhub(rows: list[dict[str, Any]]) -> pd.DataFrame:
 def _drop_stale_dolthub_ghosts(
     merged: pd.DataFrame, window_days: int = 14
 ) -> tuple[pd.DataFrame, int]:
-    """Drop dolthub-only rows for upcoming events when the same ticker
-    has a Finnhub-touched row within ±window_days.
+    """Drop DoltHub-only upcoming rows when Finnhub has a nearby date for the same ticker.
 
-    Why prefer Finnhub deterministically (even when both sources are
-    projecting): keeping both rows in the CSV creates a non-
-    deterministic build, where build_frontend_data.py's join to
-    v_options_chain implicitly picks whichever date happens to align
-    with active options expiries. That can silently flip production
-    from one projected date to the other across CI runs as options
-    coverage shifts week to week. Picking one date deterministically
-    is more important than picking the "right" date when neither
-    source is IR-confirmed.
-
-    The rule: Finnhub wins. For confirmed-timing cases (SNOW May 27
-    amc, PANW Jun 2 amc, BIDU May 18 bmo, ZKH May 21 bmo, …), this
-    is also the *correct* answer. For projection-only cases (SAIC
-    Jun 8, AGX Jun 10, ABM Jun 9, …), it's an arbitrary but stable
-    choice — both DoltHub and Finnhub are guessing, and consistency
-    across CI runs matters more than picking the closer guess. Net
-    payoff: SNOW / PANW class definitively cleaned, SAIC class stops
-    creating ghost-row noise on every refresh.
-
-    Historical rows (date < today) are untouched — the actual report
-    already happened, so neither side is "stale" by date. If the two
-    disagreed on a past date, that's a different cleanup problem
-    (manual `config/earnings_overrides.json` via apply_earnings_overrides.py)."""
+    If both sources guess a date, the site can pick a different one each run.
+    Finnhub wins for upcoming events. Past dates are left alone; use
+    config/earnings_overrides.json for those.
+    """
     today_dt = pd.Timestamp.today().date()
     finnhub_by_sym: dict[str, list] = (
         merged[

@@ -1,43 +1,10 @@
 #!/usr/bin/env python3
-"""Implied probability density → asymmetric earnings-move bands (Breeden-Litzenberger).
+"""Turn implied vol by strike into up/down earnings-move bands.
 
-The production EM band is symmetric (±straddle%). But the option smile carries
-the market's full *risk-neutral density* (RND) over the post-earnings price, and
-it is skewed and fat-tailed — downside crashes are priced richer than upside pops.
-This module extracts that density and turns it into directional up/down bands:
-
-  1. Build the IV smile from the OTM side of the chain (puts below forward, calls
-     above) — deep-ITM quotes are stale/noisy, so we never use them.
-  2. Smooth IV in log-moneyness (spline), flat-extrapolate the wings.
-  3. Reconstruct call prices C(K) on a fine grid via Black-Scholes, then
-     RND g(K) = e^{rT} · ∂²C/∂K²  (Breeden-Litzenberger, 1978). Clip tiny
-     numerical negatives and renormalize to integrate to 1.
-  4. The RND is risk-neutral, so it OVER-states realized dispersion (variance-risk
-     premium; realized ≈ 0.49 × straddle). De-bias by shrinking deviations from
-     the center by a calibrated ratio k — this narrows the band while *preserving*
-     the smile's skew/kurtosis, giving asymmetric up/down moves.
-
-Risk-neutral quantiles are exact-ish for option *pricing*; the de-biased ones are
-the physical bands we surface. `validate` measures empirical coverage (does the
-80 % band contain the realized move ~80 % of the time?) and pinball loss against
-the symmetric ±straddle baseline.
-
-═══════════════════════════════════════════════════════════════════════════════
-EMPIRICAL VERDICT (650 earnings events, 2023-07 → 2026-04, paired):
-  • The production ±straddle band is ~2× too WIDE — it covers 0.97 of realized
-    moves inside the nominal 80 % band. Narrowing the implied move by k≈0.45
-    (≈ the measured 0.49 realized/straddle ratio) calibrates the 80 % band to
-    0.80 and cuts pinball loss ~21 %. THIS is the real, shippable win.
-  • The asymmetric B-L *shape* does NOT help: at every de-bias k the skewed RND
-    bands LOSE to a symmetric Gaussian narrowed by the same k (−16 % … −44 %
-    pinball). With ~15-27 strikes/expiry the extracted skew/kurt is noise, and
-    the monthly-expiry RND is the ~30-day terminal density, not the 1-2 day
-    event move. So: ship the symmetric de-bias, NOT the asymmetry.
-  • The 80 % and 50 % bands don't calibrate at one k → realized moves are
-    fat-tailed; a symmetric Student-t band would calibrate both (cheap follow-up).
-This module is the research artifact that measured the de-bias and disproved the
-asymmetry hypothesis; it is intentionally NOT wired into the UI.
-═══════════════════════════════════════════════════════════════════════════════
+Smooths the smile, reads off the odds the market prices in, then narrows
+the bands (realized moves are smaller than the straddle). Research only —
+not used in the product. A simple narrower band around the straddle beat
+the skewed shape in tests.
 
 Usage:
   python scripts/research/implied_pdf.py demo --symbol AAPL
@@ -58,13 +25,13 @@ from scipy.stats import norm
 CHAIN_GLOB = "data/parquet/options_chain/year=*/**/*.parquet"
 DUCKDB_PATH = "data/quantiv.duckdb"
 
-# Quantiles surfaced as bands. p50 is the RND median (≈ directional drift).
+# Percentiles we report as bands. p50 is the middle (slight directional drift).
 BAND_QUANTILES = (0.10, 0.25, 0.50, 0.75, 0.90)
 
 
 # ───────────────────────── Black-Scholes ─────────────────────────
 def bs_call(F: float, K: np.ndarray, T: float, sigma: np.ndarray, r: float = 0.0) -> np.ndarray:
-    """Undiscounted-forward Black-76 call price (r folded out via forward F)."""
+    """Call price from the Black-76 formula."""
     K = np.asarray(K, dtype=float)
     sigma = np.asarray(sigma, dtype=float)
     sig_sqrt = np.maximum(sigma, 1e-6) * np.sqrt(max(T, 1e-9))
@@ -83,21 +50,21 @@ class ImpliedPDF:
     forward: float
     T: float
     K_grid: np.ndarray
-    rnd: np.ndarray              # risk-neutral density over terminal price
-    rn_quantiles: dict           # p -> terminal price (risk-neutral)
-    rn_move: dict                # p -> return vs forward (risk-neutral)
+    rnd: np.ndarray              # market-implied odds of finishing at each price
+    rn_quantiles: dict           # percentile → finishing price
+    rn_move: dict                # percentile → return vs the forward
     phys_move: dict              # p -> return vs forward (de-biased / physical)
     skew: float
     kurtosis: float
-    straddle_pct: float          # symmetric ATM straddle implied move
+    straddle_pct: float          # at-the-money straddle implied move
     debias: float
     n_strikes: int
     diagnostics: dict = field(default_factory=dict)
 
 
-# ───────────────────────── smile + RND ─────────────────────────
+# ───────────────────────── smile → odds ─────────────────────────
 def _otm_smile(chain: pd.DataFrame, forward: float) -> pd.DataFrame:
-    """One IV per strike from the OTM side (puts<F, calls≥F); drop sentinels."""
+    """Out-of-the-money implied vol by strike (puts below the forward, calls at/above)."""
     chain = chain.copy()
     chain["mid"] = (chain["bid"] + chain["ask"]) / 2.0
     good = (chain["vol"] > 0.01) & (chain["vol"] < 3.0) & (chain["ask"] > 0)
@@ -110,8 +77,7 @@ def _otm_smile(chain: pd.DataFrame, forward: float) -> pd.DataFrame:
 
 
 def _infer_forward(chain: pd.DataFrame) -> Optional[float]:
-    """Put-call parity: F = K + (C_mid − P_mid), averaged over the most ATM
-    strikes where both legs quote. r≈0 over the short earnings horizon."""
+    """Forward from put-call parity, using the strikes closest to at-the-money."""
     c = chain[chain["call_put"] == "Call"].set_index("strike")
     p = chain[chain["call_put"] == "Put"].set_index("strike")
     common = c.index.intersection(p.index)
@@ -120,7 +86,7 @@ def _infer_forward(chain: pd.DataFrame) -> Optional[float]:
     cmid = (c.loc[common, "bid"] + c.loc[common, "ask"]) / 2.0
     pmid = (p.loc[common, "bid"] + p.loc[common, "ask"]) / 2.0
     parity_f = common.to_numpy(float) + (cmid - pmid).to_numpy(float)
-    # weight toward strikes where |C−P| is small (closest to ATM, most reliable)
+    # Prefer strikes closest to at-the-money (smallest |call − put|).
     diff = np.abs((cmid - pmid).to_numpy(float))
     order = np.argsort(diff)[: max(3, len(diff) // 4)]
     return float(np.median(parity_f[order]))
@@ -128,7 +94,7 @@ def _infer_forward(chain: pd.DataFrame) -> Optional[float]:
 
 def build_rnd(chain: pd.DataFrame, T: float, r: float = 0.0,
               n_grid: int = 600) -> Optional[dict]:
-    """Smile → smoothed IV(K) → BS call curve → Breeden-Litzenberger RND."""
+    """Implied vol by strike → call prices → odds of finishing at each strike."""
     forward = _infer_forward(chain)
     if not forward or forward <= 0:
         return None
@@ -184,7 +150,7 @@ def _quantiles(K: np.ndarray, g: np.ndarray, ps) -> dict:
 
 
 def _moments(K: np.ndarray, g: np.ndarray, forward: float):
-    """Skew & excess kurtosis of the RND return distribution."""
+    """How lopsided the distribution is, and how fat the tails are."""
     r = K / forward - 1.0
     w = g * np.gradient(K)
     w = w / w.sum()
@@ -199,7 +165,7 @@ def _moments(K: np.ndarray, g: np.ndarray, forward: float):
 def implied_pdf_bands(chain: pd.DataFrame, the_date: Date, expiration: Date,
                       symbol: str = "", debias: float = 1.0,
                       r: float = 0.0) -> Optional[ImpliedPDF]:
-    """Full pipeline for one (symbol, date, expiry) chain → asymmetric bands."""
+    """One chain → up/down expected-move bands."""
     the_date = pd.Timestamp(the_date).date()
     expiration = pd.Timestamp(expiration).date()
     T = max((expiration - the_date).days, 1) / 365.0
@@ -239,8 +205,7 @@ def load_chain(con, symbol: str, the_date: Date, expiration: Date) -> pd.DataFra
 
 
 def pick_expiry(con, symbol: str, the_date: Date, after: Date) -> Optional[Date]:
-    """First expiry strictly after `after` (the earnings date) that has a chain
-    snapshot on `the_date` with enough strikes to fit a smile."""
+    """First expiry after earnings that has a chain."""
     row = con.execute(
         f"""
         SELECT expiration, COUNT(DISTINCT strike) ns
@@ -256,8 +221,7 @@ def pick_expiry(con, symbol: str, the_date: Date, after: Date) -> Optional[Date]
 
 # ───────────────────────── validation ─────────────────────────
 def _validation_events(con, n: int, seed: int = 0) -> pd.DataFrame:
-    """Earnings events with a realized close-to-close move AND a usable
-    pre-earnings chain. Snapshot = last session before the earnings date."""
+    """Earnings events that have both a realized move and a usable option chain."""
     return con.execute(
         f"""
         WITH ev AS (
@@ -359,10 +323,9 @@ def validate(n: int, debias: float, seed: int = 0, center: str = "median") -> in
     print(f"    80% coverage: {base_cov80:.3f}   50% coverage: {base_cov50:.3f}   "
           f"pinball: {pb_base:.5f}")
     print()
-    # Decompose the gain: at each de-bias k, compare the asymmetric RND bands to
-    # a SYMMETRIC Gaussian narrowed by the SAME k (k·σ·z). If RND beats matched-k
-    # Gaussian, the smile's skew/kurtosis is doing real work; if they tie, the
-    # win is purely from narrowing and a symmetric de-biased band would suffice.
+    # At each narrowing factor k, compare the skewed bands to a simple
+    # bell-curve band narrowed by the same k. If they tie, the win is from
+    # narrowing, not from the skew.
     print(f"  ── de-bias sweep: asymmetric RND vs symmetric-Gaussian, same k ──")
     print(f"  {'k':>5} | {'RND cov80':>9} {'pin(RND)':>9} | {'symN cov80':>10} "
           f"{'symN cov50':>10} {'pin(symN)':>9} {'symN vs base':>12}")

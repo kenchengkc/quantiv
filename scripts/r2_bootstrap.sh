@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
-# One-time upload of your existing local data/ to R2. Run this ONCE from
-# your laptop after creating the R2 bucket and setting up your ~/.config/
-# rclone/rclone.conf with the `r2` remote (see docs/R2_SETUP.md).
-#
-# Subsequent runs use scripts/r2_push.sh (delta upload inside GHA).
+# One-time upload of local data/ to R2. Set up rclone first (docs/R2_SETUP.md).
+# Later uploads: scripts/r2_push.sh.
 
 set -euo pipefail
 

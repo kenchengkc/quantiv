@@ -1,13 +1,8 @@
 #!/usr/bin/env python3
-"""Quick directional read: does pre-earnings SHORT INTEREST relate to the move?
+"""Does pre-earnings days-to-cover relate to the realized move?
 
-put/call volume & options VOI have no free stored history (the options_chain
-parquet carries IV/greeks but no volume/OI), so they can only be judged once the
-forward panel (accumulate_event_signals.py) matures. Short interest, however, has
-~15 months of free Massive history — enough to test now whether days-to-cover (a
-crowded-borrow proxy) relates to the realized earnings move in magnitude or
-direction. This is an effectiveness probe, NOT a model change: it reports rank
-correlations + a decile table so we know if the signal is worth wiring later.
+Reports whether the ranking lines up with the move, in 10 groups.
+Does not change the model.
 
 Usage: python scripts/research/probe_signal_effectiveness.py --n 700
 """
@@ -36,8 +31,7 @@ def _load_env():
 
 
 def sample_events(n: int, seed: int) -> pd.DataFrame:
-    """Historical events with a signed realized move, within the short-interest
-    history window (~2025-02 onward)."""
+    """Past earnings events that have a realized move, from early 2025 onward (short-interest history)."""
     con = duckdb.connect(str(REPO / "data" / "quantiv.duckdb"), read_only=True)
     return con.execute(
         f"""

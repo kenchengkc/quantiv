@@ -1,6 +1,6 @@
 # DuckDB + Parquet Architecture (Quantiv)
 
-This document defines the canonical storage conventions, DuckDB views, and integration points used by Quantiv. Historical options and OHLCV live in Parquet + DuckDB. Neon Postgres holds watchlists and imported forecast serving rows — not a local Docker Postgres warehouse.
+This document defines Parquet layout, DuckDB views, and how the backend reads them. History lives in Parquet + DuckDB. Neon holds watchlists and recent forecast rows.
 
 ## Goals
 - Keep historical data in columnar Parquet with predictable partitions and filenames.
