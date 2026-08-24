@@ -24,6 +24,7 @@ from ml.data_reconciliation import (  # noqa: E402 - standalone script path setu
     build_reconciliation_manifest,
 )
 from export_quote_quarantine import export_quarantine  # noqa: E402
+from delisted import canonical_ticker, is_delisted  # noqa: E402
 
 
 MODEL_HORIZONS = (1, 2, 3, 7, 14, 21)
@@ -530,19 +531,25 @@ def _corporate_actions(
     except ValueError:
         errors.append("corporate-action query window is invalid")
 
-    active_filter = _retired_symbol_sql("act_symbol")
-    symbols = [
+    raw_symbols = [
         str(row[0])
         for row in conn.execute(
-            f"""
+            """
             SELECT DISTINCT act_symbol
             FROM v_options
             WHERE date = (SELECT MAX(date) FROM v_options)
-              AND {active_filter}
             ORDER BY act_symbol
             """
         ).fetchall()
     ]
+    symbols = sorted(
+        {
+            canonical_ticker(symbol)
+            for symbol in raw_symbols
+            if not is_delisted(symbol)
+        }
+    )
+    symbols = [symbol for symbol in symbols if symbol]
     symbol_digest = hashlib.sha256("\n".join(symbols).encode()).hexdigest()
     universe = payload.get("universe") or {}
     if receipt_int(universe.get("symbols"), "corporate-action universe count") != len(symbols):

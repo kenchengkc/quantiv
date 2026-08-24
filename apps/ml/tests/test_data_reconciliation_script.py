@@ -58,6 +58,8 @@ def _write_fresh_database(path: Path) -> None:
             [
                 (snapshot, "ACME", expiration, "Call", 0.5),
                 (snapshot, "ACME", expiration, "Put", -0.5),
+                (snapshot, "BK", expiration, "Call", 0.5),
+                (snapshot, "BK", expiration, "Put", -0.5),
                 (snapshot, "MISS", expiration, "Call", 0.5),
                 (snapshot, "MISS", expiration, "Put", -0.5),
             ],
@@ -151,8 +153,8 @@ def _run(tmp_path: Path, db_path: Path) -> subprocess.CompletedProcess[str]:
     manifest_path.write_text(
         json.dumps(
             {
-                "expected_rows": 4,
-                "received_rows": 4,
+                "expected_rows": 6,
+                "received_rows": 6,
                 "partition": str(partition.relative_to(data_dir)),
                 "partition_sha256": partition_hash,
                 "content_sha256": "test-content",
@@ -206,8 +208,8 @@ def _run(tmp_path: Path, db_path: Path) -> subprocess.CompletedProcess[str]:
                 "query_start": "2019-01-01",
                 "query_end": date.today().isoformat(),
                 "universe": {
-                    "symbols": 2,
-                    "symbols_sha256": hashlib.sha256(b"ACME\nMISS").hexdigest(),
+                    "symbols": 3,
+                    "symbols_sha256": hashlib.sha256(b"ACME\nBNY\nMISS").hexdigest(),
                     "method": "latest_options_partition_excluding_retired_symbols",
                 },
                 "datasets": {
@@ -223,7 +225,7 @@ def _run(tmp_path: Path, db_path: Path) -> subprocess.CompletedProcess[str]:
                                 "completion": "short_page",
                                 "pages": 1,
                                 "rows": 0,
-                                "symbols": 2,
+                                "symbols": 3,
                             }
                         ],
                     },
@@ -239,7 +241,7 @@ def _run(tmp_path: Path, db_path: Path) -> subprocess.CompletedProcess[str]:
                                 "completion": "short_page",
                                 "pages": 1,
                                 "rows": 0,
-                                "symbols": 2,
+                                "symbols": 3,
                             }
                         ],
                     },
@@ -288,6 +290,8 @@ def test_script_reconciles_source_quotes_and_events(tmp_path: Path) -> None:
     assert report["event_coverage"]["status"] == "passed"
     assert report["quote_quality"]["status"] == "passed"
     assert report["source_reconciliation"]["status"] == "passed"
+    assert report["corporate_actions"]["status"] == "passed"
+    assert report["corporate_actions"]["universe_symbols"] == 3
     assert report["pipeline_controls"]["quarantine"]["status"] == "enforced"
     assert report["duplicates"]["options"]["duplicate_rows"] == 0
 
