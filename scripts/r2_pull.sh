@@ -27,8 +27,41 @@ rclone sync "$REMOTE/models" "$DATA_DIR/models" \
 rclone sync "$REMOTE/quarantine" "$DATA_DIR/quarantine" \
   --fast-list --transfers=4 --progress 2>/dev/null || true
 
+materialize_vix_alias() {
+  local snapshot
+  snapshot="$("$PYTHON_BIN" - "$DATA_DIR" <<'PY'
+import json
+from pathlib import Path
+import sys
+
+data_dir = Path(sys.argv[1])
+pointer = json.loads((data_dir / "control" / "current_data_release.json").read_text())
+manifest = json.loads((data_dir / str(pointer["manifest"])).read_text())
+paths = [
+    str(item.get("path", ""))
+    for item in manifest.get("files") or []
+    if str(item.get("path", "")).startswith("parquet/vix/")
+    and str(item.get("path", "")) != "parquet/vix/vix.parquet"
+]
+if len(paths) > 1:
+    raise RuntimeError(f"active data release contains multiple VIX snapshots: {paths}")
+if paths:
+    print(paths[0])
+PY
+)"
+  if [ -n "$snapshot" ]; then
+    local alias="$DATA_DIR/parquet/vix/vix.parquet"
+    local temporary="${alias}.tmp.$$"
+    mkdir -p "$(dirname "$alias")"
+    cp "$DATA_DIR/$snapshot" "$temporary"
+    mv "$temporary" "$alias"
+    echo "✅ Restored local VIX alias from $snapshot"
+  fi
+}
+
 if [ -f "$DATA_DIR/control/current_data_release.json" ]; then
   "$PYTHON_BIN" scripts/data_release.py verify --data-dir "$DATA_DIR"
+  materialize_vix_alias
 else
   echo "⚠️  No published data version yet; the first successful push will create it"
 fi
