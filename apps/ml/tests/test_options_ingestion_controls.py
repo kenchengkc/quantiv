@@ -80,7 +80,6 @@ def test_incremental_current_partition_persists_source_metadata(
 ) -> None:
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     root = sync_dolthub.parquet_root()
-    target = date(2026, 8, 21)
     frame = _frame()
     assert sync_dolthub.write_date(frame, root) == 1
 
