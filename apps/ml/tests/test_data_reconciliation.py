@@ -64,6 +64,43 @@ def test_manifest_is_reproducible_and_surfaces_coverage_gaps() -> None:
     }
 
 
+def test_sparse_horizon_coverage_is_advisory_when_aggregate_coverage_passes() -> None:
+    base = _manifest("2026-08-22T12:00:00+00:00")
+    event_coverage = {
+        **base["event_coverage"],
+        "status": "passed",
+        "horizon_coverage": {
+            "status": "failed",
+            "missing_events": 2,
+            "failed_horizons": [
+                {"horizon": 3, "coverage_pct": 0.666667},
+                {"horizon": 14, "coverage_pct": 0.0},
+            ],
+        },
+    }
+    manifest = build_reconciliation_manifest(
+        generated_at="2026-08-22T12:00:00+00:00",
+        datasets=base["datasets"],
+        event_coverage=event_coverage,
+        duplicates=base["duplicates"],
+        symbol_mappings=base["symbol_mappings"],
+        corporate_actions=base["corporate_actions"],
+        pipeline_controls=base["pipeline_controls"],
+        quote_quality=base["quote_quality"],
+        source_reconciliation=base["source_reconciliation"],
+    )
+
+    horizon_issue = next(
+        issue
+        for issue in manifest["exceptions"]
+        if issue["code"] == "forecast_horizon_coverage_below_limit"
+    )
+    assert horizon_issue["severity"] == "warning"
+    assert manifest["quality"]["status"] == "degraded"
+    assert manifest["quality"]["decision_safe"] is True
+    assert manifest["quality"]["critical_exceptions"] == 0
+
+
 def test_duplicate_serving_keys_make_manifest_fail_closed() -> None:
     clean = _manifest("2026-08-22T12:00:00+00:00")
     failed = _manifest("2026-08-22T12:00:00+00:00", duplicate_rows=3)
