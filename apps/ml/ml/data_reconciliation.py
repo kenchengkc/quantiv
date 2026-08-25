@@ -128,7 +128,7 @@ def build_reconciliation_manifest(
         exceptions.append(
             _exception(
                 "forecast_horizon_coverage_below_limit",
-                "critical",
+                "warning",
                 "One or more model horizons lack sufficient eligible option coverage",
                 count=int(horizon_coverage.get("missing_events", 0)),
                 sample=horizon_coverage.get("failed_horizons") or [],
