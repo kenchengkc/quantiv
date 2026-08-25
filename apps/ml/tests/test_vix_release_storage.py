@@ -78,6 +78,7 @@ def test_r2_push_keeps_vix_alias_out_of_immutable_upload(
     snapshot = out_dir / ("vix-through-2026-08-24-" + "a" * 64 + ".parquet")
     snapshot.write_bytes(b"immutable-vix")
     (out_dir / "vix.parquet").write_bytes(b"immutable-vix")
+    (tmp_path / "bias_curves.parquet").write_bytes(b"bias")
 
     bin_dir, log_path = _fake_rclone(tmp_path)
     env = {
