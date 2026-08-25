@@ -23,12 +23,15 @@ esac
 echo "📤 Pushing $DATA_DIR/ → $REMOTE (mode=$MODE)"
 
 push_parquet() {
-  # Existing dated partitions may never be overwritten. New files remain
-  # inactive until current_data_release.json is promoted below.
+  # Existing release objects may never be overwritten. vix/vix.parquet is a
+  # local compatibility alias; the content-addressed VIX snapshot beside it is
+  # the immutable object included in the release manifest.
   rclone copy "$DATA_DIR/parquet" "$REMOTE/parquet" --immutable \
+    --exclude "/vix/vix.parquet" \
     --fast-list --transfers=16 --checkers=16 \
     --progress
   rclone check "$DATA_DIR/parquet" "$REMOTE/parquet" \
+    --exclude "/vix/vix.parquet" \
     --one-way --checkers=16
 }
 
