@@ -4,6 +4,7 @@ from datetime import date
 import json
 from pathlib import Path
 import sys
+from types import SimpleNamespace
 
 import pandas as pd
 import pytest
@@ -72,6 +73,35 @@ def test_partition_promotion_and_replay_equivalence(
         sync_dolthub._write_ingestion_manifest(
             target, _frame(bid=1.1), root, prior_manifest=baseline
         )
+
+
+def test_incremental_current_partition_persists_source_metadata(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
+    root = sync_dolthub.parquet_root()
+    target = date(2026, 8, 21)
+    frame = _frame()
+    assert sync_dolthub.write_date(frame, root) == 1
+
+    class FixedDate(date):
+        @classmethod
+        def today(cls) -> FixedDate:
+            return cls(2026, 8, 25)
+
+    monkeypatch.setattr(sync_dolthub, "date", FixedDate)
+    monkeypatch.setattr(sync_dolthub, "latest_dolthub_date", lambda: FixedDate(2026, 8, 21))
+
+    sync_dolthub.cmd_incremental(SimpleNamespace(days=3))
+
+    meta = json.loads(sync_dolthub.metadata_path().read_text())
+    assert meta["last_sync_date"] == "2026-08-21"
+    assert meta["mode"] == "incremental"
+    assert sync_dolthub._manifest_path(FixedDate(2026, 8, 21)).exists()
+
+    source_date, symbols = sync_dolthub._latest_option_universe()
+    assert source_date == FixedDate(2026, 8, 21)
+    assert symbols == ["TEST"]
 
 
 def test_sync_aborts_on_source_failure(
