@@ -563,9 +563,16 @@ def cmd_incremental(args):
 
     if start > end:
         # A fresh runner may have pulled a canonical partition without its
-        # control manifest. Verify/backfill the latest partition before exit.
+        # control manifest. Verify/backfill the latest partition before exit,
+        # then persist the verified source date for downstream controls.
         sync_dates([end], parquet_root(), skip_existing=True)
-        print(f"Already up to date (synced through {last}, DoltHub has through {end})")
+        save_meta({
+            "last_sync_date": end.isoformat(),
+            "last_sync_time": datetime.now().isoformat(),
+            "total_rows_synced": meta.get("total_rows_synced", 0),
+            "mode": "incremental",
+        })
+        print(f"Already up to date (synced through {end}, DoltHub has through {end})")
         return
 
     print(f"{'='*60}\nINCREMENTAL SYNC: {start} → {end}\n{'='*60}")
