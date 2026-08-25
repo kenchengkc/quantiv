@@ -15,6 +15,7 @@ from typing import Any
 REPO_ROOT = Path(__file__).resolve().parent.parent
 RELEASE_SCHEMA = "quantiv.data-release.v1"
 POINTER_SCHEMA = "quantiv.current-data-release.v1"
+MUTABLE_PARQUET_ALIASES = {"parquet/vix/vix.parquet"}
 
 
 def _sha256_file(path: Path) -> str:
@@ -38,11 +39,16 @@ def _atomic_json(path: Path, payload: dict[str, Any]) -> None:
 
 
 def build_release(data_dir: Path) -> tuple[Path, Path, dict[str, Any]]:
-    """Snapshot every immutable Parquet partition into one versioned manifest."""
+    """Snapshot every immutable Parquet object into one versioned manifest."""
     parquet_root = data_dir / "parquet"
-    paths = sorted(parquet_root.rglob("*.parquet")) if parquet_root.exists() else []
+    candidates = sorted(parquet_root.rglob("*.parquet")) if parquet_root.exists() else []
+    paths = [
+        path
+        for path in candidates
+        if path.relative_to(data_dir).as_posix() not in MUTABLE_PARQUET_ALIASES
+    ]
     if not paths:
-        raise RuntimeError(f"no Parquet partitions found beneath {parquet_root}")
+        raise RuntimeError(f"no immutable Parquet objects found beneath {parquet_root}")
     files: list[dict[str, Any]] = []
     for path in paths:
         relative = path.relative_to(data_dir).as_posix()
