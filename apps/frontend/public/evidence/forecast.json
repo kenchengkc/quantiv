@@ -1,33 +1,30 @@
 {
   "schema": "quantiv.dashboard-evidence.v1",
-  "receipt_id": "sha256:e2b3e8e7609e304e0c669d0d5b7aee8a5db27c8ec0e09efe0731a0e13baf355b",
-  "receipt_file": "forecasts_2026-08-27.e2b3e8e7609e.receipt.json",
-  "validated_at": "2026-08-27T21:10:46.645900+00:00",
+  "receipt_id": "sha256:058ecea429467c01bb657305ce7f66b83cbd105617797add5d1d33f0124ef682",
+  "receipt_file": "forecasts_2026-08-28.058ecea42946.receipt.json",
+  "validated_at": "2026-08-28T21:32:58.194361+00:00",
   "quality": {
     "status": "passed",
     "issue_count": 0,
     "issue_codes": []
   },
   "coverage": {
-    "rows": 144,
-    "symbols": 50,
-    "events": 50,
+    "rows": 91,
+    "symbols": 39,
+    "events": 39,
     "horizons": [
-      1,
-      2,
-      3,
       7,
       14,
       21
     ]
   },
   "observation_window": {
-    "earnings_max": "2026-09-16",
-    "earnings_min": "2026-08-27",
-    "scored_at_max": "2026-08-27T21:10:43.861874+00:00",
-    "scored_at_min": "2026-08-27T21:10:43.690031+00:00",
-    "snapshot_max": "2026-08-26",
-    "snapshot_min": "2026-08-06"
+    "earnings_max": "2026-09-17",
+    "earnings_min": "2026-08-31",
+    "scored_at_max": "2026-08-28T21:32:55.200568+00:00",
+    "scored_at_min": "2026-08-28T21:32:55.126211+00:00",
+    "snapshot_max": "2026-08-27",
+    "snapshot_min": "2026-08-10"
   },
   "controls": {
     "evaluated": 24,
@@ -48,7 +45,7 @@
       "invalid_quote_quality_labels": 0,
       "iv_formula_mismatches": 0,
       "leg_mid_mismatches": 0,
-      "max_point_median_gap": 0.014326476436239771,
+      "max_point_median_gap": 0.010121698407187171,
       "non_finite_values": 0,
       "out_of_range_move_rows": 0,
       "point_outside_band": 0,
@@ -63,16 +60,16 @@
     {
       "name": "model_bundle",
       "producer": "apps/ml/model_trainer.py",
-      "member_count": 42,
-      "bytes": 11606118,
-      "sha256": "ba948c3ef60a3c51af32ee9de49fd9cc76174a832695720d2232867f745abbab"
+      "member_count": 21,
+      "bytes": 1897405,
+      "sha256": "f2a3c2d34b2c0e3c20da33c56266159d38d05d0ec34982d5d23eeef808cdbda8"
     },
     {
       "name": "forecast_snapshot",
       "producer": "scripts/daily_score.py",
       "member_count": 1,
-      "bytes": 161957,
-      "sha256": "d7fb86d106db92e16d20dcbd013dd98134da2174d3447e81367ee071bb8b86ed"
+      "bytes": 117774,
+      "sha256": "2cdf6c6d7d1fcc02fca0cd652906654cb983c297b69e694cfafe509a048a80a1"
     }
   ]
 }
