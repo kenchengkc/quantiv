@@ -19,6 +19,7 @@ See [`.github/workflows/daily-refresh.yml`](../.github/workflows/daily-refresh.y
 | `probe_provider_capabilities.py` | Additive-provider entitlement/shape research | Manual research only |
 | `sync_provider_enrichments.py` | Derived provider-signal research tables, production-policy gated | Manual research workflow |
 | `detect_delistings.py` | Flags forecast-universe tickers gone from NASDAQ/NYSE directories; auto-adds confirmed delistings to `config/delisted_tickers.json` after N days (renames excluded) | Nightly (before integrity gate) |
+| `apply_ticker_lifecycle.py` | Reapplies newly detected delistings and canonical renames to both earnings artifacts, then verifies their event keys agree | Nightly (immediately after lifecycle detection) |
 | `delisted.py` | Loader for `config/delisted_tickers.json` + `config/ticker_renames.json` (delistings & old→new symbol remaps; shared by the gates + `sync_dolthub`) | import-only |
 | `check_earnings_calendar_integrity.py` | Guardrails before committing calendar CSV (honors `delisted_tickers.json`) | Nightly (blocks commit on failure) |
 | `check_ticker_identity.py` | Foreign-ticker leaks + Finnhub/SEC name alignment; bare-symbol logo cache | After `sync_finnhub_profiles` |

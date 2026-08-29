@@ -243,6 +243,14 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python scripts/detect_delistings.py --allow-fetch-failure --notify-github
 
+      - name: Apply ticker lifecycle to earnings artifacts
+        # Provider syncs precede lifecycle detection. If detection promotes a
+        # ticker in this run, rewrite both canonical artifacts immediately so
+        # integrity, DuckDB, reconciliation, scoring, and publication all see
+        # the same filtered universe. The command also verifies CSV/Parquet
+        # event-key equivalence and fails closed on disagreement.
+        run: python scripts/apply_ticker_lifecycle.py
+
       - name: Gate — earnings_calendar integrity
         # Prints a structured diff of the about-to-be-committed CSV vs HEAD
         # and aborts if any guardrail trips (row drop >2.5%, >50 tickers
