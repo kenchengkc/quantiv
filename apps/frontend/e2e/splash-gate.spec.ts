@@ -22,6 +22,23 @@ test.describe("homepage splash", () => {
     await expect(page.locator(".quantiv-splash-wordmark")).toHaveText(
       "QUANTIV",
     );
+    const wordmarkLayout = await page
+      .locator(".quantiv-splash-wordmark")
+      .evaluate((element) => {
+        const rect = element.getBoundingClientRect();
+        const style = getComputedStyle(element);
+        return {
+          center: rect.left + rect.width / 2,
+          viewportCenter: window.innerWidth / 2,
+          fontSize: Number.parseFloat(style.fontSize),
+          textIndent: style.textIndent,
+        };
+      });
+    expect(wordmarkLayout.fontSize).toBeGreaterThanOrEqual(13);
+    expect(wordmarkLayout.textIndent).toBe("0px");
+    expect(
+      Math.abs(wordmarkLayout.center - wordmarkLayout.viewportCenter),
+    ).toBeLessThanOrEqual(1);
     await expect(page.locator(".quantiv-app-shell")).toBeVisible();
 
     await page.waitForFunction(() =>

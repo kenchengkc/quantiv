@@ -878,13 +878,13 @@
   bottom: max(7vh, 32px);
   left: 50%;
   transform: translateX(-50%);
-  color: rgba(250, 251, 253, 0.76);
+  color: rgba(250, 251, 253, 0.86);
   font-family: ui-sans-serif, system-ui, sans-serif;
-  font-size: 11px;
+  font-size: clamp(13px, 1vw, 16px);
   font-weight: 600;
-  letter-spacing: 0.34em;
+  letter-spacing: 0.3em;
   line-height: 1;
-  text-indent: 0.34em;
+  text-indent: 0;
   animation: quantiv-splash-wordmark 1800ms ease-in-out forwards;
 }
 
