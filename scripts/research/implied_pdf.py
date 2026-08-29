@@ -130,7 +130,6 @@ def build_rnd(chain: pd.DataFrame, T: float, r: float = 0.0,
 
     C = bs_call(forward, Kg, T, ivg, r)
     # Breeden-Litzenberger: g(K) = e^{rT} ∂²C/∂K²
-    dK = np.gradient(Kg)
     dC = np.gradient(C, Kg)
     d2C = np.gradient(dC, Kg)
     g = np.exp(r * T) * d2C
@@ -319,14 +318,14 @@ def validate(n: int, debias: float, seed: int = 0, center: str = "median") -> in
     print(f"  median |RN p90 move|:   {r['rn90'].abs().median():.2%}   "
           f"(symmetric straddle p90: {np.median(base_q[90]):.2%})")
     print()
-    print(f"  ── symmetric ±straddle baseline ──")
+    print("  ── symmetric ±straddle baseline ──")
     print(f"    80% coverage: {base_cov80:.3f}   50% coverage: {base_cov50:.3f}   "
           f"pinball: {pb_base:.5f}")
     print()
     # At each narrowing factor k, compare the skewed bands to a simple
     # bell-curve band narrowed by the same k. If they tie, the win is from
     # narrowing, not from the skew.
-    print(f"  ── de-bias sweep: asymmetric RND vs symmetric-Gaussian, same k ──")
+    print("  ── de-bias sweep: asymmetric RND vs symmetric-Gaussian, same k ──")
     print(f"  {'k':>5} | {'RND cov80':>9} {'pin(RND)':>9} | {'symN cov80':>10} "
           f"{'symN cov50':>10} {'pin(symN)':>9} {'symN vs base':>12}")
     for k in (1.0, 0.85, 0.70, 0.65, 0.60, 0.55, 0.49, 0.45, 0.40):

@@ -63,7 +63,7 @@ Raise Quantiv's production confidence without changing its product architecture:
 - Keep HMAC validation ahead of expensive route handling.
 - Apply the same conservative ticker validation used at the frontend boundary.
 
-## Phase 3: Delivery safeguards
+## Phase 3: Delivery safeguards (implemented)
 
 - Expand CI to run:
   - frontend lint, type-check, production build, Vitest, and Playwright;
@@ -73,6 +73,13 @@ Raise Quantiv's production confidence without changing its product architecture:
 - Validate committed public JSON artifacts on every relevant push.
 - Run public production smoke checks after changes reach `main`, with retries for deployment propagation.
 - Add CodeQL scanning and grouped Dependabot updates for npm and Python dependency surfaces.
+
+CI now has independent gates for frontend build/unit/E2E, backend and ML,
+deterministic script/tool data contracts, Cloudflare Worker type-check/tests,
+and a production Railway image build with Postgres/Redis-backed `/health`
+smoke verification. Security scanning and post-main production smoke remain
+separate workflows so their results are visible rather than hidden in a single
+monolithic job.
 
 ## Phase 4: Configuration and repository cleanup
 
@@ -101,7 +108,7 @@ The hardening pass is complete when:
 1. Existing and new frontend unit tests pass.
 2. Frontend lint, TypeScript, and production build pass.
 3. Public Playwright specifications pass; authenticated specifications run when Clerk test credentials are configured.
-4. Backend, ML, script, and tool pytest suites pass.
+4. Backend, ML, script, and tool pytest suites pass in independent jobs.
 5. Ruff passes for every Python path enabled in CI.
 6. Cloudflare Worker tests and type-check pass.
 7. The backend Docker image builds and its `/health` endpoint responds from a container.

@@ -47,6 +47,13 @@ large output divergence before the signed pointer changes. A valid challenger
 that does not win remains in the signed registry; it does not replace production
 forecasts or serving models.
 
+The first complete gated cycle ran on 2026-08-23. All training, four-fold
+purged walk-forward, artifact, shadow, and handoff validations reached the
+promotion decision. The challenger was retained rather than promoted because
+its T-1 and T-3 calibration regressed on the common holdout. This is the
+expected fail-closed behavior: completing a retrain is not evidence that the
+new bundle deserves production traffic.
+
 ## Production monitoring and rollback
 
 Every daily forecast run records the champion plus available challenger and
@@ -94,6 +101,12 @@ fails visibly instead of treating either missing secret as a successful skip.
 bundles or a forecast whose `model_bundle_id` differs from the activated
 champion. Rollback rescoring explicitly reads the signed rollback bundle rather
 than the newly trained candidate directory.
+
+A rejected challenger has exercised the complete pre-promotion path. The first
+genuinely superior challenger must still exercise production activation,
+same-bundle Neon import, and subsequent rollback-capable monitoring. Until that
+occurs, those operational steps are implemented and tested but are not claimed
+as production-proven.
 
 ## Main files
 

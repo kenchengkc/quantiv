@@ -93,3 +93,95 @@ jobs:
           # Tests do not open the lifespan connections, but the environment
           # still documents the only supported live-serving database.
           DATABASE_URL: postgres://ci@localhost:5432/ci
+
+  data-contracts:
+    name: Data pipeline (ruff, pytest, artifacts)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+      - run: pip install -e apps/ml
+      - run: pip install ruff==0.14.4 pytest
+
+      # Deterministic, provider-mocked tests for ingestion budgets, ticker
+      # lifecycle, generated public JSON, model activation receipts, and the
+      # frontend-data transformations consumed by deployment jobs.
+      - run: ruff check scripts tools
+      - run: pytest scripts tools -q
+        env:
+          PYTHONPATH: apps/ml:scripts:tools
+
+  quote-worker:
+    name: Quote Worker (type-check, vitest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: workers/refresh-prices/package-lock.json
+
+      - run: npm ci --prefix workers/refresh-prices
+      - run: npm run type-check --prefix workers/refresh-prices
+      - run: npm test --prefix workers/refresh-prices
+
+  railway-image:
+    name: Railway image (build, health smoke)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build production image
+        run: docker build -f apps/backend/Dockerfile -t quantiv-backend:ci .
+
+      - name: Start image and verify health
+        run: |
+          set -euo pipefail
+          docker run -d --name quantiv-backend-ci --network host \
+            -e DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/postgres \
+            -e REDIS_URL=redis://127.0.0.1:6379 \
+            -e ADMIN_API_KEY=ci-admin \
+            quantiv-backend:ci
+          trap 'docker logs quantiv-backend-ci; docker rm -f quantiv-backend-ci >/dev/null' EXIT
+          for attempt in $(seq 1 30); do
+            if response=$(curl --fail --silent http://127.0.0.1:8000/health); then
+              echo "$response"
+              echo "$response" | grep -q '"status":"healthy"'
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Backend health endpoint did not become healthy" >&2
+          exit 1
