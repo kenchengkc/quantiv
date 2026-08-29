@@ -33,13 +33,14 @@ Schema notes:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 import os
 import sys
 import time
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import pandas as pd
@@ -352,6 +353,73 @@ def verify_expected_model_bundle(df: pd.DataFrame, expected_bundle_id: str) -> N
         )
 
 
+def verify_activation_receipt(path: Path, expected_bundle_id: str) -> dict:
+    """Require serving activation of the same exact bundle before import."""
+    payload = json.loads(path.read_text())
+    if not isinstance(payload, dict):
+        raise ValueError("serving activation receipt must be a JSON object")
+    if payload.get("schema") != "quantiv.serving-activation.v1":
+        raise ValueError("unsupported serving activation receipt schema")
+    if payload.get("status") != "passed":
+        raise ValueError("serving activation receipt did not pass")
+    if (
+        payload.get("expected_bundle_id") != expected_bundle_id
+        or payload.get("activated_bundle_id") != expected_bundle_id
+    ):
+        raise ValueError("serving activation receipt names a different bundle")
+    receipt_id = str(payload.get("receipt_id") or "")
+    if not receipt_id.startswith("sha256:") or len(receipt_id) != 71:
+        raise ValueError("serving activation receipt ID is invalid")
+    return payload
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def write_import_receipt(
+    path: Path,
+    *,
+    parquet_path: Path,
+    bundle_id: str,
+    activation_receipt: dict,
+    stats: ImportStats,
+    frame: pd.DataFrame,
+    rows_upserted: int,
+) -> dict:
+    """Record that the activated bundle's forecasts committed to Postgres."""
+    core = {
+        "schema": "quantiv.forecast-import.v1",
+        "status": "passed",
+        "imported_at": datetime.now(timezone.utc).isoformat(),
+        "model_bundle_id": bundle_id,
+        "activation_receipt_id": activation_receipt["receipt_id"],
+        "parquet_file": parquet_path.name,
+        "parquet_sha256": _sha256_file(parquet_path),
+        "source_rows": stats.source_rows,
+        "selected_rows": stats.selected_rows,
+        "rows_upserted": rows_upserted,
+        "feature_vector_rows": _feature_vector_count(frame),
+        "horizons": _horizon_counts(frame),
+    }
+    receipt = {
+        **core,
+        "receipt_id": "sha256:"
+        + hashlib.sha256(
+            json.dumps(core, sort_keys=True, separators=(",", ":")).encode()
+        ).hexdigest(),
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n")
+    temporary.replace(path)
+    return receipt
+
+
 def record_import(
     conn,
     parquet_path: Path,
@@ -471,6 +539,18 @@ def main() -> int:
         action="store_true",
         help="Fail when DATABASE_URL is missing instead of treating the import as optional.",
     )
+    ap.add_argument(
+        "--activation-receipt",
+        type=Path,
+        default=None,
+        help="Require a passing exact-bundle serving activation receipt before import.",
+    )
+    ap.add_argument(
+        "--receipt",
+        type=Path,
+        default=None,
+        help="Write a content-addressed receipt after the database transaction commits.",
+    )
     args = ap.parse_args()
 
     url = os.getenv("DATABASE_URL")
@@ -488,6 +568,16 @@ def main() -> int:
     df, stats = load_and_filter(parquet_path, args.days, args.full)
     if args.expected_model_bundle_id:
         verify_expected_model_bundle(df, args.expected_model_bundle_id)
+    activation_receipt = None
+    if args.activation_receipt:
+        if not args.expected_model_bundle_id:
+            raise ValueError("--activation-receipt requires --expected-model-bundle-id")
+        activation_receipt = verify_activation_receipt(
+            args.activation_receipt,
+            args.expected_model_bundle_id,
+        )
+    if args.receipt and activation_receipt is None:
+        raise ValueError("--receipt requires a verified --activation-receipt")
     import_mode = "full" if args.full else f"days:{args.days}"
     print(f"import_recent_to_postgres: {parquet_path.name} → {len(df)} rows "
           f"({import_mode})")
@@ -502,6 +592,17 @@ def main() -> int:
         with conn:
             record_import(conn, parquet_path, import_mode, stats, df, count)
         print(f"import_recent_to_postgres: upserted {count} rows")
+        if args.receipt and activation_receipt is not None:
+            receipt = write_import_receipt(
+                args.receipt,
+                parquet_path=parquet_path,
+                bundle_id=args.expected_model_bundle_id,
+                activation_receipt=activation_receipt,
+                stats=stats,
+                frame=df,
+                rows_upserted=count,
+            )
+            print(f"import receipt: {receipt['receipt_id']} → {args.receipt}")
     finally:
         conn.close()
     return 0

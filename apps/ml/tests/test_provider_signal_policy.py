@@ -58,15 +58,33 @@ def test_enabled_signal_requires_pinned_passing_evidence(tmp_path) -> None:
     with pytest.raises(ProviderSignalPolicyError, match="no pinned paired-test evidence"):
         permitted_signals(policy, "allow_ml", repo_root=tmp_path)
 
+    split_audit = [
+        {
+            "fold": str(fold),
+            "train_end": f"2025-0{fold + 1}-01",
+            "test_start": f"2025-0{fold + 1}-06",
+            "test_end": f"2025-0{fold + 2}-05",
+            "purge_days": 5,
+            "events": 100,
+            "rows": 100,
+        }
+        for fold in range(5)
+    ]
+    split_digest = hashlib.sha256(
+        json.dumps(split_audit, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
     report = {
         "schema": "quantiv.provider-paired-test.v1",
         "signal": "options_flow",
         "status": "passed",
+        "source_sha256": "sha256:" + "c" * 64,
         "paired_keys_sha256": "sha256:" + "a" * 64,
-        "split_audit_sha256": "sha256:" + "b" * 64,
+        "split_audit_sha256": "sha256:" + split_digest,
+        "split_audit": split_audit,
         "sample": {"events": 500, "walk_forward_folds": 5},
         "control": {"mae": 0.0500, "straddle_relative_mae": 0.94},
         "candidate": {"mae": 0.0480, "straddle_relative_mae": 0.91},
+        "paired_error_delta": {"mean": -0.002, "t_stat": -3.0},
         "worst_slice_mae_regression_pct": 2.0,
         "incremental_monthly_cost_usd": 0.0,
     }

@@ -13,6 +13,15 @@ provider collection, frontend publication, and ML admission are frozen by
 No signal below can ship until a pinned paired walk-forward report satisfies
 the no-added-cost policy.
 
+`scripts/research/build_provider_paired_evidence.py` is now the mandatory
+decision boundary for such a report. It consumes row-level control and
+signal-enabled predictions on identical event/horizon/fold keys, verifies the
+purged chronological split, computes event-level paired significance and
+straddle-relative MAE, checks sector/volatility/liquidity/DTE slices, and emits
+a content-addressed `quantiv.provider-paired-test.v1` artifact. It does not
+enable collection or ML admission automatically; the passing artifact still
+requires explicit review and a pinned digest in the policy.
+
 ## What already exists in research tooling
 
 `scripts/sync_provider_enrichments.py --research-override` can collect all three
@@ -65,9 +74,11 @@ To test these as model features:
    - `eps_dispersion`, `rev_dispersion`, `num_analysts_eps`
    - `put_call_vol_ratio`, `put_call_oi_ratio`, `options_voi`
    - `short_days_to_cover`, `short_pct_float` (if float available)
-3. Add the names to `feature_cols`; rebuild to a temp dir; **paired-test** with
-   `scripts/research/experiment_model_improvements.py` (new `events` round: baseline = drop the new
-   cols, variant = keep) on both OOS windows. Ship only if ΔMAE<0 **and** |t|≥2.
+3. Add the names to `feature_cols`; rebuild control and candidate predictions
+   to an isolated temp directory on identical purged walk-forward rows, then
+   build the pinned evidence with `scripts/research/build_provider_paired_evidence.py`.
+   Ship only when the policy's lift, paired significance, straddle, slice, and
+   zero-incremental-cost gates all pass.
 
 ## Expected value & order
 Run the paired test per signal group so we learn which (if any) actually moves

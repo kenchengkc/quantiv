@@ -103,3 +103,62 @@ def test_import_bundle_must_match_activated_serving_bundle(tmp_path):
         assert "does not match the activated serving bundle" in str(exc)
     else:
         raise AssertionError("mismatched serving/import bundles must fail closed")
+
+
+def test_exact_bundle_activation_and_import_receipt_chain(tmp_path):
+    bundle_id = "a" * 64
+    parquet_path = tmp_path / "forecasts_2026-05-24.parquet"
+    pd.DataFrame([_forecast_row(model_bundle_id=bundle_id)]).to_parquet(
+        parquet_path, index=False
+    )
+    frame, stats = importer.load_and_filter(parquet_path, days=7, full=True)
+    activation_path = tmp_path / "activation.json"
+    activation_path.write_text(
+        json.dumps(
+            {
+                "schema": "quantiv.serving-activation.v1",
+                "status": "passed",
+                "expected_bundle_id": bundle_id,
+                "activated_bundle_id": bundle_id,
+                "receipt_id": "sha256:" + "b" * 64,
+            }
+        )
+    )
+
+    activation = importer.verify_activation_receipt(activation_path, bundle_id)
+    receipt = importer.write_import_receipt(
+        tmp_path / "import.json",
+        parquet_path=parquet_path,
+        bundle_id=bundle_id,
+        activation_receipt=activation,
+        stats=stats,
+        frame=frame,
+        rows_upserted=len(frame),
+    )
+
+    assert receipt["status"] == "passed"
+    assert receipt["model_bundle_id"] == bundle_id
+    assert receipt["activation_receipt_id"] == activation["receipt_id"]
+    assert receipt["rows_upserted"] == len(frame)
+
+
+def test_import_rejects_activation_receipt_for_different_bundle(tmp_path):
+    activation_path = tmp_path / "activation.json"
+    activation_path.write_text(
+        json.dumps(
+            {
+                "schema": "quantiv.serving-activation.v1",
+                "status": "passed",
+                "expected_bundle_id": "b" * 64,
+                "activated_bundle_id": "b" * 64,
+                "receipt_id": "sha256:" + "c" * 64,
+            }
+        )
+    )
+
+    try:
+        importer.verify_activation_receipt(activation_path, "a" * 64)
+    except ValueError as exc:
+        assert "different bundle" in str(exc)
+    else:
+        raise AssertionError("mismatched activation/import bundles must fail closed")

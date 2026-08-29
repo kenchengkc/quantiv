@@ -50,6 +50,13 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _canonical_sha256(value: Any) -> str:
+    payload = json.dumps(
+        value, sort_keys=True, separators=(",", ":"), default=str
+    ).encode()
+    return "sha256:" + hashlib.sha256(payload).hexdigest()
+
+
 def _finite_number(value: Any) -> bool:
     return (
         isinstance(value, (int, float))
@@ -86,6 +93,15 @@ def validate_paired_evidence(
         report = _object(evidence_path)
     except (OSError, json.JSONDecodeError, ProviderSignalPolicyError) as exc:
         return [f"evidence is unreadable: {exc}"]
+    return validate_paired_report(signal, report, requirements)
+
+
+def validate_paired_report(
+    signal: str,
+    report: dict[str, Any],
+    requirements: dict[str, Any],
+) -> list[str]:
+    """Validate report metrics independently of repository pinning."""
     errors: list[str] = []
     if report.get("schema") != EVIDENCE_SCHEMA:
         errors.append("unsupported paired-test evidence schema")
@@ -93,7 +109,7 @@ def validate_paired_evidence(
         errors.append("paired-test report names a different signal")
     if report.get("status") != "passed":
         errors.append("paired-test status is not passed")
-    for receipt_field in ("paired_keys_sha256", "split_audit_sha256"):
+    for receipt_field in ("source_sha256", "paired_keys_sha256", "split_audit_sha256"):
         receipt = str(report.get(receipt_field) or "")
         if not receipt.startswith("sha256:") or len(receipt.removeprefix("sha256:")) != 64:
             errors.append(f"{receipt_field} is not a SHA-256 receipt")
@@ -105,6 +121,13 @@ def validate_paired_evidence(
         errors.append("paired test has insufficient events")
     if not _finite_number(folds) or folds < requirements.get("minimum_walk_forward_folds", 3):
         errors.append("paired test has insufficient walk-forward folds")
+    split_audit = report.get("split_audit")
+    if not isinstance(split_audit, list) or not split_audit:
+        errors.append("paired test is missing its chronological split audit")
+    elif report.get("split_audit_sha256") != _canonical_sha256(split_audit):
+        errors.append("paired test split audit does not match its receipt")
+    elif _finite_number(folds) and len(split_audit) != int(folds):
+        errors.append("paired test split audit fold count does not match its sample")
 
     control = report.get("control") if isinstance(report.get("control"), dict) else {}
     candidate = report.get("candidate") if isinstance(report.get("candidate"), dict) else {}
@@ -116,6 +139,15 @@ def validate_paired_evidence(
         improvement = (control_mae - candidate_mae) / control_mae * 100
         if improvement < requirements.get("minimum_mae_improvement_pct", 0.5):
             errors.append("candidate MAE improvement is below policy minimum")
+    paired_delta = (
+        report.get("paired_error_delta")
+        if isinstance(report.get("paired_error_delta"), dict)
+        else {}
+    )
+    paired_t = paired_delta.get("t_stat")
+    minimum_t = abs(float(requirements.get("minimum_paired_t_stat_abs", 2.0)))
+    if not _finite_number(paired_t) or float(paired_t) > -minimum_t:
+        errors.append("candidate paired error improvement is not statistically significant")
     control_relative = control.get("straddle_relative_mae")
     candidate_relative = candidate.get("straddle_relative_mae")
     if (
@@ -217,5 +249,6 @@ __all__ = [
     "permitted_endpoint_ids",
     "permitted_signals",
     "validate_paired_evidence",
+    "validate_paired_report",
     "validate_policy",
 ]

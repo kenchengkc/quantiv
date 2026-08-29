@@ -877,4 +877,15 @@ jobs:
           python -u scripts/import_recent_to_postgres.py \
             --full \
             --require-database \
-            --expected-model-bundle-id "$EXPECTED_BUNDLE_ID"
+            --expected-model-bundle-id "$EXPECTED_BUNDLE_ID" \
+            --activation-receipt data/validation/serving_activation.json \
+            --receipt data/validation/forecast_import.json
+
+      - name: Upload exact-bundle forecast import receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: model-forecast-import
+          path: data/validation/forecast_import.json
+          if-no-files-found: ignore
+          retention-days: 90

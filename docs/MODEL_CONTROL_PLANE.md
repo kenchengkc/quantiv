@@ -108,6 +108,14 @@ same-bundle Neon import, and subsequent rollback-capable monitoring. Until that
 occurs, those operational steps are implemented and tested but are not claimed
 as production-proven.
 
+The import step now consumes the serving activation receipt rather than only a
+shell variable. After the Neon transaction commits, it emits
+`quantiv.forecast-import.v1` with the activated bundle ID, activation receipt
+ID, forecast digest, row counts, feature-vector coverage, and horizons. A
+promotion or rollback therefore leaves an artifact chain proving the same
+bundle reached both serving and stored forecasts; a different ID fails before
+the database connection is opened.
+
 ## Main files
 
 - `apps/ml/ml/model_bundle.py`: signing, verification, manifests, pointers, and registry.
