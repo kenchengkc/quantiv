@@ -888,6 +888,27 @@
   animation: quantiv-splash-wordmark 1800ms ease-in-out forwards;
 }
 
+/* Keep every visual beat at frame zero until the image layers are decoded.
+   The server-rendered wordmark still paints immediately for FCP; the ready
+   class starts all clocks together so a cold visit cannot skip the reveal. */
+.quantiv-splash--play,
+.quantiv-splash--play .quantiv-splash-mark,
+.quantiv-splash--play .quantiv-splash-closed-ring,
+.quantiv-splash--play .quantiv-splash-slit-arc,
+.quantiv-splash--play .quantiv-splash-tail-clip,
+.quantiv-splash--play .quantiv-splash-wordmark {
+  animation-play-state: paused;
+}
+
+.quantiv-splash--play.quantiv-splash--ready,
+.quantiv-splash--play.quantiv-splash--ready .quantiv-splash-mark,
+.quantiv-splash--play.quantiv-splash--ready .quantiv-splash-closed-ring,
+.quantiv-splash--play.quantiv-splash--ready .quantiv-splash-slit-arc,
+.quantiv-splash--play.quantiv-splash--ready .quantiv-splash-tail-clip,
+.quantiv-splash--play.quantiv-splash--ready .quantiv-splash-wordmark {
+  animation-play-state: running;
+}
+
 @keyframes quantiv-splash-ring-in {
   0% {
     transform: scale(0.72);
