@@ -5,8 +5,8 @@ import { requireMlStatusAdmin } from '@/lib/mlStatusAdmin';
 import MlStatusPageClient from './MlStatusPageClient';
 
 export const metadata: Metadata = {
-  title: 'ML Backend Status',
-  description: 'Operational status for Quantiv ML serving, model inventory, and feature coverage.',
+  title: 'Production Controls',
+  description: 'Decision safety, data freshness, model controls, and serving diagnostics for Quantiv.',
 };
 
 export const dynamic = 'force-dynamic';

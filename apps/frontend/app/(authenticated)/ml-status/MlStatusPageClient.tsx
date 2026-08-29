@@ -27,6 +27,7 @@ import {
   type MlStatusResponse,
   type StatusKind,
 } from './statusViewModel';
+import ProductionControlPanel from './ProductionControlPanel';
 
 type LoadState = {
   status: 'loading' | 'ready' | 'error';
@@ -520,10 +521,10 @@ export default function MlStatusPageClient() {
               letterSpacing: 0,
             }}
           >
-            ML Backend Status
+            Production Controls
           </h1>
           <div style={{ marginTop: 8, color: 'var(--ink-3)', fontSize: 13 }}>
-            Backend serving, feature coverage, import counts, and model inventory.
+            Decision safety, data freshness, model controls, and serving diagnostics.
           </div>
         </div>
 
@@ -564,6 +565,8 @@ export default function MlStatusPageClient() {
           {state.error}
         </div>
       ) : null}
+
+      <ProductionControlPanel />
 
       <div
         style={{

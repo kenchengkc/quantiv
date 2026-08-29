@@ -19,18 +19,9 @@ import {
   Toast,
   usePrevAppLocation,
 } from './SymbolPageHeader';
-import {
-  buildTermRows,
-  InteractiveBar,
-  QuantileBand,
-  TermFan,
-} from './ForecastPanels';
-import {
-  buildHistorySeries,
-  GreeksPanel,
-  HistoryBlock,
-  medianAbsoluteHistoryMove,
-} from './HistoryRiskPanels';
+import { buildTermRows, InteractiveBar, QuantileBand, TermFan } from './ForecastPanels';
+import { buildHistorySeries, GreeksPanel, HistoryBlock, medianAbsoluteHistoryMove } from './HistoryRiskPanels';
+import ScenarioRiskPanel from './ScenarioRiskPanel';
 import type {
   IntradaySeries,
   LivePredictionResponse,
@@ -56,7 +47,14 @@ function SymbolPageLoading({ symbol }: { symbol: string }) {
             alignItems: 'stretch',
           }}
         >
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 18, minWidth: 0 }}>
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 18,
+              minWidth: 0,
+            }}
+          >
             <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
               <SkeletonBlock width={56} height={56} radius={10} />
               <div style={{ minWidth: 0, flex: 1 }}>
@@ -269,7 +267,10 @@ function quarterFromRow(row?: EarningsHistoryRow | null): { q: number; year: num
   return { q: Number(m[1]), year: fullYear(m[2]) ?? 2000 + Number(m[2]) };
 }
 
-function incrementQuarter(q: { q: number; year: number }): { q: number; year: number } {
+function incrementQuarter(q: { q: number; year: number }): {
+  q: number;
+  year: number;
+} {
   if (q.q >= 4) return { q: 1, year: q.year + 1 };
   return { q: q.q + 1, year: q.year };
 }
@@ -377,8 +378,7 @@ export default function SymbolPage({
   const [live, setLive] = useState<LivePrice | null>(null);
   const [quoteReady, setQuoteReady] = useState(false);
   const [predictionMode, setPredictionMode] = useState<PredictionMode>('snapshot');
-  const [livePrediction, setLivePrediction] =
-    useState<LivePredictionState>(EMPTY_LIVE_PREDICTION);
+  const [livePrediction, setLivePrediction] = useState<LivePredictionState>(EMPTY_LIVE_PREDICTION);
   const [toast, setToast] = useState<{ msg: string; key: number } | null>(null);
   const lastPredictionFetchAtRef = useRef(0);
   const inFlightPredictionKeyRef = useRef<string | null>(null);
@@ -599,67 +599,70 @@ export default function SymbolPage({
     };
   }, [data, live?.price, symbol]);
 
-  const loadLivePrediction = useCallback(async (force = false) => {
-    if (!livePredictionRequest) return;
-    const now = Date.now();
-    if (
-      !force &&
-      livePrediction.key === livePredictionRequest.key &&
-      livePrediction.status === 'ready' &&
-      now - livePrediction.updatedAt < 30_000
-    ) {
-      return;
-    }
-    if (!force && now - lastPredictionFetchAtRef.current < 30_000) return;
-    if (inFlightPredictionKeyRef.current === livePredictionRequest.key) return;
+  const loadLivePrediction = useCallback(
+    async (force = false) => {
+      if (!livePredictionRequest) return;
+      const now = Date.now();
+      if (
+        !force &&
+        livePrediction.key === livePredictionRequest.key &&
+        livePrediction.status === 'ready' &&
+        now - livePrediction.updatedAt < 30_000
+      ) {
+        return;
+      }
+      if (!force && now - lastPredictionFetchAtRef.current < 30_000) return;
+      if (inFlightPredictionKeyRef.current === livePredictionRequest.key) return;
 
-    inFlightPredictionKeyRef.current = livePredictionRequest.key;
-    lastPredictionFetchAtRef.current = now;
-    setLivePrediction((prev) => ({
-      status: 'loading',
-      key: livePredictionRequest.key,
-      response: prev.key === livePredictionRequest.key ? prev.response : null,
-      error: null,
-      updatedAt: prev.updatedAt,
-    }));
+      inFlightPredictionKeyRef.current = livePredictionRequest.key;
+      lastPredictionFetchAtRef.current = now;
+      setLivePrediction((prev) => ({
+        status: 'loading',
+        key: livePredictionRequest.key,
+        response: prev.key === livePredictionRequest.key ? prev.response : null,
+        error: null,
+        updatedAt: prev.updatedAt,
+      }));
 
-    try {
-      const res = await fetch('/api/ml/predict', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(livePredictionRequest.body),
-        cache: 'no-store',
-      });
-      const json = await res.json().catch(() => null);
-      if (!res.ok) {
+      try {
+        const res = await fetch('/api/ml/predict', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(livePredictionRequest.body),
+          cache: 'no-store',
+        });
+        const json = await res.json().catch(() => null);
+        if (!res.ok) {
+          setLivePrediction({
+            status: 'unavailable',
+            key: livePredictionRequest.key,
+            response: null,
+            error: livePredictionUnavailableMessage(res.status),
+            updatedAt: Date.now(),
+          });
+          return;
+        }
+        setLivePrediction({
+          status: 'ready',
+          key: livePredictionRequest.key,
+          response: json as LivePredictionResponse,
+          error: null,
+          updatedAt: Date.now(),
+        });
+      } catch {
         setLivePrediction({
           status: 'unavailable',
           key: livePredictionRequest.key,
           response: null,
-          error: livePredictionUnavailableMessage(res.status),
+          error: livePredictionUnavailableMessage(null),
           updatedAt: Date.now(),
         });
-        return;
+      } finally {
+        inFlightPredictionKeyRef.current = null;
       }
-      setLivePrediction({
-        status: 'ready',
-        key: livePredictionRequest.key,
-        response: json as LivePredictionResponse,
-        error: null,
-        updatedAt: Date.now(),
-      });
-    } catch {
-      setLivePrediction({
-        status: 'unavailable',
-        key: livePredictionRequest.key,
-        response: null,
-        error: livePredictionUnavailableMessage(null),
-        updatedAt: Date.now(),
-      });
-    } finally {
-      inFlightPredictionKeyRef.current = null;
-    }
-  }, [livePrediction.key, livePrediction.status, livePrediction.updatedAt, livePredictionRequest]);
+    },
+    [livePrediction.key, livePrediction.status, livePrediction.updatedAt, livePredictionRequest],
+  );
 
   useEffect(() => {
     if (predictionMode === 'live') void loadLivePrediction();
@@ -714,7 +717,12 @@ export default function SymbolPage({
             else router.push(prevLoc.path);
           }}
           className="chip"
-          style={{ border: 'none', color: 'var(--ink-3)', paddingLeft: 0, cursor: 'pointer' }}
+          style={{
+            border: 'none',
+            color: 'var(--ink-3)',
+            paddingLeft: 0,
+            cursor: 'pointer',
+          }}
         >
           <ChevronLeft size={14} /> {prevLoc.label}
         </button>
@@ -746,7 +754,12 @@ export default function SymbolPage({
           <div style={{ flex: 1, minWidth: 0 }}>
             <div
               className="serif"
-              style={{ fontSize: 36, fontWeight: 800, letterSpacing: '-0.025em', lineHeight: 1 }}
+              style={{
+                fontSize: 36,
+                fontWeight: 800,
+                letterSpacing: '-0.025em',
+                lineHeight: 1,
+              }}
             >
               {symbol}
             </div>
@@ -769,14 +782,17 @@ export default function SymbolPage({
             <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
               <div
                 className="serif tnum"
-                style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-0.015em' }}
+                style={{
+                  fontSize: 24,
+                  fontWeight: 700,
+                  letterSpacing: '-0.015em',
+                }}
               >
                 ${tick.price.toFixed(2)}
               </div>
               {pct != null && (
                 <div className="mono tnum" style={{ fontSize: 12, color: tone, marginTop: 2 }}>
-                  {arrow} {chg != null ? `$${Math.abs(chg).toFixed(2)} ` : ''}
-                  ({Math.abs(pct * 100).toFixed(2)}%)
+                  {arrow} {chg != null ? `$${Math.abs(chg).toFixed(2)} ` : ''}({Math.abs(pct * 100).toFixed(2)}%)
                 </div>
               )}
             </div>
@@ -810,13 +826,21 @@ export default function SymbolPage({
           >
             Options data not tracked
           </div>
-          <div className="serif" style={{ fontSize: 18, fontWeight: 600, color: 'var(--ink)', marginBottom: 8 }}>
+          <div
+            className="serif"
+            style={{
+              fontSize: 18,
+              fontWeight: 600,
+              color: 'var(--ink)',
+              marginBottom: 8,
+            }}
+          >
             We don&apos;t have an options snapshot for {symbol} yet.
           </div>
           <div style={{ color: 'var(--ink-3)', fontSize: 13 }}>
-            Expected moves, IV rank, straddle quotes, and the historical
-            implied-vs-actual chart all require an options-chain ingest
-            for this symbol. Live spot quotes above {tick?.price != null ? 'are working' : 'will appear when the market is open'}.
+            Expected moves, IV rank, straddle quotes, and the historical implied-vs-actual chart all require an
+            options-chain ingest for this symbol. Live spot quotes above{' '}
+            {tick?.price != null ? 'are working' : 'will appear when the market is open'}.
           </div>
         </div>
       </div>
@@ -836,20 +860,19 @@ export default function SymbolPage({
   // after-hours move — anchoring to it understates the reaction (ADBE read
   // −1.5% off the ~17:00 after-hours print vs the true −6.4% off the official
   // close). Fall back to intraday's close only when batch-price has none.
-  const previousCloseForChange =
-    liveForSymbol?.previousClose ?? intradayForSymbol?.previousClose ?? null;
+  const previousCloseForChange = liveForSymbol?.previousClose ?? intradayForSymbol?.previousClose ?? null;
   const useLiveChangeFallback = liveForSymbol != null;
   const change =
     livePrice != null && previousCloseForChange != null && previousCloseForChange > 0
       ? livePrice - previousCloseForChange
       : useLiveChangeFallback
-        ? liveForSymbol?.change ?? 0
+        ? (liveForSymbol?.change ?? 0)
         : 0;
   const changePct =
     livePrice != null && previousCloseForChange != null && previousCloseForChange > 0
       ? change / previousCloseForChange
       : useLiveChangeFallback
-        ? liveForSymbol?.changePct ?? 0
+        ? (liveForSymbol?.changePct ?? 0)
         : 0;
 
   const straddlePct = em?.straddle_pct ?? 0;
@@ -874,17 +897,13 @@ export default function SymbolPage({
       : null,
   );
   const liveQuantiles =
-    livePrediction.status === 'ready'
-      ? normalizeForecastQuantiles(livePrediction.response?.quantiles)
-      : null;
+    livePrediction.status === 'ready' ? normalizeForecastQuantiles(livePrediction.response?.quantiles) : null;
   const showingLivePrediction =
-    predictionMode === 'live' &&
-    livePrediction.status === 'ready' &&
-    livePrediction.response != null;
+    predictionMode === 'live' && livePrediction.status === 'ready' && livePrediction.response != null;
   const quantiles = showingLivePrediction && liveQuantiles ? liveQuantiles : snapshotQuantiles;
   const rawActivePredictionPct = showingLivePrediction
-    ? livePrediction.response?.em_ml_pct ?? null
-    : em?.em_ml_pct ?? null;
+    ? (livePrediction.response?.em_ml_pct ?? null)
+    : (em?.em_ml_pct ?? null);
   const activePredictionPct =
     rawActivePredictionPct != null && Number.isFinite(rawActivePredictionPct)
       ? Math.max(0, rawActivePredictionPct)
@@ -892,21 +911,14 @@ export default function SymbolPage({
   const quantileMeta = showingLivePrediction
     ? livePrediction.response?.source === 'nightly_fallback'
       ? 'Static nightly fallback · live backend unavailable'
-      : `Re-scored with latest stock price; options snapshot from ${
-          livePrediction.response?.feature_snapshot_date ?? 'nightly snapshot'
-        }.`
+      : `Re-scored with latest stock price; options snapshot from ${livePrediction.response?.feature_snapshot_date ?? 'nightly snapshot'}.`
     : em?.ml_snapshot_date
       ? `Nightly LightGBM snapshot from ${em.ml_snapshot_date}.`
       : 'LightGBM ensemble · range of plausible absolute moves on print day';
   const liveUnavailableReason =
-    predictionMode === 'live' && livePrediction.status === 'unavailable'
-      ? livePrediction.error
-      : null;
+    predictionMode === 'live' && livePrediction.status === 'unavailable' ? livePrediction.error : null;
 
-  const termRows = buildTermRows(
-    data.straddle_features,
-    em?.expiration ?? null,
-  );
+  const termRows = buildTermRows(data.straddle_features, em?.expiration ?? null);
   const historySeries = buildHistorySeries(data.earnings_history);
   const historicalMedianMovePct = medianAbsoluteHistoryMove(historySeries);
 
@@ -972,11 +984,7 @@ export default function SymbolPage({
             <KpiCard
               label="IV-based expected move"
               value={em.iv_pct != null ? `±${(em.iv_pct * 100).toFixed(1)}%` : '–'}
-              sub={
-                em.atm_iv != null
-                  ? `${(em.atm_iv * 100).toFixed(0)}% annualized IV · ${em.dte} DTE`
-                  : undefined
-              }
+              sub={em.atm_iv != null ? `${(em.atm_iv * 100).toFixed(0)}% annualized IV · ${em.dte} DTE` : undefined}
               metric="ivExpectedMove"
               helpAlign="left"
             />
@@ -1039,18 +1047,13 @@ export default function SymbolPage({
                   <MetricHelp metric="probabilityDensity" align="left" />
                 </div>
                 <div style={{ fontSize: 14, color: 'var(--ink-3)', marginTop: 4 }}>
-                  Log-normal model with ATM IV {(atmIV * 100).toFixed(1)}% over {dte} days.
-                  Range ${(spot * (1 - straddlePct)).toFixed(2)}–${(spot * (1 + straddlePct)).toFixed(2)}.
+                  Log-normal model with ATM IV {(atmIV * 100).toFixed(1)}% over {dte} days. Range $
+                  {(spot * (1 - straddlePct)).toFixed(2)}–$
+                  {(spot * (1 + straddlePct)).toFixed(2)}.
                 </div>
               </div>
             </div>
-            <InteractiveBar
-              spot={spot}
-              em={straddlePct}
-              emIV={ivPct}
-              atmIV={atmIV}
-              dte={dte}
-            />
+            <InteractiveBar spot={spot} em={straddlePct} emIV={ivPct} atmIV={atmIV} dte={dte} />
           </div>
         </Reveal>
       )}
@@ -1063,8 +1066,7 @@ export default function SymbolPage({
             style={{
               marginTop: 18,
               display: 'grid',
-              gridTemplateColumns:
-                quantiles != null && termRows.length > 0 ? '1fr 1.1fr' : '1fr',
+              gridTemplateColumns: quantiles != null && termRows.length > 0 ? '1fr 1.1fr' : '1fr',
               gap: 16,
             }}
           >
@@ -1096,6 +1098,20 @@ export default function SymbolPage({
               ivRank={data.vol_regime?.iv_rank ?? null}
               historicalMovePct={historicalMedianMovePct}
               historyCount={historySeries.length}
+            />
+          </div>
+        </Reveal>
+      )}
+
+      {em && termRows.length > 0 && spot > 0 && straddlePct > 0 && (
+        <Reveal delay={195}>
+          <div style={{ marginTop: 18 }}>
+            <ScenarioRiskPanel
+              spot={spot}
+              strike={(termRows.find((row) => row.isEarnings) ?? termRows[0]).strike}
+              premium={(termRows.find((row) => row.isEarnings) ?? termRows[0]).straddle}
+              expectedMovePct={straddlePct}
+              modelMovePct={activePredictionPct}
             />
           </div>
         </Reveal>
@@ -1140,9 +1156,7 @@ export default function SymbolPage({
             gap: 10,
           }}
         >
-          <span className="mono">
-            Options data · as of {data.as_of_date}
-          </span>
+          <span className="mono">Options data · as of {data.as_of_date}</span>
           <span>
             Method:{' '}
             {em?.em_method === 'ml_lightgbm'

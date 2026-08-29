@@ -67,6 +67,11 @@ jobs:
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.E2E_CLERK_PUBLISHABLE_KEY }}
           CLERK_SECRET_KEY: ${{ secrets.E2E_CLERK_SECRET_KEY }}
       - run: npm run test:performance --workspace=apps/frontend
+        env:
+          # next start executes Clerk middleware at runtime; pass the same
+          # development-instance keys used by the regular Playwright suite.
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.E2E_CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.E2E_CLERK_SECRET_KEY }}
 
       - uses: actions/upload-artifact@v4
         if: failure()
