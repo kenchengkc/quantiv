@@ -105,6 +105,44 @@ def test_r2_push_keeps_vix_alias_out_of_immutable_upload(
     assert "--exclude /vix/vix.parquet" in parquet_check
 
 
+def test_r2_push_refreshes_same_date_quarantine_evidence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
+    parquet_dir = tmp_path / "parquet" / "options_chain"
+    parquet_dir.mkdir(parents=True)
+    (parquet_dir / "2026-08-24.parquet").write_bytes(b"options")
+    quarantine_dir = tmp_path / "quarantine" / "options"
+    quarantine_dir.mkdir(parents=True)
+    (quarantine_dir / "quote_quarantine_2026-08-28.parquet").write_bytes(
+        b"recomputed-evidence"
+    )
+    (tmp_path / "bias_curves.parquet").write_bytes(b"bias")
+
+    bin_dir, log_path = _fake_rclone(tmp_path)
+    env = {
+        **os.environ,
+        "DATA_DIR": str(tmp_path),
+        "PATH": f"{bin_dir}:{os.environ['PATH']}",
+        "PYTHON_BIN": sys.executable,
+        "RCLONE_LOG": str(log_path),
+    }
+    subprocess.run(
+        ["bash", "scripts/r2_push.sh", "--skip-forecasts"],
+        cwd=REPO_ROOT,
+        env=env,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    calls = log_path.read_text().splitlines()
+    quarantine_copy = next(
+        line for line in calls if line.startswith("copy ") and "/quarantine " in line
+    )
+    assert "--immutable" not in quarantine_copy
+
+
 def test_r2_pull_restores_vix_alias_from_active_release(
     tmp_path: Path,
 ) -> None:

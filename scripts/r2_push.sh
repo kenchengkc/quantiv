@@ -88,7 +88,11 @@ push_controls() {
       --fast-list --transfers=4 --progress
   fi
   if [ -d "$DATA_DIR/quarantine" ]; then
-    rclone copy "$DATA_DIR/quarantine" "$REMOTE/quarantine" --immutable \
+    # Quarantine is derived evidence keyed by source date. A rerun can add
+    # newly rejected rows for that same date, so the dated Parquet may change.
+    # Keep the core parquet release and control manifests immutable, but allow
+    # this refreshable ledger to replace its same-date object in R2.
+    rclone copy "$DATA_DIR/quarantine" "$REMOTE/quarantine" \
       --fast-list --transfers=4 --progress
   fi
   if [ -d "$DATA_DIR/validation" ]; then
