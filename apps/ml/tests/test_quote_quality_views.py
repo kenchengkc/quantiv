@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 import sys
 
@@ -22,7 +22,10 @@ def _option(
     *,
     bid: float,
     ask: float,
-    delta: float,
+    delta: float | None,
+    quote_timestamp: datetime | None = None,
+    option_volume: int | None = None,
+    open_interest: int | None = None,
 ) -> dict[str, object]:
     return {
         "date": date(2026, 8, 21),
@@ -38,6 +41,9 @@ def _option(
         "theta": -0.1,
         "vega": 0.1,
         "rho": 0.01,
+        "quote_timestamp": quote_timestamp,
+        "option_volume": option_volume,
+        "open_interest": open_interest,
     }
 
 
@@ -52,6 +58,42 @@ def test_quote_views_pair_same_strike_and_fail_closed(tmp_path: Path) -> None:
         _option("CROSS", 100, "Call", bid=2.0, ask=1.0, delta=0.50),
         _option("CROSS", 100, "Put", bid=1.0, ask=1.2, delta=-0.50),
         _option("ORPHAN", 100, "Call", bid=1.0, ask=1.1, delta=0.50),
+        _option("NODELTA", 100, "Call", bid=1.0, ask=1.1, delta=None),
+        _option("NODELTA", 100, "Put", bid=1.0, ask=1.1, delta=-0.50),
+        _option(
+            "PARTIALILLIQ", 100, "Call", bid=1.0, ask=1.1, delta=0.50,
+            option_volume=0,
+        ),
+        _option(
+            "PARTIALILLIQ", 100, "Put", bid=1.0, ask=1.1, delta=-0.50,
+            option_volume=0,
+        ),
+        _option(
+            "NEGATIVE", 100, "Call", bid=1.0, ask=1.1, delta=0.50,
+            option_volume=10, open_interest=-1,
+        ),
+        _option(
+            "NEGATIVE", 100, "Put", bid=1.0, ask=1.1, delta=-0.50,
+            option_volume=10, open_interest=-1,
+        ),
+        _option("FAR", 100, "Call", bid=1.0, ask=1.1, delta=0.10),
+        _option("FAR", 100, "Put", bid=1.0, ask=1.1, delta=-0.10),
+        _option(
+            "STALE", 100, "Call", bid=1.0, ask=1.1, delta=0.50,
+            quote_timestamp=datetime(2026, 8, 20, 20),
+        ),
+        _option(
+            "STALE", 100, "Put", bid=1.0, ask=1.1, delta=-0.50,
+            quote_timestamp=datetime(2026, 8, 20, 20),
+        ),
+        _option(
+            "SKEW", 100, "Call", bid=1.0, ask=1.1, delta=0.50,
+            quote_timestamp=datetime(2026, 8, 21, 20, 0),
+        ),
+        _option(
+            "SKEW", 100, "Put", bid=1.0, ask=1.1, delta=-0.50,
+            quote_timestamp=datetime(2026, 8, 21, 20, 2),
+        ),
     ]
     parquet = (
         tmp_path
@@ -81,13 +123,33 @@ def test_quote_views_pair_same_strike_and_fail_closed(tmp_path: Path) -> None:
             """
             SELECT act_symbol, rejection_reason
             FROM v_option_quote_quarantine
-            WHERE act_symbol IN ('CROSS', 'ORPHAN')
+            WHERE act_symbol IN (
+                'CROSS', 'ORPHAN', 'NODELTA', 'PARTIALILLIQ', 'NEGATIVE'
+            )
             ORDER BY act_symbol, rejection_reason
             """
         ).fetchall()
     )
     assert rejected["CROSS"] == "crossed_market"
     assert rejected["ORPHAN"] == "missing_same_strike_opposite_leg"
+    assert rejected["NODELTA"] == "invalid_delta"
+    assert rejected["PARTIALILLIQ"] == "illiquid_contract"
+    assert rejected["NEGATIVE"] == "invalid_liquidity_evidence"
+
+    rejected_pairs = dict(
+        conn.execute(
+            """
+            SELECT act_symbol, pair_rejection_reason
+            FROM v_straddle_quote_quarantine
+            WHERE act_symbol IN ('FAR', 'SKEW')
+            ORDER BY act_symbol
+            """
+        ).fetchall()
+    )
+    assert rejected_pairs == {
+        "FAR": "not_atm_by_delta",
+        "SKEW": "quote_timestamp_skew",
+    }
 
     lineage = conn.execute(
         """

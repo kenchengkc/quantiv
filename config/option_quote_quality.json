@@ -3,6 +3,7 @@
   "market_data_mode": "end_of_day",
   "timestamp_precision": "date",
   "max_quote_date_lag_days": 0,
+  "max_quote_session_lag": 0,
   "max_quote_time_skew_seconds": 60,
   "max_leg_relative_spread": 0.5,
   "max_straddle_relative_spread": 0.5,
@@ -14,6 +15,7 @@
   "min_ask": 0.01,
   "min_iv": 0.0001,
   "max_iv": 5.0,
+  "max_atm_delta_distance": 0.35,
   "min_option_volume_when_available": 1,
   "min_open_interest_when_available": 10,
   "min_dte": 1,
@@ -23,6 +25,7 @@
     "option_volume": false,
     "open_interest": false
   },
+  "min_source_capability_coverage": 0.95,
   "decision_scope": "end_of_day_research",
   "live_trading_eligible": false
 }

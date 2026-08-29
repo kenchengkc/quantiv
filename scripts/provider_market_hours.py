@@ -1,26 +1,13 @@
 from __future__ import annotations
 
 import os
-import re
 from datetime import datetime
-from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from market_sessions import is_us_market_session
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
 QUOTE_REFRESH_OPEN_MIN = 9 * 60 + 25
 QUOTE_REFRESH_CLOSE_MIN = 16 * 60 + 45
-
-
-def _generated_holidays() -> set[str]:
-    path = REPO_ROOT / "apps" / "frontend" / "lib" / "marketHolidays.generated.ts"
-    if not path.exists():
-        return set()
-    text = path.read_text()
-    match = re.search(r"MARKET_HOLIDAYS_US\s*=\s*\[(.*?)\]\s+as const", text, re.S)
-    if not match:
-        return set()
-    return set(re.findall(r"""["'](\d{4}-\d{2}-\d{2})["']""", match.group(1)))
 
 
 def is_finnhub_reserved_window(now: datetime | None = None) -> bool:
@@ -28,9 +15,7 @@ def is_finnhub_reserved_window(now: datetime | None = None) -> bool:
     et_now = (now or datetime.now(ZoneInfo("America/New_York"))).astimezone(
         ZoneInfo("America/New_York")
     )
-    if et_now.weekday() >= 5:
-        return False
-    if et_now.date().isoformat() in _generated_holidays():
+    if not is_us_market_session(et_now.date()):
         return False
     minutes = et_now.hour * 60 + et_now.minute
     return QUOTE_REFRESH_OPEN_MIN <= minutes <= QUOTE_REFRESH_CLOSE_MIN

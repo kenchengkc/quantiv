@@ -44,6 +44,7 @@ def quote_quality_policy() -> dict[str, object]:
         "timestamp_precision",
         "max_leg_relative_spread",
         "max_straddle_relative_spread",
+        "max_atm_delta_distance",
         "min_bid",
         "min_ask",
         "min_iv",
@@ -67,6 +68,7 @@ def setup_views(conn: duckdb.DuckDBPyConnection, data_dir: Path):
     max_dte = int(policy["max_dte"])
     max_leg_spread = float(policy["max_leg_relative_spread"])
     max_straddle_spread = float(policy["max_straddle_relative_spread"])
+    max_atm_delta_distance = float(policy["max_atm_delta_distance"])
     max_quote_time_skew_seconds = int(policy["max_quote_time_skew_seconds"])
     min_option_volume = int(policy["min_option_volume_when_available"])
     min_open_interest = int(policy["min_open_interest_when_available"])
@@ -149,11 +151,18 @@ def setup_views(conn: duckdb.DuckDBPyConnection, data_dir: Path):
                 WHEN bid < {min_bid} OR ask < {min_ask} THEN 'zero_or_noncommercial_side'
                 WHEN ask < bid THEN 'crossed_market'
                 WHEN iv IS NULL OR iv < {min_iv} OR iv > {max_iv} THEN 'invalid_iv'
+                WHEN delta IS NULL
+                  OR (call_put = 'Call' AND (delta < 0 OR delta > 1))
+                  OR (call_put = 'Put' AND (delta < -1 OR delta > 0))
+                  THEN 'invalid_delta'
                 WHEN source_quote_timestamp IS NOT NULL
                   AND CAST(source_quote_timestamp AS DATE) != date THEN 'stale_quote_timestamp'
-                WHEN option_volume IS NOT NULL AND open_interest IS NOT NULL
-                  AND option_volume < {min_option_volume}
-                  AND open_interest < {min_open_interest} THEN 'illiquid_contract'
+                WHEN option_volume < 0 OR open_interest < 0
+                  THEN 'invalid_liquidity_evidence'
+                WHEN (option_volume IS NOT NULL OR open_interest IS NOT NULL)
+                  AND COALESCE(option_volume, 0) < {min_option_volume}
+                  AND COALESCE(open_interest, 0) < {min_open_interest}
+                  THEN 'illiquid_contract'
                 WHEN dte < {min_dte} OR dte > {max_dte} THEN 'dte_out_of_policy'
                 WHEN relative_spread > {max_leg_spread} THEN 'excessive_leg_spread'
                 ELSE NULL
@@ -163,11 +172,15 @@ def setup_views(conn: duckdb.DuckDBPyConnection, data_dir: Path):
                   OR bid < {min_bid} OR ask < {min_ask}
                   OR ask < bid
                   OR iv IS NULL OR iv < {min_iv} OR iv > {max_iv}
+                  OR delta IS NULL
+                  OR (call_put = 'Call' AND (delta < 0 OR delta > 1))
+                  OR (call_put = 'Put' AND (delta < -1 OR delta > 0))
                   OR (source_quote_timestamp IS NOT NULL
                       AND CAST(source_quote_timestamp AS DATE) != date)
-                  OR (option_volume IS NOT NULL AND open_interest IS NOT NULL
-                      AND option_volume < {min_option_volume}
-                      AND open_interest < {min_open_interest})
+                  OR option_volume < 0 OR open_interest < 0
+                  OR ((option_volume IS NOT NULL OR open_interest IS NOT NULL)
+                      AND COALESCE(option_volume, 0) < {min_option_volume}
+                      AND COALESCE(open_interest, 0) < {min_open_interest})
                   OR dte < {min_dte} OR dte > {max_dte}
                   OR relative_spread > {max_leg_spread}
                 THEN 'rejected'
@@ -263,6 +276,9 @@ def setup_views(conn: duckdb.DuckDBPyConnection, data_dir: Path):
                      AND ABS(EPOCH(c.source_quote_timestamp)
                              - EPOCH(p.source_quote_timestamp)) > {max_quote_time_skew_seconds}
                         THEN 'quote_timestamp_skew'
+                    WHEN ABS(c.delta - 0.5) + ABS(p.delta + 0.5)
+                           > {max_atm_delta_distance}
+                        THEN 'not_atm_by_delta'
                     WHEN (c.ask + p.ask - c.bid - p.bid)
                            / NULLIF(c.mid + p.mid, 0) > {max_straddle_spread}
                         THEN 'excessive_straddle_spread'

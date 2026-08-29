@@ -15,11 +15,14 @@ import pyarrow.parquet as pq
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 SCRIPT = REPO_ROOT / "scripts" / "build_data_reconciliation.py"
+sys.path.insert(0, str(REPO_ROOT / "scripts"))
+
+from market_sessions import latest_completed_us_market_session  # noqa: E402
 
 
 def _write_fresh_database(path: Path) -> None:
     today = date.today()
-    snapshot = today - timedelta(days=1)
+    snapshot = latest_completed_us_market_session()
     earnings = today + timedelta(days=3)
     expiration = earnings + timedelta(days=1)
     conn = duckdb.connect(str(path))
@@ -140,7 +143,7 @@ def _write_fresh_database(path: Path) -> None:
 def _run(tmp_path: Path, db_path: Path) -> subprocess.CompletedProcess[str]:
     report_path = tmp_path / "reconciliation.json"
     data_dir = tmp_path / "data"
-    snapshot = date.today() - timedelta(days=1)
+    snapshot = latest_completed_us_market_session()
     partition = (
         data_dir / "parquet" / "options_chain" / f"year={snapshot.year}"
         / f"month={snapshot.month:02d}" / f"{snapshot}.parquet"
@@ -159,6 +162,11 @@ def _run(tmp_path: Path, db_path: Path) -> subprocess.CompletedProcess[str]:
                 "partition_sha256": partition_hash,
                 "content_sha256": "test-content",
                 "replay_equivalence": "verified",
+                "source_capabilities": {
+                    "intraday_quote_timestamp": False,
+                    "option_volume": False,
+                    "open_interest": False,
+                },
             }
         )
     )
@@ -289,6 +297,13 @@ def test_script_reconciles_source_quotes_and_events(tmp_path: Path) -> None:
     assert report["event_coverage"]["outside_option_universe_events"] == 1
     assert report["event_coverage"]["status"] == "passed"
     assert report["quote_quality"]["status"] == "passed"
+    assert report["quote_quality"]["source_session_lag"] == 0
+    assert report["quote_quality"]["observed_capabilities"] == {
+        "intraday_quote_timestamp": False,
+        "option_volume": False,
+        "open_interest": False,
+    }
+    assert report["quote_quality"]["live_trading_eligible"] is False
     assert report["source_reconciliation"]["status"] == "passed"
     assert report["corporate_actions"]["status"] == "passed"
     assert report["corporate_actions"]["universe_symbols"] == 3

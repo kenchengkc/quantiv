@@ -25,6 +25,10 @@ from ml.data_reconciliation import (  # noqa: E402 - standalone script path setu
 )
 from export_quote_quarantine import export_quarantine  # noqa: E402
 from delisted import canonical_ticker, is_delisted  # noqa: E402
+from market_sessions import (  # noqa: E402
+    latest_completed_us_market_session,
+    market_session_lag,
+)
 
 
 MODEL_HORIZONS = (1, 2, 3, 7, 14, 21)
@@ -296,7 +300,12 @@ def _event_coverage(
     }
 
 
-def _quote_quality(conn: duckdb.DuckDBPyConnection) -> dict[str, Any]:
+def _quote_quality(
+    conn: duckdb.DuckDBPyConnection,
+    *,
+    now: datetime | None = None,
+    ingestion_capabilities: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     policy = json.loads(
         (REPO_ROOT / "config" / "option_quote_quality.json").read_text()
     )
@@ -332,6 +341,17 @@ def _quote_quality(conn: duckdb.DuckDBPyConnection) -> dict[str, Any]:
         LIMIT 10
         """
     ).fetchall()
+    timestamp_rows, volume_rows, open_interest_rows, invalid_liquidity_rows = conn.execute(
+        """
+        SELECT
+            COUNT(source_quote_timestamp),
+            COUNT(option_volume),
+            COUNT(open_interest),
+            COUNT(*) FILTER (WHERE option_volume < 0 OR open_interest < 0)
+        FROM v_options
+        WHERE date = (SELECT MAX(date) FROM v_options)
+        """
+    ).fetchone()
     contracts = int(contracts or 0)
     rejected = int(rejected or 0)
     pairs = int(pairs or 0)
@@ -340,13 +360,80 @@ def _quote_quality(conn: duckdb.DuckDBPyConnection) -> dict[str, Any]:
     pair_rate = rejected_pairs / pairs if pairs else 1.0
     max_contract = float(policy["max_contract_rejection_rate"])
     max_pair = float(policy["max_pair_rejection_rate"])
+    expected_source_date = latest_completed_us_market_session(now)
+    source_session_lag = (
+        market_session_lag(latest, expected_source_date) if latest else None
+    )
+    max_session_lag = int(policy["max_quote_session_lag"])
+    source_fresh = (
+        source_session_lag is not None
+        and 0 <= source_session_lag <= max_session_lag
+    )
+    minimum_capability_coverage = float(policy["min_source_capability_coverage"])
+    observed_capabilities = {
+        "intraday_quote_timestamp": bool(timestamp_rows),
+        "option_volume": bool(volume_rows),
+        "open_interest": bool(open_interest_rows),
+    }
+    capability_coverage = {
+        "intraday_quote_timestamp": round(int(timestamp_rows or 0) / contracts, 6)
+        if contracts else 0.0,
+        "option_volume": round(int(volume_rows or 0) / contracts, 6)
+        if contracts else 0.0,
+        "open_interest": round(int(open_interest_rows or 0) / contracts, 6)
+        if contracts else 0.0,
+    }
+    declared_capabilities = dict(policy["source_capabilities"])
+    capability_errors = [
+        f"declared {name} capability has only {capability_coverage[name]:.1%} row coverage"
+        for name, declared in declared_capabilities.items()
+        if declared and capability_coverage.get(name, 0.0) < minimum_capability_coverage
+    ]
+    if ingestion_capabilities is not None:
+        manifest_capabilities = {
+            "intraday_quote_timestamp": bool(
+                ingestion_capabilities.get("intraday_quote_timestamp")
+            ),
+            "option_volume": bool(ingestion_capabilities.get("option_volume")),
+            "open_interest": bool(ingestion_capabilities.get("open_interest")),
+        }
+        if manifest_capabilities != declared_capabilities:
+            capability_errors.append(
+                "ingestion receipt capabilities do not match the quote-quality policy"
+            )
+    if policy["live_trading_eligible"] and (
+        not all(declared_capabilities.values())
+        or policy["timestamp_precision"] != "timestamp"
+        or policy["market_data_mode"] == "end_of_day"
+    ):
+        capability_errors.append(
+            "live-trading eligibility requires timestamp, volume, and open-interest evidence"
+        )
+    errors = []
+    if not source_fresh:
+        errors.append(
+            f"latest source date {latest} is {source_session_lag} market session(s) "
+            f"behind expected {expected_source_date}"
+        )
+    if invalid_liquidity_rows:
+        errors.append(
+            f"{int(invalid_liquidity_rows)} row(s) contain negative volume/open interest"
+        )
+    errors.extend(capability_errors)
     return {
         "status": (
             "passed"
-            if contracts and pairs and contract_rate <= max_contract and pair_rate <= max_pair
+            if contracts
+            and pairs
+            and contract_rate <= max_contract
+            and pair_rate <= max_pair
+            and not errors
             else "failed"
         ),
         "source_date": latest.isoformat() if latest else None,
+        "expected_source_date": expected_source_date.isoformat(),
+        "source_session_lag": source_session_lag,
+        "max_quote_session_lag": max_session_lag,
         "contracts": contracts,
         "eligible_contracts": contracts - rejected,
         "rejected_contracts": rejected,
@@ -362,9 +449,13 @@ def _quote_quality(conn: duckdb.DuckDBPyConnection) -> dict[str, Any]:
             {"reason": str(reason), "rows": int(rows)} for reason, rows in reason_rows
         ],
         "timestamp_precision": policy["timestamp_precision"],
-        "source_capabilities": policy["source_capabilities"],
+        "source_capabilities": declared_capabilities,
+        "observed_capabilities": observed_capabilities,
+        "capability_coverage": capability_coverage,
+        "min_source_capability_coverage": minimum_capability_coverage,
         "decision_scope": policy["decision_scope"],
         "live_trading_eligible": bool(policy["live_trading_eligible"]),
+        "errors": errors,
     }
 
 
@@ -420,6 +511,7 @@ def _source_reconciliation(
         "partition_sha256": manifest.get("partition_sha256"),
         "content_sha256": manifest.get("content_sha256"),
         "replay_equivalence": manifest.get("replay_equivalence"),
+        "source_capabilities": manifest.get("source_capabilities") or {},
         "errors": errors,
     }
 
@@ -795,8 +887,11 @@ def main() -> int:
             strict=args.strict,
         )
     try:
-        quote_quality = _quote_quality(conn)
         source_reconciliation = _source_reconciliation(conn, data_dir)
+        quote_quality = _quote_quality(
+            conn,
+            ingestion_capabilities=source_reconciliation.get("source_capabilities"),
+        )
         try:
             quarantine_path, quarantine_rows = export_quarantine(
                 conn, data_dir / "quarantine" / "options"
