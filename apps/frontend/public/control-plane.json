@@ -1,44 +1,59 @@
 {
   "data": {
-    "contract_rejection_rate": null,
-    "contracts": null,
-    "corporate_action_rows": 0,
-    "corporate_action_status": "unavailable",
-    "covered_events": null,
-    "decision_scope": null,
+    "contract_rejection_rate": 0.440461,
+    "contracts": 113220,
+    "corporate_action_rows": 28417,
+    "corporate_action_status": "enforced",
+    "covered_events": 38,
+    "decision_scope": "end_of_day_research",
     "duplicate_rows": 0,
-    "eligible_contracts": null,
-    "event_coverage_pct": null,
-    "expected_events": null,
-    "expected_source_date": null,
+    "eligible_contracts": 63351,
+    "event_coverage_pct": 0.745098,
+    "expected_events": 51,
+    "expected_source_date": "2026-08-28",
     "live_trading_eligible": false,
-    "missing_events": null,
-    "pair_rejection_rate": null,
-    "quarantine_records": null,
-    "quarantine_status": "unavailable",
-    "replay_status": "unavailable",
-    "source_date": null,
-    "source_session_lag": null,
-    "status": "unavailable"
+    "missing_events": 13,
+    "pair_rejection_rate": 0.877619,
+    "quarantine_records": 99551,
+    "quarantine_status": "enforced",
+    "replay_status": "verified",
+    "source_date": "2026-08-28",
+    "source_session_lag": 0,
+    "status": "degraded"
   },
-  "decision_safe": false,
-  "exceptions": [],
-  "generated_at": "not-yet-generated",
+  "decision_safe": true,
+  "exceptions": [
+    {
+      "code": "upcoming_events_outside_option_universe",
+      "count": 335,
+      "severity": "warning",
+      "summary": "Calendar events fall outside the current options decision universe"
+    },
+    {
+      "code": "upcoming_events_without_option_chain",
+      "count": 13,
+      "severity": "warning",
+      "summary": "In-universe earnings events have no decision-eligible option chain"
+    }
+  ],
+  "generated_at": "2026-08-29T19:27:32.269586+00:00",
   "model": {
-    "challenger_present": false,
-    "champion_active": false,
-    "critical_features": null,
-    "drift_status": "unavailable",
-    "hard_missing_features": null,
-    "monitored_at": null,
+    "challenger_present": true,
+    "champion_active": true,
+    "critical_features": 3,
+    "drift_status": "warning",
+    "hard_missing_features": 0,
+    "monitored_at": "2026-08-29T19:20:45.420172+00:00",
     "outcome_status": "unavailable",
     "rollback_ready": false,
     "rollback_recorded": false,
-    "shadow_roles": [],
-    "snapshot_date": null,
-    "status": "unavailable",
-    "warning_features": 0
+    "shadow_roles": [
+      "challenger"
+    ],
+    "snapshot_date": "2026-08-28",
+    "status": "passed",
+    "warning_features": 7
   },
   "schema": "quantiv.control-plane.v1",
-  "status": "unavailable"
+  "status": "degraded"
 }
