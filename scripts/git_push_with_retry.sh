@@ -22,6 +22,22 @@ for attempt in $(seq 1 "$max_attempts"); do
     exit 0
   fi
 
+  # A scheduled refresh can finish its data commit while a code or another
+  # refresh commit lands on main. Retrying the same SHA can never fast-forward
+  # in that case, so integrate the fetched tip before the next attempt. The
+  # refresh commit contains generated artifacts; -X theirs keeps those local
+  # outputs when a generated file overlaps with the fetched commit.
+  if [[ -n "$remote_sha" ]] && ! git merge-base --is-ancestor "$remote_sha" HEAD; then
+    echo "Remote ${remote}/${branch} advanced to ${remote_sha}; rebasing local commit."
+    if git rebase -X theirs "$remote/${branch}"; then
+      head_sha="$(git rev-parse HEAD)"
+      echo "Rebased local refresh commit onto ${remote}/${branch} as ${head_sha}."
+    else
+      echo "Could not rebase local refresh commit onto ${remote}/${branch}." >&2
+      git rebase --abort || true
+    fi
+  fi
+
   if [[ "$attempt" == "$max_attempts" ]]; then
     break
   fi
