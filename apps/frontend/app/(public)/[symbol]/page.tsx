@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { notFound } from 'next/navigation';
 import { companyName, stripLegalSuffix } from '@/lib/companyNames';
-import tickerNames from '../../public/ticker-names.json';
+import tickerNames from '../../../public/ticker-names.json';
 import SymbolPageClient from './SymbolPageClient';
 
 type SymbolPageProps = {

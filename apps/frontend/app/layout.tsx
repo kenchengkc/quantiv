@@ -1,12 +1,6 @@
 import './globals.css';
 import type { Metadata } from 'next';
 import { JetBrains_Mono, Mulish, Nunito_Sans } from 'next/font/google';
-import { ClerkProvider } from '@clerk/nextjs';
-import { Providers } from './providers';
-import { ErrorBoundary } from '@/components/ErrorBoundary';
-import { Topbar } from '@/components/Topbar';
-import { Footer } from '@/components/Footer';
-import { TickerHoverHost } from '@/components/TickerHoverCard';
 import { SPLASH_SESSION_KEY, SPLASH_SKIP_ATTRIBUTE } from '@/lib/splashSession';
 import { Analytics } from '@vercel/analytics/next';
 import { SpeedInsights } from '@vercel/speed-insights/next';
@@ -43,11 +37,20 @@ export const metadata: Metadata = {
     default: 'Quantiv',
     template: '%s | Quantiv',
   },
-  description: 'Instantly see market-implied moves before earnings. Compute expected moves, greeks, and IV rank from live options chains.',
-  keywords: ['options', 'trading', 'earnings', 'implied volatility', 'greeks', 'expected move'],
+  description:
+    'Instantly see market-implied moves before earnings. Compute expected moves, greeks, and IV rank from live options chains.',
+  keywords: [
+    'options',
+    'trading',
+    'earnings',
+    'implied volatility',
+    'greeks',
+    'expected move',
+  ],
   openGraph: {
     title: 'Quantiv',
-    description: 'Know the move before earnings. Expected moves, Greeks, IV rank from live options chains.',
+    description:
+      'Know the move before earnings. Expected moves, Greeks, IV rank from live options chains.',
     type: 'website',
     locale: 'en_US',
   },
@@ -90,54 +93,39 @@ function SplashSessionGuard() {
   // Returning sessions must be hidden before the server-rendered splash can
   // paint. First visits keep the splash markup visible immediately, so FCP no
   // longer waits for React hydration.
-  return <script id="quantiv-splash-session" dangerouslySetInnerHTML={{ __html: script }} />;
+  return (
+    <script
+      id="quantiv-splash-session"
+      dangerouslySetInnerHTML={{ __html: script }}
+    />
+  );
 }
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
-    <ClerkProvider
-      // Clerk's theme engine doesn't understand CSS custom-property references,
-      // so we hard-code these to match the global Quantiv palette.
-      appearance={{
-        variables: {
-          colorPrimary: '#1E90FF',          // matches --accent (logo wave blue)
-          colorBackground: '#000000',       // pure black page background
-          colorText: '#fafbfd',             // near-pure white, matches --ink
-          colorInputBackground: '#000000',  // matches --bg
-          colorInputText: '#fafbfd',
-          borderRadius: '10px',
-        },
-      }}
+    <html
+      lang="en"
+      suppressHydrationWarning
+      className={`${mulish.variable} ${nunitoSans.variable} ${jetbrainsMono.variable}`}
+      style={{ backgroundColor: '#000000', colorScheme: 'dark' }}
     >
-      <html
-        lang="en"
-        suppressHydrationWarning
-        className={`${mulish.variable} ${nunitoSans.variable} ${jetbrainsMono.variable}`}
-        style={{ backgroundColor: '#000000', colorScheme: 'dark' }}
-      >
-        <head>
-          <style
-            dangerouslySetInnerHTML={{
-              __html: 'html,body{background:#000;color-scheme:dark}',
-            }}
-          />
-          <SplashSessionGuard />
-        </head>
-        <body suppressHydrationWarning style={{ backgroundColor: '#000000' }}>
-          <Providers>
-            <ErrorBoundary>
-              <div className="min-h-screen flex flex-col quantiv-app-shell">
-                <Topbar />
-                <main className="flex-1">{children}</main>
-                <Footer />
-              </div>
-              <TickerHoverHost />
-            </ErrorBoundary>
-            <Analytics />
-            <SpeedInsights />
-          </Providers>
-        </body>
-      </html>
-    </ClerkProvider>
+      <head>
+        <style
+          dangerouslySetInnerHTML={{
+            __html: 'html,body{background:#000;color-scheme:dark}',
+          }}
+        />
+        <SplashSessionGuard />
+      </head>
+      <body suppressHydrationWarning style={{ backgroundColor: '#000000' }}>
+        {children}
+        <Analytics />
+        <SpeedInsights />
+      </body>
+    </html>
   );
 }

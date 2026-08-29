@@ -1,11 +1,19 @@
 'use client';
 
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { Search, ChevronRight, Menu, X } from 'lucide-react';
-import { SignedIn, SignedOut, UserButton } from '@clerk/nextjs';
 import { TickerLogo } from '@/components/TickerLogo';
+
+const TopbarAuthControls = dynamic(
+  () =>
+    import('@/components/TopbarAuthControls').then(
+      (module) => module.TopbarAuthControls,
+    ),
+  { ssr: false },
+);
 
 const NAV = [
   { href: '/', label: 'Earnings Calendar' },
@@ -51,7 +59,9 @@ function useClock() {
 
 function NavSearch() {
   const [query, setQuery] = useState('');
-  const [suggestions, setSuggestions] = useState<{ symbol: string; name: string }[]>([]);
+  const [suggestions, setSuggestions] = useState<
+    { symbol: string; name: string }[]
+  >([]);
   const [isOpen, setIsOpen] = useState(false);
   const router = useRouter();
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -59,7 +69,8 @@ function NavSearch() {
 
   useEffect(() => {
     const h = (e: MouseEvent) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setIsOpen(false);
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node))
+        setIsOpen(false);
     };
     document.addEventListener('mousedown', h);
     return () => document.removeEventListener('mousedown', h);
@@ -77,19 +88,31 @@ function NavSearch() {
   }, []);
 
   useEffect(() => {
-    if (!query) { setSuggestions([]); setIsOpen(false); return; }
+    if (!query) {
+      setSuggestions([]);
+      setIsOpen(false);
+      return;
+    }
     const ctl = new AbortController();
     const t = setTimeout(async () => {
       try {
-        const res = await fetch(`/api/stocks/search?q=${encodeURIComponent(query)}&limit=6`, { signal: ctl.signal });
+        const res = await fetch(
+          `/api/stocks/search?q=${encodeURIComponent(query)}&limit=6`,
+          { signal: ctl.signal },
+        );
         if (!res.ok) return;
         const json = await res.json();
         const results = json.data ?? [];
         setSuggestions(results);
         setIsOpen(results.length > 0);
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     }, 200);
-    return () => { ctl.abort(); clearTimeout(t); };
+    return () => {
+      ctl.abort();
+      clearTimeout(t);
+    };
   }, [query]);
 
   const go = (sym: string) => {
@@ -100,9 +123,16 @@ function NavSearch() {
   };
 
   return (
-    <div ref={wrapRef} className="relative" style={{ display: 'flex', alignItems: 'center' }}>
+    <div
+      ref={wrapRef}
+      className="relative"
+      style={{ display: 'flex', alignItems: 'center' }}
+    >
       <form
-        onSubmit={(e) => { e.preventDefault(); go(query); }}
+        onSubmit={(e) => {
+          e.preventDefault();
+          go(query);
+        }}
         className="relative"
         style={{ display: 'flex', alignItems: 'center', height: 34 }}
       >
@@ -123,7 +153,8 @@ function NavSearch() {
             lineHeight: '34px',
             background: 'color-mix(in oklab, var(--bg-2) 88%, transparent)',
             border: '1px solid var(--line-2)',
-            boxShadow: 'inset 0 0 0 1px color-mix(in oklab, var(--ink) 4%, transparent)',
+            boxShadow:
+              'inset 0 0 0 1px color-mix(in oklab, var(--ink) 4%, transparent)',
             color: 'var(--ink)',
             caretColor: 'var(--ink)',
             padding: '0 12px 0 30px',
@@ -134,11 +165,13 @@ function NavSearch() {
           }}
           onFocus={(e) => {
             e.currentTarget.style.borderColor = 'var(--accent)';
-            e.currentTarget.style.boxShadow = '0 0 0 2px color-mix(in oklab, var(--accent) 18%, transparent)';
+            e.currentTarget.style.boxShadow =
+              '0 0 0 2px color-mix(in oklab, var(--accent) 18%, transparent)';
           }}
           onBlur={(e) => {
             e.currentTarget.style.borderColor = 'var(--line-2)';
-            e.currentTarget.style.boxShadow = 'inset 0 0 0 1px color-mix(in oklab, var(--ink) 4%, transparent)';
+            e.currentTarget.style.boxShadow =
+              'inset 0 0 0 1px color-mix(in oklab, var(--ink) 4%, transparent)';
           }}
         />
       </form>
@@ -160,10 +193,15 @@ function NavSearch() {
               className="w-full px-4 py-3 text-left flex items-center transition-colors"
               style={{
                 gap: 10,
-                borderBottom: i < suggestions.length - 1 ? '1px solid var(--line)' : 'none',
+                borderBottom:
+                  i < suggestions.length - 1 ? '1px solid var(--line)' : 'none',
               }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-3)')}
-              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.background = 'var(--bg-3)')
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.background = 'transparent')
+              }
             >
               <TickerLogo
                 ticker={item.symbol}
@@ -185,7 +223,10 @@ function NavSearch() {
               >
                 {item.name || item.symbol}
               </span>
-              <ChevronRight size={14} style={{ color: 'var(--ink-4)', flexShrink: 0 }} />
+              <ChevronRight
+                size={14}
+                style={{ color: 'var(--ink-4)', flexShrink: 0 }}
+              />
             </button>
           ))}
         </div>
@@ -194,7 +235,7 @@ function NavSearch() {
   );
 }
 
-export function Topbar() {
+export function Topbar({ authenticated = false }: { authenticated?: boolean }) {
   const pathname = usePathname();
   const now = useClock();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -259,7 +300,11 @@ export function Topbar() {
           gap: 18,
         }}
       >
-        <Link href="/" aria-label="Quantiv home" className="flex items-center qv-topbar-brand">
+        <Link
+          href="/"
+          aria-label="Quantiv home"
+          className="flex items-center qv-topbar-brand"
+        >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/brand/QuantivColorBanner.webp"
@@ -295,8 +340,15 @@ export function Topbar() {
                   letterSpacing: '0.01em',
                   transition: 'color 140ms ease',
                 }}
-                onMouseEnter={(e) => { if (!active) (e.currentTarget as HTMLElement).style.color = 'var(--ink)'; }}
-                onMouseLeave={(e) => { if (!active) (e.currentTarget as HTMLElement).style.color = 'var(--ink-3)'; }}
+                onMouseEnter={(e) => {
+                  if (!active)
+                    (e.currentTarget as HTMLElement).style.color = 'var(--ink)';
+                }}
+                onMouseLeave={(e) => {
+                  if (!active)
+                    (e.currentTarget as HTMLElement).style.color =
+                      'var(--ink-3)';
+                }}
               >
                 {n.label}
                 {active && (
@@ -343,37 +395,23 @@ export function Topbar() {
             justifyContent: 'flex-end',
           }}
         >
-          <SignedOut>
+          {authenticated ? (
+            <TopbarAuthControls />
+          ) : (
             <Link
-              href="/sign-in"
+              href="/watchlist"
+              prefetch={false}
               style={{
                 fontSize: 12,
                 color: 'var(--ink-2)',
                 padding: '6px 14px',
                 border: '1px solid var(--line)',
                 borderRadius: 999,
-                transition: 'border-color 140ms ease, color 140ms ease',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = 'var(--line-2)';
-                e.currentTarget.style.color = 'var(--ink)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = 'var(--line)';
-                e.currentTarget.style.color = 'var(--ink-2)';
               }}
             >
-              Sign in
+              Account
             </Link>
-          </SignedOut>
-          <SignedIn>
-            <span style={{ display: 'inline-flex' }}>
-              <UserButton
-                afterSignOutUrl="/"
-                appearance={{ elements: { avatarBox: { width: 28, height: 28 } } }}
-              />
-            </span>
-          </SignedIn>
+          )}
         </div>
 
         {/* Mobile-only hamburger toggle. Hidden on ≥ 641px via .qv-d-hide. */}
@@ -457,12 +495,18 @@ export function Topbar() {
               gap: 12,
             }}
           >
-            <span className="mono tnum" style={{ fontSize: 11, color: 'var(--ink-4)' }}>
+            <span
+              className="mono tnum"
+              style={{ fontSize: 11, color: 'var(--ink-4)' }}
+            >
               {time} EDT
             </span>
-            <SignedOut>
+            {authenticated ? (
+              <TopbarAuthControls mobile />
+            ) : (
               <Link
-                href="/sign-in"
+                href="/watchlist"
+                prefetch={false}
                 onClick={() => setMobileOpen(false)}
                 style={{
                   fontSize: 13,
@@ -472,15 +516,9 @@ export function Topbar() {
                   borderRadius: 999,
                 }}
               >
-                Sign in
+                Account
               </Link>
-            </SignedOut>
-            <SignedIn>
-              <UserButton
-                afterSignOutUrl="/"
-                appearance={{ elements: { avatarBox: { width: 32, height: 32 } } }}
-              />
-            </SignedIn>
+            )}
           </div>
         </div>
       )}

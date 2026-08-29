@@ -5,7 +5,7 @@ import EarningsGrid, { type WeeklyData } from '@/components/EarningsGrid';
 // for the default "this week" view so the calendar (the LCP element) paints
 // without waiting on the client bundle + a /weeks fetch. The client revalidates
 // from the CDN on mount, so anything stale corrects within the first frame.
-import weeklyData from '../public/weekly.json';
+import weeklyData from '../../public/weekly.json';
 
 export const metadata: Metadata = {
   title: {

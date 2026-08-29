@@ -1,10 +1,9 @@
 import { test, expect } from '@playwright/test';
 import { clerk } from '@clerk/testing/playwright';
 
-// /watchlist is the only Clerk-protected route (see middleware.ts).
-// This spec proves the bypass: visit a public page so Clerk loads, sign
-// in via Backend API token (no UI interaction), then assert /watchlist
-// renders authenticated content instead of redirecting to /sign-in.
+// Authenticated routes own the Clerk browser boundary; public routes do not
+// load the SDK. This spec signs in from /sign-in, then proves /watchlist
+// renders authenticated content instead of redirecting back there.
 test.describe('watchlist (authenticated)', () => {
   test.skip(
     !process.env.E2E_CLERK_USER_EMAIL,
@@ -12,9 +11,9 @@ test.describe('watchlist (authenticated)', () => {
   );
 
   test('reaches the watchlist page when signed in', async ({ page }) => {
-    // Required: navigate to an unprotected page first so Clerk's client
+    // Required: navigate to an authenticated route first so Clerk's client
     // SDK is loaded and ready to receive the testing token.
-    await page.goto('/');
+    await page.goto('/sign-in');
     await clerk.loaded({ page });
 
     await clerk.signIn({

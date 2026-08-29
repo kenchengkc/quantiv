@@ -6,22 +6,22 @@ and intentional loading gates dominate.
 
 ## Quick diagnosis
 
-| Symptom | Likely cause |
-|---------|----------------|
-| Screener / calendar blank for 1–4s | `contentReady` waits for logos + batch quotes + min skeleton delay |
-| Symbol page slow after navigation | Chart-heavy client bundle + redundant metadata fetches |
-| Every route feels heavy | Clerk + React Query + 3 Google font families in root layout |
-| Repeat visit faster | `next.config.js` CDN cache on `/screener.json`, `/weekly.json` — helps returns, not first paint |
+| Symptom                            | Likely cause                                                                                    |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------- |
+| Screener / calendar blank for 1–4s | `contentReady` waits for logos + batch quotes + min skeleton delay                              |
+| Symbol page slow after navigation  | Chart-heavy client bundle + redundant metadata fetches                                          |
+| Every route feels heavy            | Shared shell + React Query + 3 font families                                                    |
+| Repeat visit faster                | `next.config.js` CDN cache on `/screener.json`, `/weekly.json` — helps returns, not first paint |
 
 ## Static asset sizes (reference)
 
-| File | ~Size | Notes |
-|------|-------|--------|
-| `public/screener.json` | 132 KB | Moderate; parsed on main thread after fetch |
-| `public/weekly.json` | 44 KB | Calendar week summary |
-| `public/ticker-names.json` | 276 KB | Also imported on server **and** fetched again on client |
-| `public/ticker-exchanges.json` | 203 KB | Client fetch on symbol pages |
-| `public/symbols/*.json` | ~7 KB each | Per-symbol payload is fine |
+| File                           | ~Size      | Notes                                                   |
+| ------------------------------ | ---------- | ------------------------------------------------------- |
+| `public/screener.json`         | 132 KB     | Moderate; parsed on main thread after fetch             |
+| `public/weekly.json`           | 44 KB      | Calendar week summary                                   |
+| `public/ticker-names.json`     | 276 KB     | Also imported on server **and** fetched again on client |
+| `public/ticker-exchanges.json` | 203 KB     | Client fetch on symbol pages                            |
+| `public/symbols/*.json`        | ~7 KB each | Per-symbol payload is fine                              |
 
 ## Top causes (priority order)
 
@@ -40,14 +40,14 @@ The table stays on skeleton until **all** of these are true:
 
 ### 2. Large client-only bundles
 
-| File | Lines |
-|------|------:|
-| `app/[symbol]/SymbolPageClient.tsx` | ~1,160 |
-| `app/[symbol]/SymbolPageHeader.tsx` | ~1,130 |
-| `app/[symbol]/ForecastPanels.tsx` | ~1,105 |
-| `app/[symbol]/HistoryRiskPanels.tsx` | ~760 |
-| `components/EarningsScreener.tsx` | ~2,100 |
-| `components/EarningsGrid.tsx` | ~1,000 |
+| File                                          |  Lines |
+| --------------------------------------------- | -----: |
+| `app/(public)/[symbol]/SymbolPageClient.tsx`  | ~1,160 |
+| `app/(public)/[symbol]/SymbolPageHeader.tsx`  | ~1,130 |
+| `app/(public)/[symbol]/ForecastPanels.tsx`    | ~1,105 |
+| `app/(public)/[symbol]/HistoryRiskPanels.tsx` |   ~760 |
+| `components/EarningsScreener.tsx`             | ~2,100 |
+| `components/EarningsGrid.tsx`                 | ~1,000 |
 
 The symbol page is now separated by visible surface, so header/KPI, forecast,
 history/risk, and controller work can change independently. These are still
@@ -58,9 +58,16 @@ server component validates the ticker and renders the client tree.
 
 ### 3. Global layout overhead
 
-**File:** `app/layout.tsx`
+**Files:** `app/layout.tsx`, `app/(public)/layout.tsx`, `app/(authenticated)/layout.tsx`
 
-Every route loads: `ClerkProvider`, client `QueryClientProvider` (`app/providers.tsx`), `Topbar`, `TickerHoverHost`, `Splash`, Vercel Analytics + Speed Insights, KaTeX CSS in `globals.css` (~23 KB on all pages).
+Public routes no longer load `ClerkProvider` or the Clerk browser SDK. Clerk is
+scoped to sign-in, sign-up, watchlist, and the protected production-controls
+page. The ticker watchlist button resolves authentication through the existing
+API only after a click, preserving static ticker delivery.
+
+Every route still loads the client `QueryClientProvider` (`app/providers.tsx`),
+`Topbar`, `TickerHoverHost`, Vercel Analytics + Speed Insights, and KaTeX CSS in
+`globals.css` (~23 KB on all pages).
 
 React Query is only used for watchlist (`lib/watchlist.ts`); screener/symbol use raw `fetch` + `useState`.
 
@@ -68,7 +75,7 @@ React Query is only used for watchlist (`lib/watchlist.ts`); screener/symbol use
 
 ### 4. Duplicate JSON on symbol pages
 
-**Files:** `app/[symbol]/page.tsx`, `lib/companyNames.ts`, `lib/listingExchanges.ts`
+**Files:** `app/(public)/[symbol]/page.tsx`, `lib/companyNames.ts`, `lib/listingExchanges.ts`
 
 Server imports `ticker-names.json` for metadata; client fetches the same file again plus `ticker-exchanges.json` (~480 KB combined) on mount.
 
@@ -76,7 +83,7 @@ Server imports `ticker-names.json` for metadata; client fetches the same file ag
 
 ### 5. Symbol page quote / intraday polling
 
-**File:** `app/[symbol]/SymbolPageClient.tsx`
+**File:** `app/(public)/[symbol]/SymbolPageClient.tsx`
 
 Parallel work on load: symbol JSON, intraday route (`cache: 'no-store'`), batch-price with aggressive polling.
 
@@ -95,10 +102,14 @@ Parallel work on load: symbol JSON, intraday route (`cache: 'no-store'`), batch-
 ```bash
 cd apps/frontend
 npm run build
-# Optional: add @next/bundle-analyzer for chunk breakdown
+npm run test:performance
 ```
 
-Use Vercel Speed Insights (already in layout) and Chrome Performance → Network on `/screener` and `/AAPL` cold loads.
+The production-build browser gate takes seven cache-disabled homepage samples
+and fails when either lab p90 or the coldest-sample p99 proxy exceeds 1.8s. It
+also verifies that the public landing page requests no Clerk resources. This is
+a regression guard, not a substitute for field data: Vercel Speed Insights is
+the source of truth for real-user p90 and p99 by route and geography.
 
 ## What is already optimized
 

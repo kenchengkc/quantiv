@@ -3,9 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { ChevronLeft } from 'lucide-react';
-import { SignedIn, SignedOut, SignInButton } from '@clerk/nextjs';
 import type { MetricKey } from '@/lib/metricGlossary';
-import { useWatchlist } from '@/lib/watchlist';
 import { MetricHelp } from '@/components/MetricExplainer';
 import { TickerLogo } from '@/components/TickerLogo';
 import type { ProviderEnrichment } from './symbolPageTypes';
@@ -41,21 +39,59 @@ function WatchlistButton({
   ticker: string;
   onToast: (msg: string) => void;
 }) {
-  const { symbols, add, remove } = useWatchlist();
-  const added = symbols.includes(ticker);
+  const [added, setAdded] = useState(false);
+  const [known, setKnown] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [animating, setAnimating] = useState(false);
   const [hovered, setHovered] = useState(false);
 
-  const toggle = () => {
-    if (animating) return;
-    if (added) {
-      onToast(`${ticker} removed from watchlist`);
-      remove(ticker);
-    } else {
-      setAnimating(true);
-      onToast(`${ticker} added to watchlist`);
-      setTimeout(() => setAnimating(false), 700);
-      add(ticker);
+  const toggle = async () => {
+    if (busy || animating) return;
+    setBusy(true);
+
+    try {
+      // Keep the public ticker route static and Clerk-free. Auth and the
+      // current watchlist are resolved only when the user asks to mutate it.
+      const current = await fetch('/api/watchlist', { cache: 'no-store' });
+      if (current.status === 401) {
+        window.location.assign(
+          `/sign-in?redirect_url=${encodeURIComponent(window.location.pathname)}`,
+        );
+        return;
+      }
+      if (!current.ok)
+        throw new Error(`watchlist read failed (${current.status})`);
+
+      const payload = (await current.json()) as { symbols?: string[] };
+      const isAdded = (payload.symbols ?? []).includes(ticker);
+      const result = await fetch(
+        isAdded
+          ? `/api/watchlist/${encodeURIComponent(ticker)}`
+          : '/api/watchlist',
+        isAdded
+          ? { method: 'DELETE' }
+          : {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({ symbol: ticker }),
+            },
+      );
+      if (!result.ok)
+        throw new Error(`watchlist update failed (${result.status})`);
+
+      setKnown(true);
+      setAdded(!isAdded);
+      if (isAdded) {
+        onToast(`${ticker} removed from watchlist`);
+      } else {
+        setAnimating(true);
+        onToast(`${ticker} added to watchlist`);
+        setTimeout(() => setAnimating(false), 700);
+      }
+    } catch {
+      onToast('Watchlist update failed. Try again.');
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -74,8 +110,10 @@ function WatchlistButton({
       onClick={toggle}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      title={added ? 'Remove from watchlist' : 'Add to watchlist'}
-      aria-pressed={added}
+      title={known && added ? 'Remove from watchlist' : 'Add to watchlist'}
+      aria-label={busy ? 'Updating watchlist' : undefined}
+      aria-pressed={known ? added : undefined}
+      disabled={busy}
       style={{
         position: 'relative',
         width: size,
@@ -102,7 +140,13 @@ function WatchlistButton({
             transition: 'color 160ms ease',
           }}
         >
-          <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.6" />
+          <circle
+            cx="12"
+            cy="12"
+            r="10"
+            stroke="currentColor"
+            strokeWidth="1.6"
+          />
           <path
             d="M12 8v8M8 12h8"
             stroke="currentColor"
@@ -167,7 +211,9 @@ function WatchlistButton({
               strokeLinejoin="round"
               style={{
                 strokeDasharray: 22,
-                animation: animating ? 'check-draw 320ms ease-out 280ms both' : 'none',
+                animation: animating
+                  ? 'check-draw 320ms ease-out 280ms both'
+                  : 'none',
               }}
             />
           </svg>
@@ -177,7 +223,13 @@ function WatchlistButton({
   );
 }
 
-export function Toast({ message, onDone }: { message: string; onDone: () => void }) {
+export function Toast({
+  message,
+  onDone,
+}: {
+  message: string;
+  onDone: () => void;
+}) {
   const [leaving, setLeaving] = useState(false);
   useEffect(() => {
     const t1 = setTimeout(() => setLeaving(true), 2000);
@@ -399,7 +451,11 @@ function ProviderSignalMetric({
   );
 }
 
-export function ProviderSignalsPanel({ enrichment }: { enrichment?: ProviderEnrichment | null }) {
+export function ProviderSignalsPanel({
+  enrichment,
+}: {
+  enrichment?: ProviderEnrichment | null;
+}) {
   if (!enrichment) return null;
   const short = enrichment.short_interest;
   const flow = enrichment.options_flow;
@@ -425,8 +481,12 @@ export function ProviderSignalsPanel({ enrichment }: { enrichment?: ProviderEnri
   const sourceText = [
     ...(enrichment.sources ?? []),
     short?.settlement_date ? `short ${short.settlement_date}` : null,
-    flow?.iv_coverage_pct != null ? `IV coverage ${flow.iv_coverage_pct.toFixed(0)}%` : null,
-  ].filter(Boolean).join(' · ');
+    flow?.iv_coverage_pct != null
+      ? `IV coverage ${flow.iv_coverage_pct.toFixed(0)}%`
+      : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
 
   return (
     <div className="qv-card" style={{ marginTop: 22 }}>
@@ -458,7 +518,9 @@ export function ProviderSignalsPanel({ enrichment }: { enrichment?: ProviderEnri
             className="mono tnum qv-signal-score"
             style={{ fontSize: 11, color: 'var(--ink-4)', textAlign: 'right' }}
           >
-            <span>Positioning score {(enrichment.signal_score * 100).toFixed(0)}/100</span>
+            <span>
+              Positioning score {(enrichment.signal_score * 100).toFixed(0)}/100
+            </span>
             <MetricHelp metric="providerSignalScore" />
           </div>
         )}
@@ -474,7 +536,11 @@ export function ProviderSignalsPanel({ enrichment }: { enrichment?: ProviderEnri
         <ProviderSignalMetric
           label="Days to cover"
           value={daysToCover == null ? '–' : daysToCover.toFixed(1)}
-          sub={short?.shares != null ? `${compactNumber(short.shares)} shares short` : undefined}
+          sub={
+            short?.shares != null
+              ? `${compactNumber(short.shares)} shares short`
+              : undefined
+          }
           tone={shortTone}
           metric="daysToCover"
           helpAlign="left"
@@ -495,7 +561,8 @@ export function ProviderSignalsPanel({ enrichment }: { enrichment?: ProviderEnri
           label="P/C OI"
           value={ratioValue(pcOi)}
           sub={
-            flow?.total_put_open_interest != null || flow?.total_call_open_interest != null
+            flow?.total_put_open_interest != null ||
+            flow?.total_call_open_interest != null
               ? `${compactNumber(flow?.total_put_open_interest)} puts / ${compactNumber(flow?.total_call_open_interest)} calls`
               : undefined
           }
@@ -509,7 +576,10 @@ export function ProviderSignalsPanel({ enrichment }: { enrichment?: ProviderEnri
         />
       </div>
       {sourceText && (
-        <div className="mono" style={{ marginTop: 14, fontSize: 11, color: 'var(--ink-4)' }}>
+        <div
+          className="mono"
+          style={{ marginTop: 14, fontSize: 11, color: 'var(--ink-4)' }}
+        >
           {sourceText}
         </div>
       )}
@@ -594,9 +664,13 @@ function HeroSpark({
     return buildNeutralSparkPlaceholder();
   }, [bars]);
 
-  const d = pts.map((p, i) => `${i ? 'L' : 'M'}${p.x * 100},${p.y * 36}`).join(' ');
+  const d = pts
+    .map((p, i) => `${i ? 'L' : 'M'}${p.x * 100},${p.y * 36}`)
+    .join(' ');
   const area =
-    'M 0 36 ' + pts.map((p) => `L ${p.x * 100},${p.y * 36}`).join(' ') + ' L 100 36 Z';
+    'M 0 36 ' +
+    pts.map((p) => `L ${p.x * 100},${p.y * 36}`).join(' ') +
+    ' L 100 36 Z';
   const isReal = !!bars && bars.length >= 2;
   const stroke = isReal ? (up ? 'var(--up)' : 'var(--down)') : 'var(--ink-4)';
   return (
@@ -610,7 +684,9 @@ function HeroSpark({
         opacity: isReal ? 1 : loading ? 0.34 : 0.26,
         transition: 'opacity 220ms ease',
       }}
-      aria-label={isReal ? `${ticker} 1D intraday chart` : `${ticker} placeholder chart`}
+      aria-label={
+        isReal ? `${ticker} 1D intraday chart` : `${ticker} placeholder chart`
+      }
     >
       <defs>
         <linearGradient id={`spark-fill-${ticker}`} x1="0" x2="0" y1="0" y2="1">
@@ -690,7 +766,8 @@ export function usePrevAppLocation(): { label: string; path: string } {
     if (typeof window === 'undefined') return;
     const prev = window.sessionStorage.getItem('quantiv:prevRoute');
     if (prev === '/screener') setLoc({ label: 'Screener', path: '/screener' });
-    else if (prev === '/watchlist') setLoc({ label: 'Watchlist', path: '/watchlist' });
+    else if (prev === '/watchlist')
+      setLoc({ label: 'Watchlist', path: '/watchlist' });
     else setLoc({ label: 'Earnings Calendar', path: '/' });
   }, []);
   return loc;
@@ -756,7 +833,10 @@ export function DetailHero({
     if (!intradayBars || intradayBars.length < 2) return 'IEX bars unavailable';
     if (!intradaySessionDate) return 'IEX · latest session';
     const d = parseLocalDate(intradaySessionDate);
-    const dateLabel = d.toLocaleDateString('en-US', { month: 'short', day: '2-digit' });
+    const dateLabel = d.toLocaleDateString('en-US', {
+      month: 'short',
+      day: '2-digit',
+    });
     return intradayIsCurrentSession
       ? 'IEX · today · 08:00-17:00 ET'
       : `IEX · latest session · ${dateLabel}`;
@@ -775,7 +855,10 @@ export function DetailHero({
     return `${dayLabel}${timing}`;
   })();
   return (
-    <div className="qv-card-hi qv-detail-hero" style={{ padding: '26px 28px', marginTop: 18 }}>
+    <div
+      className="qv-card-hi qv-detail-hero"
+      style={{ padding: '26px 28px', marginTop: 18 }}
+    >
       <div
         className="qv-m-stack qv-detail-hero-grid"
         style={{
@@ -785,7 +868,14 @@ export function DetailHero({
           alignItems: 'stretch',
         }}
       >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 18, minWidth: 0 }}>
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 18,
+            minWidth: 0,
+          }}
+        >
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             <TickerLogo
               ticker={symbol}
@@ -828,33 +918,7 @@ export function DetailHero({
                 }}
               >
                 {symbol}
-                <SignedIn>
-                  <WatchlistButton ticker={symbol} onToast={onToast} />
-                </SignedIn>
-                <SignedOut>
-                  <SignInButton mode="modal">
-                    <button
-                      title="Sign in to add to watchlist"
-                      style={{
-                        display: 'grid',
-                        placeItems: 'center',
-                        width: 30,
-                        height: 30,
-                        borderRadius: '50%',
-                        background: 'transparent',
-                        border: 'none',
-                        padding: 0,
-                        cursor: 'pointer',
-                        color: 'var(--ink-3)',
-                      }}
-                    >
-                      <svg width="30" height="30" viewBox="0 0 24 24" fill="none">
-                        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.4" />
-                        <path d="M12 8v8M8 12h8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-                      </svg>
-                    </button>
-                  </SignInButton>
-                </SignedOut>
+                <WatchlistButton ticker={symbol} onToast={onToast} />
               </div>
             </div>
           </div>
@@ -882,7 +946,11 @@ export function DetailHero({
               <>
                 <span
                   className="serif tnum"
-                  style={{ fontSize: 36, fontWeight: 700, letterSpacing: '-0.02em' }}
+                  style={{
+                    fontSize: 36,
+                    fontWeight: 700,
+                    letterSpacing: '-0.02em',
+                  }}
                 >
                   ${spot.toFixed(2)}
                 </span>
@@ -890,7 +958,11 @@ export function DetailHero({
                   className="mono tnum"
                   style={{
                     fontSize: 13,
-                    color: flat ? 'var(--ink-4)' : up ? 'var(--up)' : 'var(--down)',
+                    color: flat
+                      ? 'var(--ink-4)'
+                      : up
+                        ? 'var(--up)'
+                        : 'var(--down)',
                   }}
                 >
                   {flat ? '–' : up ? '▲' : '▼'} {Math.abs(change).toFixed(2)} (
@@ -919,7 +991,12 @@ export function DetailHero({
                 above the small caption row so the chart reads as a
                 visual answer to the session % printed beneath it. */}
             <div style={{ height: 42 }}>
-              <HeroSpark ticker={symbol} up={sparkUp} bars={intradayBars} loading={intradayLoading} />
+              <HeroSpark
+                ticker={symbol}
+                up={sparkUp}
+                bars={intradayBars}
+                loading={intradayLoading}
+              />
             </div>
             <div
               style={{
@@ -931,7 +1008,8 @@ export function DetailHero({
                 marginTop: 12,
                 paddingTop: 8,
                 minHeight: 29,
-                borderTop: '1px solid color-mix(in oklab, var(--line) 70%, transparent)',
+                borderTop:
+                  '1px solid color-mix(in oklab, var(--line) 70%, transparent)',
                 fontSize: 10,
                 color: 'var(--ink-4)',
                 letterSpacing: '0.08em',
@@ -984,7 +1062,8 @@ export function DetailHero({
         <div
           className="qv-detail-hero-right"
           style={{
-            borderLeft: '1px solid color-mix(in oklab, var(--line) 60%, transparent)',
+            borderLeft:
+              '1px solid color-mix(in oklab, var(--line) 60%, transparent)',
             paddingLeft: 28,
             display: 'flex',
             flexDirection: 'column',
@@ -1066,7 +1145,8 @@ export function DetailHero({
 
           <div
             style={{
-              borderTop: '1px solid color-mix(in oklab, var(--line) 60%, transparent)',
+              borderTop:
+                '1px solid color-mix(in oklab, var(--line) 60%, transparent)',
               paddingTop: 18,
             }}
           >
@@ -1092,7 +1172,8 @@ export function DetailHero({
                 lineHeight: 1.06,
                 letterSpacing: '-0.04em',
                 marginTop: 12,
-                background: 'linear-gradient(135deg, var(--brand-blue-1), var(--accent-hi))',
+                background:
+                  'linear-gradient(135deg, var(--brand-blue-1), var(--accent-hi))',
                 WebkitBackgroundClip: 'text',
                 WebkitTextFillColor: 'transparent',
                 backgroundClip: 'text',
