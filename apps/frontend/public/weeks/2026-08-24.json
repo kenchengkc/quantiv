@@ -1,7 +1,7 @@
 {
   "metadata": {
     "version": "v4_multi_week",
-    "generated_at": "2026-08-29T19:22:46.617660",
+    "generated_at": "2026-08-30T17:33:29.153913",
     "as_of_date": "2026-08-28",
     "method": "ATM straddle + IV baseline",
     "offset": -1
@@ -964,34 +964,6 @@
       "iv_crush_pct": -0.079846
     },
     {
-      "ticker": "HUBG",
-      "earnings_date": "2026-08-27",
-      "timing": "after_market_close",
-      "fiscal_q": "Q3",
-      "eps_actual": null,
-      "eps_estimate": null,
-      "revenue_actual": null,
-      "revenue_estimate": null,
-      "realized_move_pct": -0.009255,
-      "as_of_date": "2026-08-28",
-      "spot_price": 40.0,
-      "atm_strike": 40.0,
-      "atm_iv": 0.78285,
-      "em_straddle_pct": 0.148625,
-      "em_iv_pct": 0.187777,
-      "em_straddle_abs": 5.945,
-      "expiry_date": "2026-09-18",
-      "days_to_expiry": 21,
-      "lead_time_days": -1,
-      "skew_atm": -0.0033,
-      "term_slope": null,
-      "em_method": "options_math",
-      "confidence": "high",
-      "iv_rank": 0.603,
-      "hist_move_avg_4q": 0.020233,
-      "iv_crush_pct": 0.252008
-    },
-    {
       "ticker": "MRVL",
       "earnings_date": "2026-08-27",
       "timing": "after_market_close",
@@ -1077,8 +1049,8 @@
     }
   ],
   "summary": {
-    "total_events": 38,
-    "avg_em_straddle_pct": 0.0695235,
-    "avg_em_iv_pct": 0.08888871052631579
+    "total_events": 37,
+    "avg_em_straddle_pct": 0.06738562162162162,
+    "avg_em_iv_pct": 0.08621605405405407
   }
 }
