@@ -810,19 +810,24 @@ jobs:
             --publish-receipt-dir data/forecasts/receipts
 
       - name: Rescore production after automatic rollback
+        id: rollback-score
         if: >-
           steps.outcome-control.outputs.rolled_back == 'true' &&
           steps.model-decision.outputs.promoted != 'true'
         run: |
           ROLLBACK_BUNDLE_ID=$(jq -r .champion_bundle_id data/validation/model_decision.json)
           ROLLBACK_MODELS_DIR="data/models/bundles/$ROLLBACK_BUNDLE_ID"
+          ROLLBACK_FORECAST_PATH="data/forecasts/forecasts_$(date -u +%Y-%m-%d).parquet"
           python scripts/daily_score.py \
             --days-ahead 21 \
             --models-dir "$ROLLBACK_MODELS_DIR"
+          test -f "$ROLLBACK_FORECAST_PATH"
           python scripts/validate_ml_pipeline.py forecasts \
+            --forecast-path "$ROLLBACK_FORECAST_PATH" \
             --models-dir "$ROLLBACK_MODELS_DIR" \
             --report data/validation/rollback_forecasts.json \
             --publish-receipt-dir data/forecasts/receipts
+          echo "forecast_path=$ROLLBACK_FORECAST_PATH" >> "$GITHUB_OUTPUT"
 
       - name: Upload model control decision
         if: always()
@@ -879,7 +884,14 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
           EXPECTED_BUNDLE_ID=$(jq -er .champion_bundle_id data/validation/model_decision.json)
-          FORECAST_PATH=$(jq -er .production_forecast data/validation/model_decision.json)
+          FORECAST_PATH=$(jq -r '.production_forecast // empty' data/validation/model_decision.json)
+          if [ -z "$FORECAST_PATH" ]; then
+            FORECAST_PATH="${{ steps.rollback-score.outputs.forecast_path }}"
+          fi
+          if [ -z "$FORECAST_PATH" ]; then
+            echo "::error::No exact promoted or rollback forecast path was recorded."
+            exit 1
+          fi
           python -u scripts/import_recent_to_postgres.py \
             --file "$FORECAST_PATH" \
             --full \

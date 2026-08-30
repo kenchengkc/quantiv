@@ -170,5 +170,6 @@ def test_retrain_workflow_imports_exact_promoted_forecast() -> None:
         "- name: Import retrain forecasts to Neon Postgres", maxsplit=1
     )[1].split("- name: Upload exact-bundle forecast import receipt", maxsplit=1)[0]
 
-    assert "FORECAST_PATH=$(jq -er .production_forecast" in import_step
+    assert "FORECAST_PATH=$(jq -r '.production_forecast // empty'" in import_step
+    assert 'FORECAST_PATH="${{ steps.rollback-score.outputs.forecast_path }}"' in import_step
     assert '--file "$FORECAST_PATH"' in import_step
