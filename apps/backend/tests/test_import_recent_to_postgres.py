@@ -162,3 +162,13 @@ def test_import_rejects_activation_receipt_for_different_bundle(tmp_path):
         assert "different bundle" in str(exc)
     else:
         raise AssertionError("mismatched activation/import bundles must fail closed")
+
+
+def test_retrain_workflow_imports_exact_promoted_forecast() -> None:
+    workflow = (REPO_ROOT / ".github" / "workflows" / "daily-refresh.yml").read_text()
+    import_step = workflow.split(
+        "- name: Import retrain forecasts to Neon Postgres", maxsplit=1
+    )[1].split("- name: Upload exact-bundle forecast import receipt", maxsplit=1)[0]
+
+    assert "FORECAST_PATH=$(jq -er .production_forecast" in import_step
+    assert '--file "$FORECAST_PATH"' in import_step
