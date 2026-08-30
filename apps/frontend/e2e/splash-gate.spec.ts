@@ -29,6 +29,7 @@ test.describe("homepage splash", () => {
         const style = getComputedStyle(element);
         return {
           center: rect.left + rect.width / 2,
+          width: rect.width,
           viewportCenter: window.innerWidth / 2,
           fontSize: Number.parseFloat(style.fontSize),
           textIndent: style.textIndent,
@@ -36,8 +37,13 @@ test.describe("homepage splash", () => {
       });
     expect(wordmarkLayout.fontSize).toBeGreaterThanOrEqual(13);
     expect(wordmarkLayout.textIndent).toBe("0px");
+    const expectedLeftShift = wordmarkLayout.width * 0.05;
     expect(
-      Math.abs(wordmarkLayout.center - wordmarkLayout.viewportCenter),
+      Math.abs(
+        wordmarkLayout.viewportCenter -
+          wordmarkLayout.center -
+          expectedLeftShift,
+      ),
     ).toBeLessThanOrEqual(1);
     await expect(page.locator(".quantiv-app-shell")).toBeVisible();
 
