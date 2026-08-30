@@ -414,15 +414,20 @@ def setup_views(conn: duckdb.DuckDBPyConnection, data_dir: Path):
         print("[views] ⚠ No earnings data found (run: python scripts/sync_dolthub.py --earnings)")
 
     # ── Corporate actions used to normalize realized earnings moves ──
-    action_receipts = sorted(
-        (data_dir / "control" / "ingestion" / "corporate_actions").glob("*.json")
-    )
+    action_receipt_root = data_dir / "control" / "ingestion" / "corporate_actions"
+    latest_action_receipt = action_receipt_root / "latest.json"
+    action_receipts = sorted(action_receipt_root.glob("*.json"))
     action_receipt = None
     split_path = None
     dividend_path = None
-    if action_receipts:
+    if latest_action_receipt.exists() or action_receipts:
         try:
-            action_receipt = json.loads(action_receipts[-1].read_text())
+            selected_receipt = (
+                latest_action_receipt
+                if latest_action_receipt.exists()
+                else action_receipts[-1]
+            )
+            action_receipt = json.loads(selected_receipt.read_text())
             split_value = action_receipt["datasets"]["splits"]["partition"]
             dividend_value = action_receipt["datasets"]["dividends"]["partition"]
             split_path = data_dir / str(split_value)

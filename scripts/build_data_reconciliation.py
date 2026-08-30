@@ -582,7 +582,9 @@ def _corporate_actions(
     """Verify the canonical split/dividend snapshot and its active-universe receipt."""
     latest = conn.execute("SELECT MAX(date) FROM v_options").fetchone()[0]
     receipt_name = f"{latest}.json" if latest is not None else "missing.json"
-    path = data_dir / "control" / "ingestion" / "corporate_actions" / receipt_name
+    receipt_root = data_dir / "control" / "ingestion" / "corporate_actions"
+    latest_path = receipt_root / "latest.json"
+    path = latest_path if latest_path.exists() else receipt_root / receipt_name
     errors: list[str] = []
 
     def receipt_int(value: object, label: str) -> int:

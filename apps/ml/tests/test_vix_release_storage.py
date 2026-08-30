@@ -79,6 +79,11 @@ def test_r2_push_keeps_vix_alias_out_of_immutable_upload(
     snapshot.write_bytes(b"immutable-vix")
     (out_dir / "vix.parquet").write_bytes(b"immutable-vix")
     (tmp_path / "bias_curves.parquet").write_bytes(b"bias")
+    action_pointer = (
+        tmp_path / "control" / "ingestion" / "corporate_actions" / "latest.json"
+    )
+    action_pointer.parent.mkdir(parents=True)
+    action_pointer.write_text('{"receipt_id":"current"}\n')
 
     bin_dir, log_path = _fake_rclone(tmp_path)
     env = {
@@ -103,6 +108,15 @@ def test_r2_push_keeps_vix_alias_out_of_immutable_upload(
     assert "--immutable" in parquet_copy
     assert "--exclude /vix/vix.parquet" in parquet_copy
     assert "--exclude /vix/vix.parquet" in parquet_check
+    control_copy = next(
+        line for line in calls if line.startswith("copy ") and "/control " in line
+    )
+    assert "--exclude ingestion/corporate_actions/latest.json" in control_copy
+    assert any(
+        line.startswith("copyto ")
+        and "corporate_actions/latest.json" in line
+        for line in calls
+    )
 
 
 def test_r2_push_refreshes_same_date_quarantine_evidence(

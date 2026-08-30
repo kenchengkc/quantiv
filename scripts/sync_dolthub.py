@@ -140,11 +140,45 @@ def corporate_action_manifest_path(source_date: date) -> Path:
     )
 
 
+def corporate_action_latest_path() -> Path:
+    """Mutable pointer to the most recently verified provider snapshot."""
+    return (
+        data_dir()
+        / "control"
+        / "ingestion"
+        / "corporate_actions"
+        / "latest.json"
+    )
+
+
+def corporate_action_receipt_path(source_date: date, receipt_id: str) -> Path:
+    """Content-addressed audit receipt for one provider snapshot revision."""
+    return (
+        data_dir()
+        / "control"
+        / "ingestion"
+        / "corporate_actions"
+        / "receipts"
+        / source_date.isoformat()
+        / f"{receipt_id}.json"
+    )
+
+
 def _atomic_json(path: Path, payload: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
     temporary.write_text(json.dumps(payload, indent=2, sort_keys=True, default=str) + "\n")
     os.replace(temporary, path)
+
+
+def _json_digest(payload: dict) -> str:
+    encoded = json.dumps(
+        payload,
+        sort_keys=True,
+        separators=(",", ":"),
+        default=str,
+    ).encode()
+    return hashlib.sha256(encoded).hexdigest()
 
 
 def _sha256_file(path: Path) -> str:
@@ -968,6 +1002,107 @@ def _write_action_parquet(path: Path, frame: pd.DataFrame, schema: pa.Schema) ->
     os.replace(temporary, path)
 
 
+_CORPORATE_ACTION_AUDIT_FIELDS = {
+    "receipt_id",
+    "revision",
+    "predecessor_receipt_id",
+    "change_summary",
+    "generated_at",
+}
+
+
+def _corporate_action_material(payload: dict) -> dict:
+    """Return source evidence without receipt-chain bookkeeping."""
+    return {
+        key: value
+        for key, value in payload.items()
+        if key not in _CORPORATE_ACTION_AUDIT_FIELDS
+    }
+
+
+def _corporate_action_change_summary(previous: dict, current: dict) -> dict:
+    previous_datasets = previous.get("datasets", {})
+    current_datasets = current.get("datasets", {})
+    summary: dict[str, object] = {
+        "query_end": {
+            "previous": previous.get("query_end"),
+            "current": current.get("query_end"),
+        },
+        "datasets": {},
+    }
+    for name in ("splits", "dividends"):
+        before = previous_datasets.get(name, {})
+        after = current_datasets.get(name, {})
+        before_rows = int(before.get("rows", 0))
+        after_rows = int(after.get("rows", 0))
+        summary["datasets"][name] = {
+            "previous_rows": before_rows,
+            "current_rows": after_rows,
+            "row_delta": after_rows - before_rows,
+            "content_changed": (
+                before.get("content_sha256") != after.get("content_sha256")
+            ),
+        }
+    return summary
+
+
+def _publish_corporate_action_receipt(source_date: date, snapshot: dict) -> dict:
+    """Version mutable provider history without overwriting audit evidence."""
+    latest_path = corporate_action_latest_path()
+    dated_path = corporate_action_manifest_path(source_date)
+    previous_path = latest_path if latest_path.exists() else dated_path
+    previous = None
+    if previous_path.exists():
+        try:
+            loaded = json.loads(previous_path.read_text())
+            if isinstance(loaded, dict):
+                previous = loaded
+        except json.JSONDecodeError as exc:
+            raise RuntimeError(
+                f"invalid corporate-action receipt at {previous_path}: {exc}"
+            ) from exc
+
+    if previous is not None and _corporate_action_material(previous) == snapshot:
+        if previous.get("receipt_id"):
+            # Exact replay: preserve the receipt chain and only repair a missing
+            # mutable pointer if necessary.
+            _atomic_json(latest_path, previous)
+            return previous
+        revision = int(previous.get("revision", 1))
+        receipt = {**snapshot, "revision": revision}
+    else:
+        revision = int(previous.get("revision", 1)) + 1 if previous else 1
+        receipt = {**snapshot, "revision": revision}
+        if previous is not None:
+            receipt["predecessor_receipt_id"] = str(
+                previous.get("receipt_id") or _json_digest(previous)
+            )
+            receipt["change_summary"] = _corporate_action_change_summary(
+                _corporate_action_material(previous), snapshot
+            )
+
+    receipt["receipt_id"] = _json_digest(receipt)
+    immutable_path = corporate_action_receipt_path(
+        source_date, str(receipt["receipt_id"])
+    )
+    if immutable_path.exists():
+        existing = json.loads(immutable_path.read_text())
+        if existing != receipt:
+            raise RuntimeError(
+                "content-addressed corporate-action receipt does not match its ID"
+            )
+    else:
+        _atomic_json(immutable_path, receipt)
+
+    # Retain the original source-date receipt as an immutable compatibility
+    # record. Consumers use latest.json, so later DoltHub backfills create a
+    # new content-addressed revision rather than mutating or rejecting history.
+    if not dated_path.exists():
+        _atomic_json(dated_path, receipt)
+    _atomic_json(latest_path, receipt)
+    return receipt
+
+
 def sync_corporate_actions(
     start_date_str: Optional[str] = None,
     end_date_str: Optional[str] = None,
@@ -1053,18 +1188,10 @@ def sync_corporate_actions(
             "scope": "earnings realized moves and trailing realized-move features",
         },
     }
-    manifest_path = corporate_action_manifest_path(source_date)
-    if manifest_path.exists():
-        existing = json.loads(manifest_path.read_text())
-        if existing != manifest:
-            raise RuntimeError(
-                "corporate-action receipt changed for an immutable options source date"
-            )
-    else:
-        _atomic_json(manifest_path, manifest)
+    manifest = _publish_corporate_action_receipt(source_date, manifest)
     print(
         f"✅ Corporate actions: {len(splits):,} splits · {len(dividends):,} dividends · "
-        "replay verified"
+        f"replay verified · receipt revision {manifest['revision']}"
     )
     return manifest
 

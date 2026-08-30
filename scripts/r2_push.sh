@@ -85,7 +85,14 @@ push_controls() {
   if [ -d "$DATA_DIR/control" ]; then
     rclone copy "$DATA_DIR/control" "$REMOTE/control" --immutable \
       --exclude "current_data_release.json" \
+      --exclude "ingestion/corporate_actions/latest.json" \
       --fast-list --transfers=4 --progress
+    local action_pointer="$DATA_DIR/control/ingestion/corporate_actions/latest.json"
+    if [ -f "$action_pointer" ]; then
+      rclone copyto \
+        "$action_pointer" \
+        "$REMOTE/control/ingestion/corporate_actions/latest.json"
+    fi
   fi
   if [ -d "$DATA_DIR/quarantine" ]; then
     # Quarantine is derived evidence keyed by source date. A rerun can add
