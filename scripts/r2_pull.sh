@@ -28,10 +28,12 @@ rclone sync "$REMOTE/quarantine" "$DATA_DIR/quarantine" \
   --fast-list --transfers=4 --progress 2>/dev/null || true
 
 materialize_vix_alias() {
-  local snapshot
-  snapshot="$("$PYTHON_BIN" - "$DATA_DIR" <<'PY'
+  "$PYTHON_BIN" - "$DATA_DIR" <<'PY'
 import json
+import os
 from pathlib import Path
+import re
+import shutil
 import sys
 
 data_dir = Path(sys.argv[1])
@@ -43,20 +45,42 @@ paths = [
     if str(item.get("path", "")).startswith("parquet/vix/")
     and str(item.get("path", "")) != "parquet/vix/vix.parquet"
 ]
+if not paths:
+    raise SystemExit(0)
+
+pattern = re.compile(
+    r"^parquet/vix/vix-through-(\d{4}-\d{2}-\d{2})-[0-9a-f]{64}\.parquet$"
+)
+dated_paths = []
+for value in paths:
+    match = pattern.fullmatch(value)
+    if match is None:
+        raise RuntimeError(f"active data release contains an invalid VIX snapshot: {value}")
+    dated_paths.append((match.group(1), value))
+latest_date = max(item[0] for item in dated_paths)
+latest = [value for snapshot_date, value in dated_paths if snapshot_date == latest_date]
+if len(latest) != 1:
+    raise RuntimeError(
+        f"active data release contains ambiguous latest VIX snapshots: {latest}"
+    )
+
+selected = data_dir / latest[0]
+alias = data_dir / "parquet" / "vix" / "vix.parquet"
+alias.parent.mkdir(parents=True, exist_ok=True)
+temporary = alias.with_name(f".{alias.name}.{os.getpid()}.tmp")
+shutil.copyfile(selected, temporary)
+os.replace(temporary, alias)
+
+# Older releases briefly accumulated one immutable VIX snapshot per day. Keep
+# the latest verified object plus the mutable compatibility alias locally so
+# the next release heals itself instead of perpetuating that historical set.
+for snapshot in alias.parent.glob("vix-through-*.parquet"):
+    if snapshot != selected:
+        snapshot.unlink()
+print(f"✅ Restored local VIX alias from {latest[0]}")
 if len(paths) > 1:
-    raise RuntimeError(f"active data release contains multiple VIX snapshots: {paths}")
-if paths:
-    print(paths[0])
+    print(f"✅ Pruned {len(paths) - 1} superseded VIX snapshots from the local release")
 PY
-)"
-  if [ -n "$snapshot" ]; then
-    local alias="$DATA_DIR/parquet/vix/vix.parquet"
-    local temporary="${alias}.tmp.$$"
-    mkdir -p "$(dirname "$alias")"
-    cp "$DATA_DIR/$snapshot" "$temporary"
-    mv "$temporary" "$alias"
-    echo "✅ Restored local VIX alias from $snapshot"
-  fi
 }
 
 if [ -f "$DATA_DIR/control/current_data_release.json" ]; then

@@ -162,6 +162,10 @@ def test_r2_pull_restores_vix_alias_from_active_release(
 ) -> None:
     out_dir = tmp_path / "parquet" / "vix"
     out_dir.mkdir(parents=True)
+    old_snapshot = out_dir / (
+        "vix-through-2026-08-23-" + "a" * 64 + ".parquet"
+    )
+    old_snapshot.write_bytes(b"superseded-vix")
     snapshot = out_dir / ("vix-through-2026-08-24-" + "b" * 64 + ".parquet")
     snapshot.write_bytes(b"active-vix")
     build_release(tmp_path)
@@ -184,3 +188,5 @@ def test_r2_pull_restores_vix_alias_from_active_release(
     )
 
     assert (out_dir / "vix.parquet").read_bytes() == snapshot.read_bytes()
+    assert snapshot.exists()
+    assert not old_snapshot.exists()
