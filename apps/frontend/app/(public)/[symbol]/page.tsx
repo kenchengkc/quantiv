@@ -39,6 +39,20 @@ function readSymbolPayload(symbol: string): unknown | null {
   }
 }
 
+function readForecastEvidence(): unknown | null {
+  const candidates = [
+    join(process.cwd(), 'apps', 'frontend', 'public', 'evidence', 'forecast.json'),
+    join(process.cwd(), 'public', 'evidence', 'forecast.json'),
+  ];
+  const path = candidates.find((candidate) => existsSync(candidate));
+  if (!path) return null;
+  try {
+    return JSON.parse(readFileSync(path, 'utf8')) as unknown;
+  } catch {
+    return null;
+  }
+}
+
 function isKnownSymbol(symbol: string): boolean {
   if (!SYMBOL_RE.test(symbol)) return false;
   return Boolean(EXTENDED_NAMES[symbol]) || companyName(symbol) !== symbol || hasSymbolPayload(symbol);
@@ -97,6 +111,7 @@ export default async function SymbolPage({ params }: SymbolPageProps) {
     <SymbolPageClient
       initialSymbol={symbol}
       initialData={readSymbolPayload(symbol)}
+      initialEvidence={readForecastEvidence()}
     />
   );
 }

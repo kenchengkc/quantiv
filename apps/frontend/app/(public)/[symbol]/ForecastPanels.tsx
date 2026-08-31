@@ -460,7 +460,7 @@ export function QuantileBand({
       >
         <div>
           <span className="qv-pill warm">
-            {mode === 'live' && liveStatus === 'ready' ? 'Live re-score' : 'ML model'}
+            {mode === 'live' && liveStatus === 'ready' ? 'Spot-updated' : 'ML model'}
           </span>
           <div className="qv-title-with-help">
             <h3
@@ -481,14 +481,14 @@ export function QuantileBand({
           </div>
           {mode === 'live' && liveStatus === 'unavailable' && unavailableReason && (
             <div style={{ fontSize: 12, color: 'var(--ink-4)', marginTop: 6 }}>
-              Live unavailable · showing snapshot. {unavailableReason}
+              Spot update unavailable · showing nightly snapshot. {unavailableReason}
             </div>
           )}
         </div>
         <div style={{ display: 'grid', justifyItems: 'end', gap: 10 }}>
           <div
             role="tablist"
-            aria-label="Forecast source"
+            aria-label="Forecast input mode"
             style={{
               display: 'inline-grid',
               gridTemplateColumns: '1fr 1fr',
@@ -527,7 +527,11 @@ export function QuantileBand({
                     fontFamily: 'inherit',
                   }}
                 >
-                  {item === 'snapshot' ? 'Snapshot' : liveStatus === 'loading' ? 'Live…' : 'Live'}
+                  {item === 'snapshot'
+                    ? 'Nightly'
+                    : liveStatus === 'loading'
+                      ? 'Updating…'
+                      : 'Spot-updated'}
                 </button>
               );
             })}

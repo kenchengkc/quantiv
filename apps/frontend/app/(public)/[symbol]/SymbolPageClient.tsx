@@ -22,6 +22,7 @@ import {
 import { buildTermRows, InteractiveBar, QuantileBand, TermFan } from './ForecastPanels';
 import { buildHistorySeries, GreeksPanel, HistoryBlock, medianAbsoluteHistoryMove } from './HistoryRiskPanels';
 import ScenarioRiskPanel from './ScenarioRiskPanel';
+import ResearchSnapshotRibbon from './ResearchSnapshotRibbon';
 import type {
   IntradaySeries,
   LivePredictionResponse,
@@ -220,9 +221,9 @@ function livePredictionUnavailableMessage(status: number | null): string {
     return 'No fresh feature snapshot is available for this event yet.';
   }
   if (status === 400 || status === 422) {
-    return 'This snapshot is not supported by the live model.';
+    return 'This snapshot cannot be re-scored from the latest stock price.';
   }
-  return 'Live prediction is unavailable right now.';
+  return 'The spot-updated forecast is unavailable right now.';
 }
 
 function daysFromToday(iso?: string | null): number | null {
@@ -356,9 +357,11 @@ function Reveal({
 // ---------- Page ----------
 export default function SymbolPage({
   initialData = null,
+  initialEvidence = null,
   initialSymbol,
 }: {
   initialData?: unknown;
+  initialEvidence?: unknown;
   initialSymbol?: string;
 }) {
   // Triggers EDGAR ticker-names fetch + re-render so the header company
@@ -910,8 +913,8 @@ export default function SymbolPage({
       : null;
   const quantileMeta = showingLivePrediction
     ? livePrediction.response?.source === 'nightly_fallback'
-      ? 'Static nightly fallback · live backend unavailable'
-      : `Re-scored with latest stock price; options snapshot from ${livePrediction.response?.feature_snapshot_date ?? 'nightly snapshot'}.`
+      ? 'Nightly snapshot · spot update unavailable'
+      : `Latest stock price only; options and other inputs remain frozen at ${livePrediction.response?.feature_snapshot_date ?? 'the nightly snapshot'}.`
     : em?.ml_snapshot_date
       ? `Nightly LightGBM snapshot from ${em.ml_snapshot_date}.`
       : 'LightGBM ensemble · range of plausible absolute moves on print day';
@@ -956,6 +959,19 @@ export default function SymbolPage({
           onToast={showToast}
         />
       </Reveal>
+
+      {em && (
+        <Reveal delay={60}>
+          <ResearchSnapshotRibbon
+            evidence={initialEvidence}
+            optionsDate={data.as_of_date}
+            earningsDate={earningsDate}
+            earningsTiming={em.timing ?? data.next_earnings_timing}
+            modelSnapshotDate={em.ml_snapshot_date}
+            modelHorizon={em.model_horizon}
+          />
+        </Reveal>
+      )}
 
       {/* KPI strip */}
       {em && (
