@@ -17,6 +17,7 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 SCRIPT = REPO_ROOT / "scripts" / "build_data_reconciliation.py"
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
+from build_data_reconciliation import _event_coverage  # noqa: E402
 from market_sessions import latest_completed_us_market_session  # noqa: E402
 
 
@@ -298,6 +299,9 @@ def test_script_reconciles_source_quotes_and_events(tmp_path: Path) -> None:
     assert report["event_coverage"]["status"] == "passed"
     assert report["quote_quality"]["status"] == "passed"
     assert report["quote_quality"]["source_session_lag"] == 0
+    assert report["quote_quality"]["decision_groups"] == 2
+    assert report["quote_quality"]["eligible_decision_groups"] == 2
+    assert report["quote_quality"]["decision_group_rejection_rate"] == 0.0
     assert report["quote_quality"]["observed_capabilities"] == {
         "intraday_quote_timestamp": False,
         "option_volume": False,
@@ -309,6 +313,39 @@ def test_script_reconciles_source_quotes_and_events(tmp_path: Path) -> None:
     assert report["corporate_actions"]["universe_symbols"] == 3
     assert report["pipeline_controls"]["quarantine"]["status"] == "enforced"
     assert report["duplicates"]["options"]["duplicate_rows"] == 0
+
+
+def test_event_coverage_names_the_control_blocking_an_in_universe_event(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "coverage-gap.duckdb"
+    _write_fresh_database(db_path)
+    conn = duckdb.connect(str(db_path))
+    try:
+        conn.execute("DELETE FROM v_straddle_features WHERE act_symbol = 'MISS'")
+        conn.execute(
+            """
+            UPDATE v_straddle_candidates
+            SET pair_rejection_reason = 'call_excessive_leg_spread',
+                pair_quality_status = 'rejected'
+            WHERE act_symbol = 'MISS'
+            """
+        )
+        coverage = _event_coverage(conn, days_ahead=21)
+    finally:
+        conn.close()
+
+    assert coverage["missing_events"] == 1
+    assert coverage["missing_reason_counts"] == [
+        {"reason": "noncommercial_leg_quotes", "events": 1}
+    ]
+    assert coverage["missing_sample"] == [
+        {
+            "symbol": "MISS",
+            "earnings_date": (date.today() + timedelta(days=3)).isoformat(),
+            "reason": "noncommercial_leg_quotes",
+        }
+    ]
 
 
 def test_script_writes_a_fail_closed_manifest_when_database_is_missing(

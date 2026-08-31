@@ -209,6 +209,15 @@ export default function ProductionControlPanel({
       ? 'var(--ink-3)'
       : 'var(--down)';
   const snapshotUnavailable = snapshot.status === 'unavailable';
+  const decisionGroupAvailability =
+    data.decision_group_rejection_rate == null
+      ? null
+      : 1 - data.decision_group_rejection_rate;
+  const quoteAvailability =
+    decisionGroupAvailability ??
+    (data.contract_rejection_rate == null
+      ? null
+      : 1 - data.contract_rejection_rate);
 
   return (
     <section
@@ -332,9 +341,25 @@ export default function ProductionControlPanel({
             status={data.live_trading_eligible ? 'passed' : 'degraded'}
           />
           <ControlMetric
-            label="Quote rejection"
-            value={percent(data.contract_rejection_rate)}
-            detail={`${percent(data.pair_rejection_rate)} same-strike pairs rejected`}
+            label={
+              decisionGroupAvailability == null
+                ? 'Contract availability'
+                : 'ATM-pair availability'
+            }
+            value={percent(quoteAvailability)}
+            detail={
+              data.decision_groups == null
+                ? `${count(data.eligible_contracts)} of ${count(data.contracts)} contracts`
+                : `${count(data.eligible_decision_groups ?? null)} of ${count(data.decision_groups)} symbol-expiry sets`
+            }
+            status={
+              quoteAvailability == null
+                ? undefined
+                : quoteAvailability >=
+                    (decisionGroupAvailability == null ? 0.35 : 0.5)
+                  ? 'passed'
+                  : 'failed'
+            }
           />
           <div
             style={{ display: 'flex', gap: 7, flexWrap: 'wrap', marginTop: 11 }}

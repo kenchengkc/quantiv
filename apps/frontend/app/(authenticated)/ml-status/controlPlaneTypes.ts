@@ -24,6 +24,9 @@ export type ControlSnapshot = {
     missing_events: number | null;
     contract_rejection_rate: number | null;
     pair_rejection_rate: number | null;
+    decision_group_rejection_rate?: number | null;
+    decision_groups?: number | null;
+    eligible_decision_groups?: number | null;
     contracts: number | null;
     eligible_contracts: number | null;
     live_trading_eligible: boolean;
@@ -74,6 +77,7 @@ export type ControlHistoryRun = {
   missing_events: number | null;
   contract_rejection_rate: number | null;
   pair_rejection_rate: number | null;
+  decision_group_rejection_rate?: number | null;
   duplicate_rows: number | null;
   model_snapshot_date: string | null;
   model_status: ControlStatus;

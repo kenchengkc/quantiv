@@ -141,9 +141,18 @@ def build_reconciliation_manifest(
             _exception(
                 "option_quote_quality_below_limit",
                 "critical",
-                "Option quote or same-strike pair rejection exceeds the publication limit",
-                count=int(quote_quality.get("rejected_contracts", 0)),
-                sample=quote_quality.get("top_rejection_reasons") or [],
+                "Option leg or decision-group quality exceeds the publication limit",
+                count=int(
+                    quote_quality.get(
+                        "rejected_decision_groups",
+                        quote_quality.get("rejected_contracts", 0),
+                    )
+                ),
+                sample=(
+                    quote_quality.get("top_decision_group_rejection_reasons")
+                    or quote_quality.get("top_rejection_reasons")
+                    or []
+                ),
             )
         )
 

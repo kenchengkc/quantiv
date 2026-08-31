@@ -173,14 +173,98 @@ def _event_coverage(
     missing_rows = conn.execute(
         ctes
         + """
-        SELECT u.act_symbol, u.earnings_date
-        FROM expected u
-        LEFT JOIN covered c USING (act_symbol, earnings_date)
-        WHERE c.act_symbol IS NULL
-        ORDER BY u.earnings_date, u.act_symbol
-        LIMIT 25
+        , missing AS (
+            SELECT u.*
+            FROM expected u
+            LEFT JOIN covered c USING (act_symbol, earnings_date)
+            WHERE c.act_symbol IS NULL
+        ), diagnosed AS (
+            SELECT
+                u.act_symbol,
+                u.earnings_date,
+                raw.covering_expirations,
+                pairs.pair_rows,
+                pairs.leg_quote_best_pairs,
+                pairs.synchronized_best_pairs,
+                pairs.straddle_spread_best_pairs,
+                pairs.atm_best_pairs,
+                pairs.expiration_policy_best_pairs
+            FROM missing u
+            LEFT JOIN LATERAL (
+                SELECT COUNT(DISTINCT expiration) AS covering_expirations
+                FROM v_options o
+                WHERE o.date = u.snapshot_date
+                  AND o.act_symbol = u.act_symbol
+                  AND (
+                      (LOWER(COALESCE(CAST(u.timing AS VARCHAR), '')) = 'amc'
+                       AND o.expiration > u.earnings_date)
+                      OR
+                      (LOWER(COALESCE(CAST(u.timing AS VARCHAR), '')) != 'amc'
+                       AND o.expiration >= u.earnings_date)
+                  )
+            ) raw ON TRUE
+            LEFT JOIN LATERAL (
+                SELECT
+                    COUNT(*) AS pair_rows,
+                    COUNT(*) FILTER (
+                        WHERE pair_rank = 1
+                          AND (
+                              pair_rejection_reason LIKE 'call_%'
+                              OR pair_rejection_reason LIKE 'put_%'
+                          )
+                          AND pair_rejection_reason NOT LIKE '%dte_out_of_policy'
+                    ) AS leg_quote_best_pairs,
+                    COUNT(*) FILTER (
+                        WHERE pair_rank = 1
+                          AND pair_rejection_reason IN (
+                              'unsynchronized_quote_timestamp_availability',
+                              'quote_timestamp_skew'
+                          )
+                    ) AS synchronized_best_pairs,
+                    COUNT(*) FILTER (
+                        WHERE pair_rank = 1
+                          AND pair_rejection_reason = 'excessive_straddle_spread'
+                    ) AS straddle_spread_best_pairs,
+                    COUNT(*) FILTER (
+                        WHERE pair_rank = 1
+                          AND pair_rejection_reason = 'not_atm_by_delta'
+                    ) AS atm_best_pairs,
+                    COUNT(*) FILTER (
+                        WHERE pair_rank = 1
+                          AND pair_rejection_reason LIKE '%dte_out_of_policy'
+                    ) AS expiration_policy_best_pairs
+                FROM v_straddle_candidates p
+                WHERE p.date = u.snapshot_date
+                  AND p.act_symbol = u.act_symbol
+                  AND (
+                      (LOWER(COALESCE(CAST(u.timing AS VARCHAR), '')) = 'amc'
+                       AND p.expiration > u.earnings_date)
+                      OR
+                      (LOWER(COALESCE(CAST(u.timing AS VARCHAR), '')) != 'amc'
+                       AND p.expiration >= u.earnings_date)
+                  )
+            ) pairs ON TRUE
+        )
+        SELECT
+            act_symbol,
+            earnings_date,
+            CASE
+                WHEN covering_expirations = 0 THEN 'no_covering_expiration'
+                WHEN pair_rows = 0 THEN 'no_same_strike_pairs'
+                WHEN leg_quote_best_pairs > 0 THEN 'noncommercial_leg_quotes'
+                WHEN synchronized_best_pairs > 0 THEN 'unsynchronized_quotes'
+                WHEN straddle_spread_best_pairs > 0 THEN 'excessive_straddle_spread'
+                WHEN atm_best_pairs > 0 THEN 'no_atm_pair'
+                WHEN expiration_policy_best_pairs > 0 THEN 'expiration_out_of_policy'
+                ELSE 'other_quote_quality'
+            END AS reason
+        FROM diagnosed
+        ORDER BY earnings_date, act_symbol
         """
     ).fetchall()
+    missing_reason_counts: dict[str, int] = {}
+    for _, _, reason in missing_rows:
+        missing_reason_counts[str(reason)] = missing_reason_counts.get(str(reason), 0) + 1
     outside_rows = conn.execute(
         ctes
         + """
@@ -284,9 +368,19 @@ def _event_coverage(
         "missing_events": max(expected - covered, 0),
         "coverage_pct": overall_coverage,
         "minimum_coverage_pct": min_event_coverage,
+        "missing_reason_counts": [
+            {"reason": reason, "events": events}
+            for reason, events in sorted(
+                missing_reason_counts.items(), key=lambda item: (-item[1], item[0])
+            )
+        ],
         "missing_sample": [
-            {"symbol": symbol, "earnings_date": earnings_date.isoformat()}
-            for symbol, earnings_date in missing_rows
+            {
+                "symbol": symbol,
+                "earnings_date": earnings_date.isoformat(),
+                "reason": str(reason),
+            }
+            for symbol, earnings_date, reason in missing_rows[:25]
         ],
         "horizon_coverage": {
             "status": "failed" if failed_horizons else "passed",
@@ -319,11 +413,12 @@ def _quote_quality(
         GROUP BY l.date
         """
     ).fetchone()
-    pairs, rejected_pairs, eligible_groups = conn.execute(
+    pairs, rejected_pairs, decision_groups, eligible_groups = conn.execute(
         """
         WITH latest AS (SELECT MAX(date) AS date FROM v_options)
         SELECT COUNT(*),
                COUNT(*) FILTER (WHERE pair_quality_status = 'rejected'),
+               COUNT(DISTINCT (act_symbol, expiration)),
                COUNT(DISTINCT (act_symbol, expiration))
                    FILTER (WHERE pair_quality_status = 'eligible')
         FROM v_straddle_candidates
@@ -338,6 +433,18 @@ def _quote_quality(
           AND quote_rejection_reason IS NOT NULL
         GROUP BY quote_rejection_reason
         ORDER BY rows DESC, quote_rejection_reason
+        LIMIT 10
+        """
+    ).fetchall()
+    decision_reason_rows = conn.execute(
+        """
+        SELECT pair_rejection_reason, COUNT(*) AS groups
+        FROM v_straddle_candidates
+        WHERE date = (SELECT MAX(date) FROM v_options)
+          AND pair_rank = 1
+          AND pair_quality_status = 'rejected'
+        GROUP BY pair_rejection_reason
+        ORDER BY groups DESC, pair_rejection_reason
         LIMIT 10
         """
     ).fetchall()
@@ -356,10 +463,17 @@ def _quote_quality(
     rejected = int(rejected or 0)
     pairs = int(pairs or 0)
     rejected_pairs = int(rejected_pairs or 0)
+    decision_groups = int(decision_groups or 0)
+    eligible_groups = int(eligible_groups or 0)
+    rejected_groups = decision_groups - eligible_groups
     contract_rate = rejected / contracts if contracts else 1.0
     pair_rate = rejected_pairs / pairs if pairs else 1.0
+    decision_group_rate = (
+        rejected_groups / decision_groups if decision_groups else 1.0
+    )
     max_contract = float(policy["max_contract_rejection_rate"])
     max_pair = float(policy["max_pair_rejection_rate"])
+    max_decision_group = float(policy["max_decision_group_rejection_rate"])
     expected_source_date = latest_completed_us_market_session(now)
     source_session_lag = (
         market_session_lag(latest, expected_source_date) if latest else None
@@ -427,6 +541,7 @@ def _quote_quality(
             and pairs
             and contract_rate <= max_contract
             and pair_rate <= max_pair
+            and decision_group_rate <= max_decision_group
             and not errors
             else "failed"
         ),
@@ -444,9 +559,19 @@ def _quote_quality(
         "rejected_pairs": rejected_pairs,
         "pair_rejection_rate": round(pair_rate, 6),
         "max_pair_rejection_rate": max_pair,
-        "eligible_symbol_expirations": int(eligible_groups or 0),
+        "pair_rejection_rate_scope": "all_same_strike_pairs_diagnostic",
+        "decision_groups": decision_groups,
+        "eligible_decision_groups": eligible_groups,
+        "rejected_decision_groups": rejected_groups,
+        "decision_group_rejection_rate": round(decision_group_rate, 6),
+        "max_decision_group_rejection_rate": max_decision_group,
+        "eligible_symbol_expirations": eligible_groups,
         "top_rejection_reasons": [
             {"reason": str(reason), "rows": int(rows)} for reason, rows in reason_rows
+        ],
+        "top_decision_group_rejection_reasons": [
+            {"reason": str(reason), "groups": int(groups)}
+            for reason, groups in decision_reason_rows
         ],
         "timestamp_precision": policy["timestamp_precision"],
         "source_capabilities": declared_capabilities,

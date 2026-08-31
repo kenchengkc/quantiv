@@ -45,6 +45,7 @@ def quote_quality_policy() -> dict[str, object]:
         "max_leg_relative_spread",
         "max_straddle_relative_spread",
         "max_atm_delta_distance",
+        "max_decision_group_rejection_rate",
         "min_bid",
         "min_ask",
         "min_iv",

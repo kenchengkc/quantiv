@@ -15,6 +15,9 @@ def test_snapshot_is_compact_and_does_not_expose_artifact_ids() -> None:
                 "source_session_lag": 0,
                 "contract_rejection_rate": 0.12,
                 "pair_rejection_rate": 0.03,
+                "decision_group_rejection_rate": 0.04,
+                "decision_groups": 50,
+                "eligible_decision_groups": 48,
                 "live_trading_eligible": False,
             },
             "event_coverage": {"coverage_pct": 0.98, "missing_events": 2},
@@ -55,6 +58,8 @@ def test_snapshot_is_compact_and_does_not_expose_artifact_ids() -> None:
     assert snapshot["schema"] == "quantiv.control-plane.v2"
     assert snapshot["publication_eligible"] is True
     assert snapshot["data"]["quarantine_records"] == 42
+    assert snapshot["data"]["decision_group_rejection_rate"] == 0.04
+    assert snapshot["data"]["eligible_decision_groups"] == 48
     assert snapshot["model"]["fallback_bundle_available"] is True
     assert snapshot["model"]["outcome_common_rows"] == 12
     assert snapshot["model"]["outcome_minimum_rows"] == 30

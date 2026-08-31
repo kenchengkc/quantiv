@@ -127,6 +127,7 @@ def test_quote_quality_failure_makes_manifest_fail_closed() -> None:
         source_reconciliation=manifest["source_reconciliation"],
     )
     assert failed["quality"]["decision_safe"] is False
+    assert failed["quality"]["status"] == "failed"
     assert "option_quote_quality_below_limit" in {
         issue["code"] for issue in failed["exceptions"]
     }

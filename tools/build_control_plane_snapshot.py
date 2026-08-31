@@ -122,6 +122,13 @@ def build_snapshot(
             "missing_events": _number(events.get("missing_events")),
             "contract_rejection_rate": _number(quote.get("contract_rejection_rate")),
             "pair_rejection_rate": _number(quote.get("pair_rejection_rate")),
+            "decision_group_rejection_rate": _number(
+                quote.get("decision_group_rejection_rate")
+            ),
+            "decision_groups": _number(quote.get("decision_groups")),
+            "eligible_decision_groups": _number(
+                quote.get("eligible_decision_groups")
+            ),
             "contracts": _number(quote.get("contracts")),
             "eligible_contracts": _number(quote.get("eligible_contracts")),
             "live_trading_eligible": bool(quote.get("live_trading_eligible")),
@@ -207,6 +214,9 @@ def build_history_entry(
         "missing_events": _number(data.get("missing_events")),
         "contract_rejection_rate": _number(data.get("contract_rejection_rate")),
         "pair_rejection_rate": _number(data.get("pair_rejection_rate")),
+        "decision_group_rejection_rate": _number(
+            data.get("decision_group_rejection_rate")
+        ),
         "duplicate_rows": _number(data.get("duplicate_rows")),
         "model_snapshot_date": model.get("snapshot_date"),
         "model_status": model.get("status", "unavailable"),
