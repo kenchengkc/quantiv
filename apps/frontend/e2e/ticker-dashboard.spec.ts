@@ -38,7 +38,7 @@ test("ticker dashboard presents one market-model-history view before detail", as
   const termStructure = page.getByRole("heading", {
     name: "Implied range across expiries",
   });
-  const history = page.getByRole("heading", { name: /Realized moves/ });
+  const history = page.getByRole("heading", { name: /Event study/ });
 
   await expect(comparison).toBeVisible({ timeout: 60_000 });
   await expect(page.getByText(/Straddle exceedance [≈≥≤]\d+%/)).toBeVisible();
@@ -49,7 +49,7 @@ test("ticker dashboard presents one market-model-history view before detail", as
   const comparisonIndex = headingOrder.indexOf("Market vs model vs history");
   const termStructureIndex = headingOrder.indexOf("Implied range across expiries");
   const historyIndex = headingOrder.findIndex((heading) =>
-    heading.startsWith("Realized moves"),
+    heading.startsWith("Event study"),
   );
 
   expect(comparisonIndex).toBeGreaterThanOrEqual(0);
@@ -63,6 +63,7 @@ test("ticker dashboard presents one market-model-history view before detail", as
   await expect(page.getByText("Probability density around spot")).toHaveCount(0);
   await expect(page.getByText("Expected move comparison")).toHaveCount(0);
   await expect(page.getByText("Event lens")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /Export .* event study as CSV/ })).toBeVisible();
 
   await expect(page.locator(".qv-evidence-strip")).toHaveCount(0);
   await expect(page.getByText("Decision evidence")).toHaveCount(0);

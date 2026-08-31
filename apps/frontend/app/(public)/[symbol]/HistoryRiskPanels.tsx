@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { Download } from 'lucide-react';
 import { MetricHelp } from '@/components/MetricExplainer';
 import type { SymbolDetail } from './symbolPageTypes';
 import type { TermRow } from './ForecastPanels';
@@ -9,6 +10,7 @@ import { axisDate } from './symbolPageUtils';
 export type HistoryPoint = {
   q: string;
   date: string;
+  timing: string;
   /** Implied move (always ≥ 0). Null until at-the-time chain data is wired. */
   implied: number | null;
   /** Signed realized move (e.g. -0.034 = -3.4%). */
@@ -23,12 +25,13 @@ export type HistoryPoint = {
   revSurprise: number | null;
 };
 
-
 function pickNum(v: number | null | undefined): number | null {
   return v != null && Number.isFinite(v) ? v : null;
 }
 
-
+function percent(value: number): string {
+  return `${(value * 100).toFixed(1)}%`;
+}
 
 /** Build the chart series from earnings_history rows that carry an
  *  `actual` close-to-close move. `implied` is optional — when present
@@ -36,7 +39,7 @@ function pickNum(v: number | null | undefined): number | null {
  *  shows just the realized dot. EPS / revenue surprise come from the
  *  Finnhub overlay and may be null for older rows that predate the
  *  overlay's coverage window. Returns rows in chronological order
- *  (oldest → newest) and clips to the last 8 quarters. */
+ *  (oldest → newest) and keeps up to three years for the local event study. */
 export function buildHistorySeries(
   raw: SymbolDetail['earnings_history'] | undefined,
 ): HistoryPoint[] {
@@ -57,6 +60,7 @@ export function buildHistorySeries(
       return {
         q,
         date: h.date,
+        timing: h.timing,
         implied,
         actual: h.actual,
         epsActual: pickNum(h.eps_actual),
@@ -68,7 +72,7 @@ export function buildHistorySeries(
       };
     })
     .sort((a, b) => a.date.localeCompare(b.date));
-  return usable.slice(-8);
+  return usable.slice(-12);
 }
 
 export function medianAbsoluteHistoryMove(history: HistoryPoint[]): number | null {
@@ -78,6 +82,112 @@ export function medianAbsoluteHistoryMove(history: HistoryPoint[]): number | nul
   return moves.length % 2 === 0
     ? (moves[middle - 1] + moves[middle]) / 2
     : moves[middle];
+}
+
+export function eventStudyEvidenceCounts(history: HistoryPoint[]) {
+  const impliedObservations = history.filter(
+    (point) => point.implied != null,
+  ).length;
+  const impliedExceedances = history.filter(
+    (point) =>
+      point.implied != null && Math.abs(point.actual) > point.implied,
+  ).length;
+  const epsObservations = history.filter(
+    (point) => point.epsSurprise != null,
+  ).length;
+  const epsBeats = history.filter(
+    (point) => point.epsSurprise != null && point.epsSurprise >= 0,
+  ).length;
+  return {
+    impliedObservations,
+    impliedExceedances,
+    epsObservations,
+    epsBeats,
+  };
+}
+
+function csvCell(value: string | number | boolean | null): string {
+  if (value == null) return '';
+  const text = String(value);
+  return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+export function historyRowsToCsv(
+  symbol: string,
+  history: HistoryPoint[],
+): string {
+  const header = [
+    'symbol',
+    'quarter',
+    'earnings_date',
+    'timing',
+    'realized_move_pct',
+    'absolute_move_pct',
+    'direction',
+    'implied_move_pct',
+    'exceeded_implied',
+    'eps_actual',
+    'eps_estimate',
+    'eps_surprise_pct',
+    'revenue_actual',
+    'revenue_estimate',
+    'revenue_surprise_pct',
+  ];
+  const rows = history.map((point) => [
+    symbol,
+    point.q,
+    point.date,
+    point.timing,
+    (point.actual * 100).toFixed(6),
+    (Math.abs(point.actual) * 100).toFixed(6),
+    point.actual >= 0 ? 'up' : 'down',
+    point.implied == null ? null : (point.implied * 100).toFixed(6),
+    point.implied == null ? null : Math.abs(point.actual) > point.implied,
+    point.epsActual,
+    point.epsEstimate,
+    point.epsSurprise == null ? null : (point.epsSurprise * 100).toFixed(6),
+    point.revActual,
+    point.revEstimate,
+    point.revSurprise == null ? null : (point.revSurprise * 100).toFixed(6),
+  ]);
+  return [header, ...rows]
+    .map((row) => row.map((value) => csvCell(value)).join(','))
+    .join('\n');
+}
+
+function EventStudyMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div
+      style={{
+        padding: '9px 10px',
+        border: '1px solid var(--line)',
+        borderRadius: 8,
+        background: 'color-mix(in oklab, var(--bg-3) 54%, transparent)',
+      }}
+    >
+      <div
+        style={{
+          color: 'var(--ink-4)',
+          fontSize: 8.5,
+          letterSpacing: '0.1em',
+          textTransform: 'uppercase',
+        }}
+      >
+        {label}
+      </div>
+      <div
+        className="mono tnum"
+        style={{
+          marginTop: 3,
+          color: 'var(--ink-2)',
+          fontSize: 13,
+          fontWeight: 650,
+        }}
+      >
+        {value}
+      </div>
+    </div>
+  );
 }
 
 // EPS surprise strip — one bar per quarter, sharing column positions with
@@ -100,9 +210,34 @@ export function medianAbsoluteHistoryMove(history: HistoryPoint[]): number | nul
 // chart. Layout: chart (hero, the realized moves are the primary
 // signal) → SurpriseStrip (secondary, fundamentals context).
 // ---------- History block (chart + EPS strip combined) ----------
-export function HistoryBlock({ history }: { history: HistoryPoint[] }) {
+type DirectionCohort = 'all' | 'up' | 'down';
+
+export function HistoryBlock({
+  history: completeHistory,
+  symbol,
+}: {
+  history: HistoryPoint[];
+  symbol: string;
+}) {
   const [hovered, setHovered] = useState<number | null>(null);
-  if (history.length === 0) return null;
+  const [windowSize, setWindowSize] = useState<8 | 'all'>(8);
+  const [direction, setDirection] = useState<DirectionCohort>('all');
+  if (completeHistory.length === 0) return null;
+
+  const windowedHistory =
+    windowSize === 'all' ? completeHistory : completeHistory.slice(-windowSize);
+  const directionCount = {
+    up: windowedHistory.filter((point) => point.actual >= 0).length,
+    down: windowedHistory.filter((point) => point.actual < 0).length,
+  };
+  const effectiveDirection =
+    direction === 'all' || directionCount[direction] > 0 ? direction : 'all';
+  const history =
+    effectiveDirection === 'all'
+      ? windowedHistory
+      : windowedHistory.filter((point) =>
+          effectiveDirection === 'up' ? point.actual >= 0 : point.actual < 0,
+        );
 
   const hasImplied = history.some((h) => h.implied != null);
   const hasEps = history.some((h) => h.epsSurprise != null);
@@ -126,14 +261,30 @@ export function HistoryBlock({ history }: { history: HistoryPoint[] }) {
 
   const hovered_ = hovered != null ? history[hovered] : null;
 
-  const beatImplied = hasImplied
-    ? history.filter(
-        (h) => h.implied != null && Math.abs(h.actual) > (h.implied as number),
-      ).length
-    : 0;
-  const epsBeats = hasEps
-    ? history.filter((h) => (h.epsSurprise ?? 0) >= 0).length
-    : 0;
+  const {
+    impliedObservations,
+    impliedExceedances,
+    epsObservations,
+    epsBeats,
+  } = eventStudyEvidenceCounts(history);
+  const medianMove = medianAbsoluteHistoryMove(history) ?? 0;
+  const meanMove =
+    history.reduce((total, point) => total + point.actual, 0) / history.length;
+  const largestMove = Math.max(...history.map((point) => Math.abs(point.actual)));
+
+  const downloadHistory = () => {
+    const csv = historyRowsToCsv(symbol, history);
+    const url = URL.createObjectURL(
+      new Blob([csv], { type: 'text/csv;charset=utf-8' }),
+    );
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `${symbol.toUpperCase()}-earnings-event-study.csv`;
+    document.body.append(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  };
 
   return (
     <div className="qv-card">
@@ -167,40 +318,149 @@ export function HistoryBlock({ history }: { history: HistoryPoint[] }) {
                 letterSpacing: '-0.01em',
               }}
             >
-              {hasImplied
-                ? 'Implied vs realized · last '
-                : 'Realized moves · last '}
-              {history.length} {history.length === 1 ? 'quarter' : 'quarters'}
+              Event study · {history.length}{' '}
+              {history.length === 1 ? 'event' : 'events'}
             </h3>
             <MetricHelp metric="history" align="left" />
           </div>
           <div style={{ fontSize: 14, color: 'var(--ink-3)', marginTop: 4 }}>
             {hasImplied
-              ? 'Realized moves overlaid on what options priced going in.'
-              : 'Close-to-close moves; implied range pending historical option chains.'}
+              ? 'Realized earnings reactions versus the option-implied range available before each event.'
+              : 'Close-to-close earnings reactions; historical option ranges are not available for this cohort.'}
           </div>
+        </div>
+        <button
+          type="button"
+          onClick={downloadHistory}
+          aria-label={`Export ${symbol} event study as CSV`}
+          style={{
+            minHeight: 32,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 7,
+            padding: '6px 10px',
+            border: '1px solid var(--line)',
+            borderRadius: 8,
+            color: 'var(--ink-3)',
+            background: 'var(--bg-2)',
+            fontFamily: 'inherit',
+            fontSize: 10,
+            cursor: 'pointer',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          <Download aria-hidden="true" size={13} />
+          Export rows
+        </button>
+      </div>
+
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: 10,
+          flexWrap: 'wrap',
+          marginTop: 14,
+        }}
+      >
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {completeHistory.length > 8
+            ? ([8, 'all'] as const).map((item) => {
+                const active = windowSize === item;
+                return (
+                  <button
+                    key={item}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => {
+                      setHovered(null);
+                      setWindowSize(item);
+                    }}
+                    style={{
+                      minHeight: 27,
+                      padding: '4px 9px',
+                      border: '1px solid var(--line)',
+                      borderRadius: 999,
+                      color: active ? 'var(--ink)' : 'var(--ink-4)',
+                      background: active ? 'var(--bg-3)' : 'transparent',
+                      fontFamily: 'inherit',
+                      fontSize: 10,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {item === 'all' ? `${completeHistory.length}Q` : '8Q'}
+                  </button>
+                );
+              })
+            : null}
+          {(['all', 'up', 'down'] as DirectionCohort[]).map((item) => {
+            const active = effectiveDirection === item;
+            const disabled = item !== 'all' && directionCount[item] === 0;
+            return (
+              <button
+                key={item}
+                type="button"
+                aria-pressed={active}
+                disabled={disabled}
+                onClick={() => {
+                  setHovered(null);
+                  setDirection(item);
+                }}
+                style={{
+                  minHeight: 27,
+                  padding: '4px 9px',
+                  border: '1px solid var(--line)',
+                  borderRadius: 999,
+                  color: disabled
+                    ? 'var(--ink-4)'
+                    : active
+                      ? item === 'up'
+                        ? 'var(--up)'
+                        : item === 'down'
+                          ? 'var(--down)'
+                          : 'var(--ink)'
+                      : 'var(--ink-4)',
+                  opacity: disabled ? 0.45 : 1,
+                  background: active ? 'var(--bg-3)' : 'transparent',
+                  fontFamily: 'inherit',
+                  fontSize: 10,
+                  cursor: disabled ? 'not-allowed' : 'pointer',
+                  textTransform: 'capitalize',
+                }}
+              >
+                {item === 'all'
+                  ? `All ${windowedHistory.length}`
+                  : `${item} ${directionCount[item]}`}
+              </button>
+            );
+          })}
         </div>
         <div
           className="mono tnum"
-          style={{ fontSize: 13, color: 'var(--ink-3)', textAlign: 'right', lineHeight: 1.6 }}
+          style={{ display: 'flex', gap: 9, color: 'var(--ink-4)', fontSize: 9.5 }}
         >
-          {hasImplied && (
-            <div>
-              Beat implied{' '}
-              <span style={{ color: 'var(--ink-2)' }}>
-                {beatImplied}/{history.length}
-              </span>
-            </div>
-          )}
-          {hasEps && (
-            <div>
-              EPS beat{' '}
-              <span style={{ color: 'var(--up)' }}>
-                {epsBeats}/{history.length}
-              </span>
-            </div>
-          )}
+          {hasImplied ? <span>Beat implied {impliedExceedances}/{impliedObservations}</span> : null}
+          {hasEps ? <span>EPS beat {epsBeats}/{epsObservations}</span> : null}
         </div>
+      </div>
+
+      <div
+        className="qv-m-2col"
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+          gap: 8,
+          marginTop: 10,
+        }}
+      >
+        <EventStudyMetric label="Observations" value={String(history.length)} />
+        <EventStudyMetric label="Median |move|" value={percent(medianMove)} />
+        <EventStudyMetric
+          label="Mean move"
+          value={`${meanMove >= 0 ? '+' : ''}${percent(meanMove)}`}
+        />
+        <EventStudyMetric label="Largest |move|" value={percent(largestMove)} />
       </div>
 
       {/* Wrap the chart in a relative container so the hover tooltip can
@@ -492,7 +752,21 @@ export function HistoryBlock({ history }: { history: HistoryPoint[] }) {
             <line x1={P} x2={W - P} y1={epsH / 2} y2={epsH / 2} stroke="var(--line)" />
             {history.map((h, i) => {
               const cx = P + colW * i + colW / 2;
-              const s = h.epsSurprise ?? 0;
+              const s = h.epsSurprise;
+              if (s == null) {
+                return (
+                  <line
+                    key={`eps-${h.q}-${h.date}`}
+                    x1={cx - 8}
+                    x2={cx + 8}
+                    y1={epsH / 2}
+                    y2={epsH / 2}
+                    stroke="var(--ink-4)"
+                    strokeWidth="1"
+                    opacity="0.45"
+                  />
+                );
+              }
               const beat = s >= 0;
               const top = beat ? epsY(s) : epsH / 2;
               const bot = beat ? epsH / 2 : epsY(s);

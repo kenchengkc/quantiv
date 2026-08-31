@@ -921,7 +921,8 @@ export default function SymbolPage({
 
   const termRows = buildTermRows(data.straddle_features, em?.expiration ?? null);
   const historySeries = buildHistorySeries(data.earnings_history);
-  const historicalMedianMovePct = medianAbsoluteHistoryMove(historySeries);
+  const comparisonHistory = historySeries.slice(-8);
+  const historicalMedianMovePct = medianAbsoluteHistoryMove(comparisonHistory);
 
   return (
     <div className="qv-m-pad qv-symbol-page-shell" style={{ maxWidth: 1100, margin: '0 auto', padding: '0 28px 80px' }}>
@@ -1041,7 +1042,7 @@ export default function SymbolPage({
             modelQuantiles={quantiles}
             modelIsSpotUpdated={modelIsSpotUpdated}
             historicalMovePct={historicalMedianMovePct}
-            historyCount={historySeries.length}
+            historyCount={comparisonHistory.length}
             ivRank={data.vol_regime?.iv_rank ?? null}
             mode={predictionMode}
             onModeChange={setPredictionMode}
@@ -1079,7 +1080,7 @@ export default function SymbolPage({
       {historySeries.length >= 2 && (
         <Reveal delay={200}>
           <div style={{ marginTop: 18 }}>
-            <HistoryBlock history={historySeries} />
+            <HistoryBlock key={symbol} history={historySeries} symbol={symbol} />
           </div>
         </Reveal>
       )}
