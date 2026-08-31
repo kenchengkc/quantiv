@@ -21,7 +21,7 @@ function forecastFixtureSymbol(): string | null {
   return fixture?.replace(/\.json$/, "") ?? null;
 }
 
-test("ticker dashboard presents market, model, comparison, then history", async ({
+test("ticker dashboard presents one market-model-history view before detail", async ({
   page,
 }) => {
   const symbol = forecastFixtureSymbol();
@@ -32,26 +32,35 @@ test("ticker dashboard presents market, model, comparison, then history", async 
 
   await page.goto(`/${symbol}`);
 
-  const forecast = page.getByRole("heading", { name: "Forecast distribution" });
   const comparison = page.getByRole("heading", {
-    name: "Expected move comparison",
+    name: "Market vs model vs history",
+  });
+  const termStructure = page.getByRole("heading", {
+    name: "Implied range across expiries",
   });
   const history = page.getByRole("heading", { name: /Realized moves/ });
 
-  await expect(forecast).toBeVisible({ timeout: 60_000 });
-  await expect(comparison).toBeVisible();
+  await expect(comparison).toBeVisible({ timeout: 60_000 });
+  await expect(termStructure).toBeVisible();
   await expect(history).toBeVisible();
 
   const headingOrder = await page.locator("h2, h3").allTextContents();
-  const forecastIndex = headingOrder.indexOf("Forecast distribution");
-  const comparisonIndex = headingOrder.indexOf("Expected move comparison");
+  const comparisonIndex = headingOrder.indexOf("Market vs model vs history");
+  const termStructureIndex = headingOrder.indexOf("Implied range across expiries");
   const historyIndex = headingOrder.findIndex((heading) =>
     heading.startsWith("Realized moves"),
   );
 
-  expect(forecastIndex).toBeGreaterThanOrEqual(0);
-  expect(comparisonIndex).toBeGreaterThan(forecastIndex);
-  expect(historyIndex).toBeGreaterThan(comparisonIndex);
+  expect(comparisonIndex).toBeGreaterThanOrEqual(0);
+  expect(termStructureIndex).toBeGreaterThan(comparisonIndex);
+  expect(historyIndex).toBeGreaterThan(termStructureIndex);
+  await expect(
+    page.getByRole("region", {
+      name: "Research snapshot and forecast validation",
+    }),
+  ).toBeVisible();
+  await expect(page.getByText("Probability density around spot")).toHaveCount(0);
+  await expect(page.getByText("Expected move comparison")).toHaveCount(0);
   await expect(page.getByText("Event lens")).toHaveCount(0);
 
   await expect(page.locator(".qv-evidence-strip")).toHaveCount(0);

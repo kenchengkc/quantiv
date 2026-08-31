@@ -518,9 +518,7 @@
 .qv-metric-help-left .qv-metric-help-popover {
   left: 0;
 }
-.qv-metric-help-eyebrow,
-.qv-reading-guide-eyebrow,
-.qv-reading-guide-layer-label {
+.qv-metric-help-eyebrow {
   color: var(--brand-blue-1);
   font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
   font-size: 9.5px;
@@ -668,114 +666,6 @@
 }
 .qv-about-formula-card {
   scroll-margin-top: 96px;
-}
-
-.qv-reading-guide {
-  overflow: visible;
-  padding: 18px 20px 16px;
-  border: 1px solid color-mix(in oklab, var(--brand-blue-1) 22%, var(--line));
-  border-radius: 14px;
-  background:
-    radial-gradient(
-      90% 180% at 0% 0%,
-      color-mix(in oklab, var(--brand-blue-1) 11%, transparent),
-      transparent 62%
-    ),
-    color-mix(in oklab, var(--bg-2) 88%, transparent);
-}
-.qv-reading-guide-heading {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-}
-.qv-reading-guide-icon {
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  flex: 0 0 auto;
-  border: 1px solid color-mix(in oklab, var(--brand-blue-1) 32%, var(--line));
-  border-radius: 9px;
-  color: var(--brand-blue-1);
-  background: color-mix(in oklab, var(--brand-blue-1) 10%, transparent);
-}
-.qv-reading-guide-heading h2 {
-  margin: 4px 0 0;
-  color: var(--ink);
-  font-family: var(--font-mulish), var(--font-nunito-sans), sans-serif;
-  font-size: 19px;
-  font-weight: 700;
-  letter-spacing: -0.012em;
-}
-.qv-reading-guide-grid {
-  display: grid;
-  grid-template-columns: repeat(
-    var(--qv-reading-guide-columns, 3),
-    minmax(0, 1fr)
-  );
-  gap: 10px;
-  margin-top: 15px;
-}
-.qv-reading-guide-layer {
-  position: relative;
-  display: grid;
-  grid-template-columns: 18px minmax(0, 1fr);
-  align-items: flex-start;
-  gap: 9px;
-  min-width: 0;
-  padding: 12px;
-  border: 1px solid var(--line);
-  border-radius: 9px;
-  color: var(--ink-4);
-  background: color-mix(in oklab, var(--bg-3) 66%, transparent);
-}
-.qv-reading-guide-layer:not(:last-child)::after {
-  content: "";
-  position: absolute;
-  top: 50%;
-  right: -11px;
-  z-index: 2;
-  width: 10px;
-  height: 1px;
-  background: color-mix(in oklab, var(--brand-blue-1) 34%, var(--line));
-}
-.qv-reading-guide-layer-label {
-  color: var(--ink-4);
-  font-size: 8.5px;
-}
-.qv-reading-guide-layer-title {
-  margin-top: 4px;
-  color: var(--ink);
-  font-family: var(--font-mulish), var(--font-nunito-sans), sans-serif;
-  font-size: 14px;
-  font-weight: 700;
-}
-.qv-reading-guide-layer-caption {
-  margin: 4px 0 0;
-  color: var(--ink-4);
-  font-size: 11.5px;
-  line-height: 1.45;
-}
-.qv-reading-guide-footer {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  margin-top: 10px;
-}
-.qv-reading-guide-footer > :where(strong, span) {
-  padding: 4px 8px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  color: var(--ink-4);
-  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
-  font-size: 9.5px;
-  font-weight: 500;
-}
-.qv-reading-guide-footer > strong {
-  border-color: color-mix(in oklab, var(--brand-blue-1) 30%, var(--line));
-  color: var(--brand-blue-1);
-  background: color-mix(in oklab, var(--brand-blue-1) 8%, transparent);
 }
 
 @keyframes earnings-grid-pulse {
@@ -1106,6 +996,14 @@
   min-height: 1120px;
 }
 
+.qv-move-comparison-row,
+.qv-move-comparison-axis {
+  display: grid;
+  grid-template-columns: minmax(138px, 0.32fr) minmax(0, 1fr);
+  gap: 18px;
+  align-items: center;
+}
+
 /* Sticky-first-column for horizontally-scrolling tables (Screener,
    Greeks panel). Applies on both desktop and mobile now that the
    screener table is virtualized + 1480px wide — without this the
@@ -1169,6 +1067,12 @@ tr:hover .qv-m-sticky-cell {
   /* Stack any grid to a single column */
   .qv-m-stack {
     grid-template-columns: 1fr !important;
+  }
+
+  .qv-move-comparison-row,
+  .qv-move-comparison-axis {
+    grid-template-columns: 112px minmax(0, 1fr);
+    gap: 10px;
   }
 
   .qv-calendar-shell {
@@ -1359,29 +1263,6 @@ tr:hover .qv-m-sticky-cell {
     font-size: 44px !important;
   }
 
-  .qv-reading-guide {
-    padding: 16px;
-  }
-  .qv-reading-guide-grid {
-    grid-template-columns: 1fr;
-    gap: 7px;
-  }
-  .qv-reading-guide-layer {
-    grid-template-columns: 18px minmax(0, 1fr);
-    gap: 9px;
-    padding: 10px;
-  }
-  .qv-reading-guide-layer:not(:last-child)::after {
-    top: auto;
-    right: auto;
-    bottom: -8px;
-    left: 18px;
-    width: 1px;
-    height: 7px;
-  }
-  .qv-reading-guide-layer-caption {
-    font-size: 11px;
-  }
   .qv-metric-help-popover {
     width: min(330px, calc(100vw - 32px));
   }

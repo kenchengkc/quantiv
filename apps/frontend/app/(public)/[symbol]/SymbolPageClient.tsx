@@ -9,7 +9,6 @@ import { normalizeForecastQuantiles } from '@/lib/forecastQuantiles';
 import { listingExchangeLabel } from '@/lib/listingExchanges';
 import { useEnsureCompanyNames } from '@/lib/useCompanyNames';
 import { useEnsureListingExchanges } from '@/lib/useListingExchanges';
-import { ExpectedMoveComparison, MetricHelp } from '@/components/MetricExplainer';
 import { TickerLogo } from '@/components/TickerLogo';
 import {
   DetailHero,
@@ -19,10 +18,11 @@ import {
   Toast,
   usePrevAppLocation,
 } from './SymbolPageHeader';
-import { buildTermRows, InteractiveBar, QuantileBand, TermFan } from './ForecastPanels';
+import { buildTermRows, TermFan } from './ForecastPanels';
 import { buildHistorySeries, GreeksPanel, HistoryBlock, medianAbsoluteHistoryMove } from './HistoryRiskPanels';
 import ScenarioRiskPanel from './ScenarioRiskPanel';
 import ResearchSnapshotRibbon from './ResearchSnapshotRibbon';
+import MoveComparisonChart from './MoveComparisonChart';
 import type {
   IntradaySeries,
   LivePredictionResponse,
@@ -879,10 +879,6 @@ export default function SymbolPage({
         : 0;
 
   const straddlePct = em?.straddle_pct ?? 0;
-  const ivPct = em?.iv_pct ?? straddlePct;
-  const atmIV = em?.atm_iv ?? 0.3;
-  const dte = em?.dte ?? 28;
-
   const earningsDate = em?.earnings_date ?? data.next_earnings ?? null;
   const earningsTiming = timingText(em?.timing ?? data.next_earnings_timing);
   const daysLeft = daysFromToday(earningsDate);
@@ -903,6 +899,8 @@ export default function SymbolPage({
     livePrediction.status === 'ready' ? normalizeForecastQuantiles(livePrediction.response?.quantiles) : null;
   const showingLivePrediction =
     predictionMode === 'live' && livePrediction.status === 'ready' && livePrediction.response != null;
+  const modelIsSpotUpdated =
+    showingLivePrediction && livePrediction.response?.source !== 'nightly_fallback';
   const quantiles = showingLivePrediction && liveQuantiles ? liveQuantiles : snapshotQuantiles;
   const rawActivePredictionPct = showingLivePrediction
     ? (livePrediction.response?.em_ml_pct ?? null)
@@ -1034,87 +1032,31 @@ export default function SymbolPage({
         </Reveal>
       )}
 
-      {/* Interactive density bar */}
-      {em && spot > 0 && straddlePct > 0 && (
+      {em && spot > 0 && (
         <Reveal delay={100}>
-          <div className="qv-card" style={{ marginTop: 22 }}>
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'flex-start',
-                gap: 16,
-              }}
-            >
-              <div>
-                <span className="qv-pill">Expected move</span>
-                <div className="qv-title-with-help">
-                  <h3
-                    className="serif"
-                    style={{
-                      margin: '10px 0 0',
-                      fontSize: 20,
-                      fontWeight: 700,
-                      letterSpacing: '-0.01em',
-                    }}
-                  >
-                    Probability density around spot
-                  </h3>
-                  <MetricHelp metric="probabilityDensity" align="left" />
-                </div>
-                <div style={{ fontSize: 14, color: 'var(--ink-3)', marginTop: 4 }}>
-                  Log-normal model with ATM IV {(atmIV * 100).toFixed(1)}% over {dte} days. Range $
-                  {(spot * (1 - straddlePct)).toFixed(2)}–$
-                  {(spot * (1 + straddlePct)).toFixed(2)}.
-                </div>
-              </div>
-            </div>
-            <InteractiveBar spot={spot} em={straddlePct} emIV={ivPct} atmIV={atmIV} dte={dte} />
-          </div>
+          <MoveComparisonChart
+            spot={spot}
+            optionsMovePct={em.straddle_pct ?? null}
+            modelMovePct={activePredictionPct}
+            modelQuantiles={quantiles}
+            modelIsSpotUpdated={modelIsSpotUpdated}
+            historicalMovePct={historicalMedianMovePct}
+            historyCount={historySeries.length}
+            ivRank={data.vol_regime?.iv_rank ?? null}
+            mode={predictionMode}
+            onModeChange={setPredictionMode}
+            spotUpdateDisabled={livePredictionRequest == null}
+            spotUpdateStatus={livePrediction.status}
+            modelMeta={quantileMeta}
+            unavailableReason={liveUnavailableReason}
+          />
         </Reveal>
       )}
 
-      {/* Quantile band + Term fan side-by-side on wide; stacked otherwise */}
-      {(quantiles != null || termRows.length > 0) && (
+      {termRows.length > 0 && (
         <Reveal delay={140}>
-          <div
-            className="qv-m-stack"
-            style={{
-              marginTop: 18,
-              display: 'grid',
-              gridTemplateColumns: quantiles != null && termRows.length > 0 ? '1fr 1.1fr' : '1fr',
-              gap: 16,
-            }}
-          >
-            {quantiles != null && (
-              <QuantileBand
-                q={quantiles}
-                straddleAbs={straddlePct}
-                spot={spot}
-                mode={predictionMode}
-                onModeChange={setPredictionMode}
-                liveDisabled={livePredictionRequest == null}
-                liveStatus={livePrediction.status}
-                pointPct={activePredictionPct}
-                modelMeta={quantileMeta}
-                unavailableReason={liveUnavailableReason}
-              />
-            )}
-            {termRows.length > 0 && <TermFan rows={termRows} spot={spot} />}
-          </div>
-        </Reveal>
-      )}
-
-      {em && (
-        <Reveal delay={180}>
           <div style={{ marginTop: 18 }}>
-            <ExpectedMoveComparison
-              optionsMovePct={em.straddle_pct ?? null}
-              mlMovePct={activePredictionPct}
-              ivRank={data.vol_regime?.iv_rank ?? null}
-              historicalMovePct={historicalMedianMovePct}
-              historyCount={historySeries.length}
-            />
+            <TermFan rows={termRows} spot={spot} />
           </div>
         </Reveal>
       )}

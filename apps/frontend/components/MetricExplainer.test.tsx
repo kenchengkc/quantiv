@@ -3,7 +3,7 @@ import { flushSync } from "react-dom";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { ExpectedMoveComparison, MetricHelp } from "./MetricExplainer";
+import { MetricHelp } from "./MetricExplainer";
 
 const roots: Root[] = [];
 
@@ -22,7 +22,6 @@ afterEach(() => {
   });
   document.body.replaceChildren();
 });
-
 describe("MetricHelp", () => {
   it("keeps only one metric guide open", () => {
     const container = renderMetricHelp(
@@ -92,56 +91,5 @@ describe("MetricHelp", () => {
     expect(container.querySelector("a")?.getAttribute("href")).toBe(
       "/about#methodology-atm-iv",
     );
-  });
-});
-
-describe("ExpectedMoveComparison", () => {
-  it("compares options, model, and realized moves in plain language", () => {
-    const container = renderMetricHelp(
-      <ExpectedMoveComparison
-        optionsMovePct={0.072}
-        mlMovePct={0.037}
-        historicalMovePct={0.051}
-        historyCount={8}
-        ivRank={0.36}
-      />,
-    );
-
-    expect(container.textContent).toContain("Expected move comparison");
-    expect(container.textContent).toContain("Options-implied±7.2%ATM straddle");
-    expect(container.textContent).toContain(
-      "Model forecast±3.7%Expected absolute move",
-    );
-    expect(container.textContent).toContain(
-      "Historical median±5.1%Last 8 earnings",
-    );
-    expect(container.textContent).toContain(
-      "Model 3.5 percentage points below options-implied",
-    );
-    expect(container.textContent).toContain(
-      "Absolute move only; not direction",
-    );
-    expect(container.textContent).not.toContain("Event lens");
-  });
-
-  it("omits an unavailable model instead of presenting it as broken", () => {
-    const container = renderMetricHelp(
-      <ExpectedMoveComparison
-        optionsMovePct={0.039}
-        mlMovePct={null}
-        historicalMovePct={0.019}
-        historyCount={8}
-        ivRank={0.46}
-      />,
-    );
-
-    expect(container.querySelectorAll(".qv-reading-guide-layer")).toHaveLength(
-      2,
-    );
-    expect(container.textContent).toContain("Options-implied±3.9%");
-    expect(container.textContent).toContain("Historical median±1.9%");
-    expect(container.textContent).not.toContain("Model forecast");
-    expect(container.textContent).not.toContain("No forecast");
-    expect(container.textContent).not.toContain("Unavailable");
   });
 });

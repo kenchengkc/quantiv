@@ -1,18 +1,10 @@
 "use client";
 
-import {
-  ArrowRight,
-  BrainCircuit,
-  CircleHelp,
-  History,
-  LineChart,
-  Scale,
-} from "lucide-react";
+import { ArrowRight, CircleHelp } from "lucide-react";
 import {
   useEffect,
   useRef,
   useState,
-  type CSSProperties,
   type SyntheticEvent,
 } from "react";
 import Link from "next/link";
@@ -44,7 +36,6 @@ function closeOtherMetricHelp(event: SyntheticEvent<HTMLDetailsElement>) {
       if (details !== current) details.open = false;
     });
 }
-
 export function MetricHelp({
   metric,
   align = "right",
@@ -168,124 +159,5 @@ export function MetricHelp({
         </div>
       ) : null}
     </details>
-  );
-}
-
-function pct(value: number): string {
-  return `${(value * 100).toFixed(1)}%`;
-}
-
-function modelComparison(
-  optionsMovePct: number | null,
-  mlMovePct: number | null,
-): string | null {
-  if (optionsMovePct == null || mlMovePct == null) return null;
-  const gapPoints = Math.abs(mlMovePct - optionsMovePct) * 100;
-  if (gapPoints < 0.2) return "Model and options-implied moves agree";
-  return `Model ${gapPoints.toFixed(1)} percentage points ${mlMovePct > optionsMovePct ? "above" : "below"} options-implied`;
-}
-
-export function ExpectedMoveComparison({
-  optionsMovePct,
-  mlMovePct,
-  ivRank,
-  historicalMovePct,
-  historyCount,
-}: {
-  optionsMovePct: number | null;
-  mlMovePct: number | null;
-  ivRank: number | null;
-  historicalMovePct: number | null;
-  historyCount: number;
-}) {
-  const comparison = modelComparison(optionsMovePct, mlMovePct);
-  const layers = [
-    ...(optionsMovePct != null
-      ? [
-          {
-            icon: LineChart,
-            label: "Options-implied",
-            title: `±${pct(optionsMovePct)}`,
-            caption: "ATM straddle",
-          },
-        ]
-      : []),
-    ...(mlMovePct != null
-      ? [
-          {
-            icon: BrainCircuit,
-            label: "Model forecast",
-            title: `±${pct(mlMovePct)}`,
-            caption: "Expected absolute move",
-          },
-        ]
-      : []),
-    ...(historicalMovePct != null
-      ? [
-          {
-            icon: History,
-            label: "Historical median",
-            title: `±${pct(historicalMovePct)}`,
-            caption:
-              historyCount > 0
-                ? `Last ${historyCount} earnings`
-                : "Realized moves",
-          },
-        ]
-      : []),
-  ];
-
-  if (layers.length < 2) return null;
-
-  return (
-    <section
-      className="qv-reading-guide"
-      aria-labelledby="qv-expected-move-comparison-title"
-    >
-      <div className="qv-reading-guide-heading">
-        <div className="qv-reading-guide-icon" aria-hidden="true">
-          <Scale size={18} strokeWidth={1.8} />
-        </div>
-        <div>
-          <div className="qv-reading-guide-eyebrow">Earnings move</div>
-          <h2 id="qv-expected-move-comparison-title">
-            Expected move comparison
-          </h2>
-        </div>
-      </div>
-      <div
-        className="qv-reading-guide-grid"
-        style={
-          {
-            "--qv-reading-guide-columns": layers.length,
-          } as CSSProperties
-        }
-      >
-        {layers.map((layer) => {
-          const Icon = layer.icon;
-          return (
-            <div key={layer.label} className="qv-reading-guide-layer">
-              <Icon aria-hidden="true" size={16} strokeWidth={1.8} />
-              <div>
-                <div className="qv-reading-guide-layer-label">
-                  {layer.label}
-                </div>
-                <div className="qv-reading-guide-layer-title">
-                  {layer.title}
-                </div>
-                <div className="qv-reading-guide-layer-caption">
-                  {layer.caption}
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-      <div className="qv-reading-guide-footer">
-        {comparison && <strong>{comparison}</strong>}
-        {ivRank != null && <span>IV rank {Math.round(ivRank * 100)}%</span>}
-        <span>Absolute move only; not direction</span>
-      </div>
-    </section>
   );
 }

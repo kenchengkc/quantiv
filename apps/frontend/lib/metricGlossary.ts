@@ -9,7 +9,6 @@ export type MetricKey =
   | "putCallOpenInterest"
   | "corporateActions"
   | "providerSignalScore"
-  | "probabilityDensity"
   | "forecastDistribution"
   | "termStructure"
   | "history"
@@ -163,21 +162,6 @@ export const METRIC_GLOSSARY: Record<MetricKey, MetricDefinition> = {
     methodologyHref: "/about#models-and-math",
     use: "Prioritize unusual context for review",
     caution: "Descriptive heuristic, not the LightGBM forecast",
-  },
-  probabilityDensity: {
-    label: "Probability density",
-    definition:
-      "A smooth log-normal illustration built from spot, IV, and time.",
-    calculation: [
-      "Spot + ATM IV + DTE",
-      "Log-normal mapping",
-      "Relative density curve",
-    ],
-    formula: "Return volatility = ATM IV × √(DTE ÷ 365)",
-    formulaTex: String.raw`\sigma_T=\sigma_{\mathrm{ATM}}\sqrt{\tfrac{\mathrm{DTE}}{365}}`,
-    methodologyHref: "/about#methodology-density",
-    use: "Compare where a smooth volatility model places more mass",
-    caution: "Earnings jumps can have fatter, asymmetric tails",
   },
   forecastDistribution: {
     label: "ML forecast distribution",
