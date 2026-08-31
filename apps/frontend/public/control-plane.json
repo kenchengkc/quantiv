@@ -21,7 +21,6 @@
     "source_session_lag": 0,
     "status": "degraded"
   },
-  "decision_safe": true,
   "exceptions": [
     {
       "code": "upcoming_events_outside_option_universe",
@@ -42,18 +41,21 @@
     "champion_active": true,
     "critical_features": 3,
     "drift_status": "warning",
+    "fallback_bundle_available": true,
     "hard_missing_features": 0,
     "monitored_at": "2026-08-30T17:31:29.600557+00:00",
+    "outcome_common_rows": null,
+    "outcome_minimum_rows": null,
     "outcome_status": "unavailable",
-    "rollback_ready": true,
     "rollback_recorded": false,
     "shadow_roles": [
       "previous"
     ],
     "snapshot_date": "2026-08-28",
-    "status": "passed",
+    "status": "degraded",
     "warning_features": 8
   },
-  "schema": "quantiv.control-plane.v1",
+  "publication_eligible": true,
+  "schema": "quantiv.control-plane.v2",
   "status": "degraded"
 }

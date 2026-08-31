@@ -3,7 +3,7 @@
 
 The source manifests stay in the validation/R2 audit paths. This projection is
 deliberately small: engineers get the full receipts there, while the protected
-status page gets the exceptions and decision-safety signals a person can act on.
+status page gets the exceptions and publication-control signals a person can act on.
 """
 
 from __future__ import annotations
@@ -75,7 +75,7 @@ def build_snapshot(
 
     drift = monitoring.get("feature_drift") or {}
     shadow_scoring = monitoring.get("shadow_scoring") or {}
-    model_status = _status(monitoring.get("status"))
+    model_status = _status(monitoring.get("status"), drift.get("status"))
     if not monitoring:
         model_status = "unavailable"
     data_status = _status(quality.get("status"))
@@ -96,12 +96,16 @@ def build_snapshot(
     active_champion = bool(registry.get("champion_bundle_id"))
     challenger = bool(registry.get("challenger_bundle_id"))
 
+    publication_eligible = bool(quality.get("decision_safe")) and model_status in {
+        "passed",
+        "degraded",
+    }
+
     return {
-        "schema": "quantiv.control-plane.v1",
+        "schema": "quantiv.control-plane.v2",
         "generated_at": generated_at,
         "status": overall_status,
-        "decision_safe": bool(quality.get("decision_safe"))
-        and model_status not in {"failed"},
+        "publication_eligible": publication_eligible,
         "data": {
             "status": data_status,
             "source_date": source.get("source_date") or quote.get("source_date"),
@@ -143,8 +147,10 @@ def build_snapshot(
                 for value in (drift.get("horizons") or {}).values()
                 if isinstance(value, dict)
             ),
-            "rollback_ready": bool(registry.get("previous_bundle_id")),
+            "fallback_bundle_available": bool(registry.get("previous_bundle_id")),
             "outcome_status": outcomes.get("status", "unavailable"),
+            "outcome_common_rows": _number(outcomes.get("common_rows")),
+            "outcome_minimum_rows": _number(outcomes.get("minimum_common_rows")),
             "rollback_recorded": bool(outcomes.get("rolled_back")),
         },
         "exceptions": exceptions,

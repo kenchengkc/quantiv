@@ -38,14 +38,22 @@ def test_snapshot_is_compact_and_does_not_expose_artifact_ids() -> None:
             "champion_bundle_id": "sha256:secret-champion",
             "previous_bundle_id": "sha256:secret-previous",
         },
-        {"status": "insufficient_data", "rolled_back": False},
+        {
+            "status": "insufficient_data",
+            "common_rows": 12,
+            "minimum_common_rows": 30,
+            "rolled_back": False,
+        },
         generated_at="2026-08-29T00:00:00Z",
     )
 
     assert snapshot["status"] == "degraded"
-    assert snapshot["decision_safe"] is True
+    assert snapshot["schema"] == "quantiv.control-plane.v2"
+    assert snapshot["publication_eligible"] is True
     assert snapshot["data"]["quarantine_records"] == 42
-    assert snapshot["model"]["rollback_ready"] is True
+    assert snapshot["model"]["fallback_bundle_available"] is True
+    assert snapshot["model"]["outcome_common_rows"] == 12
+    assert snapshot["model"]["outcome_minimum_rows"] == 30
     assert "sample" not in snapshot["exceptions"][0]
     assert "secret-champion" not in str(snapshot)
 
@@ -54,6 +62,53 @@ def test_missing_manifests_are_explicitly_unavailable() -> None:
     snapshot = build_snapshot({}, {}, {}, {}, generated_at="now")
 
     assert snapshot["status"] == "unavailable"
-    assert snapshot["decision_safe"] is False
+    assert snapshot["publication_eligible"] is False
     assert snapshot["data"]["status"] == "unavailable"
+    assert snapshot["model"]["status"] == "unavailable"
+
+
+def test_feature_drift_degrades_model_health_without_blocking_publication() -> None:
+    snapshot = build_snapshot(
+        {"quality": {"status": "passed", "decision_safe": True}},
+        {
+            "status": "passed",
+            "feature_drift": {"status": "warning", "critical_features": 3},
+        },
+        {"champion_bundle_id": "champion"},
+        {},
+        generated_at="now",
+    )
+
+    assert snapshot["status"] == "degraded"
+    assert snapshot["publication_eligible"] is True
+    assert snapshot["model"]["status"] == "degraded"
+
+
+def test_critical_drift_blocks_publication() -> None:
+    snapshot = build_snapshot(
+        {"quality": {"status": "passed", "decision_safe": True}},
+        {
+            "status": "passed",
+            "feature_drift": {"status": "critical", "critical_features": 1},
+        },
+        {"champion_bundle_id": "champion"},
+        {},
+        generated_at="now",
+    )
+
+    assert snapshot["status"] == "failed"
+    assert snapshot["publication_eligible"] is False
+    assert snapshot["model"]["status"] == "failed"
+
+
+def test_missing_model_monitoring_blocks_publication_claim() -> None:
+    snapshot = build_snapshot(
+        {"quality": {"status": "passed", "decision_safe": True}},
+        {},
+        {"champion_bundle_id": "champion"},
+        {},
+        generated_at="now",
+    )
+
+    assert snapshot["publication_eligible"] is False
     assert snapshot["model"]["status"] == "unavailable"

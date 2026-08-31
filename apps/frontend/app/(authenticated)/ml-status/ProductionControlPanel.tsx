@@ -23,7 +23,9 @@ type Exception = {
 type ControlSnapshot = {
   generated_at: string;
   status: ControlStatus;
-  decision_safe: boolean;
+  publication_eligible?: boolean;
+  /** Compatibility with v1 snapshots during a rolling deployment. */
+  decision_safe?: boolean;
   data: {
     status: ControlStatus;
     source_date: string | null;
@@ -57,8 +59,10 @@ type ControlSnapshot = {
     critical_features: number | null;
     hard_missing_features: number | null;
     warning_features: number;
-    rollback_ready: boolean;
+    fallback_bundle_available: boolean;
     outcome_status: string;
+    outcome_common_rows: number | null;
+    outcome_minimum_rows: number | null;
     rollback_recorded: boolean;
   };
   exceptions: Exception[];
@@ -67,7 +71,7 @@ type ControlSnapshot = {
 const EMPTY: ControlSnapshot = {
   generated_at: '',
   status: 'unavailable',
-  decision_safe: false,
+  publication_eligible: false,
   data: {
     status: 'unavailable',
     source_date: null,
@@ -101,8 +105,10 @@ const EMPTY: ControlSnapshot = {
     critical_features: null,
     hard_missing_features: null,
     warning_features: 0,
-    rollback_ready: false,
+    fallback_bundle_available: false,
     outcome_status: 'unavailable',
+    outcome_common_rows: null,
+    outcome_minimum_rows: null,
     rollback_recorded: false,
   },
   exceptions: [],
@@ -121,6 +127,7 @@ function statusLabel(status: ControlStatus | string): string {
   if (status === 'degraded') return 'Needs review';
   if (status === 'failed') return 'Blocked';
   if (status === 'unavailable') return 'Not reported';
+  if (status === 'insufficient_data') return 'Building evidence';
   if (status === 'enforced' || status === 'verified') return 'Verified';
   return status.replace(/_/g, ' ');
 }
@@ -295,13 +302,23 @@ export default function ProductionControlPanel() {
   }, []);
 
   const { data, model } = snapshot;
-  const overallLabel = snapshot.decision_safe
-    ? 'Decision-safe'
+  const publicationEligible =
+    snapshot.publication_eligible ?? snapshot.decision_safe ?? false;
+  const coveredEventsOnly =
+    publicationEligible &&
+    data.missing_events != null &&
+    data.missing_events > 0;
+  const overallLabel = publicationEligible
+    ? coveredEventsOnly
+      ? 'Publication eligible · covered events only'
+      : 'Publication eligible'
     : snapshot.status === 'unavailable'
       ? 'Controls not reported'
       : 'Publication blocked';
-  const overallColor = snapshot.decision_safe
-    ? 'var(--up)'
+  const overallColor = publicationEligible
+    ? snapshot.status === 'degraded'
+      ? 'var(--flag)'
+      : 'var(--up)'
     : snapshot.status === 'unavailable'
       ? 'var(--ink-3)'
       : 'var(--down)';
@@ -339,7 +356,7 @@ export default function ProductionControlPanel() {
               textTransform: 'uppercase',
             }}
           >
-            {snapshot.decision_safe ? (
+            {publicationEligible ? (
               <ShieldCheck size={15} />
             ) : (
               <AlertTriangle size={15} />
@@ -361,8 +378,9 @@ export default function ProductionControlPanel() {
               lineHeight: 1.45,
             }}
           >
-            One exception-first view of data readiness and model safety.
-            Detailed receipts stay in the pipeline artifacts.
+            {publicationEligible
+              ? `Covered forecasts cleared publication gates. ${data.live_trading_eligible ? 'Live-trading controls are eligible.' : 'This is end-of-day research data, not an execution feed.'}`
+              : 'One exception-first view of data readiness and model controls. Detailed receipts stay in pipeline artifacts.'}
           </p>
         </div>
         <ControlPill status={snapshot.status}>
@@ -412,6 +430,20 @@ export default function ProductionControlPanel() {
             }
           />
           <ControlMetric
+            label="Decision scope"
+            value={
+              data.live_trading_eligible
+                ? 'Live trading eligible'
+                : 'End-of-day research'
+            }
+            detail={
+              data.live_trading_eligible
+                ? 'Timeliness and liquidity controls passed'
+                : 'Not eligible as an execution feed'
+            }
+            status={data.live_trading_eligible ? 'passed' : 'degraded'}
+          />
+          <ControlMetric
             label="Quote rejection"
             value={percent(data.contract_rejection_rate)}
             detail={`${percent(data.pair_rejection_rate)} same-strike pairs rejected`}
@@ -452,7 +484,7 @@ export default function ProductionControlPanel() {
           <ControlMetric
             label="Feature drift"
             value={statusLabel(model.drift_status)}
-            detail={`${count(model.critical_features)} critical · ${count(model.warning_features)} warnings`}
+            detail={`${count(model.critical_features)} high-drift · ${count(model.warning_features)} warnings`}
             status={model.drift_status}
           />
           <ControlMetric
@@ -471,13 +503,21 @@ export default function ProductionControlPanel() {
             style={{ display: 'flex', gap: 7, flexWrap: 'wrap', marginTop: 11 }}
           >
             <ControlPill
-              status={model.rollback_ready ? 'passed' : 'unavailable'}
+              status={
+                model.fallback_bundle_available ? 'passed' : 'unavailable'
+              }
             >
               <RotateCcw size={11} style={{ marginRight: 4 }} />
-              Rollback {model.rollback_ready ? 'ready' : 'not ready'}
+              {model.fallback_bundle_available
+                ? 'Fallback bundle available'
+                : 'No fallback bundle reported'}
             </ControlPill>
             <ControlPill status={model.outcome_status}>
               Outcomes {statusLabel(model.outcome_status)}
+              {model.outcome_common_rows == null ||
+              model.outcome_minimum_rows == null
+                ? ''
+                : ` ${count(model.outcome_common_rows)}/${count(model.outcome_minimum_rows)}`}
             </ControlPill>
             {model.rollback_recorded ? (
               <ControlPill status="warning">Rollback recorded</ControlPill>
@@ -512,12 +552,13 @@ export default function ProductionControlPanel() {
             {snapshotUnavailable
               ? 'Control snapshot unavailable'
               : snapshot.exceptions.length
-              ? 'Exceptions requiring attention'
-              : 'No publication exceptions reported'}
+                ? 'Exceptions requiring attention'
+                : 'No publication exceptions reported'}
           </div>
           {snapshotUnavailable ? (
             <div style={{ color: 'var(--ink-4)', fontSize: 11, marginTop: 3 }}>
-              The next successful data refresh will publish the first production-control snapshot.
+              The next successful data refresh will publish the first
+              production-control snapshot.
             </div>
           ) : snapshot.exceptions.length ? (
             <div style={{ display: 'grid', gap: 5, marginTop: 7 }}>
