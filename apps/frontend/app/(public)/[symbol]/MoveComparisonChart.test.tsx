@@ -59,6 +59,10 @@ describe('MoveComparisonChart', () => {
     expect(container.textContent).toContain(
       'Options price 3.1 percentage points more movement than the model.',
     );
+    expect(container.textContent).toContain('Straddle exceedance ≈16%');
+    expect(container.textContent).toContain(
+      'Quantile interpolation · before spreads, fees, and post-event IV change',
+    );
     expect(container.textContent).toContain('Light band P10–P90');
 
     const spotUpdatedTab = Array.from(

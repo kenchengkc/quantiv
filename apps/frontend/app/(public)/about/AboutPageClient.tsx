@@ -1570,18 +1570,6 @@ export default function AboutPageClient() {
             body="Standard Black–Scholes–Merton sensitivities (continuous dividend yield). We surface the chain’s published ATM Greeks per expiry — delta, gamma, vega, theta — so you can see how delta-flat a position is, how much it moves on a 1-vol jump, and how fast theta accelerates into print."
           />
           <FormulaCard
-            id="methodology-density"
-            kicker="Density"
-            title="Two-sided log-normal probability"
-            tex={String.raw`\begin{aligned}
-              z_{+} &= \tfrac{\ln(1 + |x|)}{\sigma} \qquad z_{-} = \tfrac{\ln(1 - |x|)}{\sigma} \\[2pt]
-              P\!\left(\,\left|\tfrac{S}{S_0} - 1\right| \ge |x|\,\right) &= \bigl(1 - \Phi(z_{+})\bigr) + \Phi(z_{-})
-              \end{aligned}`}
-            body="The hover probability on the density bar uses the correct asymmetric
-              form. Naïve 2·(1 − Φ(z₊)) slightly overstates the tail because the
-              downside in simple-return space is fatter than the upside."
-          />
-          <FormulaCard
             id="methodology-history"
             kicker="Hist edge"
             title="Rich versus what actually printed"
@@ -1600,6 +1588,22 @@ export default function AboutPageClient() {
               walk-forward across every observed earnings event in the universe with
               no look-ahead. The 80% band P10–P90 is the model's confidence
               interval, not a guarantee."
+          />
+          <FormulaCard
+            id="methodology-exceedance"
+            kicker="Market-relative probability"
+            title="Straddle exceedance"
+            tex={String.raw`\begin{aligned}
+              \widehat{P}(|r| > s) &= 1 - \operatorname{lerp}\!\left((q_i,\tau_i),(q_{i+1},\tau_{i+1});s\right) \\[2pt]
+              s < q_{0.10} &\Rightarrow \widehat{P}(|r| > s) \ge 0.90 \\[2pt]
+              s > q_{0.90} &\Rightarrow \widehat{P}(|r| > s) \le 0.10
+              \end{aligned}`}
+            body="The ticker chart compares the ATM straddle move s with the
+              validated P10, P25, P50, P75, and P90 absolute-move forecasts.
+              It linearly interpolates only between those quantiles and reports
+              bounds outside them. This is a market-relative model readout, not
+              a sixth model or a return forecast; spreads, fees, and the
+              post-event volatility change are not included."
           />
         </div>
       </Reveal>

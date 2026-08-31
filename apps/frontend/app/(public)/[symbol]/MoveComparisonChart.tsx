@@ -1,4 +1,5 @@
 import type { PredictionMode, LivePredictionStatus } from './symbolPageTypes';
+import { estimateQuantileExceedance } from '@/lib/forecastQuantiles';
 
 type Quantiles = {
   p10: number;
@@ -45,6 +46,16 @@ function comparisonText(
   return `Options price ${gap.toFixed(1)} percentage points ${
     optionsMove > comparisonMove ? 'more' : 'less'
   } movement than the ${comparisonName}.`;
+}
+
+function exceedanceLabel(
+  estimate: ReturnType<typeof estimateQuantileExceedance>,
+): string | null {
+  if (!estimate) return null;
+  const probability = Math.round(estimate.probability * 100);
+  if (estimate.qualifier === 'at_least') return `≥${probability}%`;
+  if (estimate.qualifier === 'at_most') return `≤${probability}%`;
+  return `≈${probability}%`;
 }
 
 function MoveRow({
@@ -263,6 +274,11 @@ export default function MoveComparisonChart({
     modelMovePct,
     historicalMovePct,
   );
+  const exceedance =
+    optionsMovePct != null && modelQuantiles
+      ? estimateQuantileExceedance(modelQuantiles, optionsMovePct)
+      : null;
+  const exceedanceValue = exceedanceLabel(exceedance);
   const ticks = [0, 0.25, 0.5, 0.75, 1];
 
   return (
@@ -442,6 +458,24 @@ export default function MoveComparisonChart({
           borderTop: '1px solid var(--line)',
         }}
       >
+        {exceedanceValue ? (
+          <span
+            className="mono tnum"
+            style={{
+              padding: '4px 8px',
+              borderRadius: 999,
+              color: 'var(--brand-blue-1)',
+              border:
+                '1px solid color-mix(in oklab, var(--brand-blue-1) 30%, var(--line))',
+              background:
+                'color-mix(in oklab, var(--brand-blue-1) 8%, transparent)',
+              fontSize: 10,
+              fontWeight: 650,
+            }}
+          >
+            Straddle exceedance {exceedanceValue}
+          </span>
+        ) : null}
         {comparison ? (
           <strong
             style={{
@@ -461,6 +495,12 @@ export default function MoveComparisonChart({
         {modelQuantiles ? (
           <span style={{ color: 'var(--ink-4)', fontSize: 10 }}>
             Light band P10–P90 · dark band P25–P75 · line P50
+          </span>
+        ) : null}
+        {exceedanceValue ? (
+          <span style={{ color: 'var(--ink-4)', fontSize: 10 }}>
+            Quantile interpolation · before spreads, fees, and post-event IV
+            change
           </span>
         ) : null}
       </div>

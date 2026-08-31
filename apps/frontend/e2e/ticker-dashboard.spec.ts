@@ -41,6 +41,7 @@ test("ticker dashboard presents one market-model-history view before detail", as
   const history = page.getByRole("heading", { name: /Realized moves/ });
 
   await expect(comparison).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByText(/Straddle exceedance [≈≥≤]\d+%/)).toBeVisible();
   await expect(termStructure).toBeVisible();
   await expect(history).toBeVisible();
 

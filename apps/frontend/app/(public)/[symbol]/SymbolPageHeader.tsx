@@ -1209,5 +1209,3 @@ export function DetailHero({
     </div>
   );
 }
-
-// ---------- Interactive Bar (probability density) ----------
