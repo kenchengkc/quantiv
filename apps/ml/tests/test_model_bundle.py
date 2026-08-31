@@ -12,11 +12,13 @@ from ml.model_bundle import (
     create_signed_bundle,
     create_signed_control_pointer,
     create_signed_monitor_receipt,
+    create_signed_outcome_receipt,
     create_signed_registry,
     required_artifact_names,
     verify_bundle_dir,
     verify_control_pointer,
     verify_monitor_receipt,
+    verify_outcome_receipt,
     verify_registry,
 )
 
@@ -139,5 +141,33 @@ def test_registry_and_monitoring_ledger_are_signed(tmp_path: Path) -> None:
             receipt,
             ledger_path=ledger,
             report_path=report,
+            public_key=public,
+        )
+
+
+def test_realized_outcome_evidence_is_signed_as_one_unit(tmp_path: Path) -> None:
+    private, public = _keys()
+    report = tmp_path / "latest_outcomes.json"
+    history = tmp_path / "outcome_history.json"
+    report.write_text(json.dumps({"status": "insufficient_data", "common_rows": 0}))
+    history.write_text(json.dumps({"evaluations": [{"common_rows": 0}]}))
+    receipt = create_signed_outcome_receipt(
+        report_path=report,
+        history_path=history,
+        private_key=private,
+    )
+
+    verify_outcome_receipt(
+        receipt,
+        report_path=report,
+        history_path=history,
+        public_key=public,
+    )
+    history.write_text(json.dumps({"evaluations": []}))
+    with pytest.raises(ModelBundleError, match="history"):
+        verify_outcome_receipt(
+            receipt,
+            report_path=report,
+            history_path=history,
             public_key=public,
         )

@@ -103,7 +103,10 @@ push_controls() {
       --fast-list --transfers=4 --progress
   fi
   if [ -d "$DATA_DIR/validation" ]; then
-    rclone sync "$DATA_DIR/validation" "$REMOTE/validation" \
+    # Validation evidence is produced by multiple jobs. A daily runner does
+    # not restore every weekly report, so sync would delete valid outcome and
+    # retraining evidence that is absent from that runner's checkout.
+    rclone copy "$DATA_DIR/validation" "$REMOTE/validation" \
       --fast-list --transfers=4 --progress
   fi
 }

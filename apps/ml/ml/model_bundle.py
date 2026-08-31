@@ -33,6 +33,7 @@ BUNDLE_SCHEMA = "quantiv.model-bundle.v1"
 CONTROL_SCHEMA = "quantiv.model-control.v1"
 REGISTRY_SCHEMA = "quantiv.model-registry.v1"
 MONITOR_SCHEMA = "quantiv.model-monitor.v1"
+OUTCOME_SCHEMA = "quantiv.model-outcome-receipt.v1"
 SIGNATURE_ALGORITHM = "ed25519"
 DEFAULT_HORIZONS = (1, 2, 3, 7, 14, 21)
 DEFAULT_QUANTILES = (10, 25, 50, 75, 90)
@@ -418,17 +419,69 @@ def verify_monitor_receipt(
     return payload
 
 
+def create_signed_outcome_receipt(
+    *,
+    report_path: Path,
+    history_path: Path,
+    private_key: str | bytes | None = None,
+) -> dict[str, Any]:
+    """Sign the latest realized-outcome report and its bounded history."""
+    return _sign(
+        {
+            "schema": OUTCOME_SCHEMA,
+            "created_at": _utc_now(),
+            "report": {
+                "name": report_path.name,
+                "bytes": report_path.stat().st_size,
+                "sha256": sha256_file(report_path),
+            },
+            "history": {
+                "name": history_path.name,
+                "bytes": history_path.stat().st_size,
+                "sha256": sha256_file(history_path),
+            },
+        },
+        private_key,
+    )
+
+
+def verify_outcome_receipt(
+    receipt: Mapping[str, Any],
+    *,
+    report_path: Path,
+    history_path: Path,
+    public_key: str | bytes | None = None,
+) -> dict[str, Any]:
+    """Fail closed when realized-outcome evidence is missing or altered."""
+    payload = verify_signed_payload(receipt, public_key=public_key)
+    if payload.get("schema") != OUTCOME_SCHEMA:
+        raise ModelBundleError("unsupported model outcome receipt schema")
+    for label, path in (("report", report_path), ("history", history_path)):
+        artifact = payload.get(label)
+        if not isinstance(artifact, Mapping):
+            raise ModelBundleError(f"outcome receipt has no {label} artifact")
+        if artifact.get("name") != path.name:
+            raise ModelBundleError(f"outcome {label} name mismatch")
+        if int(artifact.get("bytes", -1)) != path.stat().st_size:
+            raise ModelBundleError(f"outcome {label} size mismatch")
+        if artifact.get("sha256") != sha256_file(path):
+            raise ModelBundleError(f"outcome {label} digest mismatch")
+    return payload
+
+
 __all__ = [
     "BUNDLE_SCHEMA",
     "CONTROL_SCHEMA",
     "REGISTRY_SCHEMA",
     "MONITOR_SCHEMA",
+    "OUTCOME_SCHEMA",
     "DEFAULT_HORIZONS",
     "DEFAULT_QUANTILES",
     "ModelBundleError",
     "create_signed_bundle",
     "create_signed_control_pointer",
     "create_signed_monitor_receipt",
+    "create_signed_outcome_receipt",
     "create_signed_registry",
     "required_artifact_names",
     "resolve_champion_bundle",
@@ -436,6 +489,7 @@ __all__ = [
     "verify_bundle_manifest",
     "verify_control_pointer",
     "verify_monitor_receipt",
+    "verify_outcome_receipt",
     "verify_registry",
     "verify_signed_payload",
 ]

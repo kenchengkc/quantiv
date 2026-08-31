@@ -11,12 +11,20 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+ML_PACKAGE_ROOT = REPO_ROOT / "apps" / "ml"
+if str(ML_PACKAGE_ROOT) not in sys.path:
+    sys.path.insert(0, str(ML_PACKAGE_ROOT))
+
+from ml.model_bundle import ModelBundleError, verify_outcome_receipt  # noqa: E402
+
+
 OUTPUT_PATH = REPO_ROOT / "apps" / "frontend" / "public" / "control-plane.json"
 HISTORY_OUTPUT_PATH = (
     REPO_ROOT / "apps" / "frontend" / "public" / "control-plane-history.json"
@@ -40,6 +48,27 @@ def _number(value: Any) -> int | float | None:
     return None
 
 
+def _read_verified_outcomes(
+    report_path: Path,
+    history_path: Path,
+    receipt_path: Path,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    if not report_path.exists():
+        return {}, {}
+    if not history_path.exists() or not receipt_path.exists():
+        return {"status": "unverified"}, {}
+    try:
+        receipt = _read(receipt_path)
+        verify_outcome_receipt(
+            receipt,
+            report_path=report_path,
+            history_path=history_path,
+        )
+    except (ModelBundleError, OSError, ValueError):
+        return {"status": "unverified"}, {}
+    return _read(report_path), _read(history_path)
+
+
 def _status(*values: str | None) -> str:
     normalized = {value for value in values if value}
     if "failed" in normalized or "critical" in normalized:
@@ -56,6 +85,7 @@ def build_snapshot(
     monitoring: dict[str, Any],
     registry: dict[str, Any],
     outcomes: dict[str, Any],
+    outcome_history: dict[str, Any] | None = None,
     *,
     generated_at: str,
 ) -> dict[str, Any]:
@@ -100,6 +130,11 @@ def build_snapshot(
     )
     active_champion = bool(registry.get("champion_bundle_id"))
     challenger = bool(registry.get("challenger_bundle_id"))
+    outcome_evaluations = [
+        item
+        for item in ((outcome_history or {}).get("evaluations") or [])
+        if isinstance(item, dict)
+    ]
 
     publication_eligible = bool(quality.get("decision_safe")) and model_status in {
         "passed",
@@ -163,6 +198,8 @@ def build_snapshot(
             "outcome_status": outcomes.get("status", "unavailable"),
             "outcome_common_rows": _number(outcomes.get("common_rows")),
             "outcome_minimum_rows": _number(outcomes.get("minimum_common_rows")),
+            "outcome_evaluated_at": outcomes.get("evaluated_at"),
+            "outcome_evaluations": len(outcome_evaluations),
             "rollback_recorded": bool(outcomes.get("rolled_back")),
         },
         "exceptions": exceptions,
@@ -285,16 +322,24 @@ def main() -> int:
     parser.add_argument("--reconciliation", type=Path, default=REPO_ROOT / "data/validation/data_reconciliation.json")
     parser.add_argument("--monitoring", type=Path, default=REPO_ROOT / "data/models/monitoring/latest_monitoring.json")
     parser.add_argument("--registry", type=Path, default=REPO_ROOT / "data/models/control/registry.json")
-    parser.add_argument("--outcomes", type=Path, default=REPO_ROOT / "data/validation/model_outcomes.json")
+    parser.add_argument("--outcomes", type=Path, default=REPO_ROOT / "data/models/monitoring/latest_outcomes.json")
+    parser.add_argument("--outcome-history", type=Path, default=REPO_ROOT / "data/models/monitoring/outcome_history.json")
+    parser.add_argument("--outcome-receipt", type=Path, default=REPO_ROOT / "data/models/monitoring/latest_outcomes.receipt.json")
     parser.add_argument("--history-output", type=Path, default=HISTORY_OUTPUT_PATH)
     parser.add_argument("--history-limit", type=int, default=DEFAULT_HISTORY_LIMIT)
     args = parser.parse_args()
 
+    outcomes, outcome_history = _read_verified_outcomes(
+        args.outcomes,
+        args.outcome_history,
+        args.outcome_receipt,
+    )
     snapshot = build_snapshot(
         _read(args.reconciliation),
         _read(args.monitoring),
         _read(args.registry),
-        _read(args.outcomes),
+        outcomes,
+        outcome_history,
         generated_at=datetime.now(timezone.utc).isoformat(),
     )
     history = update_history(

@@ -21,6 +21,7 @@ if str(ML_PACKAGE_ROOT) not in sys.path:
 from ml.model_bundle import (  # noqa: E402
     create_signed_control_pointer,
     create_signed_monitor_receipt,
+    create_signed_outcome_receipt,
     create_signed_registry,
     verify_bundle_dir,
     verify_control_pointer,
@@ -34,6 +35,7 @@ from ml.model_control import (  # noqa: E402
     feature_drift_report,
     monitoring_rows,
     shadow_score_report,
+    update_outcome_history,
 )
 from ml.pipeline_validation import latest_forecast_path  # noqa: E402
 
@@ -50,6 +52,33 @@ def _read_json(path: Path) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise ValueError(f"expected a JSON object at {path}")
     return payload
+
+
+def _publish_outcome_evidence(
+    args: argparse.Namespace,
+    report: dict[str, Any],
+    monitoring_dir: Path,
+) -> None:
+    """Atomically persist and sign the latest outcome check plus bounded history."""
+    latest_path = args.monitoring_report or monitoring_dir / "latest_outcomes.json"
+    history_path = args.history or monitoring_dir / "outcome_history.json"
+    receipt_path = monitoring_dir / "latest_outcomes.receipt.json"
+    existing_history = _read_json(history_path) if history_path.exists() else {}
+    history = update_outcome_history(
+        existing_history,
+        report,
+        limit=args.history_limit,
+    )
+    _atomic_json(args.report, report)
+    _atomic_json(latest_path, report)
+    _atomic_json(history_path, history)
+    _atomic_json(
+        receipt_path,
+        create_signed_outcome_receipt(
+            report_path=latest_path,
+            history_path=history_path,
+        ),
+    )
 
 
 def _promote_forecast(candidate_path: Path, forecast_dir: Path) -> Path:
@@ -262,14 +291,16 @@ def evaluate_outcomes(args: argparse.Namespace) -> int:
     ledger_path = monitoring_dir / "prediction_ledger.parquet"
     monitoring_report_path = monitoring_dir / "latest_monitoring.json"
     receipt_path = monitoring_dir / "latest_monitoring.receipt.json"
+    evaluated_at = datetime.now(timezone.utc).isoformat()
     if not (ledger_path.exists() and monitoring_report_path.exists() and receipt_path.exists()):
         report = {
             "schema": "quantiv.model-outcome-monitor.v1",
+            "evaluated_at": evaluated_at,
             "status": "insufficient_data",
             "rolled_back": False,
             "reason": "signed production prediction ledger is not available yet",
         }
-        _atomic_json(args.report, report)
+        _publish_outcome_evidence(args, report, monitoring_dir)
         print(json.dumps(report, indent=2, sort_keys=True))
         return 0
     verify_monitor_receipt(
@@ -284,11 +315,12 @@ def evaluate_outcomes(args: argparse.Namespace) -> int:
     if not comparison_id or comparison_id == champion_id:
         report = {
             "schema": "quantiv.model-outcome-monitor.v1",
+            "evaluated_at": evaluated_at,
             "status": "insufficient_data",
             "rolled_back": False,
             "reason": "no distinct previous or challenger bundle is available",
         }
-        _atomic_json(args.report, report)
+        _publish_outcome_evidence(args, report, monitoring_dir)
         print(json.dumps(report, indent=2, sort_keys=True))
         return 0
     champion_dir = args.models_root / "bundles" / champion_id
@@ -340,11 +372,11 @@ def evaluate_outcomes(args: argparse.Namespace) -> int:
         )
     report = {
         "schema": "quantiv.model-outcome-monitor.v1",
-        "evaluated_at": datetime.now(timezone.utc).isoformat(),
+        "evaluated_at": evaluated_at,
         "rolled_back": rolled_back,
         **result,
     }
-    _atomic_json(args.report, report)
+    _publish_outcome_evidence(args, report, monitoring_dir)
     print(json.dumps(report, indent=2, sort_keys=True, default=str))
     return 0
 
@@ -379,6 +411,9 @@ def main() -> int:
     outcomes.add_argument("--models-root", type=Path, default=REPO_ROOT / "data" / "models")
     outcomes.add_argument("--training-dir", type=Path, default=REPO_ROOT / "data" / "ml_training")
     outcomes.add_argument("--min-common-rows", type=int, default=30)
+    outcomes.add_argument("--monitoring-report", type=Path, default=None)
+    outcomes.add_argument("--history", type=Path, default=None)
+    outcomes.add_argument("--history-limit", type=int, default=52)
     outcomes.add_argument(
         "--report",
         type=Path,

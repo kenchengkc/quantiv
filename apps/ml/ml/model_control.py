@@ -510,6 +510,47 @@ def evaluate_realized_outcomes(
     return report
 
 
+def update_outcome_history(
+    existing: Mapping[str, Any] | None,
+    report: Mapping[str, Any],
+    *,
+    limit: int = 52,
+) -> dict[str, Any]:
+    """Retain bounded weekly outcome evidence without a database dependency."""
+    if limit < 1:
+        raise ValueError("outcome history limit must be at least 1")
+    evaluated_at = str(report.get("evaluated_at") or "")
+    entry = {
+        key: value
+        for key, value in {
+            "evaluated_at": evaluated_at,
+            "status": report.get("status", "unavailable"),
+            "common_rows": int(report.get("common_rows") or 0),
+            "minimum_common_rows": int(report.get("minimum_common_rows") or 0),
+            "champion_bundle_id": report.get("champion_bundle_id"),
+            "comparison_bundle_id": report.get("comparison_bundle_id"),
+            "champion": report.get("champion"),
+            "comparison": report.get("comparison"),
+            "residual_drift_alerts": len(report.get("residual_drift_alerts") or []),
+            "rollback_recommended": bool(report.get("rollback_recommended")),
+            "rolled_back": bool(report.get("rolled_back")),
+            "rollback_reasons": report.get("rollback_reasons"),
+            "reason": report.get("reason"),
+        }.items()
+        if value is not None
+    }
+    prior = [
+        dict(item)
+        for item in ((existing or {}).get("evaluations") or [])
+        if isinstance(item, Mapping) and str(item.get("evaluated_at") or "") != evaluated_at
+    ]
+    return {
+        "schema": "quantiv.model-outcome-history.v1",
+        "updated_at": evaluated_at,
+        "evaluations": [entry, *prior][:limit],
+    }
+
+
 __all__ = [
     "compare_on_common_holdout",
     "append_prediction_ledger",
@@ -518,4 +559,5 @@ __all__ = [
     "score_bundle_frame",
     "shadow_score_report",
     "monitoring_rows",
+    "update_outcome_history",
 ]

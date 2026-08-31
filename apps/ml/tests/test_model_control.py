@@ -16,6 +16,7 @@ from ml.model_control import (
     compare_on_common_holdout,
     evaluate_realized_outcomes,
     feature_drift_report,
+    update_outcome_history,
 )
 
 
@@ -226,3 +227,43 @@ def test_drift_blocks_large_missingness_shift_below_psi_sample_floor(tmp_path: P
     assert result["status"] == "critical"
     assert result["critical_features"] == 1
     assert result["horizons"]["1"]["features"]["feature"]["status"] == "critical"
+
+
+def test_outcome_history_is_bounded_and_replaces_the_same_evaluation() -> None:
+    first = update_outcome_history(
+        {},
+        {
+            "evaluated_at": "2026-08-23T12:00:00Z",
+            "status": "insufficient_data",
+            "common_rows": 0,
+            "minimum_common_rows": 30,
+            "rolled_back": False,
+        },
+        limit=2,
+    )
+    second = update_outcome_history(
+        first,
+        {
+            "evaluated_at": "2026-08-30T12:00:00Z",
+            "status": "passed",
+            "common_rows": 40,
+            "minimum_common_rows": 30,
+            "champion": {"mae": 0.04, "baseline_straddle_mae": 0.05},
+            "rolled_back": False,
+        },
+        limit=2,
+    )
+    replaced = update_outcome_history(
+        second,
+        {
+            "evaluated_at": "2026-08-30T12:00:00Z",
+            "status": "passed",
+            "common_rows": 41,
+            "minimum_common_rows": 30,
+            "rolled_back": False,
+        },
+        limit=2,
+    )
+
+    assert [item["common_rows"] for item in replaced["evaluations"]] == [41, 0]
+    assert replaced["schema"] == "quantiv.model-outcome-history.v1"

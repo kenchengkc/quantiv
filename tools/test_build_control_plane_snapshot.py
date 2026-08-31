@@ -1,4 +1,5 @@
 from build_control_plane_snapshot import (
+    _read_verified_outcomes,
     build_snapshot,
     build_workflow_reference,
     update_history,
@@ -51,6 +52,7 @@ def test_snapshot_is_compact_and_does_not_expose_artifact_ids() -> None:
             "minimum_common_rows": 30,
             "rolled_back": False,
         },
+        {"evaluations": [{"evaluated_at": "2026-08-29T00:00:00Z"}]},
         generated_at="2026-08-29T00:00:00Z",
     )
 
@@ -63,8 +65,23 @@ def test_snapshot_is_compact_and_does_not_expose_artifact_ids() -> None:
     assert snapshot["model"]["fallback_bundle_available"] is True
     assert snapshot["model"]["outcome_common_rows"] == 12
     assert snapshot["model"]["outcome_minimum_rows"] == 30
+    assert snapshot["model"]["outcome_evaluations"] == 1
     assert "sample" not in snapshot["exceptions"][0]
     assert "secret-champion" not in str(snapshot)
+
+
+def test_unsigned_outcome_report_is_not_exposed(tmp_path) -> None:
+    report = tmp_path / "latest_outcomes.json"
+    report.write_text('{"status":"passed","common_rows":100}')
+
+    outcomes, history = _read_verified_outcomes(
+        report,
+        tmp_path / "outcome_history.json",
+        tmp_path / "latest_outcomes.receipt.json",
+    )
+
+    assert outcomes == {"status": "unverified"}
+    assert history == {}
 
 
 def test_missing_manifests_are_explicitly_unavailable() -> None:

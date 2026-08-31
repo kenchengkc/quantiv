@@ -412,6 +412,17 @@ export default function ProductionControlPanel({
             }
             status={model.shadow_roles.length ? 'passed' : 'unavailable'}
           />
+          <ControlMetric
+            label="Realized outcomes"
+            value={statusLabel(model.outcome_status)}
+            detail={
+              model.outcome_common_rows == null ||
+              model.outcome_minimum_rows == null
+                ? 'No verified evaluation yet'
+                : `${count(model.outcome_common_rows)} of ${count(model.outcome_minimum_rows)} paired events · ${count(model.outcome_evaluations ?? 0)} checks retained`
+            }
+            status={model.outcome_status}
+          />
           <div
             style={{ display: 'flex', gap: 7, flexWrap: 'wrap', marginTop: 11 }}
           >
@@ -424,13 +435,6 @@ export default function ProductionControlPanel({
               {model.fallback_bundle_available
                 ? 'Fallback bundle available'
                 : 'No fallback bundle reported'}
-            </ControlPill>
-            <ControlPill status={model.outcome_status}>
-              Outcomes {statusLabel(model.outcome_status)}
-              {model.outcome_common_rows == null ||
-              model.outcome_minimum_rows == null
-                ? ''
-                : ` ${count(model.outcome_common_rows)}/${count(model.outcome_minimum_rows)}`}
             </ControlPill>
             {model.rollback_recorded ? (
               <ControlPill status="warning">Rollback recorded</ControlPill>

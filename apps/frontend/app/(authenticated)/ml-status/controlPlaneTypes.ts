@@ -53,6 +53,8 @@ export type ControlSnapshot = {
     outcome_status: string;
     outcome_common_rows: number | null;
     outcome_minimum_rows: number | null;
+    outcome_evaluated_at?: string | null;
+    outcome_evaluations?: number;
     rollback_recorded: boolean;
   };
   exceptions: ControlException[];
