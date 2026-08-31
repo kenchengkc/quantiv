@@ -4,15 +4,15 @@
     "contracts": 113220,
     "corporate_action_rows": 28474,
     "corporate_action_status": "enforced",
-    "covered_events": 38,
+    "covered_events": 48,
     "decision_scope": "end_of_day_research",
     "duplicate_rows": 0,
     "eligible_contracts": 63351,
-    "event_coverage_pct": 0.730769,
-    "expected_events": 52,
+    "event_coverage_pct": 0.75,
+    "expected_events": 64,
     "expected_source_date": "2026-08-28",
     "live_trading_eligible": false,
-    "missing_events": 14,
+    "missing_events": 16,
     "pair_rejection_rate": 0.877619,
     "quarantine_records": 99551,
     "quarantine_status": "enforced",
@@ -24,26 +24,26 @@
   "exceptions": [
     {
       "code": "upcoming_events_outside_option_universe",
-      "count": 408,
+      "count": 353,
       "severity": "warning",
       "summary": "Calendar events fall outside the current options decision universe"
     },
     {
       "code": "upcoming_events_without_option_chain",
-      "count": 14,
+      "count": 16,
       "severity": "warning",
       "summary": "In-universe earnings events have no decision-eligible option chain"
     }
   ],
-  "generated_at": "2026-08-30T17:38:18.241108+00:00",
+  "generated_at": "2026-08-31T18:13:07.364495+00:00",
   "model": {
     "challenger_present": false,
     "champion_active": true,
-    "critical_features": 3,
+    "critical_features": 4,
     "drift_status": "warning",
     "fallback_bundle_available": true,
     "hard_missing_features": 0,
-    "monitored_at": "2026-08-30T17:31:29.600557+00:00",
+    "monitored_at": "2026-08-31T18:06:56.087137+00:00",
     "outcome_common_rows": null,
     "outcome_minimum_rows": null,
     "outcome_status": "unavailable",
@@ -53,7 +53,7 @@
     ],
     "snapshot_date": "2026-08-28",
     "status": "degraded",
-    "warning_features": 8
+    "warning_features": 7
   },
   "publication_eligible": true,
   "schema": "quantiv.control-plane.v2",

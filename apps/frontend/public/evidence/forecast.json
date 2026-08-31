@@ -1,17 +1,17 @@
 {
   "schema": "quantiv.dashboard-evidence.v1",
-  "receipt_id": "sha256:ac3853de5eeec6038885cf6abdad32dd6bb8ca36f45ae56ad008d83344bff3c9",
-  "receipt_file": "forecasts_2026-08-30.ac3853de5eee.receipt.json",
-  "validated_at": "2026-08-30T17:31:26.713299+00:00",
+  "receipt_id": "sha256:fa8abbf62882aca615a0717bd75bb4b2904c2478574831ebb66f2d0256b8dad8",
+  "receipt_file": "forecasts_2026-08-31.fa8abbf62882.receipt.json",
+  "validated_at": "2026-08-31T18:06:53.016963+00:00",
   "quality": {
     "status": "passed",
     "issue_count": 0,
     "issue_codes": []
   },
   "coverage": {
-    "rows": 91,
-    "symbols": 39,
-    "events": 39,
+    "rows": 106,
+    "symbols": 40,
+    "events": 47,
     "horizons": [
       3,
       7,
@@ -22,8 +22,8 @@
   "observation_window": {
     "earnings_max": "2026-09-17",
     "earnings_min": "2026-08-31",
-    "scored_at_max": "2026-08-30T17:31:24.078731+00:00",
-    "scored_at_min": "2026-08-30T17:31:24.001094+00:00",
+    "scored_at_max": "2026-08-31T18:06:49.569697+00:00",
+    "scored_at_min": "2026-08-31T18:06:49.453137+00:00",
     "snapshot_max": "2026-08-28",
     "snapshot_min": "2026-08-10"
   },
@@ -62,15 +62,15 @@
       "name": "model_bundle",
       "producer": "apps/ml/model_trainer.py",
       "member_count": 28,
-      "bytes": 2890337,
-      "sha256": "1e689feaead75ce16cc98b3a0c721eb019304a368427398a972d6ca8f967ef2a"
+      "bytes": 2890376,
+      "sha256": "aebdeee595101467cb2cb45bc41404ccd3908a3cca3dbf0af623615282c79afd"
     },
     {
       "name": "forecast_snapshot",
       "producer": "scripts/daily_score.py",
       "member_count": 1,
-      "bytes": 117835,
-      "sha256": "990fb2e4b733ca945e947a9b1d89a2ebd7197b929b419c0275ff76942831aca7"
+      "bytes": 131139,
+      "sha256": "66c09755be1de736058225d16bf3b23ce3b87757bb31f03f317ab7793801e1ac"
     }
   ]
 }

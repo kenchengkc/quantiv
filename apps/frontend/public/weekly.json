@@ -1,7 +1,7 @@
 {
   "metadata": {
     "version": "v4_multi_week",
-    "generated_at": "2026-08-30T17:33:56.691967",
+    "generated_at": "2026-08-31T18:09:07.001736",
     "as_of_date": "2026-08-28",
     "method": "ATM straddle + IV baseline",
     "offset": 0
@@ -86,44 +86,6 @@
       "p50": 0.081224,
       "p75": 0.155557,
       "p90": 0.223931
-    },
-    {
-      "ticker": "M",
-      "earnings_date": "2026-09-01",
-      "timing": "before_market_open",
-      "fiscal_q": "Q2",
-      "eps_actual": null,
-      "eps_estimate": 0.3743,
-      "revenue_actual": null,
-      "revenue_estimate": 4917152535.0,
-      "realized_move_pct": null,
-      "as_of_date": "2026-08-28",
-      "spot_price": 22.5,
-      "atm_strike": 22.5,
-      "atm_iv": 0.6127,
-      "em_straddle_pct": 0.096,
-      "em_iv_pct": 0.119996,
-      "em_straddle_abs": 2.16,
-      "expiry_date": "2026-09-11",
-      "days_to_expiry": 14,
-      "lead_time_days": 4,
-      "skew_atm": 0.01895,
-      "term_slope": -0.116007,
-      "em_method": "ml_lightgbm",
-      "confidence": "high",
-      "iv_rank": 0.357765,
-      "hist_move_avg_4q": 0.028294,
-      "iv_crush_pct": 0.234472,
-      "em_ml_pct": 0.049596,
-      "em_ml_abs": 1.120383,
-      "correction_factor": 0.514248,
-      "model_horizon": 7,
-      "ml_snapshot_date": "2026-08-25",
-      "p10": 0.006302,
-      "p25": 0.020968,
-      "p50": 0.058863,
-      "p75": 0.123572,
-      "p90": 0.124184
     },
     {
       "ticker": "MDT",
@@ -773,8 +735,8 @@
     }
   ],
   "summary": {
-    "total_events": 20,
-    "avg_em_straddle_pct": 0.113496,
-    "avg_em_iv_pct": 0.14367795
+    "total_events": 19,
+    "avg_em_straddle_pct": 0.11441684210526318,
+    "avg_em_iv_pct": 0.1449243684210526
   }
 }

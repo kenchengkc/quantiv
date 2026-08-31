@@ -20,13 +20,13 @@
     "correction_factor": 0.576175,
     "model_horizon": 14,
     "ml_snapshot_date": "2026-08-25",
-    "p10": 0.010248,
+    "p10": 0.01017,
     "p25": 0.033849,
     "p50": 0.073549,
     "p75": 0.14714,
-    "p90": 0.218599,
+    "p90": 0.218476,
     "em_method": "ml_lightgbm",
-    "timing": "after_market_close"
+    "timing": "before_market_open"
   },
   "straddle_features": [
     {
@@ -67,7 +67,7 @@
   "earnings_history": [
     {
       "date": "2026-09-08",
-      "timing": "after_market_close",
+      "timing": "before_market_open",
       "q": "Q4 26",
       "fiscal_year": 2026,
       "fiscal_q": "Q4",
@@ -257,5 +257,5 @@
     "iv_mom_week": -0.0223,
     "iv_mom_month": null
   },
-  "next_earnings_timing": "after_market_close"
+  "next_earnings_timing": "before_market_open"
 }
