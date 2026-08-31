@@ -1,0 +1,62 @@
+{
+  "generated_at": "2026-08-30T17:38:18.241108+00:00",
+  "runs": [
+    {
+      "challenger_present": false,
+      "contract_rejection_rate": 0.440461,
+      "covered_events": 38,
+      "critical_exceptions": 0,
+      "critical_features": 3,
+      "drift_status": "warning",
+      "duplicate_rows": 0,
+      "event_coverage_pct": 0.730769,
+      "exception_codes": [
+        "upcoming_events_outside_option_universe",
+        "upcoming_events_without_option_chain"
+      ],
+      "expected_events": 52,
+      "generated_at": "2026-08-30T17:38:18.241108+00:00",
+      "missing_events": 14,
+      "model_snapshot_date": "2026-08-28",
+      "model_status": "degraded",
+      "outcome_status": "unavailable",
+      "pair_rejection_rate": 0.877619,
+      "publication_eligible": true,
+      "source_date": "2026-08-28",
+      "source_session_lag": 0,
+      "status": "degraded",
+      "warning_exceptions": 2,
+      "warning_features": 8,
+      "workflow": null
+    },
+    {
+      "challenger_present": true,
+      "contract_rejection_rate": 0.440461,
+      "covered_events": 38,
+      "critical_exceptions": 0,
+      "critical_features": 3,
+      "drift_status": "warning",
+      "duplicate_rows": 0,
+      "event_coverage_pct": 0.745098,
+      "exception_codes": [
+        "upcoming_events_outside_option_universe",
+        "upcoming_events_without_option_chain"
+      ],
+      "expected_events": 51,
+      "generated_at": "2026-08-29T19:27:32.269586+00:00",
+      "missing_events": 13,
+      "model_snapshot_date": "2026-08-28",
+      "model_status": "passed",
+      "outcome_status": "unavailable",
+      "pair_rejection_rate": 0.877619,
+      "publication_eligible": true,
+      "source_date": "2026-08-28",
+      "source_session_lag": 0,
+      "status": "degraded",
+      "warning_exceptions": 2,
+      "warning_features": 7,
+      "workflow": null
+    }
+  ],
+  "schema": "quantiv.control-plane-history.v1"
+}

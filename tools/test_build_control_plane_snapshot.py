@@ -1,4 +1,8 @@
-from build_control_plane_snapshot import build_snapshot
+from build_control_plane_snapshot import (
+    build_snapshot,
+    build_workflow_reference,
+    update_history,
+)
 
 
 def test_snapshot_is_compact_and_does_not_expose_artifact_ids() -> None:
@@ -112,3 +116,80 @@ def test_missing_model_monitoring_blocks_publication_claim() -> None:
 
     assert snapshot["publication_eligible"] is False
     assert snapshot["model"]["status"] == "unavailable"
+
+
+def test_history_is_bounded_deduplicated_and_hash_free() -> None:
+    older = build_snapshot(
+        {
+            "quality": {"status": "passed", "decision_safe": True},
+            "source_reconciliation": {"source_date": "2026-08-28"},
+            "event_coverage": {
+                "coverage_pct": 0.75,
+                "expected_events": 20,
+                "covered_events": 15,
+                "missing_events": 5,
+            },
+        },
+        {"status": "passed", "feature_drift": {"status": "passed"}},
+        {"champion_bundle_id": "sha256:secret-old"},
+        {},
+        generated_at="2026-08-29T12:00:00Z",
+    )
+    current = build_snapshot(
+        {
+            "quality": {"status": "degraded", "decision_safe": True},
+            "source_reconciliation": {"source_date": "2026-08-29"},
+            "event_coverage": {
+                "coverage_pct": 0.80,
+                "expected_events": 20,
+                "covered_events": 16,
+                "missing_events": 4,
+            },
+            "exceptions": [
+                {"code": "missing_chain", "severity": "warning", "count": 4}
+            ],
+        },
+        {
+            "status": "passed",
+            "feature_drift": {"status": "warning", "critical_features": 2},
+        },
+        {"champion_bundle_id": "sha256:secret-current"},
+        {},
+        generated_at="2026-08-30T12:00:00Z",
+    )
+    workflow = {
+        "run_id": "42",
+        "run_number": "183",
+        "run_attempt": "1",
+        "url": "https://github.com/example/quantiv/actions/runs/42",
+    }
+    history = update_history({}, older, limit=2)
+    history = update_history(history, current, workflow=workflow, limit=2)
+    history = update_history(history, current, workflow=workflow, limit=2)
+
+    assert history["schema"] == "quantiv.control-plane-history.v1"
+    assert len(history["runs"]) == 2
+    assert history["runs"][0]["source_date"] == "2026-08-29"
+    assert history["runs"][0]["warning_exceptions"] == 1
+    assert history["runs"][1]["source_date"] == "2026-08-28"
+    assert "secret-current" not in str(history)
+    assert "secret-old" not in str(history)
+
+
+def test_workflow_reference_is_actionable_without_commit_or_artifact_hashes() -> None:
+    reference = build_workflow_reference(
+        {
+            "GITHUB_RUN_ID": "42",
+            "GITHUB_RUN_NUMBER": "183",
+            "GITHUB_RUN_ATTEMPT": "2",
+            "GITHUB_SERVER_URL": "https://github.com",
+            "GITHUB_REPOSITORY": "example/quantiv",
+        }
+    )
+
+    assert reference == {
+        "run_id": "42",
+        "run_number": "183",
+        "run_attempt": "2",
+        "url": "https://github.com/example/quantiv/actions/runs/42",
+    }

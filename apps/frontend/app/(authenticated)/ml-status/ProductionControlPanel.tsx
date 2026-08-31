@@ -1,6 +1,3 @@
-'use client';
-
-import { useEffect, useState } from 'react';
 import {
   Activity,
   AlertTriangle,
@@ -10,109 +7,12 @@ import {
   RotateCcw,
   ShieldCheck,
 } from 'lucide-react';
-
-type ControlStatus = 'passed' | 'degraded' | 'failed' | 'unavailable';
-
-type Exception = {
-  code: string;
-  severity: 'warning' | 'critical';
-  summary: string;
-  count?: number;
-};
-
-type ControlSnapshot = {
-  generated_at: string;
-  status: ControlStatus;
-  publication_eligible?: boolean;
-  /** Compatibility with v1 snapshots during a rolling deployment. */
-  decision_safe?: boolean;
-  data: {
-    status: ControlStatus;
-    source_date: string | null;
-    expected_source_date: string | null;
-    source_session_lag: number | null;
-    event_coverage_pct: number | null;
-    expected_events: number | null;
-    covered_events: number | null;
-    missing_events: number | null;
-    contract_rejection_rate: number | null;
-    pair_rejection_rate: number | null;
-    contracts: number | null;
-    eligible_contracts: number | null;
-    live_trading_eligible: boolean;
-    decision_scope: string | null;
-    quarantine_records: number | null;
-    quarantine_status: string;
-    replay_status: string;
-    corporate_action_status: string;
-    corporate_action_rows: number;
-    duplicate_rows: number;
-  };
-  model: {
-    status: ControlStatus;
-    monitored_at: string | null;
-    snapshot_date: string | null;
-    champion_active: boolean;
-    challenger_present: boolean;
-    shadow_roles: string[];
-    drift_status: string;
-    critical_features: number | null;
-    hard_missing_features: number | null;
-    warning_features: number;
-    fallback_bundle_available: boolean;
-    outcome_status: string;
-    outcome_common_rows: number | null;
-    outcome_minimum_rows: number | null;
-    rollback_recorded: boolean;
-  };
-  exceptions: Exception[];
-};
-
-const EMPTY: ControlSnapshot = {
-  generated_at: '',
-  status: 'unavailable',
-  publication_eligible: false,
-  data: {
-    status: 'unavailable',
-    source_date: null,
-    expected_source_date: null,
-    source_session_lag: null,
-    event_coverage_pct: null,
-    expected_events: null,
-    covered_events: null,
-    missing_events: null,
-    contract_rejection_rate: null,
-    pair_rejection_rate: null,
-    contracts: null,
-    eligible_contracts: null,
-    live_trading_eligible: false,
-    decision_scope: null,
-    quarantine_records: null,
-    quarantine_status: 'unavailable',
-    replay_status: 'unavailable',
-    corporate_action_status: 'unavailable',
-    corporate_action_rows: 0,
-    duplicate_rows: 0,
-  },
-  model: {
-    status: 'unavailable',
-    monitored_at: null,
-    snapshot_date: null,
-    champion_active: false,
-    challenger_present: false,
-    shadow_roles: [],
-    drift_status: 'unavailable',
-    critical_features: null,
-    hard_missing_features: null,
-    warning_features: 0,
-    fallback_bundle_available: false,
-    outcome_status: 'unavailable',
-    outcome_common_rows: null,
-    outcome_minimum_rows: null,
-    rollback_recorded: false,
-  },
-  exceptions: [],
-};
+import ControlReleaseHistory from './ControlReleaseHistory';
+import type {
+  ControlHistory,
+  ControlSnapshot,
+  ControlStatus,
+} from './controlPlaneTypes';
 
 function statusColor(status: ControlStatus | string): string {
   if (status === 'passed' || status === 'enforced') return 'var(--up)';
@@ -280,27 +180,13 @@ function ControlCard({
   );
 }
 
-export default function ProductionControlPanel() {
-  const [snapshot, setSnapshot] = useState<ControlSnapshot>(EMPTY);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    fetch('/control-plane.json', {
-      cache: 'no-store',
-      signal: controller.signal,
-    })
-      .then((response) =>
-        response.ok
-          ? response.json()
-          : Promise.reject(new Error('control snapshot unavailable')),
-      )
-      .then((payload: ControlSnapshot) => setSnapshot(payload))
-      .catch(() => undefined)
-      .finally(() => setLoading(false));
-    return () => controller.abort();
-  }, []);
-
+export default function ProductionControlPanel({
+  snapshot,
+  history,
+}: {
+  snapshot: ControlSnapshot;
+  history: ControlHistory;
+}) {
   const { data, model } = snapshot;
   const publicationEligible =
     snapshot.publication_eligible ?? snapshot.decision_safe ?? false;
@@ -322,7 +208,7 @@ export default function ProductionControlPanel() {
     : snapshot.status === 'unavailable'
       ? 'var(--ink-3)'
       : 'var(--down)';
-  const snapshotUnavailable = !loading && snapshot.status === 'unavailable';
+  const snapshotUnavailable = snapshot.status === 'unavailable';
 
   return (
     <section
@@ -384,9 +270,11 @@ export default function ProductionControlPanel() {
           </p>
         </div>
         <ControlPill status={snapshot.status}>
-          {loading ? 'Loading' : statusLabel(snapshot.status)}
+          {statusLabel(snapshot.status)}
         </ControlPill>
       </div>
+
+      <ControlReleaseHistory history={history} />
 
       <div
         className="qv-m-stack"

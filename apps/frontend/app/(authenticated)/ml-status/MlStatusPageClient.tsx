@@ -28,6 +28,10 @@ import {
   type StatusKind,
 } from './statusViewModel';
 import ProductionControlPanel from './ProductionControlPanel';
+import type {
+  ControlHistory,
+  ControlSnapshot,
+} from './controlPlaneTypes';
 
 type LoadState = {
   status: 'loading' | 'ready' | 'error';
@@ -399,7 +403,13 @@ function CoverageGapPill({ row }: { row: MlStatusCoverageGapRow }) {
   return <Pill tone="down">{coverageReasonLabel(row.unavailable_reason)}</Pill>;
 }
 
-export default function MlStatusPageClient() {
+export default function MlStatusPageClient({
+  initialControlSnapshot,
+  initialControlHistory,
+}: {
+  initialControlSnapshot: ControlSnapshot;
+  initialControlHistory: ControlHistory;
+}) {
   const [state, setState] = useState<LoadState>(EMPTY_STATE);
 
   const load = useCallback(async (signal?: AbortSignal) => {
@@ -566,7 +576,10 @@ export default function MlStatusPageClient() {
         </div>
       ) : null}
 
-      <ProductionControlPanel />
+      <ProductionControlPanel
+        snapshot={initialControlSnapshot}
+        history={initialControlHistory}
+      />
 
       <div
         style={{

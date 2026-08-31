@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -17,6 +18,10 @@ from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 OUTPUT_PATH = REPO_ROOT / "apps" / "frontend" / "public" / "control-plane.json"
+HISTORY_OUTPUT_PATH = (
+    REPO_ROOT / "apps" / "frontend" / "public" / "control-plane-history.json"
+)
+DEFAULT_HISTORY_LIMIT = 14
 
 
 def _read(path: Path) -> dict[str, Any]:
@@ -157,6 +162,113 @@ def build_snapshot(
     }
 
 
+def build_workflow_reference(environment: dict[str, str]) -> dict[str, str] | None:
+    run_id = environment.get("GITHUB_RUN_ID")
+    if not run_id:
+        return None
+    reference = {
+        "run_id": run_id,
+        "run_number": environment.get("GITHUB_RUN_NUMBER", ""),
+        "run_attempt": environment.get("GITHUB_RUN_ATTEMPT", ""),
+    }
+    server_url = environment.get("GITHUB_SERVER_URL")
+    repository = environment.get("GITHUB_REPOSITORY")
+    reference["url"] = (
+        f"{server_url}/{repository}/actions/runs/{run_id}"
+        if server_url and repository
+        else ""
+    )
+    return reference
+
+
+def build_history_entry(
+    snapshot: dict[str, Any],
+    *,
+    workflow: dict[str, str] | None = None,
+) -> dict[str, Any]:
+    data = snapshot.get("data") or {}
+    model = snapshot.get("model") or {}
+    exceptions = [
+        item
+        for item in (snapshot.get("exceptions") or [])
+        if isinstance(item, dict)
+    ]
+    return {
+        "generated_at": snapshot.get("generated_at"),
+        "status": snapshot.get("status", "unavailable"),
+        "publication_eligible": bool(
+            snapshot.get("publication_eligible", snapshot.get("decision_safe", False))
+        ),
+        "source_date": data.get("source_date"),
+        "source_session_lag": _number(data.get("source_session_lag")),
+        "event_coverage_pct": _number(data.get("event_coverage_pct")),
+        "expected_events": _number(data.get("expected_events")),
+        "covered_events": _number(data.get("covered_events")),
+        "missing_events": _number(data.get("missing_events")),
+        "contract_rejection_rate": _number(data.get("contract_rejection_rate")),
+        "pair_rejection_rate": _number(data.get("pair_rejection_rate")),
+        "duplicate_rows": _number(data.get("duplicate_rows")),
+        "model_snapshot_date": model.get("snapshot_date"),
+        "model_status": model.get("status", "unavailable"),
+        "drift_status": model.get("drift_status", "unavailable"),
+        "critical_features": _number(model.get("critical_features")),
+        "warning_features": _number(model.get("warning_features")),
+        "challenger_present": bool(model.get("challenger_present")),
+        "outcome_status": model.get("outcome_status", "unavailable"),
+        "critical_exceptions": sum(
+            1 for item in exceptions if item.get("severity") == "critical"
+        ),
+        "warning_exceptions": sum(
+            1 for item in exceptions if item.get("severity") == "warning"
+        ),
+        "exception_codes": sorted(
+            str(item["code"]) for item in exceptions if item.get("code")
+        ),
+        "workflow": workflow,
+    }
+
+
+def _history_identity(entry: dict[str, Any]) -> tuple[str, ...]:
+    workflow = entry.get("workflow")
+    if isinstance(workflow, dict) and workflow.get("run_id"):
+        return (
+            "workflow",
+            str(workflow["run_id"]),
+            str(workflow.get("run_attempt") or "1"),
+        )
+    return ("generated_at", str(entry.get("generated_at") or ""))
+
+
+def update_history(
+    existing: dict[str, Any],
+    snapshot: dict[str, Any],
+    *,
+    workflow: dict[str, str] | None = None,
+    limit: int = DEFAULT_HISTORY_LIMIT,
+) -> dict[str, Any]:
+    if limit < 1:
+        raise ValueError("history limit must be at least 1")
+    current = build_history_entry(snapshot, workflow=workflow)
+    current_identity = _history_identity(current)
+    previous = [
+        entry
+        for entry in (existing.get("runs") or [])
+        if isinstance(entry, dict) and _history_identity(entry) != current_identity
+    ]
+    return {
+        "schema": "quantiv.control-plane-history.v1",
+        "generated_at": snapshot.get("generated_at"),
+        "runs": [current, *previous][:limit],
+    }
+
+
+def _write_json_atomic(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+    temporary.replace(path)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, default=OUTPUT_PATH)
@@ -164,6 +276,8 @@ def main() -> int:
     parser.add_argument("--monitoring", type=Path, default=REPO_ROOT / "data/models/monitoring/latest_monitoring.json")
     parser.add_argument("--registry", type=Path, default=REPO_ROOT / "data/models/control/registry.json")
     parser.add_argument("--outcomes", type=Path, default=REPO_ROOT / "data/validation/model_outcomes.json")
+    parser.add_argument("--history-output", type=Path, default=HISTORY_OUTPUT_PATH)
+    parser.add_argument("--history-limit", type=int, default=DEFAULT_HISTORY_LIMIT)
     args = parser.parse_args()
 
     snapshot = build_snapshot(
@@ -173,13 +287,18 @@ def main() -> int:
         _read(args.outcomes),
         generated_at=datetime.now(timezone.utc).isoformat(),
     )
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    temporary = args.output.with_suffix(args.output.suffix + ".tmp")
-    temporary.write_text(json.dumps(snapshot, indent=2, sort_keys=True) + "\n")
-    temporary.replace(args.output)
+    history = update_history(
+        _read(args.history_output),
+        snapshot,
+        workflow=build_workflow_reference(dict(os.environ)),
+        limit=args.history_limit,
+    )
+    _write_json_atomic(args.output, snapshot)
+    _write_json_atomic(args.history_output, history)
     print(
         f"Control plane: {snapshot['status']} · "
-        f"{len(snapshot['exceptions'])} exceptions → {args.output}"
+        f"{len(snapshot['exceptions'])} exceptions · "
+        f"{len(history['runs'])} retained runs → {args.output}"
     )
     return 0
 
