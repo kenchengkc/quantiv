@@ -1,5 +1,6 @@
 from build_control_plane_snapshot import (
     _read_verified_outcomes,
+    build_release_status,
     build_snapshot,
     build_workflow_reference,
     update_history,
@@ -54,6 +55,13 @@ def test_snapshot_is_compact_and_does_not_expose_artifact_ids() -> None:
         },
         {"evaluations": [{"evaluated_at": "2026-08-29T00:00:00Z"}]},
         generated_at="2026-08-29T00:00:00Z",
+        release={
+            "artifact_promotion_status": "passed",
+            "data_r2_status": "passed",
+            "forecast_r2_status": "passed",
+            "frontend_payload_status": "passed",
+            "neon_import_status": "failed",
+        },
     )
 
     assert snapshot["status"] == "degraded"
@@ -66,6 +74,8 @@ def test_snapshot_is_compact_and_does_not_expose_artifact_ids() -> None:
     assert snapshot["model"]["outcome_common_rows"] == 12
     assert snapshot["model"]["outcome_minimum_rows"] == 30
     assert snapshot["model"]["outcome_evaluations"] == 1
+    assert snapshot["release"]["artifact_promotion_status"] == "passed"
+    assert snapshot["release"]["neon_import_status"] == "failed"
     assert "sample" not in snapshot["exceptions"][0]
     assert "secret-champion" not in str(snapshot)
 
@@ -193,6 +203,7 @@ def test_history_is_bounded_deduplicated_and_hash_free() -> None:
     assert len(history["runs"]) == 2
     assert history["runs"][0]["source_date"] == "2026-08-29"
     assert history["runs"][0]["warning_exceptions"] == 1
+    assert history["runs"][0]["artifact_promotion_status"] == "unavailable"
     assert history["runs"][1]["source_date"] == "2026-08-28"
     assert "secret-current" not in str(history)
     assert "secret-old" not in str(history)
@@ -206,12 +217,37 @@ def test_workflow_reference_is_actionable_without_commit_or_artifact_hashes() ->
             "GITHUB_RUN_ATTEMPT": "2",
             "GITHUB_SERVER_URL": "https://github.com",
             "GITHUB_REPOSITORY": "example/quantiv",
-        }
+            "GITHUB_EVENT_NAME": "workflow_dispatch",
+            "REFRESH_STARTED_AT": "2026-08-30T11:00:00Z",
+        },
+        completed_at="2026-08-30T11:18:30Z",
     )
 
     assert reference == {
         "run_id": "42",
         "run_number": "183",
         "run_attempt": "2",
+        "event_name": "workflow_dispatch",
+        "started_at": "2026-08-30T11:00:00Z",
+        "control_ready_seconds": 1110,
         "url": "https://github.com/example/quantiv/actions/runs/42",
+    }
+
+
+def test_release_status_normalizes_github_step_outcomes() -> None:
+    release = build_release_status(
+        {
+            "CONTROL_DATA_R2_STATUS": "passed",
+            "CONTROL_FORECAST_R2_STATUS": "success",
+            "CONTROL_FRONTEND_PAYLOAD_STATUS": "completed",
+            "CONTROL_NEON_IMPORT_STATUS": "failure",
+        }
+    )
+
+    assert release == {
+        "artifact_promotion_status": "passed",
+        "data_r2_status": "passed",
+        "forecast_r2_status": "passed",
+        "frontend_payload_status": "passed",
+        "neon_import_status": "failed",
     }

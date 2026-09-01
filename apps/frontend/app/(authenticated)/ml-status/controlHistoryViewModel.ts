@@ -5,7 +5,7 @@ export type ControlReleaseComparison = {
   previous: ControlHistoryRun | null;
   coverageDeltaPp: number | null;
   missingEventsDelta: number | null;
-  rejectionDeltaPp: number | null;
+  decisionAvailabilityDeltaPp: number | null;
   criticalFeaturesDelta: number | null;
   newExceptionCodes: string[];
   resolvedExceptionCodes: string[];
@@ -16,6 +16,14 @@ function difference(
   previous: number | null,
 ): number | null {
   return current == null || previous == null ? null : current - previous;
+}
+
+export function decisionAvailability(
+  run: ControlHistoryRun,
+): number | null {
+  const rejection =
+    run.decision_group_rejection_rate ?? run.contract_rejection_rate;
+  return rejection == null ? null : 1 - rejection;
 }
 
 export function compareControlReleases(
@@ -29,7 +37,7 @@ export function compareControlReleases(
       previous,
       coverageDeltaPp: null,
       missingEventsDelta: null,
-      rejectionDeltaPp: null,
+      decisionAvailabilityDeltaPp: null,
       criticalFeaturesDelta: null,
       newExceptionCodes: [],
       resolvedExceptionCodes: [],
@@ -42,9 +50,9 @@ export function compareControlReleases(
     current.event_coverage_pct,
     previous.event_coverage_pct,
   );
-  const rejectionDelta = difference(
-    current.contract_rejection_rate,
-    previous.contract_rejection_rate,
+  const availabilityDelta = difference(
+    decisionAvailability(current),
+    decisionAvailability(previous),
   );
   return {
     current,
@@ -54,7 +62,8 @@ export function compareControlReleases(
       current.missing_events,
       previous.missing_events,
     ),
-    rejectionDeltaPp: rejectionDelta == null ? null : rejectionDelta * 100,
+    decisionAvailabilityDeltaPp:
+      availabilityDelta == null ? null : availabilityDelta * 100,
     criticalFeaturesDelta: difference(
       current.critical_features,
       previous.critical_features,

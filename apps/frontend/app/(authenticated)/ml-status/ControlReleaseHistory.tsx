@@ -1,6 +1,7 @@
 import { ExternalLink, History } from 'lucide-react';
 import {
   compareControlReleases,
+  decisionAvailability,
   recentControlRuns,
 } from './controlHistoryViewModel';
 import type {
@@ -96,7 +97,7 @@ function DeltaMetric({
   );
 }
 
-function CoverageTimeline({ runs }: { runs: ControlHistoryRun[] }) {
+function ControlTimeline({ runs }: { runs: ControlHistoryRun[] }) {
   const width = 620;
   const height = 116;
   const left = 48;
@@ -110,21 +111,23 @@ function CoverageTimeline({ runs }: { runs: ControlHistoryRun[] }) {
       : left + (index * (width - left - right)) / (runs.length - 1);
   const y = (coverage: number | null) =>
     coverage == null ? height - bottom : top + (1 - coverage) * plotHeight;
-  const points = runs
-    .map((run, index) =>
-      run.event_coverage_pct == null
-        ? null
-        : `${x(index)},${y(run.event_coverage_pct)}`,
-    )
-    .filter((point): point is string => point != null)
-    .join(' ');
+  const seriesPoints = (value: (run: ControlHistoryRun) => number | null) =>
+    runs
+      .map((run, index) => {
+        const observation = value(run);
+        return observation == null ? null : `${x(index)},${y(observation)}`;
+      })
+      .filter((point): point is string => point != null)
+      .join(' ');
+  const coveragePoints = seriesPoints((run) => run.event_coverage_pct);
+  const availabilityPoints = seriesPoints(decisionAvailability);
 
   return (
     <div style={{ overflowX: 'auto', marginTop: 10 }}>
       <svg
         viewBox={`0 0 ${width} ${height}`}
         role="img"
-        aria-label={`Eligible earnings coverage across ${runs.length} retained control snapshots`}
+        aria-label={`Earnings coverage and eligible ATM pair availability across ${runs.length} retained control snapshots`}
         style={{ display: 'block', width: '100%', minWidth: 520, height: 116 }}
       >
         {[0.5, 0.75, 1].map((level) => (
@@ -148,34 +151,57 @@ function CoverageTimeline({ runs }: { runs: ControlHistoryRun[] }) {
             </text>
           </g>
         ))}
-        {points ? (
+        {coveragePoints ? (
           <polyline
-            points={points}
+            points={coveragePoints}
             fill="none"
             stroke="var(--accent)"
             strokeWidth="1.5"
             strokeLinejoin="round"
           />
         ) : null}
-        {runs.map((run, index) => (
+        {availabilityPoints ? (
+          <polyline
+            points={availabilityPoints}
+            fill="none"
+            stroke="var(--brand-blue-1)"
+            strokeWidth="1.5"
+            strokeLinejoin="round"
+            strokeDasharray="4 3"
+          />
+        ) : null}
+        {runs.map((run, index) => {
+          const availability = decisionAvailability(run);
+          return (
           <g key={`${run.generated_at}-${index}`}>
+            {run.event_coverage_pct != null ? (
+              <circle
+                cx={x(index)}
+                cy={y(run.event_coverage_pct)}
+                r="3.5"
+                fill="var(--accent)"
+                stroke="var(--bg)"
+                strokeWidth="1.5"
+              />
+            ) : null}
+            {availability != null ? (
+              <rect
+                x={x(index) - 3}
+                y={y(availability) - 3}
+                width="6"
+                height="6"
+                rx="1"
+                fill="var(--brand-blue-1)"
+                stroke="var(--bg)"
+                strokeWidth="1.2"
+              />
+            ) : null}
             <circle
               cx={x(index)}
-              cy={y(run.event_coverage_pct)}
-              r="4"
+              cy={height - 20}
+              r="2.5"
               fill={statusColor(run)}
-              stroke="var(--bg)"
-              strokeWidth="2"
             />
-            <text
-              x={x(index)}
-              y={Math.max(10, y(run.event_coverage_pct) - 8)}
-              fill="var(--ink-2)"
-              fontSize="8.5"
-              textAnchor="middle"
-            >
-              {percent(run.event_coverage_pct)}
-            </text>
             <text
               x={x(index)}
               y={height - 7}
@@ -186,8 +212,196 @@ function CoverageTimeline({ runs }: { runs: ControlHistoryRun[] }) {
               {shortDate(run.generated_at)}
             </text>
           </g>
-        ))}
+          );
+        })}
       </svg>
+      <div
+        style={{
+          display: 'flex',
+          gap: 14,
+          flexWrap: 'wrap',
+          color: 'var(--ink-4)',
+          fontSize: 9,
+          marginTop: -4,
+          paddingLeft: 48,
+        }}
+      >
+        <span style={{ color: 'var(--accent)' }}>● Earnings coverage</span>
+        <span style={{ color: 'var(--brand-blue-1)' }}>■ Eligible ATM pairs</span>
+        <span>Bottom dot = release status</span>
+      </div>
+    </div>
+  );
+}
+
+function compactStatus(value: string | null | undefined): string {
+  if (!value || value === 'unavailable') return 'Not recorded';
+  return value.replace(/_/g, ' ');
+}
+
+function stateColor(value: string | null | undefined): string {
+  if (value === 'passed' || value === 'verified' || value === 'enforced') {
+    return 'var(--up)';
+  }
+  if (value === 'failed' || value === 'critical') return 'var(--down)';
+  if (value === 'degraded' || value === 'warning') return 'var(--flag)';
+  return 'var(--ink-4)';
+}
+
+function duration(seconds: number | null | undefined): string {
+  if (seconds == null || !Number.isFinite(seconds)) return 'duration not recorded';
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes}m to controls`;
+  return `${Math.floor(minutes / 60)}h ${minutes % 60}m to controls`;
+}
+
+function trigger(value: string | undefined): string {
+  if (value === 'schedule') return 'Scheduled';
+  if (value === 'workflow_dispatch') return 'Manual';
+  return value ? value.replace(/_/g, ' ') : 'Prior format';
+}
+
+function RunAuditTable({ runs }: { runs: ControlHistoryRun[] }) {
+  const newestFirst = [...runs].reverse();
+  return (
+    <div style={{ marginTop: 13 }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'baseline',
+          justifyContent: 'space-between',
+          gap: 12,
+          marginBottom: 7,
+        }}
+      >
+        <div style={{ color: 'var(--ink-2)', fontSize: 10.5, fontWeight: 650 }}>
+          Recent release audit
+        </div>
+        <div style={{ color: 'var(--ink-4)', fontSize: 9 }}>
+          {newestFirst.length} shown · up to 30 retained
+        </div>
+      </div>
+      <div style={{ overflowX: 'auto' }}>
+        <table
+          style={{
+            width: '100%',
+            minWidth: 850,
+            borderCollapse: 'collapse',
+            fontSize: 9.5,
+          }}
+        >
+          <thead>
+            <tr style={{ color: 'var(--ink-4)', textAlign: 'left' }}>
+              {['Run', 'Market data', 'Decision coverage', 'Data controls', 'Model controls', 'Promotion', 'Exceptions'].map((label) => (
+                <th
+                  key={label}
+                  style={{
+                    borderBottom: '1px solid var(--line)',
+                    padding: '6px 8px',
+                    fontWeight: 500,
+                    letterSpacing: '0.05em',
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  {label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {newestFirst.map((run) => {
+              const workflowUrl = run.workflow?.url?.startsWith('https://')
+                ? run.workflow.url
+                : null;
+              const availability = decisionAvailability(run);
+              const outcomeRows =
+                run.outcome_common_rows == null || run.outcome_minimum_rows == null
+                  ? null
+                  : `${run.outcome_common_rows}/${run.outcome_minimum_rows} paired`;
+              return (
+                <tr key={run.generated_at}>
+                  <td style={{ borderBottom: '1px solid var(--line)', padding: '8px' }}>
+                    <div style={{ color: statusColor(run), fontWeight: 650 }}>
+                      {workflowUrl ? (
+                        <a
+                          href={workflowUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{ color: 'inherit', textDecoration: 'none' }}
+                        >
+                          {shortDate(run.generated_at)} ↗
+                        </a>
+                      ) : shortDate(run.generated_at)}
+                    </div>
+                    <div style={{ color: 'var(--ink-4)', marginTop: 2 }}>
+                      {trigger(run.workflow?.event_name)} · {duration(run.workflow?.control_ready_seconds)}
+                    </div>
+                  </td>
+                  <td style={{ borderBottom: '1px solid var(--line)', padding: '8px' }}>
+                    <div className="mono tnum" style={{ color: 'var(--ink-2)' }}>
+                      {run.source_date ?? '—'}
+                    </div>
+                    <div style={{ color: 'var(--ink-4)', marginTop: 2 }}>
+                      {run.source_session_lag == null
+                        ? 'lag not recorded'
+                        : `${run.source_session_lag} session lag`}
+                    </div>
+                  </td>
+                  <td style={{ borderBottom: '1px solid var(--line)', padding: '8px' }}>
+                    <div className="mono tnum" style={{ color: 'var(--accent)' }}>
+                      {percent(run.event_coverage_pct)} events
+                    </div>
+                    <div className="mono tnum" style={{ color: 'var(--brand-blue-1)', marginTop: 2 }}>
+                      {percent(availability)} ATM pairs
+                    </div>
+                  </td>
+                  <td style={{ borderBottom: '1px solid var(--line)', padding: '8px' }}>
+                    <div style={{ color: stateColor(run.replay_status) }}>
+                      Replay {compactStatus(run.replay_status)}
+                    </div>
+                    <div style={{ color: stateColor(run.corporate_action_status), marginTop: 2 }}>
+                      Actions {compactStatus(run.corporate_action_status)}
+                    </div>
+                    <div style={{ color: 'var(--ink-4)', marginTop: 2 }}>
+                      {run.quarantine_records ?? '—'} quarantined · {run.duplicate_rows ?? '—'} duplicate
+                    </div>
+                  </td>
+                  <td style={{ borderBottom: '1px solid var(--line)', padding: '8px' }}>
+                    <div style={{ color: stateColor(run.model_status) }}>
+                      Model {compactStatus(run.model_status)}
+                    </div>
+                    <div style={{ color: stateColor(run.drift_status), marginTop: 2 }}>
+                      Drift {compactStatus(run.drift_status)}
+                    </div>
+                    <div style={{ color: 'var(--ink-4)', marginTop: 2 }}>
+                      Outcome {compactStatus(run.outcome_status)}{outcomeRows ? ` · ${outcomeRows}` : ''}
+                    </div>
+                  </td>
+                  <td style={{ borderBottom: '1px solid var(--line)', padding: '8px' }}>
+                    <div style={{ color: stateColor(run.artifact_promotion_status) }}>
+                      Artifacts {compactStatus(run.artifact_promotion_status)}
+                    </div>
+                    <div style={{ color: stateColor(run.neon_import_status), marginTop: 2 }}>
+                      Neon {compactStatus(run.neon_import_status)}
+                    </div>
+                  </td>
+                  <td
+                    title={run.exception_codes.join(', ')}
+                    style={{ borderBottom: '1px solid var(--line)', padding: '8px' }}
+                  >
+                    <div className="mono tnum" style={{ color: run.critical_exceptions ? 'var(--down)' : 'var(--ink-2)' }}>
+                      {run.critical_exceptions} critical
+                    </div>
+                    <div className="mono tnum" style={{ color: run.warning_exceptions ? 'var(--flag)' : 'var(--ink-4)', marginTop: 2 }}>
+                      {run.warning_exceptions} warning
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -235,7 +449,7 @@ export default function ControlReleaseHistory({
             </h3>
           </div>
           <div style={{ color: 'var(--ink-4)', fontSize: 10.5, marginTop: 4 }}>
-            Bounded daily snapshots · newest release compared with the prior run
+            Static 30-release audit · newest controls compared with the prior run
           </div>
         </div>
         {workflowUrl ? (
@@ -258,7 +472,7 @@ export default function ControlReleaseHistory({
         ) : null}
       </div>
 
-      <CoverageTimeline runs={runs} />
+      <ControlTimeline runs={runs} />
 
       <div
         className="qv-m-2col"
@@ -281,9 +495,10 @@ export default function ControlReleaseHistory({
           tone={deltaTone(comparison.missingEventsDelta, true)}
         />
         <DeltaMetric
-          label="Quote rejection"
-          value={signed(comparison.rejectionDeltaPp, ' pp')}
-          detail="Change can reflect market quality or stricter filters"
+          label="ATM-pair availability"
+          value={signed(comparison.decisionAvailabilityDeltaPp, ' pp')}
+          detail={`Now ${percent(decisionAvailability(current))}`}
+          tone={deltaTone(comparison.decisionAvailabilityDeltaPp, false)}
         />
         <DeltaMetric
           label="High-drift features"
@@ -316,6 +531,8 @@ export default function ControlReleaseHistory({
           ) : null}
         </div>
       ) : null}
+
+      <RunAuditTable runs={runs} />
     </div>
   );
 }

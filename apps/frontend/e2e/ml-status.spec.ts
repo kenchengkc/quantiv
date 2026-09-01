@@ -27,10 +27,12 @@ test.describe('production controls (authenticated admin)', () => {
       page.getByRole('heading', { name: 'Publication history' }),
     ).toBeVisible();
     await expect(
-      page.getByRole('img', { name: /Eligible earnings coverage across/ }),
+      page.getByRole('img', { name: /Earnings coverage and eligible ATM pair availability across/ }),
     ).toBeVisible();
     await expect(page.getByText('Coverage change')).toBeVisible();
     await expect(page.getByText('Missing events', { exact: true })).toBeVisible();
+    await expect(page.getByText('Recent release audit')).toBeVisible();
+    await expect(page.getByRole('columnheader', { name: 'Promotion' })).toBeVisible();
 
     await page.unrouteAll({ behavior: 'ignoreErrors' });
   });

@@ -29,7 +29,7 @@ OUTPUT_PATH = REPO_ROOT / "apps" / "frontend" / "public" / "control-plane.json"
 HISTORY_OUTPUT_PATH = (
     REPO_ROOT / "apps" / "frontend" / "public" / "control-plane-history.json"
 )
-DEFAULT_HISTORY_LIMIT = 14
+DEFAULT_HISTORY_LIMIT = 30
 
 
 def _read(path: Path) -> dict[str, Any]:
@@ -80,6 +80,42 @@ def _status(*values: str | None) -> str:
     return "unavailable"
 
 
+def _stage_status(value: str | None) -> str:
+    normalized = str(value or "").strip().lower()
+    if normalized in {"passed", "success", "succeeded", "completed"}:
+        return "passed"
+    if normalized in {"failed", "failure", "cancelled", "timed_out"}:
+        return "failed"
+    if normalized in {"warning", "degraded"}:
+        return "degraded"
+    return "unavailable"
+
+
+def build_release_status(environment: dict[str, str]) -> dict[str, str]:
+    """Summarize publication stages reached before the control snapshot."""
+    data_status = _stage_status(environment.get("CONTROL_DATA_R2_STATUS"))
+    forecast_status = _stage_status(environment.get("CONTROL_FORECAST_R2_STATUS"))
+    frontend_status = _stage_status(environment.get("CONTROL_FRONTEND_PAYLOAD_STATUS"))
+    core = [data_status, forecast_status, frontend_status]
+    if "failed" in core:
+        promotion_status = "failed"
+    elif all(status == "passed" for status in core):
+        promotion_status = "passed"
+    elif any(status == "degraded" for status in core):
+        promotion_status = "degraded"
+    else:
+        promotion_status = "unavailable"
+    return {
+        "artifact_promotion_status": promotion_status,
+        "data_r2_status": data_status,
+        "forecast_r2_status": forecast_status,
+        "frontend_payload_status": frontend_status,
+        "neon_import_status": _stage_status(
+            environment.get("CONTROL_NEON_IMPORT_STATUS")
+        ),
+    }
+
+
 def build_snapshot(
     reconciliation: dict[str, Any],
     monitoring: dict[str, Any],
@@ -88,6 +124,7 @@ def build_snapshot(
     outcome_history: dict[str, Any] | None = None,
     *,
     generated_at: str,
+    release: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     quality = reconciliation.get("quality") or {}
     source = reconciliation.get("source_reconciliation") or {}
@@ -202,11 +239,44 @@ def build_snapshot(
             "outcome_evaluations": len(outcome_evaluations),
             "rollback_recorded": bool(outcomes.get("rolled_back")),
         },
+        "release": {
+            "artifact_promotion_status": (release or {}).get(
+                "artifact_promotion_status", "unavailable"
+            ),
+            "data_r2_status": (release or {}).get(
+                "data_r2_status", "unavailable"
+            ),
+            "forecast_r2_status": (release or {}).get(
+                "forecast_r2_status", "unavailable"
+            ),
+            "frontend_payload_status": (release or {}).get(
+                "frontend_payload_status", "unavailable"
+            ),
+            "neon_import_status": (release or {}).get(
+                "neon_import_status", "unavailable"
+            ),
+        },
         "exceptions": exceptions,
     }
 
 
-def build_workflow_reference(environment: dict[str, str]) -> dict[str, str] | None:
+def _parse_datetime(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def build_workflow_reference(
+    environment: dict[str, str],
+    *,
+    completed_at: str | None = None,
+) -> dict[str, Any] | None:
     run_id = environment.get("GITHUB_RUN_ID")
     if not run_id:
         return None
@@ -214,6 +284,8 @@ def build_workflow_reference(environment: dict[str, str]) -> dict[str, str] | No
         "run_id": run_id,
         "run_number": environment.get("GITHUB_RUN_NUMBER", ""),
         "run_attempt": environment.get("GITHUB_RUN_ATTEMPT", ""),
+        "event_name": environment.get("GITHUB_EVENT_NAME", ""),
+        "started_at": environment.get("REFRESH_STARTED_AT", ""),
     }
     server_url = environment.get("GITHUB_SERVER_URL")
     repository = environment.get("GITHUB_REPOSITORY")
@@ -222,16 +294,24 @@ def build_workflow_reference(environment: dict[str, str]) -> dict[str, str] | No
         if server_url and repository
         else ""
     )
+    started_at = _parse_datetime(reference["started_at"])
+    completed = _parse_datetime(completed_at)
+    reference["control_ready_seconds"] = (
+        max(0, int((completed - started_at).total_seconds()))
+        if started_at and completed
+        else None
+    )
     return reference
 
 
 def build_history_entry(
     snapshot: dict[str, Any],
     *,
-    workflow: dict[str, str] | None = None,
+    workflow: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     data = snapshot.get("data") or {}
     model = snapshot.get("model") or {}
+    release = snapshot.get("release") or {}
     exceptions = [
         item
         for item in (snapshot.get("exceptions") or [])
@@ -254,14 +334,42 @@ def build_history_entry(
         "decision_group_rejection_rate": _number(
             data.get("decision_group_rejection_rate")
         ),
+        "decision_groups": _number(data.get("decision_groups")),
+        "eligible_decision_groups": _number(
+            data.get("eligible_decision_groups")
+        ),
+        "quarantine_records": _number(data.get("quarantine_records")),
+        "quarantine_status": data.get("quarantine_status", "unavailable"),
+        "replay_status": data.get("replay_status", "unavailable"),
+        "corporate_action_status": data.get(
+            "corporate_action_status", "unavailable"
+        ),
         "duplicate_rows": _number(data.get("duplicate_rows")),
         "model_snapshot_date": model.get("snapshot_date"),
         "model_status": model.get("status", "unavailable"),
         "drift_status": model.get("drift_status", "unavailable"),
         "critical_features": _number(model.get("critical_features")),
         "warning_features": _number(model.get("warning_features")),
+        "hard_missing_features": _number(model.get("hard_missing_features")),
         "challenger_present": bool(model.get("challenger_present")),
         "outcome_status": model.get("outcome_status", "unavailable"),
+        "outcome_common_rows": _number(model.get("outcome_common_rows")),
+        "outcome_minimum_rows": _number(model.get("outcome_minimum_rows")),
+        "outcome_evaluations": _number(model.get("outcome_evaluations")),
+        "rollback_recorded": bool(model.get("rollback_recorded")),
+        "artifact_promotion_status": release.get(
+            "artifact_promotion_status", "unavailable"
+        ),
+        "data_r2_status": release.get("data_r2_status", "unavailable"),
+        "forecast_r2_status": release.get(
+            "forecast_r2_status", "unavailable"
+        ),
+        "frontend_payload_status": release.get(
+            "frontend_payload_status", "unavailable"
+        ),
+        "neon_import_status": release.get(
+            "neon_import_status", "unavailable"
+        ),
         "critical_exceptions": sum(
             1 for item in exceptions if item.get("severity") == "critical"
         ),
@@ -290,7 +398,7 @@ def update_history(
     existing: dict[str, Any],
     snapshot: dict[str, Any],
     *,
-    workflow: dict[str, str] | None = None,
+    workflow: dict[str, Any] | None = None,
     limit: int = DEFAULT_HISTORY_LIMIT,
 ) -> dict[str, Any]:
     if limit < 1:
@@ -334,18 +442,24 @@ def main() -> int:
         args.outcome_history,
         args.outcome_receipt,
     )
+    generated_at = datetime.now(timezone.utc).isoformat()
+    environment = dict(os.environ)
     snapshot = build_snapshot(
         _read(args.reconciliation),
         _read(args.monitoring),
         _read(args.registry),
         outcomes,
         outcome_history,
-        generated_at=datetime.now(timezone.utc).isoformat(),
+        generated_at=generated_at,
+        release=build_release_status(environment),
     )
     history = update_history(
         _read(args.history_output),
         snapshot,
-        workflow=build_workflow_reference(dict(os.environ)),
+        workflow=build_workflow_reference(
+            environment,
+            completed_at=generated_at,
+        ),
         limit=args.history_limit,
     )
     _write_json_atomic(args.output, snapshot)

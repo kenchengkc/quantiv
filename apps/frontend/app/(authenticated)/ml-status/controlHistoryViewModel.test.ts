@@ -21,6 +21,7 @@ function run(
     missing_events: 4,
     contract_rejection_rate: 0.4,
     pair_rejection_rate: 0.8,
+    decision_group_rejection_rate: 0.2,
     duplicate_rows: 0,
     model_snapshot_date: '2026-08-28',
     model_status: 'degraded',
@@ -47,6 +48,7 @@ describe('control release history', () => {
           event_coverage_pct: 0.85,
           missing_events: 3,
           contract_rejection_rate: 0.42,
+          decision_group_rejection_rate: 0.15,
           critical_features: 1,
           exception_codes: ['new_warning'],
         }),
@@ -64,7 +66,7 @@ describe('control release history', () => {
       resolvedExceptionCodes: ['missing_chain'],
     });
     expect(comparison.coverageDeltaPp).toBeCloseTo(5);
-    expect(comparison.rejectionDeltaPp).toBeCloseTo(2);
+    expect(comparison.decisionAvailabilityDeltaPp).toBeCloseTo(5);
     expect(recentControlRuns(history).map((item) => item.generated_at)).toEqual([
       '2026-08-29T12:00:00Z',
       '2026-08-30T12:00:00Z',
