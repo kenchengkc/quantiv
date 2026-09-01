@@ -9,6 +9,7 @@ describe('ML nightly fallback payload', () => {
         horizon_days: 7,
         spot_override: 181.19,
         earnings_date: '2026-05-27',
+        intended_use: 'end_of_day_research',
       },
       {
         spot_price: 182.5,
@@ -53,7 +54,12 @@ describe('ML nightly fallback payload', () => {
 
   it('falls back to straddle when static ML fields are absent', () => {
     const payload = buildNightlyFallbackPayload(
-      { symbol: 'ABC', horizon_days: 7, spot_override: 50 },
+      {
+        symbol: 'ABC',
+        horizon_days: 7,
+        spot_override: 50,
+        intended_use: 'end_of_day_research',
+      },
       {
         as_of_date: '2026-05-22',
         expected_move: {
@@ -74,7 +80,12 @@ describe('ML nightly fallback payload', () => {
 
   it('returns unavailable instead of inventing a zero move', () => {
     const payload = buildNightlyFallbackPayload(
-      { symbol: 'EMPTY', horizon_days: 7, spot_override: 50 },
+      {
+        symbol: 'EMPTY',
+        horizon_days: 7,
+        spot_override: 50,
+        intended_use: 'end_of_day_research',
+      },
       {
         spot_price: 50,
         as_of_date: '2026-05-22',
