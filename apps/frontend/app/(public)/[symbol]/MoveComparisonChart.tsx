@@ -337,9 +337,9 @@ export default function MoveComparisonChart({
               background: 'var(--bg-2)',
             }}
           >
-            {(['snapshot', 'live'] as PredictionMode[]).map((item) => {
+            {(['snapshot', 'spot_updated'] as PredictionMode[]).map((item) => {
               const active = mode === item;
-              const disabled = item === 'live' && spotUpdateDisabled;
+              const disabled = item === 'spot_updated' && spotUpdateDisabled;
               return (
                 <button
                   key={item}
@@ -505,7 +505,7 @@ export default function MoveComparisonChart({
         ) : null}
       </div>
 
-      {mode === 'live' ? (
+      {mode === 'spot_updated' ? (
         <div
           style={{
             marginTop: 8,

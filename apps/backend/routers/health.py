@@ -1,4 +1,4 @@
-"""Operational health endpoint for the live prediction service."""
+"""Operational health endpoint for the spot-updated prediction service."""
 
 from __future__ import annotations
 

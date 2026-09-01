@@ -84,7 +84,7 @@ def _validate_env():
     has_discrete = bool(os.getenv("POSTGRES_USER")) and bool(os.getenv("POSTGRES_PASSWORD"))
     if not has_url and not has_discrete:
         errors.append(
-            "Live prediction requires DATABASE_URL or both POSTGRES_USER and POSTGRES_PASSWORD"
+            "Spot-updated prediction requires DATABASE_URL or both POSTGRES_USER and POSTGRES_PASSWORD"
         )
 
     if not os.getenv("REDIS_URL"):

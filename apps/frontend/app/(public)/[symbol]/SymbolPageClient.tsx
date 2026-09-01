@@ -501,11 +501,11 @@ export default function SymbolPage({
   );
 
   useEffect(() => {
-    if (predictionMode === 'live') void loadLivePrediction();
+    if (predictionMode === 'spot_updated') void loadLivePrediction();
   }, [loadLivePrediction, predictionMode]);
 
   useEffect(() => {
-    if (predictionMode !== 'live') return;
+    if (predictionMode !== 'spot_updated') return;
     const onVisible = () => {
       if (document.visibilityState === 'visible') void loadLivePrediction();
     };
@@ -591,9 +591,12 @@ export default function SymbolPage({
   const liveQuantiles =
     livePrediction.status === 'ready' ? normalizeForecastQuantiles(livePrediction.response?.quantiles) : null;
   const showingLivePrediction =
-    predictionMode === 'live' && livePrediction.status === 'ready' && livePrediction.response != null;
+    predictionMode === 'spot_updated' && livePrediction.status === 'ready' && livePrediction.response != null;
   const modelIsSpotUpdated =
-    showingLivePrediction && livePrediction.response?.source !== 'nightly_fallback';
+    showingLivePrediction &&
+    (livePrediction.response?.inference_mode === 'spot_updated_snapshot' ||
+      (livePrediction.response?.inference_mode == null &&
+        livePrediction.response?.source !== 'nightly_fallback'));
   const quantiles = showingLivePrediction && liveQuantiles ? liveQuantiles : snapshotQuantiles;
   const rawActivePredictionPct = showingLivePrediction
     ? (livePrediction.response?.em_ml_pct ?? null)
@@ -605,12 +608,12 @@ export default function SymbolPage({
   const quantileMeta = showingLivePrediction
     ? livePrediction.response?.source === 'nightly_fallback'
       ? 'Nightly snapshot · spot update unavailable'
-      : `Latest stock price only; options and other inputs remain frozen at ${livePrediction.response?.feature_snapshot_date ?? 'the nightly snapshot'}.`
+      : `End-of-day research · latest stock price only; options and other inputs remain frozen at ${livePrediction.response?.feature_snapshot_date ?? 'the nightly snapshot'}.`
     : em?.ml_snapshot_date
       ? `Nightly LightGBM snapshot from ${em.ml_snapshot_date}.`
       : 'LightGBM ensemble · range of plausible absolute moves on print day';
   const liveUnavailableReason =
-    predictionMode === 'live' && livePrediction.status === 'unavailable' ? livePrediction.error : null;
+    predictionMode === 'spot_updated' && livePrediction.status === 'unavailable' ? livePrediction.error : null;
 
   const termRows = buildTermRows(data.straddle_features, em?.expiration ?? null);
   const historySeries = buildHistorySeries(data.earnings_history);

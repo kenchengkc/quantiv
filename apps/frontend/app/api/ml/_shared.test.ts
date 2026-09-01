@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildNightlyFallbackPayload } from './_shared';
+import { PredictRequestSchema, buildNightlyFallbackPayload } from './_shared';
 
 describe('ML nightly fallback payload', () => {
   it('prefers static nightly ML fields over straddle fields', () => {
@@ -37,6 +37,11 @@ describe('ML nightly fallback payload', () => {
     expect(payload.em_ml_pct).toBe(0.069509);
     expect(payload.em_ml_abs).toBeCloseTo(0.069509 * 181.19);
     expect(payload.feature_snapshot_date).toBe('2026-05-20');
+    expect(payload.inference_mode).toBe('nightly_snapshot');
+    expect(payload.market_data_mode).toBe('end_of_day');
+    expect(payload.decision_scope).toBe('end_of_day_research');
+    expect(payload.live_trading_eligible).toBe(false);
+    expect(payload.updated_inputs).toEqual(['spot_for_dollar_scaling']);
     expect(payload.quantiles).toEqual({
       '10': 0.010664,
       '25': 0.029028,
@@ -81,5 +86,22 @@ describe('ML nightly fallback payload', () => {
     );
 
     expect(payload).toBeNull();
+  });
+
+  it('fails closed when a caller requests live-trading use', () => {
+    expect(
+      PredictRequestSchema.safeParse({
+        symbol: 'CRM',
+        horizon_days: 7,
+        spot_override: 181.19,
+        intended_use: 'live_trading',
+      }).success,
+    ).toBe(false);
+    expect(
+      PredictRequestSchema.parse({
+        symbol: 'CRM',
+        horizon_days: 7,
+      }).intended_use,
+    ).toBe('end_of_day_research');
   });
 });

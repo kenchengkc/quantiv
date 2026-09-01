@@ -7,6 +7,8 @@ export const NO_STORE = {
 };
 
 export const SYMBOL_RE = /^[A-Z][A-Z0-9.\-]{0,9}$/;
+export const ML_DECISION_SCOPE = 'end_of_day_research' as const;
+export const ML_MARKET_DATA_MODE = 'end_of_day' as const;
 
 export const PredictRequestSchema = z.object({
   symbol: z.string().trim().toUpperCase().regex(SYMBOL_RE),
@@ -20,6 +22,7 @@ export const PredictRequestSchema = z.object({
   ]),
   spot_override: z.number().positive().optional(),
   earnings_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  intended_use: z.literal(ML_DECISION_SCOPE).optional().default(ML_DECISION_SCOPE),
 });
 
 export type PredictRequestBody = z.infer<typeof PredictRequestSchema>;
@@ -33,7 +36,12 @@ export type BackendPredictResponse = {
   spot_used: number;
   feature_snapshot_date: string;
   earnings_date: string | null;
-  source: 'live' | 'cached';
+  source: 'computed' | 'cached';
+  inference_mode: 'snapshot_rescore' | 'spot_updated_snapshot';
+  market_data_mode: typeof ML_MARKET_DATA_MODE;
+  decision_scope: typeof ML_DECISION_SCOPE;
+  live_trading_eligible: false;
+  updated_inputs: Array<'spot'>;
   served_at: string;
   snapshot_age_days?: number | null;
   forecast_scored_at?: string | null;
@@ -74,6 +82,11 @@ export type NightlyFallbackPayload = {
   feature_snapshot_date: string | null;
   earnings_date: string | null;
   source: 'nightly_fallback';
+  inference_mode: 'nightly_snapshot';
+  market_data_mode: typeof ML_MARKET_DATA_MODE;
+  decision_scope: typeof ML_DECISION_SCOPE;
+  live_trading_eligible: false;
+  updated_inputs: Array<'spot_for_dollar_scaling'>;
   fallback_kind: NightlyFallbackKind;
   fallback_reason: string;
   served_at: string;
@@ -160,6 +173,11 @@ export function buildNightlyFallbackPayload(
         : nightly?.as_of_date ?? null,
     earnings_date: req.earnings_date ?? expectedMove?.earnings_date ?? null,
     source: 'nightly_fallback',
+    inference_mode: 'nightly_snapshot',
+    market_data_mode: ML_MARKET_DATA_MODE,
+    decision_scope: ML_DECISION_SCOPE,
+    live_trading_eligible: false,
+    updated_inputs: req.spot_override == null ? [] : ['spot_for_dollar_scaling'],
     fallback_kind: fallbackKind,
     fallback_reason: fallbackReason,
     served_at: new Date().toISOString(),

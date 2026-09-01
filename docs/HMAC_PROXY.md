@@ -78,7 +78,7 @@ Browser  →  POST /api/ml/...  →  Vercel (signs + forwards)
 including the latest `em_forecast_imports` audit row when the database has
 been imported by the current importer. It also returns the supported model
 horizons, missing model horizons, missing fresh-data horizons, and a
-`coverage_gaps` table so sparse live ML coverage is explainable. This route
+`coverage_gaps` table so sparse spot-update coverage is explainable. This route
 and the browser page at `/ml-status` require Clerk sign-in plus an email in
 `ML_STATUS_ADMIN_EMAILS` or `ADMIN_EMAILS`.
 
@@ -86,7 +86,7 @@ Current proxied endpoints:
 
 | Browser path | Railway path | Purpose |
 |--------------|--------------|---------|
-| `POST /api/ml/predict` | `POST /api/ml/predict` | Single-symbol live re-score |
+| `POST /api/ml/predict` | `POST /api/ml/predict` | Single-symbol end-of-day re-score with the latest stock price |
 | `POST /api/ml/batch-predict` | `POST /api/ml/batch-predict` | Per-item batch re-score; partial failures are returned per item |
 | `POST /api/ml/coverage` | `POST /api/ml/coverage` | Feature-vector coverage totals plus per-event horizon availability and no-snapshot/stale reasons |
 | `POST /api/ml/status` | `POST /api/ml/status` | ML model inventory, feature data freshness, coverage gaps, latest import metadata, and runtime dependency status |

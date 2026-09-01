@@ -1,8 +1,8 @@
-"""POST /api/ml/predict — on-demand ML re-inference with live spot.
+"""POST /api/ml/predict — on-demand ML re-inference with an updated spot.
 
 Phase 1 of the Path B backend build. The route reads the most recent
 `em_forecasts.feature_vector` snapshot for (symbol, horizon[, earnings_date]),
-substitutes the caller's live spot into the two spot-derived features, and
+substitutes the caller's latest stock price into the spot-derived features, and
 re-runs the LightGBM point + quantile heads.
 
 Wired into `apps/backend/main.py` via `init_router({...})`.
@@ -84,7 +84,7 @@ def _supported_horizons() -> list[int]:
 
 def _cache_key(req: MLPredictRequest) -> str:
     """Stable cache key. Spot is rounded to 1 decimal so trivial flicker
-    in the live tick doesn't blow the cache to bits; 0.1 = ~10bp on a $100
+    in the latest stock tick doesn't blow the cache to bits; 0.1 = ~10bp on a $100
     name, well below the noise floor of an EM prediction."""
     spot_bucket = round(req.spot_override, 1) if req.spot_override is not None else "snap"
     earn = req.earnings_date.isoformat() if req.earnings_date else "auto"
@@ -139,6 +139,12 @@ async def _predict_response(req: MLPredictRequest) -> MLPredictResponse:
     hit = await _cached_get(cache_key)
     if hit is not None:
         hit["source"] = "cached"
+        hit["inference_mode"] = (
+            "spot_updated_snapshot"
+            if req.spot_override is not None
+            else "snapshot_rescore"
+        )
+        hit["updated_inputs"] = ["spot"] if req.spot_override is not None else []
         return MLPredictResponse(**hit)
 
     snapshot = await predict_service.fetch_latest_feature_snapshot(
@@ -179,7 +185,13 @@ async def _predict_response(req: MLPredictRequest) -> MLPredictResponse:
         spot_used=result.spot_used,
         feature_snapshot_date=result.feature_snapshot_date,
         earnings_date=snapshot.get("earnings_date"),
-        source="live",
+        source="computed",
+        inference_mode=(
+            "spot_updated_snapshot"
+            if req.spot_override is not None
+            else "snapshot_rescore"
+        ),
+        updated_inputs=["spot"] if req.spot_override is not None else [],
         served_at=datetime.now(timezone.utc),
         snapshot_age_days=snapshot.get("snapshot_age_days"),
         forecast_scored_at=snapshot.get("forecast_scored_at"),
@@ -315,7 +327,7 @@ async def coverage_endpoint(req: MLCoverageRequest) -> MLCoverageResponse:
                     earnings_date=row["earnings_date"],
                     snapshot_date=row["snapshot_date"],
                     snapshot_age_days=row["snapshot_age_days"],
-                    live_eligible=(
+                    spot_update_eligible=(
                         row["snapshot_age_days"] <= predict_service.MAX_SNAPSHOT_AGE_DAYS
                     ),
                     unavailable_reason=(
@@ -359,7 +371,7 @@ async def coverage_endpoint(req: MLCoverageRequest) -> MLCoverageResponse:
                     MLEventHorizonStatus(
                         horizon_days=horizon,
                         earnings_date=req.earnings_date,
-                        live_eligible=False,
+                        spot_update_eligible=False,
                         unavailable_reason="no_snapshot",
                     )
                 )
@@ -371,7 +383,7 @@ async def coverage_endpoint(req: MLCoverageRequest) -> MLCoverageResponse:
                 snapshot_age_days is not None
                 and snapshot_age_days <= predict_service.MAX_SNAPSHOT_AGE_DAYS
             )
-            live_eligible = has_feature_vector and is_fresh
+            spot_update_eligible = has_feature_vector and is_fresh
             reason = None
             if not has_feature_vector:
                 reason = "missing_feature_vector"
@@ -383,7 +395,7 @@ async def coverage_endpoint(req: MLCoverageRequest) -> MLCoverageResponse:
                     earnings_date=row["earnings_date"],
                     snapshot_date=row["snapshot_date"],
                     snapshot_age_days=snapshot_age_days,
-                    live_eligible=live_eligible,
+                    spot_update_eligible=spot_update_eligible,
                     unavailable_reason=reason,
                     spot_price=float(row["spot_price"]) if row["spot_price"] is not None else None,
                     forecast_scored_at=row["scored_at"],

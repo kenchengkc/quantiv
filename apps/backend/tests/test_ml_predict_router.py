@@ -168,18 +168,18 @@ async def test_coverage_endpoint_returns_totals_and_event_availability():
     assert response.rows_by_horizon[0].fresh_events == 42
     assert response.symbol == "CRM"
     assert response.available_horizons[0].snapshot_age_days == 4
-    assert response.available_horizons[0].live_eligible is True
+    assert response.available_horizons[0].spot_update_eligible is True
     assert response.available_horizons[0].unavailable_reason is None
     assert response.available_horizons[0].forecast_scored_at == datetime(
         2026, 5, 24, tzinfo=timezone.utc
     )
-    assert response.available_horizons[1].live_eligible is False
+    assert response.available_horizons[1].spot_update_eligible is False
     assert response.available_horizons[1].unavailable_reason == "snapshot_stale"
     assert response.supported_horizons == [1, 2, 3, 7, 14, 21]
     by_horizon = {row.horizon_days: row for row in response.event_horizon_statuses}
-    assert by_horizon[1].live_eligible is False
+    assert by_horizon[1].spot_update_eligible is False
     assert by_horizon[1].unavailable_reason == "no_snapshot"
-    assert by_horizon[7].live_eligible is True
+    assert by_horizon[7].spot_update_eligible is True
     assert by_horizon[7].unavailable_reason is None
     assert by_horizon[14].unavailable_reason == "snapshot_stale"
     assert by_horizon[21].unavailable_reason == "missing_feature_vector"
@@ -198,7 +198,8 @@ async def test_batch_predict_returns_per_item_errors(monkeypatch):
                 spot_used=req.spot_override or 100.0,
                 feature_snapshot_date="2026-05-20",
                 earnings_date=req.earnings_date,
-                source="live",
+                source="computed",
+                inference_mode="spot_updated_snapshot",
                 served_at=datetime.now(timezone.utc),
             )
         raise HTTPException(status_code=404, detail="No fresh feature snapshot")
@@ -305,3 +306,87 @@ async def test_predict_response_includes_debug_metadata(monkeypatch):
     assert response.forecast_scored_at == datetime(2026, 5, 24, tzinfo=timezone.utc)
     assert response.model_version == "v3"
     assert response.feature_schema_hash == "abc123"
+    assert response.inference_mode == "spot_updated_snapshot"
+    assert response.market_data_mode == "end_of_day"
+    assert response.decision_scope == "end_of_day_research"
+    assert response.live_trading_eligible is False
+    assert response.updated_inputs == ["spot"]
+
+
+@pytest.mark.asyncio
+async def test_cached_prediction_is_upgraded_to_current_decision_contract(monkeypatch):
+    async def fake_cached_get(_key):
+        return {
+            "symbol": "CRM",
+            "horizon_days": 7,
+            "em_ml_pct": 0.07,
+            "em_ml_abs": 7.0,
+            "quantiles": {10: 0.01, 50: 0.05, 90: 0.17},
+            "spot_used": 100.0,
+            "feature_snapshot_date": "2026-05-20",
+            "earnings_date": "2026-05-27",
+            "source": "live",
+            "served_at": "2026-05-24T00:00:00Z",
+        }
+
+    monkeypatch.setattr(ml_predict, "_cached_get", fake_cached_get)
+    ml_predict.init_router({"db_pool": _Pool(_StatusConn()), "redis_client": None})
+
+    response = await ml_predict._predict_response(
+        MLPredictRequest(symbol="CRM", horizon_days=7, spot_override=100.0),
+    )
+
+    assert response.source == "cached"
+    assert response.inference_mode == "spot_updated_snapshot"
+    assert response.decision_scope == "end_of_day_research"
+    assert response.live_trading_eligible is False
+    assert response.updated_inputs == ["spot"]
+
+
+def test_prediction_request_rejects_live_trading_intent() -> None:
+    with pytest.raises(ValueError):
+        MLPredictRequest(
+            symbol="CRM",
+            horizon_days=7,
+            spot_override=100.0,
+            intended_use="live_trading",
+        )
+
+
+@pytest.mark.asyncio
+async def test_predict_response_labels_snapshot_rescore_without_spot_override(monkeypatch):
+    class _SnapshotResult:
+        em_ml_pct = 0.07
+        em_ml_abs = 6.93
+        quantiles = {10: 0.01, 50: 0.05, 90: 0.17}
+        spot_used = 99.0
+        feature_snapshot_date = "2026-05-20"
+        model_version = "v3"
+        model_trained_at = datetime(2026, 5, 24, tzinfo=timezone.utc)
+        model_loaded_at = datetime(2026, 5, 24, tzinfo=timezone.utc)
+        feature_schema_hash = "abc123"
+
+    async def fake_snapshot(*_args):
+        return {
+            "snapshot_date": date(2026, 5, 20),
+            "earnings_date": date(2026, 5, 27),
+            "feature_vector": {"log_spot": 4.6},
+            "spot_at_snapshot": 99.0,
+            "forecast_scored_at": datetime(2026, 5, 24, tzinfo=timezone.utc),
+            "snapshot_age_days": 4,
+        }
+
+    monkeypatch.setattr(ml_predict.predict_service, "fetch_latest_feature_snapshot", fake_snapshot)
+    monkeypatch.setattr(
+        ml_predict.predict_service,
+        "predict",
+        lambda **_kwargs: _SnapshotResult(),
+    )
+    ml_predict.init_router({"db_pool": _Pool(_StatusConn()), "redis_client": None})
+
+    response = await ml_predict._predict_response(
+        MLPredictRequest(symbol="CRM", horizon_days=7),
+    )
+
+    assert response.inference_mode == "snapshot_rescore"
+    assert response.updated_inputs == []

@@ -98,7 +98,12 @@ def _prediction(req) -> MLPredictResponse:
         spot_used=req.spot_override or 100.0,
         feature_snapshot_date="2026-08-21",
         earnings_date=req.earnings_date,
-        source="live",
+        source="computed",
+        inference_mode=(
+            "spot_updated_snapshot"
+            if req.spot_override is not None
+            else "snapshot_rescore"
+        ),
         served_at=datetime(2026, 8, 22, tzinfo=timezone.utc),
     )
 

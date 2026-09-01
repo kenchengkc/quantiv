@@ -143,7 +143,7 @@ export interface LivePrice {
   marketOpen: boolean;
 }
 
-export type PredictionMode = 'snapshot' | 'live';
+export type PredictionMode = 'snapshot' | 'spot_updated';
 export type LivePredictionStatus = 'idle' | 'loading' | 'ready' | 'unavailable';
 
 export interface LivePredictionResponse {
@@ -155,7 +155,12 @@ export interface LivePredictionResponse {
   spot_used: number;
   feature_snapshot_date: string | null;
   earnings_date: string | null;
-  source: 'live' | 'cached' | 'nightly_fallback';
+  source: 'computed' | 'cached' | 'nightly_fallback';
+  inference_mode?: 'snapshot_rescore' | 'spot_updated_snapshot' | 'nightly_snapshot';
+  market_data_mode?: 'end_of_day';
+  decision_scope?: 'end_of_day_research';
+  live_trading_eligible?: false;
+  updated_inputs?: Array<'spot' | 'spot_for_dollar_scaling'>;
   fallback_kind?: 'static_ml' | 'straddle';
   fallback_reason?: string;
   served_at: string;

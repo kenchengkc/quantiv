@@ -1,4 +1,4 @@
-"""Health checks cover only dependencies used by live prediction."""
+"""Health checks cover only dependencies used by spot-updated prediction."""
 
 from __future__ import annotations
 

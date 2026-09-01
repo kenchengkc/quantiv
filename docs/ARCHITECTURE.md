@@ -7,7 +7,7 @@ This guide documents Quantiv's production data flow, application services, live 
 Quantiv has three independent paths:
 
 1. **Static dashboard generation** — scheduled ingestion, validation, scoring, and JSON publication.
-2. **Live ML inference** — an optional signed Vercel-to-Railway request path.
+2. **Spot-updated ML inference** — an optional signed Vercel-to-Railway request path that keeps non-price features frozen at their end-of-day snapshot.
 3. **Live quotes** — one lease-elected regular-hours writer with explicit fallbacks.
 
 ```mermaid
@@ -39,7 +39,7 @@ flowchart TB
 
     PUB --> VERCEL
     VERCEL <-->|Watchlists| NEON
-    VERCEL -->|HMAC live prediction| RAILWAY
+    VERCEL -->|HMAC spot update| RAILWAY
     R2 -->|Parquet and models| RAILWAY
     SCORE -->|Recent forecasts| NEON
   end
@@ -87,9 +87,9 @@ apps/frontend/public/
 
 Provider outputs are reconciled into `data/earnings_calendar.csv`. The integrity gate must pass before downstream generation proceeds.
 
-## Live ML path
+## Spot-updated ML path
 
-When configured, symbol and watchlist pages can request live re-inference through a signed proxy:
+When configured, symbol and watchlist pages can request a spot-updated re-score through a signed proxy:
 
 ```text
 Vercel
@@ -100,7 +100,7 @@ Vercel
 → prediction response
 ```
 
-The proxy uses `BACKEND_URL` and `BACKEND_SHARED_SECRET`. See [HMAC_PROXY.md](HMAC_PROXY.md) for signing details.
+The response is explicitly marked `market_data_mode: "end_of_day"`, `decision_scope: "end_of_day_research"`, and `live_trading_eligible: false`. Requests that declare a live-trading use fail validation. See [Decision scope](DECISION_SCOPE.md) for the input boundary and [HMAC proxy](HMAC_PROXY.md) for signing details.
 
 If Railway is unavailable, the frontend can continue displaying ML fields embedded in nightly static JSON.
 
@@ -142,7 +142,7 @@ Protected cron routes use `CRON_SECRET` and `BROAD_REFRESH_SECRET`.
 | Finnhub | Earnings overlay and regular-hours quote source | Required for the primary quote workflow |
 | Clerk | Watchlist and admin authentication | Optional |
 | Neon | Watchlists, forecasts, and cron metadata | Optional for public browsing |
-| Railway FastAPI | Live ML re-inference from persisted feature vectors | Optional |
+| Railway FastAPI | Spot-updated ML re-inference from persisted end-of-day feature vectors | Optional |
 | Railway quote worker | Scaled quote ingestion | Optional |
 | Polygon | Off-hours broad quote refresh | Optional |
 | Alpaca IEX | Intraday bars and selected extended-hours data | Optional |
@@ -177,8 +177,8 @@ See [RAILWAY_SETUP.md](RAILWAY_SETUP.md) for deployment instructions.
 | `/api/stocks/intraday` | Return Alpaca IEX intraday bars |
 | `/api/stocks/search` | Search supported stock and ETF metadata |
 | `/api/watchlist/*` | Watchlist CRUD and reordering |
-| `/api/ml/predict` | Proxy one live prediction to Railway |
-| `/api/ml/batch-predict` | Proxy multiple live predictions |
+| `/api/ml/predict` | Proxy one end-of-day, spot-updated prediction to Railway |
+| `/api/ml/batch-predict` | Proxy multiple spot-updated predictions |
 | `/api/ml/status` | Return protected ML diagnostics |
 | `/api/cron/refresh-prices` | Refresh regular-hours and selected extended-hours quotes |
 | `/api/cron/refresh-broad` | Refresh the broad universe outside market hours |

@@ -43,7 +43,12 @@ type WatchlistMlResponse = {
   spot_used: number;
   feature_snapshot_date: string | null;
   earnings_date: string | null;
-  source: 'live' | 'cached' | 'nightly_fallback';
+  source: 'computed' | 'cached' | 'nightly_fallback';
+  inference_mode?: 'snapshot_rescore' | 'spot_updated_snapshot' | 'nightly_snapshot';
+  market_data_mode?: 'end_of_day';
+  decision_scope?: 'end_of_day_research';
+  live_trading_eligible?: false;
+  updated_inputs?: Array<'spot' | 'spot_for_dollar_scaling'>;
   fallback_kind?: 'static_ml' | 'straddle';
   fallback_reason?: string;
   served_at: string;
@@ -112,7 +117,9 @@ function liveMlLabel(
   hasMathMove: boolean,
 ): string {
   if (liveState?.status === 'ready') {
-    return liveState.response?.source === 'nightly_fallback' ? 'Snapshot ML' : 'Live ML';
+    return liveState.response?.source === 'nightly_fallback'
+      ? 'Snapshot ML'
+      : 'Spot-updated ML';
   }
   if (hasStaticMl) return 'Snapshot ML';
   if (hasMathMove) return 'Straddle';

@@ -1,11 +1,11 @@
-"""On-demand re-inference with a live spot price.
+"""On-demand re-inference with an updated stock price.
 
 The nightly batch (`scripts/daily_score.py`) writes the exact feature vector
 it scored with into `em_forecasts.feature_vector` (JSONB). This service:
 
 1. Queries that vector for a given (symbol, earnings_date, horizon).
-2. Substitutes in the caller's live spot, recomputing the two spot-derived
-   features (`underlying_price`, `log_price`).
+2. Substitutes in the caller's latest stock price, recomputing whichever
+   spot-derived features exist (`underlying_price`, `log_price`, `log_spot`).
 3. Runs `model.predict` against the substituted vector.
 4. Returns point + quantile predictions and the freshness metadata the
    route layer needs to label the response.
@@ -279,7 +279,7 @@ def model_inventory() -> List[Dict[str, Any]]:
 
 def _substitute_spot(
     feature_vector: Dict[str, float],
-    live_spot: float,
+    updated_spot: float,
 ) -> Dict[str, float]:
     """Return a copy of feature_vector with the spot-derived features
     swapped in. Schema-flexible — the v3 production models use `log_spot`,
@@ -288,18 +288,18 @@ def _substitute_spot(
     landing different names) doesn't silently no-op the override.
 
     Everything else (IV, Greeks, term slope, surprise history) is anchored
-    to the nightly chain and unaffected by an intraday move.
+    to the nightly chain and unaffected by the stock-price update.
     """
-    if live_spot is None or not (live_spot > 0):
+    if updated_spot is None or not (updated_spot > 0):
         # Defensive: a non-positive spot would NaN out log values and the
         # predict call would emit NaN. Skip the substitution and serve the
         # snapshot's own value.
         return dict(feature_vector)
     out = dict(feature_vector)
-    log_spot = float(math.log(max(live_spot, 1.0)))
+    log_spot = float(math.log(max(updated_spot, 1.0)))
     # MVP1 schema names
     if "underlying_price" in out:
-        out["underlying_price"] = float(live_spot)
+        out["underlying_price"] = float(updated_spot)
     if "log_price" in out:
         out["log_price"] = log_spot
     # v3 schema name

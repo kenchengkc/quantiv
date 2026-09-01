@@ -2,7 +2,7 @@
 
 import re
 from datetime import date, datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -36,11 +36,21 @@ class MLPredictRequest(BaseModel):
     horizon_days: int = Field(..., description="Must be one of 1, 2, 3, 7, 14, 21")
     spot_override: float | None = Field(
         None, gt=0,
-        description="Live spot price (Finnhub). Omit to score with the snapshot's spot.",
+        description=(
+            "Latest stock price. Omit to score with the end-of-day snapshot's spot; "
+            "all non-price features remain frozen."
+        ),
     )
     earnings_date: date | None = Field(
         None,
         description="Pin to a specific earnings event; otherwise the latest snapshot wins.",
+    )
+    intended_use: Literal["end_of_day_research"] = Field(
+        "end_of_day_research",
+        description=(
+            "Fail-closed decision scope. Live-trading requests are not accepted because "
+            "the options and model features are end-of-day snapshots."
+        ),
     )
 
     @field_validator("symbol", mode="before")
@@ -63,10 +73,15 @@ class MLPredictResponse(BaseModel):
         ..., description="ET date of the chain snapshot whose features we re-scored.",
     )
     earnings_date: date | None = None
-    source: str = Field(
+    source: Literal["computed", "cached"] = Field(
         ...,
-        description="'live' = backend ran the model; 'cached' = served from Upstash within TTL.",
+        description="Whether the backend computed or briefly cached this response.",
     )
+    inference_mode: Literal["snapshot_rescore", "spot_updated_snapshot"]
+    market_data_mode: Literal["end_of_day"] = "end_of_day"
+    decision_scope: Literal["end_of_day_research"] = "end_of_day_research"
+    live_trading_eligible: Literal[False] = False
+    updated_inputs: list[Literal["spot"]] = Field(default_factory=list)
     served_at: datetime
     snapshot_age_days: int | None = Field(
         None,
@@ -137,13 +152,13 @@ class MLAvailableHorizon(BaseModel):
     earnings_date: date
     snapshot_date: date
     snapshot_age_days: int
-    live_eligible: bool = Field(
+    spot_update_eligible: bool = Field(
         ...,
         description="True when this snapshot is recent enough for /api/ml/predict.",
     )
     unavailable_reason: str | None = Field(
         None,
-        description="Machine-readable reason when live_eligible is false.",
+        description="Machine-readable reason when spot_update_eligible is false.",
     )
     spot_price: float | None = None
     forecast_scored_at: datetime | None = None
@@ -154,9 +169,9 @@ class MLEventHorizonStatus(BaseModel):
     earnings_date: date | None = None
     snapshot_date: date | None = None
     snapshot_age_days: int | None = None
-    live_eligible: bool = Field(
+    spot_update_eligible: bool = Field(
         False,
-        description="True when /api/ml/predict can use this event/horizon now.",
+        description="True when /api/ml/predict can spot-update this event/horizon now.",
     )
     unavailable_reason: str | None = Field(
         None,

@@ -69,7 +69,7 @@ describe('MoveComparisonChart', () => {
       container.querySelectorAll<HTMLButtonElement>('[role="tab"]'),
     ).find((button) => button.textContent === 'Spot-updated');
     spotUpdatedTab?.click();
-    expect(onModeChange).toHaveBeenCalledWith('live');
+    expect(onModeChange).toHaveBeenCalledWith('spot_updated');
   });
 
   it('omits the model row when no forecast exists', () => {

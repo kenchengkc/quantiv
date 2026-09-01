@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: err.message }, { status: err.status, headers: NO_STORE });
       }
       // 5xx / timeout / network — degrade to the nightly fallback so the
-      // UI shows a number with a clear "live unavailable" badge instead
+      // UI shows a number with a clear "spot update unavailable" label instead
       // of an error.
     }
     return nightlyFallbackResponse(requestBody, 'backend_unavailable');
