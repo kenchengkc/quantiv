@@ -37,7 +37,7 @@ test.describe("homepage splash", () => {
       });
     expect(wordmarkLayout.fontSize).toBeGreaterThanOrEqual(13);
     expect(wordmarkLayout.textIndent).toBe("0px");
-    const expectedLeftShift = wordmarkLayout.width * 0.1;
+    const expectedLeftShift = wordmarkLayout.width * 0.05;
     expect(
       Math.abs(
         wordmarkLayout.viewportCenter -
