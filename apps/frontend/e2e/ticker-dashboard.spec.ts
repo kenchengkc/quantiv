@@ -30,7 +30,7 @@ test("ticker dashboard presents one market-model-history view before detail", as
     "No committed ticker fixture includes an ML forecast",
   );
 
-  await page.goto(`/${symbol}`);
+  await page.goto(`/${symbol}`, { waitUntil: "domcontentloaded" });
 
   const comparison = page.getByRole("heading", {
     name: "Market vs model vs history",
@@ -72,7 +72,10 @@ test("ticker dashboard presents one market-model-history view before detail", as
 test("About documents the platform-wide publication controls", async ({
   page,
 }) => {
-  await page.goto("/about");
+  // The page is ready for assertions at DOMContentLoaded. Waiting for the
+  // browser's full `load` event also waits on non-critical third-party assets
+  // and can exhaust Playwright's 30-second test budget on a cold CI runner.
+  await page.goto("/about", { waitUntil: "domcontentloaded" });
 
   const controls = page.getByRole("region", {
     name: "Only validated snapshots reach the product.",
