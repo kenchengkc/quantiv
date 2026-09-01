@@ -24,92 +24,80 @@ def load_env_file(env_path: Path) -> Dict[str, str]:
                     env_vars[key.strip()] = value.strip()
     return env_vars
 
-def find_post_event_expiry(conn: duckdb.DuckDBPyConnection, ticker: str, as_of_date: date, earnings_dt: date) -> Optional[date]:
-    """Find the nearest regular expiry after earnings (post-event window)."""
-    
-    # Look for expiries between earnings_dt and earnings_dt + 7 days
-    max_expiry = earnings_dt + timedelta(days=7)
-    
-    result = conn.execute("""
-        SELECT DISTINCT expiry_date
-        FROM v_options_chain
+def _is_after_close(timing: str | None) -> bool:
+    normalized = str(timing or "").strip().lower()
+    return normalized in {"after_market_close", "amc", "after_close"} or "after" in normalized
+
+
+def _is_pre_event_observation(
+    as_of_date: date,
+    earnings_dt: date,
+    timing: str | None,
+) -> bool:
+    """Whether an EOD quote can have been observed before the event."""
+    if _is_after_close(timing):
+        return as_of_date <= earnings_dt
+    return as_of_date < earnings_dt
+
+
+def find_post_event_expiry(
+    conn: duckdb.DuckDBPyConnection,
+    ticker: str,
+    as_of_date: date,
+    earnings_dt: date,
+    timing: str | None = None,
+) -> Optional[date]:
+    """Find the nearest decision-eligible expiry that still spans the event."""
+    comparison = ">" if _is_after_close(timing) else ">="
+    result = conn.execute(
+        f"""
+        SELECT expiry_date
+        FROM v_eligible_straddles
         WHERE ticker = ?
-        AND as_of_date = ?
-        AND expiry_date >= ?
-        AND expiry_date <= ?
+          AND as_of_date = ?
+          AND expiry_date {comparison} ?
+          AND expiry_date <= ?
         ORDER BY expiry_date
         LIMIT 1
-    """, [ticker, as_of_date, earnings_dt, max_expiry]).fetchone()
-    
-    if result:
-        return result[0]
-    
-    # Fallback: find nearest expiry after earnings (within 30 days)
-    fallback_max = earnings_dt + timedelta(days=30)
-    result = conn.execute("""
-        SELECT DISTINCT expiry_date
-        FROM v_options_chain
-        WHERE ticker = ?
-        AND as_of_date = ?
-        AND expiry_date >= ?
-        AND expiry_date <= ?
-        ORDER BY expiry_date
-        LIMIT 1
-    """, [ticker, as_of_date, earnings_dt, fallback_max]).fetchone()
-    
+        """,
+        [ticker, as_of_date, earnings_dt, earnings_dt + timedelta(days=30)],
+    ).fetchone()
     return result[0] if result else None
 
 def compute_atm_straddle_pct(conn: duckdb.DuckDBPyConnection, ticker: str, as_of_date: date, 
                             earnings_dt: date, expiry_date: date) -> Optional[Dict[str, Any]]:
     """Compute ATM straddle % for given ticker/date/expiry."""
     
-    # Get ATM strike and spot estimate
-    atm_info = conn.execute("""
-        SELECT estimated_spot, atm_strike
-        FROM v_atm_strikes
-        WHERE ticker = ?
-        AND as_of_date = ?
-        AND expiry_date = ?
-    """, [ticker, as_of_date, expiry_date]).fetchone()
-    
-    if not atm_info:
+    pair = conn.execute(
+        """
+        SELECT estimated_spot, atm_strike,
+               call_mid, put_mid, call_iv, put_iv,
+               call_delta, put_delta, call_vega, put_vega,
+               straddle_mid, straddle_pct, straddle_relative_spread
+        FROM v_eligible_straddles
+        WHERE ticker = ? AND as_of_date = ? AND expiry_date = ?
+        LIMIT 1
+        """,
+        [ticker, as_of_date, expiry_date],
+    ).fetchone()
+    if not pair:
         return None
-    
-    estimated_spot, atm_strike = atm_info
-    
-    # Get call and put prices at ATM strike
-    options_data = conn.execute("""
-        SELECT 
-            call_put,
-            mid_price,
-            iv,
-            bid_ask_spread_pct,
-            delta,
-            vega
-        FROM v_options_chain
-        WHERE ticker = ?
-        AND as_of_date = ?
-        AND expiry_date = ?
-        AND strike = ?
-        AND call_put IN ('C', 'P')
-    """, [ticker, as_of_date, expiry_date, atm_strike]).fetchall()
-    
-    if len(options_data) != 2:  # Need both call and put
-        return None
-    
-    # Parse call and put data
-    call_data = next((row for row in options_data if row[0] == 'C'), None)
-    put_data = next((row for row in options_data if row[0] == 'P'), None)
-    
-    if not call_data or not put_data:
-        return None
-    
-    call_mid, call_iv, call_spread, call_delta, call_vega = call_data[1:]
-    put_mid, put_iv, put_spread, put_delta, put_vega = put_data[1:]
-    
-    # Calculate straddle metrics
-    straddle_price = call_mid + put_mid
-    straddle_pct = straddle_price / estimated_spot if estimated_spot > 0 else None
+
+    (
+        estimated_spot,
+        atm_strike,
+        call_mid,
+        put_mid,
+        call_iv,
+        put_iv,
+        call_delta,
+        put_delta,
+        call_vega,
+        put_vega,
+        straddle_price,
+        straddle_pct,
+        straddle_spread,
+    ) = pair
     
     # Average IV (vega-weighted if possible)
     if call_vega and put_vega and (call_vega + put_vega) > 0:
@@ -143,7 +131,8 @@ def compute_atm_straddle_pct(conn: duckdb.DuckDBPyConnection, ticker: str, as_of
         'call_delta': float(call_delta) if call_delta else None,
         'put_delta': float(put_delta) if put_delta else None,
         'total_vega': float(call_vega + put_vega) if call_vega and put_vega else None,
-        'avg_bid_ask_spread': float((call_spread + put_spread) / 2.0) if call_spread and put_spread else None
+        'avg_bid_ask_spread': float(straddle_spread),
+        'quote_quality_status': 'decision_eligible_eod',
     }
 
 def compute_skew_and_term_structure(conn: duckdb.DuckDBPyConnection, ticker: str, as_of_date: date, 
@@ -205,15 +194,28 @@ def compute_skew_and_term_structure(conn: duckdb.DuckDBPyConnection, ticker: str
         'num_term_points': len(term_data)
     }
 
-def compute_em_math(conn: duckdb.DuckDBPyConnection, ticker: str, as_of_date: date, 
-                   earnings_dt: date) -> Optional[Dict[str, Any]]:
+def compute_em_math(
+    conn: duckdb.DuckDBPyConnection,
+    ticker: str,
+    as_of_date: date,
+    earnings_dt: date,
+    timing: str | None = None,
+) -> Optional[Dict[str, Any]]:
     """Compute math baseline EM for a ticker at given as_of_date (T-k)."""
+    if not _is_pre_event_observation(as_of_date, earnings_dt, timing):
+        return None
     
     # Calculate lead time
     lead_time_days = (earnings_dt - as_of_date).days
     
     # Find post-event expiry
-    expiry_date = find_post_event_expiry(conn, ticker, as_of_date, earnings_dt)
+    expiry_date = find_post_event_expiry(
+        conn,
+        ticker,
+        as_of_date,
+        earnings_dt,
+        timing,
+    )
     if not expiry_date:
         return None
     

@@ -103,12 +103,89 @@ def _quarter_label(fiscal_year, fiscal_q, fallback_date):
     return f"{fq} {yy}"
 
 
+def _historical_option_evidence(conn, ticker: str, cutoff: date) -> dict[date, dict]:
+    """Select the latest eligible pre-event ATM straddle for recent earnings."""
+    rows = conn.execute(
+        """
+        WITH recent_events AS (
+            SELECT ticker, earnings_dt, timing
+            FROM earnings_events
+            WHERE ticker = ? AND earnings_dt < ?
+            ORDER BY earnings_dt DESC
+            LIMIT 12
+        )
+        SELECT
+            e.earnings_dt,
+            selected.as_of_date,
+            selected.expiry_date,
+            selected.dte,
+            DATE_DIFF('day', selected.as_of_date, e.earnings_dt) AS lead_time_days,
+            selected.atm_strike,
+            selected.straddle_mid,
+            selected.straddle_pct,
+            selected.atm_iv,
+            selected.quote_quality_status
+        FROM recent_events e
+        LEFT JOIN LATERAL (
+            SELECT s.*
+            FROM v_eligible_straddles s
+            WHERE s.ticker = e.ticker
+              AND s.as_of_date >= e.earnings_dt - INTERVAL '14' DAY
+              AND (
+                  ((LOWER(COALESCE(e.timing, '')) IN (
+                        'after_market_close', 'amc', 'after_close'
+                    ) OR LOWER(COALESCE(e.timing, '')) LIKE '%after%')
+                   AND s.as_of_date <= e.earnings_dt
+                   AND s.expiry_date > e.earnings_dt)
+                  OR
+                  (NOT (
+                        LOWER(COALESCE(e.timing, '')) IN (
+                            'after_market_close', 'amc', 'after_close'
+                        ) OR LOWER(COALESCE(e.timing, '')) LIKE '%after%'
+                   )
+                   AND s.as_of_date < e.earnings_dt
+                   AND s.expiry_date >= e.earnings_dt)
+              )
+            ORDER BY s.as_of_date DESC, s.expiry_date
+            LIMIT 1
+        ) selected ON TRUE
+        """,
+        [ticker, cutoff],
+    ).fetchall()
+    return {
+        earnings_date: {
+            "implied": jsonable(straddle_pct),
+            "implied_as_of": source_date.isoformat() if source_date else None,
+            "implied_expiration": expiration.isoformat() if expiration else None,
+            "implied_dte": int(dte) if dte is not None else None,
+            "implied_lead_days": int(lead_days) if lead_days is not None else None,
+            "implied_atm_strike": jsonable(atm_strike),
+            "implied_straddle_abs": jsonable(straddle_mid),
+            "implied_atm_iv": jsonable(atm_iv),
+            "implied_quality_status": quality_status,
+        }
+        for (
+            earnings_date,
+            source_date,
+            expiration,
+            dte,
+            lead_days,
+            atm_strike,
+            straddle_mid,
+            straddle_pct,
+            atm_iv,
+            quality_status,
+        ) in rows
+        if straddle_pct is not None
+    }
+
+
 def _history_row(d, timing, fiscal_year, fiscal_q, eps_actual, eps_estimate,
-                 rev_actual, rev_estimate, actual_move, symbol=None, source=None):
-    """Shape one earnings_history entry. Implied is null until historical
-    option-chain data is wired; everything else is best-effort from the
-    Finnhub-overlaid earnings_events table."""
+                 rev_actual, rev_estimate, actual_move, symbol=None, source=None,
+                 option_evidence=None):
+    """Shape one realized earnings event with point-in-time options evidence."""
     fy = _corrected_fiscal_year(symbol, fiscal_year, source)
+    evidence = option_evidence or {}
     return {
         "date": d.isoformat(),
         "timing": timing,
@@ -118,10 +195,15 @@ def _history_row(d, timing, fiscal_year, fiscal_q, eps_actual, eps_estimate,
         # Signed close-to-close realized move (e.g. +0.034 = +3.4%).
         # NULL when OHLCV doesn't bracket the event.
         "actual": jsonable(actual_move),
-        # At-the-time implied move. Populated once historical
-        # option-chain data is wired into the build; until then
-        # the chart shows only the actual dots.
-        "implied": None,
+        "implied": evidence.get("implied"),
+        "implied_as_of": evidence.get("implied_as_of"),
+        "implied_expiration": evidence.get("implied_expiration"),
+        "implied_dte": evidence.get("implied_dte"),
+        "implied_lead_days": evidence.get("implied_lead_days"),
+        "implied_atm_strike": evidence.get("implied_atm_strike"),
+        "implied_straddle_abs": evidence.get("implied_straddle_abs"),
+        "implied_atm_iv": evidence.get("implied_atm_iv"),
+        "implied_quality_status": evidence.get("implied_quality_status"),
         "eps_actual": jsonable(eps_actual),
         "eps_estimate": jsonable(eps_estimate),
         "eps_surprise_pct": jsonable(_surprise_pct(eps_actual, eps_estimate)),
@@ -135,10 +217,13 @@ def build_symbol_detail(conn, ticker: str, as_of_date: date, earnings_dt: date |
                         ml_lookup: dict[tuple[str, str], dict] | None = None,
                         provider_lookup: dict[str, dict] | None = None) -> dict | None:
     """Build per-symbol detail: implied moves across expiries + term structure."""
-    expiries = conn.execute(
+    eligible_pairs = conn.execute(
         """
-        SELECT DISTINCT expiry_date
-        FROM v_options_chain
+        SELECT
+            expiry_date, dte, atm_strike, atm_iv,
+            call_iv, put_iv, straddle_mid, straddle_pct,
+            call_delta, call_gamma, call_vega, call_theta
+        FROM v_eligible_straddles
         WHERE ticker = ? AND as_of_date = ?
           AND expiry_date > ?
           AND expiry_date <= ?
@@ -148,81 +233,46 @@ def build_symbol_detail(conn, ticker: str, as_of_date: date, earnings_dt: date |
         [ticker, as_of_date, as_of_date, as_of_date + timedelta(days=120)],
     ).fetchall()
 
-    if not expiries:
+    if not eligible_pairs:
         return None
 
-    # Spot estimate from ATM call with delta ~ 0.5 on nearest expiry
-    spot_row = conn.execute(
-        """
-        SELECT strike
-        FROM v_options_chain
-        WHERE ticker = ? AND as_of_date = ?
-          AND expiry_date = ?
-          AND call_put = 'C' AND delta IS NOT NULL
-          AND delta BETWEEN 0.3 AND 0.7
-        ORDER BY ABS(delta - 0.5)
-        LIMIT 1
-        """,
-        [ticker, as_of_date, expiries[0][0]],
-    ).fetchone()
-    spot = float(spot_row[0]) if spot_row else None
+    # The source does not carry underlying spot, so the nearest eligible
+    # delta-balanced strike is the explicit EOD spot proxy.
+    spot = float(eligible_pairs[0][2])
 
     straddles = []
-    for (exp,) in expiries:
-        atm_row = conn.execute(
-            """
-            SELECT strike
-            FROM v_options_chain
-            WHERE ticker = ? AND as_of_date = ? AND expiry_date = ?
-              AND call_put = 'C' AND delta IS NOT NULL
-              AND delta BETWEEN 0.3 AND 0.7
-            ORDER BY ABS(delta - 0.5)
-            LIMIT 1
-            """,
-            [ticker, as_of_date, exp],
-        ).fetchone()
-        if not atm_row:
-            continue
-        atm_strike = float(atm_row[0])
-
-        pair = conn.execute(
-            """
-            SELECT call_put, mid_price, iv, delta, gamma, vega, theta
-            FROM v_options_chain
-            WHERE ticker = ? AND as_of_date = ? AND expiry_date = ? AND strike = ?
-              AND call_put IN ('C','P')
-            """,
-            [ticker, as_of_date, exp, atm_strike],
-        ).fetchall()
-        if len(pair) != 2:
-            continue
-        call = next((r for r in pair if r[0] == "C"), None)
-        put = next((r for r in pair if r[0] == "P"), None)
-        if not call or not put:
-            continue
-
-        call_mid, call_iv, call_delta, call_gamma, call_vega, call_theta = (
-            call[1], call[2], call[3], call[4], call[5], call[6]
+    for (
+        exp,
+        dte,
+        atm_strike,
+        atm_iv,
+        call_iv,
+        put_iv,
+        straddle_mid,
+        straddle_pct,
+        call_delta,
+        call_gamma,
+        call_vega,
+        call_theta,
+    ) in eligible_pairs:
+        em_iv_abs = (
+            atm_strike * atm_iv * math.sqrt(dte / 365.0)
+            if atm_strike and atm_iv and dte > 0
+            else None
         )
-        put_mid, put_iv = put[1], put[2]
-
-        dte = (exp - as_of_date).days
-        straddle_mid = (call_mid or 0) + (put_mid or 0)
-        atm_iv = (call_iv + put_iv) / 2.0 if call_iv and put_iv else None
-        em_iv_abs = (spot * atm_iv * math.sqrt(dte / 365.0)) if (spot and atm_iv and dte > 0) else None
 
         straddles.append({
             "expiration": exp.isoformat(),
             "dte": dte,
-            "atm_strike": atm_strike,
+            "atm_strike": jsonable(atm_strike),
             "atm_iv": jsonable(atm_iv),
             "atm_call_iv": jsonable(call_iv),
             "atm_put_iv": jsonable(put_iv),
             "straddle_mid": jsonable(straddle_mid),
             "em_straddle": jsonable(straddle_mid),
-            "em_straddle_pct": jsonable(straddle_mid / spot) if spot else None,
+            "em_straddle_pct": jsonable(straddle_pct),
             "em_iv": jsonable(em_iv_abs),
-            "em_iv_pct": jsonable((em_iv_abs / spot) if (em_iv_abs and spot) else None),
+            "em_iv_pct": jsonable((em_iv_abs / atm_strike) if (em_iv_abs and atm_strike) else None),
             "call_delta": jsonable(call_delta),
             "call_gamma": jsonable(call_gamma),
             "call_vega": jsonable(call_vega),
@@ -310,10 +360,27 @@ def build_symbol_detail(conn, ticker: str, as_of_date: date, earnings_dt: date |
             ).fetchall()
         ]
 
+    historical_options = _historical_option_evidence(conn, ticker, as_of_date)
+
     # Use the closest post-earnings expiry as the headline expected move
     em = None
     if earnings_dt:
-        em_math_data = compute_em_math(conn, ticker, as_of_date, earnings_dt)
+        timing_row = conn.execute(
+            """
+            SELECT timing FROM earnings_events
+            WHERE ticker = ? AND earnings_dt = ?
+            LIMIT 1
+            """,
+            [ticker, earnings_dt],
+        ).fetchone()
+        earnings_timing = timing_row[0] if timing_row else None
+        em_math_data = compute_em_math(
+            conn,
+            ticker,
+            as_of_date,
+            earnings_dt,
+            earnings_timing,
+        )
         if em_math_data:
             em = {
                 "earnings_date": earnings_dt.isoformat(),
@@ -337,8 +404,10 @@ def build_symbol_detail(conn, ticker: str, as_of_date: date, earnings_dt: date |
             else:
                 em["em_method"] = "options_math"
 
-    # Fall back to nearest expiry for summary if no earnings event
-    if em is None and straddles:
+    # A generic near-term straddle is useful only when there is no known event.
+    # It must never stand in for an earnings expected move if no eligible expiry
+    # spans that event.
+    if em is None and straddles and earnings_dt is None:
         near = straddles[0]
         em = {
             "expiration": near["expiration"],
@@ -393,7 +462,20 @@ def build_symbol_detail(conn, ticker: str, as_of_date: date, earnings_dt: date |
         "expected_move": em,
         "straddle_features": straddles,
         "earnings_history": [
-            _history_row(d, t, fy, fq, epa, epe, rva, rve, a, symbol=ticker, source=src)
+            _history_row(
+                d,
+                t,
+                fy,
+                fq,
+                epa,
+                epe,
+                rva,
+                rve,
+                a,
+                symbol=ticker,
+                source=src,
+                option_evidence=historical_options.get(d),
+            )
             for d, t, fy, fq, epa, epe, rva, rve, a, src in history
         ],
         "next_earnings": earnings_dt.isoformat() if earnings_dt else None,
@@ -659,7 +741,7 @@ def build_week_events(conn, as_of_date: date, week_start: date, week_end: date,
         if require_ml and not fc and earnings_dt >= today:
             skipped_no_ml += 1
             continue
-        em = compute_em_math(conn, ticker, as_of_date, earnings_dt)
+        em = compute_em_math(conn, ticker, as_of_date, earnings_dt, timing)
         if not em:
             skipped_no_options += 1
             continue

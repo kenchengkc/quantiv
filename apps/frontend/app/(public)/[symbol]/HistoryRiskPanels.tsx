@@ -11,8 +11,15 @@ export type HistoryPoint = {
   q: string;
   date: string;
   timing: string;
-  /** Implied move (always ≥ 0). Null until at-the-time chain data is wired. */
+  /** Point-in-time, pre-event implied move (always ≥ 0). */
   implied: number | null;
+  impliedAsOf: string | null;
+  impliedExpiration: string | null;
+  impliedDte: number | null;
+  impliedLeadDays: number | null;
+  impliedAtmStrike: number | null;
+  impliedStraddleAbs: number | null;
+  impliedAtmIv: number | null;
   /** Signed realized move (e.g. -0.034 = -3.4%). */
   actual: number;
   /** Non-GAAP EPS fundamentals from Finnhub. */
@@ -62,6 +69,13 @@ export function buildHistorySeries(
         date: h.date,
         timing: h.timing,
         implied,
+        impliedAsOf: h.implied_as_of ?? null,
+        impliedExpiration: h.implied_expiration ?? null,
+        impliedDte: pickNum(h.implied_dte),
+        impliedLeadDays: pickNum(h.implied_lead_days),
+        impliedAtmStrike: pickNum(h.implied_atm_strike),
+        impliedStraddleAbs: pickNum(h.implied_straddle_abs),
+        impliedAtmIv: pickNum(h.implied_atm_iv),
         actual: h.actual,
         epsActual: pickNum(h.eps_actual),
         epsEstimate: pickNum(h.eps_estimate),
@@ -125,6 +139,13 @@ export function historyRowsToCsv(
     'absolute_move_pct',
     'direction',
     'implied_move_pct',
+    'implied_observation_date',
+    'implied_expiration',
+    'implied_dte',
+    'implied_lead_days',
+    'implied_atm_strike',
+    'implied_straddle_abs',
+    'implied_atm_iv_pct',
     'exceeded_implied',
     'eps_actual',
     'eps_estimate',
@@ -142,6 +163,13 @@ export function historyRowsToCsv(
     (Math.abs(point.actual) * 100).toFixed(6),
     point.actual >= 0 ? 'up' : 'down',
     point.implied == null ? null : (point.implied * 100).toFixed(6),
+    point.impliedAsOf,
+    point.impliedExpiration,
+    point.impliedDte,
+    point.impliedLeadDays,
+    point.impliedAtmStrike,
+    point.impliedStraddleAbs,
+    point.impliedAtmIv == null ? null : (point.impliedAtmIv * 100).toFixed(6),
     point.implied == null ? null : Math.abs(point.actual) > point.implied,
     point.epsActual,
     point.epsEstimate,
@@ -440,7 +468,6 @@ export function HistoryBlock({
           className="mono tnum"
           style={{ display: 'flex', gap: 9, color: 'var(--ink-4)', fontSize: 9.5 }}
         >
-          {hasImplied ? <span>Beat implied {impliedExceedances}/{impliedObservations}</span> : null}
           {hasEps ? <span>EPS beat {epsBeats}/{epsObservations}</span> : null}
         </div>
       </div>
@@ -456,10 +483,17 @@ export function HistoryBlock({
       >
         <EventStudyMetric label="Observations" value={String(history.length)} />
         <EventStudyMetric label="Median |move|" value={percent(medianMove)} />
-        <EventStudyMetric
-          label="Mean move"
-          value={`${meanMove >= 0 ? '+' : ''}${percent(meanMove)}`}
-        />
+        {hasImplied ? (
+          <EventStudyMetric
+            label="Outside implied"
+            value={`${impliedExceedances}/${impliedObservations}`}
+          />
+        ) : (
+          <EventStudyMetric
+            label="Mean move"
+            value={`${meanMove >= 0 ? '+' : ''}${percent(meanMove)}`}
+          />
+        )}
         <EventStudyMetric label="Largest |move|" value={percent(largestMove)} />
       </div>
 
@@ -657,7 +691,7 @@ export function HistoryBlock({
               transform: placeRight
                 ? 'translate(12px, -50%)'
                 : 'translate(calc(-100% - 12px), -50%)',
-              width: 172,
+              width: 196,
               background: 'var(--bg-3)',
               border: '1px solid var(--line-2)',
               padding: '7px 9px',
@@ -696,6 +730,28 @@ export function HistoryBlock({
             >
               realized
             </div>
+            {hovered_.implied != null && (
+              <div
+                className="mono tnum"
+                style={{
+                  borderTop: '1px solid var(--line)',
+                  marginTop: 6,
+                  paddingTop: 5,
+                  fontSize: 9,
+                  color: 'var(--brand-blue-1)',
+                }}
+              >
+                <div>Options implied ±{(hovered_.implied * 100).toFixed(1)}%</div>
+                <div style={{ color: 'var(--ink-4)', marginTop: 2 }}>
+                  Observed {hovered_.impliedAsOf ?? 'pre-event close'}
+                </div>
+                {hovered_.impliedExpiration && (
+                  <div style={{ color: 'var(--ink-4)', marginTop: 1 }}>
+                    Expires {hovered_.impliedExpiration} · {hovered_.impliedDte ?? '–'} DTE
+                  </div>
+                )}
+              </div>
+            )}
             {hovered_.epsSurprise != null && (
               <div
                 className="mono tnum"
@@ -837,7 +893,7 @@ export function HistoryBlock({
                 display: 'inline-block',
               }}
             />
-            Beat implied
+            Outside implied
           </span>
         )}
       </div>

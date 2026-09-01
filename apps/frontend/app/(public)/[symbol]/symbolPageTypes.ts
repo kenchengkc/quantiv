@@ -104,6 +104,14 @@ export interface SymbolDetail {
     fiscal_q?: string | null;
     /** Implied move at the time, as a decimal fraction. */
     implied?: number | null;
+    implied_as_of?: string | null;
+    implied_expiration?: string | null;
+    implied_dte?: number | null;
+    implied_lead_days?: number | null;
+    implied_atm_strike?: number | null;
+    implied_straddle_abs?: number | null;
+    implied_atm_iv?: number | null;
+    implied_quality_status?: 'decision_eligible_eod' | null;
     /** Realized close-to-close move, as a signed decimal fraction. */
     actual?: number | null;
     eps_actual?: number | null;

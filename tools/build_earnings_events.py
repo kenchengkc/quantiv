@@ -4,8 +4,9 @@ Build canonical earnings_events table from earnings_calendar.csv
 Creates the backbone for lead-time aware EM calculations.
 """
 
-import sys
 import duckdb
+import json
+import sys
 from pathlib import Path
 from typing import Dict, Any
 
@@ -292,43 +293,117 @@ def infer_unknown_timings(conn: duckdb.DuckDBPyConnection) -> None:
 
 def create_duckdb_views(conn: duckdb.DuckDBPyConnection, data_dir: Path):
     """Create DuckDB views for options_chain and volatility_history."""
-    
+
     print("🦆 Creating DuckDB views...")
-    
+
+    policy_path = Path(__file__).resolve().parent.parent / "config" / "option_quote_quality.json"
+    policy = json.loads(policy_path.read_text())
+    min_bid = float(policy["min_bid"])
+    min_ask = float(policy["min_ask"])
+    min_iv = float(policy["min_iv"])
+    max_iv = float(policy["max_iv"])
+    min_dte = int(policy["min_dte"])
+    max_dte = int(policy["max_dte"])
+    max_leg_spread = float(policy["max_leg_relative_spread"])
+    max_straddle_spread = float(policy["max_straddle_relative_spread"])
+    max_atm_delta_distance = float(policy["max_atm_delta_distance"])
+    max_quote_time_skew_seconds = int(policy["max_quote_time_skew_seconds"])
+    min_option_volume = int(policy["min_option_volume_when_available"])
+    min_open_interest = int(policy["min_open_interest_when_available"])
+    timestamp_precision = str(policy["timestamp_precision"])
+    market_data_mode = str(policy["market_data_mode"])
+
     # Options chain view (dedup on ticker/date/expiry/strike/call_put since parquet files can overlap)
     options_pattern = str(data_dir / "parquet" / "options_chain" / "*" / "*" / "*.parquet")
+    parquet_scan = (
+        f"read_parquet('{options_pattern}', "
+        "hive_partitioning=true, union_by_name=true)"
+    )
+    parquet_columns = {
+        str(row[0])
+        for row in conn.execute(f"DESCRIBE SELECT * FROM {parquet_scan}").fetchall()
+    }
+    quote_timestamp_expr = (
+        "TRY_CAST(quote_timestamp AS TIMESTAMP)"
+        if "quote_timestamp" in parquet_columns
+        else "NULL::TIMESTAMP"
+    )
+    option_volume_expr = (
+        "TRY_CAST(option_volume AS BIGINT)"
+        if "option_volume" in parquet_columns
+        else "NULL::BIGINT"
+    )
+    open_interest_expr = (
+        "TRY_CAST(open_interest AS BIGINT)"
+        if "open_interest" in parquet_columns
+        else "NULL::BIGINT"
+    )
     conn.execute(f"""
         CREATE OR REPLACE VIEW v_options_chain AS
-        SELECT * FROM (
-        SELECT
-            act_symbol as ticker,
-            CAST(date AS DATE) as as_of_date,
-            CAST(expiration AS DATE) as expiry_date,
-            strike,
-            CASE
-                WHEN UPPER(call_put) IN ('C', 'CALL') THEN 'C'
-                WHEN UPPER(call_put) IN ('P', 'PUT') THEN 'P'
-                ELSE NULL
-            END as call_put,
-            bid,
-            ask,
-            (bid + ask) / 2.0 as mid_price,
-            CASE WHEN bid > 0 AND ask > 0 THEN (ask - bid) / ((ask + bid) / 2.0) ELSE NULL END as bid_ask_spread_pct,
-            delta,
-            gamma,
-            theta,
-            vega,
-            vol as iv
-        FROM read_parquet('{options_pattern}')
-        WHERE bid IS NOT NULL 
-        AND ask IS NOT NULL
-        AND bid > 0
-        AND ask > bid
-        AND vol IS NOT NULL
-        AND vol > 0
-        AND vol < 5.0  -- Filter extreme IVs
-        QUALIFY ROW_NUMBER() OVER (PARTITION BY act_symbol, date, expiration, strike, call_put ORDER BY (bid+ask) DESC) = 1
+        WITH normalized AS (
+            SELECT
+                act_symbol AS ticker,
+                CAST(date AS DATE) AS as_of_date,
+                CAST(expiration AS DATE) AS expiry_date,
+                strike,
+                CASE
+                    WHEN UPPER(call_put) IN ('C', 'CALL') THEN 'C'
+                    WHEN UPPER(call_put) IN ('P', 'PUT') THEN 'P'
+                    ELSE NULL
+                END AS call_put,
+                bid,
+                ask,
+                (bid + ask) / 2.0 AS mid_price,
+                (ask - bid) / NULLIF((ask + bid) / 2.0, 0) AS bid_ask_spread_pct,
+                DATE_DIFF('day', CAST(date AS DATE), CAST(expiration AS DATE)) AS dte,
+                delta,
+                gamma,
+                theta,
+                vega,
+                vol AS iv,
+                {quote_timestamp_expr} AS source_quote_timestamp,
+                {option_volume_expr} AS option_volume,
+                {open_interest_expr} AS open_interest,
+                CASE
+                    WHEN {quote_timestamp_expr} IS NULL THEN '{timestamp_precision}'
+                    ELSE 'timestamp'
+                END::VARCHAR AS quote_timestamp_precision,
+                '{market_data_mode}'::VARCHAR AS market_data_mode
+            FROM {parquet_scan}
         )
+        SELECT *
+        FROM normalized
+        WHERE ticker IS NOT NULL
+          AND strike > 0
+          AND call_put IS NOT NULL
+          AND bid >= {min_bid}
+          AND ask >= {min_ask}
+          AND ask >= bid
+          AND iv IS NOT NULL
+          AND iv >= {min_iv}
+          AND iv <= {max_iv}
+          AND dte BETWEEN {min_dte} AND {max_dte}
+          AND bid_ask_spread_pct <= {max_leg_spread}
+          AND delta IS NOT NULL
+          AND (
+              (call_put = 'C' AND delta BETWEEN 0 AND 1)
+              OR (call_put = 'P' AND delta BETWEEN -1 AND 0)
+          )
+          AND (
+              source_quote_timestamp IS NULL
+              OR CAST(source_quote_timestamp AS DATE) = as_of_date
+          )
+          AND (option_volume IS NULL OR option_volume >= 0)
+          AND (open_interest IS NULL OR open_interest >= 0)
+          AND (
+              (option_volume IS NULL AND open_interest IS NULL)
+              OR COALESCE(option_volume, 0) >= {min_option_volume}
+              OR COALESCE(open_interest, 0) >= {min_open_interest}
+          )
+        QUALIFY ROW_NUMBER() OVER (
+            PARTITION BY ticker, as_of_date, expiry_date, strike, call_put
+            ORDER BY bid_ask_spread_pct, bid + ask DESC
+        ) = 1
     """)
     
     # v_ohlcv — daily stock prices. Needed by build_frontend_data.screener_extras
@@ -452,15 +527,85 @@ def create_duckdb_views(conn: duckdb.DuckDBPyConnection, data_dir: Path):
         FROM atm_candidates
         WHERE rn = 1
     """)
+
+    # One decision-eligible ATM pair per symbol, observation date, and expiry.
+    # This is shared by current and historical frontend evidence so no displayed
+    # straddle can bypass the production leg, pair, spread, delta, or DTE gates.
+    conn.execute(f"""
+        CREATE OR REPLACE VIEW v_eligible_straddles AS
+        WITH pairs AS (
+            SELECT
+                c.ticker,
+                c.as_of_date,
+                c.expiry_date,
+                c.dte,
+                c.strike,
+                c.bid AS call_bid,
+                c.ask AS call_ask,
+                c.mid_price AS call_mid,
+                c.iv AS call_iv,
+                c.delta AS call_delta,
+                c.gamma AS call_gamma,
+                c.vega AS call_vega,
+                c.theta AS call_theta,
+                c.source_quote_timestamp AS call_quote_timestamp,
+                p.bid AS put_bid,
+                p.ask AS put_ask,
+                p.mid_price AS put_mid,
+                p.iv AS put_iv,
+                p.delta AS put_delta,
+                p.vega AS put_vega,
+                p.source_quote_timestamp AS put_quote_timestamp,
+                c.mid_price + p.mid_price AS straddle_mid,
+                (c.ask + p.ask - c.bid - p.bid)
+                    / NULLIF(c.mid_price + p.mid_price, 0) AS straddle_relative_spread,
+                ABS(c.delta - 0.5) + ABS(p.delta + 0.5) AS atm_delta_distance
+            FROM v_options_chain c
+            JOIN v_options_chain p
+              ON p.ticker = c.ticker
+             AND p.as_of_date = c.as_of_date
+             AND p.expiry_date = c.expiry_date
+             AND p.strike = c.strike
+             AND c.call_put = 'C'
+             AND p.call_put = 'P'
+        ), eligible AS (
+            SELECT *
+            FROM pairs
+            WHERE straddle_mid > 0
+              AND straddle_relative_spread <= {max_straddle_spread}
+              AND atm_delta_distance <= {max_atm_delta_distance}
+              AND (call_quote_timestamp IS NULL) = (put_quote_timestamp IS NULL)
+              AND (
+                  call_quote_timestamp IS NULL
+                  OR ABS(EPOCH(call_quote_timestamp) - EPOCH(put_quote_timestamp))
+                      <= {max_quote_time_skew_seconds}
+              )
+        )
+        SELECT
+            *,
+            strike AS estimated_spot,
+            strike AS atm_strike,
+            straddle_mid / NULLIF(strike, 0) AS straddle_pct,
+            (call_iv + put_iv) / 2.0 AS atm_iv,
+            'decision_eligible_eod'::VARCHAR AS quote_quality_status,
+            ROW_NUMBER() OVER (
+                PARTITION BY ticker, as_of_date, expiry_date
+                ORDER BY atm_delta_distance, straddle_relative_spread, strike
+            ) AS pair_rank
+        FROM eligible
+        QUALIFY pair_rank = 1
+    """)
     
-    print("✅ Created v_options_chain and v_atm_strikes views")
+    print("✅ Created v_options_chain, v_atm_strikes, and v_eligible_straddles views")
     
     # Test the views
     options_count = conn.execute("SELECT COUNT(*) FROM v_options_chain").fetchone()[0]
     atm_count = conn.execute("SELECT COUNT(*) FROM v_atm_strikes").fetchone()[0]
+    straddle_count = conn.execute("SELECT COUNT(*) FROM v_eligible_straddles").fetchone()[0]
     
     print(f"📊 v_options_chain: {options_count:,} records")
     print(f"📊 v_atm_strikes: {atm_count:,} records")
+    print(f"📊 v_eligible_straddles: {straddle_count:,} records")
 
 def main():
     # Setup paths

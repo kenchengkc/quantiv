@@ -30,6 +30,13 @@ describe('historyRowsToCsv', () => {
       date: '2026-06-11',
       timing: 'after_market_close',
       implied: 0.08,
+      impliedAsOf: '2026-06-11',
+      impliedExpiration: '2026-06-19',
+      impliedDte: 8,
+      impliedLeadDays: 0,
+      impliedAtmStrike: 410,
+      impliedStraddleAbs: 32.8,
+      impliedAtmIv: 0.42,
       actual: -0.06755,
       epsActual: 5.96,
       epsEstimate: 5.9385,
@@ -45,7 +52,9 @@ describe('historyRowsToCsv', () => {
     expect(header).toContain('realized_move_pct');
     expect(header).toContain('exceeded_implied');
     expect(row).toContain('ADBE,"Q2, FY26",2026-06-11,after_market_close');
-    expect(row).toContain('-6.755000,6.755000,down,8.000000,false');
+    expect(row).toContain(
+      '-6.755000,6.755000,down,8.000000,2026-06-11,2026-06-19,8,0,410,32.8,42.000000,false',
+    );
     expect(row).toContain('5.96,5.9385,0.362000');
   });
 });
@@ -57,6 +66,13 @@ describe('eventStudyEvidenceCounts', () => {
       date: '2026-01-01',
       timing: 'after_market_close',
       actual: 0.05,
+      impliedAsOf: null,
+      impliedExpiration: null,
+      impliedDte: null,
+      impliedLeadDays: null,
+      impliedAtmStrike: null,
+      impliedStraddleAbs: null,
+      impliedAtmIv: null,
       epsActual: null,
       epsEstimate: null,
       revActual: null,
