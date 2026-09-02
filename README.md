@@ -33,7 +33,7 @@ Under the hood, a Python pipeline reconciles provider data, validates every publ
 | Methodology         | `/about`     | Review formulas, data sources, and interpretation                                       |
 | Production controls | `/ml-status` | Inspect data, model, serving, and release exceptions                                    |
 
-## Built to earn trust
+## Built to be reliable
 
 Institutional research software is credible only when every displayed number is timely, reproducible, and safe to interpret. Quantiv makes those requirements part of the publication path:
 
