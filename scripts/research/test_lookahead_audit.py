@@ -1,6 +1,6 @@
 import pandas as pd
 
-from scripts.research.lookahead_audit import audit_lookahead
+from research.lookahead_audit import audit_lookahead
 
 
 def test_audit_passes_when_all_features_are_available_before_decision() -> None:
