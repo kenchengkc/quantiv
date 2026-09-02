@@ -1,6 +1,6 @@
 import numpy as np
 
-from scripts.research.event_study_inference import (
+from research.event_study_inference import (
     moving_block_bootstrap_mean,
     sign_flip_pvalue,
     summarize_event_study,
