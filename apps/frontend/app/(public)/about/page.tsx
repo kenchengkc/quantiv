@@ -4,7 +4,7 @@ import AboutPageClient from './AboutPageClient';
 export const metadata: Metadata = {
   title: 'About',
   description:
-    'How Quantiv reads option chains: straddle EM, IV term structure, twelve-quarter realized history, and a LightGBM quantile forecast — with the math.',
+    'A visual guide to how Quantiv compares option-implied movement, realized earnings reactions, model quantiles, and publication controls.',
 };
 
 export default function AboutPage() {
