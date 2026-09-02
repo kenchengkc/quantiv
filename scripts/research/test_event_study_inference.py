@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from research.event_study_inference import (
     moving_block_bootstrap_mean,
@@ -37,3 +38,13 @@ def test_moving_block_bootstrap_is_reproducible() -> None:
     first = moving_block_bootstrap_mean(values, block_size=2, draws=50, seed=23)
     second = moving_block_bootstrap_mean(values, block_size=2, draws=50, seed=23)
     np.testing.assert_array_equal(first, second)
+
+
+def test_priced_move_must_be_positive() -> None:
+    with pytest.raises(ValueError, match="priced_move must be positive"):
+        summarize_event_study(
+            [0.03, 0.04],
+            [0.02, 0.0],
+            bootstrap_draws=10,
+            permutation_draws=10,
+        )
