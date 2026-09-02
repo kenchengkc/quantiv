@@ -16,6 +16,8 @@ export default function AuthenticatedLayout({
           colorInputBackground: '#000000',
           colorInputText: '#fafbfd',
           borderRadius: '10px',
+          fontFamily:
+            'var(--font-nunito-sans), ui-sans-serif, system-ui, sans-serif',
         },
       }}
     >
