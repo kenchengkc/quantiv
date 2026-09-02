@@ -48,3 +48,13 @@ async def test_health_degrades_when_dependencies_are_uninitialized() -> None:
 
     assert response.status == "degraded"
     assert response.services == {"postgres": "unhealthy", "redis": "unhealthy"}
+
+
+@pytest.mark.asyncio
+async def test_health_reports_deployed_revision(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("RAILWAY_GIT_COMMIT_SHA", "abc123")
+    health.init_router({"db_pool": _Pool(), "redis_client": _Redis()})
+
+    response = await health.health_check()
+
+    assert response.revision == "abc123"
