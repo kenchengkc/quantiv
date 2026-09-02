@@ -93,20 +93,22 @@ def summarize_event_study(
     priced = priced[valid]
     if realized.size == 0:
         raise ValueError("at least one paired finite observation is required")
+    if (priced <= 0).any():
+        raise ValueError("priced_move must be positive")
 
     excess = realized - priced
     bootstrap = moving_block_bootstrap_mean(
         excess, block_size=block_size, draws=bootstrap_draws, seed=seed
     )
     ci_low, ci_high = np.quantile(bootstrap, [0.025, 0.975])
-    ratio = np.divide(realized, priced, out=np.full_like(realized, np.nan), where=priced != 0)
+    ratio = realized / priced
     return {
         "n": int(excess.size),
         "mean_realized_move": float(realized.mean()),
         "mean_priced_move": float(priced.mean()),
         "mean_excess_move": float(excess.mean()),
         "median_excess_move": float(np.median(excess)),
-        "mean_realized_to_priced_ratio": float(np.nanmean(ratio)),
+        "mean_realized_to_priced_ratio": float(np.mean(ratio)),
         "realized_exceeded_priced_rate": float(np.mean(realized > priced)),
         "bootstrap_95_ci_mean_excess": [float(ci_low), float(ci_high)],
         "sign_flip_pvalue": float(
