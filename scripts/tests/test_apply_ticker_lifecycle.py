@@ -6,7 +6,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 import apply_ticker_lifecycle as lifecycle  # noqa: E402

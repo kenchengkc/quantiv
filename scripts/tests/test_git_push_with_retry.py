@@ -5,7 +5,7 @@ import subprocess
 from pathlib import Path
 
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parents[2]
 PUSH_HELPER = REPO_ROOT / "scripts" / "git_push_with_retry.sh"
 
 

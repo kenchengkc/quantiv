@@ -113,7 +113,7 @@ quantiv/
 ├── data/                   # CSV, Parquet, DuckDB, and validation artifacts
 ├── docs/                   # Architecture, controls, deployment, and performance
 ├── lib/                    # Shared ticker and index metadata
-├── scripts/                # Ingestion, reconciliation, scoring, and operations
+├── scripts/                # Stable operational commands; grouped nonproduction tooling below
 ├── tools/                  # Frontend-data and metadata builders
 ├── workers/refresh-prices/ # Cloudflare trigger for quote-writer failover
 ├── railway.toml
@@ -122,7 +122,7 @@ quantiv/
 └── package.json
 ```
 
-Experimental and retired code is isolated under `scripts/research/`, `scripts/archive/`, and `apps/ml/archive/` rather than included in the production path.
+Research and manual tooling is isolated under `scripts/research/`, `scripts/maintenance/`, and `scripts/provider_probes/`; script tests live under `scripts/tests/`. Retired scripts are removed from the live tree and remain available through Git history.
 
 ## Local development
 
@@ -158,7 +158,7 @@ The frontend runs at `http://localhost:3000`. Start the optional FastAPI service
 For Neon-backed features, apply migrations with:
 
 ```bash
-node scripts/migrate.mjs
+node scripts/maintenance/migrate.mjs
 ```
 
 ## Data and ML workflows

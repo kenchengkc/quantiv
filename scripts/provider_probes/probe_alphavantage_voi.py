@@ -23,7 +23,7 @@ from typing import Any
 import requests
 
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parents[2]
 OUTPUT_PATH = REPO_ROOT / "data" / "alpha_vantage_voi_probe.json"
 PUBLIC_DIR = REPO_ROOT / "apps" / "frontend" / "public"
 POPULAR_WEIGHTS_PATH = REPO_ROOT / "apps" / "frontend" / "lib" / "popular.ts"
@@ -37,7 +37,6 @@ SYMBOL_RE = re.compile(r"^[A-Z][A-Z0-9.\-]{0,9}$")
 
 
 def load_local_env() -> None:
-    """Local dev convenience. CI/hosts still win via real environment vars."""
     for path in [
         REPO_ROOT / "config" / ".env.local",
         REPO_ROOT / "config" / ".env.production",
@@ -127,10 +126,7 @@ def priority_symbols(universe: str) -> list[str]:
 
     return [
         symbol
-        for symbol, _score in sorted(
-            scores.items(),
-            key=lambda item: (-item[1], item[0]),
-        )
+        for symbol, _score in sorted(scores.items(), key=lambda item: (-item[1], item[0]))
     ]
 
 
@@ -262,13 +258,7 @@ def should_stop_after_summary(summary: dict[str, Any]) -> bool:
     error = str(summary.get("error") or "").lower()
     if not error:
         return False
-    stop_terms = [
-        "api call frequency",
-        "daily",
-        "minute",
-        "rate limit",
-        "premium",
-    ]
+    stop_terms = ["api call frequency", "daily", "minute", "rate limit", "premium"]
     return any(term in error for term in stop_terms)
 
 
@@ -373,12 +363,7 @@ def main() -> int:
         body = fetch(function, symbol, api_key)
         summary = summarize_body(body)
         checked_at = datetime.now(timezone.utc).isoformat()
-        result = {
-            "symbol": symbol,
-            "function": function,
-            "checked_at": checked_at,
-            **summary,
-        }
+        result = {"symbol": symbol, "function": function, "checked_at": checked_at, **summary}
         results_by_key[(symbol, function)] = result
         calls_made += 1
         if should_stop_after_summary(summary):

@@ -1,15 +1,9 @@
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-
 import pandas as pd
 import pytest
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(REPO_ROOT / "scripts" / "research"))
-
-from build_provider_paired_evidence import build_paired_report  # noqa: E402
+from research.build_provider_paired_evidence import build_paired_report
 
 
 def _paired_rows() -> pd.DataFrame:
