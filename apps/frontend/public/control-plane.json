@@ -1,61 +1,79 @@
 {
   "data": {
-    "contract_rejection_rate": 0.440461,
-    "contracts": 113220,
-    "corporate_action_rows": 28474,
+    "contract_rejection_rate": 0.428305,
+    "contracts": 97762,
+    "corporate_action_rows": 28523,
     "corporate_action_status": "enforced",
-    "covered_events": 48,
+    "covered_events": 59,
+    "decision_group_rejection_rate": 0.46887,
+    "decision_groups": 3389,
     "decision_scope": "end_of_day_research",
     "duplicate_rows": 0,
-    "eligible_contracts": 63351,
-    "event_coverage_pct": 0.75,
-    "expected_events": 64,
-    "expected_source_date": "2026-08-28",
+    "eligible_contracts": 55890,
+    "eligible_decision_groups": 1800,
+    "event_coverage_pct": 0.746835,
+    "expected_events": 79,
+    "expected_source_date": "2026-09-01",
     "live_trading_eligible": false,
-    "missing_events": 16,
-    "pair_rejection_rate": 0.877619,
-    "quarantine_records": 99551,
+    "missing_events": 20,
+    "pair_rejection_rate": 0.878296,
+    "quarantine_records": 84804,
     "quarantine_status": "enforced",
     "replay_status": "verified",
-    "source_date": "2026-08-28",
+    "source_date": "2026-09-01",
     "source_session_lag": 0,
     "status": "degraded"
   },
   "exceptions": [
     {
       "code": "upcoming_events_outside_option_universe",
-      "count": 353,
+      "count": 304,
       "severity": "warning",
       "summary": "Calendar events fall outside the current options decision universe"
     },
     {
       "code": "upcoming_events_without_option_chain",
-      "count": 16,
+      "count": 20,
       "severity": "warning",
       "summary": "In-universe earnings events have no decision-eligible option chain"
+    },
+    {
+      "code": "forecast_horizon_coverage_below_limit",
+      "count": 15,
+      "severity": "warning",
+      "summary": "One or more model horizons lack sufficient eligible option coverage"
     }
   ],
-  "generated_at": "2026-08-31T18:13:07.364495+00:00",
+  "generated_at": "2026-09-02T16:14:07.524603+00:00",
   "model": {
     "challenger_present": false,
     "champion_active": true,
-    "critical_features": 4,
+    "critical_features": 2,
     "drift_status": "warning",
     "fallback_bundle_available": true,
     "hard_missing_features": 0,
-    "monitored_at": "2026-08-31T18:06:56.087137+00:00",
+    "monitored_at": "2026-09-02T15:22:44.446687+00:00",
     "outcome_common_rows": null,
+    "outcome_evaluated_at": null,
+    "outcome_evaluations": 0,
     "outcome_minimum_rows": null,
     "outcome_status": "unavailable",
     "rollback_recorded": false,
     "shadow_roles": [
       "previous"
     ],
-    "snapshot_date": "2026-08-28",
+    "snapshot_date": "2026-09-01",
     "status": "degraded",
-    "warning_features": 7
+    "warning_features": 10
   },
   "publication_eligible": true,
+  "release": {
+    "artifact_promotion_status": "passed",
+    "data_r2_status": "passed",
+    "forecast_r2_status": "passed",
+    "frontend_payload_status": "passed",
+    "neon_import_status": "passed"
+  },
   "schema": "quantiv.control-plane.v2",
   "status": "degraded"
 }

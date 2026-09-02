@@ -1,18 +1,20 @@
 {
   "schema": "quantiv.dashboard-evidence.v1",
-  "receipt_id": "sha256:fa8abbf62882aca615a0717bd75bb4b2904c2478574831ebb66f2d0256b8dad8",
-  "receipt_file": "forecasts_2026-08-31.fa8abbf62882.receipt.json",
-  "validated_at": "2026-08-31T18:06:53.016963+00:00",
+  "receipt_id": "sha256:c7d4de01949cd7affb538eb025e816f9b101331b7239ad099ae28a71e8d27067",
+  "receipt_file": "forecasts_2026-09-02.c7d4de01949c.receipt.json",
+  "validated_at": "2026-09-02T15:22:40.979973+00:00",
   "quality": {
     "status": "passed",
     "issue_count": 0,
     "issue_codes": []
   },
   "coverage": {
-    "rows": 106,
-    "symbols": 40,
-    "events": 47,
+    "rows": 139,
+    "symbols": 46,
+    "events": 53,
     "horizons": [
+      1,
+      2,
       3,
       7,
       14,
@@ -20,12 +22,12 @@
     ]
   },
   "observation_window": {
-    "earnings_max": "2026-09-17",
-    "earnings_min": "2026-08-31",
-    "scored_at_max": "2026-08-31T18:06:49.569697+00:00",
-    "scored_at_min": "2026-08-31T18:06:49.453137+00:00",
-    "snapshot_max": "2026-08-28",
-    "snapshot_min": "2026-08-10"
+    "earnings_max": "2026-09-22",
+    "earnings_min": "2026-09-02",
+    "scored_at_max": "2026-09-02T15:22:37.338591+00:00",
+    "scored_at_min": "2026-09-02T15:22:37.146409+00:00",
+    "snapshot_max": "2026-09-01",
+    "snapshot_min": "2026-08-12"
   },
   "controls": {
     "evaluated": 24,
@@ -61,16 +63,16 @@
     {
       "name": "model_bundle",
       "producer": "apps/ml/model_trainer.py",
-      "member_count": 28,
-      "bytes": 2890376,
-      "sha256": "aebdeee595101467cb2cb45bc41404ccd3908a3cca3dbf0af623615282c79afd"
+      "member_count": 42,
+      "bytes": 6584614,
+      "sha256": "f11c540e5081eac72c882c4e69e13d479698bd74c9d71f7b5e74cd140c6fa8a7"
     },
     {
       "name": "forecast_snapshot",
       "producer": "scripts/daily_score.py",
       "member_count": 1,
-      "bytes": 131139,
-      "sha256": "66c09755be1de736058225d16bf3b23ce3b87757bb31f03f317ab7793801e1ac"
+      "bytes": 155360,
+      "sha256": "430ff4ab913220755745cf01748690aa0f73ee284ebef434ea3c8ed151f83718"
     }
   ]
 }
