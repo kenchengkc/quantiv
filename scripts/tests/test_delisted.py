@@ -4,7 +4,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 from delisted import delisted_tickers, ticker_renames  # noqa: E402
@@ -64,13 +64,9 @@ def test_detect_delistings_excludes_known_renames_from_missing(tmp_path, monkeyp
     monkeypatch.setattr(dd, "promote_to_delisted", lambda *a, **k: None)
     monkeypatch.setattr(dd, "notify_github", lambda *a, **k: None)
 
-    # Simulate CLI with no writes
     sys.argv = ["detect_delistings.py", "--dry-run", "--allow-fetch-failure"]
     assert dd.main() == 0
 
-    # IAC/VSCO are rename-old symbols — should not appear in promoted output.
-    # MASI is genuinely missing and should be on watch (first day), not promoted
-    # unless threshold met. Re-run internals via direct computation:
     universe = {"IAC", "VSCO", "MASI"}
     listed = {"PPLI", "VSXY", "AAPL"}
     already = set()

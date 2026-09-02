@@ -76,7 +76,7 @@ rclone lsd r2:quantiv-data    # should list nothing initially
 Upload (one time — takes 10–30 min depending on upload speed; ~2 GB):
 
 ```bash
-R2_BUCKET=quantiv-data bash scripts/r2_bootstrap.sh
+R2_BUCKET=quantiv-data bash scripts/maintenance/r2_bootstrap.sh
 ```
 
 Verify size after:
@@ -90,7 +90,7 @@ rclone size r2:quantiv-data
 ## 5. Enable the workflow
 
 ```bash
-git add .github/workflows/daily-refresh.yml scripts/r2_{pull,push,bootstrap}.sh docs/R2_SETUP.md
+git add .github/workflows/daily-refresh.yml scripts/r2_pull.sh scripts/r2_push.sh scripts/maintenance/r2_bootstrap.sh docs/R2_SETUP.md
 git commit -m "Add daily R2-backed refresh workflow"
 git push
 ```

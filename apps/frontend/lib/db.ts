@@ -1,7 +1,7 @@
 import { neon, type NeonQueryFunction } from '@neondatabase/serverless';
 
 // Connect on first query so `next build` can run without DATABASE_URL.
-// Schema changes: node scripts/migrate.mjs (not here, not in CI).
+// Schema changes: node scripts/maintenance/migrate.mjs (not here, not in CI).
 let _sql: NeonQueryFunction<false, false> | null = null;
 
 function getSql(): NeonQueryFunction<false, false> {

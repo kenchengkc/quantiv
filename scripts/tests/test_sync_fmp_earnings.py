@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 from sync_fmp_earnings import FMPQuotaError, decode_fmp_response, main  # noqa: E402

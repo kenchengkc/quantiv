@@ -9,7 +9,7 @@ consistent types.
 Output: data/parquet/volatility_history/year=YYYY/month=MM/*.parquet
 
 Usage:
-  python scripts/csv_to_parquet_volhist.py
+  python scripts/maintenance/csv_to_parquet_volhist.py
 """
 
 import os
@@ -21,7 +21,8 @@ import duckdb
 
 
 def get_data_dir() -> Path:
-    return Path(os.getenv("DATA_DIR", str(Path(__file__).resolve().parent.parent / "data")))
+    repo_root = Path(__file__).resolve().parents[2]
+    return Path(os.getenv("DATA_DIR", str(repo_root / "data")))
 
 
 def main():
@@ -36,7 +37,6 @@ def main():
     print(f"CSV:          {csv_path} ({csv_path.stat().st_size / 1e6:.1f} MB)")
     print(f"Parquet root: {parquet_root}")
 
-    # Remove old broken parquet files (mixed schemas)
     if parquet_root.exists():
         print("Removing old parquet files (broken schema)...")
         shutil.rmtree(parquet_root)
@@ -79,13 +79,12 @@ def main():
     elapsed = time.time() - t0
     print(f"Bulk write complete ({elapsed:.1f}s)")
 
-    # Verify
     count = conn.execute(f"""
         SELECT COUNT(*) FROM read_parquet('{parquet_root}/**/*.parquet', hive_partitioning=true)
     """).fetchone()[0]
 
     date_range = conn.execute(f"""
-        SELECT MIN(date), MAX(date) 
+        SELECT MIN(date), MAX(date)
         FROM read_parquet('{parquet_root}/**/*.parquet', hive_partitioning=true)
     """).fetchone()
 

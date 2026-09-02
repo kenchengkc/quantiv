@@ -8,14 +8,22 @@ import sys
 import time
 from pathlib import Path
 
-from provider_probe import (
+SCRIPTS_DIR = Path(__file__).resolve().parents[1]
+if str(SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS_DIR))
+
+from provider_probe import (  # noqa: E402
     CAPABILITIES_PATH,
     load_capabilities,
     probe_spec,
     select_specs,
     write_capabilities,
 )
-from provider_utils import DEFAULT_LEDGER_PATH, ProviderUsageLedger, load_local_env
+from provider_utils import (  # noqa: E402
+    DEFAULT_LEDGER_PATH,
+    ProviderUsageLedger,
+    load_local_env,
+)
 
 
 def parse_providers(raw: str) -> set[str] | None:
@@ -91,8 +99,6 @@ def main() -> int:
         if idx < len(specs):
             pause = args.delay
             if spec.provider == "alphavantage":
-                # AV free tier throttles at 1 req/sec; an explicit --delay
-                # below that must not undercut the floor.
                 pause = max(pause, 1.2)
             if pause > 0:
                 time.sleep(pause)

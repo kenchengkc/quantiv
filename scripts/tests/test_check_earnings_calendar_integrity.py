@@ -6,7 +6,7 @@ import sys
 from datetime import date, timedelta
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = REPO_ROOT / "scripts" / "check_earnings_calendar_integrity.py"
 
 FIELDS = ["act_symbol", "date", "timing", "fiscal_year", "fiscal_q", "source"]

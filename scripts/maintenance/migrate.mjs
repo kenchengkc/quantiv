@@ -2,7 +2,7 @@
 /**
  * Apply watchlist schema changes to Neon.
  *
- *   node scripts/migrate.mjs
+ *   node scripts/maintenance/migrate.mjs
  *
  * Needs DATABASE_URL. Safe to re-run. Append to MIGRATIONS using
  * CREATE/ALTER … IF NOT EXISTS. Use a role that can change schema;
