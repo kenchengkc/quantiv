@@ -68,12 +68,15 @@ def compare_forecasts(
     if min_group_size < 1:
         raise ValueError("min_group_size must be >= 1")
 
+    numeric_columns = [actual_column, model_column, baseline_column]
     work = frame[required].copy()
-    for column in (actual_column, model_column, baseline_column):
+    for column in numeric_columns:
         work[column] = pd.to_numeric(work[column], errors="coerce")
-    work = work.dropna(subset=[actual_column, model_column, baseline_column])
+    work = work.dropna(subset=numeric_columns)
     if work.empty:
         raise ValueError("no complete finite rows available")
+    if not np.isfinite(work[numeric_columns].to_numpy(dtype=float)).all():
+        raise ValueError("forecast comparison contains non-finite values")
 
     actual = work[actual_column].to_numpy(dtype=float)
     model = work[model_column].to_numpy(dtype=float)
@@ -92,7 +95,9 @@ def compare_forecasts(
 
     if group_column:
         groups: dict[str, Any] = {}
-        for offset, (name, group) in enumerate(work.groupby(group_column, dropna=False, sort=True)):
+        for offset, (name, group) in enumerate(
+            work.groupby(group_column, dropna=False, sort=True)
+        ):
             if len(group) < min_group_size:
                 continue
             groups[str(name)] = _paired_metrics(
