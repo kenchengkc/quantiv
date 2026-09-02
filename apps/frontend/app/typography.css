@@ -1,0 +1,247 @@
+/* Quantiv typography system
+ *
+ * Three families, three jobs:
+ * - Mulish: display and hierarchy
+ * - Nunito Sans: body and interface copy
+ * - JetBrains Mono: data, timestamps, and technical labels
+ *
+ * Keep the scale role-based. New UI should use these variables/classes rather
+ * than introducing one-off half-pixel sizes or local font stacks.
+ */
+
+:root {
+  --qv-font-heading: var(--font-mulish), var(--font-nunito-sans), ui-sans-serif,
+    system-ui, sans-serif;
+  --qv-font-body: var(--font-nunito-sans), ui-sans-serif, system-ui, sans-serif;
+  --qv-font-data: var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, Menlo,
+    Monaco, Consolas, monospace;
+
+  --qv-type-label: 10px;
+  --qv-type-meta: 11px;
+  --qv-type-small: 12px;
+  --qv-type-ui: 13px;
+  --qv-type-body: 14px;
+  --qv-type-lead: 16px;
+  --qv-type-card-title: 20px;
+  --qv-type-subhead: 24px;
+  --qv-type-stat: 32px;
+  --qv-type-section: 38px;
+  --qv-type-detail-title: 48px;
+  --qv-type-page-title: 56px;
+  --qv-type-data-display: 64px;
+  --qv-type-hero: 76px;
+
+  --qv-track-tight: -0.032em;
+  --qv-track-heading: -0.02em;
+  --qv-track-label: 0.14em;
+}
+
+body {
+  font-family: var(--qv-font-body);
+  font-size: var(--qv-type-body);
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.heading,
+.serif {
+  font-family: var(--qv-font-heading);
+}
+
+/* `.serif` is retained as a backwards-compatible name. It has always been
+ * Mulish in Quantiv; new code should prefer semantic heading roles below. */
+.serif {
+  font-feature-settings: "ss01";
+}
+
+.mono {
+  font-family: var(--qv-font-data);
+  font-feature-settings: "tnum", "zero";
+}
+
+/* Semantic roles for new and progressively migrated UI. */
+.qv-type-eyebrow {
+  font-family: var(--qv-font-body);
+  font-size: var(--qv-type-label);
+  font-weight: 700;
+  letter-spacing: var(--qv-track-label);
+  text-transform: uppercase;
+}
+
+.qv-type-meta {
+  font-size: var(--qv-type-meta);
+}
+
+.qv-type-small {
+  font-size: var(--qv-type-small);
+}
+
+.qv-type-lead {
+  font-size: var(--qv-type-lead);
+  line-height: 1.55;
+}
+
+.qv-type-card-title {
+  font-family: var(--qv-font-heading);
+  font-size: var(--qv-type-card-title);
+  font-weight: 700;
+  line-height: 1.08;
+  letter-spacing: -0.015em;
+}
+
+.qv-type-section-title {
+  font-family: var(--qv-font-heading);
+  font-size: var(--qv-type-section);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.025em;
+}
+
+.qv-type-page-title {
+  font-family: var(--qv-font-heading);
+  font-size: var(--qv-type-page-title);
+  font-weight: 800;
+  line-height: 0.94;
+  letter-spacing: var(--qv-track-tight);
+  text-transform: uppercase;
+}
+
+.qv-type-data {
+  font-family: var(--qv-font-data);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Existing shared primitives: collapse the most common half-step drift. */
+.qv-pill,
+.qv-metric-label-row {
+  font-size: var(--qv-type-label) !important;
+}
+
+.chip {
+  font-size: var(--qv-type-small);
+}
+
+.kbd {
+  font-family: var(--qv-font-data);
+  font-size: var(--qv-type-meta);
+}
+
+.qv-footer-links {
+  font-size: var(--qv-type-meta) !important;
+}
+
+.qv-metric-help-popover {
+  font-size: var(--qv-type-small);
+}
+
+.qv-metric-help-eyebrow,
+.qv-metric-help-flow-role,
+.qv-metric-help-formula > span:first-child,
+.qv-metric-help-notes span,
+.qv-metric-help-flow-detail {
+  font-size: var(--qv-type-label);
+}
+
+.qv-metric-help-definition {
+  font-size: var(--qv-type-small);
+}
+
+.qv-metric-help-title {
+  font-family: var(--qv-font-heading);
+  font-size: var(--qv-type-lead);
+}
+
+/* Splash used a fourth, system-only stack. Keep the brand reveal in the same
+ * Mulish display voice as the product hierarchy. */
+.quantiv-splash-wordmark {
+  font-family: var(--qv-font-heading);
+}
+
+/* The About page established the preferred display treatment. Keep all of its
+ * section headings on the same 38px Mulish role and its cards on 20px. */
+body:has(.quantiv-hero-q) h2.serif {
+  font-size: var(--qv-type-section) !important;
+}
+
+body:has(.quantiv-hero-q) article h3.serif {
+  font-size: var(--qv-type-card-title) !important;
+}
+
+body:has(.quantiv-hero-q) header p {
+  font-size: var(--qv-type-lead) !important;
+}
+
+/* Earnings calendar and Watchlist already use 56px page titles. Bring the
+ * Screener's former 66px one-off onto that same role without interfering with
+ * the calendar's dynamic nowrap fitting hook. */
+body:has(.qv-screener-table-shell) h1.qv-m-h1 {
+  font-size: var(--qv-type-page-title) !important;
+  letter-spacing: var(--qv-track-tight) !important;
+  line-height: 0.94 !important;
+}
+
+body:has(.qv-screener-table-shell) .qv-screener-table-shell th.mono {
+  font-size: var(--qv-type-label) !important;
+}
+
+/* Detail pages have their own data-display hierarchy. Normalize only the
+ * headline roles; the 56/64px countdown and implied-move values remain
+ * intentionally larger than ordinary page copy. */
+.qv-detail-symbol {
+  font-size: var(--qv-type-detail-title) !important;
+}
+
+.qv-detail-countdown {
+  font-size: var(--qv-type-page-title) !important;
+}
+
+.qv-detail-em {
+  font-size: var(--qv-type-data-display) !important;
+}
+
+body:has(.qv-detail-hero) .qv-card h3.serif {
+  font-size: var(--qv-type-card-title) !important;
+}
+
+/* SVG chart labels that explicitly requested a generic monospace stack should
+ * use the same JetBrains Mono data voice as the rest of the product. */
+svg text[font-family*="ui-monospace"],
+svg text[font-family*="monospace"] {
+  font-family: var(--qv-font-data) !important;
+}
+
+@media (max-width: 640px) {
+  .qv-type-section-title,
+  body:has(.quantiv-hero-q) h2.serif {
+    font-size: 24px !important;
+  }
+
+  .qv-type-page-title,
+  body:has(.qv-screener-table-shell) h1.qv-m-h1 {
+    font-size: 38px !important;
+    letter-spacing: -0.027em !important;
+    line-height: 0.98 !important;
+  }
+
+  .qv-m-h-hero {
+    font-size: 48px !important;
+    letter-spacing: -0.03em !important;
+    line-height: 0.92 !important;
+  }
+
+  .qv-detail-symbol {
+    font-size: 36px !important;
+  }
+
+  .qv-detail-countdown {
+    font-size: 40px !important;
+  }
+
+  .qv-detail-em {
+    font-size: 44px !important;
+  }
+}
