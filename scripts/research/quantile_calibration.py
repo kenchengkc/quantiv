@@ -41,12 +41,11 @@ def evaluate_quantiles(
     work = frame[required].apply(pd.to_numeric, errors="coerce").dropna()
     if work.empty:
         raise ValueError("no complete finite rows available")
+    if not np.isfinite(work.to_numpy(dtype=float)).all():
+        raise ValueError("quantile evaluation contains non-finite values")
 
     actual = work[target_column].to_numpy(dtype=float)
-    forecasts = {
-        name: work[name].to_numpy(dtype=float)
-        for name in quantiles
-    }
+    forecasts = {name: work[name].to_numpy(dtype=float) for name in quantiles}
 
     ordered_names = sorted(quantiles, key=lambda name: quantiles[name])
     rows: dict[str, dict[str, float]] = {}
@@ -107,6 +106,8 @@ def parse_quantile_columns(values: list[str]) -> dict[str, float]:
             raise ValueError(f"invalid quantile mapping: {value}") from exc
         if not name or not 0.0 < level < 1.0:
             raise ValueError(f"invalid quantile mapping: {value}")
+        if name in parsed:
+            raise ValueError(f"duplicate quantile column: {name}")
         parsed[name] = level
 
     if len(set(parsed.values())) != len(parsed):
