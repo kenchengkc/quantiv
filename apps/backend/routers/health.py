@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from datetime import datetime, timezone
 from typing import Any
 
@@ -16,6 +17,19 @@ _state: dict[str, Any] = {}
 def init_router(state: dict[str, Any]) -> None:
     _state.clear()
     _state.update(state)
+
+
+def _build_revision() -> str | None:
+    for name in (
+        "RAILWAY_GIT_COMMIT_SHA",
+        "GIT_COMMIT_SHA",
+        "GITHUB_SHA",
+        "SOURCE_VERSION",
+    ):
+        value = os.getenv(name)
+        if value:
+            return value.strip()
+    return None
 
 
 @router.get("/health", response_model=HealthResponse)
@@ -47,4 +61,5 @@ async def health_check() -> HealthResponse:
         status=status,
         timestamp=datetime.now(timezone.utc),
         services=services,
+        revision=_build_revision(),
     )
