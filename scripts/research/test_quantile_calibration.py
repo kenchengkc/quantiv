@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from scripts.research.quantile_calibration import (
+from research.quantile_calibration import (
     evaluate_quantiles,
     parse_quantile_columns,
     pinball_loss,
