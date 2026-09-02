@@ -54,3 +54,22 @@ def test_manifest_rejects_paths_outside_repo_root(tmp_path: Path) -> None:
             build_manifest([outside], repo_root=tmp_path, git_commit="abc123")
     finally:
         outside.unlink(missing_ok=True)
+
+
+def test_verify_fails_closed_on_malformed_input_record(tmp_path: Path) -> None:
+    manifest = {
+        "schema": "quantiv.research-manifest.v1",
+        "as_of": "2026-09-02T00:00:00+00:00",
+        "git_commit": "abc123",
+        "inputs": [{"path": None}],
+        "metadata": {},
+        "manifest_id": "invalid",
+    }
+
+    report = verify_manifest(manifest, repo_root=tmp_path)
+
+    assert report["ok"] is False
+    assert "manifest_id mismatch" in report["errors"]
+    assert report["files"] == [
+        {"path": None, "ok": False, "reason": "malformed_record"}
+    ]
