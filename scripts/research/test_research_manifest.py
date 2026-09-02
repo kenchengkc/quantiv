@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from scripts.research.research_manifest import build_manifest, verify_manifest
+from research.research_manifest import build_manifest, verify_manifest
 
 
 def test_manifest_is_order_independent_and_content_addressed(tmp_path: Path) -> None:
