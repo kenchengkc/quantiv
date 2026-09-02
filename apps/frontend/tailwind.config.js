@@ -47,8 +47,21 @@ module.exports = {
         },
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
-        mono: ['var(--font-jetbrains-mono)', 'Consolas', 'monospace'],
+        sans: ['var(--font-nunito-sans)', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        heading: [
+          'var(--font-mulish)',
+          'var(--font-nunito-sans)',
+          'ui-sans-serif',
+          'system-ui',
+          'sans-serif',
+        ],
+        mono: [
+          'var(--font-jetbrains-mono)',
+          'ui-monospace',
+          'SFMono-Regular',
+          'Menlo',
+          'monospace',
+        ],
       },
       animation: {
         'fade-in': 'fadeIn 0.5s ease-in-out',
