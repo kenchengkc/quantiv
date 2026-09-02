@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -57,3 +58,21 @@ def test_custom_quantile_mapping_validation() -> None:
     }
     with pytest.raises(ValueError, match="invalid quantile mapping"):
         parse_quantile_columns(["p20=1.2"])
+    with pytest.raises(ValueError, match="duplicate quantile column"):
+        parse_quantile_columns(["p20=0.2", "p20=0.3"])
+
+
+def test_non_finite_values_fail_closed() -> None:
+    frame = pd.DataFrame(
+        {
+            "actual": [1.0, 2.0],
+            "q10": [0.5, 1.5],
+            "q25": [0.8, 1.8],
+            "q50": [1.0, np.inf],
+            "q75": [1.2, 2.2],
+            "q90": [1.5, 2.5],
+        }
+    )
+
+    with pytest.raises(ValueError, match="non-finite"):
+        evaluate_quantiles(frame, target_column="actual")
