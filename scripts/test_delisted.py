@@ -10,11 +10,12 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 from delisted import delisted_tickers, ticker_renames  # noqa: E402
 
 
-def test_ticker_renames_includes_iac_leg_and_vsco():
+def test_ticker_renames_includes_iac_leg_vsco_and_hlx():
     renames = ticker_renames()
     assert renames.get("IAC") == "PPLI"
     assert renames.get("LEG") == "SGI"
     assert renames.get("VSCO") == "VSXY"
+    assert renames.get("HLX") == "HOS"
 
 
 def test_eqr_avb_two_are_delisted_not_renames():
