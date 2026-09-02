@@ -1,18 +1,17 @@
 /* Quantiv typography system
  *
- * Three families, three jobs:
- * - Mulish: display and hierarchy
- * - Nunito Sans: body and interface copy
+ * Two families, two jobs:
+ * - Mulish: all product text, hierarchy, controls, and explanatory copy
  * - JetBrains Mono: data, timestamps, and technical labels
  *
- * Keep the scale role-based. New UI should use these variables/classes rather
- * than introducing one-off half-pixel sizes or local font stacks.
+ * The About-page “See the research move.” heading is the visual reference for
+ * display hierarchy. Keep the scale role-based instead of introducing local
+ * font stacks or one-off half-pixel sizes.
  */
 
 :root {
-  --qv-font-heading: var(--font-mulish), var(--font-nunito-sans), ui-sans-serif,
-    system-ui, sans-serif;
-  --qv-font-body: var(--font-nunito-sans), ui-sans-serif, system-ui, sans-serif;
+  --qv-font-heading: var(--font-mulish), ui-sans-serif, system-ui, sans-serif;
+  --qv-font-body: var(--font-mulish), ui-sans-serif, system-ui, sans-serif;
   --qv-font-data: var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, Menlo,
     Monaco, Consolas, monospace;
 
@@ -52,8 +51,8 @@ h6,
   font-family: var(--qv-font-heading);
 }
 
-/* `.serif` is retained as a backwards-compatible name. It has always been
- * Mulish in Quantiv; new code should prefer semantic heading roles below. */
+/* `.serif` is retained as a backwards-compatible name. It resolves to Mulish;
+ * new code should prefer the semantic heading roles below. */
 .serif {
   font-feature-settings: "ss01";
 }
@@ -155,15 +154,15 @@ h6,
   font-size: var(--qv-type-lead);
 }
 
-/* Splash used a fourth, system-only stack. Keep the brand reveal in the same
- * Mulish display voice as the product hierarchy. */
+/* Splash stays in the same Mulish product voice as the rest of the UI. */
 .quantiv-splash-wordmark {
   font-family: var(--qv-font-heading);
 }
 
 /* The About page established the preferred display treatment. Keep all of its
  * section headings on the same 38px Mulish role and its cards on 20px. */
-body:has(.quantiv-hero-q) h2.serif {
+body:has(.quantiv-hero-q) h2.serif,
+body:has(.quantiv-hero-q) .qv-type-section-title {
   font-size: var(--qv-type-section) !important;
 }
 

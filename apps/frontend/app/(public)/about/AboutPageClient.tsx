@@ -554,9 +554,13 @@ function FormulaDisclosure({
   tex: string;
   note: string;
 }) {
+  const [isOpen, setIsOpen] = useState(true);
+
   return (
     <details
       id={id}
+      open={isOpen}
+      onToggle={(event) => setIsOpen(event.currentTarget.open)}
       style={{
         borderRadius: 12,
         border: "1px solid var(--line)",
@@ -589,8 +593,12 @@ function FormulaDisclosure({
         <strong className="serif" style={{ color: "var(--ink)", fontSize: 15 }}>
           {title}
         </strong>
-        <span aria-hidden="true" style={{ color: "var(--ink-4)", fontSize: 18 }}>
-          +
+        <span
+          data-disclosure-glyph
+          aria-hidden="true"
+          style={{ color: "var(--ink-4)", fontSize: 18 }}
+        >
+          {isOpen ? "−" : "+"}
         </span>
       </summary>
       <div
@@ -767,14 +775,8 @@ export default function AboutPageClient() {
             One loop · three questions
           </div>
           <h2
-            className="serif"
-            style={{
-              margin: "10px 0 0",
-              color: "var(--ink)",
-              fontSize: 38,
-              lineHeight: 1,
-              letterSpacing: "-0.025em",
-            }}
+            className="qv-type-section-title"
+            style={{ margin: "10px 0 0", color: "var(--ink)" }}
           >
             See the research move.
           </h2>
@@ -818,14 +820,8 @@ export default function AboutPageClient() {
             }}
           >
             <h2
-              className="serif"
-              style={{
-                margin: 0,
-                color: "var(--ink)",
-                fontSize: 36,
-                lineHeight: 1,
-                letterSpacing: "-0.025em",
-              }}
+              className="qv-type-section-title"
+              style={{ margin: 0, color: "var(--ink)" }}
             >
               Validated before published.
             </h2>
@@ -866,19 +862,13 @@ export default function AboutPageClient() {
             }}
           >
             <h2
-              className="serif"
-              style={{
-                margin: 0,
-                color: "var(--ink)",
-                fontSize: 36,
-                lineHeight: 1,
-                letterSpacing: "-0.025em",
-              }}
+              className="qv-type-section-title"
+              style={{ margin: 0, color: "var(--ink)" }}
             >
               Math when you want it.
             </h2>
             <span style={{ color: "var(--ink-3)", fontSize: 12 }}>
-              Tap a row to inspect the formula and caveat.
+              Tap a row to collapse the formula and caveat.
             </span>
           </div>
         </section>

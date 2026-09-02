@@ -4,32 +4,27 @@ This document is the product-wide typography contract for the frontend.
 
 ## Font roles
 
-Quantiv intentionally uses three self-hosted families through `next/font`:
+Quantiv uses one primary UI family plus one technical data family, both self-hosted through `next/font`:
 
 | Role | Family | Use |
 | --- | --- | --- |
-| Display / hierarchy | **Mulish** | Page titles, section titles, card titles, large KPI values |
-| Body / interface | **Nunito Sans** | Paragraphs, navigation, controls, explanatory copy |
-| Data / technical | **JetBrains Mono** | Prices, timestamps, table metadata, formulas, technical labels |
+| Product UI | **Mulish** | Page titles, section titles, cards, paragraphs, navigation, controls, explanatory copy, and non-technical values |
+| Data / technical | **JetBrains Mono** | Prices, timestamps, table metadata, formulas, and technical labels where monospaced alignment is useful |
 
-The About-page heading **“See the research move.”** is the reference display treatment: Mulish, tight tracking, strong but clean hierarchy.
+The About-page heading **“See the research move.”** is the reference product treatment: Mulish, tight tracking, strong but clean hierarchy. All ordinary interface text now stays in the same Mulish family instead of switching to a second sans-serif family.
 
 KaTeX keeps its own mathematical glyph fonts. Brand image assets are not part of the text system.
 
-## Audit findings
+## Why the contract changed
 
-The platform already had the right three core typefaces, but their roles and sizes had drifted over time:
+The first typography pass correctly identified Mulish as the display font, but it retained Nunito Sans for body/interface copy. That still produced a visible family switch between the About-page reference headings and the rest of the interface. The current contract removes that split:
 
-- `.serif` was actually **Mulish**, so the class name obscured the intended display role.
-- `body` correctly used **Nunito Sans** and `.mono` correctly used **JetBrains Mono**.
-- Tailwind still declared **Inter**, even though Inter is not loaded by the app.
-- The splash wordmark used a generic system sans stack instead of the product display font.
-- Some SVG chart labels explicitly requested generic `ui-monospace` instead of JetBrains Mono.
-- Clerk surfaces inherited their own default family instead of Quantiv's body family.
-- Similar roles accumulated near-duplicate sizes: `9`, `9.5`, `10`, `10.5`, `11`, `11.5`, `12`, `12.5`, plus neighboring title sizes such as `20`, `21`, `22`, `36`, `38`, `46`, `56`, and `66`.
-- Page-level titles diverged: Earnings and Watchlist centered around `56px`, while Screener had grown to a one-off `66px`.
+- Mulish is the single application voice for both hierarchy and ordinary UI copy.
+- JetBrains Mono remains only where technical/data alignment is useful.
+- Tailwind `font-sans`, Clerk/auth surfaces, the splash wordmark, and semantic heading roles all resolve to Mulish.
+- The unused Nunito Sans font is no longer loaded, reducing one font family from the application bundle.
 
-The goal is not to make every number on the interface the same size. Data-heavy views need more density and hero metrics need more emphasis. The goal is for each **role** to have a predictable size and family.
+The goal is still not to make every number on the interface the same size. Data-heavy views need more density and hero metrics need more emphasis. The goal is for each **role** to have a predictable size while the product keeps one coherent visual voice.
 
 ## Type scale
 
@@ -54,32 +49,26 @@ Defined in `apps/frontend/app/typography.css`:
 
 Responsive rules intentionally reduce page, section, and data-display roles on small screens rather than creating separate per-page mobile sizes.
 
-## Normalizations in the first pass
+## Shared treatments
 
-- About section headings: `36–38px` → **38px Mulish**.
-- About story titles: `21px` → **20px Mulish**.
-- About lead: `17px` → **16px Nunito Sans**.
-- Screener page title: `66px` → **56px Mulish**, matching Earnings and Watchlist.
-- Ticker detail symbol: `46px` → **48px Mulish**.
-- Common pills / metric labels: `9.5–10.5px` → **10px**.
-- Metric explainer copy: common `11.5–12.5px` steps → **12px** where the role is secondary copy.
-- Footer metadata: `11.5px` → **11px**.
-- Splash wordmark: system sans → **Mulish**.
-- Tailwind `font-sans`: stale Inter stack → **Nunito Sans**; `font-heading` now maps to **Mulish**.
-- Clerk/auth surfaces: default family → **Nunito Sans**.
-- Generic SVG monospace labels → **JetBrains Mono**.
-
-Large quantitative displays such as countdowns and implied-move hero values remain intentionally larger than ordinary page copy.
+- `qv-type-section-title` is the semantic implementation of the **“See the research move.”** reference treatment: 38px Mulish, 700 weight, 1.0 line height, and `-0.025em` tracking.
+- Page titles use the 56px Mulish role unless they are a deliberate marketing hero.
+- Card titles use the 20px Mulish role.
+- Normal paragraphs, navigation, controls, labels, and Clerk/auth copy inherit Mulish from the product body role.
+- Data-oriented content can opt into JetBrains Mono through `.mono` / `.qv-type-data`.
+- Large quantitative displays such as countdowns and implied-move hero values remain intentionally larger than ordinary page copy.
 
 ## Rules for new UI
 
-1. Do not add a fourth application typeface without a deliberate product-wide decision.
-2. Use Mulish for hierarchy, Nunito Sans for prose/UI, and JetBrains Mono for data/technical text.
-3. Prefer the named type tokens or semantic classes in `typography.css` over local `fontSize` values.
-4. Avoid new half-pixel font sizes. If a role feels wrong, adjust the shared role rather than creating `11.5px` or `20.5px` locally.
-5. Page titles should use the page-title role unless they are a deliberate hero/marketing surface.
-6. Card titles should normally use the 20px card-title role.
-7. Uppercase eyebrows/pills should normally use the 10px label role with deliberate tracking.
-8. Numerical alignment should use tabular numerals (`.tnum`) and JetBrains Mono when the content is genuinely technical/data-oriented.
-9. SVG charts should inherit the body family for prose-like labels and use the data family for axes/numeric technical labels.
-10. Preserve readability over strict sameness: dense tables and hero quantitative output are intentional exceptions, but exceptions should map to a documented role.
+1. Do not add another application typeface without a deliberate product-wide decision.
+2. Use Mulish for all ordinary product UI and hierarchy.
+3. Use JetBrains Mono only for genuinely technical/data-oriented content where monospaced alignment helps.
+4. Prefer the named type tokens or semantic classes in `typography.css` over local `fontSize` values.
+5. Avoid new half-pixel font sizes. If a role feels wrong, adjust the shared role rather than creating `11.5px` or `20.5px` locally.
+6. Page titles should use the page-title role unless they are a deliberate hero/marketing surface.
+7. Section titles should use `qv-type-section-title`, which is anchored to the About-page reference treatment.
+8. Card titles should normally use the 20px card-title role.
+9. Uppercase eyebrows/pills should normally use the 10px label role with deliberate tracking.
+10. Numerical alignment should use tabular numerals and JetBrains Mono only when the content is genuinely technical/data-oriented.
+11. SVG charts should inherit Mulish for prose-like labels and use the data family for axes/numeric technical labels.
+12. Preserve readability over strict sameness: dense tables and hero quantitative output are intentional exceptions, but exceptions should map to a documented role.

@@ -77,9 +77,9 @@ test('SCREENER headline computed styles match design', async ({ browser }) => {
   });
 
   // Loose comparison: font-family should resolve to the same primary
-  // typeface. Browsers report font-family as the raw stack (e.g.
-  // `Mulish, "Nunito Sans", ui-sans-serif, sans-serif`); we just check
-  // the first family name matches.
+  // typeface. Browsers report font-family as the raw stack (for example,
+  // `Mulish, ui-sans-serif, system-ui, sans-serif`); we just check the first
+  // family name matches.
   const livePrimary = live.computed.fontFamily.split(',')[0].replace(/['"]/g, '').trim();
   const designPrimary = design.computed.fontFamily.split(',')[0].replace(/['"]/g, '').trim();
   expect(livePrimary, `live=${livePrimary} vs design=${designPrimary}`).toBe(designPrimary);
