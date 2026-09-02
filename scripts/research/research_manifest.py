@@ -107,12 +107,19 @@ def verify_manifest(manifest: dict[str, Any], *, repo_root: Path) -> dict[str, A
     if expected_id != actual_id:
         errors.append("manifest_id mismatch")
 
+    inputs = manifest.get("inputs")
+    if not isinstance(inputs, list):
+        return {"ok": False, "errors": [*errors, "inputs must be a list"], "files": []}
+
     files: list[dict[str, Any]] = []
-    for record in manifest.get("inputs", []):
-        relative = record.get("path")
+    for record in inputs:
+        if not isinstance(record, dict) or not isinstance(record.get("path"), str):
+            files.append({"path": None, "ok": False, "reason": "malformed_record"})
+            continue
+        relative = record["path"]
         try:
             resolved, normalized = _resolve_repo_path(repo_root, relative)
-        except (FileNotFoundError, ValueError):
+        except (FileNotFoundError, TypeError, ValueError):
             files.append({"path": relative, "ok": False, "reason": "missing_or_unsafe"})
             continue
         actual_hash = sha256_file(resolved)
