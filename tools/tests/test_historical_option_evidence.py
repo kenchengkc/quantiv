@@ -2,22 +2,13 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from pathlib import Path
-import sys
 
 import duckdb
 import pandas as pd
 
-
-REPO_ROOT = Path(__file__).resolve().parents[1]
-if str(REPO_ROOT / "tools") not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT / "tools"))
-
-from build_earnings_events import create_duckdb_views  # noqa: E402
-from frontend_data.payloads import (  # noqa: E402
-    _historical_option_evidence,
-    build_symbol_detail,
-)
-from math_baseline import _is_pre_event_observation  # noqa: E402
+from build_earnings_events import create_duckdb_views
+from frontend_data.payloads import _historical_option_evidence, build_symbol_detail
+from math_baseline import _is_pre_event_observation
 
 
 def test_eod_observation_must_precede_the_event_session() -> None:

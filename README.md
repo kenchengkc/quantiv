@@ -106,23 +106,23 @@ See [System architecture](docs/ARCHITECTURE.md) for providers, routes, schedules
 ```text
 quantiv/
 ├── apps/
-│   ├── frontend/           # Next.js UI, API routes, and generated public data
+│   ├── frontend/           # Next.js UI/API routes; E2E assets live under e2e/
 │   ├── backend/            # FastAPI prediction service and quote worker
-│   └── ml/                 # Features, training, validation, and model controls
-├── config/                 # Local environment files; gitignored
-├── data/                   # CSV, Parquet, DuckDB, and validation artifacts
-├── docs/                   # Architecture, controls, deployment, and performance
+│   └── ml/                 # Features, training, published ML package, and tests
+├── config/                 # Versioned policies/identity config + gitignored local env
+├── data/                   # Operational tracked state; manual evidence under research/
+├── docs/                   # Active architecture/runbooks plus historical docs in archive/
 ├── lib/                    # Shared ticker and index metadata
-├── scripts/                # Stable operational commands; grouped nonproduction tooling below
-├── tools/                  # Frontend-data and metadata builders
+├── scripts/                # Stable operational commands + maintenance/research/probes/tests
+├── tools/                  # Artifact builders/helpers + frontend_data package + tests
 ├── workers/refresh-prices/ # Cloudflare trigger for quote-writer failover
 ├── railway.toml
 ├── railway.worker.toml
-├── vercel.json
+├── requirements.txt
 └── package.json
 ```
 
-Research and manual tooling is isolated under `scripts/research/`, `scripts/maintenance/`, and `scripts/provider_probes/`; script tests live under `scripts/tests/`. Retired scripts are removed from the live tree and remain available through Git history.
+The layout follows ownership rather than language: stable runtime/automation entrypoints keep their existing paths, while tests, maintenance utilities, E2E-only configuration, and research artifacts live with the subsystem that owns them. Manual research data is isolated under [`data/research/`](data/README.md). Retired live code is removed from the tree and remains recoverable through Git history; `docs/archive/` is reserved for intentionally historical documentation.
 
 ## Local development
 
@@ -224,6 +224,8 @@ python -m pytest apps/backend/tests apps/ml/tests scripts tools -q
 | [Railway setup](docs/RAILWAY_SETUP.md)                               | API and quote-worker deployment                                |
 | [R2 setup](docs/R2_SETUP.md)                                         | Artifact storage and synchronization                           |
 | [Pipeline runbook](scripts/README.md)                                | Data-provider and scheduled-pipeline commands                  |
+| [Data layout](data/README.md)                                        | Operational versus research artifact ownership                 |
+| [Tooling layout](tools/README.md)                                    | Frontend builders, helpers, fixtures, and tool tests            |
 
 Additional documentation is indexed in [docs/README.md](docs/README.md).
 

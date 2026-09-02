@@ -4,7 +4,7 @@ const PORT = Number(process.env.PERFORMANCE_PORT ?? 3100);
 const BASE_URL = `http://127.0.0.1:${PORT}`;
 
 export default defineConfig({
-  testDir: './e2e',
+  testDir: '..',
   testMatch: 'fcp-budget.spec.ts',
   fullyParallel: false,
   workers: 1,

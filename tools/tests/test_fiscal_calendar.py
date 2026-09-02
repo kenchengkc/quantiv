@@ -2,12 +2,8 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-import sys
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPO_ROOT / "tools"))
-
-from fiscal_calendar import display_fiscal_year, load_fiscal_year_naming  # noqa: E402
+from fiscal_calendar import display_fiscal_year, load_fiscal_year_naming
 
 
 def test_begin_year_retailer_offset(tmp_path):

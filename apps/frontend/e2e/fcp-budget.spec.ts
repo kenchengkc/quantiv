@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import budget from '../performance-budget.json';
+import budget from './performance-budget.json';
 
 function percentile(samples: number[], value: number): number {
   const sorted = [...samples].sort((left, right) => left - right);
