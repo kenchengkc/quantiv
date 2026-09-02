@@ -77,13 +77,17 @@ test("About documents the platform-wide publication controls", async ({
   // and can exhaust Playwright's 30-second test budget on a cold CI runner.
   await page.goto("/about", { waitUntil: "domcontentloaded" });
 
-  const controls = page.getByRole("region", {
-    name: "Only validated snapshots reach the product.",
-  });
-  await expect(controls).toBeVisible({ timeout: 60_000 });
-  await expect(controls.getByText("Point-in-time inputs")).toBeVisible();
-  await expect(controls.getByText("Reconcile")).toBeVisible();
-  await expect(controls.getByText("Score and verify")).toBeVisible();
-  await expect(controls.getByText("Publish or stop")).toBeVisible();
-  await expect(controls.getByText("Fail closed")).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Validated before published." }),
+  ).toBeVisible({ timeout: 60_000 });
+  await expect(
+    page.getByRole("img", {
+      name: "Animated validation flow from point-in-time data to publication",
+    }),
+  ).toBeVisible();
+  await expect(page.getByText("Observe", { exact: true })).toBeVisible();
+  await expect(page.getByText("Reconcile", { exact: true })).toBeVisible();
+  await expect(page.getByText("Verify", { exact: true })).toBeVisible();
+  await expect(page.getByText("Publish", { exact: true })).toBeVisible();
+  await expect(page.getByText("Fail closed", { exact: true })).toBeVisible();
 });
