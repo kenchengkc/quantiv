@@ -1,6 +1,6 @@
 # Quantiv 📈
 
-> Options-implied earnings moves, historical event research, and machine-learning forecasts in one dashboard.
+> Decision-ready earnings research: market pricing, historical outcomes, and calibrated ML in one fast, auditable dashboard.
 
 ![License](https://img.shields.io/badge/license-GPL--3.0-blue.svg)
 ![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?logo=typescript&logoColor=white)
@@ -9,9 +9,9 @@
 ![DuckDB](https://img.shields.io/badge/DuckDB-FFF000?logo=duckdb&logoColor=black)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-316192?logo=postgresql&logoColor=white)
 
-Quantiv is a full-stack research platform for comparing the options market's expected earnings move with historical outcomes and LightGBM forecasts. A Python pipeline validates and converts provider data into static JSON, allowing the calendar, screener, and symbol pages to load without a database or backend request.
+Quantiv turns fragmented earnings, options, volatility, price, and company data into three clear answers for every ticker: **What move is the market pricing? What happened after similar earnings? What does the model estimate?** Each answer includes the uncertainty, freshness, and quote-quality context needed to judge it.
 
-Optional services provide cached live stock quotes, authenticated watchlists, and model re-scoring with an updated stock price. Options, volatility, and historical features remain anchored to the validated end-of-day snapshot.
+Under the hood, a Python pipeline reconciles provider data, validates every publishable snapshot, and generates static JSON. Public research pages therefore stay fast and available without waiting on a database or model server. Optional services add cached live stock quotes, authenticated watchlists, and controlled model re-scoring with an updated stock price.
 
 > **Research and educational use only. Quantiv does not provide financial advice or execution-ready signals.**
 
@@ -20,9 +20,9 @@ Optional services provide cached live stock quotes, authenticated watchlists, an
 - 120,000+ historical earnings records
 - 10,000+ searchable ticker identities
 - Approximately 100 monthly active users
-- Nightly reconciliation, model scoring, and static publication
-- Cached live quotes through Upstash Redis
-- Optional spot-updated, end-of-day model inference
+- Market pricing, model estimates, and event history in one research view
+- Validated nightly snapshots with cached live stock quotes
+- Bad data and weak models blocked before publication—without another always-on service
 
 | Surface             | Route        | Purpose                                                                                 |
 | ------------------- | ------------ | --------------------------------------------------------------------------------------- |
@@ -33,15 +33,17 @@ Optional services provide cached live stock quotes, authenticated watchlists, an
 | Methodology         | `/about`     | Review formulas, data sources, and interpretation                                       |
 | Production controls | `/ml-status` | Inspect data, model, serving, and release exceptions                                    |
 
-## Safety and measured evidence
+## Built to earn trust
 
-Quantiv publishes research snapshots only after its data and model gates pass:
+Institutional research software is credible only when every displayed number is timely, reproducible, and safe to interpret. Quantiv makes those requirements part of the publication path:
 
-- Reconciliation checks freshness, expected-versus-received rows, duplicates, symbol mappings, corporate actions, quarantine records, and deterministic replay.
-- Option controls reject crossed, stale, excessively wide, invalid-IV, and otherwise commercially unusable quotes.
-- Native LightGBM bundles are content-addressed, signed, digest-verified, and atomically activated.
-- Challenger models must pass purged chronological validation, walk-forward, straddle-baseline, calibration, drift, shadow-scoring, and forecast-handoff gates.
-- Critical failures stop scoring or publication; the last validated release remains available.
+- **Data integrity:** reconciliation checks freshness, expected-versus-received rows, duplicates, symbol mappings, corporate actions, quarantines, and deterministic replay.
+- **Usable market inputs:** option controls reject crossed, stale, excessively wide, invalid-IV, and otherwise commercially unusable quotes.
+- **Model risk:** challengers must pass purged chronological, walk-forward, straddle-baseline, calibration, drift, shadow-scoring, and forecast-handoff gates.
+- **Artifact security:** native LightGBM bundles are content-addressed, signed, digest-verified, and atomically activated.
+- **Fail-closed releases:** a critical failure stops scoring or publication while the last validated release remains available.
+
+### Measured evidence
 
 Latest `main` CI evidence as of September 1, 2026:
 
@@ -51,7 +53,9 @@ Latest `main` CI evidence as of September 1, 2026:
 
 The decision boundary is explicit: a current stock price may refresh spot-derived inputs, but it does not make the frozen options snapshot intraday or live-trading eligible. See [Decision scope](docs/DECISION_SCOPE.md).
 
-## Architecture
+## A small, production-focused architecture
+
+Most user traffic reads immutable, prebuilt research artifacts. Stateful infrastructure is reserved for the few features that need it: watchlists, cached quotes, and optional spot-updated inference.
 
 ```mermaid
 flowchart LR
@@ -75,11 +79,13 @@ flowchart LR
   end
 ```
 
-The production system has three clear paths:
+The production system has three deliberately narrow paths:
 
-1. **Static publication:** scheduled ingestion, reconciliation, scoring, and JSON generation.
-2. **Spot-updated inference:** Railway substitutes the latest stock price into a saved end-of-day feature vector and scores the signed champion model.
-3. **Live quotes:** one lease-elected regular-hours writer fills Redis; explicit fallbacks take over only when the owner is absent.
+1. **Static publication** keeps the primary research experience fast and resilient.
+2. **Spot-updated inference** substitutes only the latest stock price into a saved end-of-day feature vector, then scores the signed champion model.
+3. **Live quotes** use one lease-elected regular-hours writer; explicit fallbacks take over only when the owner is absent.
+
+This design keeps operating cost and failure surface small while preserving a reproducible data and model trail.
 
 See [System architecture](docs/ARCHITECTURE.md) for providers, routes, schedules, and service responsibilities.
 
