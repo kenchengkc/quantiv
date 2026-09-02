@@ -22,6 +22,7 @@ class HealthResponse(BaseModel):
     status: str
     timestamp: datetime
     services: dict[str, str]
+    revision: str | None = None
 
 
 # ─── /api/ml/predict (Phase 1) ────────────────────────────────────────────
