@@ -1,4 +1,5 @@
 import './globals.css';
+import './typography.css';
 import type { Metadata } from 'next';
 import { JetBrains_Mono, Mulish, Nunito_Sans } from 'next/font/google';
 import { SPLASH_SESSION_KEY, SPLASH_SKIP_ATTRIBUTE } from '@/lib/splashSession';
@@ -10,7 +11,7 @@ import { SpeedInsights } from '@vercel/speed-insights/next';
 // next/font writes its own preload + font-face rules into Next's <head>
 // stream, so there's no @import for Tailwind to reorder past, and the
 // browser never sees a third-party fonts.googleapis.com request. Each
-// family exposes a CSS variable that globals.css consumes by name.
+// family exposes a CSS variable consumed by the global typography system.
 const mulish = Mulish({
   subsets: ['latin'],
   weight: ['300', '400', '500', '600', '700', '800', '900'],
