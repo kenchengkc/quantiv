@@ -1,4 +1,6 @@
+import numpy as np
 import pandas as pd
+import pytest
 
 from research.paired_benchmark import compare_forecasts
 
@@ -51,3 +53,22 @@ def test_group_report_respects_minimum_sample_size() -> None:
 
     assert set(report["groups"]) == {"A"}
     assert report["groups"]["A"]["n"] == 3
+
+
+def test_non_finite_values_fail_closed() -> None:
+    frame = pd.DataFrame(
+        {
+            "actual": [1.0, 2.0],
+            "model": [1.1, np.inf],
+            "baseline": [1.2, 2.2],
+        }
+    )
+
+    with pytest.raises(ValueError, match="non-finite"):
+        compare_forecasts(
+            frame,
+            actual_column="actual",
+            model_column="model",
+            baseline_column="baseline",
+            draws=10,
+        )
