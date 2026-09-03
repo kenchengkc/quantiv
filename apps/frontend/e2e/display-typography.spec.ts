@@ -39,7 +39,8 @@ test('large product headings share the About-page Mulish display voice', async (
   );
   expectMulishDisplay(cardTitle);
   expect(cardTitle.fontSize).toBe('20px');
-  expect(cardTitle.fontWeight).toBe('700');
+  expect(cardTitle.fontWeight).toBe('400');
+  expect(cardTitle.lineHeight).toBe('21px');
 
   const sectionTitle = await styleOf(
     page.getByRole('heading', { name: 'See the research move.' }),

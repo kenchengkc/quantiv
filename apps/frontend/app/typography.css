@@ -129,10 +129,13 @@ h3 {
   letter-spacing: var(--qv-track-heading) !important;
 }
 
+/* Card/panel titles intentionally preserve the lighter “What is priced?”
+ * reference. The 400 weight is what keeps 20px headings clean rather than
+ * making every card compete with section and page hierarchy. */
 .qv-type-card-title {
   font-size: var(--qv-type-card-title) !important;
-  font-weight: 700 !important;
-  line-height: 1.08 !important;
+  font-weight: 400 !important;
+  line-height: 1.05 !important;
   letter-spacing: var(--qv-track-card-title) !important;
 }
 
@@ -209,10 +212,12 @@ h3 {
 }
 
 /* About already uses the semantic section-title role. Keep the legacy story
- * cards on the matching 20px card-title scale until their JSX classes migrate. */
+ * cards on the exact 20px / 400 / 1.05 reference treatment until their JSX
+ * classes migrate. */
 body:has(.quantiv-hero-q) article h3.serif {
   font-size: var(--qv-type-card-title) !important;
-  line-height: 1.08 !important;
+  font-weight: 400 !important;
+  line-height: 1.05 !important;
 }
 
 body:has(.quantiv-hero-q) header p {
@@ -249,9 +254,12 @@ body:has(.qv-screener-table-shell) .qv-screener-table-shell th.mono {
   font-size: var(--qv-type-data-display) !important;
 }
 
+/* Public detail-page research cards inherit the lighter About card treatment.
+ * Small operational/admin headings elsewhere keep their local weights. */
 body:has(.qv-detail-hero) .qv-card h3.serif {
   font-size: var(--qv-type-card-title) !important;
-  line-height: 1.08 !important;
+  font-weight: 400 !important;
+  line-height: 1.05 !important;
 }
 
 /* SVG chart labels that explicitly requested a generic monospace stack should

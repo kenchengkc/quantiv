@@ -52,6 +52,9 @@ describe('Quantiv typography contract', () => {
     expect(css).toContain('font-kerning: normal');
     expect(css).toContain('text-wrap: balance');
     expect(css).toContain('letter-spacing: var(--qv-track-card-title) !important');
+    expect(css).toContain('font-weight: 400 !important');
+    expect(css).toContain('line-height: 1.05 !important');
+    expect(css).toContain('body:has(.qv-detail-hero) .qv-card h3.serif');
     expect(css).toContain('font-size: var(--qv-type-section) !important');
     expect(css).toContain('h1.qv-m-h1:not(.qv-week-heading)');
     expect(css).toContain('font-size: var(--qv-type-page-title) !important');
