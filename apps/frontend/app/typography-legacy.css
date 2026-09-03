@@ -1,0 +1,12 @@
+/* Transitional normalization for legacy inline weights.
+ *
+ * The canonical product system is 400 / 600 / 800. Older components still
+ * carry literal 700 weights in compact labels, stats, and table controls.
+ * Normalize those non-heading values to the 600 emphasis role at render time;
+ * true page/detail/hero anchors are governed by semantic heading rules and keep
+ * the 800 strong role. Support both browser serialization forms of style attrs.
+ */
+[style*="font-weight: 700"]:not(h1):not(h2):not(h3):not(h4):not(h5):not(h6),
+[style*="font-weight:700"]:not(h1):not(h2):not(h3):not(h4):not(h5):not(h6) {
+  font-weight: var(--qv-weight-medium) !important;
+}

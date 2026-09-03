@@ -1,0 +1,221 @@
+/* Quantiv text-color system
+ *
+ * Ordinary interface copy has three neutral foreground roles only. Financial
+ * and interaction colors remain semantic so color communicates meaning rather
+ * than becoming another hierarchy dimension.
+ */
+
+:root {
+  --qv-text-primary: var(--ink);
+  --qv-text-secondary: var(--ink-2);
+  --qv-text-muted: var(--ink-3);
+
+  --qv-text-accent: var(--accent);
+  --qv-text-positive: var(--up);
+  --qv-text-negative: var(--down);
+  --qv-text-warning: var(--flag);
+
+  /* Legacy fourth neutral is intentionally collapsed into the muted role.
+   * Existing components can keep referencing --ink-4 while rendering the
+   * same foreground as --qv-text-muted until they migrate to semantic names. */
+  --ink-4: var(--qv-text-muted);
+}
+
+body {
+  color: var(--qv-text-primary);
+}
+
+.qv-text-primary {
+  color: var(--qv-text-primary) !important;
+}
+
+.qv-text-secondary {
+  color: var(--qv-text-secondary) !important;
+}
+
+.qv-text-muted {
+  color: var(--qv-text-muted) !important;
+}
+
+.qv-text-accent {
+  color: var(--qv-text-accent) !important;
+}
+
+.qv-text-positive {
+  color: var(--qv-text-positive) !important;
+}
+
+.qv-text-negative {
+  color: var(--qv-text-negative) !important;
+}
+
+.qv-text-warning {
+  color: var(--qv-text-warning) !important;
+}
+
+/* Decorative foreground treatments are normalized to semantic roles. Gradient
+ * text adds another visual dialect without adding analytical meaning. */
+.qv-m-h-hero > span {
+  background: none !important;
+  color: var(--qv-text-accent) !important;
+  -webkit-text-fill-color: currentColor !important;
+}
+
+.qv-detail-countdown {
+  background: none !important;
+  color: var(--qv-text-primary) !important;
+  -webkit-text-fill-color: currentColor !important;
+}
+
+.qv-detail-em {
+  background: none !important;
+  color: var(--qv-text-accent) !important;
+  -webkit-text-fill-color: currentColor !important;
+}
+
+.qv-metric-help-math {
+  color: var(--qv-text-primary) !important;
+}
+
+/* Placeholder and disabled hierarchy should not create additional gray tokens.
+ * Disabled controls use opacity as interaction state, not a fourth text color. */
+input::placeholder,
+textarea::placeholder {
+  color: var(--qv-text-muted);
+  opacity: 1;
+}
+
+/* Client-rendered compatibility.
+ *
+ * React serializes inline style attributes without the optional whitespace used
+ * by older server-markup selectors in typography.css. Mirror the canonical
+ * snap here (this layer loads last) so the real browser output cannot retain
+ * half-step sizes, extra weights, tracking modes, line heights, or italics.
+ * These rules are transitional and should shrink as literal JSX styles are
+ * migrated to semantic qv-type roles. */
+[style*="font-size:9px"]:not(h1):not(h2):not(h3):not(h4):not(h5):not(h6),
+[style*="font-size:9.5px"]:not(h1):not(h2):not(h3):not(h4):not(h5):not(h6),
+[style*="font-size:10.5px"]:not(h1):not(h2):not(h3):not(h4):not(h5):not(h6) {
+  font-size: var(--qv-type-label) !important;
+}
+
+[style*="font-size:11px"]:not(h1):not(h2):not(h3):not(h4):not(h5):not(h6),
+[style*="font-size:11.5px"]:not(h1):not(h2):not(h3):not(h4):not(h5):not(h6),
+[style*="font-size:12.5px"]:not(h1):not(h2):not(h3):not(h4):not(h5):not(h6) {
+  font-size: var(--qv-type-meta) !important;
+}
+
+[style*="font-size:13px"]:not(h1):not(h2):not(h3):not(h4):not(h5):not(h6) {
+  font-size: var(--qv-type-body) !important;
+}
+
+[style*="font-size:15px"]:not(h1):not(h2):not(h3):not(h4):not(h5):not(h6),
+[style*="font-size:15.5px"]:not(h1):not(h2):not(h3):not(h4):not(h5):not(h6),
+[style*="font-size:17px"]:not(h1):not(h2):not(h3):not(h4):not(h5):not(h6) {
+  font-size: var(--qv-type-lead) !important;
+}
+
+[style*="font-size:18px"]:not(h1):not(h2):not(h3):not(h4):not(h5):not(h6),
+[style*="font-size:19px"]:not(h1):not(h2):not(h3):not(h4):not(h5):not(h6),
+[style*="font-size:21px"]:not(h1):not(h2):not(h3):not(h4):not(h5):not(h6),
+[style*="font-size:22px"]:not(h1):not(h2):not(h3):not(h4):not(h5):not(h6),
+[style*="font-size:24px"]:not(h1):not(h2):not(h3):not(h4):not(h5):not(h6) {
+  font-size: var(--qv-type-card-title) !important;
+}
+
+[style*="font-size:28px"]:not(h1):not(h2):not(h3):not(h4):not(h5):not(h6),
+[style*="font-size:30px"]:not(h1):not(h2):not(h3):not(h4):not(h5):not(h6),
+[style*="font-size:36px"]:not(h1):not(h2):not(h3):not(h4):not(h5):not(h6),
+[style*="font-size:38px"]:not(h1):not(h2):not(h3):not(h4):not(h5):not(h6) {
+  font-size: var(--qv-type-section) !important;
+}
+
+[style*="font-size:40px"]:not(h1):not(h2):not(h3):not(h4):not(h5):not(h6),
+[style*="font-size:44px"]:not(h1):not(h2):not(h3):not(h4):not(h5):not(h6),
+[style*="font-size:46px"]:not(h1):not(h2):not(h3):not(h4):not(h5):not(h6),
+[style*="font-size:56px"]:not(h1):not(h2):not(h3):not(h4):not(h5):not(h6) {
+  font-size: var(--qv-type-page-title) !important;
+}
+
+[style*="font-size:66px"]:not(h1):not(h2):not(h3):not(h4):not(h5):not(h6),
+[style*="font-size:76px"]:not(h1):not(h2):not(h3):not(h4):not(h5):not(h6) {
+  font-size: var(--qv-type-data-display) !important;
+}
+
+[style*="font-weight:500"]:not(h1):not(h2):not(h3):not(h4):not(h5):not(h6),
+[style*="font-weight:650"]:not(h1):not(h2):not(h3):not(h4):not(h5):not(h6) {
+  font-weight: var(--qv-weight-medium) !important;
+}
+
+[style*="font-weight:800"]:not(h1):not(h2):not(h3):not(h4):not(h5):not(h6) {
+  font-weight: var(--qv-weight-strong) !important;
+}
+
+[style*="font-style:italic"] {
+  font-style: normal !important;
+}
+
+[style*="letter-spacing:-0.005em"],
+[style*="letter-spacing:-0.01em"],
+[style*="letter-spacing:-0.02em"],
+[style*="letter-spacing:-0.025em"],
+[style*="letter-spacing:-0.03em"],
+[style*="letter-spacing:-0.032em"],
+[style*="letter-spacing:-0.033em"],
+[style*="letter-spacing:-0.035em"],
+[style*="letter-spacing:-0.04em"],
+[style*="letter-spacing:-0.045em"] {
+  letter-spacing: var(--qv-track-display) !important;
+}
+
+[style*="letter-spacing:0.01em"],
+[style*="letter-spacing:0.02em"],
+[style*="letter-spacing:0.04em"],
+[style*="letter-spacing:0.05em"] {
+  letter-spacing: var(--qv-track-normal) !important;
+}
+
+[style*="letter-spacing:0.08em"],
+[style*="letter-spacing:0.09em"],
+[style*="letter-spacing:0.1em"],
+[style*="letter-spacing:0.11em"],
+[style*="letter-spacing:0.13em"],
+[style*="letter-spacing:0.14em"],
+[style*="letter-spacing:0.16em"],
+[style*="letter-spacing:0.17em"],
+[style*="letter-spacing:0.18em"] {
+  letter-spacing: var(--qv-track-label) !important;
+}
+
+[style*="line-height:0.9"],
+[style*="line-height:0.92"],
+[style*="line-height:0.93"],
+[style*="line-height:0.94"],
+[style*="line-height:0.95"],
+[style*="line-height:1;"],
+[style*="line-height:1.06"] {
+  line-height: var(--qv-leading-tight) !important;
+}
+
+[style*="line-height:1.1"] {
+  line-height: var(--qv-leading-heading) !important;
+}
+
+[style*="line-height:1.3"],
+[style*="line-height:1.35"],
+[style*="line-height:1.4"] {
+  line-height: var(--qv-leading-ui) !important;
+}
+
+[style*="line-height:1.45"],
+[style*="line-height:1.5"],
+[style*="line-height:1.55"] {
+  line-height: var(--qv-leading-body) !important;
+}
+
+/* Context beats raw legacy size: navigation and dense table scaffolding use
+ * the compact 12px UI role, not the generic 13px→14px body mapping above. */
+header nav.qv-m-hide > a,
+body:has(.qv-screener-table-shell) .qv-screener-table-shell table {
+  font-size: var(--qv-type-meta) !important;
+}

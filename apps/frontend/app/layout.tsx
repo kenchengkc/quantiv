@@ -1,5 +1,7 @@
 import './globals.css';
 import './typography.css';
+import './typography-legacy.css';
+import './text-colors.css';
 import type { Metadata } from 'next';
 import { JetBrains_Mono, Mulish } from 'next/font/google';
 import { SPLASH_SESSION_KEY, SPLASH_SKIP_ATTRIBUTE } from '@/lib/splashSession';
