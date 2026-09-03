@@ -139,4 +139,51 @@ test('ordinary text uses three neutral roles while signal colors stay semantic',
   expect(neutralColors.has(colors.positive)).toBe(false);
   expect(neutralColors.has(colors.negative)).toBe(false);
   expect(neutralColors.has(colors.warning)).toBe(false);
+
+  const activeNav = page.getByRole('link', { name: 'Screener' });
+  const inactiveNav = page.getByRole('link', { name: 'About' });
+  const helper = page
+    .locator('span')
+    .filter({ hasText: /Sortable table of every upcoming earnings print/ })
+    .last();
+
+  expect(await activeNav.evaluate((element) => getComputedStyle(element).color)).toBe(
+    colors.primary,
+  );
+  expect(await inactiveNav.evaluate((element) => getComputedStyle(element).color)).toBe(
+    colors.muted,
+  );
+  expect(await helper.evaluate((element) => getComputedStyle(element).color)).toBe(
+    colors.muted,
+  );
+
+  await page.goto('/about');
+  const aboutColors = await page.evaluate(() => {
+    const probe = (token: string) => {
+      const element = document.createElement('span');
+      element.style.color = `var(${token})`;
+      document.body.appendChild(element);
+      const color = getComputedStyle(element).color;
+      element.remove();
+      return color;
+    };
+    return { primary: probe('--qv-text-primary'), accent: probe('--qv-text-accent') };
+  });
+
+  const cardTitle = page.getByRole('heading', { name: 'What is priced?' });
+  const heroAccent = page.getByText('options imply.', { exact: true });
+  const heroStyle = await heroAccent.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return {
+      color: style.color,
+      textFill: style.getPropertyValue('-webkit-text-fill-color'),
+    };
+  });
+
+  expect(await cardTitle.evaluate((element) => getComputedStyle(element).color)).toBe(
+    aboutColors.primary,
+  );
+  expect(heroStyle.color).toBe(aboutColors.accent);
+  expect(heroStyle.textFill).not.toBe('transparent');
+  expect(heroStyle.textFill).not.toBe('rgba(0, 0, 0, 0)');
 });
