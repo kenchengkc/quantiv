@@ -98,6 +98,16 @@ describe('Quantiv typography contract', () => {
     expect(css).toContain('text-transform: none !important');
   });
 
+  it('renders every page header and hero title in all caps', () => {
+    const legacy = read('../app/typography-legacy.css');
+
+    expect(legacy).toContain('h1:not(.qv-week-heading):not(.qv-m-h-hero),');
+    expect(legacy).toContain('h1.qv-m-h1:not(.qv-week-heading),');
+    expect(legacy).toContain('h1.qv-week-heading,');
+    expect(legacy).toContain('h1.qv-m-h-hero {');
+    expect(legacy).toContain('text-transform: uppercase !important');
+  });
+
   it('snaps legacy inline typography onto the canonical grid', () => {
     const css = read('../app/typography.css');
 
