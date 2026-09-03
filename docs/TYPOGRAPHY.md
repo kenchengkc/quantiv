@@ -1,86 +1,101 @@
 # Quantiv Typography
 
-This document is the product-wide typography contract for the frontend.
+This is the product-wide typography contract for the frontend.
+
+Quantiv should look like one institutional research product. Typography is therefore intentionally restrained: one UI family, one technical data family, eight rendered size steps, three weights, three tracking modes, and four line-height modes.
 
 ## Font roles
 
-Quantiv uses one primary UI family plus one technical data family, both self-hosted through `next/font`:
-
 | Role | Family | Use |
 | --- | --- | --- |
-| Product UI | **Mulish** | Page titles, section titles, cards, paragraphs, navigation, controls, explanatory copy, and non-technical values |
-| Data / technical | **JetBrains Mono** | Prices, timestamps, table metadata, formulas, and technical labels where monospaced alignment is useful |
+| Product UI | **Mulish** | Hierarchy, navigation, controls, explanatory copy, card titles, page titles |
+| Data / technical | **JetBrains Mono** | Prices, percentages, timestamps, formulas, aligned technical values |
 
-The About-page headings **“What is priced?”** and **“See the research move.”** are the reference product treatments. They use the same Mulish family as the rest of the UI, but establish two deliberate hierarchy levels: lighter 400-weight card/panel titles for clean local structure, and 700-weight section titles for stronger page structure. Both use the shared display voice—alternate forms (`ss01`), normal kerning, compact line height, and deliberately tight tracking. That display voice is product-wide; it is not an About-page-only font treatment.
+KaTeX retains its mathematical glyph fonts. Brand images are not part of the text system.
 
-KaTeX keeps its own mathematical glyph fonts. Brand image assets are not part of the text system.
+The local heading reference is the About-page **“What is priced?”** treatment: light, compact Mulish rather than a bold dashboard heading.
 
-## Why the contract changed
+## Canonical size scale
 
-The first typography pass correctly identified Mulish as the display font, but it retained Nunito Sans for body/interface copy. That still produced a visible family switch between the About-page reference headings and the rest of the interface. The current contract removes that split:
+Only eight rendered size steps belong to the system:
 
-- Mulish is the single application voice for both hierarchy and ordinary UI copy.
-- JetBrains Mono remains only where technical/data alignment is useful.
-- Semantic `h1`–`h3` headings automatically receive the shared Mulish display treatment; explicit role classes control their scale and hierarchy weight.
-- Public research/detail card titles use the lighter “What is priced?” treatment instead of making every panel as heavy as a section heading.
-- Tailwind `font-sans`, Clerk/auth surfaces, the splash wordmark, and semantic heading roles all resolve to Mulish.
-- The unused Nunito Sans font is no longer loaded, reducing one font family from the application bundle.
+| Size | Role |
+| ---: | --- |
+| 10px | Uppercase labels, pills, table headers |
+| 12px | Metadata, compact controls, secondary technical copy |
+| 14px | Normal product copy |
+| 16px | Lead/intro copy |
+| 20px | Card, panel, and ordinary subsection headings |
+| 32px | Major section headings and medium display/stat roles |
+| 48px | Primary page/detail titles |
+| 64px | True hero or primary quantitative display only |
 
-The goal is still not to make every number or heading on the interface the same size or weight. Data-heavy views need more density, panel titles should stay quiet, and hero metrics need more emphasis. The goal is for each **role** to have a predictable hierarchy and for larger human-readable text to share one coherent display voice.
+Compatibility tokens such as `--qv-type-small`, `--qv-type-subhead`, and `--qv-type-page-title` remain available, but they alias one of these eight values rather than creating another visual step.
 
-## Type scale
+Responsive rules reuse the same eight values. Mobile does not have a separate parallel type scale.
 
-Defined in `apps/frontend/app/typography.css`:
+## Canonical weights
 
-| Token | Size | Intended role |
-| --- | ---: | --- |
-| `--qv-type-label` | 10px | Eyebrows, pills, compact table headers |
-| `--qv-type-meta` | 11px | Timestamps, source metadata, footer text |
-| `--qv-type-small` | 12px | Secondary copy, compact controls |
-| `--qv-type-ui` | 13px | Navigation, buttons, table UI |
-| `--qv-type-body` | 14px | Default body copy |
-| `--qv-type-lead` | 16px | Page introductions |
-| `--qv-type-card-title` | 20px | Research/card headings |
-| `--qv-type-subhead` | 24px | Compact section/subsection headings |
-| `--qv-type-stat` | 32px | Medium KPI/stat values |
-| `--qv-type-section` | 38px | Major section headings; About reference |
-| `--qv-type-detail-title` | 48px | Ticker/detail title |
-| `--qv-type-page-title` | 56px | Earnings, Screener, Watchlist page titles |
-| `--qv-type-data-display` | 64px | Hero quantitative output |
-| `--qv-type-hero` | 76px | Marketing/About hero only |
+Only three product weights are intentional:
 
-Responsive rules intentionally reduce page, section, and data-display roles on small screens rather than creating separate per-page mobile sizes.
+- **400** — normal copy and the “What is priced?” local-heading voice
+- **600** — labels, data emphasis, major section headings, bold emphasis
+- **700** — primary page/detail titles and true hero hierarchy
 
-## Shared display voice
+There is no 500, 650, or 800 product role.
 
-Semantic `h1`, `h2`, and `h3` elements automatically use the Mulish display voice: `ss01`, normal kerning, balanced wrapping, and role-appropriate tight tracking. This is intentionally separate from **size and weight**. A 16px operational heading can retain its local hierarchy while still looking like the same product family as a 20px research-card title or a 38px section heading.
+## Tracking
 
-For non-heading elements or explicit hierarchy, use the semantic roles:
+Only three tracking modes are intentional:
 
-- `qv-type-display` applies the shared display treatment without forcing a particular size.
-- `qv-type-card-title` is the semantic implementation of the **“What is priced?”** treatment: 20px Mulish, 400 weight, 1.05 line height, and `-0.015em` tracking. Public detail-page research cards use this same light panel-title hierarchy.
-- `qv-type-subhead` is the 24px compact subsection role at 700 weight.
-- `qv-type-section-title` is the semantic implementation of the **“See the research move.”** section treatment: 38px Mulish, 700 weight, 1.0 line height, and `-0.025em` tracking.
-- `qv-type-page-title` is the 56px primary page-title role at 800 weight.
-- Existing `qv-m-h1` page headings share the page-title treatment except the earnings-calendar `qv-week-heading`, whose font size is dynamically fitted to keep the date range on one line.
-- Normal paragraphs, navigation, controls, labels, and Clerk/auth copy inherit Mulish from the product body role.
-- Data-oriented content can opt into JetBrains Mono through `.mono` / `.qv-type-data`.
-- Large quantitative displays such as countdowns and implied-move hero values remain intentionally larger than ordinary page copy.
+- `0` — normal copy and controls
+- `-0.015em` — display/headline text
+- `0.12em` — uppercase labels
 
-`.serif` is now a backwards-compatibility class only. It still resolves to Mulish and preserves the display OpenType feature for older components, but new semantic headings should not need it.
+## Line height
+
+Only four line-height modes are intentional:
+
+- `1.05` — large display/page titles
+- `1.1` — card/panel headings
+- `1.35` — compact UI and metadata
+- `1.5` — body/lead copy
+
+## Product hierarchy
+
+| Level | Treatment | Typical use |
+| --- | --- | --- |
+| Label | 10px / 600 / uppercase | Table headers, pills, compact labels |
+| Metadata | 12px / 400–600 | Sources, timestamps, controls, compact technical text |
+| Body | 14px / 400 | Normal product copy |
+| Lead | 16px / 400 | Page introductions and explanatory lead text |
+| Card/panel | 20px / 400 | “What is priced?”, research cards, operational panels |
+| Major section | 32px / 600 | Large research/editorial section breaks |
+| Page/detail | 48px / 700 | Screener, Watchlist, ticker/detail titles |
+| Hero/data display | 64px / 600–700 | Only the most important quantitative or marketing display |
+
+Primary page titles are not forced uppercase. Hierarchy should come from spacing, alignment, and information density rather than oversized all-caps text.
+
+## Legacy normalization
+
+Older JSX still contains literal values such as 9.5px, 10.5px, 11.5px, 12.5px, 650 weight, 800 weight, and decorative italic helper text.
+
+`apps/frontend/app/typography.css` contains a compatibility bridge that snaps those **rendered** values onto the canonical grid. This gives the product one visual system immediately without mixing typography work with broad, unrelated component rewrites. Headings are governed directly by their semantic hierarchy; non-heading legacy literals are normalized by the bridge.
+
+This bridge is transitional architecture, not permission to add more inline styles. As components are touched for product work, migrate their typography to shared semantic roles and delete obsolete local literals. Removing those literals should not change appearance because the canonical rendered result is already defined here.
 
 ## Rules for new UI
 
-1. Do not add another application typeface without a deliberate product-wide decision.
-2. Use Mulish for all ordinary product UI and hierarchy.
-3. Use JetBrains Mono only for genuinely technical/data-oriented content where monospaced alignment helps.
-4. Let semantic `h1`–`h3` elements inherit the shared display voice instead of recreating font-feature, kerning, or tracking rules locally.
-5. Prefer `qv-type-card-title`, `qv-type-subhead`, `qv-type-section-title`, and `qv-type-page-title` for explicit heading hierarchy rather than local `fontSize`/`fontWeight` combinations.
-6. Use `qv-type-display` when a non-heading element needs the display voice without a prescribed size.
-7. Avoid new half-pixel font sizes. If a role feels wrong, adjust the shared role rather than creating `11.5px` or `20.5px` locally.
-8. Page titles should use the page-title role unless they are a deliberate hero/marketing surface or a dynamically fitted calendar heading.
-9. Card/panel titles should normally use the lighter 400-weight card-title role; do not promote them to section-level weight without a hierarchy reason.
-10. Uppercase eyebrows/pills should normally use the 10px label role with deliberate tracking.
-11. Numerical alignment should use tabular numerals and JetBrains Mono only when the content is genuinely technical/data-oriented.
-12. SVG charts should inherit Mulish for prose-like labels and use the data family for axes/numeric technical labels.
-13. Preserve readability over strict sameness: dense tables and hero quantitative output are intentional exceptions, but exceptions should map to a documented role.
+1. Use Mulish for ordinary product UI and hierarchy.
+2. Use JetBrains Mono only for genuinely technical/data-oriented content.
+3. Do not introduce a ninth size step.
+4. Do not introduce a fourth weight.
+5. Do not add new tracking or line-height values outside the canonical modes.
+6. Do not use decorative italics for helper/instruction text.
+7. Ordinary `h2`/`h3` headings should inherit the 20px / 400 local-heading role.
+8. Use `qv-type-section-title` only for true major section boundaries.
+9. Use `qv-type-page-title` for top-level page/detail titles.
+10. Use `qv-type-card-title` for card and panel headings.
+11. Prefer shared semantic roles over component-local `fontSize`, `fontWeight`, `letterSpacing`, and `lineHeight` combinations.
+12. Preserve exceptions only when they represent a genuine information role, not because a single page “looks better” with a custom value.
+13. When removing legacy inline typography, preserve the canonical rendered result rather than reintroducing page-specific values.

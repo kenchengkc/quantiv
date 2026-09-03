@@ -9,6 +9,7 @@ type StyleSnapshot = {
   fontWeight: string;
   letterSpacing: string;
   lineHeight: string;
+  textTransform: string;
 };
 
 async function styleOf(locator: Locator): Promise<StyleSnapshot> {
@@ -21,6 +22,7 @@ async function styleOf(locator: Locator): Promise<StyleSnapshot> {
       fontWeight: style.fontWeight,
       letterSpacing: style.letterSpacing,
       lineHeight: style.lineHeight,
+      textTransform: style.textTransform,
     };
   });
 }
@@ -28,10 +30,12 @@ async function styleOf(locator: Locator): Promise<StyleSnapshot> {
 function expectMulishDisplay(style: StyleSnapshot) {
   expect(style.fontFamily.toLowerCase()).toContain('mulish');
   expect(style.fontFeatureSettings.toLowerCase()).toContain('ss01');
-  expect(parseFloat(style.letterSpacing)).toBeLessThan(0);
+  const size = Number.parseFloat(style.fontSize);
+  const tracking = Number.parseFloat(style.letterSpacing);
+  expect(tracking / size).toBeCloseTo(-0.015, 3);
 }
 
-test('large product headings share the About-page Mulish display voice', async ({ page }) => {
+test('product hierarchy uses the restrained institutional Mulish system', async ({ page }) => {
   await page.goto('/about');
 
   const cardTitle = await styleOf(
@@ -40,20 +44,57 @@ test('large product headings share the About-page Mulish display voice', async (
   expectMulishDisplay(cardTitle);
   expect(cardTitle.fontSize).toBe('20px');
   expect(cardTitle.fontWeight).toBe('400');
-  expect(cardTitle.lineHeight).toBe('21px');
+  expect(cardTitle.lineHeight).toBe('22px');
 
   const sectionTitle = await styleOf(
     page.getByRole('heading', { name: 'See the research move.' }),
   );
   expectMulishDisplay(sectionTitle);
-  expect(sectionTitle.fontSize).toBe('38px');
-  expect(sectionTitle.fontWeight).toBe('700');
+  expect(sectionTitle.fontSize).toBe('32px');
+  expect(sectionTitle.fontWeight).toBe('600');
 
   await page.goto('/screener');
   const pageTitle = await styleOf(
     page.getByRole('heading', { name: /^screener$/i }).first(),
   );
   expectMulishDisplay(pageTitle);
-  expect(pageTitle.fontSize).toBe('56px');
-  expect(pageTitle.fontWeight).toBe('800');
+  expect(pageTitle.fontSize).toBe('48px');
+  expect(pageTitle.fontWeight).toBe('700');
+  expect(pageTitle.textTransform).toBe('none');
+});
+
+test('legacy inline typography snaps to canonical rendered values', async ({ page }) => {
+  await page.goto('/screener');
+
+  const bodyStyles = await page.locator('body *').evaluateAll((elements) => {
+    const visible = elements.filter((element) => {
+      const html = element as HTMLElement;
+      const style = getComputedStyle(html);
+      return (
+        style.display !== 'none' &&
+        style.visibility !== 'hidden' &&
+        html.offsetWidth > 0 &&
+        html.offsetHeight > 0 &&
+        (html.textContent?.trim().length ?? 0) > 0
+      );
+    });
+
+    return visible.map((element) => {
+      const style = getComputedStyle(element);
+      return {
+        size: style.fontSize,
+        weight: style.fontWeight,
+        style: style.fontStyle,
+      };
+    });
+  });
+
+  const canonicalSizes = new Set(['10px', '12px', '14px', '16px', '20px', '32px', '48px', '64px']);
+  const canonicalWeights = new Set(['400', '600', '700']);
+
+  for (const typography of bodyStyles) {
+    expect(canonicalSizes.has(typography.size)).toBe(true);
+    expect(canonicalWeights.has(typography.weight)).toBe(true);
+    expect(typography.style).toBe('normal');
+  }
 });
