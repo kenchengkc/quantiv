@@ -6,14 +6,13 @@ import { enforceRateLimit, PUBLIC_RATE_LIMITS } from '@/lib/rateLimit';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-// Intraday IEX bars for the ticker hero sparkline. We cache aggressively
-// because each Alpaca call is ~80 bars of JSON and the bars only update
-// every 5 min anyway. Two-level cache:
-//   1. In-memory per serverless instance (free, sub-ms)
-//   2. Upstash Redis shared across instances (fast, 60s TTL)
-// Both expire at FRESH_TTL_MS so the chart never lags more than ~1 min
-// behind the latest IEX print during a live session.
+// Intraday IEX bars for the ticker hero sparkline. Healthy data stays on the
+// existing ~60s freshness path, while a separate last-good copy survives
+// transient Alpaca/IEX gaps so an overnight provider hiccup cannot blank every
+// ticker hero at once.
 const FRESH_TTL_MS = 60_000;
+const FRESH_REDIS_TTL_SECONDS = 120;
+const LAST_GOOD_TTL_SECONDS = 14 * 24 * 60 * 60;
 
 type CachedPayload = {
   at: number;
@@ -21,9 +20,16 @@ type CachedPayload = {
 };
 
 const memCache = new Map<string, CachedPayload>();
+const lastGoodMemCache = new Map<string, IntradayPayload>();
 const inflight = new Map<string, Promise<IntradayPayload>>();
 
 const redisKey = (symbol: string, tf: string) => `intraday:${symbol}:${tf}`;
+const lastGoodRedisKey = (symbol: string, tf: string) =>
+  `intraday:last-good:${symbol}:${tf}`;
+
+function isUsablePayload(payload: IntradayPayload | null | undefined): boolean {
+  return Array.isArray(payload?.bars) && payload.bars.length >= 2;
+}
 
 async function readCached(
   cacheKey: string,
@@ -31,15 +37,25 @@ async function readCached(
 ): Promise<IntradayPayload | null> {
   // 1) per-instance memory
   const mem = memCache.get(cacheKey);
-  if (mem && Date.now() - mem.at < FRESH_TTL_MS) {
+  if (
+    mem &&
+    Date.now() - mem.at < FRESH_TTL_MS &&
+    isUsablePayload(mem.payload)
+  ) {
     return mem.payload;
   }
-  // 2) Upstash
+
+  // 2) Upstash. Ignore unusable payloads left by an older deployment so an
+  // empty response cannot remain the authoritative fresh cache entry.
   const redis = getRedis();
   if (!redis) return null;
   try {
     const cached = (await redis.get(redisK)) as CachedPayload | null;
-    if (cached && Date.now() - cached.at < FRESH_TTL_MS) {
+    if (
+      cached &&
+      Date.now() - cached.at < FRESH_TTL_MS &&
+      isUsablePayload(cached.payload)
+    ) {
       memCache.set(cacheKey, cached);
       return cached.payload;
     }
@@ -49,23 +65,60 @@ async function readCached(
   return null;
 }
 
-async function writeCached(
+async function readLastGood(
   cacheKey: string,
   redisK: string,
+): Promise<IntradayPayload | null> {
+  const mem = lastGoodMemCache.get(cacheKey);
+  if (isUsablePayload(mem)) return mem ?? null;
+
+  const redis = getRedis();
+  if (!redis) return null;
+  try {
+    const payload = (await redis.get(redisK)) as IntradayPayload | null;
+    if (isUsablePayload(payload)) {
+      lastGoodMemCache.set(cacheKey, payload as IntradayPayload);
+      return payload;
+    }
+  } catch {
+    // Best-effort fallback only.
+  }
+  return null;
+}
+
+async function writeGoodPayload(
+  cacheKey: string,
+  freshRedisK: string,
+  lastGoodRedisK: string,
   payload: IntradayPayload,
 ): Promise<void> {
+  if (!isUsablePayload(payload)) return;
+
   const envelope: CachedPayload = { at: Date.now(), payload };
   memCache.set(cacheKey, envelope);
+  lastGoodMemCache.set(cacheKey, payload);
+
   const redis = getRedis();
   if (!redis) return;
   try {
-    // EX in seconds. Buffer slightly past FRESH_TTL_MS so a memory-hit
-    // request between the in-memory expiry and the Redis expiry still
-    // sees the entry.
-    await redis.set(redisK, envelope, { ex: 120 });
+    await Promise.all([
+      redis.set(freshRedisK, envelope, { ex: FRESH_REDIS_TTL_SECONDS }),
+      redis.set(lastGoodRedisK, payload, { ex: LAST_GOOD_TTL_SECONDS }),
+    ]);
   } catch {
-    // Best-effort cache write; ignore Redis errors.
+    // Best-effort cache writes; live response is still usable.
   }
+}
+
+function intradayResponse(payload: IntradayPayload, fallback = false) {
+  return NextResponse.json(payload, {
+    headers: {
+      'Cache-Control': fallback
+        ? 's-maxage=15, stale-while-revalidate=300'
+        : 's-maxage=30, stale-while-revalidate=300',
+      'X-Quantiv-Intraday': fallback ? 'last-good' : 'fresh',
+    },
+  });
 }
 
 export async function GET(req: NextRequest) {
@@ -85,28 +138,20 @@ export async function GET(req: NextRequest) {
   }
 
   const cacheKey = `${symbol}|${timeframe}`;
-  const redisK = redisKey(symbol, timeframe);
+  const freshRedisK = redisKey(symbol, timeframe);
+  const lastGoodRedisK = lastGoodRedisKey(symbol, timeframe);
 
-  // Cache hit?
-  const cached = await readCached(cacheKey, redisK);
-  if (cached) {
-    return NextResponse.json(cached, {
-      headers: {
-        // CDN edge: serve for 30s, allow stale-while-revalidate for 5
-        // min on top of that. Means a popular ticker page hammered by
-        // visitors only ever pays Alpaca once a minute.
-        'Cache-Control': 's-maxage=30, stale-while-revalidate=300',
-      },
-    });
-  }
+  const cached = await readCached(cacheKey, freshRedisK);
+  if (cached) return intradayResponse(cached);
 
-  // De-dupe concurrent fetches for the same symbol.
+  // De-dupe concurrent live fetches for the same symbol. Empty payloads are
+  // deliberately not cached as fresh or last-good data.
   let pending = inflight.get(cacheKey);
   if (!pending) {
     pending = (async () => {
       try {
         const payload = await fetchIntradayBars(symbol, timeframe);
-        await writeCached(cacheKey, redisK, payload);
+        await writeGoodPayload(cacheKey, freshRedisK, lastGoodRedisK, payload);
         return payload;
       } finally {
         inflight.delete(cacheKey);
@@ -117,14 +162,32 @@ export async function GET(req: NextRequest) {
 
   try {
     const payload = await pending;
-    return NextResponse.json(payload, {
-      headers: { 'Cache-Control': 's-maxage=30, stale-while-revalidate=300' },
+    if (isUsablePayload(payload)) return intradayResponse(payload);
+
+    // Alpaca can occasionally return an empty bars array without throwing.
+    // Prefer the most recently confirmed session to a provider-wide blank UI.
+    const lastGood = await readLastGood(cacheKey, lastGoodRedisK);
+    if (lastGood) return intradayResponse(lastGood, true);
+
+    return intradayResponse(payload);
+  } catch (error) {
+    const lastGood = await readLastGood(cacheKey, lastGoodRedisK);
+    if (lastGood) {
+      console.warn('[intraday] Alpaca unavailable; serving last-good bars', {
+        symbol,
+        timeframe,
+      });
+      return intradayResponse(lastGood, true);
+    }
+
+    // Soft failure only when there is no previously confirmed session to use.
+    // Do not include upstream error text because providers may echo sensitive
+    // request details.
+    console.warn('[intraday] Alpaca unavailable and no last-good bars exist', {
+      symbol,
+      timeframe,
+      errorName: error instanceof Error ? error.name : 'unknown',
     });
-  } catch {
-    // Soft failure: hand the client an empty payload so the hero
-    // gracefully falls back to its seeded sparkline instead of
-    // surfacing a 500. We don't log the full error to the response
-    // body because Alpaca error text occasionally includes secrets.
     return NextResponse.json(
       {
         bars: [],
@@ -134,7 +197,13 @@ export async function GET(req: NextRequest) {
         isCurrentSession: false,
         error: 'upstream',
       },
-      { status: 200 },
+      {
+        status: 200,
+        headers: {
+          'Cache-Control': 'no-store',
+          'X-Quantiv-Intraday': 'unavailable',
+        },
+      },
     );
   }
 }
