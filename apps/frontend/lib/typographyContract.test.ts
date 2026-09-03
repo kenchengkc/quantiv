@@ -36,7 +36,7 @@ describe('Quantiv typography contract', () => {
 
     expect(css).toContain('--qv-weight-regular: 400');
     expect(css).toContain('--qv-weight-medium: 600');
-    expect(css).toContain('--qv-weight-strong: 700');
+    expect(css).toContain('--qv-weight-strong: 800');
     expect(css).toContain('--qv-track-normal: 0');
     expect(css).toContain('--qv-track-display: -0.015em');
     expect(css).toContain('--qv-track-label: 0.12em');
