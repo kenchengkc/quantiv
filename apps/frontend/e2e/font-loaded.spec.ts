@@ -19,15 +19,17 @@ async function inspect(page: import('@playwright/test').Page, url: string, label
     await page.waitForTimeout(800);
   }
 
-  // Check which fonts actually loaded.
+  // Check the two product families actually loaded: Mulish for all ordinary
+  // UI and JetBrains Mono for technical/data text.
   const loaded = await page.evaluate(() => {
     const checks = [
       ['Mulish 400', '400 16px Mulish'],
+      ['Mulish 600', '600 16px Mulish'],
       ['Mulish 700', '700 16px Mulish'],
       ['Mulish 800', '800 16px Mulish'],
       ['Mulish 900', '900 16px Mulish'],
-      ['Nunito Sans 400', '400 16px "Nunito Sans"'],
-      ['Nunito Sans 600', '600 16px "Nunito Sans"'],
+      ['JetBrains Mono 400', '400 16px "JetBrains Mono"'],
+      ['JetBrains Mono 600', '600 16px "JetBrains Mono"'],
     ];
     return Object.fromEntries(
       checks.map(([label, spec]) => [label, document.fonts.check(spec)]),

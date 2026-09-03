@@ -1,28 +1,21 @@
 import './globals.css';
 import './typography.css';
 import type { Metadata } from 'next';
-import { JetBrains_Mono, Mulish, Nunito_Sans } from 'next/font/google';
+import { JetBrains_Mono, Mulish } from 'next/font/google';
 import { SPLASH_SESSION_KEY, SPLASH_SKIP_ATTRIBUTE } from '@/lib/splashSession';
 import { Analytics } from '@vercel/analytics/next';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 
-// Self-host the three typefaces through next/font/google. This sidesteps
-// the @import ordering bug we used to work around with a <link> in <head>:
-// next/font writes its own preload + font-face rules into Next's <head>
-// stream, so there's no @import for Tailwind to reorder past, and the
-// browser never sees a third-party fonts.googleapis.com request. Each
-// family exposes a CSS variable consumed by the global typography system.
+// Self-host the product UI font and technical data font through next/font/google.
+// Mulish is the single application voice used by the About-page reference
+// heading and all ordinary interface copy; JetBrains Mono remains reserved for
+// genuinely technical/data-oriented content. next/font writes preload +
+// font-face rules into Next's <head> stream, so there is no runtime request to
+// fonts.googleapis.com.
 const mulish = Mulish({
   subsets: ['latin'],
   weight: ['300', '400', '500', '600', '700', '800', '900'],
   variable: '--font-mulish',
-  display: 'swap',
-});
-
-const nunitoSans = Nunito_Sans({
-  subsets: ['latin'],
-  weight: ['300', '400', '500', '600'],
-  variable: '--font-nunito-sans',
   display: 'swap',
 });
 
@@ -111,7 +104,7 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${mulish.variable} ${nunitoSans.variable} ${jetbrainsMono.variable}`}
+      className={`${mulish.variable} ${jetbrainsMono.variable}`}
       style={{ backgroundColor: '#000000', colorScheme: 'dark' }}
     >
       <head>

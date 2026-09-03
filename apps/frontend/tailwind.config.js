@@ -47,14 +47,8 @@ module.exports = {
         },
       },
       fontFamily: {
-        sans: ['var(--font-nunito-sans)', 'ui-sans-serif', 'system-ui', 'sans-serif'],
-        heading: [
-          'var(--font-mulish)',
-          'var(--font-nunito-sans)',
-          'ui-sans-serif',
-          'system-ui',
-          'sans-serif',
-        ],
+        sans: ['var(--font-mulish)', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        heading: ['var(--font-mulish)', 'ui-sans-serif', 'system-ui', 'sans-serif'],
         mono: [
           'var(--font-jetbrains-mono)',
           'ui-monospace',
