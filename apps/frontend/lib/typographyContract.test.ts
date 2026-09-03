@@ -95,7 +95,8 @@ describe('Quantiv typography contract', () => {
     expect(css).toContain('font-weight: var(--qv-weight-medium) !important');
     expect(css).toContain('h1.qv-m-h1:not(.qv-week-heading)');
     expect(css).toContain('font-weight: var(--qv-weight-strong) !important');
-    expect(css).toContain('text-transform: none !important');
+    expect(css).toContain('.qv-m-h-hero {');
+    expect(css.match(/text-transform: uppercase !important;/g)?.length).toBeGreaterThanOrEqual(3);
   });
 
   it('snaps legacy inline typography onto the canonical grid', () => {
