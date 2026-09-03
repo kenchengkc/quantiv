@@ -92,10 +92,10 @@ Do not introduce new gray values, near-white variants, or local neutral `color-m
 | Lead | 16px / 400 | Page introductions and explanatory lead text |
 | Card/panel | 20px / 400 | “What is priced?”, research cards, operational panels |
 | Major section | 32px / 600 | Large research/editorial section breaks |
-| Page/detail | 48px / 800 | Screener, Watchlist, ticker/detail titles |
-| Hero/data display | 64px / 600–800 | Only the most important quantitative or marketing display; marketing/page anchors use 800 |
+| Page/detail | 48px / 800 / uppercase | Screener, Watchlist, ML Status, ticker/detail page anchors |
+| Hero/data display | 64px / 600–800 | Only the most important quantitative or marketing display; marketing/page hero anchors use 800 + uppercase |
 
-Primary page titles are not forced uppercase. Hierarchy should come from spacing, alignment, information density, and the small set of documented text roles rather than oversized all-caps text or extra shades of gray.
+Top-level page headers and marketing hero headings use **ALL CAPS consistently**. This casing rule belongs to the page/hero roles themselves, not to one-off inline styles. Ordinary section, card, panel, and body headings remain normal title/sentence case so the interface does not become visually loud.
 
 ## Legacy normalization
 
@@ -118,8 +118,9 @@ These bridges are transitional architecture, not permission to add more inline s
 9. Do not add page-specific gray values or neutral text `color-mix()` variants.
 10. Ordinary `h2`/`h3` headings should inherit the 20px / 400 local-heading role.
 11. Use `qv-type-section-title` only for true major section boundaries.
-12. Use `qv-type-page-title` for top-level page/detail titles; this is the strong 800 role.
-13. Use `qv-type-card-title` for card and panel headings.
-14. Prefer shared semantic roles over component-local `fontSize`, `fontWeight`, `letterSpacing`, `lineHeight`, and `color` combinations.
-15. Preserve exceptions only when they represent a genuine information role, not because a single page “looks better” with a custom value.
-16. When removing legacy inline typography or color, preserve the canonical rendered result rather than reintroducing page-specific values.
+12. Use `qv-type-page-title` for top-level page/detail titles; this is the strong 800 uppercase role.
+13. Use `qv-m-h-hero` for true marketing/page hero headings; hero headings are uppercase.
+14. Use `qv-type-card-title` for card and panel headings.
+15. Prefer shared semantic roles over component-local `fontSize`, `fontWeight`, `letterSpacing`, `lineHeight`, `textTransform`, and `color` combinations.
+16. Preserve exceptions only when they represent a genuine information role, not because a single page “looks better” with a custom value.
+17. When removing legacy inline typography or color, preserve the canonical rendered result rather than reintroducing page-specific values.

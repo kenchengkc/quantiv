@@ -44,6 +44,7 @@ test('product hierarchy uses the restrained institutional Mulish system', async 
   expectMulishDisplay(heroTitle);
   expect(heroTitle.fontSize).toBe('64px');
   expect(heroTitle.fontWeight).toBe('800');
+  expect(heroTitle.textTransform).toBe('uppercase');
 
   const cardTitle = await styleOf(
     page.getByRole('heading', { name: 'What is priced?' }),
@@ -52,6 +53,7 @@ test('product hierarchy uses the restrained institutional Mulish system', async 
   expect(cardTitle.fontSize).toBe('20px');
   expect(cardTitle.fontWeight).toBe('400');
   expect(cardTitle.lineHeight).toBe('22px');
+  expect(cardTitle.textTransform).toBe('none');
 
   const sectionTitle = await styleOf(
     page.getByRole('heading', { name: 'See the research move.' }),
@@ -59,6 +61,7 @@ test('product hierarchy uses the restrained institutional Mulish system', async 
   expectMulishDisplay(sectionTitle);
   expect(sectionTitle.fontSize).toBe('32px');
   expect(sectionTitle.fontWeight).toBe('600');
+  expect(sectionTitle.textTransform).toBe('none');
 
   await page.goto('/screener');
   const pageTitle = await styleOf(
@@ -67,7 +70,7 @@ test('product hierarchy uses the restrained institutional Mulish system', async 
   expectMulishDisplay(pageTitle);
   expect(pageTitle.fontSize).toBe('48px');
   expect(pageTitle.fontWeight).toBe('800');
-  expect(pageTitle.textTransform).toBe('none');
+  expect(pageTitle.textTransform).toBe('uppercase');
 });
 
 test('legacy inline typography snaps to canonical rendered values', async ({ page }) => {
