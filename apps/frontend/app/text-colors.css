@@ -1,0 +1,62 @@
+/* Quantiv text-color system
+ *
+ * Ordinary interface copy has three neutral foreground roles only. Financial
+ * and interaction colors remain semantic so color communicates meaning rather
+ * than becoming another hierarchy dimension.
+ */
+
+:root {
+  --qv-text-primary: var(--ink);
+  --qv-text-secondary: var(--ink-2);
+  --qv-text-muted: var(--ink-3);
+
+  --qv-text-accent: var(--accent);
+  --qv-text-positive: var(--up);
+  --qv-text-negative: var(--down);
+  --qv-text-warning: var(--flag);
+
+  /* Legacy fourth neutral is intentionally collapsed into the muted role.
+   * Existing components can keep referencing --ink-4 while rendering the
+   * same foreground as --qv-text-muted until they migrate to semantic names. */
+  --ink-4: var(--qv-text-muted);
+}
+
+body {
+  color: var(--qv-text-primary);
+}
+
+.qv-text-primary {
+  color: var(--qv-text-primary) !important;
+}
+
+.qv-text-secondary {
+  color: var(--qv-text-secondary) !important;
+}
+
+.qv-text-muted {
+  color: var(--qv-text-muted) !important;
+}
+
+.qv-text-accent {
+  color: var(--qv-text-accent) !important;
+}
+
+.qv-text-positive {
+  color: var(--qv-text-positive) !important;
+}
+
+.qv-text-negative {
+  color: var(--qv-text-negative) !important;
+}
+
+.qv-text-warning {
+  color: var(--qv-text-warning) !important;
+}
+
+/* Placeholder and disabled hierarchy should not create additional gray tokens.
+ * Disabled controls use opacity as interaction state, not a fourth text color. */
+input::placeholder,
+textarea::placeholder {
+  color: var(--qv-text-muted);
+  opacity: 1;
+}
