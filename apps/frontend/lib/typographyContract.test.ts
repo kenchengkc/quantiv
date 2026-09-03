@@ -46,13 +46,28 @@ describe('Quantiv typography contract', () => {
     expect(css).toContain('--qv-leading-body: 1.5');
   });
 
-  it('loads only the unified UI font and technical data font', () => {
+  it('keeps ordinary text to three neutral colors and reserves color for semantics', () => {
+    const colors = read('../app/text-colors.css');
+
+    expect(colors).toContain('--qv-text-primary: var(--ink)');
+    expect(colors).toContain('--qv-text-secondary: var(--ink-2)');
+    expect(colors).toContain('--qv-text-muted: var(--ink-3)');
+    expect(colors).toContain('--ink-4: var(--qv-text-muted)');
+    expect(colors).toContain('--qv-text-accent: var(--accent)');
+    expect(colors).toContain('--qv-text-positive: var(--up)');
+    expect(colors).toContain('--qv-text-negative: var(--down)');
+    expect(colors).toContain('--qv-text-warning: var(--flag)');
+  });
+
+  it('loads unified typography and text colors after the legacy global layer', () => {
     const layout = read('../app/layout.tsx');
     const globalsIndex = layout.indexOf("import './globals.css';");
     const typographyIndex = layout.indexOf("import './typography.css';");
+    const colorsIndex = layout.indexOf("import './text-colors.css';");
 
     expect(globalsIndex).toBeGreaterThanOrEqual(0);
     expect(typographyIndex).toBeGreaterThan(globalsIndex);
+    expect(colorsIndex).toBeGreaterThan(typographyIndex);
     expect(layout).toContain('JetBrains_Mono, Mulish');
     expect(layout).not.toContain('Nunito_Sans');
     expect(layout).not.toContain('font-nunito-sans');
