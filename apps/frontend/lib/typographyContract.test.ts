@@ -43,13 +43,18 @@ describe('Quantiv typography contract', () => {
     expect(authenticatedLayout).not.toContain('font-nunito-sans');
   });
 
-  it('normalizes the reference About heading and primary page-title role', () => {
+  it('applies the About display voice to semantic hierarchy and shared roles', () => {
     const css = read('../app/typography.css');
 
-    expect(css).toContain('.qv-type-section-title');
-    expect(css).toContain('body:has(.quantiv-hero-q) h2.serif');
-    expect(css).toContain('body:has(.qv-screener-table-shell) h1.qv-m-h1');
+    expect(css).toContain('.qv-type-display');
+    expect(css).toContain('.qv-type-subhead');
+    expect(css).toContain('font-feature-settings: "ss01"');
+    expect(css).toContain('font-kerning: normal');
+    expect(css).toContain('text-wrap: balance');
+    expect(css).toContain('letter-spacing: var(--qv-track-card-title) !important');
     expect(css).toContain('font-size: var(--qv-type-section) !important');
+    expect(css).toContain('h1.qv-m-h1:not(.qv-week-heading)');
     expect(css).toContain('font-size: var(--qv-type-page-title) !important');
+    expect(css).not.toContain('body:has(.qv-screener-table-shell) h1.qv-m-h1');
   });
 });
