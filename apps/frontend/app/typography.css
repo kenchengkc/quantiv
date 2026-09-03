@@ -4,9 +4,10 @@
  * - Mulish: all product text, hierarchy, controls, and explanatory copy
  * - JetBrains Mono: data, timestamps, and technical labels
  *
- * The About-page “See the research move.” heading is the visual reference for
- * display hierarchy. Keep the scale role-based instead of introducing local
- * font stacks or one-off half-pixel sizes.
+ * The About-page “What is priced?” card title and “See the research move.”
+ * section heading define the display voice: Mulish's alternate forms, deliberate
+ * kerning, tight tracking, and compact headline rhythm. That voice belongs to
+ * product hierarchy across the platform, not only to the About page.
  */
 
 :root {
@@ -32,6 +33,8 @@
 
   --qv-track-tight: -0.032em;
   --qv-track-heading: -0.02em;
+  --qv-track-section-title: -0.025em;
+  --qv-track-card-title: -0.015em;
   --qv-track-label: 0.14em;
 }
 
@@ -51,8 +54,44 @@ h6,
   font-family: var(--qv-font-heading);
 }
 
-/* `.serif` is retained as a backwards-compatible name. It resolves to Mulish;
- * new code should prefer the semantic heading roles below. */
+/* Shared display voice. Sizes remain role-specific; these properties are what
+ * make larger Mulish text read like the clean About-card reference instead of
+ * behaving like enlarged body copy. Semantic h1–h3 headings get the treatment
+ * automatically, while qv-type-display is available for non-heading elements. */
+h1,
+h2,
+h3,
+.qv-type-display,
+.qv-type-card-title,
+.qv-type-subhead,
+.qv-type-section-title,
+.qv-type-page-title {
+  font-family: var(--qv-font-heading);
+  font-feature-settings: "ss01";
+  font-kerning: normal;
+  text-rendering: optimizeLegibility;
+}
+
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+}
+
+h1:not(.qv-m-h-hero) {
+  letter-spacing: var(--qv-track-tight) !important;
+}
+
+h2 {
+  letter-spacing: var(--qv-track-heading) !important;
+}
+
+h3 {
+  letter-spacing: var(--qv-track-card-title) !important;
+}
+
+/* `.serif` is retained only as a backwards-compatible name. It is not a
+ * separate font and should not be required on new semantic headings. */
 .serif {
   font-feature-settings: "ss01";
 }
@@ -84,28 +123,38 @@ h6,
   line-height: 1.55;
 }
 
-.qv-type-card-title {
-  font-family: var(--qv-font-heading);
-  font-size: var(--qv-type-card-title);
+.qv-type-display {
   font-weight: 700;
   line-height: 1.08;
-  letter-spacing: -0.015em;
+  letter-spacing: var(--qv-track-heading) !important;
+}
+
+.qv-type-card-title {
+  font-size: var(--qv-type-card-title) !important;
+  font-weight: 700 !important;
+  line-height: 1.08 !important;
+  letter-spacing: var(--qv-track-card-title) !important;
+}
+
+.qv-type-subhead {
+  font-size: var(--qv-type-subhead) !important;
+  font-weight: 700 !important;
+  line-height: 1.08 !important;
+  letter-spacing: var(--qv-track-heading) !important;
 }
 
 .qv-type-section-title {
-  font-family: var(--qv-font-heading);
-  font-size: var(--qv-type-section);
-  font-weight: 700;
-  line-height: 1;
-  letter-spacing: -0.025em;
+  font-size: var(--qv-type-section) !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  letter-spacing: var(--qv-track-section-title) !important;
 }
 
 .qv-type-page-title {
-  font-family: var(--qv-font-heading);
-  font-size: var(--qv-type-page-title);
-  font-weight: 800;
-  line-height: 0.94;
-  letter-spacing: var(--qv-track-tight);
+  font-size: var(--qv-type-page-title) !important;
+  font-weight: 800 !important;
+  line-height: 0.94 !important;
+  letter-spacing: var(--qv-track-tight) !important;
   text-transform: uppercase;
 }
 
@@ -159,26 +208,24 @@ h6,
   font-family: var(--qv-font-heading);
 }
 
-/* The About page established the preferred display treatment. Keep all of its
- * section headings on the same 38px Mulish role and its cards on 20px. */
-body:has(.quantiv-hero-q) h2.serif,
-body:has(.quantiv-hero-q) .qv-type-section-title {
-  font-size: var(--qv-type-section) !important;
-}
-
+/* About already uses the semantic section-title role. Keep the legacy story
+ * cards on the matching 20px card-title scale until their JSX classes migrate. */
 body:has(.quantiv-hero-q) article h3.serif {
   font-size: var(--qv-type-card-title) !important;
+  line-height: 1.08 !important;
 }
 
 body:has(.quantiv-hero-q) header p {
   font-size: var(--qv-type-lead) !important;
 }
 
-/* Earnings calendar and Watchlist already use 56px page titles. Bring the
- * Screener's former 66px one-off onto that same role without interfering with
- * the calendar's dynamic nowrap fitting hook. */
-body:has(.qv-screener-table-shell) h1.qv-m-h1 {
+/* Shared primary page-title contract. Calendar headings retain their dynamic
+ * nowrap fitting hook, so only non-calendar qv-m-h1 headings are hard-capped at
+ * the canonical 56px role. This covers Screener and Watchlist without a
+ * page-specific :has() override. */
+h1.qv-m-h1:not(.qv-week-heading) {
   font-size: var(--qv-type-page-title) !important;
+  font-weight: 800 !important;
   letter-spacing: var(--qv-track-tight) !important;
   line-height: 0.94 !important;
 }
@@ -204,6 +251,7 @@ body:has(.qv-screener-table-shell) .qv-screener-table-shell th.mono {
 
 body:has(.qv-detail-hero) .qv-card h3.serif {
   font-size: var(--qv-type-card-title) !important;
+  line-height: 1.08 !important;
 }
 
 /* SVG chart labels that explicitly requested a generic monospace stack should
@@ -214,13 +262,12 @@ svg text[font-family*="monospace"] {
 }
 
 @media (max-width: 640px) {
-  .qv-type-section-title,
-  body:has(.quantiv-hero-q) h2.serif {
+  .qv-type-section-title {
     font-size: 24px !important;
   }
 
   .qv-type-page-title,
-  body:has(.qv-screener-table-shell) h1.qv-m-h1 {
+  h1.qv-m-h1:not(.qv-week-heading) {
     font-size: 38px !important;
     letter-spacing: -0.027em !important;
     line-height: 0.98 !important;
