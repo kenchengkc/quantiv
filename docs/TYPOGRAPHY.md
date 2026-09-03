@@ -13,7 +13,7 @@ Quantiv should look like one institutional research product. The visual language
 
 KaTeX retains its mathematical glyph fonts. Brand images are not part of the text system.
 
-The local heading reference is the About-page **“What is priced?”** treatment: light, compact Mulish rather than a bold dashboard heading.
+The local heading reference is the About-page **“What is priced?”** treatment: light, compact Mulish rather than a bold dashboard heading. True page/hero anchors intentionally use the strong role so the restrained system still has clear hierarchy.
 
 ## Canonical size scale
 
@@ -40,9 +40,9 @@ Only three product weights are intentional:
 
 - **400** — normal copy and the “What is priced?” local-heading voice
 - **600** — labels, data emphasis, major section headings, bold emphasis
-- **700** — primary page/detail titles and true hero hierarchy
+- **800** — primary page/detail titles and true hero hierarchy
 
-There is no 500, 650, or 800 product role.
+There is no 500, 650, or 700 product role. The strong 800 role is deliberately narrow: it is for primary anchors such as **“See what options imply.”**, **Screener**, Watchlist, and ticker/detail titles, not ordinary card or section headings.
 
 ## Tracking
 
@@ -92,14 +92,14 @@ Do not introduce new gray values, near-white variants, or local neutral `color-m
 | Lead | 16px / 400 | Page introductions and explanatory lead text |
 | Card/panel | 20px / 400 | “What is priced?”, research cards, operational panels |
 | Major section | 32px / 600 | Large research/editorial section breaks |
-| Page/detail | 48px / 700 | Screener, Watchlist, ticker/detail titles |
-| Hero/data display | 64px / 600–700 | Only the most important quantitative or marketing display |
+| Page/detail | 48px / 800 | Screener, Watchlist, ticker/detail titles |
+| Hero/data display | 64px / 600–800 | Only the most important quantitative or marketing display; marketing/page anchors use 800 |
 
 Primary page titles are not forced uppercase. Hierarchy should come from spacing, alignment, information density, and the small set of documented text roles rather than oversized all-caps text or extra shades of gray.
 
 ## Legacy normalization
 
-Older JSX still contains literal values such as 9.5px, 10.5px, 11.5px, 12.5px, 650 weight, 800 weight, decorative italic helper text, and the older fourth neutral `--ink-4`.
+Older JSX still contains literal values such as 9.5px, 10.5px, 11.5px, 12.5px, 650 weight, 700 weight, decorative italic helper text, and the older fourth neutral `--ink-4`.
 
 `apps/frontend/app/typography.css` contains a compatibility bridge that snaps legacy **rendered typography** onto the canonical grid. `apps/frontend/app/text-colors.css` performs the equivalent neutral-color consolidation by aliasing the old fourth neutral to the muted role. Together they give the product one visual system immediately without mixing design-system work with broad, unrelated component rewrites.
 
@@ -118,7 +118,7 @@ These bridges are transitional architecture, not permission to add more inline s
 9. Do not add page-specific gray values or neutral text `color-mix()` variants.
 10. Ordinary `h2`/`h3` headings should inherit the 20px / 400 local-heading role.
 11. Use `qv-type-section-title` only for true major section boundaries.
-12. Use `qv-type-page-title` for top-level page/detail titles.
+12. Use `qv-type-page-title` for top-level page/detail titles; this is the strong 800 role.
 13. Use `qv-type-card-title` for card and panel headings.
 14. Prefer shared semantic roles over component-local `fontSize`, `fontWeight`, `letterSpacing`, `lineHeight`, and `color` combinations.
 15. Preserve exceptions only when they represent a genuine information role, not because a single page “looks better” with a custom value.
