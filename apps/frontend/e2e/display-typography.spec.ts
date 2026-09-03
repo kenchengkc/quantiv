@@ -80,8 +80,12 @@ test('legacy inline typography snaps to canonical rendered values', async ({ pag
     });
 
     return visible.map((element) => {
+      const html = element as HTMLElement;
       const style = getComputedStyle(element);
       return {
+        tag: element.tagName.toLowerCase(),
+        className: html.className?.toString().slice(0, 120) ?? '',
+        text: html.textContent?.trim().replace(/\s+/g, ' ').slice(0, 100) ?? '',
         size: style.fontSize,
         weight: style.fontWeight,
         style: style.fontStyle,
@@ -91,10 +95,48 @@ test('legacy inline typography snaps to canonical rendered values', async ({ pag
 
   const canonicalSizes = new Set(['10px', '12px', '14px', '16px', '20px', '32px', '48px', '64px']);
   const canonicalWeights = new Set(['400', '600', '700']);
+  const invalid = bodyStyles.filter(
+    (typography) =>
+      !canonicalSizes.has(typography.size) ||
+      !canonicalWeights.has(typography.weight) ||
+      typography.style !== 'normal',
+  );
 
-  for (const typography of bodyStyles) {
-    expect(canonicalSizes.has(typography.size)).toBe(true);
-    expect(canonicalWeights.has(typography.weight)).toBe(true);
-    expect(typography.style).toBe('normal');
-  }
+  expect(invalid, JSON.stringify(invalid.slice(0, 20), null, 2)).toEqual([]);
+});
+
+test('ordinary text uses three neutral roles while signal colors stay semantic', async ({ page }) => {
+  await page.goto('/screener');
+
+  const colors = await page.evaluate(() => {
+    const probe = (token: string) => {
+      const element = document.createElement('span');
+      element.style.color = `var(${token})`;
+      element.textContent = token;
+      document.body.appendChild(element);
+      const color = getComputedStyle(element).color;
+      element.remove();
+      return color;
+    };
+
+    return {
+      primary: probe('--qv-text-primary'),
+      secondary: probe('--qv-text-secondary'),
+      muted: probe('--qv-text-muted'),
+      legacyMuted: probe('--ink-4'),
+      accent: probe('--qv-text-accent'),
+      positive: probe('--qv-text-positive'),
+      negative: probe('--qv-text-negative'),
+      warning: probe('--qv-text-warning'),
+    };
+  });
+
+  expect(new Set([colors.primary, colors.secondary, colors.muted]).size).toBe(3);
+  expect(colors.legacyMuted).toBe(colors.muted);
+
+  const neutralColors = new Set([colors.primary, colors.secondary, colors.muted]);
+  expect(neutralColors.has(colors.accent)).toBe(false);
+  expect(neutralColors.has(colors.positive)).toBe(false);
+  expect(neutralColors.has(colors.negative)).toBe(false);
+  expect(neutralColors.has(colors.warning)).toBe(false);
 });
