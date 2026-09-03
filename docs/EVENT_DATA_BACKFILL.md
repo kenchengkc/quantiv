@@ -124,10 +124,10 @@ accumulate annual dispersion for an eventual paired test anyway.
 
 ## Historical experiment: forward accumulation (paused)
 
-Chose path (1). `scripts/accumulate_event_signals.py` snapshots, for every
+Chose path (1). `scripts/research/accumulate_event_signals.py` snapshots, for every
 UPCOMING reporter (within `--lead-days`, from `weeks/*.json`), the Massive
 options snapshot (put/call vol & OI ratios, VOI, ATM IV) + short interest, and
-appends to the append-only `data/event_signals_panel.jsonl`. Targeting upcoming
+appends to the append-only `data/research/event_signals/panel.jsonl`. Targeting upcoming
 reporters — not the popular-symbol set the enrichment cron uses — is the key:
 Massive has the headroom (58 calls in seconds; the `5/min` budget is self-imposed
 elsewhere). That scheduled step and its automatic commits were removed in

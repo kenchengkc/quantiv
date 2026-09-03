@@ -13,7 +13,7 @@ from build_frontend_data import (
 )
 
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 PUBLIC_DIR = REPO_ROOT / "apps" / "frontend" / "public"
 REQUIRED_EVENT_KEYS = {
     "ticker",

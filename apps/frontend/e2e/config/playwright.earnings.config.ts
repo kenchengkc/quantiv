@@ -2,10 +2,21 @@ import { defineConfig, devices } from '@playwright/test';
 import path from 'node:path';
 import dotenv from 'dotenv';
 
-dotenv.config({ path: path.resolve(__dirname, '.env.test.local'), override: false, quiet: true });
-dotenv.config({ path: path.resolve(__dirname, '.env.local'), override: false, quiet: true });
+const FRONTEND_ROOT = path.resolve(__dirname, '..', '..');
+const REPO_ROOT = path.resolve(FRONTEND_ROOT, '..', '..');
+
 dotenv.config({
-  path: path.resolve(__dirname, '..', '..', 'config', '.env.local'),
+  path: path.resolve(FRONTEND_ROOT, '.env.test.local'),
+  override: false,
+  quiet: true,
+});
+dotenv.config({
+  path: path.resolve(FRONTEND_ROOT, '.env.local'),
+  override: false,
+  quiet: true,
+});
+dotenv.config({
+  path: path.resolve(REPO_ROOT, 'config', '.env.local'),
   override: false,
   quiet: true,
 });
@@ -15,7 +26,7 @@ const BASE_URL = process.env.E2E_BASE_URL ?? `http://localhost:${PORT}`;
 
 /** Public earnings-calendar checks — no Clerk globalSetup required. */
 export default defineConfig({
-  testDir: './e2e',
+  testDir: '..',
   testMatch: 'earnings-reaction.spec.ts',
   use: {
     baseURL: BASE_URL,
@@ -26,7 +37,7 @@ export default defineConfig({
   reporter: 'list',
   workers: 1,
   retries: 0,
-  outputDir: 'test-results/earnings-reaction',
+  outputDir: '../../test-results/earnings-reaction',
   webServer: {
     command: 'npm run dev',
     url: BASE_URL,

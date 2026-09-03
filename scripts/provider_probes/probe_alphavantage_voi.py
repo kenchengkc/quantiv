@@ -24,7 +24,7 @@ import requests
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-OUTPUT_PATH = REPO_ROOT / "data" / "alpha_vantage_voi_probe.json"
+OUTPUT_PATH = REPO_ROOT / "data" / "research" / "provider_probes" / "alpha_vantage_voi_probe.json"
 PUBLIC_DIR = REPO_ROOT / "apps" / "frontend" / "public"
 POPULAR_WEIGHTS_PATH = REPO_ROOT / "apps" / "frontend" / "lib" / "popular.ts"
 BASE_URL = "https://www.alphavantage.co/query"

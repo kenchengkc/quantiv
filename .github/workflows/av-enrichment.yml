@@ -8,8 +8,8 @@ name: Manual provider-signal research
 #   • --ledger uses a fresh per-run file (the committed morning ledger would
 #     show both keys exhausted). 10/key keeps per-key cumulative use across
 #     both runs ≤ ~25 in case AV also tracks per key.
-#   • --output-dir writes to data/provider_enrichments_pm/ so the morning
-#     tables are never clobbered; consumers can union both dirs.
+#   • --output-dir writes below data/research/provider_signals/ so the morning
+#     tables are never clobbered; consumers can union both dirs explicitly.
 on:
   workflow_dispatch: {}
 
@@ -48,8 +48,8 @@ jobs:
             --providers alphavantage \
             --max-symbols 16 \
             --max-total-calls 25 \
-            --ledger data/provider_usage_ledger_pm.json \
-            --output-dir data/provider_enrichments_pm \
+            --ledger data/research/provider_signals/pm/usage_ledger.json \
+            --output-dir data/research/provider_signals/pm/enrichments \
             --respect-minute-limits
 
       - name: Upload research sample (never publish to main)
@@ -57,7 +57,7 @@ jobs:
         with:
           name: provider-signal-research-${{ github.run_id }}
           path: |
-            data/provider_usage_ledger_pm.json
-            data/provider_enrichments_pm/
+            data/research/provider_signals/pm/usage_ledger.json
+            data/research/provider_signals/pm/enrichments/
           if-no-files-found: error
           retention-days: 14

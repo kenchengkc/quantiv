@@ -1,37 +1,50 @@
 # Tools
 
-Python utilities that **build or enrich frontend artifacts** and supporting
-datasets. Invoked from CI ([`.github/workflows/daily-refresh.yml`](../.github/workflows/daily-refresh.yml))
-or locally via `npm run data:frontend` (which calls `build_frontend_data.py`).
+`tools/` contains Python builders and reusable helpers that generate or enrich application-facing artifacts. Stable command entrypoints stay at the root; reusable frontend-data logic and pytest coverage are grouped below it.
+
+## Directory contract
+
+```text
+tools/
+├── *.py             # stable builder/helper entrypoints
+├── frontend_data/   # reusable frontend-artifact transformation package
+├── fixtures/        # deterministic inputs used by builders/tests
+└── tests/           # pytest coverage for tools and frontend_data
+```
+
+Rules:
+
+- Keep root files executable/importable entrypoints used by CI, npm, scripts, or documented operator commands.
+- Put reusable frontend publication logic in `frontend_data/` rather than growing `build_frontend_data.py` into a monolith.
+- Put deterministic checked-in test inputs in `fixtures/`.
+- Put all Python tool tests in `tests/`; do not add root-level `test_*.py` files.
+- Retired tooling should be deleted from the live tree and recovered from Git history if needed.
+
+Several tools are invoked from CI ([`.github/workflows/daily-refresh.yml`](../.github/workflows/daily-refresh.yml)) or locally via `npm run data:frontend`.
 
 | Script | Purpose | CI |
 |--------|---------|-----|
 | `build_frontend_data.py` | Writes `apps/frontend/public/{weekly,weeks,symbols,screener}.json`; can use quota-managed TwelveData daily closes as a backend-only realized-move fallback | Nightly |
 | `twelvedata_basic.py` | Basic-tier quota ledger + `/time_series` daily-close helper used by `build_frontend_data.py` | Helper |
 | `build_popular_weights.py` | Regenerates popular-ticker weights consumed by the screener filter | Nightly |
-| `pull_market_caps.py` | Finnhub market-cap snapshot for ranking / display; merges top-profile logos into `ticker-logos.json` | Nightly |
+| `pull_market_caps.py` | Finnhub market-cap snapshot for ranking/display; merges top-profile logos into `ticker-logos.json` | Nightly |
 | `build_earnings_events.py` | Legacy/helper earnings event builder — run manually if needed | No |
-| `math_baseline.py` | EM baseline math experiments | Manual |
+| `math_baseline.py` | Expected-move baseline math experiments | Manual |
 
-`build_frontend_data.py` is a small orchestration entrypoint. Its
-`frontend_data/` package separates forecast/evidence inputs, timing-aware
-realized-move reconciliation, calendar/screener/symbol payload construction,
-and atomic public-file writes. Experimental provider fields are filtered by the
-paired-evidence policy before payload construction.
+`build_frontend_data.py` is a small orchestration entrypoint. Its `frontend_data/` package separates forecast/evidence inputs, timing-aware realized-move reconciliation, calendar/screener/symbol payload construction, and atomic public-file writes. Experimental provider fields are filtered by the paired-evidence policy before payload construction.
 
-Env: `DATA_DIR`, `DUCKDB_PATH` in `config/.env.local` (see [`.env.example`](../.env.example)).
-TwelveData fallback requires `TWELVEDATA_API_KEY` in the environment that runs
-`build_frontend_data.py` (GitHub Actions for production). Optional tuning env:
-`TWELVEDATA_DAILY_CREDIT_LIMIT` (default `792`), `TWELVEDATA_BATCH_SIZE`
-(default `8`), `TWELVEDATA_BATCH_DELAY_SEC` (default `61`), and
-`TWELVEDATA_LEDGER_PATH` (default `data/twelvedata_usage_ledger.json`).
-By default, TwelveData credits are also mirrored into the shared provider ledger
-(`data/provider_usage_ledger.json`) so press-release/enrichment usage and
-realized-move fallback usage share one daily cap. Set
-`TWELVEDATA_SHARE_PROVIDER_LEDGER=0` only for isolated local tests.
-After realized moves and historical averages, leftover credits may run a small
-local-vs-TwelveData validation sample controlled by
-`TWELVEDATA_VALIDATION_SAMPLE_SIZE` (default `8`) and
-`TWELVEDATA_VALIDATION_DELTA_PCT` (default `0.005`).
+Run tool coverage locally with:
+
+```bash
+python -m pytest tools/tests -q
+```
+
+Environment variables such as `DATA_DIR` and `DUCKDB_PATH` live in `config/.env.local`; see [`.env.example`](../.env.example). TwelveData fallback requires `TWELVEDATA_API_KEY` in the environment that runs `build_frontend_data.py`. Optional tuning variables include `TWELVEDATA_DAILY_CREDIT_LIMIT` (default `792`), `TWELVEDATA_BATCH_SIZE` (default `8`), `TWELVEDATA_BATCH_DELAY_SEC` (default `61`), and `TWELVEDATA_LEDGER_PATH` (default `data/twelvedata_usage_ledger.json`).
+
+By default, TwelveData credits are also mirrored into the shared provider ledger (`data/provider_usage_ledger.json`) so press-release/enrichment usage and realized-move fallback usage share one daily cap. Set `TWELVEDATA_SHARE_PROVIDER_LEDGER=0` only for isolated local tests. After realized moves and historical averages, leftover credits may run a small local-vs-TwelveData validation sample controlled by `TWELVEDATA_VALIDATION_SAMPLE_SIZE` (default `8`) and `TWELVEDATA_VALIDATION_DELTA_PCT` (default `0.005`).
+
 Preview planned credits without spending them:
-`python tools/build_frontend_data.py --twelvedata-dry-run`.
+
+```bash
+python tools/build_frontend_data.py --twelvedata-dry-run
+```

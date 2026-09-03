@@ -20,9 +20,10 @@ Rules:
 - Keep a script at the root only when Actions, npm, or another operational entrypoint calls that path directly, or when it is a shared module for those commands.
 - Put human-run repair/setup/conversion utilities in `maintenance/`.
 - Put provider evaluation probes in `provider_probes/`; production provider syncs remain at the root.
-- Put research-only analysis in `research/`.
+- Put research-only analysis and paused/manual research collectors in `research/`.
+- Research-only outputs belong under `data/research/`, not beside production artifacts at the `data/` root.
 - Put all script tests in `tests/`.
-- Do not create a live `archive/` directory. Git history is the archive for retired scripts.
+- Do not create a live code `archive/` directory. Git history is the archive for retired scripts.
 
 The retired one-off Massive capability probe was removed because `provider_probes/probe_provider_capabilities.py` supersedes it.
 
@@ -61,6 +62,7 @@ Research examples:
 npm run ml:walk-forward
 python scripts/research/experiment_model_improvements.py
 python scripts/research/lookahead_audit.py --help
+python scripts/research/accumulate_event_signals.py --help
 ```
 
 ## Operational root
@@ -81,7 +83,7 @@ Keeping these paths stable avoids turning a directory cleanup into a production-
 
 Core production sources remain narrowly scoped. Additive vendor signals are frozen by [`config/provider_signal_policy.json`](../config/provider_signal_policy.json) and do not enter production until paired evidence clears the promotion gates.
 
-The manual provider-signal workflow runs `sync_provider_enrichments.py --research-override`; provider entitlement and response-shape discovery belongs under `provider_probes/`.
+The manual provider-signal workflow runs `sync_provider_enrichments.py --research-override`; provider entitlement and response-shape discovery belongs under `provider_probes/`. Persistent manual probe evidence and isolated research samples belong under [`data/research/`](../data/README.md).
 
 See [Provider signal promotion policy](../docs/PROVIDER_SIGNAL_POLICY.md).
 
@@ -94,6 +96,6 @@ source .venv/bin/activate
 python -m pytest scripts tools -q
 ```
 
-CI adds `scripts/` to `PYTHONPATH`; `scripts/tests/conftest.py` does the same for local pytest collection so moved tests keep importing the stable root modules.
+CI adds `scripts/` and `tools/` to `PYTHONPATH`; their local `tests/conftest.py` files provide equivalent import paths for local pytest collection.
 
 Environment variables such as `DATA_DIR`, `DUCKDB_PATH`, and `DATABASE_URL` live in `config/.env.local`; see [`.env.example`](../.env.example).
