@@ -1,8 +1,8 @@
 # Quantiv Typography
 
-This is the product-wide typography contract for the frontend.
+This is the product-wide typography and text-color contract for the frontend.
 
-Quantiv should look like one institutional research product. Typography is therefore intentionally restrained: one UI family, one technical data family, eight rendered size steps, three weights, three tracking modes, and four line-height modes.
+Quantiv should look like one institutional research product. The visual language is therefore intentionally restrained: one UI family, one technical data family, eight rendered size steps, three weights, three tracking modes, four line-height modes, and three neutral text-color roles.
 
 ## Font roles
 
@@ -61,6 +61,27 @@ Only four line-height modes are intentional:
 - `1.35` — compact UI and metadata
 - `1.5` — body/lead copy
 
+## Text color
+
+Ordinary interface text has only three neutral foreground roles:
+
+| Role | Token | Use |
+| --- | --- | --- |
+| Primary | `--qv-text-primary` | Page titles, card headings, primary values and high-priority copy |
+| Secondary | `--qv-text-secondary` | Supporting copy and normal secondary information |
+| Muted | `--qv-text-muted` | Metadata, timestamps, source labels, placeholders and low-priority annotations |
+
+The historical `--ink-4` token is a compatibility alias of `--qv-text-muted`; it is no longer a fourth rendered neutral level.
+
+Color outside those three neutrals must communicate meaning rather than hierarchy:
+
+- `--qv-text-accent` — interactive or selected emphasis
+- `--qv-text-positive` — positive/up state
+- `--qv-text-negative` — negative/down state
+- `--qv-text-warning` — warning/caution state
+
+Do not introduce new gray values, near-white variants, or local neutral `color-mix()` values simply to make one block feel more or less important. Use the three neutral roles. Disabled state should normally be represented by opacity on an existing role rather than another foreground color. Brand-blue variants may still be used for surfaces, borders, charts, and brand treatments; ordinary text should use the semantic text-color tokens.
+
 ## Product hierarchy
 
 | Level | Treatment | Typical use |
@@ -74,15 +95,15 @@ Only four line-height modes are intentional:
 | Page/detail | 48px / 700 | Screener, Watchlist, ticker/detail titles |
 | Hero/data display | 64px / 600–700 | Only the most important quantitative or marketing display |
 
-Primary page titles are not forced uppercase. Hierarchy should come from spacing, alignment, and information density rather than oversized all-caps text.
+Primary page titles are not forced uppercase. Hierarchy should come from spacing, alignment, information density, and the small set of documented text roles rather than oversized all-caps text or extra shades of gray.
 
 ## Legacy normalization
 
-Older JSX still contains literal values such as 9.5px, 10.5px, 11.5px, 12.5px, 650 weight, 800 weight, and decorative italic helper text.
+Older JSX still contains literal values such as 9.5px, 10.5px, 11.5px, 12.5px, 650 weight, 800 weight, decorative italic helper text, and the older fourth neutral `--ink-4`.
 
-`apps/frontend/app/typography.css` contains a compatibility bridge that snaps those **rendered** values onto the canonical grid. This gives the product one visual system immediately without mixing typography work with broad, unrelated component rewrites. Headings are governed directly by their semantic hierarchy; non-heading legacy literals are normalized by the bridge.
+`apps/frontend/app/typography.css` contains a compatibility bridge that snaps legacy **rendered typography** onto the canonical grid. `apps/frontend/app/text-colors.css` performs the equivalent neutral-color consolidation by aliasing the old fourth neutral to the muted role. Together they give the product one visual system immediately without mixing design-system work with broad, unrelated component rewrites.
 
-This bridge is transitional architecture, not permission to add more inline styles. As components are touched for product work, migrate their typography to shared semantic roles and delete obsolete local literals. Removing those literals should not change appearance because the canonical rendered result is already defined here.
+These bridges are transitional architecture, not permission to add more inline styles or legacy color tokens. As components are touched for product work, migrate them to shared semantic roles and delete obsolete local literals. Removing those literals should not change appearance because the canonical rendered result is already defined here.
 
 ## Rules for new UI
 
@@ -92,10 +113,13 @@ This bridge is transitional architecture, not permission to add more inline styl
 4. Do not introduce a fourth weight.
 5. Do not add new tracking or line-height values outside the canonical modes.
 6. Do not use decorative italics for helper/instruction text.
-7. Ordinary `h2`/`h3` headings should inherit the 20px / 400 local-heading role.
-8. Use `qv-type-section-title` only for true major section boundaries.
-9. Use `qv-type-page-title` for top-level page/detail titles.
-10. Use `qv-type-card-title` for card and panel headings.
-11. Prefer shared semantic roles over component-local `fontSize`, `fontWeight`, `letterSpacing`, and `lineHeight` combinations.
-12. Preserve exceptions only when they represent a genuine information role, not because a single page “looks better” with a custom value.
-13. When removing legacy inline typography, preserve the canonical rendered result rather than reintroducing page-specific values.
+7. Use only primary, secondary, or muted for neutral text hierarchy.
+8. Use accent, positive, negative, and warning colors only when the color carries semantic meaning.
+9. Do not add page-specific gray values or neutral text `color-mix()` variants.
+10. Ordinary `h2`/`h3` headings should inherit the 20px / 400 local-heading role.
+11. Use `qv-type-section-title` only for true major section boundaries.
+12. Use `qv-type-page-title` for top-level page/detail titles.
+13. Use `qv-type-card-title` for card and panel headings.
+14. Prefer shared semantic roles over component-local `fontSize`, `fontWeight`, `letterSpacing`, `lineHeight`, and `color` combinations.
+15. Preserve exceptions only when they represent a genuine information role, not because a single page “looks better” with a custom value.
+16. When removing legacy inline typography or color, preserve the canonical rendered result rather than reintroducing page-specific values.
