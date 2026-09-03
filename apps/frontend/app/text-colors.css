@@ -53,6 +53,24 @@ body {
   color: var(--qv-text-warning) !important;
 }
 
+/* Decorative foreground treatments are normalized to semantic roles. Gradient
+ * text adds another visual dialect without adding analytical meaning. */
+.qv-detail-countdown {
+  background: none !important;
+  color: var(--qv-text-primary) !important;
+  -webkit-text-fill-color: currentColor !important;
+}
+
+.qv-detail-em {
+  background: none !important;
+  color: var(--qv-text-accent) !important;
+  -webkit-text-fill-color: currentColor !important;
+}
+
+.qv-metric-help-math {
+  color: var(--qv-text-primary) !important;
+}
+
 /* Placeholder and disabled hierarchy should not create additional gray tokens.
  * Disabled controls use opacity as interaction state, not a fourth text color. */
 input::placeholder,
