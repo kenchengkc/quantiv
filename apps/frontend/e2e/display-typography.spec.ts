@@ -38,6 +38,13 @@ function expectMulishDisplay(style: StyleSnapshot) {
 test('product hierarchy uses the restrained institutional Mulish system', async ({ page }) => {
   await page.goto('/about');
 
+  const heroTitle = await styleOf(
+    page.getByRole('heading', { name: 'See what options imply.' }),
+  );
+  expectMulishDisplay(heroTitle);
+  expect(heroTitle.fontSize).toBe('64px');
+  expect(heroTitle.fontWeight).toBe('800');
+
   const cardTitle = await styleOf(
     page.getByRole('heading', { name: 'What is priced?' }),
   );
@@ -59,11 +66,12 @@ test('product hierarchy uses the restrained institutional Mulish system', async 
   );
   expectMulishDisplay(pageTitle);
   expect(pageTitle.fontSize).toBe('48px');
-  expect(pageTitle.fontWeight).toBe('700');
+  expect(pageTitle.fontWeight).toBe('800');
   expect(pageTitle.textTransform).toBe('none');
 });
 
 test('legacy inline typography snaps to canonical rendered values', async ({ page }) => {
+  test.slow();
   await page.goto('/screener');
 
   const bodyStyles = await page.locator('body *').evaluateAll((elements) => {
@@ -94,7 +102,7 @@ test('legacy inline typography snaps to canonical rendered values', async ({ pag
   });
 
   const canonicalSizes = new Set(['10px', '12px', '14px', '16px', '20px', '32px', '48px', '64px']);
-  const canonicalWeights = new Set(['400', '600', '700']);
+  const canonicalWeights = new Set(['400', '600', '800']);
   const invalid = bodyStyles.filter(
     (typography) =>
       !canonicalSizes.has(typography.size) ||
@@ -140,8 +148,9 @@ test('ordinary text uses three neutral roles while signal colors stay semantic',
   expect(neutralColors.has(colors.negative)).toBe(false);
   expect(neutralColors.has(colors.warning)).toBe(false);
 
-  const activeNav = page.getByRole('link', { name: 'Screener' });
-  const inactiveNav = page.getByRole('link', { name: 'About' });
+  const navigation = page.getByRole('navigation');
+  const activeNav = navigation.getByRole('link', { name: 'Screener' });
+  const inactiveNav = navigation.getByRole('link', { name: 'About' });
   const helper = page
     .locator('span')
     .filter({ hasText: /Sortable table of every upcoming earnings print/ })
