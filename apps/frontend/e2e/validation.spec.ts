@@ -10,9 +10,9 @@ test('research validation exposes model, calibration, controls, and lineage', as
     page.getByRole('heading', { name: /does the model add information/i }),
   ).toBeVisible();
   await expect(page.getByText('Relative MAE improvement')).toBeVisible();
-  await expect(page.getByText('T-7')).toBeVisible();
+  await expect(page.getByText('T-7', { exact: true })).toBeVisible();
   await expect(
-    page.getByRole('heading', { name: /calibration/i }),
+    page.getByRole('heading', { name: 'Calibration', exact: true }),
   ).toBeVisible();
   await expect(
     page.getByRole('heading', { name: /current research controls/i }),
