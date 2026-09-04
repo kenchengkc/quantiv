@@ -1,6 +1,3 @@
-import { createHash } from 'node:crypto';
-import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { NextResponse } from 'next/server';
 import {
   applyScreenerResearchQuery,
@@ -8,6 +5,12 @@ import {
   parseScreenerResearchQuery,
   type ResearchScreenerEvent,
 } from '@/lib/screenerResearch';
+import {
+  csvCell,
+  downloadHeaders,
+  readPublicJson,
+  researchSnapshotId,
+} from '@/lib/researchSnapshot.server';
 
 export const runtime = 'nodejs';
 
@@ -34,50 +37,6 @@ type ControlPlane = {
   publication_eligible?: boolean;
   data?: { decision_scope?: string; live_trading_eligible?: boolean };
 };
-
-function publicPath(...parts: string[]): string | null {
-  const candidates = [
-    join(process.cwd(), 'apps', 'frontend', 'public', ...parts),
-    join(process.cwd(), 'public', ...parts),
-  ];
-  return candidates.find((candidate) => existsSync(candidate)) ?? null;
-}
-
-function readJson<T>(...parts: string[]): T | null {
-  const path = publicPath(...parts);
-  if (!path) return null;
-  try {
-    return JSON.parse(readFileSync(path, 'utf8')) as T;
-  } catch {
-    return null;
-  }
-}
-
-function canonicalJson(value: unknown): string {
-  if (value === undefined) return 'null';
-  if (value === null || typeof value !== 'object') {
-    return JSON.stringify(value) ?? 'null';
-  }
-  if (Array.isArray(value)) {
-    return `[${value.map((item) => canonicalJson(item)).join(',')}]`;
-  }
-  const object = value as Record<string, unknown>;
-  const entries = Object.keys(object)
-    .sort()
-    .map((key) => `${JSON.stringify(key)}:${canonicalJson(object[key])}`);
-  return `{${entries.join(',')}}`;
-}
-
-function snapshotId(body: unknown): string {
-  return `sha256:${createHash('sha256').update(canonicalJson(body)).digest('hex')}`;
-}
-
-function csvCell(value: unknown): string {
-  if (value == null) return '';
-  const text =
-    typeof value === 'object' ? JSON.stringify(value) : String(value);
-  return /[",\n\r]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
-}
 
 function toCsv(
   id: string,
@@ -127,7 +86,7 @@ export async function GET(request: Request) {
   const format = requestUrl.searchParams.get('format') === 'csv' ? 'csv' : 'json';
   const query = parseScreenerResearchQuery(requestUrl.searchParams);
 
-  const bundle = readJson<ScreenerBundle>('screener.json');
+  const bundle = readPublicJson<ScreenerBundle>('screener.json');
   if (!bundle || !Array.isArray(bundle.events)) {
     return NextResponse.json(
       { error: 'The validated screener snapshot is unavailable.' },
@@ -135,8 +94,8 @@ export async function GET(request: Request) {
     );
   }
 
-  const evidence = readJson<ForecastEvidence>('evidence', 'forecast.json');
-  const control = readJson<ControlPlane>('control-plane.json');
+  const evidence = readPublicJson<ForecastEvidence>('evidence', 'forecast.json');
+  const control = readPublicJson<ControlPlane>('control-plane.json');
   const events = applyScreenerResearchQuery(bundle.events, query);
 
   const immutableBody = {
@@ -163,36 +122,30 @@ export async function GET(request: Request) {
     result_count: events.length,
     events,
   };
-  const id = snapshotId(immutableBody);
+  const id = researchSnapshotId(immutableBody);
   const payload = { ...immutableBody, snapshot_id: id };
   const asOf = bundle.metadata?.as_of_date ?? 'unknown-date';
   const shortId = id.replace('sha256:', '').slice(0, 12);
 
-  const headers = new Headers({
-    'Cache-Control': 'private, no-store',
-    'X-Quantiv-Snapshot-Id': id,
-    'X-Quantiv-Decision-Scope': payload.decision_scope,
-  });
-
   if (format === 'csv') {
-    headers.set('Content-Type', 'text/csv; charset=utf-8');
-    headers.set(
-      'Content-Disposition',
-      `attachment; filename="quantiv-screener-${asOf}-${shortId}.csv"`,
-    );
     return new Response(toCsv(id, bundle.metadata?.as_of_date ?? null, events), {
       status: 200,
-      headers,
+      headers: downloadHeaders(
+        id,
+        payload.decision_scope,
+        `quantiv-screener-${asOf}-${shortId}.csv`,
+        'text/csv; charset=utf-8',
+      ),
     });
   }
 
-  headers.set('Content-Type', 'application/json; charset=utf-8');
-  headers.set(
-    'Content-Disposition',
-    `attachment; filename="quantiv-screener-${asOf}-${shortId}.json"`,
-  );
   return new Response(`${JSON.stringify(payload, null, 2)}\n`, {
     status: 200,
-    headers,
+    headers: downloadHeaders(
+      id,
+      payload.decision_scope,
+      `quantiv-screener-${asOf}-${shortId}.json`,
+      'application/json; charset=utf-8',
+    ),
   });
 }
