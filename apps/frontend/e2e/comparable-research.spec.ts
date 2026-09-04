@@ -30,6 +30,8 @@ test('ticker research links into a comparable historical cohort', async ({ page 
   await expect(page).toHaveURL(/maxLead=1/);
   await expect(page.getByRole('heading', { level: 1, name: /research lab/i })).toBeVisible();
   await expect(page.getByLabel('Session')).toHaveValue('amc');
+  await expect(page.getByLabel('Min lead days')).toHaveValue('0');
+  await expect(page.getByLabel('Max lead days')).toHaveValue('1');
   await expect(page.getByLabel('Sort')).toHaveValue('ratio');
   await expect(page.getByText('Calibration map')).toBeVisible();
 });
