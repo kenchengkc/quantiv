@@ -12,13 +12,17 @@ Principles:
 
 Current contracts:
 
-| Contract | Public artifact |
+| Contract | Public artifact / surface |
 |---|---|
 | `quantiv.screener.v1` | `apps/frontend/public/screener.json` |
 | `quantiv.symbol-research.v1` | `apps/frontend/public/symbols/<TICKER>.json` |
 | `quantiv.dashboard-evidence.v1` | `apps/frontend/public/evidence/forecast.json` |
 | `quantiv.control-plane.v2` | `apps/frontend/public/control-plane.json` |
+| `quantiv.public-model-validation.v1` | `apps/frontend/public/evidence/model-validation.json` |
+| `quantiv.research-snapshot.v1` | `/api/research/screener-snapshot` and `/api/research/symbol-snapshot` |
 
 The schemas intentionally allow additive properties so research payloads can gain optional fields without breaking old clients. Required keys represent the minimum stable contract a consumer can rely on.
 
-`tools/validate_public_contracts.py` checks the committed artifacts against these stable invariants in CI-friendly standard-library Python. The JSON Schema files remain the machine-readable documentation surface for external tooling.
+`tools/validate_public_contracts.py` checks the committed artifacts against these stable invariants in CI-friendly standard-library Python. The existing `pytest scripts tools -q` data-contract job executes `tools/tests/test_validate_public_contracts.py` on every pull request and every push to `main`, so generated public research state cannot silently drift away from its documented contract.
+
+Dynamic content-addressed snapshots are additionally covered by frontend API/E2E tests because their payload is produced on request rather than committed under `public/`.
