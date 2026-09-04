@@ -1,0 +1,61 @@
+.shell :global(header > div.qv-m-pad) {
+  flex-wrap: nowrap;
+}
+
+.shell :global(header nav.qv-m-hide) {
+  flex-shrink: 0;
+}
+
+.shell :global(header nav.qv-m-hide > a) {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Topbar's mobile controls carry inline display declarations, so the generic
+ * qv-d-hide rule cannot reliably suppress them on wider screens. Keep them
+ * definitively hidden until the shell reaches its compact-nav breakpoint. */
+.shell :global(header .qv-d-hide) {
+  display: none !important;
+}
+
+@media (max-width: 1180px) {
+  /* Preserve the primary navigation before auxiliary chrome. The clock and
+   * command-key hint are useful, but never worth forcing a nav label to wrap. */
+  .shell :global(header .mono.tnum.qv-m-hide),
+  .shell :global(header .kbd.qv-m-hide) {
+    display: none !important;
+  }
+
+  .shell :global(header input[placeholder='Jump to ticker']) {
+    width: 156px !important;
+  }
+}
+
+@media (max-width: 1050px) {
+  /* Switch to the compact menu while the full nav still has comfortable
+   * space. Tablet-width layouts should not squeeze five primary links,
+   * search, account controls, and the brand into a terminal-sized header. */
+  .shell :global(header .qv-m-hide) {
+    display: none !important;
+  }
+
+  .shell :global(header button.qv-d-hide) {
+    display: grid !important;
+  }
+
+  .shell :global(header div.qv-d-hide) {
+    display: flex !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .shell :global(header input[placeholder='Jump to ticker']) {
+    width: 130px !important;
+  }
+}
+
+@media (max-width: 380px) {
+  .shell :global(header input[placeholder='Jump to ticker']) {
+    width: 112px !important;
+  }
+}

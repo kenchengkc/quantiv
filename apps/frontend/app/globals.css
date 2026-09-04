@@ -1110,6 +1110,27 @@ tr:hover .qv-m-sticky-cell {
   }
   .qv-week-picker {
     margin-left: 0;
+    width: 100%;
+    min-width: 0;
+  }
+  /* The four labeled choices already cover the complete supported week
+     range. Drop the redundant previous/next arrows on phones, then let the
+     labels share the row instead of widening the page. */
+  .qv-week-picker > :first-child,
+  .qv-week-picker > :last-child {
+    display: none !important;
+  }
+  .qv-week-picker > div {
+    width: 100%;
+    min-width: 0;
+    padding-inline: 0 !important;
+  }
+  .qv-week-picker > div > .chip,
+  .qv-week-picker > .chip:not(:first-child):not(:last-child) {
+    flex: 1 1 0;
+    min-width: 0;
+    padding-inline: 8px !important;
+    white-space: nowrap;
   }
   .qv-m-h1 {
     font-size: 38px !important;
