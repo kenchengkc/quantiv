@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://usequantiv.com/schemas/quantiv.symbol-research.v1.schema.json",
+  "title": "Quantiv Symbol Research v1",
+  "type": "object",
+  "required": ["symbol", "as_of_date", "straddle_features", "earnings_history"],
+  "properties": {
+    "symbol": { "type": "string", "pattern": "^[A-Z][A-Z0-9.\\-]{0,9}$" },
+    "as_of_date": { "type": "string" },
+    "spot_price": { "type": ["number", "null"] },
+    "next_earnings": { "type": ["string", "null"] },
+    "next_earnings_timing": { "type": ["string", "null"] },
+    "expected_move": {
+      "type": ["object", "null"],
+      "properties": {
+        "earnings_date": { "type": ["string", "null"] },
+        "timing": { "type": ["string", "null"] },
+        "expiration": { "type": ["string", "null"] },
+        "dte": { "type": ["number", "null"] },
+        "straddle_pct": { "type": ["number", "null"] },
+        "iv_pct": { "type": ["number", "null"] },
+        "em_ml_pct": { "type": ["number", "null"] },
+        "p10": { "type": ["number", "null"] },
+        "p25": { "type": ["number", "null"] },
+        "p50": { "type": ["number", "null"] },
+        "p75": { "type": ["number", "null"] },
+        "p90": { "type": ["number", "null"] },
+        "model_horizon": { "type": ["number", "null"] },
+        "ml_snapshot_date": { "type": ["string", "null"] }
+      },
+      "additionalProperties": true
+    },
+    "straddle_features": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["expiration", "dte"],
+        "properties": {
+          "expiration": { "type": "string" },
+          "dte": { "type": "number" },
+          "atm_strike": { "type": ["number", "null"] },
+          "atm_iv": { "type": ["number", "null"] },
+          "straddle_mid": { "type": ["number", "null"] },
+          "em_straddle_pct": { "type": ["number", "null"] },
+          "em_iv_pct": { "type": ["number", "null"] }
+        },
+        "additionalProperties": true
+      }
+    },
+    "earnings_history": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["date"],
+        "properties": {
+          "date": { "type": "string" },
+          "timing": { "type": ["string", "null"] },
+          "actual": { "type": ["number", "null"] },
+          "implied": { "type": ["number", "null"] },
+          "implied_quality_status": { "type": ["string", "null"] },
+          "eps_actual": { "type": ["number", "null"] },
+          "eps_estimate": { "type": ["number", "null"] },
+          "eps_surprise_pct": { "type": ["number", "null"] }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}

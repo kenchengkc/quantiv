@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://usequantiv.com/schemas/quantiv.screener.v1.schema.json",
+  "title": "Quantiv Screener v1",
+  "type": "object",
+  "required": ["metadata", "events"],
+  "properties": {
+    "metadata": {
+      "type": "object",
+      "required": ["version", "as_of_date", "event_count"],
+      "properties": {
+        "version": { "const": "v1" },
+        "as_of_date": { "type": "string" },
+        "generated_at": { "type": ["string", "null"] },
+        "event_count": { "type": "integer", "minimum": 0 },
+        "week_starts": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": true
+    },
+    "events": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["ticker", "earnings_date", "timing"],
+        "properties": {
+          "ticker": { "type": "string", "pattern": "^[A-Z][A-Z0-9.\\-]{0,9}$" },
+          "earnings_date": { "type": "string" },
+          "timing": { "type": "string" },
+          "spot_price": { "type": ["number", "null"] },
+          "atm_iv": { "type": ["number", "null"] },
+          "em_straddle_pct": { "type": ["number", "null"] },
+          "em_ml_pct": { "type": ["number", "null"] },
+          "p10": { "type": ["number", "null"] },
+          "p90": { "type": ["number", "null"] },
+          "iv_rank": { "type": ["number", "null"] },
+          "hist_move_avg_4q": { "type": ["number", "null"] },
+          "lead_time_days": { "type": ["number", "null"] },
+          "em_method": { "type": ["string", "null"] }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}
