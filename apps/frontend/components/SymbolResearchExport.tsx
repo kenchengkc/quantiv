@@ -1,14 +1,21 @@
 'use client';
 
+import Link from 'next/link';
 import { useCallback, useMemo, useState } from 'react';
-import { Check, Copy, Download } from 'lucide-react';
+import { Check, Copy, Download, History } from 'lucide-react';
 
 function href(symbol: string, format: 'json' | 'csv'): string {
   const params = new URLSearchParams({ symbol, format });
   return `/api/research/symbol-snapshot?${params.toString()}`;
 }
 
-export default function SymbolResearchExport({ symbol }: { symbol: string }) {
+export default function SymbolResearchExport({
+  symbol,
+  comparableHref,
+}: {
+  symbol: string;
+  comparableHref?: string | null;
+}) {
   const [copied, setCopied] = useState(false);
   const [copying, setCopying] = useState(false);
   const jsonHref = useMemo(() => href(symbol, 'json'), [symbol]);
@@ -72,6 +79,16 @@ export default function SymbolResearchExport({ symbol }: { symbol: string }) {
       >
         Research snapshot
       </span>
+      {comparableHref && (
+        <Link
+          href={comparableHref}
+          style={{ ...style, pointerEvents: 'auto' }}
+          title="Open historical events with a similar pre-earnings implied-move regime and report session"
+        >
+          <History size={11} aria-hidden />
+          Comparable history
+        </Link>
+      )}
       <a href={jsonHref} style={{ ...style, pointerEvents: 'auto' }} title="Download validated symbol research as JSON">
         <Download size={11} aria-hidden />
         JSON
