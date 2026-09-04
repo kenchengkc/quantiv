@@ -212,6 +212,13 @@ export default function ResearchLabClient() {
     setParam({ [key]: String(number / 100) });
   };
 
+  const updateLead = (key: 'minLead' | 'maxLead', raw: string) => {
+    if (!raw.trim()) return setParam({ [key]: null });
+    const number = Number(raw);
+    if (!Number.isFinite(number) || number < 0) return;
+    setParam({ [key]: String(Math.floor(number)) });
+  };
+
   return (
     <div className="qv-m-pad" style={{ maxWidth: 1240, margin: '0 auto', padding: '34px 28px 72px' }}>
       <section style={{ borderBottom: '1px solid var(--line)', paddingBottom: 28 }}>
@@ -285,6 +292,12 @@ export default function ResearchLabClient() {
         </Field>
         <Field label="Max implied %">
           <input type="number" step="0.5" value={maxImpliedPct} onChange={(event) => updatePct('maxImplied', event.target.value)} placeholder="12" style={{ ...controlStyle(), width: 90 }} />
+        </Field>
+        <Field label="Min lead days">
+          <input type="number" min="0" step="1" value={searchParams.get('minLead') ?? ''} onChange={(event) => updateLead('minLead', event.target.value)} placeholder="0" style={{ ...controlStyle(), width: 90 }} />
+        </Field>
+        <Field label="Max lead days">
+          <input type="number" min="0" step="1" value={searchParams.get('maxLead') ?? ''} onChange={(event) => updateLead('maxLead', event.target.value)} placeholder="14" style={{ ...controlStyle(), width: 90 }} />
         </Field>
         <Field label="Sort">
           <select value={searchParams.get('sort') ?? 'date'} onChange={(event) => setParam({ sort: event.target.value === 'date' ? null : event.target.value })} style={controlStyle()}>
