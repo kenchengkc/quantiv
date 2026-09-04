@@ -415,7 +415,7 @@ export function Topbar({ authenticated = false }: { authenticated?: boolean }) {
           )}
         </div>
 
-        {/* Mobile-only hamburger toggle. Hidden on ≥ 641px via .qv-d-hide. */}
+        {/* Compact-navigation toggle. Hidden above 1050px via shell styles. */}
         <button
           type="button"
           aria-label={mobileOpen ? 'Close menu' : 'Open menu'}

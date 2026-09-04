@@ -1,9 +1,9 @@
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Footer } from '@/components/Footer';
-import { ResearchStatusStrip } from '@/components/ResearchStatusStrip';
 import { TickerHoverHost } from '@/components/TickerHoverCard';
 import { Topbar } from '@/components/Topbar';
 import { Providers } from '@/app/providers';
+import styles from './AppShell.module.css';
 
 export function AppShell({
   authenticated,
@@ -15,9 +15,8 @@ export function AppShell({
   return (
     <Providers>
       <ErrorBoundary>
-        <div className="min-h-screen flex flex-col quantiv-app-shell">
+        <div className={`${styles.shell} min-h-screen flex flex-col quantiv-app-shell`}>
           <Topbar authenticated={authenticated} />
-          <ResearchStatusStrip />
           <main className="flex-1">{children}</main>
           <Footer />
         </div>
