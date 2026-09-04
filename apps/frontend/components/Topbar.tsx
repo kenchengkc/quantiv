@@ -19,6 +19,7 @@ const NAV = [
   { href: '/', label: 'Earnings Calendar' },
   { href: '/screener', label: 'Screener' },
   { href: '/watchlist', label: 'Watchlist' },
+  { href: '/validation', label: 'Validation' },
   { href: '/about', label: 'About' },
 ];
 
