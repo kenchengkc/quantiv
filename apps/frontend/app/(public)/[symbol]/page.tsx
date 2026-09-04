@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { notFound } from 'next/navigation';
+import SymbolResearchExport from '@/components/SymbolResearchExport';
 import { companyName, stripLegalSuffix } from '@/lib/companyNames';
 import tickerNames from '../../../public/ticker-names.json';
 import SymbolPageClient from './SymbolPageClient';
@@ -108,10 +109,13 @@ export default async function SymbolPage({ params }: SymbolPageProps) {
   if (!isKnownSymbol(symbol)) notFound();
 
   return (
-    <SymbolPageClient
-      initialSymbol={symbol}
-      initialData={readSymbolPayload(symbol)}
-      initialEvidence={readForecastEvidence()}
-    />
+    <>
+      <SymbolResearchExport symbol={symbol} />
+      <SymbolPageClient
+        initialSymbol={symbol}
+        initialData={readSymbolPayload(symbol)}
+        initialEvidence={readForecastEvidence()}
+      />
+    </>
   );
 }
