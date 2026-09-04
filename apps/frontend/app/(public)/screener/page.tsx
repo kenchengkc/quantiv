@@ -1,6 +1,7 @@
 import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import EarningsScreener from '@/components/EarningsScreener';
+import ScreenerResearchExport from '@/components/ScreenerResearchExport';
 
 export const metadata: Metadata = {
   title: 'Earnings Screener',
@@ -296,6 +297,9 @@ function ScreenerFallback() {
 export default function ScreenerPage() {
   return (
     <div className="qv-m-pad" style={{ maxWidth: 1240, margin: '0 auto', padding: '0 28px 60px' }}>
+      <Suspense fallback={null}>
+        <ScreenerResearchExport />
+      </Suspense>
       <Suspense fallback={<ScreenerFallback />}>
         <EarningsScreener />
       </Suspense>
