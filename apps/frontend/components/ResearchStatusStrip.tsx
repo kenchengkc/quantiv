@@ -31,7 +31,7 @@ function statusColor(status?: Status): string {
 
 function label(status?: Status): string {
   if (!status) return 'unavailable';
-  return status.replaceAll('_', ' ');
+  return status.split('_').join(' ');
 }
 
 function sourceLabel(): string {
