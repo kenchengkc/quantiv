@@ -24,10 +24,18 @@ if str(ML_PACKAGE_ROOT) not in sys.path:
 
 from ml.model_bundle import ModelBundleError, verify_outcome_receipt  # noqa: E402
 
+try:  # package import under pytest / repo-root execution
+    from tools.build_public_validation import build_validation as build_public_validation  # noqa: E402
+except ModuleNotFoundError:  # direct `python tools/build_control_plane_snapshot.py`
+    from build_public_validation import build_validation as build_public_validation  # type: ignore[no-redef]  # noqa: E402
+
 
 OUTPUT_PATH = REPO_ROOT / "apps" / "frontend" / "public" / "control-plane.json"
 HISTORY_OUTPUT_PATH = (
     REPO_ROOT / "apps" / "frontend" / "public" / "control-plane-history.json"
+)
+PUBLIC_VALIDATION_OUTPUT_PATH = (
+    REPO_ROOT / "apps" / "frontend" / "public" / "evidence" / "model-validation.json"
 )
 DEFAULT_HISTORY_LIMIT = 30
 
@@ -464,10 +472,19 @@ def main() -> int:
     )
     _write_json_atomic(args.output, snapshot)
     _write_json_atomic(args.history_output, history)
+
+    # Publish the public due-diligence projection only after the control-plane
+    # snapshot exists, so its current-evidence fields read the same status that
+    # will be committed to the frontend. The builder prefers the active signed
+    # champion bundle pulled from R2 and falls back only in local/preview runs.
+    public_validation = build_public_validation(REPO_ROOT, generated_at=generated_at)
+    _write_json_atomic(PUBLIC_VALIDATION_OUTPUT_PATH, public_validation)
+
     print(
         f"Control plane: {snapshot['status']} · "
         f"{len(snapshot['exceptions'])} exceptions · "
-        f"{len(history['runs'])} retained runs → {args.output}"
+        f"{len(history['runs'])} retained runs → {args.output}; "
+        f"public validation → {PUBLIC_VALIDATION_OUTPUT_PATH}"
     )
     return 0
 
