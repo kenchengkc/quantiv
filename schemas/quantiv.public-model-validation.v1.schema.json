@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quantiv.dev/schemas/quantiv.public-model-validation.v1.schema.json",
+  "title": "Quantiv public model validation v1",
+  "type": "object",
+  "required": ["schema", "generated_at", "model_source", "summary", "horizons", "validation_protocol", "current_evidence"],
+  "properties": {
+    "schema": {"const": "quantiv.public-model-validation.v1"},
+    "generated_at": {"type": "string"},
+    "model_source": {
+      "type": "object",
+      "required": ["kind", "bundle_id", "artifact_sha256"],
+      "properties": {
+        "kind": {"enum": ["signed_champion", "baked_fallback"]},
+        "bundle_id": {"type": ["string", "null"]},
+        "artifact_sha256": {"type": ["string", "null"]}
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": ["supported_horizons", "validation_row_observations", "weighted_model_mae", "weighted_straddle_mae", "weighted_relative_mae_improvement", "weighted_coverage"],
+      "properties": {
+        "supported_horizons": {"type": "array", "items": {"type": "integer"}},
+        "validation_row_observations": {"type": "integer", "minimum": 0},
+        "weighted_model_mae": {"type": "number", "minimum": 0},
+        "weighted_straddle_mae": {"type": "number", "minimum": 0},
+        "weighted_relative_mae_improvement": {"type": "number"},
+        "weighted_coverage": {
+          "type": "object",
+          "required": ["p10", "p25", "p50", "p75", "p90", "interval_50", "interval_80"],
+          "additionalProperties": {"type": "number"}
+        }
+      }
+    },
+    "horizons": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["horizon_days", "n_train", "n_validation", "model_mae", "straddle_baseline_mae", "relative_mae_improvement", "coverage", "quantiles", "model_version"],
+        "properties": {
+          "horizon_days": {"type": "integer", "minimum": 1},
+          "n_train": {"type": "integer", "minimum": 0},
+          "n_validation": {"type": "integer", "minimum": 0},
+          "model_mae": {"type": "number", "minimum": 0},
+          "straddle_baseline_mae": {"type": "number", "minimum": 0},
+          "relative_mae_improvement": {"type": "number"},
+          "coverage": {"type": "object"},
+          "quantiles": {"type": "array", "items": {"type": "number"}},
+          "model_version": {"type": "string"}
+        }
+      }
+    },
+    "validation_protocol": {
+      "type": "object",
+      "required": ["target", "baseline", "chronological_holdout", "walk_forward", "promotion_controls", "decision_scope", "live_trading_eligible"],
+      "properties": {
+        "decision_scope": {"const": "end_of_day_research"},
+        "live_trading_eligible": {"const": false},
+        "chronological_holdout": {"type": "boolean"},
+        "walk_forward": {"type": "object"},
+        "promotion_controls": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "current_evidence": {
+      "type": "object",
+      "required": ["forecast_receipt_id", "forecast_quality", "control_plane_status", "publication_eligible", "data_status", "model_status", "drift_status"],
+      "properties": {
+        "forecast_receipt_id": {"type": ["string", "null"]},
+        "forecast_quality": {"type": ["string", "null"]},
+        "control_plane_status": {"type": ["string", "null"]},
+        "publication_eligible": {"type": ["boolean", "null"]},
+        "data_status": {"type": ["string", "null"]},
+        "model_status": {"type": ["string", "null"]},
+        "drift_status": {"type": ["string", "null"]}
+      }
+    }
+  }
+}
