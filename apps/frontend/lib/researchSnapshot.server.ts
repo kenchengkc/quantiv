@@ -38,7 +38,7 @@ export function researchSnapshotId(body: unknown): string {
 export function csvCell(value: unknown): string {
   if (value == null) return '';
   const text = typeof value === 'object' ? JSON.stringify(value) : String(value);
-  return /[",\n\r]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+  return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
 export function downloadHeaders(
