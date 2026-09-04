@@ -3,20 +3,13 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { notFound } from 'next/navigation';
 import SymbolResearchExport from '@/components/SymbolResearchExport';
+import { buildComparableResearchContext } from '@/lib/comparableResearch.server';
 import { companyName, stripLegalSuffix } from '@/lib/companyNames';
 import tickerNames from '../../../public/ticker-names.json';
 import SymbolPageClient from './SymbolPageClient';
 
 type SymbolPageProps = {
   params: Promise<{ symbol: string }>;
-};
-
-type ComparablePayload = {
-  expected_move?: {
-    straddle_pct?: number | null;
-    timing?: string | null;
-  } | null;
-  next_earnings_timing?: string | null;
 };
 
 const EXTENDED_NAMES = tickerNames as Record<string, string>;
@@ -93,29 +86,6 @@ function descriptionFor(symbol: string, name: string): string {
   return `Track ${label} earnings timing, expected move, options-implied range, volatility context, and historical earnings moves.`;
 }
 
-function comparableResearchHref(payload: unknown): string | null {
-  if (!payload || typeof payload !== 'object') return null;
-  const research = payload as ComparablePayload;
-  const implied = research.expected_move?.straddle_pct;
-  if (typeof implied !== 'number' || !Number.isFinite(implied) || implied <= 0) return null;
-
-  const timing = research.expected_move?.timing ?? research.next_earnings_timing ?? '';
-  const normalizedTiming = timing.toLowerCase();
-  const params = new URLSearchParams({
-    minImplied: String(Number((implied * 0.75).toFixed(6))),
-    maxImplied: String(Number((implied * 1.25).toFixed(6))),
-    sort: 'ratio',
-    dir: 'desc',
-    limit: '100',
-  });
-  if (normalizedTiming.includes('before') || normalizedTiming === 'bmo') {
-    params.set('timing', 'bmo');
-  } else if (normalizedTiming.includes('after') || normalizedTiming === 'amc') {
-    params.set('timing', 'amc');
-  }
-  return `/research?${params.toString()}`;
-}
-
 export async function generateMetadata({ params }: SymbolPageProps): Promise<Metadata> {
   const { symbol: rawSymbol } = await params;
   const symbol = normalizeSymbol(rawSymbol);
@@ -139,13 +109,11 @@ export default async function SymbolPage({ params }: SymbolPageProps) {
   const symbol = normalizeSymbol(rawSymbol);
   if (!isKnownSymbol(symbol)) notFound();
   const initialData = readSymbolPayload(symbol);
+  const comparableContext = buildComparableResearchContext(initialData);
 
   return (
     <>
-      <SymbolResearchExport
-        symbol={symbol}
-        comparableHref={comparableResearchHref(initialData)}
-      />
+      <SymbolResearchExport symbol={symbol} comparableContext={comparableContext} />
       <SymbolPageClient
         initialSymbol={symbol}
         initialData={initialData}
