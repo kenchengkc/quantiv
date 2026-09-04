@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quantiv.dev/schemas/quantiv.research-snapshot.v1.schema.json",
+  "title": "Quantiv research snapshot v1",
+  "type": "object",
+  "required": ["schema", "kind", "source", "decision_scope", "live_trading_eligible", "live_quote_overlay_included", "snapshot_id"],
+  "properties": {
+    "schema": {"const": "quantiv.research-snapshot.v1"},
+    "kind": {"enum": ["earnings_screener", "symbol_research"]},
+    "snapshot_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "decision_scope": {"const": "end_of_day_research"},
+    "live_trading_eligible": {"const": false},
+    "live_quote_overlay_included": {"const": false},
+    "source": {
+      "type": "object",
+      "required": ["forecast_receipt_id", "control_status", "publication_eligible"],
+      "properties": {
+        "forecast_receipt_id": {"type": ["string", "null"]},
+        "forecast_validated_at": {"type": ["string", "null"]},
+        "forecast_quality": {"type": ["string", "null"]},
+        "control_generated_at": {"type": ["string", "null"]},
+        "control_status": {"type": ["string", "null"]},
+        "publication_eligible": {"type": ["boolean", "null"]}
+      }
+    },
+    "query": {"type": "object"},
+    "result_count": {"type": "integer", "minimum": 0},
+    "events": {"type": "array", "items": {"type": "object"}},
+    "symbol": {"type": "string", "pattern": "^[A-Z][A-Z0-9.\\-]{0,9}$"},
+    "spot_updated_prediction_included": {"const": false},
+    "research": {"type": "object"}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"kind": {"const": "earnings_screener"}}},
+      "then": {"required": ["query", "result_count", "events"]}
+    },
+    {
+      "if": {"properties": {"kind": {"const": "symbol_research"}}},
+      "then": {"required": ["symbol", "spot_updated_prediction_included", "research"]}
+    }
+  ]
+}
