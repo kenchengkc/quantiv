@@ -20,6 +20,18 @@ function ratio(value: number | null | undefined): string {
   return `${value.toFixed(2)}x`;
 }
 
+function leadLabel(context: ComparableResearchContext): string {
+  if (context.minLead != null && context.maxLead != null) {
+    return context.minLead === context.maxLead
+      ? `T${context.minLead}`
+      : `T${context.minLead}–${context.maxLead}`;
+  }
+  if (context.currentLeadDays != null) {
+    return `T${context.currentLeadDays} · lead unmatched`;
+  }
+  return 'lead unrestricted';
+}
+
 export default function SymbolResearchExport({
   symbol,
   comparableContext,
@@ -68,8 +80,8 @@ export default function SymbolResearchExport({
   };
 
   const contextTitle = comparableContext && comparableSummary
-    ? `${comparableSummary.events} eligible historical events across ${comparableSummary.symbols} symbols. Median realized move ${pct(comparableSummary.medianRealized, 1)}; median realized/implied ${ratio(comparableSummary.medianRatio)}; ${pct(comparableSummary.outsideRate)} exceeded the priced move. Same report session when known and a ±25% band around the current ${pct(comparableContext.currentImplied, 1)} straddle-implied move.`
-    : 'Open historical events with a similar pre-earnings implied-move regime and report session';
+    ? `${comparableSummary.events} eligible historical events across ${comparableSummary.symbols} symbols. Median realized move ${pct(comparableSummary.medianRealized, 1)}; median realized/implied ${ratio(comparableSummary.medianRatio)}; ${pct(comparableSummary.outsideRate)} exceeded the priced move. Same report session when known, a ±25% band around the current ${pct(comparableContext.currentImplied, 1)} straddle-implied move, and ${leadLabel(comparableContext)} lead-time matching when supported by the historical evidence window.`
+    : 'Open historical events with a similar pre-earnings implied-move regime, report session, and observation lead time';
 
   return (
     <div
@@ -118,8 +130,8 @@ export default function SymbolResearchExport({
                 paddingRight: 3,
               }}
             >
-              {comparableSummary.events} obs · {ratio(comparableSummary.medianRatio)} med ·{' '}
-              {pct(comparableSummary.outsideRate)} outside
+              {leadLabel(comparableContext)} · {comparableSummary.events} obs ·{' '}
+              {ratio(comparableSummary.medianRatio)} med · {pct(comparableSummary.outsideRate)} outside
             </span>
           )}
         </>

@@ -59,6 +59,32 @@ Current filters are:
 
 The browser keeps these filters in the URL so a cohort view can be shared exactly.
 
+## Current-event comparable cohorts
+
+Ticker pages can seed Research Lab directly from the current event's static end-of-day option evidence. The comparable definition is intentionally transparent rather than a learned similarity score.
+
+For a current event with straddle-implied move `M`, Quantiv uses:
+
+1. the same report session when BMO/AMC is known;
+2. historical implied moves in `[0.75M, 1.25M]`;
+3. the same observation lead-time bucket when the current mark is within the historical evidence window.
+
+Lead-time buckets are:
+
+| Current observation | Historical filter |
+|---|---|
+| T0–T1 | `minLead=0&maxLead=1` |
+| T2–T3 | `minLead=2&maxLead=3` |
+| T4–T7 | `minLead=4&maxLead=7` |
+| T8–T14 | `minLead=8&maxLead=14` |
+| Beyond T14 | no lead filter; UI marks lead as unmatched |
+
+The T14 boundary is not arbitrary. Historical option evidence is selected from the final 14 calendar days before each event, so longer-dated current observations do not have like-for-like historical lead-time evidence in this contract. Quantiv therefore does not fabricate a match beyond that boundary.
+
+The ticker page summarizes the full matching cohort—not merely the first displayed rows—with event/symbol count, median realized move, median realized/implied ratio, and the share of events that exceeded the priced range. The full cohort remains encoded in the Research Lab URL and can be exported/content-addressed there.
+
+Comparable context is descriptive historical calibration only. It does not feed back into the current forecast, change an ML score, or use the fresh stock-quote overlay.
+
 ## Diagnostics
 
 The API computes summaries over the full matching cohort before applying the returned-row display limit:
