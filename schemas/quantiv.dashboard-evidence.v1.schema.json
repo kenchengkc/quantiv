@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://usequantiv.com/schemas/quantiv.dashboard-evidence.v1.schema.json",
+  "title": "Quantiv Dashboard Evidence v1",
+  "type": "object",
+  "required": ["schema", "receipt_id", "validated_at", "quality", "coverage", "controls", "artifact_bundles"],
+  "properties": {
+    "schema": { "const": "quantiv.dashboard-evidence.v1" },
+    "receipt_id": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "receipt_file": { "type": "string" },
+    "validated_at": { "type": "string" },
+    "quality": {
+      "type": "object",
+      "required": ["status", "issue_count", "issue_codes"],
+      "properties": {
+        "status": { "type": "string" },
+        "issue_count": { "type": "integer", "minimum": 0 },
+        "issue_codes": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": true
+    },
+    "coverage": {
+      "type": "object",
+      "required": ["rows", "symbols", "events", "horizons"],
+      "properties": {
+        "rows": { "type": "integer", "minimum": 0 },
+        "symbols": { "type": "integer", "minimum": 0 },
+        "events": { "type": "integer", "minimum": 0 },
+        "horizons": { "type": "array", "items": { "type": "integer", "minimum": 1 } }
+      },
+      "additionalProperties": true
+    },
+    "observation_window": { "type": "object", "additionalProperties": true },
+    "controls": {
+      "type": "object",
+      "required": ["evaluated", "exceptions", "results"],
+      "properties": {
+        "evaluated": { "type": "integer", "minimum": 0 },
+        "exceptions": { "type": "integer", "minimum": 0 },
+        "results": { "type": "object", "additionalProperties": true }
+      },
+      "additionalProperties": true
+    },
+    "artifact_bundles": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "producer", "member_count", "bytes", "sha256"],
+        "properties": {
+          "name": { "type": "string" },
+          "producer": { "type": "string" },
+          "member_count": { "type": "integer", "minimum": 0 },
+          "bytes": { "type": "integer", "minimum": 0 },
+          "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}
