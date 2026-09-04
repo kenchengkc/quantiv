@@ -44,6 +44,12 @@ export function Footer() {
             flexWrap: 'wrap',
           }}
         >
+          <Link href="/research" style={{ color: 'inherit' }}>
+            Research Lab
+          </Link>
+          <Link href="/validation" style={{ color: 'inherit' }}>
+            Validation
+          </Link>
           <Link href="/about" style={{ color: 'inherit' }}>
             About
           </Link>
