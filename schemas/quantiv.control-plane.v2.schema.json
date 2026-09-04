@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://usequantiv.com/schemas/quantiv.control-plane.v2.schema.json",
+  "title": "Quantiv Control Plane v2",
+  "type": "object",
+  "required": ["schema", "generated_at", "status", "publication_eligible", "data", "model", "release", "exceptions"],
+  "properties": {
+    "schema": { "const": "quantiv.control-plane.v2" },
+    "generated_at": { "type": "string" },
+    "status": { "type": "string" },
+    "publication_eligible": { "type": "boolean" },
+    "data": {
+      "type": "object",
+      "required": ["status", "live_trading_eligible"],
+      "properties": {
+        "status": { "type": "string" },
+        "source_date": { "type": ["string", "null"] },
+        "expected_source_date": { "type": ["string", "null"] },
+        "event_coverage_pct": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+        "contracts": { "type": ["number", "null"], "minimum": 0 },
+        "eligible_contracts": { "type": ["number", "null"], "minimum": 0 },
+        "decision_scope": { "type": ["string", "null"] },
+        "live_trading_eligible": { "type": "boolean" },
+        "quarantine_records": { "type": ["number", "null"], "minimum": 0 },
+        "quarantine_status": { "type": "string" },
+        "replay_status": { "type": "string" },
+        "corporate_action_status": { "type": "string" },
+        "duplicate_rows": { "type": ["number", "null"], "minimum": 0 }
+      },
+      "additionalProperties": true
+    },
+    "model": {
+      "type": "object",
+      "required": ["status", "champion_active", "challenger_present", "drift_status"],
+      "properties": {
+        "status": { "type": "string" },
+        "champion_active": { "type": "boolean" },
+        "challenger_present": { "type": "boolean" },
+        "drift_status": { "type": "string" },
+        "critical_features": { "type": ["number", "null"], "minimum": 0 },
+        "warning_features": { "type": ["number", "null"], "minimum": 0 },
+        "hard_missing_features": { "type": ["number", "null"], "minimum": 0 },
+        "fallback_bundle_available": { "type": "boolean" },
+        "shadow_roles": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": true
+    },
+    "release": { "type": "object", "additionalProperties": { "type": "string" } },
+    "exceptions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["code", "severity", "summary"],
+        "properties": {
+          "code": { "type": "string" },
+          "severity": { "type": "string" },
+          "summary": { "type": "string" },
+          "count": { "type": ["number", "null"], "minimum": 0 }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}
