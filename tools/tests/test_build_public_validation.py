@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from tools.build_public_validation import HORIZONS, build_validation
 
 
@@ -78,10 +80,10 @@ def test_build_validation_uses_baked_fallback(tmp_path: Path) -> None:
         "artifact_sha256": "sha256:model",
     }
     assert payload["summary"]["validation_row_observations"] == 180
-    assert payload["summary"]["weighted_model_mae"] == 0.04
-    assert payload["summary"]["weighted_straddle_mae"] == 0.06
-    assert payload["summary"]["weighted_relative_mae_improvement"] == 1 / 3
-    assert payload["summary"]["weighted_coverage"]["interval_80"] == 0.8
+    assert payload["summary"]["weighted_model_mae"] == pytest.approx(0.04)
+    assert payload["summary"]["weighted_straddle_mae"] == pytest.approx(0.06)
+    assert payload["summary"]["weighted_relative_mae_improvement"] == pytest.approx(1 / 3)
+    assert payload["summary"]["weighted_coverage"]["interval_80"] == pytest.approx(0.8)
     assert payload["current_evidence"]["publication_eligible"] is True
     assert payload["validation_protocol"]["live_trading_eligible"] is False
 
@@ -107,8 +109,8 @@ def test_build_validation_prefers_active_champion_bundle(tmp_path: Path) -> None
 
     assert payload["model_source"]["kind"] == "signed_champion"
     assert payload["model_source"]["bundle_id"] == champion
-    assert payload["summary"]["weighted_model_mae"] == 0.03
-    assert payload["summary"]["weighted_relative_mae_improvement"] == 0.5
+    assert payload["summary"]["weighted_model_mae"] == pytest.approx(0.03)
+    assert payload["summary"]["weighted_relative_mae_improvement"] == pytest.approx(0.5)
 
 
 def test_build_validation_fails_when_horizon_metadata_is_missing(tmp_path: Path) -> None:
@@ -119,9 +121,5 @@ def test_build_validation_fails_when_horizon_metadata_is_missing(tmp_path: Path)
         )
     _write_common_public_evidence(tmp_path)
 
-    try:
+    with pytest.raises(FileNotFoundError, match="metadata_T21.json"):
         build_validation(tmp_path)
-    except FileNotFoundError as exc:
-        assert "metadata_T21.json" in str(exc)
-    else:
-        raise AssertionError("missing horizon metadata must fail closed")
