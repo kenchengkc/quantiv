@@ -1,5 +1,8 @@
 import { expect, test } from '@playwright/test';
 
+// This path intentionally starts from a real event-specific symbol payload so
+// the test proves the current static research state—not a live quote overlay—
+// is what seeds the comparable historical cohort.
 test('ticker research links into a comparable historical cohort', async ({ page }) => {
   await page.goto('/AVGO');
 
