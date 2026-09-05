@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import type { ReactNode } from 'react';
 import { Download } from 'lucide-react';
 import { MetricHelp } from '@/components/MetricExplainer';
 import type { SymbolDetail } from './symbolPageTypes';
@@ -243,9 +244,11 @@ type DirectionCohort = 'all' | 'up' | 'down';
 export function HistoryBlock({
   history: completeHistory,
   symbol,
+  relatedResearch,
 }: {
   history: HistoryPoint[];
   symbol: string;
+  relatedResearch?: ReactNode;
 }) {
   const [hovered, setHovered] = useState<number | null>(null);
   const [windowSize, setWindowSize] = useState<8 | 'all'>(8);
@@ -323,9 +326,10 @@ export function HistoryBlock({
           alignItems: 'flex-start',
           marginBottom: 8,
           gap: 16,
+          flexWrap: 'wrap',
         }}
       >
-        <div>
+        <div style={{ flex: '1 1 360px', minWidth: 0 }}>
           <span
             className="qv-pill"
             style={{
@@ -897,6 +901,11 @@ export function HistoryBlock({
           </span>
         )}
       </div>
+      {relatedResearch && (
+        <div style={{ marginTop: 18, paddingTop: 14, borderTop: '1px solid var(--line)' }}>
+          {relatedResearch}
+        </div>
+      )}
     </div>
   );
 }
