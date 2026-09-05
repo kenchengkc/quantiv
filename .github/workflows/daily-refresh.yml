@@ -111,6 +111,11 @@ jobs:
         run: bash scripts/r2_pull.sh
 
       - name: Sync latest options chain from DoltHub
+        id: options_sync
+        # A provider outage must not hide healthy earnings/OHLCV updates. The
+        # reconciliation/finalization steps below decide whether a fresh options
+        # candidate can be promoted or whether the last validated snapshot stays active.
+        continue-on-error: true
         run: python scripts/sync_dolthub.py
 
       - name: Sync earnings calendar
@@ -294,13 +299,22 @@ jobs:
       - name: Rebuild DuckDB views
         run: python scripts/setup_duckdb_from_parquet.py
 
-      - name: Gate — verify data freshness before scoring
+      - name: Gate — verify candidate data freshness before scoring
+        id: candidate_freshness
+        # Let reconciliation classify an options-only freshness failure so it can
+        # fall back safely. Non-options critical failures are still made fatal by
+        # options_snapshot_resilience.py.
+        continue-on-error: true
         # Fails the workflow if any core view is empty, too stale, or has
         # duplicate rows. Prevents pushing a bad weekly.json to prod when
         # an upstream sync silently broke.
         run: python scripts/check_duckdb_freshness.py --strict --max-lag-days 5
 
-      - name: Build reconciliation control manifest
+      - name: Build candidate reconciliation control manifest
+        id: candidate_reconciliation
+        # Strict still records a failed candidate as nonzero; the next step only
+        # softens the known options-source failures and rejects every other critical.
+        continue-on-error: true
         # Reuses the local DuckDB views and checked-in mapping files. This is
         # an exception-first JSON artifact, not a Redis/Neon control table.
         # Critical exceptions fail closed; known instrumentation gaps remain
@@ -321,6 +335,41 @@ jobs:
           if-no-files-found: ignore
           retention-days: 30
 
+      - name: Finalize options snapshot decision
+        id: options_gate
+        run: |
+          python scripts/options_snapshot_resilience.py \
+            --manifest data/validation/data_reconciliation.json \
+            --data-dir data \
+            --sync-outcome "${{ steps.options_sync.outcome }}" \
+            --github-output "$GITHUB_OUTPUT"
+
+      - name: Restore validated fallback after rejected options candidate
+        if: steps.options_gate.outputs.can_score != 'true'
+        run: |
+          # The rejected candidate has been moved out of data/parquet. Rebuild
+          # views and corporate-action controls against the last validated options
+          # snapshot, then publish a non-strict manifest that makes the degraded
+          # source state explicit without blocking unrelated dataset promotion.
+          python scripts/setup_duckdb_from_parquet.py
+          python scripts/sync_dolthub.py --corporate-actions
+          python scripts/setup_duckdb_from_parquet.py
+          python scripts/build_data_reconciliation.py \
+            --max-lag-days 5 \
+            --days-ahead 21 \
+            --report data/validation/data_reconciliation.json
+
+      - name: Upload options snapshot decision
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: options-snapshot-decision
+          path: |
+            data/validation/options_snapshot_status.json
+            data/quarantine/options_candidates
+          if-no-files-found: ignore
+          retention-days: 30
+
       # Publication happens only after source counts, hashes, replay,
       # quote quality, quarantine, freshness, and event coverage pass.
       - name: Promote reconciled parquet and controls to R2
@@ -329,9 +378,11 @@ jobs:
         run: bash scripts/r2_push.sh --skip-forecasts
 
       - name: Score upcoming earnings
+        if: steps.options_gate.outputs.can_score == 'true'
         run: python scripts/daily_score.py --days-ahead 21
 
       - name: Gate — validate scored ML and IV forecasts
+        if: steps.options_gate.outputs.can_score == 'true'
         # Fail before Neon/R2/frontend publication when forecast magnitudes,
         # quantiles, feature schemas, IV math, or model handoffs are corrupt.
         # The receipt is stored beside the existing forecast artifacts, so the
@@ -351,6 +402,7 @@ jobs:
           retention-days: 14
 
       - name: Monitor champion, shadows, and feature drift
+        if: steps.options_gate.outputs.can_score == 'true'
         # A compact signed Parquet ledger in R2 replaces a new Redis/Neon
         # workload. Critical feature drift fails before forecast publication.
         env:
@@ -363,6 +415,7 @@ jobs:
           fi
 
       - name: Import recent forecasts to Neon Postgres
+        if: steps.options_gate.outputs.can_score == 'true'
         id: neon_import
         # Pushes the newest forecast snapshot into the em_forecasts table
         # the Railway-hosted FastAPI backend reads from. The script is a
@@ -381,6 +434,7 @@ jobs:
         run: python -u scripts/import_recent_to_postgres.py --full
 
       - name: Push forecasts to R2
+        if: steps.options_gate.outputs.can_score == 'true'
         # daily_score runs after the first r2_push — without this step new
         # forecasts_YYYY-MM-DD.parquet never leaves the runner (May 2026 bug).
         env:
@@ -414,6 +468,7 @@ jobs:
         run: python -u tools/build_popular_weights.py
 
       - name: Build frontend JSON
+        if: steps.options_gate.outputs.can_score == 'true'
         env:
           # Only TWELVEDATA_API_KEY needs to be configured as a GitHub secret.
           # The remaining values pin the Basic-tier defaults so repo variables
@@ -433,9 +488,9 @@ jobs:
         # hash-free status artifact for the protected ML status page.
         env:
           CONTROL_DATA_R2_STATUS: passed
-          CONTROL_FORECAST_R2_STATUS: passed
-          CONTROL_FRONTEND_PAYLOAD_STATUS: passed
-          CONTROL_NEON_IMPORT_STATUS: ${{ steps.neon_import.outcome }}
+          CONTROL_FORECAST_R2_STATUS: ${{ steps.options_gate.outputs.can_score == 'true' && 'passed' || 'degraded' }}
+          CONTROL_FRONTEND_PAYLOAD_STATUS: ${{ steps.options_gate.outputs.can_score == 'true' && 'passed' || 'degraded' }}
+          CONTROL_NEON_IMPORT_STATUS: ${{ steps.options_gate.outputs.can_score == 'true' && steps.neon_import.outcome || 'degraded' }}
         run: python -u tools/build_control_plane_snapshot.py
 
       - name: Refresh ticker names if DoltHub introduced new tickers
