@@ -3,23 +3,35 @@
 import Link from 'next/link';
 import { useCallback, useMemo, useState } from 'react';
 import { Check, Copy, Download, History } from 'lucide-react';
+import type { ComparableResearchContext } from '@/lib/comparableResearch';
 
 function href(symbol: string, format: 'json' | 'csv'): string {
   const params = new URLSearchParams({ symbol, format });
   return `/api/research/symbol-snapshot?${params.toString()}`;
 }
 
+function pct(value: number | null | undefined, digits = 0): string {
+  if (value == null || !Number.isFinite(value)) return '—';
+  return `${(value * 100).toFixed(digits)}%`;
+}
+
+function ratio(value: number | null | undefined): string {
+  if (value == null || !Number.isFinite(value)) return '—';
+  return `${value.toFixed(2)}x`;
+}
+
 export default function SymbolResearchExport({
   symbol,
-  comparableHref,
+  comparableContext,
 }: {
   symbol: string;
-  comparableHref?: string | null;
+  comparableContext?: ComparableResearchContext | null;
 }) {
   const [copied, setCopied] = useState(false);
   const [copying, setCopying] = useState(false);
   const jsonHref = useMemo(() => href(symbol, 'json'), [symbol]);
   const csvHref = useMemo(() => href(symbol, 'csv'), [symbol]);
+  const comparableSummary = comparableContext?.summary;
 
   const copyId = useCallback(async () => {
     if (copying) return;
@@ -55,6 +67,10 @@ export default function SymbolResearchExport({
     whiteSpace: 'nowrap' as const,
   };
 
+  const contextTitle = comparableContext && comparableSummary
+    ? `${comparableSummary.events} eligible historical events across ${comparableSummary.symbols} symbols. Median realized move ${pct(comparableSummary.medianRealized, 1)}; median realized/implied ${ratio(comparableSummary.medianRatio)}; ${pct(comparableSummary.outsideRate)} exceeded the priced move. Same report session when known and a ±25% band around the current ${pct(comparableContext.currentImplied, 1)} straddle-implied move.`
+    : 'Open historical events with a similar pre-earnings implied-move regime and report session';
+
   return (
     <div
       className="qv-m-pad"
@@ -79,15 +95,34 @@ export default function SymbolResearchExport({
       >
         Research snapshot
       </span>
-      {comparableHref && (
-        <Link
-          href={comparableHref}
-          style={{ ...style, pointerEvents: 'auto' }}
-          title="Open historical events with a similar pre-earnings implied-move regime and report session"
-        >
-          <History size={11} aria-hidden />
-          Comparable history
-        </Link>
+      {comparableContext && (
+        <>
+          <Link
+            href={comparableContext.href}
+            style={{ ...style, pointerEvents: 'auto' }}
+            title={contextTitle}
+          >
+            <History size={11} aria-hidden />
+            Comparable history
+          </Link>
+          {comparableSummary && comparableSummary.events > 0 && (
+            <span
+              className="mono qv-m-hide"
+              title={contextTitle}
+              aria-label="Comparable historical calibration summary"
+              style={{
+                pointerEvents: 'auto',
+                fontSize: 9.5,
+                color: 'var(--ink-4)',
+                whiteSpace: 'nowrap',
+                paddingRight: 3,
+              }}
+            >
+              {comparableSummary.events} obs · {ratio(comparableSummary.medianRatio)} med ·{' '}
+              {pct(comparableSummary.outsideRate)} outside
+            </span>
+          )}
+        </>
       )}
       <a href={jsonHref} style={{ ...style, pointerEvents: 'auto' }} title="Download validated symbol research as JSON">
         <Download size={11} aria-hidden />
