@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Finalize a nightly options candidate without weakening quote-quality gates.
 
-The daily refresh intentionally evaluates the newest local options partition before
-R2 promotion. If the reconciliation failure is confined to upstream options
-freshness/coverage/quote quality, this script quarantines the candidate and restores
-the prior validated local partition so healthy non-options datasets can continue
-through the release pipeline.
+The daily refresh evaluates newly synced local options partitions before R2
+promotion. If reconciliation fails only on options freshness, event coverage,
+or quote quality, every options partition newer than the currently published R2
+data release is quarantined and the last published options snapshot remains
+active. Healthy non-options datasets can then continue through publication.
 
 Unrelated critical reconciliation failures remain fatal. This is a blast-radius
 control, not a threshold override.
@@ -39,6 +39,7 @@ class FinalizationResult:
     active_source_date: str | None
     candidate_source_date: str | None
     critical_codes: tuple[str, ...]
+    quarantined_source_dates: tuple[str, ...] = ()
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -56,18 +57,48 @@ def _atomic_json(path: Path, payload: dict[str, Any]) -> None:
     os.replace(temporary, path)
 
 
+def _parse_partition_date(value: str) -> str | None:
+    try:
+        datetime.strptime(value, "%Y-%m-%d")
+    except ValueError:
+        return None
+    return value
+
+
 def _option_partitions(data_dir: Path) -> dict[str, Path]:
     root = data_dir / "parquet" / "options_chain"
     result: dict[str, Path] = {}
     if not root.exists():
         return result
     for path in root.glob("year=*/month=*/*.parquet"):
-        try:
-            datetime.strptime(path.stem, "%Y-%m-%d")
-        except ValueError:
-            continue
-        result[path.stem] = path
+        source_date = _parse_partition_date(path.stem)
+        if source_date:
+            result[source_date] = path
     return result
+
+
+def _published_options_date(data_dir: Path) -> str | None:
+    """Return the newest options date in the atomically published R2 release."""
+    pointer_path = data_dir / "control" / "current_data_release.json"
+    pointer = _read_json(pointer_path)
+    manifest_value = pointer.get("manifest")
+    if not manifest_value:
+        return None
+
+    manifest = _read_json(data_dir / str(manifest_value))
+    dates: list[str] = []
+    for item in manifest.get("files") or []:
+        if not isinstance(item, dict):
+            continue
+        relative = str(item.get("path") or "")
+        if not relative.startswith("parquet/options_chain/") or not relative.endswith(
+            ".parquet"
+        ):
+            continue
+        source_date = _parse_partition_date(Path(relative).stem)
+        if source_date:
+            dates.append(source_date)
+    return max(dates) if dates else None
 
 
 def _manifest_source_date(manifest: dict[str, Any]) -> str | None:
@@ -99,14 +130,19 @@ def _write_github_outputs(path: Path | None, result: FinalizationResult) -> None
         handle.write(f"candidate_source_date={result.candidate_source_date or ''}\n")
 
 
-def _update_sync_metadata(data_dir: Path, active_date: str | None, candidate_date: str | None) -> None:
+def _update_sync_metadata(
+    data_dir: Path,
+    active_date: str,
+    candidate_date: str | None,
+) -> None:
     path = data_dir / "sync_metadata.json"
     payload = _read_json(path)
-    if active_date:
-        payload["last_sync_date"] = active_date
+    payload["last_sync_date"] = active_date
     payload["last_options_candidate_date"] = candidate_date
     payload["last_options_candidate_status"] = "rejected"
-    payload["last_options_candidate_finalized_at"] = datetime.now(timezone.utc).isoformat()
+    payload["last_options_candidate_finalized_at"] = datetime.now(
+        timezone.utc
+    ).isoformat()
     _atomic_json(path, payload)
 
 
@@ -118,6 +154,7 @@ def _status_payload(
     active_date: str | None,
     candidate_date: str | None,
     critical_codes: tuple[str, ...],
+    quarantined_source_dates: tuple[str, ...] = (),
     quarantine_dir: Path | None = None,
 ) -> dict[str, Any]:
     return {
@@ -129,13 +166,68 @@ def _status_payload(
         "candidate_source_date": candidate_date,
         "candidate_manifest_id": manifest.get("manifest_id"),
         "critical_codes": list(critical_codes),
+        "quarantined_source_dates": list(quarantined_source_dates),
         "candidate_quarantine": str(quarantine_dir) if quarantine_dir else None,
         "policy": {
             "thresholds_changed": False,
             "scoring_allowed": state == "accepted",
-            "fallback_mode": "last_validated_snapshot" if state == "fallback" else None,
+            "fallback_mode": "last_published_snapshot" if state == "fallback" else None,
         },
     }
+
+
+def _remove_empty_partition_dirs(path: Path) -> None:
+    for parent in (path.parent, path.parent.parent):
+        try:
+            parent.rmdir()
+        except OSError:
+            pass
+
+
+def _quarantine_unpublished_partitions(
+    *,
+    data_dir: Path,
+    manifest_path: Path,
+    manifest: dict[str, Any],
+    published_date: str,
+    candidate_date: str | None,
+) -> tuple[Path | None, tuple[str, ...]]:
+    partitions = _option_partitions(data_dir)
+    unpublished_dates = tuple(sorted(date for date in partitions if date > published_date))
+    if not unpublished_dates:
+        return None, ()
+
+    safe_manifest_id = str(manifest.get("manifest_id") or "unidentified").replace(
+        ":", "-"
+    )
+    quarantine_dir = (
+        data_dir
+        / "quarantine"
+        / "options_candidates"
+        / (candidate_date or unpublished_dates[-1])
+        / safe_manifest_id
+    )
+    quarantine_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(manifest_path, quarantine_dir / "reconciliation.json")
+
+    for source_date in unpublished_dates:
+        partition = partitions[source_date]
+        shutil.copy2(partition, quarantine_dir / f"options-{source_date}.parquet")
+
+        ingestion_path = (
+            data_dir / "control" / "ingestion" / "options" / f"{source_date}.json"
+        )
+        if ingestion_path.exists():
+            shutil.copy2(
+                ingestion_path,
+                quarantine_dir / f"ingestion-{source_date}.json",
+            )
+            ingestion_path.unlink()
+
+        partition.unlink()
+        _remove_empty_partition_dirs(partition)
+
+    return quarantine_dir, unpublished_dates
 
 
 def finalize_snapshot(
@@ -150,12 +242,10 @@ def finalize_snapshot(
         raise RuntimeError(f"reconciliation manifest unavailable: {manifest_path}")
 
     critical_codes = _critical_codes(manifest)
-    candidate_date = _manifest_source_date(manifest)
     partitions = _option_partitions(data_dir)
     latest_local = max(partitions) if partitions else None
-    if candidate_date is None:
-        candidate_date = latest_local
-
+    candidate_date = _manifest_source_date(manifest) or latest_local
+    published_date = _published_options_date(data_dir)
     decision_safe = bool((manifest.get("quality") or {}).get("decision_safe"))
     status_path = data_dir / "validation" / "options_snapshot_status.json"
 
@@ -188,7 +278,7 @@ def finalize_snapshot(
         result = FinalizationResult(
             state="blocked",
             can_score=False,
-            active_source_date=latest_local,
+            active_source_date=published_date,
             candidate_source_date=candidate_date,
             critical_codes=critical_codes,
         )
@@ -209,58 +299,38 @@ def finalize_snapshot(
             + ", ".join(unexpected)
         )
 
-    # If the sync itself succeeded, the newest local partition is the candidate
-    # that was just evaluated. Quarantine it before restoring the prior active
-    # date. A source-sync failure has no new partition to remove; in that case
-    # the already-published local snapshot remains the fallback.
-    quarantine_dir: Path | None = None
-    if sync_outcome.lower() in {"success", "passed", "succeeded"} and candidate_date:
-        candidate_path = partitions.get(candidate_date)
-        prior_dates = sorted(value for value in partitions if value < candidate_date)
-        if candidate_path is not None and prior_dates:
-            safe_manifest_id = str(manifest.get("manifest_id") or "unidentified").replace(":", "-")
-            quarantine_dir = (
-                data_dir
-                / "quarantine"
-                / "options_candidates"
-                / candidate_date
-                / safe_manifest_id
-            )
-            quarantine_dir.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(candidate_path, quarantine_dir / "candidate.parquet")
-            shutil.copy2(manifest_path, quarantine_dir / "reconciliation.json")
+    if published_date is None:
+        raise RuntimeError(
+            "options candidate failed reconciliation and no published data-release "
+            "options snapshot exists for fallback"
+        )
+    if published_date not in partitions:
+        raise RuntimeError(
+            f"published options snapshot {published_date} is missing locally; refusing fallback"
+        )
 
-            ingestion_path = (
-                data_dir / "control" / "ingestion" / "options" / f"{candidate_date}.json"
-            )
-            if ingestion_path.exists():
-                shutil.copy2(ingestion_path, quarantine_dir / "ingestion.json")
-                ingestion_path.unlink()
+    quarantine_dir, quarantined_dates = _quarantine_unpublished_partitions(
+        data_dir=data_dir,
+        manifest_path=manifest_path,
+        manifest=manifest,
+        published_date=published_date,
+        candidate_date=candidate_date,
+    )
 
-            candidate_path.unlink()
-            # Remove empty hive directories left by the rejected candidate.
-            for parent in (candidate_path.parent, candidate_path.parent.parent):
-                try:
-                    parent.rmdir()
-                except OSError:
-                    pass
-            partitions = _option_partitions(data_dir)
-        elif candidate_path is not None and not prior_dates:
-            raise RuntimeError(
-                "options candidate failed reconciliation and no prior local snapshot exists for fallback"
-            )
+    remaining = _option_partitions(data_dir)
+    if max(remaining, default=None) != published_date:
+        raise RuntimeError(
+            "options fallback did not restore the published snapshot as the newest local partition"
+        )
 
-    active_date = max(partitions) if partitions else None
-    if active_date is None:
-        raise RuntimeError("options fallback requested but no validated local snapshot remains")
-
-    _update_sync_metadata(data_dir, active_date, candidate_date)
+    _update_sync_metadata(data_dir, published_date, candidate_date)
     result = FinalizationResult(
         state="fallback",
         can_score=False,
-        active_source_date=active_date,
+        active_source_date=published_date,
         candidate_source_date=candidate_date,
         critical_codes=critical_codes,
+        quarantined_source_dates=quarantined_dates,
     )
     _atomic_json(
         status_path,
@@ -268,16 +338,18 @@ def finalize_snapshot(
             manifest,
             state=result.state,
             sync_outcome=sync_outcome,
-            active_date=active_date,
+            active_date=published_date,
             candidate_date=candidate_date,
             critical_codes=critical_codes,
+            quarantined_source_dates=quarantined_dates,
             quarantine_dir=quarantine_dir,
         ),
     )
     _write_github_outputs(github_output, result)
     print(
-        "Options candidate quarantined; retaining validated fallback "
-        f"{active_date}. Scoring/publication of new options research is disabled for this run."
+        "Options candidate rejected; retaining published fallback "
+        f"{published_date}. Quarantined {len(quarantined_dates)} unpublished "
+        "options partition(s). Scoring/publication of new options research is disabled."
     )
     return result
 
@@ -289,7 +361,11 @@ def main() -> int:
         type=Path,
         default=Path("data/validation/data_reconciliation.json"),
     )
-    parser.add_argument("--data-dir", type=Path, default=Path(os.getenv("DATA_DIR", "data")))
+    parser.add_argument(
+        "--data-dir",
+        type=Path,
+        default=Path(os.getenv("DATA_DIR", "data")),
+    )
     parser.add_argument(
         "--sync-outcome",
         default="success",
