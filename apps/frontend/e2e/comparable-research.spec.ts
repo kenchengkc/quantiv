@@ -17,9 +17,9 @@ test('ticker research links into a comparable historical cohort', async ({ page 
 
   const calibration = page.getByLabel('Comparable historical calibration summary');
   await expect(calibration).toBeVisible();
-  await expect(calibration).toContainText('obs');
-  await expect(calibration).toContainText('med');
-  await expect(calibration).toContainText('outside');
+  await expect(calibration).toContainText('events across');
+  await expect(calibration).toContainText('median realized/implied');
+  await expect(calibration).toContainText('outside implied');
 
   await link.click();
   await expect(page).toHaveURL(/\/research\?/);

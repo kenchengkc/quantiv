@@ -2,7 +2,6 @@ import type { Metadata } from 'next';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { notFound } from 'next/navigation';
-import SymbolResearchExport from '@/components/SymbolResearchExport';
 import { buildComparableResearchContext } from '@/lib/comparableResearch.server';
 import { companyName, stripLegalSuffix } from '@/lib/companyNames';
 import tickerNames from '../../../public/ticker-names.json';
@@ -112,13 +111,11 @@ export default async function SymbolPage({ params }: SymbolPageProps) {
   const comparableContext = buildComparableResearchContext(initialData);
 
   return (
-    <>
-      <SymbolResearchExport symbol={symbol} comparableContext={comparableContext} />
-      <SymbolPageClient
-        initialSymbol={symbol}
-        initialData={initialData}
-        initialEvidence={readForecastEvidence()}
-      />
-    </>
+    <SymbolPageClient
+      initialSymbol={symbol}
+      initialData={initialData}
+      initialEvidence={readForecastEvidence()}
+      comparableContext={comparableContext}
+    />
   );
 }

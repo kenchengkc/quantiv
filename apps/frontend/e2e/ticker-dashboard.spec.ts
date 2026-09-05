@@ -53,8 +53,8 @@ test("ticker dashboard presents one market-model-history view before detail", as
   );
 
   expect(comparisonIndex).toBeGreaterThanOrEqual(0);
-  expect(termStructureIndex).toBeGreaterThan(comparisonIndex);
-  expect(historyIndex).toBeGreaterThan(termStructureIndex);
+  expect(historyIndex).toBeGreaterThan(comparisonIndex);
+  expect(termStructureIndex).toBeGreaterThan(historyIndex);
   await expect(
     page.getByRole("region", {
       name: "Research snapshot and forecast validation",

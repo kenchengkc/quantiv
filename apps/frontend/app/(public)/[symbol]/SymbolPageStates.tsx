@@ -142,6 +142,10 @@ export function SymbolPageLoading({ symbol }: { symbol: string }) {
         </div>
       </div>
 
+      <div style={{ marginTop: 22 }}>
+        <SkeletonBlock height={360} radius={8} />
+      </div>
+
       <div
         className="qv-m-2col"
         style={{
@@ -162,10 +166,6 @@ export function SymbolPageLoading({ symbol }: { symbol: string }) {
             </div>
           </div>
         ))}
-      </div>
-
-      <div style={{ marginTop: 24 }}>
-        <SkeletonBlock height={360} radius={8} />
       </div>
     </div>
   );

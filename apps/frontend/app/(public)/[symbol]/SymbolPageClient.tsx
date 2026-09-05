@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import SymbolResearchExport, { ComparableHistoryLink } from '@/components/SymbolResearchExport';
+import type { ComparableResearchContext } from '@/lib/comparableResearch';
 import { companyName } from '@/lib/companyNames';
 import { normalizeForecastQuantiles } from '@/lib/forecastQuantiles';
 import { listingExchangeLabel } from '@/lib/listingExchanges';
@@ -192,10 +194,12 @@ export default function SymbolPage({
   initialData = null,
   initialEvidence = null,
   initialSymbol,
+  comparableContext = null,
 }: {
   initialData?: unknown;
   initialEvidence?: unknown;
   initialSymbol?: string;
+  comparableContext?: ComparableResearchContext | null;
 }) {
   // Triggers EDGAR ticker-names fetch + re-render so the header company
   // name resolves even when the symbol isn't in the S&P 500 or curated map.
@@ -655,20 +659,52 @@ export default function SymbolPage({
         />
       </Reveal>
 
-      {em && (
-        <Reveal delay={60}>
-          <ResearchSnapshotRibbon
-            evidence={initialEvidence}
-            optionsDate={data.as_of_date}
-            earningsDate={earningsDate}
-            earningsTiming={em.timing ?? data.next_earnings_timing}
-            modelSnapshotDate={em.ml_snapshot_date}
-            modelHorizon={em.model_horizon}
+      {/* Start with the research question, then the historical evidence. */}
+      {em && spot > 0 && (
+        <Reveal>
+          <MoveComparisonChart
+            spot={spot}
+            optionsMovePct={em.straddle_pct ?? null}
+            modelMovePct={activePredictionPct}
+            modelQuantiles={quantiles}
+            modelIsSpotUpdated={modelIsSpotUpdated}
+            historicalMovePct={historicalMedianMovePct}
+            historyCount={comparisonHistory.length}
+            ivRank={data.vol_regime?.iv_rank ?? null}
+            mode={predictionMode}
+            onModeChange={setPredictionMode}
+            spotUpdateDisabled={livePredictionRequest == null}
+            spotUpdateStatus={livePrediction.status}
+            modelMeta={quantileMeta}
+            unavailableReason={liveUnavailableReason}
           />
         </Reveal>
       )}
 
-      {/* KPI strip */}
+      {historySeries.length >= 2 ? (
+        <Reveal>
+          <div style={{ marginTop: 18 }}>
+            <HistoryBlock
+              key={symbol}
+              history={historySeries}
+              symbol={symbol}
+              relatedResearch={comparableContext ? <ComparableHistoryLink context={comparableContext} /> : null}
+            />
+          </div>
+        </Reveal>
+      ) : comparableContext ? (
+        <Reveal style={{ marginTop: 18 }}>
+          <ComparableHistoryLink context={comparableContext} />
+        </Reveal>
+      ) : null}
+
+      {data.provider_enrichment && (
+        <Reveal>
+          <ProviderSignalsPanel enrichment={data.provider_enrichment} />
+        </Reveal>
+      )}
+
+      {/* Supporting options inputs lead into expiry and risk detail. */}
       {em && (
         <Reveal delay={80}>
           <div
@@ -729,27 +765,6 @@ export default function SymbolPage({
         </Reveal>
       )}
 
-      {em && spot > 0 && (
-        <Reveal delay={100}>
-          <MoveComparisonChart
-            spot={spot}
-            optionsMovePct={em.straddle_pct ?? null}
-            modelMovePct={activePredictionPct}
-            modelQuantiles={quantiles}
-            modelIsSpotUpdated={modelIsSpotUpdated}
-            historicalMovePct={historicalMedianMovePct}
-            historyCount={comparisonHistory.length}
-            ivRank={data.vol_regime?.iv_rank ?? null}
-            mode={predictionMode}
-            onModeChange={setPredictionMode}
-            spotUpdateDisabled={livePredictionRequest == null}
-            spotUpdateStatus={livePrediction.status}
-            modelMeta={quantileMeta}
-            unavailableReason={liveUnavailableReason}
-          />
-        </Reveal>
-      )}
-
       {termRows.length > 0 && (
         <Reveal delay={140}>
           <div style={{ marginTop: 18 }}>
@@ -772,21 +787,6 @@ export default function SymbolPage({
         </Reveal>
       )}
 
-      {/* History + EPS surprise */}
-      {historySeries.length >= 2 && (
-        <Reveal delay={200}>
-          <div style={{ marginTop: 18 }}>
-            <HistoryBlock key={symbol} history={historySeries} symbol={symbol} />
-          </div>
-        </Reveal>
-      )}
-
-      {data.provider_enrichment && (
-        <Reveal delay={220}>
-          <ProviderSignalsPanel enrichment={data.provider_enrichment} />
-        </Reveal>
-      )}
-
       {/* Greeks panel */}
       {termRows.length > 0 && (
         <Reveal delay={240}>
@@ -795,6 +795,21 @@ export default function SymbolPage({
           </div>
         </Reveal>
       )}
+
+      {/* Provenance and exports follow the analysis they document. */}
+      <Reveal style={{ marginTop: 22 }}>
+        {em && (
+          <ResearchSnapshotRibbon
+            evidence={initialEvidence}
+            optionsDate={data.as_of_date}
+            earningsDate={earningsDate}
+            earningsTiming={em.timing ?? data.next_earnings_timing}
+            modelSnapshotDate={em.ml_snapshot_date}
+            modelHorizon={em.model_horizon}
+          />
+        )}
+        <SymbolResearchExport symbol={symbol} />
+      </Reveal>
 
       {/* Footer */}
       <Reveal delay={280}>
