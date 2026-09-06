@@ -196,6 +196,9 @@ def build_snapshot(
             "source_date": source.get("source_date") or quote.get("source_date"),
             "expected_source_date": quote.get("expected_source_date"),
             "source_session_lag": _number(quote.get("source_session_lag")),
+            "quote_quality_errors": [
+                error for error in (quote.get("errors") or []) if isinstance(error, str)
+            ],
             "event_coverage_pct": _number(events.get("coverage_pct")),
             "expected_events": _number(events.get("expected_events")),
             "covered_events": _number(events.get("covered_events")),

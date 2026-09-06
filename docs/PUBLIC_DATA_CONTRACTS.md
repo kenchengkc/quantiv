@@ -17,7 +17,7 @@ Public schemas live in `schemas/`. Runtime/committed invariant checks live in `t
 | `quantiv.screener.v1` | `tools/build_frontend_data.py` | Screener + research export | validated EOD build |
 | `quantiv.symbol-research.v1` | `tools/build_frontend_data.py` | Symbol research page + export | validated EOD build |
 | `quantiv.dashboard-evidence.v1` | forecast validation/public projection | Evidence surfaces | validated forecast release |
-| `quantiv.control-plane.v2` | `tools/build_control_plane_snapshot.py` | global research status / validation | current publication cycle |
+| `quantiv.control-plane.v2` | `tools/build_control_plane_snapshot.py` | Validation / protected operational status | current publication cycle |
 | `quantiv.public-model-validation.v1` | `tools/build_public_validation.py` | `/validation` | active champion + current control evidence |
 | `quantiv.research-snapshot.v1` | research snapshot APIs | notebooks, memos, review records | immutable EOD research state |
 
@@ -38,6 +38,8 @@ The dashboard evidence receipt identifies the exact validated forecast release a
 ### Control plane
 
 The control plane summarizes data, model, release, and exception state. `degraded` is distinct from `failed`: an advisory coverage/drift condition can remain publication-eligible, while critical conditions block publication. Consumers must inspect `publication_eligible` rather than treating every non-`passed` state as equivalent.
+
+`generated_at` dates the latest control assessment, not the retained forecast validation. Validation presents these dates separately. A passed retained forecast receipt does not imply that a new research release is eligible. An options-only hold is labeled "Held" in the presentation, with the underlying failed controls and blocked publication still explicit. Other critical controls remain "Blocked". Optional `data.quote_quality_errors` preserves the actual reasons for a composite options gate failure (including freshness); clients must not infer rejection-rate failures from its generic exception code alone.
 
 ### Public model validation
 

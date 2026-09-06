@@ -1,5 +1,8 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import styles from './page.module.css';
+import { ValidationPublication } from '@/components/ValidationPublication';
+import { publishedForecastStatus, quoteEligibilityExplanation } from '@/lib/publicationPresentation';
 import controlPlaneJson from '../../../public/control-plane.json';
 import forecastEvidenceJson from '../../../public/evidence/forecast.json';
 import modelValidationJson from '../../../public/evidence/model-validation.json';
@@ -90,6 +93,7 @@ type ControlPlane = {
     source_date: string | null;
     expected_source_date: string | null;
     source_session_lag: number | null;
+    quote_quality_errors?: string[];
     event_coverage_pct: number | null;
     expected_events: number | null;
     covered_events: number | null;
@@ -189,7 +193,7 @@ function tone(status: Status | boolean): { label: string; color: string } {
     return { label: status === false ? 'Blocked' : String(status), color: 'var(--down)' };
   }
   if (status === 'degraded' || status === 'warning') {
-    return { label: String(status), color: 'var(--warn)' };
+    return { label: String(status), color: 'var(--flag)' };
   }
   return { label: String(status || 'unavailable'), color: 'var(--ink-3)' };
 }
@@ -291,32 +295,13 @@ export default function ValidationPage() {
           Research validation
         </h1>
         <p style={{ margin: '22px 0 0', maxWidth: 760, color: 'var(--ink-2)', fontSize: 16, lineHeight: 1.65 }}>
-          The due-diligence view of Quantiv. This page exposes out-of-sample model performance against the market straddle baseline,
-          distribution calibration, current publication controls, data-quality exceptions, and the evidence identifiers behind the live research surface.
+          Out-of-sample model performance, calibration and reproducible evidence.
+          Publication controls below distinguish the last validated forecast release from eligibility for new research.
+        </p>
+        <p style={{ margin: '12px 0 0', color: 'var(--ink-3)', fontSize: 12 }}>
+          Latest assessment: {dateLabel(control.generated_at)} ET
         </p>
       </header>
-
-      <section
-        aria-label="Current research status"
-        style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: 10,
-          alignItems: 'center',
-          padding: '16px 0',
-          borderBottom: '1px solid var(--line)',
-        }}
-      >
-        <span style={{ fontSize: 12, color: 'var(--ink-3)', marginRight: 4 }}>Current publication</span>
-        <StatusPill status={control.status} />
-        <span style={{ fontSize: 12, color: 'var(--ink-3)', marginLeft: 8 }}>Publication gate</span>
-        <StatusPill status={control.publication_eligible} />
-        <span style={{ fontSize: 12, color: 'var(--ink-3)', marginLeft: 8 }}>Forecast receipt</span>
-        <StatusPill status={forecast.quality.status} />
-        <span className="mono" style={{ marginLeft: 'auto', color: 'var(--ink-4)', fontSize: 10 }}>
-          Validated {dateLabel(forecast.validated_at)} ET
-        </span>
-      </section>
 
       {sourceIsFallback && (
         <div
@@ -448,17 +433,18 @@ export default function ValidationPage() {
 
       <section style={{ paddingTop: 52 }}>
         <SectionTitle kicker="Production evidence">Current research controls</SectionTitle>
-        <div className="qv-m-2col" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 14 }}>
+        <ValidationPublication control={control} forecast={forecast} />
+        <div className={styles.controlCards}>
           <div style={{ border: '1px solid var(--line)', borderRadius: 14, padding: 18, background: 'var(--bg-2)' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-              <h3 style={{ margin: 0, fontSize: 20, fontWeight: 400 }}>Forecast publication</h3>
-              <StatusPill status={forecast.quality.status} />
+              <h3 style={{ margin: 0, fontSize: 20, fontWeight: 400 }}>Published forecast evidence</h3>
+              <StatusPill status={publishedForecastStatus(forecast)} />
             </div>
             <dl style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '10px 18px', margin: '20px 0 0', fontSize: 12 }}>
               <dt style={{ color: 'var(--ink-3)' }}>Controls evaluated</dt><dd className="mono tnum" style={{ margin: 0 }}>{count(forecast.controls.evaluated)}</dd>
               <dt style={{ color: 'var(--ink-3)' }}>Control exceptions</dt><dd className="mono tnum" style={{ margin: 0 }}>{count(forecast.controls.exceptions)}</dd>
               <dt style={{ color: 'var(--ink-3)' }}>Forecast rows</dt><dd className="mono tnum" style={{ margin: 0 }}>{count(forecast.coverage.rows)}</dd>
-              <dt style={{ color: 'var(--ink-3)' }}>Upcoming events</dt><dd className="mono tnum" style={{ margin: 0 }}>{count(forecast.coverage.events)}</dd>
+              <dt style={{ color: 'var(--ink-3)' }}>Events in this release</dt><dd className="mono tnum" style={{ margin: 0 }}>{count(forecast.coverage.events)}</dd>
             </dl>
           </div>
 
@@ -490,18 +476,18 @@ export default function ValidationPage() {
 
           {control.exceptions.length > 0 && (
             <div style={{ marginTop: 18, borderTop: '1px solid var(--line)', paddingTop: 16 }}>
-              <div className="mono" style={{ fontSize: 10, color: 'var(--ink-3)', letterSpacing: '0.12em', textTransform: 'uppercase' }}>Current advisory exceptions</div>
+              <div className="mono" style={{ fontSize: 10, color: 'var(--ink-3)', letterSpacing: '0.12em', textTransform: 'uppercase' }}>Current control exceptions</div>
               <div style={{ display: 'grid', gap: 8, marginTop: 10 }}>
                 {control.exceptions.map((item) => (
-                  <div key={item.code} style={{ display: 'grid', gridTemplateColumns: '120px 1fr auto', gap: 12, alignItems: 'center', fontSize: 12 }}>
+                  <div key={item.code} className={styles.exception}>
                     <StatusPill status={item.severity} />
-                    <span style={{ color: 'var(--ink-2)' }}>{item.summary}</span>
-                    <span className="mono tnum" style={{ color: 'var(--ink-3)' }}>{item.count != null ? count(item.count) : ''}</span>
+                    <span style={{ color: 'var(--ink-2)' }}>{item.code === 'option_quote_quality_below_limit' ? quoteEligibilityExplanation(control.data) : item.summary}</span>
+                    <span className="mono tnum" style={{ color: 'var(--ink-3)' }}>{item.code !== 'option_quote_quality_below_limit' && item.count != null ? count(item.count) : ''}</span>
                   </div>
                 ))}
               </div>
               <p style={{ margin: '12px 0 0', color: 'var(--ink-3)', fontSize: 11.5, lineHeight: 1.55 }}>
-                “Degraded” is intentionally distinct from failed: advisory coverage/drift warnings remain visible while critical exceptions fail publication closed.
+                These controls assess eligibility for new research. A retained forecast receipt can remain passed while stale or ineligible options data blocks the next release. No publication threshold is relaxed.
               </p>
             </div>
           )}
@@ -539,14 +525,9 @@ export default function ValidationPage() {
           ].map(([label, value, detail], index, rows) => (
             <div
               key={label}
+              className={styles.lineage}
               style={{
-                display: 'grid',
-                gridTemplateColumns: '180px minmax(0, 1fr) minmax(220px, 0.8fr)',
-                gap: 16,
-                padding: '14px 16px',
                 borderBottom: index < rows.length - 1 ? '1px solid var(--line)' : 'none',
-                alignItems: 'center',
-                fontSize: 12,
               }}
             >
               <span style={{ color: 'var(--ink-3)' }}>{label}</span>
@@ -571,7 +552,7 @@ export default function ValidationPage() {
         }}
       >
         <div style={{ maxWidth: 760 }}>
-          <div className="mono" style={{ fontSize: 10, color: 'var(--warn)', letterSpacing: '0.12em', textTransform: 'uppercase' }}>Decision scope</div>
+          <div className="mono" style={{ fontSize: 10, color: 'var(--flag)', letterSpacing: '0.12em', textTransform: 'uppercase' }}>Decision scope</div>
           <p style={{ margin: '8px 0 0', color: 'var(--ink-2)', fontSize: 12.5, lineHeight: 1.65 }}>
             Quantiv model outputs are end-of-day research evidence. A latest stock quote may update spot-derived inputs, but options, IV, Greeks and other snapshot features remain frozen. These results are not presented as executable option quotes or live-trading signals.
           </p>
