@@ -94,11 +94,17 @@ fi
 rclone sync "$REMOTE/forecasts" "$DATA_DIR/forecasts" \
   --fast-list --transfers=8 --progress 2>/dev/null || true
 
-# Earnings calendar stays in git unless R2_PULL_EARNINGS=1 (weekly retrain
-# may start before the daily commit lands).
+# Earnings calendar stays in git unless R2_PULL_EARNINGS=1. That flag is used
+# by the weekly/manual retrain path, which must also restore and verify the
+# latest reconciliation decision before it is allowed to train or mutate models.
 if [ "${R2_PULL_EARNINGS:-0}" = "1" ]; then
   rclone copy "$REMOTE/earnings_calendar.csv"     "$DATA_DIR/" 2>/dev/null || true
   rclone copy "$REMOTE/earnings_calendar.parquet" "$DATA_DIR/" 2>/dev/null || true
+  mkdir -p "$DATA_DIR/validation"
+  rclone copyto \
+    "$REMOTE/validation/data_reconciliation.json" \
+    "$DATA_DIR/validation/data_reconciliation.json"
+  "$PYTHON_BIN" scripts/verify_retrain_data_gate.py --data-dir "$DATA_DIR"
 fi
 rclone copy "$REMOTE/bias_curves.parquet"   "$DATA_DIR/" 2>/dev/null || true
 
