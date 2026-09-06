@@ -150,6 +150,7 @@ function ExpectedMoveHover({
 
   return (
     <div
+      data-calendar-move
       style={{
         position: 'relative',
         display: 'flex',
@@ -178,6 +179,7 @@ function ExpectedMoveHover({
       {show && hasTooltip && (
         <div
           role="tooltip"
+          aria-label="Expected move breakdown"
           style={{
             position: 'absolute',
             right: 0,
@@ -287,7 +289,7 @@ function TickerRow({
       href={`/${ev.ticker}`}
       style={{
         display: 'grid',
-        gridTemplateColumns: '24px minmax(0, 1fr) auto',
+        gridTemplateColumns: 'minmax(0, 1fr) auto',
         alignItems: 'center',
         gap: 8,
         padding: '7px 8px',
@@ -297,69 +299,74 @@ function TickerRow({
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.background = 'var(--bg-3)';
-        hover.onMouseEnter(e);
       }}
-      onMouseMove={hover.onMouseMove}
       onMouseLeave={(e) => {
         e.currentTarget.style.background = 'transparent';
-        hover.onMouseLeave();
       }}
     >
-      <TickerLogo ticker={ev.ticker} size={24} radius={6} loading="eager" />
-      <div style={{ minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, minWidth: 0 }}>
-          <span
-            className="serif"
-            style={{
-              fontWeight: 800,
-              color: 'var(--ink-2)',
-              fontSize: 13,
-              letterSpacing: '-0.01em',
-              textTransform: 'uppercase',
-              flexShrink: 0,
-            }}
-          >
-            {ev.ticker}
-          </span>
-          <span
-            style={{
-              color: 'var(--ink-3)',
-              fontSize: 11,
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-              minWidth: 0,
-            }}
-          >
-            {companyName(ev.ticker)}
-          </span>
-        </div>
-        {changePct !== null && (
-          <div
-            className="mono tnum"
-            style={{
-              fontSize: 10,
-              color,
-              marginTop: 2,
-              letterSpacing: '0.01em',
-            }}
-          >
-            {arrow} {Math.abs(changePct * 100).toFixed(2)}%
-            {moveTag && (
-              <span
-                style={{
-                  color: 'var(--ink-4)',
-                  fontSize: 8.5,
-                  letterSpacing: '0.08em',
-                  textTransform: 'uppercase',
-                  marginLeft: 4,
-                }}
-              >
-                {moveTag}
-              </span>
-            )}
+      {/* Keep the company hover target separate from the move breakdown.
+          Leaving this area cancels pending timers as well as visible cards. */}
+      <div
+        data-calendar-identity
+        style={{ display: 'grid', gridTemplateColumns: '24px minmax(0, 1fr)', alignItems: 'center', gap: 8, minWidth: 0 }}
+        {...hover}
+      >
+        <TickerLogo ticker={ev.ticker} size={24} radius={6} loading="eager" />
+        <div style={{ minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, minWidth: 0 }}>
+            <span
+              className="serif"
+              style={{
+                fontWeight: 800,
+                color: 'var(--ink-2)',
+                fontSize: 13,
+                letterSpacing: '-0.01em',
+                textTransform: 'uppercase',
+                flexShrink: 0,
+              }}
+            >
+              {ev.ticker}
+            </span>
+            <span
+              style={{
+                color: 'var(--ink-3)',
+                fontSize: 11,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                minWidth: 0,
+              }}
+            >
+              {companyName(ev.ticker)}
+            </span>
           </div>
-        )}
+          {changePct !== null && (
+            <div
+              className="mono tnum"
+              style={{
+                fontSize: 10,
+                color,
+                marginTop: 2,
+                letterSpacing: '0.01em',
+              }}
+            >
+              {arrow} {Math.abs(changePct * 100).toFixed(2)}%
+              {moveTag && (
+                <span
+                  style={{
+                    color: 'var(--ink-4)',
+                    fontSize: 8.5,
+                    letterSpacing: '0.08em',
+                    textTransform: 'uppercase',
+                    marginLeft: 4,
+                  }}
+                >
+                  {moveTag}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
       </div>
       <ExpectedMoveHover
         movePct={movePct}
