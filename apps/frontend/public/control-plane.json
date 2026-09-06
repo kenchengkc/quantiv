@@ -2,7 +2,7 @@
   "data": {
     "contract_rejection_rate": 0.428305,
     "contracts": 97762,
-    "corporate_action_rows": 28523,
+    "corporate_action_rows": 28685,
     "corporate_action_status": "enforced",
     "covered_events": 29,
     "decision_group_rejection_rate": 0.46887,
@@ -19,6 +19,9 @@
     "pair_rejection_rate": 0.878296,
     "quarantine_records": 84804,
     "quarantine_status": "enforced",
+    "quote_quality_errors": [
+      "latest source date 2026-09-01 is 3 market session(s) behind expected 2026-09-04"
+    ],
     "replay_status": "verified",
     "source_date": "2026-09-01",
     "source_session_lag": 3,
@@ -56,7 +59,7 @@
       "summary": "Latest source quotes for retired symbols are excluded from the decision universe"
     }
   ],
-  "generated_at": "2026-09-06T06:13:20.827327+00:00",
+  "generated_at": "2026-09-06T14:48:54.389859+00:00",
   "model": {
     "challenger_present": false,
     "champion_active": true,
