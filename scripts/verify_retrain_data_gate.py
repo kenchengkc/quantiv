@@ -2,9 +2,9 @@
 """Require current decision-safe data evidence before a model retrain can mutate prod.
 
 The weekly retrain restores the published R2 data release instead of ingesting a new
-options candidate itself.  That means a plain age check is insufficient: a bounded
+options candidate itself. That means a plain age check is insufficient: a bounded
 fallback release can still be recent in calendar days while the latest candidate was
-held by reconciliation.  This gate binds retraining to the same reconciliation
+held by reconciliation. This gate binds retraining to the same reconciliation
 contract used by the daily publication path.
 """
 
@@ -17,7 +17,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from market_sessions import latest_completed_us_market_session
+try:
+    from market_sessions import latest_completed_us_market_session
+except ModuleNotFoundError:  # imported as scripts.verify_retrain_data_gate in pytest
+    from scripts.market_sessions import latest_completed_us_market_session
 
 RECONCILIATION_SCHEMA = "quantiv.data-reconciliation.v2"
 _OPTION_SNAPSHOT_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})\.parquet$")
@@ -27,7 +30,9 @@ def _read_json(path: Path) -> dict[str, Any]:
     try:
         payload = json.loads(path.read_text())
     except (OSError, json.JSONDecodeError) as exc:
-        raise RuntimeError(f"retrain reconciliation evidence unavailable: {path}") from exc
+        raise RuntimeError(
+            f"retrain reconciliation evidence unavailable: {path}"
+        ) from exc
     if not isinstance(payload, dict):
         raise RuntimeError("retrain reconciliation evidence must be a JSON object")
     return payload
@@ -73,7 +78,9 @@ def verify_retrain_data_gate(
     if quality["decision_safe"] != (len(critical) == 0):
         raise RuntimeError("retrain reconciliation decision contradicts its exceptions")
     if not quality["decision_safe"]:
-        codes = ", ".join(sorted(str(item.get("code") or "unknown") for item in critical))
+        codes = ", ".join(
+            sorted(str(item.get("code") or "unknown") for item in critical)
+        )
         raise RuntimeError(
             "published data release is held by reconciliation; retraining is blocked"
             + (f": {codes}" if codes else "")
@@ -81,7 +88,9 @@ def verify_retrain_data_gate(
 
     generated_raw = manifest.get("generated_at")
     try:
-        generated_at = datetime.fromisoformat(str(generated_raw).replace("Z", "+00:00"))
+        generated_at = datetime.fromisoformat(
+            str(generated_raw).replace("Z", "+00:00")
+        )
     except ValueError as exc:
         raise RuntimeError("retrain reconciliation generated_at is invalid") from exc
     if generated_at.tzinfo is None:
@@ -90,18 +99,25 @@ def verify_retrain_data_gate(
     current = now or datetime.now(timezone.utc)
     if current.tzinfo is None:
         current = current.replace(tzinfo=timezone.utc)
-    age_hours = (current.astimezone(timezone.utc) - generated_at.astimezone(timezone.utc)).total_seconds() / 3600
+    age_hours = (
+        current.astimezone(timezone.utc) - generated_at.astimezone(timezone.utc)
+    ).total_seconds() / 3600
     if age_hours < -1.0:
         raise RuntimeError("retrain reconciliation evidence is dated in the future")
     if age_hours > max_report_age_hours:
         raise RuntimeError(
-            f"retrain reconciliation evidence is {age_hours:.1f}h old; current evidence is required"
+            f"retrain reconciliation evidence is {age_hours:.1f}h old; "
+            "current evidence is required"
         )
 
     active_source_date = _active_options_date(data_dir)
     source = manifest.get("source_reconciliation") or {}
     quote = manifest.get("quote_quality") or {}
-    source_dates = {str(value) for value in (source.get("source_date"), quote.get("source_date")) if value}
+    source_dates = {
+        str(value)
+        for value in (source.get("source_date"), quote.get("source_date"))
+        if value
+    }
     if source_dates != {active_source_date}:
         raise RuntimeError(
             "retrain reconciliation source date does not match the published options release"
