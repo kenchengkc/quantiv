@@ -94,6 +94,8 @@ export function TickerHoverHost() {
 
   return (
     <div
+      role="tooltip"
+      aria-label={`${state.ticker} company information`}
       style={{
         position: 'fixed',
         left,
