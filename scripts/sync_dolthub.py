@@ -874,15 +874,21 @@ CORPORATE_ACTION_BATCH_SIZE = 75
 
 
 def _latest_option_universe() -> tuple[date, list[str]]:
-    """Read the active symbol set from the latest already-reconciled partition."""
-    meta = load_meta()
-    latest_value = meta.get("last_sync_date")
-    if not latest_value:
-        raise RuntimeError("options metadata lacks last_sync_date")
-    latest = date.fromisoformat(str(latest_value))
-    partition = _partition_path(latest, parquet_root())
-    if not partition.exists():
-        raise RuntimeError(f"latest options partition is missing: {partition}")
+    """Read active symbols from the newest dated canonical options partition."""
+    candidates: list[tuple[date, Path]] = []
+    for partition in parquet_root().glob("year=*/month=*/*.parquet"):
+        try:
+            source_date = date.fromisoformat(partition.stem)
+        except ValueError:
+            # Historical aggregate files such as data_0.parquet are not
+            # single-date canonical candidates.
+            continue
+        candidates.append((source_date, partition))
+
+    if not candidates:
+        raise RuntimeError("no dated canonical options partitions are available")
+
+    latest, partition = max(candidates, key=lambda item: item[0])
     frame = pq.read_table(partition, columns=["act_symbol"]).to_pandas()
     symbols = sorted(
         {
