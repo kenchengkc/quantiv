@@ -59,9 +59,9 @@ def _scope_quote_quality(
     """Separate chain diagnostics from the earnings decisions we publish.
 
     Contract, same-strike-pair, and all-symbol/expiration rejection rates remain
-    visible diagnostics over the immutable source chain.  Publication-facing
+    visible diagnostics over the immutable source chain. Publication-facing
     decision groups, however, are upcoming in-universe earnings events because
-    that is the unit consumed by daily_score.py.  This changes no numerical
+    that is the unit consumed by daily_score.py. This changes no numerical
     threshold and never hides a source/freshness failure.
     """
     quote = dict(quote_quality or {"status": "not_enforced"})
@@ -107,6 +107,8 @@ def _scope_quote_quality(
             "decision_group_rejection_rate_scope": (
                 "upcoming_in_universe_earnings_events"
             ),
+            # Preserve the historical field for compatibility; its scope is
+            # explicitly chain-wide and duplicated under chain_* above.
             "eligible_symbol_expirations": quote.get(
                 "chain_eligible_symbol_expirations"
             ),
@@ -156,7 +158,7 @@ def _scope_quote_quality(
         quote["status"] = "failed"
     elif raw_status == "failed" and diagnostics_exceeded:
         # A chain-wide diagnostic alone cannot veto an otherwise supported
-        # earnings decision surface.  Keep the failure visible as degradation.
+        # earnings decision surface. Keep the failure visible as degradation.
         quote["status"] = "degraded"
     elif raw_status == "failed":
         # Unknown/unclassified quote failures remain fail-closed.
@@ -225,7 +227,7 @@ def build_reconciliation_manifest(
                 "warning",
                 "Calendar events fall outside the current options decision universe",
                 count=outside_universe_events,
-                sample=event_coverage.get("outside_universe_sample") or [],
+                sample=event_coverage.get("outside_option_universe_sample") or [],
             )
         )
 
