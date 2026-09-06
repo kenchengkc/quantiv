@@ -119,6 +119,81 @@ def _critical_codes(manifest: dict[str, Any]) -> tuple[str, ...]:
     return tuple(sorted(codes))
 
 
+def _validated_manifest(path: Path, not_before: str | None) -> dict[str, Any]:
+    """A stale or malformed report is an execution failure, never a fallback."""
+    manifest = _read_json(path)
+    if not manifest:
+        raise RuntimeError(f"reconciliation manifest unavailable: {path}")
+    quality = manifest.get("quality")
+    exceptions = manifest.get("exceptions")
+    if (
+        manifest.get("schema") != "quantiv.data-reconciliation.v2"
+        or not isinstance(quality, dict)
+        or type(quality.get("decision_safe")) is not bool
+        or not isinstance(exceptions, list)
+        or any(
+            not isinstance(item, dict)
+            or item.get("severity") not in {"critical", "warning"}
+            or not isinstance(item.get("code"), str)
+            or not item["code"]
+            for item in exceptions
+        )
+    ):
+        raise RuntimeError("reconciliation manifest has an invalid decision contract")
+    critical_count = sum(item["severity"] == "critical" for item in exceptions)
+    if (
+        quality.get("critical_exceptions") != critical_count
+        or quality["decision_safe"] != (critical_count == 0)
+    ):
+        raise RuntimeError("reconciliation decision contradicts its critical exceptions")
+    if not_before is not None:
+        try:
+            generated = datetime.fromisoformat(str(manifest.get("generated_at")))
+            started = datetime.fromisoformat(not_before)
+            if generated.tzinfo is None or started.tzinfo is None:
+                raise ValueError("timestamps must include a timezone")
+        except ValueError as exc:
+            raise RuntimeError("reconciliation freshness cannot be verified") from exc
+        if generated < started:
+            raise RuntimeError("reconciliation manifest predates this refresh; refusing stale evidence")
+    return manifest
+
+
+def _require_source_date(manifest: dict[str, Any], expected: str | None) -> None:
+    if expected is None or any(
+        (manifest.get(section) or {}).get("source_date") != expected
+        for section in ("source_reconciliation", "quote_quality")
+    ):
+        raise RuntimeError("reconciliation source date does not match the active options partition")
+
+
+def verify_fallback(
+    *, manifest_path: Path, data_dir: Path, not_before: str | None = None,
+) -> None:
+    """Recheck the restored universe before publishing independent datasets."""
+    manifest = _validated_manifest(manifest_path, not_before)
+    status_path = data_dir / "validation" / "options_snapshot_status.json"
+    status = _read_json(status_path)
+    published_date = _published_options_date(data_dir)
+    if (
+        status.get("state") != "fallback"
+        or not published_date
+        or status.get("active_source_date") != published_date
+        or max(_option_partitions(data_dir), default=None) != published_date
+    ):
+        raise RuntimeError("fallback no longer matches the published options snapshot")
+    _require_source_date(manifest, published_date)
+    unexpected = sorted(set(_critical_codes(manifest)) - SOFT_FALLBACK_CRITICAL_CODES)
+    if unexpected:
+        raise RuntimeError(
+            "restored fallback contains non-options critical failures: " + ", ".join(unexpected)
+        )
+    status["fallback_manifest_id"] = manifest.get("manifest_id")
+    status["fallback_verified_at"] = datetime.now(timezone.utc).isoformat()
+    _atomic_json(status_path, status)
+    print(f"Restored fallback verified: {published_date}; new scoring remains disabled")
+
+
 def _write_github_outputs(path: Path | None, result: FinalizationResult) -> None:
     if path is None:
         return
@@ -236,10 +311,9 @@ def finalize_snapshot(
     data_dir: Path,
     sync_outcome: str = "success",
     github_output: Path | None = None,
+    not_before: str | None = None,
 ) -> FinalizationResult:
-    manifest = _read_json(manifest_path)
-    if not manifest:
-        raise RuntimeError(f"reconciliation manifest unavailable: {manifest_path}")
+    manifest = _validated_manifest(manifest_path, not_before)
 
     critical_codes = _critical_codes(manifest)
     partitions = _option_partitions(data_dir)
@@ -250,6 +324,7 @@ def finalize_snapshot(
     status_path = data_dir / "validation" / "options_snapshot_status.json"
 
     if decision_safe:
+        _require_source_date(manifest, latest_local)
         active_date = candidate_date or latest_local
         result = FinalizationResult(
             state="accepted",
@@ -304,6 +379,7 @@ def finalize_snapshot(
             "options candidate failed reconciliation and no published data-release "
             "options snapshot exists for fallback"
         )
+    _require_source_date(manifest, latest_local)
     if published_date not in partitions:
         raise RuntimeError(
             f"published options snapshot {published_date} is missing locally; refusing fallback"
@@ -372,17 +448,31 @@ def main() -> int:
         help="GitHub step outcome for the latest options sync (success/failure).",
     )
     parser.add_argument(
+        "--not-before",
+        help="Require reconciliation evidence generated at or after this ISO refresh-start timestamp.",
+    )
+    parser.add_argument(
+        "--verify-fallback", action="store_true",
+        help="Validate the rebuilt fallback report before R2 promotion; never enable scoring.",
+    )
+    parser.add_argument(
         "--github-output",
         type=Path,
         default=None,
         help="Append options_state/can_score outputs for the calling Actions step.",
     )
     args = parser.parse_args()
+    if args.verify_fallback:
+        verify_fallback(
+            manifest_path=args.manifest, data_dir=args.data_dir, not_before=args.not_before,
+        )
+        return 0
     finalize_snapshot(
         manifest_path=args.manifest,
         data_dir=args.data_dir,
         sync_outcome=args.sync_outcome,
         github_output=args.github_output,
+        not_before=args.not_before,
     )
     return 0
 
