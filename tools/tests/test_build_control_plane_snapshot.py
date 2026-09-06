@@ -103,6 +103,24 @@ def test_missing_manifests_are_explicitly_unavailable() -> None:
     assert snapshot["model"]["status"] == "unavailable"
 
 
+def test_quote_failure_reason_is_preserved_without_changing_gate() -> None:
+    reason = "latest source date is 3 market sessions behind expected date"
+    snapshot = build_snapshot(
+        {
+            "quality": {"status": "failed", "decision_safe": False},
+            "quote_quality": {"errors": [reason, None, 7]},
+        },
+        {"status": "passed"},
+        {},
+        {},
+        generated_at="2026-09-06T06:13:20Z",
+    )
+
+    assert snapshot["data"]["quote_quality_errors"] == [reason]
+    assert snapshot["data"]["status"] == "failed"
+    assert snapshot["publication_eligible"] is False
+
+
 def test_feature_drift_degrades_model_health_without_blocking_publication() -> None:
     snapshot = build_snapshot(
         {"quality": {"status": "passed", "decision_safe": True}},
