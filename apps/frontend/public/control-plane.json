@@ -4,47 +4,59 @@
     "contracts": 97762,
     "corporate_action_rows": 28523,
     "corporate_action_status": "enforced",
-    "covered_events": 59,
+    "covered_events": 29,
     "decision_group_rejection_rate": 0.46887,
     "decision_groups": 3389,
     "decision_scope": "end_of_day_research",
     "duplicate_rows": 0,
     "eligible_contracts": 55890,
     "eligible_decision_groups": 1800,
-    "event_coverage_pct": 0.746835,
-    "expected_events": 79,
-    "expected_source_date": "2026-09-01",
+    "event_coverage_pct": 0.763158,
+    "expected_events": 38,
+    "expected_source_date": "2026-09-04",
     "live_trading_eligible": false,
-    "missing_events": 20,
+    "missing_events": 9,
     "pair_rejection_rate": 0.878296,
     "quarantine_records": 84804,
     "quarantine_status": "enforced",
     "replay_status": "verified",
     "source_date": "2026-09-01",
-    "source_session_lag": 0,
-    "status": "degraded"
+    "source_session_lag": 3,
+    "status": "failed"
   },
   "exceptions": [
     {
       "code": "upcoming_events_outside_option_universe",
-      "count": 304,
+      "count": 296,
       "severity": "warning",
       "summary": "Calendar events fall outside the current options decision universe"
     },
     {
       "code": "upcoming_events_without_option_chain",
-      "count": 20,
+      "count": 9,
       "severity": "warning",
       "summary": "In-universe earnings events have no decision-eligible option chain"
     },
     {
       "code": "forecast_horizon_coverage_below_limit",
-      "count": 15,
+      "count": 12,
       "severity": "warning",
       "summary": "One or more model horizons lack sufficient eligible option coverage"
+    },
+    {
+      "code": "option_quote_quality_below_limit",
+      "count": 1589,
+      "severity": "critical",
+      "summary": "Option leg or decision-group quality exceeds the publication limit"
+    },
+    {
+      "code": "retired_source_symbols_quarantined",
+      "count": 1,
+      "severity": "warning",
+      "summary": "Latest source quotes for retired symbols are excluded from the decision universe"
     }
   ],
-  "generated_at": "2026-09-02T16:14:07.524603+00:00",
+  "generated_at": "2026-09-06T06:13:20.827327+00:00",
   "model": {
     "challenger_present": false,
     "champion_active": true,
@@ -66,14 +78,14 @@
     "status": "degraded",
     "warning_features": 10
   },
-  "publication_eligible": true,
+  "publication_eligible": false,
   "release": {
-    "artifact_promotion_status": "passed",
+    "artifact_promotion_status": "degraded",
     "data_r2_status": "passed",
-    "forecast_r2_status": "passed",
-    "frontend_payload_status": "passed",
-    "neon_import_status": "passed"
+    "forecast_r2_status": "degraded",
+    "frontend_payload_status": "degraded",
+    "neon_import_status": "degraded"
   },
   "schema": "quantiv.control-plane.v2",
-  "status": "degraded"
+  "status": "failed"
 }
