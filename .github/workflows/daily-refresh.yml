@@ -342,6 +342,7 @@ jobs:
             --manifest data/validation/data_reconciliation.json \
             --data-dir data \
             --sync-outcome "${{ steps.options_sync.outcome }}" \
+            --not-before "$REFRESH_STARTED_AT" \
             --github-output "$GITHUB_OUTPUT"
 
       - name: Restore validated fallback after rejected options candidate
@@ -358,6 +359,14 @@ jobs:
             --max-lag-days 5 \
             --days-ahead 21 \
             --report data/validation/data_reconciliation.json
+          # Restoring the old universe can uncover different corporate-action,
+          # source-integrity, or non-options failures. Only the same explicit
+          # options-quality/freshness exceptions may pass this publication gate.
+          python scripts/options_snapshot_resilience.py \
+            --verify-fallback \
+            --manifest data/validation/data_reconciliation.json \
+            --data-dir data \
+            --not-before "$REFRESH_STARTED_AT"
 
       - name: Upload options snapshot decision
         if: always()
