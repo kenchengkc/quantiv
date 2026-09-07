@@ -23,25 +23,31 @@ materialize_earnings_calendar() {
   local target="$DATA_DIR/earnings_calendar.csv"
   local baseline="$DATA_DIR/validation/earnings_calendar_baseline.csv"
   local tmp="$DATA_DIR/.earnings_calendar.csv.$$.tmp"
+  local download_ok=0
 
   rm -f "$tmp"
   if rclone copyto "$REMOTE/earnings_calendar.csv" "$tmp"; then
-    if [ ! -s "$tmp" ]; then
-      echo "Downloaded earnings calendar is empty; refusing materialization" >&2
-      rm -f "$tmp"
-      exit 1
-    fi
+    download_ok=1
+  fi
+
+  if [ "$download_ok" = "1" ] && [ -s "$tmp" ]; then
     mv "$tmp" "$target"
     cp "$target" "$baseline"
     echo "✅ Materialized prior-release earnings calendar and integrity baseline"
   elif [ "$ALLOW_MISSING_EARNINGS_BASELINE" = "1" ] && [ -s "$target" ]; then
-    # Explicit bootstrap escape hatch only. Normal production CI leaves this
-    # disabled and therefore fails closed when the canonical R2 object is absent.
-    cp "$target" "$baseline"
-    echo "⚠️  R2 earnings calendar missing; using explicit bootstrap local baseline"
-  else
+    # Explicit bootstrap/test escape hatch only. Normal production CI leaves
+    # this disabled and therefore fails closed when the canonical R2 object is
+    # absent, unreadable, or empty.
     rm -f "$tmp"
-    echo "Missing canonical R2 earnings calendar; refusing to run without a prior-release baseline" >&2
+    cp "$target" "$baseline"
+    echo "⚠️  R2 earnings calendar unavailable; using explicit bootstrap local baseline"
+  else
+    if [ "$download_ok" = "1" ]; then
+      echo "Downloaded earnings calendar is empty; refusing materialization" >&2
+    else
+      echo "Missing canonical R2 earnings calendar; refusing to run without a prior-release baseline" >&2
+    fi
+    rm -f "$tmp"
     exit 1
   fi
 
