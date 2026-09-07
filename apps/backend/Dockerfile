@@ -36,11 +36,13 @@ RUN pip install --no-compile --no-deps /app/apps/ml
 
 # Application code last (changes most often).
 COPY apps/backend /app/apps/backend
-# Shared security master / quote-worker publication inputs. These remain here
-# until the frontend publication corpus is materialized as an explicit release.
+# Shared security master / quote-worker publication inputs. The quote worker and
+# API now consume the same canonical NYSE session contract as the frontend and
+# Cloudflare Worker. The generated frontend corpus remains transitional until its
+# R2 publication release is proven and materialized at deploy time.
 COPY lib /app/lib
+COPY config/market_sessions.json /app/config/market_sessions.json
 COPY apps/frontend/public /app/apps/frontend/public
-COPY apps/frontend/lib/marketHolidays.generated.ts /app/apps/frontend/lib/marketHolidays.generated.ts
 
 WORKDIR /app/apps/backend
 
