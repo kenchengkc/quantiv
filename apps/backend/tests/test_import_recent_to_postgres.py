@@ -165,9 +165,9 @@ def test_import_rejects_activation_receipt_for_different_bundle(tmp_path):
 
 
 def test_retrain_workflow_imports_exact_promoted_forecast() -> None:
-    workflow = (REPO_ROOT / ".github" / "workflows" / "daily-refresh.yml").read_text()
+    workflow = (REPO_ROOT / ".github" / "workflows" / "model-retrain.yml").read_text()
     import_step = workflow.split(
-        "- name: Import retrain forecasts to Neon Postgres", maxsplit=1
+        "- name: Import exact retrain forecast into Neon", maxsplit=1
     )[1].split("- name: Upload exact-bundle forecast import receipt", maxsplit=1)[0]
 
     assert "FORECAST_PATH=$(jq -r '.production_forecast // empty'" in import_step
