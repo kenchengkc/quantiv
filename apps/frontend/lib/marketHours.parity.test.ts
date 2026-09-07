@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import MARKET_SESSIONS from '../../../config/market_sessions.json';
 import fixture from '../../../tools/fixtures/market-hours.json';
-import { MARKET_HOLIDAYS_US } from './marketHolidays.generated';
 import { currentRefreshWindow } from './marketHours';
 
 describe('market-hours parity fixture', () => {
@@ -10,7 +10,7 @@ describe('market-hours parity fixture', () => {
 
   it('matches the shared NYSE holiday set over the common support range', () => {
     const { rangeStart, rangeEnd, dates } = fixture.holidayParity;
-    const supportedHolidays = MARKET_HOLIDAYS_US.filter(
+    const supportedHolidays = MARKET_SESSIONS.holidays.filter(
       (date) => date >= rangeStart && date <= rangeEnd,
     );
 
