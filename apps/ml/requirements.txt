@@ -2,8 +2,8 @@
 #
 # Production serving installs apps/ml as a package from pyproject.toml and uses
 # apps/backend/requirements.txt for the API process. Keep this file focused on
-# training, research scripts, and their tests; do not add backend/web or legacy
-# object-store dependencies here.
+# file-backed training, research scripts, and tests; do not add backend/web,
+# database/cache, or legacy object-store dependencies here without a real import.
 
 # Core data
 pandas>=2.0.0,<3
@@ -21,11 +21,6 @@ cryptography>=43.0.0
 requests>=2.31.0
 python-dotenv>=1.0.0
 pydantic>=2.5.0
-
-# Optional training-path persistence
-psycopg2-binary>=2.9.0
-sqlalchemy>=2.0.0
-redis>=5.0.0
 
 # Research plotting used by scripts/research/walk_forward.py
 matplotlib>=3.7.0
