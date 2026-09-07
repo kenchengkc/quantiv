@@ -33,6 +33,9 @@ def test_recovery_is_isolated_serialized_and_uses_existing_deployment_tools():
     workflow = yaml.safe_load((ROOT / ".github/workflows/daily-refresh.yml").read_text())
     assert workflow["concurrency"] == {"group": "daily-refresh", "cancel-in-progress": False}
     jobs = workflow["jobs"]
+    # Match r2_pull.sh/r2_push.sh when the optional bucket secret is unset;
+    # otherwise direct rclone paths accidentally address a bucket named forecasts.
+    assert jobs["provenance-rollback"]["env"]["R2_BUCKET"] == "${{ secrets.R2_BUCKET || 'quantiv-data' }}"
     for name in ("refresh", "weekly-retrain", "finnhub-profile-sweep"):
         assert "!inputs.provenance_rollback" in jobs[name]["if"]
     steps = jobs["provenance-rollback"]["steps"]
