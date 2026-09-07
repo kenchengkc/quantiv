@@ -20,6 +20,7 @@ import signal
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -34,7 +35,8 @@ from dotenv import load_dotenv
 logger = structlog.get_logger()
 
 QUOTE_REFRESH_OPEN_MIN = 9 * 60 + 25
-QUOTE_REFRESH_CLOSE_MIN = 16 * 60 + 45
+DEFAULT_REGULAR_CLOSE_MIN = 16 * 60
+QUOTE_SETTLE_MINUTES = 45
 STALE_TTL_S = 7 * 24 * 60 * 60
 PREVIOUS_CLOSE_CACHE_MAX_AGE_S = 30 * 60
 INTEREST_ZSET = "quote:interest"
@@ -198,10 +200,10 @@ def public_dir() -> Path:
     return candidates[0]
 
 
-def holidays_path() -> Path:
+def market_sessions_path() -> Path:
     candidates = [
-        REPO_ROOT / "apps" / "frontend" / "lib" / "marketHolidays.generated.ts",
-        Path("/app/apps/frontend/lib/marketHolidays.generated.ts"),
+        REPO_ROOT / "config" / "market_sessions.json",
+        Path("/app/config/market_sessions.json"),
     ]
     for candidate in candidates:
         if candidate.exists():
@@ -209,15 +211,32 @@ def holidays_path() -> Path:
     return candidates[0]
 
 
-def load_holidays() -> set[str]:
-    path = holidays_path()
+@lru_cache(maxsize=1)
+def load_market_sessions() -> tuple[set[str], dict[str, int]]:
+    """Load the repository-wide NYSE session contract once per process."""
+    path = market_sessions_path()
     if not path.exists():
-        return set()
-    text = path.read_text()
-    match = re.search(r"MARKET_HOLIDAYS_US\s*=\s*\[(.*?)\]\s+as const", text, re.S)
-    if not match:
-        return set()
-    return set(re.findall(r"""["'](\d{4}-\d{2}-\d{2})["']""", match.group(1)))
+        raise RuntimeError(f"canonical market session contract is missing: {path}")
+    payload = json.loads(path.read_text())
+    if payload.get("schema") != "quantiv.market-sessions.v1":
+        raise RuntimeError("unsupported canonical market session schema")
+    holidays = {
+        str(day) for day in payload.get("holidays") or []
+        if isinstance(day, str)
+    }
+    early_closes: dict[str, int] = {}
+    for day, close in (payload.get("early_closes") or {}).items():
+        hour, minute = (int(part) for part in str(close).split(":", 1))
+        early_closes[str(day)] = hour * 60 + minute
+    if not holidays:
+        raise RuntimeError("canonical market session contract contains no holidays")
+    return holidays, early_closes
+
+
+def load_holidays() -> set[str]:
+    """Compatibility helper retained for tests/callers; backed by canonical JSON."""
+    holidays, _early_closes = load_market_sessions()
+    return set(holidays)
 
 
 def et_parts(now: datetime | None = None) -> tuple[int, str, int]:
@@ -231,9 +250,13 @@ def is_quote_window(
     weekday, iso_date, minutes = et_parts(now)
     if weekday >= 5:
         return False
-    if holidays and iso_date in holidays:
+    canonical_holidays, early_closes = load_market_sessions()
+    closed = canonical_holidays if holidays is None else holidays
+    if iso_date in closed:
         return False
-    return QUOTE_REFRESH_OPEN_MIN <= minutes <= QUOTE_REFRESH_CLOSE_MIN
+    regular_close = early_closes.get(iso_date, DEFAULT_REGULAR_CLOSE_MIN)
+    quote_refresh_close = regular_close + QUOTE_SETTLE_MINUTES
+    return QUOTE_REFRESH_OPEN_MIN <= minutes <= quote_refresh_close
 
 
 def monday_iso_for(date_iso: str) -> str:

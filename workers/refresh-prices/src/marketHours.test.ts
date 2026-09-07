@@ -24,4 +24,12 @@ describe('currentRefreshWindow', () => {
 
     expect(supportedHolidays).toEqual(dates);
   });
+
+  it('switches to after-hours at the actual 13:00 ET early close', () => {
+    // Friday after Thanksgiving 2026. EST is UTC-5.
+    expect(currentRefreshWindow(new Date('2026-11-27T17:59:00Z'))).toBe('regular');
+    expect(currentRefreshWindow(new Date('2026-11-27T18:00:00Z'))).toBe('afterhours');
+    expect(currentRefreshWindow(new Date('2026-11-27T22:00:00Z'))).toBe('afterhours');
+    expect(currentRefreshWindow(new Date('2026-11-27T22:01:00Z'))).toBeNull();
+  });
 });

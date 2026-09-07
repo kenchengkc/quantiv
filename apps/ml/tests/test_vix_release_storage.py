@@ -160,6 +160,12 @@ def test_r2_push_refreshes_same_date_quarantine_evidence(
 def test_r2_pull_restores_vix_alias_from_active_release(
     tmp_path: Path,
 ) -> None:
+    # r2_pull now requires the production earnings-calendar baseline. This VIX
+    # unit test does not model R2 object bytes, so exercise the explicit local
+    # bootstrap path rather than weakening the production fail-closed default.
+    (tmp_path / "earnings_calendar.csv").write_text(
+        "act_symbol,date,timing\nAAPL,2026-08-24,amc\n"
+    )
     out_dir = tmp_path / "parquet" / "vix"
     out_dir.mkdir(parents=True)
     old_snapshot = out_dir / (
@@ -177,6 +183,7 @@ def test_r2_pull_restores_vix_alias_from_active_release(
         "PATH": f"{bin_dir}:{os.environ['PATH']}",
         "PYTHON_BIN": sys.executable,
         "RCLONE_LOG": str(log_path),
+        "R2_ALLOW_MISSING_EARNINGS_BASELINE": "1",
     }
     subprocess.run(
         ["bash", "scripts/r2_pull.sh"],
@@ -187,6 +194,9 @@ def test_r2_pull_restores_vix_alias_from_active_release(
         text=True,
     )
 
+    assert (tmp_path / "validation" / "earnings_calendar_baseline.csv").read_text() == (
+        tmp_path / "earnings_calendar.csv"
+    ).read_text()
     assert (out_dir / "vix.parquet").read_bytes() == snapshot.read_bytes()
     assert snapshot.exists()
     assert not old_snapshot.exists()

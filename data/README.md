@@ -1,28 +1,29 @@
-# Data
+# Data workspace
 
-`data/` contains repository-tracked state and small artifacts that support the data pipeline. Large local databases, Parquet partitions, downloads, and caches remain gitignored and are synchronized through the configured artifact stores instead.
+`data/` is Quantiv's local materialization and pipeline workspace. It is not the canonical production datastore and new mutable artifacts must not be added to Git.
+
+Production jobs restore the currently published release from R2, write candidate/provider output locally, run reconciliation and model/data gates, and publish verified immutable artifacts back to R2. The canonical earnings calendar is materialized as `data/earnings_calendar.csv`; the exact prior-release copy is retained as `data/validation/earnings_calendar_baseline.csv` for the regression gate.
 
 ## Directory contract
 
 ```text
 data/
-├── earnings_calendar.csv          # canonical tracked earnings calendar
-├── provider_enrichments/          # operational derived provider summaries
-├── provider_capabilities.json     # operational entitlement/capability cache
-├── provider_usage_ledger.json     # shared production/provider call ledger
-├── research/                      # artifacts that cannot affect publication by default
-│   ├── event_signals/             # paused/manual forward-accumulation panel
-│   ├── provider_probes/           # provider coverage and entitlement evidence
-│   └── provider_signals/          # isolated manual provider-signal samples
-└── ...                            # other small operational snapshots/metadata
+├── earnings_calendar.csv          # R2-materialized production input; not tracked
+├── validation/                    # per-run gates, receipts, and baselines
+├── parquet/                       # materialized analytical release members
+├── forecasts/                     # generated forecast artifacts
+├── models/                        # materialized model/control state
+├── quarantine/                    # rejected candidate evidence
+├── research/                      # isolated research/probe output
+└── ...                            # transitional operational caches
 ```
 
 Rules:
 
-- Keep production inputs, operational ledgers, and publication metadata at `data/` or in an explicitly owned operational subdirectory.
-- Put manual experiments, probes, and evidence collection under `data/research/`.
-- Research artifacts must not enter frontend publication or ML admission unless an explicit reviewed pipeline consumes them and the corresponding control policy permits it.
-- Do not use `data/` as a general source-code directory.
-- Git ignores `/data/` by default because most local artifacts are large. Existing tracked files continue to update normally; adding a brand-new tracked artifact under `data/` may require `git add -f` plus an explicit review of why it belongs in Git.
+- R2/release manifests are authoritative for mutable production datasets, model bundles, forecasts, and control evidence.
+- Git is authoritative for source, schemas, stable configuration, documentation, and small deterministic test fixtures.
+- Research artifacts must never enter publication or model admission unless a reviewed production pipeline explicitly consumes them.
+- Do not `git add -f` a new file under `data/`. If a generator needs cross-run state, give that state an explicit artifact-store owner and materialization path.
+- A small number of historical operational caches remain tracked during migration; treat them as transitional debt rather than precedent for new files.
 
-See [`scripts/README.md`](../scripts/README.md) for production data commands and [`docs/EVENT_DATA_BACKFILL.md`](../docs/EVENT_DATA_BACKFILL.md) for the paused event-signal research history.
+See [`docs/REPOSITORY_STATE_POLICY.md`](../docs/REPOSITORY_STATE_POLICY.md), [`docs/runbooks/ARTIFACT_MATERIALIZATION.md`](../docs/runbooks/ARTIFACT_MATERIALIZATION.md), and [`scripts/README.md`](../scripts/README.md).

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Restore data/ from R2 at the start of GitHub Actions.
+# Materialize the current production data release from R2 at the start of CI.
 # Needs rclone pointed at R2 (docs/R2_SETUP.md). Actions builds that from secrets.
 
 set -euo pipefail
@@ -7,12 +7,56 @@ set -euo pipefail
 DATA_DIR="${DATA_DIR:-data}"
 REMOTE="${R2_REMOTE:-r2:${R2_BUCKET:-quantiv-data}}"
 PYTHON_BIN="${PYTHON_BIN:-python}"
+ALLOW_MISSING_EARNINGS_BASELINE="${R2_ALLOW_MISSING_EARNINGS_BASELINE:-0}"
 
+mkdir -p "$DATA_DIR" "$DATA_DIR/validation"
 echo "📥 Pulling from $REMOTE → $DATA_DIR/"
 
 # Which data version to use. Fine if this is the first run.
 rclone copy "$REMOTE/control" "$DATA_DIR/control" \
   --fast-list --transfers=4 --progress 2>/dev/null || true
+
+materialize_earnings_calendar() {
+  # The earnings calendar is mutable production state, not source code. Resolve
+  # the last published copy before provider mutation and retain those exact
+  # bytes as the integrity-gate baseline for this run.
+  local target="$DATA_DIR/earnings_calendar.csv"
+  local baseline="$DATA_DIR/validation/earnings_calendar_baseline.csv"
+  local tmp="$DATA_DIR/.earnings_calendar.csv.$$.tmp"
+  local download_ok=0
+
+  rm -f "$tmp"
+  if rclone copyto "$REMOTE/earnings_calendar.csv" "$tmp"; then
+    download_ok=1
+  fi
+
+  if [ "$download_ok" = "1" ] && [ -s "$tmp" ]; then
+    mv "$tmp" "$target"
+    cp "$target" "$baseline"
+    echo "✅ Materialized prior-release earnings calendar and integrity baseline"
+  elif [ "$ALLOW_MISSING_EARNINGS_BASELINE" = "1" ] && [ -s "$target" ]; then
+    # Explicit bootstrap/test escape hatch only. Normal production CI leaves
+    # this disabled and therefore fails closed when the canonical R2 object is
+    # absent, unreadable, or empty.
+    rm -f "$tmp"
+    cp "$target" "$baseline"
+    echo "⚠️  R2 earnings calendar unavailable; using explicit bootstrap local baseline"
+  else
+    if [ "$download_ok" = "1" ]; then
+      echo "Downloaded earnings calendar is empty; refusing materialization" >&2
+    else
+      echo "Missing canonical R2 earnings calendar; refusing to run without a prior-release baseline" >&2
+    fi
+    rm -f "$tmp"
+    exit 1
+  fi
+
+  # Parquet is a compatibility/analytical derivative and may not exist in older
+  # releases; the CSV remains the canonical provider-merge input.
+  rclone copy "$REMOTE/earnings_calendar.parquet" "$DATA_DIR/" 2>/dev/null || true
+}
+
+materialize_earnings_calendar
 
 # Options, daily prices, and vol history.
 rclone copy "$REMOTE/parquet" "$DATA_DIR/parquet" \
@@ -71,9 +115,6 @@ temporary = alias.with_name(f".{alias.name}.{os.getpid()}.tmp")
 shutil.copyfile(selected, temporary)
 os.replace(temporary, alias)
 
-# Older releases briefly accumulated one immutable VIX snapshot per day. Keep
-# the latest verified object plus the mutable compatibility alias locally so
-# the next release heals itself instead of perpetuating that historical set.
 for snapshot in alias.parent.glob("vix-through-*.parquet"):
     if snapshot != selected:
         snapshot.unlink()
@@ -94,19 +135,15 @@ fi
 rclone sync "$REMOTE/forecasts" "$DATA_DIR/forecasts" \
   --fast-list --transfers=8 --progress 2>/dev/null || true
 
-# Earnings calendar stays in git unless R2_PULL_EARNINGS=1. That flag is used
-# by the weekly/manual retrain path, which must also restore and verify the
-# latest reconciliation decision before it is allowed to train or mutate models.
+# Weekly/manual retraining additionally restores the latest reconciliation
+# decision and verifies that the materialized release is eligible for training.
 if [ "${R2_PULL_EARNINGS:-0}" = "1" ]; then
-  rclone copy "$REMOTE/earnings_calendar.csv"     "$DATA_DIR/" 2>/dev/null || true
-  rclone copy "$REMOTE/earnings_calendar.parquet" "$DATA_DIR/" 2>/dev/null || true
-  mkdir -p "$DATA_DIR/validation"
   rclone copyto \
     "$REMOTE/validation/data_reconciliation.json" \
     "$DATA_DIR/validation/data_reconciliation.json"
   "$PYTHON_BIN" scripts/verify_retrain_data_gate.py --data-dir "$DATA_DIR"
 fi
-rclone copy "$REMOTE/bias_curves.parquet"   "$DATA_DIR/" 2>/dev/null || true
+rclone copy "$REMOTE/bias_curves.parquet" "$DATA_DIR/" 2>/dev/null || true
 
 echo "✅ Pull complete"
 du -sh "$DATA_DIR/parquet" "$DATA_DIR/models" 2>/dev/null || true

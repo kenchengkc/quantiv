@@ -1,15 +1,17 @@
 """
-Gate the daily-refresh auto-commit by comparing the freshly built
-data/earnings_calendar.csv against the version at git HEAD.
+Gate the daily refresh by comparing the freshly built earnings calendar against
+an explicitly materialized prior-release baseline.
 
-Always prints a structured diff summary (visible in CI logs); exits
-non-zero if any integrity guardrail trips. The workflow's commit step
-runs only on success, so a tripped gate aborts the commit without
-shipping a regressed CSV.
+Production uses ``data/validation/earnings_calendar_baseline.csv``, written by
+``scripts/r2_pull.sh`` from the previously published R2 calendar before any
+provider mutation occurs. This keeps the regression gate independent of Git
+working-tree state. For local/backward-compatible use only, the gate can still
+fall back to the CSV at git HEAD when no explicit baseline exists.
 
-History: shipped 2026-05-18 after a sync_dolthub.py left-join bug
-wiped ~960 Finnhub-discovered upcoming earnings rows (MARA, CYBR,
-CLSK, MOS, FSK, etc.) silently across multiple CI runs.
+Always prints a structured diff summary and exits non-zero if a guardrail trips.
+
+History: shipped 2026-05-18 after a sync_dolthub.py left-join bug wiped ~960
+Finnhub-discovered upcoming earnings rows silently across multiple CI runs.
 """
 from __future__ import annotations
 
@@ -21,15 +23,12 @@ from pathlib import Path
 
 import pandas as pd
 
-# Single source of truth for the foreign-suffix denylist (US dual-class
-# share classes like BRK.B / BF.B / MOG.A / GRP.U stay correctly
-# classified as US). Both scripts live in scripts/, so a sibling import
-# works when invoked as `python scripts/check_earnings_calendar_integrity.py`.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from sync_finnhub_earnings import is_us_symbol  # noqa: E402
 from delisted import is_retired  # noqa: E402
 
 CSV_PATH = Path("data/earnings_calendar.csv")
+DEFAULT_BASELINE_PATH = Path("data/validation/earnings_calendar_baseline.csv")
 
 
 def read_csv(buf_or_path) -> pd.DataFrame:
@@ -38,20 +37,28 @@ def read_csv(buf_or_path) -> pd.DataFrame:
     return df.dropna(subset=["date", "act_symbol"])
 
 
-def head_csv() -> pd.DataFrame | None:
-    """Return the CSV at git HEAD, or None if we can't read it (e.g.
-    first run, file not tracked yet, repo not a git checkout)."""
+def _git_head_csv() -> pd.DataFrame | None:
+    """Compatibility fallback for local checkouts during the migration."""
     try:
         blob = subprocess.run(
             ["git", "show", f"HEAD:{CSV_PATH}"],
             capture_output=True,
             check=True,
         ).stdout
-    except subprocess.CalledProcessError:
+    except (subprocess.CalledProcessError, FileNotFoundError):
         return None
     if not blob:
         return None
     return read_csv(io.BytesIO(blob))
+
+
+def baseline_csv(path: Path) -> tuple[pd.DataFrame | None, str | None]:
+    if path.exists():
+        return read_csv(path), str(path)
+    fallback = _git_head_csv()
+    if fallback is not None:
+        return fallback, f"git HEAD:{CSV_PATH} (compatibility fallback)"
+    return None, None
 
 
 def fmt_delta(new: int, old: int) -> str:
@@ -63,16 +70,20 @@ def fmt_delta(new: int, old: int) -> str:
 
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__)
-    # Thresholds tuned 2026-05-18 against the first full nightly CI run after
-    # commit d8d97f0 (CSV persisted across runs). Observed daily churn vs the
-    # prior committed CSV: ~300 US-only past-30d vanishes, ~90 US-only next-60d
-    # vanishes, and ~1.5% row drop — almost entirely DoltHub's daily aggregator
-    # revisions (small-cap projection dates that shift by ±5-10 days as the
-    # SEC filing deadline approaches), not data loss. The anchor-ticker gate
-    # (any anchor with ≥10 prior rows losing ALL rows) is the real silent-drop
-    # protection; these per-event thresholds are secondary backstops sized
-    # well below the 712-row failure mode of the 2026-05-18 sync_dolthub
-    # left-join bug.
+    p.add_argument(
+        "--baseline",
+        type=Path,
+        default=DEFAULT_BASELINE_PATH,
+        help=f"Prior verified calendar snapshot (default: {DEFAULT_BASELINE_PATH})",
+    )
+    p.add_argument(
+        "--require-baseline",
+        action="store_true",
+        help="Fail closed when no explicit baseline file exists. Production CI should set this.",
+    )
+    # Thresholds were tuned against ordinary daily churn. The anchor gate is
+    # the strongest silent-drop protection; event-count thresholds are
+    # secondary backstops sized below the 2026-05-18 regression signature.
     p.add_argument(
         "--max-row-drop-pct",
         type=float,
@@ -89,19 +100,19 @@ def main() -> int:
         "--max-past-vanished",
         type=int,
         default=400,
-        help="Fail if more than this many US (ticker, date) events from the past 30 days vanish vs HEAD (default 400)",
+        help="Fail if more than this many US (ticker, date) events from the past 30 days vanish vs baseline (default 400)",
     )
     p.add_argument(
         "--max-future-vanished",
         type=int,
         default=150,
-        help="Fail if more than this many US (ticker, date) events in the next 60 days vanish vs HEAD (default 150)",
+        help="Fail if more than this many US (ticker, date) events in the next 60 days vanish vs baseline (default 150)",
     )
     p.add_argument(
         "--anchor-min-history",
         type=int,
         default=10,
-        help="Tickers with ≥ this many historical rows are 'anchors' — any anchor losing all rows fails the gate (default 10)",
+        help="Tickers with ≥ this many historical rows are anchors; any anchor losing all rows fails the gate",
     )
     p.add_argument(
         "--warn-only",
@@ -114,24 +125,27 @@ def main() -> int:
         print(f"❌ {CSV_PATH} does not exist — nothing to check")
         return 1
 
+    if args.require_baseline and not args.baseline.exists():
+        print(f"❌ Required prior-release baseline missing: {args.baseline}")
+        return 1
+
     new = read_csv(CSV_PATH)
-    old = head_csv()
+    old, baseline_source = baseline_csv(args.baseline)
 
     if old is None:
-        print("ℹ No prior CSV at HEAD — first commit, skipping integrity gate")
+        print("ℹ No prior calendar baseline available — skipping comparative integrity gates")
         print(f"  current: {len(new):,} rows across {new['act_symbol'].nunique():,} tickers")
         return 0
 
-    # --- Always-on diff summary --------------------------------------
     print("=" * 60)
     print("EARNINGS CALENDAR INTEGRITY CHECK")
     print("=" * 60)
+    print(f"Baseline: {baseline_source}")
     print(f"Rows:    {fmt_delta(len(new), len(old))}")
     print(
         f"Tickers: {fmt_delta(new['act_symbol'].nunique(), old['act_symbol'].nunique())}"
     )
 
-    # Source breakdown (where the new rows came from)
     src_new = new["source"].value_counts().to_dict() if "source" in new.columns else {}
     src_old = old["source"].value_counts().to_dict() if "source" in old.columns else {}
     if src_new or src_old:
@@ -139,7 +153,6 @@ def main() -> int:
         for k in sorted(set(src_new) | set(src_old)):
             print(f"  {k:24} {fmt_delta(int(src_new.get(k, 0)), int(src_old.get(k, 0)))}")
 
-    # Per-(ticker,date) key set diff
     k_new = set(zip(new["act_symbol"], new["date"]))
     k_old = set(zip(old["act_symbol"], old["date"]))
     added = k_new - k_old
@@ -154,7 +167,6 @@ def main() -> int:
     )
 
     def _is_low_confidence_provider_churn(sym: str) -> bool:
-        """Return True for sub-anchor tickers with no DoltHub backing in HEAD."""
         if int(old_counts_by_ticker.get(sym, 0)) >= args.anchor_min_history:
             return False
         sources = old_sources_by_ticker.get(sym, ())
@@ -162,32 +174,14 @@ def main() -> int:
             "dolthub" not in str(source).lower() for source in sources
         )
 
-    # Past 30d / next 60d windows. We compare SETS of (ticker, date) keys
-    # across CSVs — not bare counts — so events naturally rolling out of
-    # the window don't look like a regression. Only events that existed
-    # in HEAD's window AND are missing from the new CSV count as
-    # "vanished" (the actual silent-drop signature).
-    #
-    # Date-drift rescue: DoltHub refreshes its earnings_calendar daily and
-    # routinely shifts a ticker's estimated date by 1-7 days as the print
-    # approaches. Those shifts would otherwise show up as a (ticker, date)
-    # pair vanishing in HEAD while a new (ticker, date') pair appears for
-    # the same ticker. We don't want to fail the gate on those — they're
-    # date corrections, not data loss. A vanished (ticker, date) is rescued
-    # if the same ticker has ANY row within ±DATE_DRIFT_DAYS of that date
-    # in the new CSV. The original 2026-05-18 regression-mode bug (rows
-    # dropped silently) is still caught because dropped tickers have zero
-    # nearby rows. Anchor-ticker gate (below) provides a second safety net.
+    # Date-drift rescue: estimated earnings dates can shift as the event
+    # approaches. A vanished key is rescued when the same ticker still has a
+    # nearby event in the new calendar; complete ticker loss remains visible.
     DATE_DRIFT_DAYS = 14
 
     today = pd.Timestamp.today().date()
     past_start = today - pd.Timedelta(days=30)
     future_end = today + pd.Timedelta(days=60)
-    # Restrict the windows to US-only keys. sync_dolthub.py's universe gate
-    # intentionally trims foreign-suffix tickers (.HK/.KS/.TW/.TA/.OL/.PA/
-    # .TO/.L/.BR/.IR/.V/.PA/etc.) every run — events for those tickers
-    # vanishing is expected behavior, not a regression. We measure the
-    # vanished-event count on the US subset only.
     past_old = {k for k in k_old if past_start <= k[1] <= today and is_us_symbol(k[0])}
     past_new = {k for k in k_new if past_start <= k[1] <= today and is_us_symbol(k[0])}
     future_old = {k for k in k_old if today < k[1] <= future_end and is_us_symbol(k[0])}
@@ -206,8 +200,6 @@ def main() -> int:
 
     past_vanished_raw = past_old - past_new
     future_vanished_raw = future_old - future_new
-    # Drop date-drifted rescues and retired tickers (delisted via M&A/bankruptcy
-    # or renamed away) — their events vanishing is expected, not a regression.
     past_vanished_base = {
         k for k in past_vanished_raw if not _rescued(*k) and not is_retired(k[0])
     }
@@ -226,12 +218,12 @@ def main() -> int:
     future_drifted = len(future_vanished_raw) - len(future_vanished_base)
     print(
         f"Past 30d:  {len(past_new):,} events  "
-        f"({len(past_vanished):,} vanished vs HEAD, "
+        f"({len(past_vanished):,} vanished vs baseline, "
         f"{past_drifted:,} date-drifted, {len(past_new - past_old):,} new)"
     )
     print(
         f"Next 60d:  {len(future_new):,} events  "
-        f"({len(future_vanished):,} vanished vs HEAD, "
+        f"({len(future_vanished):,} vanished vs baseline, "
         f"{future_drifted:,} date-drifted, {len(future_new - future_old):,} new)"
     )
     if past_churn_trimmed or future_churn_trimmed:
@@ -243,12 +235,8 @@ def main() -> int:
         )
 
     print()
-
-    # --- Guardrails --------------------------------------------------
     tripped: list[str] = []
 
-    # 1. Total row count drop — measured on the US-only subset so that
-    #    sync_dolthub's foreign-symbol cleanup doesn't trip the gate.
     old_us = old[old["act_symbol"].map(is_us_symbol)]
     new_us = new[new["act_symbol"].map(is_us_symbol)]
     if len(old_us) > 0:
@@ -264,29 +252,10 @@ def main() -> int:
                 f"{len(old_us):,} → {len(new_us):,})"
             )
 
-    # 2. Vanished tickers — but exclude foreign symbols, which sync_dolthub's
-    #    universe gate (commit 9876311e) intentionally trims out. Foreign
-    #    rows leak into the CSV during broad Finnhub overlays and get
-    #    cleaned up the next time sync_dolthub runs — expected behavior, not
-    #    a regression. Uses the shared is_us_symbol denylist so US dual-class
-    #    share tickers (BRK.B, BF.B, MOG.A, GRP.U) are correctly counted as
-    #    US and a regression affecting them would still trip the gate.
     vanished_all = set(old["act_symbol"]) - set(new["act_symbol"])
     foreign_trimmed = {t for t in vanished_all if not is_us_symbol(t)}
-    # Retired tickers (delisted via config/delisted_tickers.json, or renamed
-    # away via config/ticker_renames.json) are removed on purpose; their
-    # disappearance is expected, not a silent-drop regression.
     retired_trimmed = {t for t in vanished_all if is_retired(t)}
     vanished = vanished_all - foreign_trimmed - retired_trimmed
-    # Finnhub's upcoming-earnings discovery is volatile for illiquid names: a
-    # ticker that only ever appeared via Finnhub (no DoltHub backing) and
-    # carried fewer than --anchor-min-history rows swings in and out of the
-    # feed day to day. Counting those vanishings trips the gate on ordinary
-    # churn, not the silent-drop regression it guards — which removes
-    # DoltHub-backed or established tickers (still counted here) and is caught
-    # harder by the anchor gate below (any ticker with ≥anchor-min-history rows
-    # losing all of them, provider-only included). Exclude provider-only
-    # sub-anchor names so a high-churn provider day can't trip the count gate.
     churn_trimmed = {t for t in vanished if _is_low_confidence_provider_churn(t)}
     vanished = vanished - churn_trimmed
     if foreign_trimmed:
@@ -308,27 +277,20 @@ def main() -> int:
             f"(threshold: {args.max_ticker_drop}). Sample: {sample}"
         )
 
-    # 3. Past 30d events vanishing (regressing already-happened earnings).
     if len(past_vanished) > args.max_past_vanished:
         sample = sorted(past_vanished, key=lambda x: (x[1], x[0]), reverse=True)[:15]
         tripped.append(
-            f"{len(past_vanished):,} events from the past 30 days vanished vs HEAD "
+            f"{len(past_vanished):,} events from the past 30 days vanished vs baseline "
             f"(threshold: {args.max_past_vanished}). Sample: {sample}"
         )
 
-    # 4. Next 60d events vanishing (regressing upcoming earnings — the
-    #    signature of the 2026-05-18 bug, where 712 of the 961 dropped
-    #    rows were future-dated upcoming events).
     if len(future_vanished) > args.max_future_vanished:
         sample = sorted(future_vanished, key=lambda x: (x[1], x[0]))[:15]
         tripped.append(
-            f"{len(future_vanished):,} events in the next 60 days vanished vs HEAD "
+            f"{len(future_vanished):,} events in the next 60 days vanished vs baseline "
             f"(threshold: {args.max_future_vanished}). Sample: {sample}"
         )
 
-    # 5. Blank act_symbol in the new CSV — never a legitimate ticker
-    #    (usually pandas eating "NA" on a read without keep_default_na=False).
-    #    Reject at commit time so corruption can't ship.
     blank_new = new[new["act_symbol"].astype(str).str.strip() == ""]
     if len(blank_new):
         sample_dates = sorted(blank_new["date"].unique())[:5]
@@ -337,11 +299,6 @@ def main() -> int:
             f"(sample dates: {sample_dates})"
         )
 
-    # 6. Anchor tickers losing all rows. "Anchor" = had ≥N historical rows
-    #    in the prior CSV — established names whose disappearance signals
-    #    a universe-wide drop, not a delisting. Blank act_symbol values are
-    #    never legitimate tickers — exclude them so cleanup of corrupt rows
-    #    in HEAD can't block shipping a clean new CSV (see gate 5).
     anchors = {
         sym
         for sym in old_counts_by_ticker[
@@ -350,9 +307,6 @@ def main() -> int:
         if str(sym or "").strip()
     }
     anchors_in_new = set(new["act_symbol"].unique())
-    # A retired anchor losing all rows (delisted, or renamed to a new symbol) is
-    # the intended outcome, not a universe-wide drop — exclude it so the commit
-    # ships. (For renames the new symbol picks the rows back up.)
     lost_anchors = {a for a in (anchors - anchors_in_new) if not is_retired(a)}
     if lost_anchors:
         sample = sorted(lost_anchors)[:20]
@@ -361,7 +315,6 @@ def main() -> int:
             f"lost all rows: {sample}"
         )
 
-    # --- Result ------------------------------------------------------
     if not tripped:
         print("✅ All integrity gates passed")
         return 0
@@ -375,7 +328,7 @@ def main() -> int:
         print("⚠ --warn-only set; exiting 0 despite tripped gate(s)")
         return 0
 
-    print("Aborting auto-commit to prevent shipping a regressed CSV.")
+    print("Aborting publication to prevent shipping a regressed earnings calendar.")
     print("If this is a legitimate large change, re-run with --warn-only or")
     print("widen the threshold flags (--max-row-drop-pct / --max-ticker-drop / ...).")
     return 1

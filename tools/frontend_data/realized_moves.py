@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+import json
 import os
-import re
 from datetime import date, datetime, timedelta
 
 from twelvedata_basic import (
@@ -13,7 +13,8 @@ from twelvedata_basic import (
     plan_credit_use,
 )
 
-from .shared import DATA_DIR, ET, MARKET_HOLIDAYS_TS, jsonable
+from .shared import DATA_DIR, ET, MARKET_SESSIONS_JSON, jsonable
+
 
 def monday_of_week(d: date) -> date:
     return d - timedelta(days=d.weekday())
@@ -30,26 +31,31 @@ def target_week(today: date) -> tuple[date, date]:
 
 # Week offsets we expose in the UI: last week, this week, next week, week after next.
 WEEK_OFFSETS = [-1, 0, 1, 2]
+DEFAULT_REGULAR_CLOSE_MIN = 16 * 60
 
 
-def load_market_holidays() -> set[date]:
-    if not MARKET_HOLIDAYS_TS.exists():
-        return set()
-    text = MARKET_HOLIDAYS_TS.read_text()
-    match = re.search(
-        r"MARKET_HOLIDAYS_US\s*=\s*\[(.*?)\]\s*as const",
-        text,
-        flags=re.S,
-    )
-    if not match:
-        return set()
-    return {
-        date.fromisoformat(m.group(0))
-        for m in re.finditer(r"\d{4}-\d{2}-\d{2}", match.group(1))
+def load_market_sessions() -> tuple[set[date], dict[date, int]]:
+    if not MARKET_SESSIONS_JSON.exists():
+        raise RuntimeError(
+            f"canonical market session contract is missing: {MARKET_SESSIONS_JSON}"
+        )
+    payload = json.loads(MARKET_SESSIONS_JSON.read_text())
+    if payload.get("schema") != "quantiv.market-sessions.v1":
+        raise RuntimeError("unsupported canonical market session schema")
+    holidays = {
+        date.fromisoformat(str(value))
+        for value in payload.get("holidays") or []
     }
+    early_closes: dict[date, int] = {}
+    for day, close in (payload.get("early_closes") or {}).items():
+        hour, minute = (int(part) for part in str(close).split(":", 1))
+        early_closes[date.fromisoformat(str(day))] = hour * 60 + minute
+    if not holidays:
+        raise RuntimeError("canonical market session contract contains no holidays")
+    return holidays, early_closes
 
 
-MARKET_HOLIDAYS = load_market_holidays()
+MARKET_HOLIDAYS, MARKET_EARLY_CLOSES = load_market_sessions()
 
 
 def timing_bucket(timing: str | None) -> str:
@@ -85,7 +91,8 @@ def realization_window_complete(
         return True
     if now_et.date() < close_date:
         return False
-    return now_et.hour * 60 + now_et.minute >= 16 * 60
+    close_minute = MARKET_EARLY_CLOSES.get(close_date, DEFAULT_REGULAR_CLOSE_MIN)
+    return now_et.hour * 60 + now_et.minute >= close_minute
 
 
 def realized_move_from_ohlcv(

@@ -1,0 +1,192 @@
+name: Model provenance rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_current:
+        description: "Exact current champion SHA-256 authorized for recovery."
+        required: true
+        type: string
+      target_bundle:
+        description: "Exact signed previous champion SHA-256 to restore."
+        required: true
+        type: string
+      reason:
+        description: "Provenance incident and recovery reason."
+        required: true
+        type: string
+
+concurrency:
+  group: model-provenance-rollback
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment: production-recovery
+    env:
+      EXPECTED_CURRENT: ${{ inputs.expected_current }}
+      ROLLBACK_TARGET: ${{ inputs.target_bundle }}
+      ROLLBACK_REASON: ${{ inputs.reason }}
+      R2_BUCKET: ${{ secrets.R2_BUCKET || 'quantiv-data' }}
+    steps:
+      - name: Require isolated main-branch recovery
+        env:
+          ADMIN_API_KEY: ${{ secrets.ADMIN_API_KEY }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = refs/heads/main
+          test -n "$ROLLBACK_REASON"
+          test -n "$ADMIN_API_KEY"
+          test -n "$DATABASE_URL"
+          [[ "$EXPECTED_CURRENT" =~ ^[0-9a-f]{64}$ ]]
+          [[ "$ROLLBACK_TARGET" =~ ^[0-9a-f]{64}$ ]]
+          test "$EXPECTED_CURRENT" != "$ROLLBACK_TARGET"
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Install verified rclone
+        run: bash scripts/install_rclone.sh
+
+      - name: Configure R2
+        env:
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.config/rclone
+          cat > ~/.config/rclone/rclone.conf <<EOF
+          [r2]
+          type = s3
+          provider = Cloudflare
+          access_key_id = $R2_ACCESS_KEY_ID
+          secret_access_key = $R2_SECRET_ACCESS_KEY
+          endpoint = https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com
+          region = auto
+          EOF
+
+      - name: Restore recovery evidence
+        run: |
+          set -euo pipefail
+          bash scripts/r2_pull.sh
+          rclone sync "r2:$R2_BUCKET/forecasts" data/forecasts
+          mkdir -p data/validation/provenance-recovery
+          rclone copyto "r2:$R2_BUCKET/validation/data_reconciliation.json" data/validation/provenance-recovery/reconciliation-before.json
+          rclone copyto "r2:$R2_BUCKET/control/current_data_release.json" data/validation/provenance-recovery/data-pointer-before.json
+          cp data/models/control/champion.json data/validation/provenance-recovery/champion-before.json
+          cp data/models/control/registry.json data/validation/provenance-recovery/registry-before.json
+
+      - name: Verify exact signed rollback authorization
+        run: |
+          python scripts/provenance_model_rollback.py --check-only \
+            --expected-current-bundle-id "$EXPECTED_CURRENT" \
+            --target-bundle-id "$ROLLBACK_TARGET" --reason "$ROLLBACK_REASON"
+
+      - name: Rescore signed previous bundle
+        run: |
+          python scripts/setup_duckdb_from_parquet.py
+          python scripts/daily_score.py --days-ahead 21 \
+            --models-dir "data/models/bundles/$ROLLBACK_TARGET" \
+            --output-path data/validation/provenance-recovery/forecast.parquet
+
+      - name: Validate rollback forecast
+        run: |
+          python scripts/validate_ml_pipeline.py forecasts \
+            --forecast-path data/validation/provenance-recovery/forecast.parquet \
+            --models-dir "data/models/bundles/$ROLLBACK_TARGET" \
+            --report data/validation/provenance-recovery/forecast-validation.json
+
+      - name: Verify complete Neon replacement coverage
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          python scripts/verify_model_recovery.py --preflight \
+            --evidence-dir data/validation/provenance-recovery \
+            --expected-bundle-id "$ROLLBACK_TARGET"
+
+      - name: Re-sign constrained rollback state
+        env:
+          MODEL_BUNDLE_SIGNING_KEY: ${{ secrets.MODEL_BUNDLE_SIGNING_KEY }}
+        run: |
+          python scripts/provenance_model_rollback.py \
+            --expected-current-bundle-id "$EXPECTED_CURRENT" \
+            --target-bundle-id "$ROLLBACK_TARGET" \
+            --reason "$ROLLBACK_REASON" \
+            --candidate-forecast data/validation/provenance-recovery/forecast.parquet \
+            --report data/validation/provenance-recovery/decision.json
+          FORECAST_PATH=$(jq -er .production_forecast data/validation/provenance-recovery/decision.json)
+          python scripts/validate_ml_pipeline.py forecasts \
+            --forecast-path "$FORECAST_PATH" \
+            --models-dir "data/models/bundles/$ROLLBACK_TARGET" \
+            --report data/validation/provenance-recovery/production-validation.json \
+            --publish-receipt-dir data/forecasts/receipts
+
+      - name: Recheck remote race guard and publish recovery
+        run: |
+          set -euo pipefail
+          rclone copyto "r2:$R2_BUCKET/models/control/champion.json" data/validation/provenance-recovery/champion-prepush.json
+          rclone copyto "r2:$R2_BUCKET/models/control/registry.json" data/validation/provenance-recovery/registry-prepush.json
+          rclone copyto "r2:$R2_BUCKET/control/current_data_release.json" data/validation/provenance-recovery/data-pointer-prepush.json
+          rclone copyto "r2:$R2_BUCKET/validation/data_reconciliation.json" data/validation/provenance-recovery/reconciliation-prepush.json
+          cmp data/validation/provenance-recovery/champion-before.json data/validation/provenance-recovery/champion-prepush.json
+          cmp data/validation/provenance-recovery/registry-before.json data/validation/provenance-recovery/registry-prepush.json
+          cmp data/validation/provenance-recovery/data-pointer-before.json data/validation/provenance-recovery/data-pointer-prepush.json
+          cmp data/validation/provenance-recovery/reconciliation-before.json data/validation/provenance-recovery/reconciliation-prepush.json
+          bash scripts/r2_push.sh --model-recovery
+
+      - name: Activate exact restored bundle on Railway
+        env:
+          RAILWAY_BACKEND_URL: ${{ secrets.RAILWAY_BACKEND_URL }}
+          ADMIN_API_KEY: ${{ secrets.ADMIN_API_KEY }}
+        run: |
+          python scripts/activate_model_bundle.py \
+            --decision data/validation/provenance-recovery/decision.json \
+            --receipt data/validation/provenance-recovery/activation.json
+
+      - name: Import exact restored forecast into Neon
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          FORECAST_PATH=$(jq -er .production_forecast data/validation/provenance-recovery/decision.json)
+          python scripts/import_recent_to_postgres.py --file "$FORECAST_PATH" \
+            --full --require-database \
+            --expected-model-bundle-id "$ROLLBACK_TARGET" \
+            --activation-receipt data/validation/provenance-recovery/activation.json \
+            --receipt data/validation/provenance-recovery/import.json
+
+      - name: Verify read-back identities and publication hold
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          rclone copyto "r2:$R2_BUCKET/models/control/champion.json" data/validation/provenance-recovery/champion-after.json
+          rclone copyto "r2:$R2_BUCKET/models/control/registry.json" data/validation/provenance-recovery/registry-after.json
+          rclone copyto "r2:$R2_BUCKET/control/current_data_release.json" data/validation/provenance-recovery/data-pointer-after.json
+          rclone copyto "r2:$R2_BUCKET/validation/data_reconciliation.json" data/validation/provenance-recovery/reconciliation-after.json
+          cmp data/validation/provenance-recovery/data-pointer-before.json data/validation/provenance-recovery/data-pointer-after.json
+          cmp data/validation/provenance-recovery/reconciliation-before.json data/validation/provenance-recovery/reconciliation-after.json
+          python scripts/verify_model_recovery.py \
+            --evidence-dir data/validation/provenance-recovery \
+            --expected-bundle-id "$ROLLBACK_TARGET"
+
+      - name: Preserve provenance recovery evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: provenance-model-recovery
+          path: data/validation/provenance-recovery
+          retention-days: 90
+          if-no-files-found: ignore

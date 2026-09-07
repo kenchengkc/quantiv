@@ -1,62 +1,42 @@
-// US equity market-hours helpers.
-//
-// Two notions:
-//   • NYSE regular session (for UI "market closed" badges): 09:30–16:00 ET.
-//   • Quote refresh window (Finnhub cron + cache warming + fast client polls):
-//     weekday 09:25 ET → 16:45 ET inclusive, excluding Sat/Sun and NYSE holidays.
-// The pre-open buffer pre-warms before the bell. The post-close buffer (~45 min
-// after the 16:00 bell) covers vendor delay before same-day close / day change
-// show up in Finnhub. The cron walks a rotating cursor through ~300 symbols at
-// ~50/min, so each ticker only updates every ~6 min; the 45-min buffer ensures
-// every ticker gets at least one post-close refresh pass.
-//
-// Half-day sessions (e.g. 13:00 ET early close on Black Friday and Christmas
-// Eve) are intentionally treated as full days. The harm is limited to a few
-// hours of redundant Finnhub fetches that overwrite the same close price —
-// not worth the two extra dates/year of calendar maintenance.
+// US equity market-hours helpers backed by one repository-wide NYSE session
+// contract. Full-day holidays and early closes live in config/market_sessions.json;
+// frontend, Cloudflare Worker, and Python control paths must consume that same file.
 
-import { MARKET_HOLIDAYS_US } from './marketHolidays.generated';
+import MARKET_SESSIONS from '../../../config/market_sessions.json';
 
 /** First minute we start hitting Finnhub (slightly before the 09:30 open). */
 const QUOTE_REFRESH_OPEN_MIN = 9 * 60 + 25; // 09:25 ET
-/** Last minute we still refresh quotes (after 16:00 close; feeds often lag
- *  15–20+ min, and the rotating cursor takes a few minutes to reach every
- *  ticker, so 45 min ensures full post-close coverage). */
-const QUOTE_REFRESH_CLOSE_MIN = 16 * 60 + 45; // 16:45 ET
+/** Keep a short settle window after the actual regular close. On an early-close
+ * session this becomes 13:45 ET rather than incorrectly running until 16:45. */
+const QUOTE_SETTLE_MINUTES = 45;
 
 const REGULAR_OPEN_MIN = 9 * 60 + 30; // 09:30 ET
-/** First minute after the 16:00 regular close (exclusive end for session-open check). */
-const REGULAR_CLOSE_MIN = 16 * 60; // 16:00 ET
+const DEFAULT_REGULAR_CLOSE_MIN = 16 * 60; // 16:00 ET
 
 // Extended-hours windows for "tickers reporting today" focused refresh via
-// Alpaca Basic's free IEX feed. IEX system hours are 08:00-17:00 ET, so
-// the free feed is useful for the BMO window shortly before the open and
-// the first post-close hour for AMC reporters. If we later pay for SIP,
-// these bounds can widen toward the full 04:00-20:00 extended-hours span.
-// The regular cron (above) walks the full universe inside RTH; these two
-// narrower windows fire only for today's BMO / AMC reporters, which keeps
-// Alpaca rate-limit pressure low.
-//
-// After-hours starts at 16:00 ET (the bell), not after the old regular
-// cron's 16:45 settle. The first 15-45 minutes after the print is where
-// most of the earnings move happens, so the refresh-session classifier
-// gives after-hours precedence over the broader settle window below.
-const PREMARKET_OPEN_MIN  = 8 * 60;       // 08:00 ET — start of IEX pre-market session
-const PREMARKET_CLOSE_MIN = 9 * 60 + 24;  // 09:24 ET — hand off to the regular cron at 09:25
-const AFTERHOURS_OPEN_MIN = 16 * 60;      // 16:00 ET — at the bell (earnings prints land here)
-const AFTERHOURS_CLOSE_MIN = 17 * 60;     // 17:00 ET — end of IEX post-market session
+// Alpaca Basic's free IEX feed. On an NYSE early-close session, after-hours starts
+// at the actual 13:00 close rather than the normal 16:00 bell.
+const PREMARKET_OPEN_MIN = 8 * 60; // 08:00 ET — start of IEX pre-market session
+const PREMARKET_CLOSE_MIN = 9 * 60 + 24; // 09:24 ET — hand off to regular refresh
+const AFTERHOURS_CLOSE_MIN = 17 * 60; // 17:00 ET — end of IEX post-market session
 
-const NYSE_HOLIDAYS: ReadonlySet<string> = new Set(MARKET_HOLIDAYS_US);
+const NYSE_HOLIDAYS: ReadonlySet<string> = new Set(MARKET_SESSIONS.holidays);
+const EARLY_CLOSE_MINUTES: ReadonlyMap<string, number> = new Map(
+  Object.entries(MARKET_SESSIONS.early_closes).map(([isoDate, close]) => {
+    const [hour, minute] = close.split(':').map(Number);
+    return [isoDate, hour * 60 + minute] as const;
+  }),
+);
 
 interface NowParts {
   weekday: string;
   minutes: number;
-  isoDate: string; // YYYY-MM-DD in ET, for holiday lookup
+  isoDate: string; // YYYY-MM-DD in ET, for session lookup
 }
 
 function nowParts(d: Date = new Date()): NowParts {
   const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/New_York',
+    timeZone: MARKET_SESSIONS.timezone,
     weekday: 'short',
     year: 'numeric',
     month: '2-digit',
@@ -78,14 +58,20 @@ function nowParts(d: Date = new Date()): NowParts {
 function isTradingDayET(now: Date): boolean {
   const { weekday, isoDate } = nowParts(now);
   if (weekday === 'Sat' || weekday === 'Sun') return false;
-  if (NYSE_HOLIDAYS.has(isoDate)) return false;
-  return true;
+  return !NYSE_HOLIDAYS.has(isoDate);
+}
+
+function regularCloseMinute(isoDate: string): number {
+  return EARLY_CLOSE_MINUTES.get(isoDate) ?? DEFAULT_REGULAR_CLOSE_MIN;
+}
+
+function quoteRefreshCloseMinute(isoDate: string): number {
+  return regularCloseMinute(isoDate) + QUOTE_SETTLE_MINUTES;
 }
 
 /** Returns today's date in ET as YYYY-MM-DD. Use this anywhere a route is
- *  filtering by "today" — server local time can disagree with ET around
- *  UTC midnight, e.g. 19:30 ET Monday is 00:30 UTC Tuesday during EST,
- *  and `new Date().toISOString().slice(0,10)` would pick Tuesday. */
+ * filtering by "today" — server local time can disagree with ET around UTC
+ * midnight. */
 export function etDateIso(now: Date = new Date()): string {
   return nowParts(now).isoDate;
 }
@@ -93,20 +79,19 @@ export function etDateIso(now: Date = new Date()): string {
 /** NYSE regular session only — drives "market closed" UI while quotes may still refresh. */
 export function isNyseRegularSessionET(now: Date = new Date()): boolean {
   if (!isTradingDayET(now)) return false;
-  const { minutes } = nowParts(now);
-  return minutes >= REGULAR_OPEN_MIN && minutes < REGULAR_CLOSE_MIN;
+  const { minutes, isoDate } = nowParts(now);
+  return minutes >= REGULAR_OPEN_MIN && minutes < regularCloseMinute(isoDate);
 }
 
-/** True after the regular 16:00 ET close on the given ET date. */
+/** True after the actual regular close on the given ET date. */
 export function hasRegularClosePassedET(now: Date = new Date()): boolean {
-  const { minutes } = nowParts(now);
-  return minutes >= REGULAR_CLOSE_MIN;
+  const { minutes, isoDate } = nowParts(now);
+  return minutes >= regularCloseMinute(isoDate);
 }
 
 /** ET date of the most recent trading day whose regular session has fully
- *  ended as of `now`. Today counts only once its 16:00 ET close has passed;
- *  otherwise walk back to the previous trading day (skipping weekends/holidays).
- *  Used to tell whether a vendor's "latest" daily bar is actually current. */
+ * ended as of `now`. Today counts once its session-specific close has passed;
+ * otherwise walk back to the previous trading day. */
 export function lastCompletedTradingDayIso(now: Date = new Date()): string {
   if (isTradingDayET(now) && hasRegularClosePassedET(now)) {
     return etDateIso(now);
@@ -122,57 +107,49 @@ export function lastCompletedTradingDayIso(now: Date = new Date()): string {
 /** When cron / batch-price / fast polling should still hit Finnhub. */
 export function isQuoteRefreshWindowET(now: Date = new Date()): boolean {
   if (!isTradingDayET(now)) return false;
-  const { minutes } = nowParts(now);
-  return minutes >= QUOTE_REFRESH_OPEN_MIN && minutes <= QUOTE_REFRESH_CLOSE_MIN;
+  const { minutes, isoDate } = nowParts(now);
+  return minutes >= QUOTE_REFRESH_OPEN_MIN && minutes <= quoteRefreshCloseMinute(isoDate);
 }
 
-/** Pre-market window — Alpaca extended-hours quotes for BMO reporters
- *  reporting *today*. Window ends right before the regular cron starts
- *  so the two never compete for the same minute. */
+/** Pre-market window — Alpaca extended-hours quotes for BMO reporters. */
 export function isPremarketWindowET(now: Date = new Date()): boolean {
   if (!isTradingDayET(now)) return false;
   const { minutes } = nowParts(now);
   return minutes >= PREMARKET_OPEN_MIN && minutes <= PREMARKET_CLOSE_MIN;
 }
 
-/** After-hours window — Alpaca extended-hours quotes for AMC reporters
- *  reporting *today*. Window starts at the regular 16:00 ET close. */
+/** After-hours window — starts at that session's actual regular close. */
 export function isAfterhoursWindowET(now: Date = new Date()): boolean {
   if (!isTradingDayET(now)) return false;
-  const { minutes } = nowParts(now);
-  return minutes >= AFTERHOURS_OPEN_MIN && minutes <= AFTERHOURS_CLOSE_MIN;
+  const { minutes, isoDate } = nowParts(now);
+  return minutes >= regularCloseMinute(isoDate) && minutes <= AFTERHOURS_CLOSE_MIN;
 }
 
-/** Classify the current minute into the matching window kind, or null
- *  if outside all windows. Used by the cron route to pick a refresh
- *  strategy without re-running every window check. */
+/** Classify the current minute into the matching window kind, or null. */
 export type RefreshWindowKind = 'premarket' | 'regular' | 'afterhours';
 
 export function currentRefreshWindow(now: Date = new Date()): RefreshWindowKind | null {
   if (!isTradingDayET(now)) return null;
-  const { minutes } = nowParts(now);
-  if (minutes >= PREMARKET_OPEN_MIN  && minutes <= PREMARKET_CLOSE_MIN)  return 'premarket';
-  // After-hours takes precedence over the broader quote-refresh settle
-  // window so AMC reporters get Alpaca ticks immediately after 16:00 ET.
-  if (minutes >= AFTERHOURS_OPEN_MIN && minutes <= AFTERHOURS_CLOSE_MIN) return 'afterhours';
-  if (minutes >= QUOTE_REFRESH_OPEN_MIN && minutes <= QUOTE_REFRESH_CLOSE_MIN) return 'regular';
+  const { minutes, isoDate } = nowParts(now);
+  if (minutes >= PREMARKET_OPEN_MIN && minutes <= PREMARKET_CLOSE_MIN) return 'premarket';
+  // After-hours takes precedence from the actual session close, including 13:00
+  // early closes, so reporting tickers can switch strategies immediately.
+  if (minutes >= regularCloseMinute(isoDate) && minutes <= AFTERHOURS_CLOSE_MIN) {
+    return 'afterhours';
+  }
+  if (minutes >= QUOTE_REFRESH_OPEN_MIN && minutes <= quoteRefreshCloseMinute(isoDate)) {
+    return 'regular';
+  }
   return null;
 }
 
-/** @deprecated Prefer isNyseRegularSessionET or isQuoteRefreshWindowET for clarity. */
-export function isMarketOpenET(now: Date = new Date()): boolean {
-  return isQuoteRefreshWindowET(now);
-}
-
-/** True while earnings-calendar quote-based moves should read LIVE (vs CLOSE).
- *  Weekends/holidays, the overnight gap, and post-17:00 ET are false — IEX
- *  (Alpaca Basic) stops then and Finnhub's settle window ends at 16:45. */
+/** True while earnings-calendar quote-based moves should read LIVE (vs CLOSE). */
 export function areEarningsQuotesLive(now: Date = new Date()): boolean {
   if (!isTradingDayET(now)) return false;
-  const { minutes } = nowParts(now);
+  const { minutes, isoDate } = nowParts(now);
   if (minutes >= PREMARKET_OPEN_MIN && minutes <= PREMARKET_CLOSE_MIN) return true;
-  if (minutes >= QUOTE_REFRESH_OPEN_MIN && minutes <= QUOTE_REFRESH_CLOSE_MIN) return true;
-  if (minutes >= AFTERHOURS_OPEN_MIN && minutes < AFTERHOURS_CLOSE_MIN) return true;
+  if (minutes >= QUOTE_REFRESH_OPEN_MIN && minutes <= quoteRefreshCloseMinute(isoDate)) return true;
+  if (minutes >= regularCloseMinute(isoDate) && minutes < AFTERHOURS_CLOSE_MIN) return true;
   return false;
 }
 
@@ -182,9 +159,9 @@ export function marketClosedReason(now: Date = new Date()): string | null {
   if (weekday === 'Sat' || weekday === 'Sun') return 'Weekend · last close';
   if (NYSE_HOLIDAYS.has(isoDate)) return 'Market holiday · last close';
   if (minutes < REGULAR_OPEN_MIN) return 'Pre-market · last close';
-  if (minutes >= REGULAR_CLOSE_MIN && minutes <= QUOTE_REFRESH_CLOSE_MIN) {
-    return 'After close · quotes settling';
-  }
-  if (minutes > QUOTE_REFRESH_CLOSE_MIN) return 'After-hours · last close';
+  const closeMinute = regularCloseMinute(isoDate);
+  const settleMinute = quoteRefreshCloseMinute(isoDate);
+  if (minutes >= closeMinute && minutes <= settleMinute) return 'After close · quotes settling';
+  if (minutes > settleMinute) return 'After-hours · last close';
   return null;
 }

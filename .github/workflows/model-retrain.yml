@@ -1,0 +1,290 @@
+name: Weekly model retrain
+
+on:
+  schedule:
+    - cron: '0 12 * * 0'
+  workflow_dispatch:
+
+concurrency:
+  group: weekly-model-retrain
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  retrain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Install verified rclone
+        run: bash scripts/install_rclone.sh
+
+      - name: Configure R2
+        env:
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.config/rclone
+          cat > ~/.config/rclone/rclone.conf <<EOF
+          [r2]
+          type = s3
+          provider = Cloudflare
+          access_key_id = $R2_ACCESS_KEY_ID
+          secret_access_key = $R2_SECRET_ACCESS_KEY
+          endpoint = https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com
+          region = auto
+          EOF
+
+      - name: Pull verified production data from R2
+        env:
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          R2_PULL_EARNINGS: "1"
+        run: bash scripts/r2_pull.sh
+
+      - name: Rebuild DuckDB views
+        run: python scripts/setup_duckdb_from_parquet.py
+
+      - name: Gate — verify data freshness before ML
+        run: python scripts/check_duckdb_freshness.py --strict --max-lag-days 5
+
+      - name: Build ML training parquet
+        run: |
+          END=$(date -u +%Y-%m-%d)
+          python apps/ml/feature_engineering.py \
+            --start-date 2023-01-01 \
+            --end-date "$END"
+
+      - name: Evaluate realized champion outcomes and automatic rollback
+        id: outcome-control
+        env:
+          MODEL_BUNDLE_SIGNING_KEY: ${{ secrets.MODEL_BUNDLE_SIGNING_KEY }}
+        run: |
+          if [ -f data/models/control/champion.json ]; then
+            python scripts/model_control_plane.py evaluate-outcomes \
+              --report data/validation/model_outcomes.json
+            echo "rolled_back=$(jq -r .rolled_back data/validation/model_outcomes.json)" >> "$GITHUB_OUTPUT"
+          else
+            echo "rolled_back=false" >> "$GITHUB_OUTPUT"
+            echo "No signed champion exists; skipping realized-outcome evaluation."
+          fi
+
+      - name: Upload realized model outcome report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: model-realized-outcomes
+          path: data/validation/model_outcomes.json
+          if-no-files-found: ignore
+          retention-days: 90
+
+      - name: Gate — validate training artifacts
+        run: |
+          python scripts/validate_ml_pipeline.py training \
+            --report data/validation/retrain_training.json
+
+      - name: Upload training validation report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: retrain-training-validation
+          path: data/validation/retrain_training.json
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: Train LightGBM models
+        run: python apps/ml/model_trainer.py --tune --time-decay 0.5
+
+      - name: Gate — mandatory purged walk-forward validation
+        run: |
+          python scripts/validate_walk_forward.py \
+            --report data/validation/retrain_walk_forward.json
+
+      - name: Upload walk-forward validation report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: retrain-walk-forward-validation
+          path: data/validation/retrain_walk_forward.json
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: Gate — validate trained model bundle
+        run: |
+          python scripts/validate_ml_pipeline.py models \
+            --report data/validation/retrain_models.json \
+            --publish-receipt-dir data/models/receipts
+
+      - name: Upload model validation report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: retrain-model-validation
+          path: data/validation/retrain_models.json
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: Package signed challenger bundle
+        id: package-challenger
+        env:
+          MODEL_BUNDLE_SIGNING_KEY: ${{ secrets.MODEL_BUNDLE_SIGNING_KEY }}
+        run: |
+          python scripts/package_model_bundle.py \
+            --source-revision "$GITHUB_SHA" \
+            --output-manifest data/validation/candidate_bundle.json
+          BUNDLE_ID=$(jq -r .bundle_id data/validation/candidate_bundle.json)
+          echo "bundle_dir=data/models/bundles/$BUNDLE_ID" >> "$GITHUB_OUTPUT"
+
+      - name: Shadow-score upcoming earnings with the challenger
+        run: |
+          python scripts/daily_score.py \
+            --days-ahead 21 \
+            --models-dir "${{ steps.package-challenger.outputs.bundle_dir }}" \
+            --output-path data/validation/candidate_forecasts.parquet
+
+      - name: Gate — validate retrain forecasts
+        run: |
+          python scripts/validate_ml_pipeline.py forecasts \
+            --forecast-path data/validation/candidate_forecasts.parquet \
+            --models-dir "${{ steps.package-challenger.outputs.bundle_dir }}" \
+            --report data/validation/retrain_forecasts.json \
+            --publish-receipt-dir data/validation/candidate_receipts
+
+      - name: Upload retrain forecast validation report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: retrain-forecast-validation
+          path: data/validation/retrain_forecasts.json
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: Champion/challenger promotion decision
+        id: model-decision
+        env:
+          MODEL_BUNDLE_SIGNING_KEY: ${{ secrets.MODEL_BUNDLE_SIGNING_KEY }}
+        run: |
+          python scripts/model_control_plane.py decide \
+            --candidate-manifest data/validation/candidate_bundle.json \
+            --candidate-forecast data/validation/candidate_forecasts.parquet \
+            --report data/validation/model_decision.json
+          echo "promoted=$(jq -r .promoted data/validation/model_decision.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Gate — validate promoted production forecast
+        if: steps.model-decision.outputs.promoted == 'true'
+        run: |
+          FORECAST_PATH=$(jq -r .production_forecast data/validation/model_decision.json)
+          python scripts/validate_ml_pipeline.py forecasts \
+            --forecast-path "$FORECAST_PATH" \
+            --models-dir "${{ steps.package-challenger.outputs.bundle_dir }}" \
+            --report data/validation/promoted_forecasts.json \
+            --publish-receipt-dir data/forecasts/receipts
+
+      - name: Rescore production after automatic rollback
+        id: rollback-score
+        if: >-
+          steps.outcome-control.outputs.rolled_back == 'true' &&
+          steps.model-decision.outputs.promoted != 'true'
+        run: |
+          ROLLBACK_BUNDLE_ID=$(jq -r .champion_bundle_id data/validation/model_decision.json)
+          ROLLBACK_MODELS_DIR="data/models/bundles/$ROLLBACK_BUNDLE_ID"
+          ROLLBACK_FORECAST_PATH="data/forecasts/forecasts_$(date -u +%Y-%m-%d).parquet"
+          python scripts/daily_score.py \
+            --days-ahead 21 \
+            --models-dir "$ROLLBACK_MODELS_DIR"
+          test -f "$ROLLBACK_FORECAST_PATH"
+          python scripts/validate_ml_pipeline.py forecasts \
+            --forecast-path "$ROLLBACK_FORECAST_PATH" \
+            --models-dir "$ROLLBACK_MODELS_DIR" \
+            --report data/validation/rollback_forecasts.json \
+            --publish-receipt-dir data/forecasts/receipts
+          echo "forecast_path=$ROLLBACK_FORECAST_PATH" >> "$GITHUB_OUTPUT"
+
+      - name: Upload model control decision
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: model-control-decision
+          path: |
+            data/validation/model_decision.json
+            data/validation/candidate_bundle.json
+            data/validation/promoted_forecasts.json
+          if-no-files-found: ignore
+          retention-days: 90
+
+      - name: Push models to R2
+        env:
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+        run: bash scripts/r2_push.sh
+
+      - name: Sync Railway serving models
+        id: sync-railway-models
+        if: >-
+          steps.model-decision.outputs.promoted == 'true' ||
+          steps.outcome-control.outputs.rolled_back == 'true'
+        env:
+          RAILWAY_BACKEND_URL: ${{ secrets.RAILWAY_BACKEND_URL }}
+          ADMIN_API_KEY: ${{ secrets.ADMIN_API_KEY }}
+        run: |
+          if [ -z "$ADMIN_API_KEY" ]; then
+            echo "::error::ADMIN_API_KEY is required to activate a promoted or rolled-back model."
+            exit 1
+          fi
+          python scripts/activate_model_bundle.py \
+            --decision data/validation/model_decision.json \
+            --receipt data/validation/serving_activation.json
+          echo "synced=true" >> "$GITHUB_OUTPUT"
+
+      - name: Upload serving activation receipt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: model-serving-activation
+          path: data/validation/serving_activation.json
+          if-no-files-found: ignore
+          retention-days: 90
+
+      - name: Import exact retrain forecast into Neon
+        if: steps.sync-railway-models.outputs.synced == 'true'
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          EXPECTED_BUNDLE_ID=$(jq -er .champion_bundle_id data/validation/model_decision.json)
+          FORECAST_PATH=$(jq -r '.production_forecast // empty' data/validation/model_decision.json)
+          if [ -z "$FORECAST_PATH" ]; then
+            FORECAST_PATH="${{ steps.rollback-score.outputs.forecast_path }}"
+          fi
+          if [ -z "$FORECAST_PATH" ]; then
+            echo "::error::No exact promoted or rollback forecast path was recorded."
+            exit 1
+          fi
+          python -u scripts/import_recent_to_postgres.py \
+            --file "$FORECAST_PATH" \
+            --full \
+            --require-database \
+            --expected-model-bundle-id "$EXPECTED_BUNDLE_ID" \
+            --activation-receipt data/validation/serving_activation.json \
+            --receipt data/validation/forecast_import.json
+
+      - name: Upload exact-bundle forecast import receipt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: model-forecast-import
+          path: data/validation/forecast_import.json
+          if-no-files-found: ignore
+          retention-days: 90
