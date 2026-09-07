@@ -1,5 +1,9 @@
-# Quantiv ML — training, notebooks, and apps/ml Docker image.
-# Keep roughly aligned with root requirements.txt / scripts/daily_score.py.
+# Quantiv ML development/training environment.
+#
+# Production serving installs apps/ml as a package from pyproject.toml and uses
+# apps/backend/requirements.txt for the API process. Keep this file focused on
+# training, research scripts, and their tests; do not add backend/web or legacy
+# object-store dependencies here.
 
 # Core data
 pandas>=2.0.0,<3
@@ -7,46 +11,27 @@ numpy>=1.24.0,<2
 pyarrow>=15.0.0
 duckdb>=1.0.0
 
-# ML
+# ML / model control
 scikit-learn>=1.3.0
 lightgbm>=4.0.0
-xgboost>=1.7.0
 optuna>=3.3.0
 cryptography>=43.0.0
 
-# IO / config
+# Pipeline IO / config
 requests>=2.31.0
 python-dotenv>=1.0.0
 pydantic>=2.5.0
 
-# DB / cache (optional training paths)
+# Optional training-path persistence
 psycopg2-binary>=2.9.0
 sqlalchemy>=2.0.0
 redis>=5.0.0
 
-# Viz / notebooks
+# Research plotting used by scripts/research/walk_forward.py
 matplotlib>=3.7.0
-seaborn>=0.12.0
-plotly>=5.15.0
-jupyter>=1.0.0
-ipykernel>=6.25.0
 
-# Dev
+# Tests / lint
 pytest>=7.4.0
 pytest-asyncio>=0.21.0
-black>=23.7.0
-ruff>=0.1.6
-isort>=5.12.0
-flake8>=6.0.0
-
-# Optional object storage (legacy)
-boto3>=1.34.0
-google-cloud-storage>=2.10.0
-azure-storage-blob>=12.19.0
-
-# Overlap with API stack when importing serving code locally
-fastapi>=0.104.0
-uvicorn[standard]>=0.24.0
-python-multipart>=0.0.6
-structlog>=23.2.0
-prometheus-client>=0.19.0
+# Match CI/backend lint semantics; avoid floating into new rule sets implicitly.
+ruff==0.14.4
