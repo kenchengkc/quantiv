@@ -4,10 +4,6 @@
 The production source of truth is ``config/market_sessions.json``. Finnhub is a
 secondary provider check only: a vendor response may surface drift, but it never
 silently rewrites the exchange calendar consumed by serving code.
-
-A small TypeScript projection is still emitted for the Railway quote worker while
-that service is migrated off its legacy frontend-file lookup. Frontend, Cloudflare,
-and Python control paths read the JSON contract directly.
 """
 
 from __future__ import annotations
@@ -31,7 +27,6 @@ from sync_finnhub_earnings import load_local_env
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SESSION_PATH = REPO_ROOT / "config" / "market_sessions.json"
-LEGACY_OUTPUT_PATH = REPO_ROOT / "apps" / "frontend" / "lib" / "marketHolidays.generated.ts"
 DIAGNOSTIC_PATH = REPO_ROOT / "data" / "provider_enrichments" / "finnhub_market_sessions.json"
 BASE_URL = "https://finnhub.io/api/v1/stock/market-holiday"
 SCHEMA = "quantiv.market-sessions.v1"
@@ -143,40 +138,6 @@ def write_diagnostic(
     DIAGNOSTIC_PATH.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
 
 
-def write_legacy_projection(canonical: dict[str, Any]) -> None:
-    source = canonical.get("source") or {}
-    lines = [
-        "// Generated projection of config/market_sessions.json.",
-        "// Legacy compatibility only; new code must import the JSON contract directly.",
-        "",
-        "export const MARKET_HOLIDAY_SOURCE = {",
-        f"  provider: {json.dumps(source.get('name') or 'NYSE')},",
-        f"  exchange: {json.dumps(canonical.get('exchange') or 'NYSE')},",
-        f"  verifiedThrough: {json.dumps(source.get('verified_through'))},",
-        f"  timezone: {json.dumps(canonical.get('timezone') or 'America/New_York')},",
-        "} as const;",
-        "",
-        "export const MARKET_HOLIDAYS_US = [",
-    ]
-    lines.extend(f"  {json.dumps(day)}," for day in canonical["holidays"])
-    lines.extend(
-        [
-            "] as const;",
-            "",
-            "export const MARKET_EARLY_CLOSES_US: Record<string, string> = {",
-        ]
-    )
-    lines.extend(
-        f"  {json.dumps(day)}: {json.dumps(close)},"
-        for day, close in canonical["early_closes"].items()
-    )
-    lines.extend(["};", ""])
-    content = "\n".join(lines)
-    if not LEGACY_OUTPUT_PATH.exists() or LEGACY_OUTPUT_PATH.read_text() != content:
-        LEGACY_OUTPUT_PATH.write_text(content)
-        print(f"updated legacy projection {LEGACY_OUTPUT_PATH.relative_to(REPO_ROOT)}")
-
-
 def main() -> int:
     load_local_env()
     parser = argparse.ArgumentParser(description=__doc__)
@@ -199,7 +160,6 @@ def main() -> int:
     args = parser.parse_args()
 
     canonical = load_canonical()
-    write_legacy_projection(canonical)
 
     token = os.getenv("FINNHUB_API_KEY")
     if not token:
