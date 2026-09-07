@@ -1,0 +1,37 @@
+name: P0 lockfile generator
+
+on:
+  push:
+    branches:
+      - cleanup/p0-repository-hygiene
+    paths:
+      - .github/workflows/p0-lock-generator.yml
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: cleanup/p0-repository-hygiene
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.11'
+
+      - name: Compile pinned dependency locks
+        run: bash scripts/compile_requirements.sh
+
+      - name: Commit generated lockfiles and retire bootstrap workflow
+        run: |
+          set -euo pipefail
+          git config --local user.email "action@github.com"
+          git config --local user.name "Quantiv dependency bot"
+          git add requirements.txt apps/backend/requirements.txt apps/ml/requirements.txt
+          git rm .github/workflows/p0-lock-generator.yml
+          git commit -m "deps: pin resolved Python environments"
+          git push origin HEAD:cleanup/p0-repository-hygiene
