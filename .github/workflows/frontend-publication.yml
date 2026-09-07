@@ -21,12 +21,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - name: Checkout exact published revision
+      - name: Checkout published main
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || 'main' }}
+          ref: main
 
+      # workflow_run.head_sha is the revision that started the refresh, not the
+      # generated-data commit the refresh may push afterward. Provenance must
+      # describe the bytes actually checked out and packaged here.
       - name: Capture release provenance
         run: echo "FRONTEND_SOURCE_REVISION=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
 
