@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "Quantiv is a modern web platform for options traders to instantly see market-implied moves before earnings. It computes expected moves, greeks, and IV rank from live options chains, with a clean dashboard, historical comparisons, and shareable insights—helping traders act with precision and speed.",
   "private": true,
+  "engines": {
+    "node": "20.x"
+  },
   "workspaces": [
     "apps/*"
   ],
