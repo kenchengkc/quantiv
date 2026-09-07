@@ -1,41 +1,30 @@
 # Node.js / Next.js
-
 node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
-
-# Dolt data
-dolt/
-
-# Next.js build output and cache
 .next/
 out/
 build/
 dist/
-
-# Next.js cache files
 .next/cache/
 .next/static/chunks/
 .next/server/
 .next/types/
-
-# Storybook
 .out
 .storybook-out
 
-# Playwright (E2E artifacts; specs and config ARE tracked)
+# Playwright artifacts (specs/config remain tracked)
 playwright-report/
 test-results/
 .playwright/
 blob-report/
 
-
-# Quantiv Data Files
-
-# Local DB + large data dumps (root-level only, not lib/data/)
+# Mutable Quantiv production/research state
+# Canonical market data, release state, forecasts, reconciliation output, and
+# runtime evidence are materialized from R2 or regenerated; they are not source.
 /data/
 *.csv
 *.db
@@ -43,29 +32,10 @@ blob-report/
 *.sqlite3
 *.parquet
 *.duckdb
-
-# Exception: Include essential data files for GitHub Actions.
-#
-# Caveat: git cannot re-include a file via `!path` when its parent
-# directory is excluded (git's .gitignore precedence rule). `/data/`
-# above excludes the whole dir, so the `!data/earnings_calendar.csv`
-# negation alone is insufficient — `git add data/earnings_calendar.csv`
-# will reject the file as ignored. CI works around this with
-# `git add -f data/earnings_calendar.csv` (see daily-refresh.yml).
-# Any NEW tracked file added under data/ will need the same -f.
-#
-# The `!data/parquet/` chain below works without -f because it
-# re-includes the directory itself first, then the contents.
-!data/earnings_calendar.csv
-!data/.gitkeep
-!data/parquet/
-!data/parquet/options_chain/
-!data/parquet/options_chain/**/*.parquet
-
-# Always ignore raw downloads
 scripts/data/
 
-# ML Models & Training Artifacts (joblib/pickle dirs — not apps/backend/models schemas)
+# ML training outputs. The transitional baked-in native LightGBM fallback under
+# apps/ml/models remains tracked until serving is fully R2-materialized.
 data/models/
 apps/backend/data/models/
 *.pkl
@@ -74,35 +44,20 @@ apps/backend/data/models/
 *.h5
 *.pt
 *.pth
-
-# Exception: the serving models in apps/ml/models/ ship with the repo
-# so the Railway image (and CI pytest) has them available. They're
-# small (~300 KB total for all 6 LightGBM Boosters + metadata + bias
-# curves) and stable across the daily-refresh cycle — only retrains
-# rewrite them. The broad `*.joblib` rule above still ignores stray
-# training outputs anywhere else.
 !apps/ml/models/
 !apps/ml/models/*.joblib
 !apps/ml/models/*.json
 !apps/ml/data/bias_curves.parquet
 
-# DuckDB cache and temp files
+# DuckDB/cache/temp state
 duckdb-cache/
 *.tmp
 *.temp
-
-# Training outputs and logs
 outputs/
 training_logs/
 checkpoints/
 
-# If you want to commit a small demo DB, uncomment:
-# !data/quantiv_options.db
-
-
 # Python
-
-# Byte-compiled / cache
 __pycache__/
 *.py[cod]
 *.pyd
@@ -111,28 +66,22 @@ __pycache__/
 *.egg
 .pytest_cache/
 .mypy_cache/
+.ruff_cache/
 .ipynb_checkpoints/
-
-# Virtual environments
 .venv/
 venv/
 env/
 .venv-*/
 .venv-quantiv/
 
-# Build
-build/
-dist/
-
-
-# Env / Secrets
+# Environment / secrets
+.env
+.env.*
+!.env.example
 config/.env.local
 config/.env.development
 config/.env.production
 config/.env.test
-# Tracked example env file lives at the repo root: .env.example
-
-# SSH Keys & Certificates
 *.pem
 !apps/ml/ml/model_bundle_public_key.pem
 *.key
@@ -143,23 +92,19 @@ id_ed25519*
 *.pub
 authorized_keys
 known_hosts
-
-# API Keys & Tokens
 *.token
 *.secret
 .secrets/
 secrets/
 
-
-# IDE & Editor
+# IDE / editor
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 
-
-# OS / System
+# OS
 .DS_Store
 .DS_Store?
 ._*
@@ -168,8 +113,7 @@ secrets/
 ehthumbs.db
 Thumbs.db
 
-
-# Logs / Runtime
+# Logs / runtime
 logs/
 *.log
 pids
@@ -177,14 +121,10 @@ pids
 *.seed
 *.pid.lock
 
-
-# Test Coverage
+# Coverage / caches
 coverage/
 *.lcov
 .nyc_output
-
-
-# Misc Caches
 .eslintcache
 .npm
 .node_repl_history
@@ -192,13 +132,11 @@ coverage/
 next-env.d.ts
 .yarn-integrity
 .cache
-.parcel-cachewarp.md
-WARP.md
+.parcel-cache
 .vercel
-.env*.local
-
-# Claude Code runtime artifacts
 .claude/
-
-# MPL Cache
 .mplcache/
+
+# Local editor/runtime notes
+warp.md
+WARP.md
