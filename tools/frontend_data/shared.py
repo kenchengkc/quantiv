@@ -15,7 +15,7 @@ EARNINGS_CSV = DATA_DIR / "earnings_calendar.csv"
 FORECASTS_DIR = DATA_DIR / "forecasts"
 FORECAST_RECEIPT_PATH = FORECASTS_DIR / "receipts" / "latest_forecasts.json"
 PROVIDER_ENRICHMENTS_DIR = DATA_DIR / "provider_enrichments"
-MARKET_HOLIDAYS_TS = REPO_ROOT / "apps" / "frontend" / "lib" / "marketHolidays.generated.ts"
+MARKET_SESSIONS_JSON = REPO_ROOT / "config" / "market_sessions.json"
 WEEK_OFFSETS = [-1, 0, 1, 2]
 ET = ZoneInfo("America/New_York")
 
