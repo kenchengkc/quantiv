@@ -77,11 +77,15 @@ jobs:
         env:
           RUN_REFRESH: ${{ inputs.run_refresh }}
           RUN_RETRAIN: ${{ inputs.run_retrain }}
+          ADMIN_API_KEY: ${{ secrets.ADMIN_API_KEY }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
           test "$GITHUB_REF" = refs/heads/main
           test "$RUN_REFRESH" = false
           test "$RUN_RETRAIN" = false
           test -n "$ROLLBACK_REASON"
+          test -n "$ADMIN_API_KEY"
+          test -n "$DATABASE_URL"
           [[ "$EXPECTED_CURRENT" =~ ^[0-9a-f]{64}$ ]]
           [[ "$ROLLBACK_TARGET" =~ ^[0-9a-f]{64}$ ]]
 
@@ -142,6 +146,13 @@ jobs:
             --forecast-path data/validation/provenance-recovery/forecast.parquet \
             --models-dir "data/models/bundles/$ROLLBACK_TARGET" \
             --report data/validation/provenance-recovery/forecast-validation.json
+
+      - name: Verify complete Neon replacement coverage before publication
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          python scripts/verify_model_recovery.py --preflight \
+            --evidence-dir data/validation/provenance-recovery --expected-bundle-id "$ROLLBACK_TARGET"
 
       - name: Re-sign constrained rollback state
         env:

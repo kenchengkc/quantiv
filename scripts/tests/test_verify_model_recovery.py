@@ -109,3 +109,18 @@ def test_database_requires_exact_keys_recent_import_and_no_rejected_upcoming(evi
     else:
         assert verification.verify_database(conn, verified, target)["verified_forecast_keys"] == 1
     assert all(call.args[0].strip().startswith("SELECT") for call in cursor.execute.call_args_list)
+
+
+@pytest.mark.parametrize("missing", [0, 3])
+def test_preflight_blocks_uncovered_rejected_forecasts_before_publication(evidence, missing):
+    directory, target, public = evidence
+    verified = verification.verify_evidence(directory, target, public_key=public)
+    conn = MagicMock()
+    cursor = conn.cursor.return_value.__enter__.return_value
+    cursor.fetchone.return_value = (missing,)
+    if missing:
+        with pytest.raises(ValueError, match="lacks replacements for 3"):
+            verification.verify_replacement_coverage(conn, verified["frame"], verified["before"]["champion_bundle_id"], target)
+    else:
+        verification.verify_replacement_coverage(conn, verified["frame"], verified["before"]["champion_bundle_id"], target)
+    assert cursor.execute.call_args.args[0].strip().startswith("SELECT")

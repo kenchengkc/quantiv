@@ -32,6 +32,8 @@ that production has already been restored**.
    before scoring, and rescores with the signed previous model. Both the workflow
    and mutation command run the standard forecast validator. Every forecast row
    must name the target, without null identities. No new model is trained.
+   A read-only Neon preflight requires replacements for every upcoming forecast
+   key attributed to the rejected bundle, before the first production mutation.
 5. Sign and verify the replacement controls before replacing local forecasts.
    Preserve the old signed controls and forecast files under
    `data/models/provenance_recovery/<incident-identity>/`. The invalid bundle is

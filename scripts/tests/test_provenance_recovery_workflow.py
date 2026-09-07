@@ -42,9 +42,10 @@ def test_recovery_is_isolated_serialized_and_uses_existing_deployment_tools():
     assert 'test "$RUN_RETRAIN" = false' in commands
     sequence = [
         "--check-only", "scripts/daily_score.py", "scripts/validate_ml_pipeline.py",
+        "scripts/verify_model_recovery.py --preflight",
         "champion-prepush.json", "scripts/r2_push.sh --model-recovery",
         "scripts/activate_model_bundle.py", "scripts/import_recent_to_postgres.py",
-        "scripts/verify_model_recovery.py",
+        "scripts/verify_model_recovery.py \\",
     ]
     offsets = [commands.index(item) for item in sequence]
     assert offsets == sorted(offsets)

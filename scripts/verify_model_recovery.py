@@ -125,12 +125,43 @@ def verify_database(connection, evidence: dict, expected: str) -> dict:
     return {"verified_forecast_keys": len(keys), "latest_import_bundle_id": expected}
 
 
+def verify_replacement_coverage(connection, frame: pd.DataFrame, rejected: str, target: str) -> None:
+    """Reject an incomplete replacement before the first production mutation."""
+    if frame.empty or frame["model_bundle_id"].isna().any() or set(frame["model_bundle_id"]) != {target}:
+        raise ValueError("preflight forecast must contain only the exact target bundle")
+    keys = frame[["act_symbol", "earnings_date", "snapshot_date", "model_horizon"]].copy()
+    for column in ("earnings_date", "snapshot_date"):
+        keys[column] = pd.to_datetime(keys[column]).dt.strftime("%Y-%m-%d")
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """SELECT COUNT(*) FROM em_forecasts f
+               WHERE f.model_bundle_id = %s AND f.earnings_date >= CURRENT_DATE
+               AND NOT EXISTS (
+                 SELECT 1 FROM jsonb_to_recordset(%s::jsonb) AS replacement(
+                   act_symbol text, earnings_date date, snapshot_date date, model_horizon int)
+                 WHERE (replacement.act_symbol, replacement.earnings_date,
+                        replacement.snapshot_date, replacement.model_horizon) =
+                       (f.act_symbol, f.earnings_date, f.snapshot_date, f.model_horizon))""",
+            (rejected, keys.to_json(orient="records")),
+        )
+        missing = cursor.fetchone()[0]
+        if missing:
+            raise ValueError(f"recovery lacks replacements for {missing} upcoming rejected forecast keys")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--evidence-dir", required=True, type=Path)
     parser.add_argument("--expected-bundle-id", required=True)
+    parser.add_argument("--preflight", action="store_true")
     args = parser.parse_args()
-    evidence = verify_evidence(args.evidence_dir, args.expected_bundle_id)
+    if args.preflight:
+        before = verify_control_pointer(_json(args.evidence_dir / "champion-before.json"))
+        if before.get("previous_bundle_id") != args.expected_bundle_id:
+            raise ValueError("preflight target is not the signed previous bundle")
+        frame = pd.read_parquet(args.evidence_dir / "forecast.parquet")
+    else:
+        evidence = verify_evidence(args.evidence_dir, args.expected_bundle_id)
     database_url = os.environ.get("DATABASE_URL")
     if not database_url:
         raise ValueError("DATABASE_URL is required for read-only recovery verification")
@@ -138,6 +169,10 @@ def main() -> int:
     try:
         connection.set_session(readonly=True)
         with connection:
+            if args.preflight:
+                verify_replacement_coverage(connection, frame, before["champion_bundle_id"], args.expected_bundle_id)
+                print("Read-only Neon preflight: all upcoming rejected forecast keys have replacements")
+                return 0
             database = verify_database(connection, evidence, args.expected_bundle_id)
     finally:
         connection.close()
