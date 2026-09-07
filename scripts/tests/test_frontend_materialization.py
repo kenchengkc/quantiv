@@ -11,6 +11,7 @@ from scripts.frontend_release import build_release, write_deployment_pointer
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 MATERIALIZER = REPO_ROOT / "scripts" / "materialize_frontend_release.sh"
+FRONTEND_WORKSPACE = REPO_ROOT / "apps" / "frontend"
 
 
 def _write(path: Path, body: bytes) -> None:
@@ -84,9 +85,11 @@ def test_materializer_downloads_verified_pinned_release_and_preserves_brand(
             "FRONTEND_RELEASE_REQUIRED": "1",
         }
     )
+    # npm workspace lifecycle scripts run with cwd=apps/frontend. Keep this
+    # integration test at the same cwd so repo-relative script regressions fail.
     result = subprocess.run(
         ["bash", str(MATERIALIZER)],
-        cwd=REPO_ROOT,
+        cwd=FRONTEND_WORKSPACE,
         env=env,
         text=True,
         capture_output=True,
@@ -99,6 +102,33 @@ def test_materializer_downloads_verified_pinned_release_and_preserves_brand(
     assert (target_public / "weekly.json").read_bytes() == b'{"fresh":true}\n'
     assert (target_public / "symbols/AAPL.json").exists()
     assert not (target_public / "symbols/STALE.json").exists()
+
+
+def test_default_paths_work_from_frontend_workspace_without_r2_credentials() -> None:
+    env = os.environ.copy()
+    for key in (
+        "PUBLIC_DIR",
+        "FRONTEND_DEPLOYMENT_POINTER",
+        "R2_ACCOUNT_ID",
+        "R2_ACCESS_KEY_ID",
+        "R2_SECRET_ACCESS_KEY",
+        "RCLONE_BIN",
+        "FRONTEND_RELEASE_REQUIRED",
+    ):
+        env.pop(key, None)
+    env["PYTHON_BIN"] = sys.executable
+
+    result = subprocess.run(
+        ["bash", str(MATERIALIZER)],
+        cwd=FRONTEND_WORKSPACE,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "source-controlled publication fallback" in result.stdout
 
 
 def test_materializer_uses_checked_in_fallback_when_credentials_are_absent(
@@ -122,7 +152,7 @@ def test_materializer_uses_checked_in_fallback_when_credentials_are_absent(
     )
     result = subprocess.run(
         ["bash", str(MATERIALIZER)],
-        cwd=REPO_ROOT,
+        cwd=FRONTEND_WORKSPACE,
         env=env,
         text=True,
         capture_output=True,
@@ -152,7 +182,7 @@ def test_materializer_fails_closed_without_remote_access_or_fallback(tmp_path: P
     )
     result = subprocess.run(
         ["bash", str(MATERIALIZER)],
-        cwd=REPO_ROOT,
+        cwd=FRONTEND_WORKSPACE,
         env=env,
         text=True,
         capture_output=True,
