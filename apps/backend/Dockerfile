@@ -20,16 +20,19 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
-# Backend runtime dependencies first for stable Docker layer caching.
+# Backend runtime dependencies first for stable Docker layer caching. This is a
+# hash-pinned lock generated from backend requirements.in + the ML serving
+# package, so the image never resolves a second dependency graph.
 COPY apps/backend/requirements.txt /tmp/backend-requirements.txt
-RUN pip install --no-compile -r /tmp/backend-requirements.txt \
+RUN pip install --no-compile --require-hashes -r /tmp/backend-requirements.txt \
     && rm /tmp/backend-requirements.txt
 
-# Install the shared ML package non-editably. Keep the source/artifact directory
-# in /app/apps/ml for the baked-in model fallback until model materialization is
-# fully externalized from the image.
+# Install the shared ML package non-editably and explicitly without dependencies:
+# every project dependency was already admitted by the lock above. Keep the
+# source/artifact directory in /app/apps/ml for the baked-in model fallback until
+# model materialization is fully externalized from the image.
 COPY apps/ml /app/apps/ml
-RUN pip install --no-compile /app/apps/ml
+RUN pip install --no-compile --no-deps /app/apps/ml
 
 # Application code last (changes most often).
 COPY apps/backend /app/apps/backend
