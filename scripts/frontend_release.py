@@ -198,7 +198,10 @@ def write_deployment_pointer(
     *,
     source_revision: str | None = None,
 ) -> dict[str, Any]:
-    """Pin the locally verified immutable release for deterministic deployment."""
+    """Verify and pin the immutable release for deterministic deployment."""
+    # ``pin`` is a standalone control-plane primitive as well as a publisher
+    # sub-step. Keep it fail-closed even when a caller bypasses r2_push_frontend.sh.
+    verify_release(output_dir)
     pointer, manifest, archive_path = _load_release(output_dir)
     manifest_path = output_dir / str(pointer["manifest"])
     if not manifest_path.is_file() or not archive_path.is_file():
