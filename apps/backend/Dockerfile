@@ -34,15 +34,12 @@ RUN pip install --no-compile --require-hashes -r /tmp/backend-requirements.txt \
 COPY apps/ml /app/apps/ml
 RUN pip install --no-compile --no-deps /app/apps/ml
 
-# Application code last (changes most often).
+# Application code last (changes most often). Railway runtime inputs are limited
+# to backend code, the shared security master, and the canonical NYSE session
+# contract. Generated Vercel publication JSON is not part of the backend image.
 COPY apps/backend /app/apps/backend
-# Shared security master / quote-worker publication inputs. The quote worker and
-# API now consume the same canonical NYSE session contract as the frontend and
-# Cloudflare Worker. The generated frontend corpus remains transitional until its
-# R2 publication release is proven and materialized at deploy time.
 COPY lib /app/lib
 COPY config/market_sessions.json /app/config/market_sessions.json
-COPY apps/frontend/public /app/apps/frontend/public
 
 WORKDIR /app/apps/backend
 
