@@ -10,8 +10,10 @@
 set -euo pipefail
 umask 077
 
-PUBLIC_DIR="${PUBLIC_DIR:-apps/frontend/public}"
-DEPLOYMENT_POINTER="${FRONTEND_DEPLOYMENT_POINTER:-apps/frontend/frontend-release.json}"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+PUBLIC_DIR="${PUBLIC_DIR:-$REPO_ROOT/apps/frontend/public}"
+DEPLOYMENT_POINTER="${FRONTEND_DEPLOYMENT_POINTER:-$REPO_ROOT/apps/frontend/frontend-release.json}"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 R2_BUCKET="${R2_BUCKET:-quantiv-data}"
 FRONTEND_R2_REMOTE="${FRONTEND_R2_REMOTE:-r2:${R2_BUCKET}/frontend}"
@@ -105,7 +107,7 @@ mkdir -p "$STAGE_DIR/$(dirname "$MANIFEST_PATH")" "$STAGE_DIR/$(dirname "$ARCHIV
 
 RCLONE_CONFIG=""
 if [ -z "$RCLONE_BIN" ]; then
-  RCLONE_INSTALL_DIR="$TMP_ROOT/bin" GITHUB_PATH=/dev/null bash scripts/install_rclone.sh
+  RCLONE_INSTALL_DIR="$TMP_ROOT/bin" GITHUB_PATH=/dev/null bash "$REPO_ROOT/scripts/install_rclone.sh"
   RCLONE_BIN="$TMP_ROOT/bin/rclone"
   RCLONE_CONFIG="$TMP_ROOT/rclone.conf"
   cat > "$RCLONE_CONFIG" <<EOF
@@ -168,8 +170,8 @@ if sys.argv[4]:
 Path(sys.argv[1]).write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
 PY
 
-"$PYTHON_BIN" scripts/frontend_release.py verify --output-dir "$STAGE_DIR"
-"$PYTHON_BIN" scripts/frontend_release.py materialize \
+"$PYTHON_BIN" "$REPO_ROOT/scripts/frontend_release.py" verify --output-dir "$STAGE_DIR"
+"$PYTHON_BIN" "$REPO_ROOT/scripts/frontend_release.py" materialize \
   --output-dir "$STAGE_DIR" \
   --public-dir "$PUBLIC_DIR"
 
