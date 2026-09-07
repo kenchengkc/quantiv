@@ -268,8 +268,6 @@ def test_stale_report_after_reconciliation_crash_cannot_authorize_publication(
         source_date="2026-09-04",
     )))
     outputs = tmp_path / "github-output"
-    # Reconciliation crashed before replacing yesterday's report. Exercise the
-    # actual CLI boundary consumed by Actions, not only its Python return value.
     process = subprocess.run([
         sys.executable, "scripts/options_snapshot_resilience.py",
         "--manifest", str(manifest_path), "--data-dir", str(data_dir),
@@ -367,7 +365,7 @@ def test_workflow_checks_restored_report_before_r2_promotion() -> None:
     import yaml
 
     root = Path(__file__).resolve().parents[2]
-    workflow = yaml.safe_load((root / ".github/workflows/daily-refresh.yml").read_text())
+    workflow = yaml.safe_load((root / ".github/workflows/data-refresh.yml").read_text())
     steps = workflow["jobs"]["refresh"]["steps"]
     finalizer = next(step for step in steps if step.get("id") == "options_gate")
     restore = next(step for step in steps if step["name"].startswith("Restore validated fallback"))
