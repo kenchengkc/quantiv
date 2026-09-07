@@ -1,34 +1,28 @@
-# Quantiv — Python deps for GitHub Actions data refresh and local scripts
-# (`daily-refresh.yml` uses this file). The FastAPI Docker image installs
-# apps/backend/requirements.txt separately; overlap is intentional but pins
-# should stay compatible.
+# Quantiv scheduled pipeline dependencies.
+#
+# GitHub Actions data refresh/retrain jobs install this file. Backend serving
+# installs apps/backend/requirements.txt separately; the ML wheel declares its
+# serving dependencies in apps/ml/pyproject.toml. Keep web/runtime-only packages
+# out of this environment.
 
-# Core Data & Database
-SQLAlchemy>=2.0.0
-psycopg2-binary>=2.9
+# Core data / persistence
 duckdb>=1.0.0
+psycopg2-binary>=2.9
 python-dotenv>=1.0.0
 
-# Data Processing
-pandas>=2.2.0
+# Data processing
+pandas>=2.2.0,<3
 pyarrow>=15.0.0
 polars>=0.20.0
-numpy>=1.24.0
+numpy>=1.24.0,<2
 scipy>=1.11.0
 
-# Machine Learning
+# Machine learning / signed model control
 scikit-learn>=1.3.0
 lightgbm>=4.1.0
 optuna>=3.5.0
 cryptography>=43.0.0
 
-# HTTP
+# Provider HTTP / validation
 requests>=2.31.0
-
-# Web API & Validation
-fastapi>=0.104.0
-uvicorn[standard]>=0.24.0
 pydantic>=2.5.0
-
-# Caching & Storage
-redis>=5.0.0
