@@ -1,10 +1,10 @@
-# Quantiv Backend — FastAPI service (Docker build context: apps/backend/).
-# Overlaps with repo root requirements.txt; keep versions roughly compatible.
+# Quantiv Backend runtime dependencies.
+# Docker installs this file into the Railway production image. CI installs
+# pytest/ruff separately, so development tools do not belong in this surface.
 
 # FastAPI and async web framework
-# Pin: fastapi>=0.104.0 resolved to 0.141.1 on Railway/CI. That release inserts
-# internal _IncludedRouter entries without .path, which crashed startup while
-# applying SlowAPI exemptions and made /health never listen.
+# Pin: FastAPI releases changed internal router objects used by SlowAPI route
+# exemption wiring; keep the tested serving pair explicit.
 fastapi==0.135.2
 starlette==1.0.0
 uvicorn[standard]>=0.24.0
@@ -15,39 +15,25 @@ websockets>=12.0
 
 # Database and caching
 asyncpg>=0.29.0
-# Required by scripts/import_recent_to_postgres.py, which is exercised by the
-# backend pytest suite in CI.
+# Backend tests import scripts/import_recent_to_postgres.py; keep psycopg2 here
+# until that test dependency is split into a dedicated CI requirements group.
 psycopg2-binary>=2.9.0
 redis>=5.0.0
 
 # Data processing
 pandas>=2.2.0,<3
-# Pin numpy<2 to match apps/ml/pyproject.toml and the tested LightGBM runtime.
-# Model artifacts use LightGBM's non-executable native text format.
 numpy>=1.24.0,<2
 duckdb>=1.0.0
-# Required by scripts/backfill_fmp_earnings_by_symbol.py (and the Finnhub
-# helpers it imports), which are exercised by the backend pytest suite in CI.
 requests>=2.31.0
 pyarrow>=15.0.0
 
-# Object storage — Cloudflare R2 model pull at lifespan startup. R2 is
-# S3-compatible; boto3 talks to it via a custom endpoint_url. Required
-# for the on-demand re-inference path to pick up weekly retrains without
-# a Docker rebuild.
+# Cloudflare R2 model materialization. R2 is S3-compatible and boto3 uses a
+# custom endpoint URL; required for signed champion activation at startup.
 boto3>=1.34.0
 cryptography>=43.0.0
 
 # Rate limiting
-# Pin to the Limiter signature used by fail-open Redis fallback.
 slowapi==0.1.10
 
-# Monitoring and logging
+# Structured production logging
 structlog>=23.2.0
-
-# Development and testing
-pytest>=7.4.0
-pytest-asyncio>=0.21.0
-black>=23.11.0
-# Pin: unpinned ruff pulled 0.16.4 in CI and failed Backend with 252 new-rule hits.
-ruff==0.14.4
