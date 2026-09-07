@@ -10,6 +10,7 @@ race a newer promotion.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import shutil
 import sys
@@ -31,6 +32,7 @@ from ml.model_bundle import (  # noqa: E402
     verify_control_pointer,
     verify_registry,
 )
+from ml.pipeline_validation import validate_forecast_artifact  # noqa: E402
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -58,7 +60,9 @@ def _promote_forecast(
         raise ValueError("provenance rollback forecast is empty")
     if "model_bundle_id" not in frame.columns or "snapshot_date" not in frame.columns:
         raise ValueError("provenance rollback forecast lacks bundle or snapshot identity")
-    bundle_ids = set(frame["model_bundle_id"].dropna().astype(str))
+    if frame["model_bundle_id"].isna().any():
+        raise ValueError("rollback forecast contains a blank model bundle identity")
+    bundle_ids = set(frame["model_bundle_id"].astype(str))
     if bundle_ids != {expected_bundle_id}:
         raise ValueError(
             f"rollback forecast bundles {sorted(bundle_ids)} do not match target "
@@ -76,21 +80,13 @@ def _promote_forecast(
     return destination
 
 
-def provenance_rollback(
+def verify_authorization(
     *,
     models_root: Path,
     expected_current_bundle_id: str,
     target_bundle_id: str,
-    candidate_forecast: Path,
-    production_forecast_dir: Path,
-    report_path: Path,
-    reason: str,
-    private_key: str | bytes | None = None,
     public_key: str | bytes | None = None,
-) -> dict[str, Any]:
-    if not reason.strip():
-        raise ValueError("provenance rollback requires a non-empty reason")
-
+) -> tuple[dict[str, Any], dict[str, Any]]:
     control_dir = models_root / "control"
     pointer_path = control_dir / "champion.json"
     registry_path = control_dir / "registry.json"
@@ -120,12 +116,39 @@ def provenance_rollback(
     target_dir = models_root / "bundles" / target_bundle_id
     verify_bundle_dir(current_dir, public_key=public_key)
     verify_bundle_dir(target_dir, public_key=public_key)
+    return pointer, registry
 
-    production_forecast = _promote_forecast(
-        candidate_forecast,
-        production_forecast_dir,
-        expected_bundle_id=target_bundle_id,
+
+def provenance_rollback(
+    *,
+    models_root: Path,
+    expected_current_bundle_id: str,
+    target_bundle_id: str,
+    candidate_forecast: Path,
+    production_forecast_dir: Path,
+    report_path: Path,
+    reason: str,
+    private_key: str | bytes | None = None,
+    public_key: str | bytes | None = None,
+) -> dict[str, Any]:
+    if not reason.strip():
+        raise ValueError("provenance rollback requires a non-empty reason")
+    pointer, registry = verify_authorization(
+        models_root=models_root,
+        expected_current_bundle_id=expected_current_bundle_id,
+        target_bundle_id=target_bundle_id,
+        public_key=public_key,
     )
+    current_id = pointer["champion_bundle_id"]
+    control_dir = models_root / "control"
+    pointer_path = control_dir / "champion.json"
+    registry_path = control_dir / "registry.json"
+    # Run the production forecast validator inside the mutation command too;
+    # a caller cannot bypass validation by omitting a workflow step/report.
+    validate_forecast_artifact(
+        candidate_forecast, models_dir=models_root / "bundles" / target_bundle_id,
+    )
+
     evaluated_at = datetime.now(timezone.utc).isoformat()
     decision_summary = {
         "action": "operator_provenance_rollback",
@@ -137,7 +160,8 @@ def provenance_rollback(
 
     new_pointer = create_signed_control_pointer(
         bundle_id=target_bundle_id,
-        previous_bundle_id=current_id,
+        # The displaced bundle is evidence, not an eligible automatic fallback.
+        previous_bundle_id=None,
         decision=decision_summary,
         private_key=private_key,
     )
@@ -150,15 +174,29 @@ def provenance_rollback(
     )
     new_registry = create_signed_registry(
         champion_bundle_id=target_bundle_id,
-        challenger_bundle_id=current_id,
-        previous_bundle_id=current_id,
+        challenger_bundle_id=None,
+        previous_bundle_id=None,
         decision=decision_summary,
         history=history,
         private_key=private_key,
     )
+    verify_control_pointer(new_pointer, public_key=public_key)
+    verify_registry(new_registry, public_key=public_key)
 
-    _atomic_json(pointer_path, new_pointer)
+    # Sign everything before replacing forecast/control files. Preserve the
+    # displaced evidence for recovery if a filesystem or downstream step fails.
+    archive_id = hashlib.sha256(json.dumps(decision_summary, sort_keys=True).encode()).hexdigest()
+    archive = models_root / "provenance_recovery" / archive_id
+    archive.mkdir(parents=True, exist_ok=False)
+    shutil.copy2(pointer_path, archive / "champion.json")
+    shutil.copy2(registry_path, archive / "registry.json")
+    for old in production_forecast_dir.glob("forecasts_*.parquet"):
+        shutil.copy2(old, archive / old.name)
+    production_forecast = _promote_forecast(
+        candidate_forecast, production_forecast_dir, expected_bundle_id=target_bundle_id,
+    )
     _atomic_json(registry_path, new_registry)
+    _atomic_json(pointer_path, new_pointer)
     report = {
         "schema": "quantiv.model-decision.v1",
         "status": "passed",
@@ -167,9 +205,12 @@ def provenance_rollback(
         "promoted": False,
         "candidate_bundle_id": None,
         "champion_bundle_id": target_bundle_id,
-        "previous_bundle_id": current_id,
-        "challenger_bundle_id": current_id,
+        "previous_bundle_id": None,
+        "challenger_bundle_id": None,
+        "disqualified_bundle_id": current_id,
         "production_forecast": str(production_forecast),
+        "recovery_archive": str(archive),
+        "research_publication_eligible": False,
         "reasons": [reason.strip()],
     }
     _atomic_json(report_path, report)
@@ -181,7 +222,8 @@ def main() -> int:
     parser.add_argument("--models-root", type=Path, default=REPO_ROOT / "data" / "models")
     parser.add_argument("--expected-current-bundle-id", required=True)
     parser.add_argument("--target-bundle-id", required=True)
-    parser.add_argument("--candidate-forecast", type=Path, required=True)
+    parser.add_argument("--candidate-forecast", type=Path)
+    parser.add_argument("--check-only", action="store_true")
     parser.add_argument(
         "--production-forecast-dir",
         type=Path,
@@ -194,6 +236,16 @@ def main() -> int:
     )
     parser.add_argument("--reason", required=True)
     args = parser.parse_args()
+    if args.check_only:
+        verify_authorization(
+            models_root=args.models_root,
+            expected_current_bundle_id=args.expected_current_bundle_id,
+            target_bundle_id=args.target_bundle_id,
+        )
+        print("Signed current/previous authorization and both bundles verified")
+        return 0
+    if args.candidate_forecast is None:
+        parser.error("--candidate-forecast is required unless --check-only")
 
     report = provenance_rollback(
         models_root=args.models_root,

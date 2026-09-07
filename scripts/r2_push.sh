@@ -13,9 +13,9 @@ PYTHON_BIN="${PYTHON_BIN:-python}"
 
 MODE="${1:-all}"
 case "$MODE" in
-  all|--skip-forecasts|--forecasts-only) ;;
+  all|--skip-forecasts|--forecasts-only|--model-recovery) ;;
   *)
-    echo "Usage: r2_push.sh [all| --skip-forecasts | --forecasts-only]" >&2
+    echo "Usage: r2_push.sh [all| --skip-forecasts | --forecasts-only | --model-recovery]" >&2
     exit 2
     ;;
 esac
@@ -124,7 +124,13 @@ promote_data_release() {
   echo "✅ Promoted atomic data-release pointer"
 }
 
-if [ "$MODE" = "--forecasts-only" ]; then
+if [ "$MODE" = "--model-recovery" ]; then
+  # Controlled provenance recovery: never build/promote a data release or
+  # rewrite reconciliation. The publication hold remains intact.
+  push_models
+  push_forecasts
+  promote_model_champion
+elif [ "$MODE" = "--forecasts-only" ]; then
   push_forecasts
 elif [ "$MODE" = "--skip-forecasts" ]; then
   "$PYTHON_BIN" scripts/data_release.py build --data-dir "$DATA_DIR"
