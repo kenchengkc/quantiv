@@ -71,7 +71,7 @@ jobs:
       EXPECTED_CURRENT: ${{ inputs.rollback_expected_current }}
       ROLLBACK_TARGET: ${{ inputs.rollback_target }}
       ROLLBACK_REASON: ${{ inputs.rollback_reason }}
-      R2_BUCKET: ${{ secrets.R2_BUCKET }}
+      R2_BUCKET: ${{ secrets.R2_BUCKET || 'quantiv-data' }}
     steps:
       - name: Require isolated main-branch recovery
         env:
