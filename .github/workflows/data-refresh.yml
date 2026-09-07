@@ -362,7 +362,7 @@ jobs:
           set -euo pipefail
           git config --local user.email "action@github.com"
           git config --local user.name "Quantiv bot"
-          git add apps/frontend/public apps/frontend/lib/popular.ts apps/frontend/lib/marketHolidays.generated.ts
+          git add apps/frontend/public apps/frontend/lib/popular.ts
           git add config/delisted_tickers.json config/ticker_renames.json
           # Transitional state still required by existing generators. The
           # canonical earnings calendar is deliberately absent: R2 owns it.
