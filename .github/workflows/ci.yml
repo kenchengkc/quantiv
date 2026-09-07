@@ -91,10 +91,10 @@ jobs:
           python-version: "3.11"
           cache: pip
 
-      - run: pip install -r apps/backend/requirements.txt
-      # The current prediction service consumes the published ml package.
-      # Install it editable so the package layout is honored.
-      - run: pip install -e apps/ml
+      # Hash-pinned production graph. The editable ML install below is --no-deps,
+      # so CI tests exactly the dependency versions admitted by the lock.
+      - run: pip install --require-hashes -r apps/backend/requirements.txt
+      - run: pip install --no-deps -e apps/ml
       # Test-only tooling stays out of the Railway runtime lock/image.
       - run: pip install ruff==0.14.4 pytest==9.1.1 pytest-asyncio==1.4.0
 
@@ -120,8 +120,11 @@ jobs:
           python-version: "3.11"
           cache: pip
 
-      - run: pip install -r requirements.txt
-      - run: pip install -e apps/ml
+      # Same rule for the scheduled pipeline graph: install only the committed,
+      # hash-pinned lock, then expose the local ML package without dependency
+      # resolution.
+      - run: pip install --require-hashes -r requirements.txt
+      - run: pip install --no-deps -e apps/ml
       - run: pip install ruff==0.14.4 pytest==9.1.1
 
       # Deterministic, provider-mocked tests for ingestion budgets, ticker
