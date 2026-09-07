@@ -42,6 +42,7 @@ Institutional research software is credible only when every displayed number is 
 - **Model risk:** challengers must pass purged chronological, walk-forward, straddle-baseline, calibration, drift, shadow-scoring, and forecast-handoff gates.
 - **Artifact security:** native LightGBM bundles are content-addressed, signed, digest-verified, and atomically activated.
 - **Fail-closed releases:** a critical failure stops scoring or publication while the last validated release remains available.
+- **Session correctness:** one versioned NYSE session contract supplies full holidays and early closes to frontend, workers, and Python controls.
 
 ### Measured evidence
 
@@ -106,23 +107,24 @@ See [System architecture](docs/ARCHITECTURE.md) for providers, routes, schedules
 ```text
 quantiv/
 ├── apps/
-│   ├── frontend/           # Next.js UI/API routes; E2E assets live under e2e/
+│   ├── frontend/           # Next.js UI/API routes; generated public artifacts are transitional
 │   ├── backend/            # FastAPI prediction service and quote worker
 │   └── ml/                 # Features, training, published ML package, and tests
-├── config/                 # Versioned policies/identity config + gitignored local env
-├── data/                   # Operational tracked state; manual evidence under research/
-├── docs/                   # Active architecture/runbooks plus historical docs in archive/
+├── config/                 # Versioned policies, security/session contracts + gitignored local env
+├── data/                   # Gitignored runtime/artifact workspace; selected small evidence may be tracked
+├── docs/                   # Active architecture, controls, and runbooks
 ├── lib/                    # Shared ticker and index metadata
 ├── scripts/                # Stable operational commands + maintenance/research/probes/tests
 ├── tools/                  # Artifact builders/helpers + frontend_data package + tests
-├── workers/refresh-prices/ # Cloudflare trigger for quote-writer failover
+├── workers/refresh-prices/ # Cloudflare quote-writer failover worker
 ├── railway.toml
 ├── railway.worker.toml
-├── requirements.txt
+├── requirements.in         # Direct scheduled-pipeline Python dependencies
+├── requirements.txt        # Hash-pinned scheduled-pipeline lock
 └── package.json
 ```
 
-The layout follows ownership rather than language: stable runtime/automation entrypoints keep their existing paths, while tests, maintenance utilities, E2E-only configuration, and research artifacts live with the subsystem that owns them. Manual research data is isolated under [`data/research/`](data/README.md). Retired live code is removed from the tree and remains recoverable through Git history; `docs/archive/` is reserved for intentionally historical documentation.
+The layout follows ownership rather than language: stable runtime/automation entrypoints keep their existing paths, while tests, maintenance utilities, E2E-only configuration, and research artifacts live with the subsystem that owns them. Runtime datasets are materialized from artifact storage rather than treated as source code; manual research data is isolated under [`data/research/`](data/README.md). Retired live code remains recoverable through Git history.
 
 ## Local development
 
@@ -140,7 +142,7 @@ Install dependencies and create the local environment:
 npm install
 python -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+pip install --require-hashes -r requirements.txt
 cp .env.example config/.env.local
 ```
 
@@ -175,7 +177,7 @@ npm run ml:score
 npm run data:frontend
 ```
 
-Use `npm run data:sync-full` for the expanded synchronization workflow. Generated application data is written to `apps/frontend/public/`.
+Use `npm run data:sync-full` for the expanded synchronization workflow. Generated application data is currently written to `apps/frontend/public/` for Vercel compatibility. The repository also supports a content-addressed frontend release in R2 (`scripts/frontend_release.py` and `scripts/r2_push_frontend.sh`); that path is staging-verified but source-control eviction remains a separate deployment cutover.
 
 Common model-development commands:
 
@@ -206,7 +208,10 @@ python -m pytest apps/backend/tests apps/ml/tests scripts tools -q
 | `ci.yml`                   | Lint, type-check, build, pytest, Vitest, Playwright, performance, and Railway image smoke |
 | `security.yml`             | Python and JavaScript/TypeScript CodeQL analysis                                          |
 | `production-smoke.yml`     | Public frontend and API checks                                                            |
-| `daily-refresh.yml`        | Provider refresh, reconciliation, scoring, publication, and Sunday challenger training    |
+| `data-refresh.yml`         | Provider refresh, reconciliation, scoring, and current frontend generation                |
+| `frontend-publication.yml` | Build and publish immutable content-addressed frontend releases to R2                     |
+| `model-retrain.yml`        | Weekly/manual gated challenger training, promotion, activation, and exact forecast import |
+| `model-rollback.yml`       | Isolated signed provenance recovery to an exact previously approved champion              |
 | `refresh-broad.yml`        | Off-hours Polygon quote-cache warming                                                     |
 | `refresh-ticker-names.yml` | Quarterly SEC ticker and exchange refresh                                                 |
 | `av-enrichment.yml`        | Manual, isolated provider-signal research; never publishes to `main`                      |
@@ -224,7 +229,7 @@ python -m pytest apps/backend/tests apps/ml/tests scripts tools -q
 | [Railway setup](docs/RAILWAY_SETUP.md)                               | API and quote-worker deployment                                |
 | [R2 setup](docs/R2_SETUP.md)                                         | Artifact storage and synchronization                           |
 | [Pipeline runbook](scripts/README.md)                                | Data-provider and scheduled-pipeline commands                  |
-| [Data layout](data/README.md)                                        | Operational versus research artifact ownership                 |
+| [Data layout](data/README.md)                                        | Runtime versus research artifact ownership                     |
 | [Tooling layout](tools/README.md)                                    | Frontend builders, helpers, fixtures, and tool tests            |
 
 Additional documentation is indexed in [docs/README.md](docs/README.md).
