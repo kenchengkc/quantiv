@@ -13,7 +13,7 @@
  * Close — same quote as LIVE but shown when the market is closed or quotes
  *   are no longer refreshing (weekends/holidays, after 17:00 ET IEX cutoff).
  */
-import { MARKET_HOLIDAYS_US } from './marketHolidays.generated';
+import MARKET_SESSIONS from '../../../config/market_sessions.json';
 import { areEarningsQuotesLive, etDateIso, hasRegularClosePassedET } from './marketHours';
 
 export type EarningsTimingBucket = 'bmo' | 'amc' | 'unknown';
@@ -25,7 +25,7 @@ export type EarningsReactionDisplay = {
   tag: EarningsReactionTag | null;
 };
 
-const HOLIDAYS = new Set<string>(MARKET_HOLIDAYS_US);
+const HOLIDAYS = new Set<string>(MARKET_SESSIONS.holidays);
 
 export function timingBucket(timing?: string): EarningsTimingBucket {
   const k = (timing ?? '').toLowerCase();
