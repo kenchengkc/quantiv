@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
-"""Build, verify, and materialize immutable frontend publication releases.
+"""Build, verify, pin, and materialize immutable frontend publication releases.
 
 The release contains generated browser-safe files beneath ``apps/frontend/public``
 except ``brand/``, which is source-controlled static design material. A logical
 release ID is the SHA-256 of the sorted file inventory, not a timestamp. The
 archive is deterministic, immutable, and safe to reproduce from any checkout.
+
+``current.json`` is the mutable R2 discovery pointer. The source-controlled
+``apps/frontend/frontend-release.json`` is a separate deployment pointer: it
+pins an exact immutable manifest/archive pair (including SHA-256 digests) so a
+Git revision cannot silently resolve to different frontend bytes later.
 """
 from __future__ import annotations
 
@@ -25,8 +30,10 @@ from typing import Any
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_PUBLIC_DIR = REPO_ROOT / "apps" / "frontend" / "public"
 DEFAULT_OUTPUT_DIR = REPO_ROOT / "data" / "frontend_publication"
+DEFAULT_DEPLOYMENT_POINTER = REPO_ROOT / "apps" / "frontend" / "frontend-release.json"
 RELEASE_SCHEMA = "quantiv.frontend-release.v1"
 POINTER_SCHEMA = "quantiv.current-frontend-release.v1"
+DEPLOYMENT_POINTER_SCHEMA = "quantiv.frontend-deployment.v1"
 SOURCE_CONTROLLED_PREFIXES = ("brand/",)
 
 
@@ -51,8 +58,10 @@ def _atomic_json(path: Path, payload: dict[str, Any]) -> None:
 
 
 def _is_generated(relative: str) -> bool:
-    return not any(relative == prefix.rstrip("/") or relative.startswith(prefix)
-                   for prefix in SOURCE_CONTROLLED_PREFIXES)
+    return not any(
+        relative == prefix.rstrip("/") or relative.startswith(prefix)
+        for prefix in SOURCE_CONTROLLED_PREFIXES
+    )
 
 
 def _inventory(public_dir: Path) -> list[dict[str, Any]]:
@@ -156,7 +165,9 @@ def build_release(
     return archive_path, manifest_path, pointer_path, manifest
 
 
-def _load_release(output_dir: Path, pointer_path: Path | None = None) -> tuple[dict, dict, Path]:
+def _load_release(
+    output_dir: Path, pointer_path: Path | None = None
+) -> tuple[dict, dict, Path]:
     pointer_path = pointer_path or output_dir / "current.json"
     pointer = json.loads(pointer_path.read_text())
     if pointer.get("schema") != POINTER_SCHEMA:
@@ -179,6 +190,41 @@ def _load_release(output_dir: Path, pointer_path: Path | None = None) -> tuple[d
         raise RuntimeError("frontend release pointer/manifest identity mismatch")
     archive_path = output_dir / str(manifest["archive"]["path"])
     return pointer, manifest, archive_path
+
+
+def write_deployment_pointer(
+    output_dir: Path = DEFAULT_OUTPUT_DIR,
+    deployment_pointer: Path = DEFAULT_DEPLOYMENT_POINTER,
+    *,
+    source_revision: str | None = None,
+) -> dict[str, Any]:
+    """Pin the locally verified immutable release for deterministic deployment."""
+    pointer, manifest, archive_path = _load_release(output_dir)
+    manifest_path = output_dir / str(pointer["manifest"])
+    if not manifest_path.is_file() or not archive_path.is_file():
+        raise RuntimeError("frontend release must be fully materialized before it can be pinned")
+
+    resolved_source_revision = source_revision or pointer.get("source_revision")
+    pinned: dict[str, Any] = {
+        "schema": DEPLOYMENT_POINTER_SCHEMA,
+        "release_id": pointer["release_id"],
+        "manifest": {
+            "path": str(pointer["manifest"]),
+            "bytes": manifest_path.stat().st_size,
+            "sha256": _sha256_file(manifest_path),
+        },
+        "archive": {
+            "path": str(manifest["archive"]["path"]),
+            "bytes": int(manifest["archive"]["bytes"]),
+            "sha256": str(manifest["archive"]["sha256"]),
+        },
+        "file_count": int(manifest["file_count"]),
+        "total_bytes": int(manifest["total_bytes"]),
+    }
+    if resolved_source_revision:
+        pinned["source_revision"] = str(resolved_source_revision)
+    _atomic_json(deployment_pointer, pinned)
+    return pinned
 
 
 def _safe_member_name(name: str) -> str:
@@ -283,11 +329,12 @@ def materialize_release(
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("build", "verify", "materialize"))
+    parser.add_argument("command", choices=("build", "verify", "materialize", "pin"))
     parser.add_argument("--public-dir", type=Path, default=DEFAULT_PUBLIC_DIR)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
     parser.add_argument("--pointer", type=Path, default=None)
-    parser.add_argument("--source-revision", default=os.getenv("GITHUB_SHA"))
+    parser.add_argument("--deployment-pointer", type=Path, default=DEFAULT_DEPLOYMENT_POINTER)
+    parser.add_argument("--source-revision", default=os.getenv("FRONTEND_SOURCE_REVISION"))
     args = parser.parse_args()
 
     if args.command == "build":
@@ -308,6 +355,15 @@ def main() -> int:
         print(
             f"Verified frontend release {result['release_id']}: "
             f"{result['files']:,} files, {result['bytes']:,} bytes"
+        )
+    elif args.command == "pin":
+        result = write_deployment_pointer(
+            args.output_dir,
+            args.deployment_pointer,
+            source_revision=args.source_revision,
+        )
+        print(
+            f"Pinned frontend release {result['release_id']} -> {args.deployment_pointer}"
         )
     else:
         result = materialize_release(args.output_dir, args.public_dir, args.pointer)
