@@ -4,15 +4,15 @@
     "contracts": 97762,
     "corporate_action_rows": 28685,
     "corporate_action_status": "enforced",
-    "covered_events": 29,
-    "decision_group_rejection_rate": 0.46887,
-    "decision_groups": 3389,
+    "covered_events": 31,
+    "decision_group_rejection_rate": 0.225,
+    "decision_groups": 40,
     "decision_scope": "end_of_day_research",
     "duplicate_rows": 0,
     "eligible_contracts": 55890,
-    "eligible_decision_groups": 1800,
-    "event_coverage_pct": 0.763158,
-    "expected_events": 38,
+    "eligible_decision_groups": 31,
+    "event_coverage_pct": 0.775,
+    "expected_events": 40,
     "expected_source_date": "2026-09-04",
     "live_trading_eligible": false,
     "missing_events": 9,
@@ -29,8 +29,14 @@
   },
   "exceptions": [
     {
+      "code": "options_stale",
+      "count": 6,
+      "severity": "critical",
+      "summary": "options exceeds its freshness limit"
+    },
+    {
       "code": "upcoming_events_outside_option_universe",
-      "count": 296,
+      "count": 343,
       "severity": "warning",
       "summary": "Calendar events fall outside the current options decision universe"
     },
@@ -48,9 +54,9 @@
     },
     {
       "code": "option_quote_quality_below_limit",
-      "count": 1589,
+      "count": 9,
       "severity": "critical",
-      "summary": "Option leg or decision-group quality exceeds the publication limit"
+      "summary": "Option evidence on the scoped earnings decision surface exceeds the publication limit"
     },
     {
       "code": "retired_source_symbols_quarantined",
@@ -59,20 +65,20 @@
       "summary": "Latest source quotes for retired symbols are excluded from the decision universe"
     }
   ],
-  "generated_at": "2026-09-06T14:48:54.389859+00:00",
+  "generated_at": "2026-09-07T16:33:53.226781+00:00",
   "model": {
     "challenger_present": false,
     "champion_active": true,
     "critical_features": 2,
     "drift_status": "warning",
-    "fallback_bundle_available": true,
+    "fallback_bundle_available": false,
     "hard_missing_features": 0,
     "monitored_at": "2026-09-02T15:22:44.446687+00:00",
-    "outcome_common_rows": null,
-    "outcome_evaluated_at": null,
-    "outcome_evaluations": 0,
-    "outcome_minimum_rows": null,
-    "outcome_status": "unavailable",
+    "outcome_common_rows": 95,
+    "outcome_evaluated_at": "2026-09-06T15:14:48.694772+00:00",
+    "outcome_evaluations": 1,
+    "outcome_minimum_rows": 30,
+    "outcome_status": "passed",
     "rollback_recorded": false,
     "shadow_roles": [
       "previous"
