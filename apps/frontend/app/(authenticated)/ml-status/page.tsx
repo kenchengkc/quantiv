@@ -2,8 +2,7 @@ import type { Metadata } from 'next';
 import { auth } from '@clerk/nextjs/server';
 import { notFound, redirect } from 'next/navigation';
 import { requireMlStatusAdmin } from '@/lib/mlStatusAdmin';
-import controlHistory from '../../../public/control-plane-history.json';
-import controlSnapshot from '../../../public/control-plane.json';
+import { readPublicJson } from '@/lib/researchSnapshot.server';
 import MlStatusPageClient from './MlStatusPageClient';
 import type {
   ControlHistory,
@@ -26,10 +25,17 @@ export default async function MlStatusPage() {
 
   const access = await requireMlStatusAdmin();
   if (!access.ok) notFound();
+
+  const controlSnapshot = readPublicJson<ControlSnapshot>('control-plane.json');
+  const controlHistory = readPublicJson<ControlHistory>('control-plane-history.json');
+  if (!controlSnapshot || !controlHistory) {
+    throw new Error('Production-control publication is unavailable; frontend release materialization is incomplete.');
+  }
+
   return (
     <MlStatusPageClient
-      initialControlSnapshot={controlSnapshot as ControlSnapshot}
-      initialControlHistory={controlHistory as ControlHistory}
+      initialControlSnapshot={controlSnapshot}
+      initialControlHistory={controlHistory}
     />
   );
 }
