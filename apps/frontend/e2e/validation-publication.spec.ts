@@ -1,6 +1,30 @@
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { expect, test } from '@playwright/test';
-import control from '../public/control-plane.json';
-import forecast from '../public/evidence/forecast.json';
+
+type ControlPublication = {
+  generated_at: string;
+  data: { source_date: string };
+};
+
+type ForecastPublication = {
+  validated_at: string;
+};
+
+function readPublication<T>(...parts: string[]): T {
+  const candidates = [
+    join(process.cwd(), 'public', ...parts),
+    join(process.cwd(), 'apps', 'frontend', 'public', ...parts),
+  ];
+  const path = candidates.find((candidate) => existsSync(candidate));
+  if (!path) {
+    throw new Error(`Missing frontend publication fixture: ${parts.join('/')}`);
+  }
+  return JSON.parse(readFileSync(path, 'utf8')) as T;
+}
+
+const control = readPublication<ControlPublication>('control-plane.json');
+const forecast = readPublication<ForecastPublication>('evidence', 'forecast.json');
 
 function dateLabel(value: string) {
   return new Date(value).toLocaleString('en-US', {
