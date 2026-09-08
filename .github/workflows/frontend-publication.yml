@@ -2,7 +2,9 @@ name: Frontend publication release
 
 on:
   workflow_run:
-    workflows: ["Daily data refresh"]
+    workflows:
+      - "Daily data refresh"
+      - "Refresh ticker names"
     types: [completed]
   workflow_dispatch:
 
@@ -27,9 +29,9 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           ref: main
 
-      # workflow_run.head_sha is the revision that started the refresh, not the
-      # generated-data commit the refresh may push afterward. Provenance must
-      # describe the bytes actually checked out and packaged here.
+      # workflow_run.head_sha is the revision that started the producer workflow,
+      # not necessarily the generated-data commit that producer may push afterward.
+      # Provenance must describe the bytes actually checked out and packaged here.
       - name: Capture release provenance
         run: echo "FRONTEND_SOURCE_REVISION=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
 
