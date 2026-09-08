@@ -3,7 +3,7 @@ import Link from 'next/link';
 import styles from './page.module.css';
 import { ValidationPublication } from '@/components/ValidationPublication';
 import { publishedForecastStatus, quoteEligibilityExplanation } from '@/lib/publicationPresentation';
-import { readPublicJson } from '@/lib/researchSnapshot.server';
+import { requirePublicJson } from '@/lib/researchSnapshot.server';
 
 export const metadata: Metadata = {
   title: 'Research Validation',
@@ -148,12 +148,9 @@ type ForecastEvidence = {
   }>;
 };
 
-const validation = readPublicJson<ValidationArtifact>('evidence', 'model-validation.json');
-const control = readPublicJson<ControlPlane>('control-plane.json');
-const forecast = readPublicJson<ForecastEvidence>('evidence', 'forecast.json');
-if (!validation || !control || !forecast) {
-  throw new Error('Validation publication is unavailable; frontend release materialization is incomplete.');
-}
+const validation = requirePublicJson<ValidationArtifact>('evidence', 'model-validation.json');
+const control = requirePublicJson<ControlPlane>('control-plane.json');
+const forecast = requirePublicJson<ForecastEvidence>('evidence', 'forecast.json');
 
 function pct(value: number | null | undefined, digits = 1): string {
   if (value == null || !Number.isFinite(value)) return '—';
