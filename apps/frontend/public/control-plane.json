@@ -4,18 +4,18 @@
     "contracts": 97762,
     "corporate_action_rows": 28685,
     "corporate_action_status": "enforced",
-    "covered_events": 31,
-    "decision_group_rejection_rate": 0.225,
-    "decision_groups": 40,
+    "covered_events": 45,
+    "decision_group_rejection_rate": 0.237288,
+    "decision_groups": 59,
     "decision_scope": "end_of_day_research",
     "duplicate_rows": 0,
     "eligible_contracts": 55890,
-    "eligible_decision_groups": 31,
-    "event_coverage_pct": 0.775,
-    "expected_events": 40,
+    "eligible_decision_groups": 45,
+    "event_coverage_pct": 0.762712,
+    "expected_events": 59,
     "expected_source_date": "2026-09-04",
     "live_trading_eligible": false,
-    "missing_events": 9,
+    "missing_events": 14,
     "pair_rejection_rate": 0.878296,
     "quarantine_records": 84804,
     "quarantine_status": "enforced",
@@ -30,19 +30,19 @@
   "exceptions": [
     {
       "code": "options_stale",
-      "count": 6,
+      "count": 7,
       "severity": "critical",
       "summary": "options exceeds its freshness limit"
     },
     {
       "code": "upcoming_events_outside_option_universe",
-      "count": 343,
+      "count": 292,
       "severity": "warning",
       "summary": "Calendar events fall outside the current options decision universe"
     },
     {
       "code": "upcoming_events_without_option_chain",
-      "count": 9,
+      "count": 14,
       "severity": "warning",
       "summary": "In-universe earnings events have no decision-eligible option chain"
     },
@@ -54,7 +54,7 @@
     },
     {
       "code": "option_quote_quality_below_limit",
-      "count": 9,
+      "count": 14,
       "severity": "critical",
       "summary": "Option evidence on the scoped earnings decision surface exceeds the publication limit"
     },
@@ -65,7 +65,7 @@
       "summary": "Latest source quotes for retired symbols are excluded from the decision universe"
     }
   ],
-  "generated_at": "2026-09-07T16:33:53.226781+00:00",
+  "generated_at": "2026-09-08T15:08:23.858447+00:00",
   "model": {
     "challenger_present": false,
     "champion_active": true,
