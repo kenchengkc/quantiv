@@ -19,7 +19,7 @@ import re
 import signal
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -37,6 +37,8 @@ logger = structlog.get_logger()
 QUOTE_REFRESH_OPEN_MIN = 9 * 60 + 25
 DEFAULT_REGULAR_CLOSE_MIN = 16 * 60
 QUOTE_SETTLE_MINUTES = 45
+FORECAST_LOOKBACK_DAYS = 7
+FORECAST_LOOKAHEAD_DAYS = 21
 STALE_TTL_S = 7 * 24 * 60 * 60
 PREVIOUS_CLOSE_CACHE_MAX_AGE_S = 30 * 60
 INTEREST_ZSET = "quote:interest"
@@ -188,18 +190,6 @@ def normalize_symbol(value: object) -> str | None:
     return symbol if SYMBOL_RE.match(symbol) else None
 
 
-def public_dir() -> Path:
-    candidates = [
-        REPO_ROOT / "apps" / "frontend" / "public",
-        Path("/app/apps/frontend/public"),
-        Path.cwd() / "public",
-    ]
-    for candidate in candidates:
-        if candidate.exists():
-            return candidate
-    return candidates[0]
-
-
 def market_sessions_path() -> Path:
     candidates = [
         REPO_ROOT / "config" / "market_sessions.json",
@@ -260,21 +250,9 @@ def is_quote_window(
 
 
 def monday_iso_for(date_iso: str) -> str:
-    date = datetime.fromisoformat(f"{date_iso}T00:00:00+00:00")
-    delta = 6 if date.weekday() == 6 else date.weekday()
-    return (date - timedelta(days=delta)).date().isoformat()
-
-
-def load_week_file(monday_iso: str) -> list[dict[str, Any]]:
-    path = public_dir() / "weeks" / f"{monday_iso}.json"
-    if not path.exists():
-        return []
-    try:
-        payload = json.loads(path.read_text())
-    except Exception:
-        return []
-    events = payload.get("events") if isinstance(payload, dict) else None
-    return events if isinstance(events, list) else []
+    parsed = datetime.fromisoformat(f"{date_iso}T00:00:00+00:00")
+    delta = 6 if parsed.weekday() == 6 else parsed.weekday()
+    return (parsed - timedelta(days=delta)).date().isoformat()
 
 
 def load_sp500() -> list[str]:
@@ -309,6 +287,44 @@ async def load_watchlist_symbols(pool: asyncpg.Pool | None) -> list[str]:
         logger.warning("watchlist load failed", error=str(exc))
         return []
     return [symbol for row in rows if (symbol := normalize_symbol(row["symbol"]))]
+
+
+async def load_forecast_events(
+    pool: asyncpg.Pool | None,
+    start_date: date,
+    end_date: date,
+) -> list[dict[str, str]] | None:
+    """Load the nightly scored earnings universe from Neon.
+
+    ``None`` means Neon was unavailable and callers should retain their last
+    successful snapshot. An empty list is a valid result (including when the
+    quote worker intentionally runs without ``DATABASE_URL``).
+    """
+    if pool is None:
+        return []
+    try:
+        rows = await pool.fetch(
+            """
+            SELECT DISTINCT act_symbol, earnings_date
+            FROM em_forecasts
+            WHERE earnings_date >= $1
+              AND earnings_date <= $2
+            """,
+            start_date,
+            end_date,
+        )
+    except Exception as exc:
+        logger.warning("forecast universe load failed", error=str(exc))
+        return None
+
+    events: list[dict[str, str]] = []
+    for row in rows:
+        symbol = normalize_symbol(row["act_symbol"])
+        earnings_date = row["earnings_date"]
+        if not symbol or not isinstance(earnings_date, date):
+            continue
+        events.append({"ticker": symbol, "earnings_date": earnings_date.isoformat()})
+    return events
 
 
 async def load_interest_scores(client: redis.Redis) -> dict[str, float]:
@@ -399,6 +415,8 @@ class QuoteWorkerState:
     watchlist_symbols: list[str] = field(default_factory=list)
     watchlist_rev: str | None = None
     watchlist_loaded: bool = False
+    forecast_events: list[dict[str, str]] = field(default_factory=list)
+    forecast_events_session_date: str | None = None
     previous_close: dict[str, float] = field(default_factory=dict)
     previous_close_session_date: str | None = None
     missing_previous_close_cursor: int = 0
@@ -613,6 +631,30 @@ class QuoteWorker:
         logger.info("watchlist reloaded", symbols=len(symbols), rev=rev)
         return symbols
 
+    async def load_forecast_universe(self, today_iso: str) -> list[dict[str, str]]:
+        """Load the scored earnings universe at most once per ET session date.
+
+        The nightly import is immutable for the quote worker's purposes. A
+        transient Neon failure retains the last successful snapshot and leaves
+        the session marker unchanged so the next universe refresh retries.
+        """
+        if self.state.forecast_events_session_date == today_iso:
+            return self.state.forecast_events
+
+        today = date.fromisoformat(today_iso)
+        events = await load_forecast_events(
+            self.pg_pool,
+            today - timedelta(days=FORECAST_LOOKBACK_DAYS),
+            today + timedelta(days=FORECAST_LOOKAHEAD_DAYS),
+        )
+        if events is None:
+            return self.state.forecast_events
+
+        self.state.forecast_events = events
+        self.state.forecast_events_session_date = today_iso
+        logger.info("forecast universe reloaded", events=len(events), session_date=today_iso)
+        return events
+
     async def refresh_universe(self, *, force: bool = False) -> None:
         now = asyncio.get_running_loop().time()
         if (
@@ -654,18 +696,20 @@ class QuoteWorker:
         for symbol in await self.load_watchlist():
             scores[symbol] = scores.get(symbol, 0.0) + 120.0
 
-        score_week_events(
-            scores, load_week_file(this_monday), today_iso=today_iso, weight=55.0
-        )
-        score_week_events(
-            scores, load_week_file(next_monday), today_iso=today_iso, weight=30.0
-        )
-        score_week_events(
-            scores, load_week_file(week_after_next), today_iso=today_iso, weight=20.0
-        )
-        score_week_events(
-            scores, load_week_file(last_monday), today_iso=today_iso, weight=15.0
-        )
+        forecast_events = await self.load_forecast_universe(today_iso)
+        week_weights = {
+            this_monday: 55.0,
+            next_monday: 30.0,
+            week_after_next: 20.0,
+            last_monday: 15.0,
+        }
+        for monday, weight in week_weights.items():
+            events = [
+                event
+                for event in forecast_events
+                if monday_iso_for(event["earnings_date"]) == monday
+            ]
+            score_week_events(scores, events, today_iso=today_iso, weight=weight)
 
         for symbol in load_sp500():
             scores[symbol] = scores.get(symbol, 0.0) + 5.0
@@ -1052,12 +1096,13 @@ class QuoteWorker:
     async def run(self) -> None:
         await self.start()
         await self.register_lease_protocol()
-        if (
+        quote_window_open = (
             is_quote_window(holidays=self.holidays)
             or self.config.allow_market_hours_override
-        ):
+        )
+        if quote_window_open:
             await self.acquire_lease()
-        await self.refresh_universe(force=True)
+            await self.refresh_universe(force=True)
         tasks = [
             asyncio.create_task(self.lease_loop(), name="lease_loop"),
             asyncio.create_task(self.rest_loop(), name="rest_loop"),
