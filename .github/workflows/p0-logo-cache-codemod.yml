@@ -1,0 +1,149 @@
+name: P0 ticker-logo publication codemod
+
+on:
+  push:
+    branches: ["cleanup/p0-ticker-logo-publication-fetch"]
+
+permissions:
+  contents: write
+
+jobs:
+  codemod:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: cleanup/p0-ticker-logo-publication-fetch
+
+      - name: Replace bundled ticker-logo JSON with lazy publication fetch
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('apps/frontend/components/TickerLogo.tsx')
+          text = path.read_text()
+
+          replacements = [
+              (
+                  "import { type CSSProperties, useEffect, useMemo, useState } from 'react';\nimport tickerLogoData from '@/public/ticker-logos.json';\n",
+                  "import { type CSSProperties, useEffect, useMemo, useState } from 'react';\n",
+              ),
+              (
+                  "const logoPromiseCache = new Map<string, Promise<TickerLogoLoadState>>();\n",
+                  """const logoPromiseCache = new Map<string, Promise<TickerLogoLoadState>>();
+const FINNHUB_CACHE_WAIT_MS = 500;
+let finnhubLogoCache: Record<string, unknown> = {};
+let finnhubLogoCacheAttempted = false;
+let finnhubLogoCachePromise: Promise<void> | null = null;
+
+async function ensureFinnhubLogoCache(): Promise<void> {
+  if (typeof window === 'undefined' || finnhubLogoCacheAttempted) return;
+  if (!finnhubLogoCachePromise) {
+    finnhubLogoCachePromise = fetch('/ticker-logos.json', { cache: 'force-cache' })
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`ticker-logo publication returned ${response.status}`);
+        const payload = (await response.json()) as { logos?: Record<string, unknown> };
+        finnhubLogoCache = payload.logos ?? {};
+      })
+      .catch(() => {
+        // Logo.dev and Parqet remain functional fallbacks. Avoid retry storms in
+        // a single page session; a future navigation/reload gets a fresh attempt.
+        finnhubLogoCache = {};
+      })
+      .finally(() => {
+        finnhubLogoCacheAttempted = true;
+        finnhubLogoCachePromise = null;
+      });
+  }
+  await finnhubLogoCachePromise;
+}
+""",
+              ),
+              (
+                  """function cachedFinnhubLogoUrl(ticker: string): string | null {
+  const logos = (tickerLogoData as { logos?: Record<string, unknown> }).logos ?? {};
+  const url = logos[normalizeTicker(ticker)];
+  return typeof url === 'string' && /^https?:\\/\\//.test(url) ? url : null;
+}
+""",
+                  """function cachedFinnhubLogoUrl(ticker: string): string | null {
+  const url = finnhubLogoCache[normalizeTicker(ticker)];
+  return typeof url === 'string' && /^https?:\\/\\//.test(url) ? url : null;
+}
+""",
+              ),
+              (
+                  """  const urls = tickerLogoUrls(normalized);
+  const promise = new Promise<TickerLogoLoadState>((resolve) => {
+""",
+                  """  const cacheReady = Promise.race([
+    ensureFinnhubLogoCache(),
+    new Promise<void>((resolve) => window.setTimeout(resolve, FINNHUB_CACHE_WAIT_MS)),
+  ]);
+  const promise = cacheReady.then(() => new Promise<TickerLogoLoadState>((resolve) => {
+    const urls = tickerLogoUrls(normalized);
+""",
+              ),
+              (
+                  """    tryNext();
+  });
+
+  logoPromiseCache.set(normalized, promise);
+""",
+                  """    tryNext();
+  }));
+
+  logoPromiseCache.set(normalized, promise);
+""",
+              ),
+              (
+                  """  const normalized = normalizeTicker(ticker);
+  const urls = useMemo(() => tickerLogoUrls(normalized), [normalized]);
+  const [failed, setFailed] = useState(
+""",
+                  """  const normalized = normalizeTicker(ticker);
+  const [logoDataRevision, setLogoDataRevision] = useState(0);
+  const urls = useMemo(() => tickerLogoUrls(normalized), [normalized, logoDataRevision]);
+  const [failed, setFailed] = useState(
+""",
+              ),
+              (
+                  """  useEffect(() => {
+    setFailed(getTickerLogoState(normalized) === 'failed');
+""",
+                  """  useEffect(() => {
+    let active = true;
+    void ensureFinnhubLogoCache().then(() => {
+      if (active) setLogoDataRevision((revision) => revision + 1);
+    });
+    return () => {
+      active = false;
+    };
+  }, [normalized]);
+
+  useEffect(() => {
+    setFailed(getTickerLogoState(normalized) === 'failed');
+""",
+              ),
+          ]
+
+          for old, new in replacements:
+              if old not in text:
+                  raise SystemExit(f'expected ticker-logo source fragment not found:\n{old}')
+              text = text.replace(old, new, 1)
+
+          path.write_text(text)
+          PY
+
+      - name: Commit codemod result
+        run: |
+          set -euo pipefail
+          git config user.name 'quantiv-bot'
+          git config user.email 'quantiv-bot@users.noreply.github.com'
+          git add apps/frontend/components/TickerLogo.tsx
+          git diff --staged --check
+          git commit -m 'P0: lazy-load ticker-logo publication cache'
+          git push origin HEAD:cleanup/p0-ticker-logo-publication-fetch
