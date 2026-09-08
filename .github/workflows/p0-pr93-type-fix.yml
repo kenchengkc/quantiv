@@ -1,0 +1,59 @@
+name: P0 PR93 type fix
+
+on:
+  push:
+    branches: ["cleanup/p0-publication-static-analysis"]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: cleanup/p0-publication-static-analysis
+
+      - name: Use non-null publication reader
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('apps/frontend/app/(public)/validation/page.tsx')
+          text = path.read_text()
+          text = text.replace(
+              "import { readPublicJson } from '@/lib/researchSnapshot.server';",
+              "import { requirePublicJson } from '@/lib/researchSnapshot.server';",
+              1,
+          )
+          old = (
+              "const validation = readPublicJson<ValidationArtifact>('evidence', 'model-validation.json');\n"
+              "const control = readPublicJson<ControlPlane>('control-plane.json');\n"
+              "const forecast = readPublicJson<ForecastEvidence>('evidence', 'forecast.json');\n"
+              "if (!validation || !control || !forecast) {\n"
+              "  throw new Error('Validation publication is unavailable; frontend release materialization is incomplete.');\n"
+              "}\n"
+          )
+          new = (
+              "const validation = requirePublicJson<ValidationArtifact>('evidence', 'model-validation.json');\n"
+              "const control = requirePublicJson<ControlPlane>('control-plane.json');\n"
+              "const forecast = requirePublicJson<ForecastEvidence>('evidence', 'forecast.json');\n"
+          )
+          if old not in text:
+              raise SystemExit('expected validation publication block not found')
+          path.write_text(text.replace(old, new, 1))
+          PY
+
+      - name: Commit fix
+        run: |
+          set -euo pipefail
+          git config user.name 'quantiv-bot'
+          git config user.email 'quantiv-bot@users.noreply.github.com'
+          git add 'apps/frontend/app/(public)/validation/page.tsx'
+          git diff --staged --check
+          git commit -m 'P0: make validation publication reads non-null by contract'
+          git push origin HEAD:cleanup/p0-publication-static-analysis
