@@ -16,6 +16,16 @@ export function readPublicJson<T>(...parts: string[]): T | null {
   }
 }
 
+export function requirePublicJson<T>(...parts: string[]): T {
+  const value = readPublicJson<T>(...parts);
+  if (value === null) {
+    throw new Error(
+      `Required frontend publication is unavailable or invalid: ${parts.join('/')}`,
+    );
+  }
+  return value;
+}
+
 export function canonicalJson(value: unknown): string {
   if (value === undefined) return 'null';
   if (value === null || typeof value !== 'object') {
