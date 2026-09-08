@@ -3,14 +3,41 @@
 /* eslint-disable @next/next/no-img-element */
 
 import { type CSSProperties, useEffect, useMemo, useState } from 'react';
-import tickerLogoData from '@/public/ticker-logos.json';
 
 export type TickerLogoLoadState = 'loaded' | 'failed';
 
 const DEFAULT_TIMEOUT_MS = 4_000;
+const FINNHUB_CACHE_WAIT_MS = 500;
 const logoStateCache = new Map<string, TickerLogoLoadState>();
 const logoUrlCache = new Map<string, string>();
 const logoPromiseCache = new Map<string, Promise<TickerLogoLoadState>>();
+let finnhubLogoCache: Record<string, unknown> = {};
+let finnhubLogoCacheAttempted = false;
+let finnhubLogoCachePromise: Promise<void> | null = null;
+
+async function ensureFinnhubLogoCache(): Promise<void> {
+  if (typeof window === 'undefined' || finnhubLogoCacheAttempted) return;
+  if (!finnhubLogoCachePromise) {
+    finnhubLogoCachePromise = fetch('/ticker-logos.json', { cache: 'force-cache' })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error(`ticker-logo publication returned ${response.status}`);
+        }
+        const payload = (await response.json()) as { logos?: Record<string, unknown> };
+        finnhubLogoCache = payload.logos ?? {};
+      })
+      .catch(() => {
+        // Logo.dev and Parqet remain functional fallbacks. Avoid retry storms in
+        // a single page session; a future navigation/reload gets a fresh attempt.
+        finnhubLogoCache = {};
+      })
+      .finally(() => {
+        finnhubLogoCacheAttempted = true;
+        finnhubLogoCachePromise = null;
+      });
+  }
+  await finnhubLogoCachePromise;
+}
 
 function normalizeTicker(ticker: string) {
   return ticker.trim().toUpperCase();
@@ -88,8 +115,7 @@ function logoDevDomainUrl(ticker: string): string | null {
 }
 
 function cachedFinnhubLogoUrl(ticker: string): string | null {
-  const logos = (tickerLogoData as { logos?: Record<string, unknown> }).logos ?? {};
-  const url = logos[normalizeTicker(ticker)];
+  const url = finnhubLogoCache[normalizeTicker(ticker)];
   return typeof url === 'string' && /^https?:\/\//.test(url) ? url : null;
 }
 
@@ -109,7 +135,7 @@ function sourceUrl(source: LogoSource, ticker: string): (string | null)[] {
       // Logo.dev hosts dual-class under the dash symbol; try dash first.
       return separatorVariants(ticker).map(logoDevUrl);
     case 'finnhub':
-      // Cache is keyed exactly as committed (dot form for BF.B); try both.
+      // Cache is keyed exactly as published (dot form for BF.B); try both.
       return separatorVariants(ticker).map(cachedFinnhubLogoUrl);
     case 'parqet':
       return separatorVariants(ticker).map(tickerLogoUrl);
@@ -181,8 +207,15 @@ export function preloadTickerLogo(
 
   if (typeof window === 'undefined') return Promise.resolve('failed');
 
-  const urls = tickerLogoUrls(normalized);
-  const promise = new Promise<TickerLogoLoadState>((resolve) => {
+  // Give the local publication cache a bounded head start so Finnhub remains
+  // ahead of Parqet without allowing one JSON request to consume the image
+  // preload timeout budget on a slow connection.
+  const cacheReady = Promise.race([
+    ensureFinnhubLogoCache(),
+    new Promise<void>((resolve) => window.setTimeout(resolve, FINNHUB_CACHE_WAIT_MS)),
+  ]);
+  const promise = cacheReady.then(() => new Promise<TickerLogoLoadState>((resolve) => {
+    const urls = tickerLogoUrls(normalized);
     let settled = false;
     let timedOut = false;
     let timeoutId: number | null = null;
@@ -246,7 +279,7 @@ export function preloadTickerLogo(
       resolve('failed');
     }, timeoutMs);
     tryNext();
-  });
+  }));
 
   logoPromiseCache.set(normalized, promise);
   return promise;
@@ -283,7 +316,11 @@ export function TickerLogo({
   fallbackStyle,
 }: TickerLogoProps) {
   const normalized = normalizeTicker(ticker);
-  const urls = useMemo(() => tickerLogoUrls(normalized), [normalized]);
+  const [logoDataRevision, setLogoDataRevision] = useState(0);
+  const urls = useMemo(
+    () => tickerLogoUrls(normalized),
+    [normalized, logoDataRevision],
+  );
   const [failed, setFailed] = useState(
     () => getTickerLogoState(normalized) === 'failed',
   );
@@ -291,6 +328,16 @@ export function TickerLogo({
     const loadedUrl = logoUrlCache.get(normalized);
     return loadedUrl ? Math.max(0, urls.indexOf(loadedUrl)) : 0;
   });
+
+  useEffect(() => {
+    let active = true;
+    void ensureFinnhubLogoCache().then(() => {
+      if (active) setLogoDataRevision((revision) => revision + 1);
+    });
+    return () => {
+      active = false;
+    };
+  }, [normalized]);
 
   useEffect(() => {
     setFailed(getTickerLogoState(normalized) === 'failed');
