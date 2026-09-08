@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   publish:
@@ -24,7 +24,14 @@ jobs:
       - name: Checkout published main
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          token: ${{ secrets.GITHUB_TOKEN }}
           ref: main
+
+      # workflow_run.head_sha is the revision that started the refresh, not the
+      # generated-data commit the refresh may push afterward. Provenance must
+      # describe the bytes actually checked out and packaged here.
+      - name: Capture release provenance
+        run: echo "FRONTEND_SOURCE_REVISION=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
 
       - name: Setup Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -55,11 +62,24 @@ jobs:
           region = auto
           EOF
 
-      - name: Build, verify, and publish immutable frontend release
+      - name: Build, verify, publish, and pin immutable frontend release
         env:
           R2_BUCKET: ${{ secrets.R2_BUCKET || 'quantiv-data' }}
-          GITHUB_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
         run: bash scripts/r2_push_frontend.sh
+
+      - name: Commit only the deployment pointer
+        run: |
+          set -euo pipefail
+          git config --local user.email "action@github.com"
+          git config --local user.name "Quantiv publication bot"
+          git add apps/frontend/frontend-release.json
+          if git diff --staged --quiet; then
+            echo "Frontend deployment pointer already matches the published release."
+          else
+            RELEASE_ID=$(jq -r .release_id apps/frontend/frontend-release.json)
+            git commit -m "publish frontend release ${RELEASE_ID:0:12}"
+            bash scripts/git_push_with_retry.sh origin main
+          fi
 
       - name: Preserve publication control artifacts
         if: always()
@@ -67,6 +87,7 @@ jobs:
         with:
           name: frontend-publication-control
           path: |
+            apps/frontend/frontend-release.json
             data/frontend_publication/current.json
             data/frontend_publication/manifests/*.json
           if-no-files-found: ignore

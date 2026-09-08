@@ -1,11 +1,18 @@
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 
 import pytest
 
-from scripts.frontend_release import build_release, materialize_release, verify_release
+from scripts.frontend_release import (
+    DEPLOYMENT_POINTER_SCHEMA,
+    build_release,
+    materialize_release,
+    verify_release,
+    write_deployment_pointer,
+)
 
 
 def _write(path: Path, body: bytes) -> None:
@@ -36,6 +43,36 @@ def test_release_is_content_addressed_deterministic_and_excludes_brand(tmp_path:
     assert pointer1 == pointer2
     assert all(not item["path"].startswith("brand/") for item in release1["files"])
     assert verify_release(output)["status"] == "passed"
+
+
+def test_deployment_pointer_pins_verified_manifest_archive_and_source_revision(
+    tmp_path: Path,
+) -> None:
+    public = tmp_path / "public"
+    output = tmp_path / "release"
+    deployment_pointer = tmp_path / "frontend-release.json"
+    _write(public / "weekly.json", b'{"week":1}\n')
+    archive, manifest, _current, release = build_release(
+        public, output, source_revision="wrong-event-sha"
+    )
+
+    pinned = write_deployment_pointer(
+        output,
+        deployment_pointer,
+        source_revision="actual-checkout-sha",
+    )
+    on_disk = json.loads(deployment_pointer.read_text())
+
+    assert pinned == on_disk
+    assert pinned["schema"] == DEPLOYMENT_POINTER_SCHEMA
+    assert pinned["release_id"] == release["release_id"]
+    assert pinned["source_revision"] == "actual-checkout-sha"
+    assert pinned["manifest"]["path"] == f"manifests/{release['release_id']}.json"
+    assert pinned["manifest"]["bytes"] == manifest.stat().st_size
+    assert len(pinned["manifest"]["sha256"]) == 64
+    assert pinned["archive"]["path"] == f"releases/{release['release_id']}.tar.gz"
+    assert pinned["archive"]["bytes"] == archive.stat().st_size
+    assert len(pinned["archive"]["sha256"]) == 64
 
 
 def test_verify_rejects_tampered_archive(tmp_path: Path) -> None:

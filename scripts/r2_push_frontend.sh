@@ -1,19 +1,30 @@
 #!/usr/bin/env bash
 # Publish the generated frontend corpus as an immutable, content-addressed R2 release.
 # The immutable archive and manifest are uploaded first; current.json is the only
-# mutable object and is written last after local verification.
+# mutable R2 object and is written last after local verification. After R2 readback
+# succeeds, write a tiny source-controlled deployment pointer that pins the exact
+# immutable manifest/archive digests for deterministic Vercel materialization.
 
 set -euo pipefail
 
 PUBLIC_DIR="${PUBLIC_DIR:-apps/frontend/public}"
 STAGE_DIR="${FRONTEND_RELEASE_DIR:-data/frontend_publication}"
+DEPLOYMENT_POINTER="${FRONTEND_DEPLOYMENT_POINTER:-apps/frontend/frontend-release.json}"
 REMOTE="${R2_REMOTE:-r2:${R2_BUCKET:-quantiv-data}}"
 PYTHON_BIN="${PYTHON_BIN:-python}"
+SOURCE_REVISION="${FRONTEND_SOURCE_REVISION:-}"
+
+if [ -z "$SOURCE_REVISION" ]; then
+  SOURCE_REVISION="$(git rev-parse HEAD 2>/dev/null || true)"
+fi
+if [ -z "$SOURCE_REVISION" ]; then
+  SOURCE_REVISION="local"
+fi
 
 "$PYTHON_BIN" scripts/frontend_release.py build \
   --public-dir "$PUBLIC_DIR" \
   --output-dir "$STAGE_DIR" \
-  --source-revision "${GITHUB_SHA:-local}"
+  --source-revision "$SOURCE_REVISION"
 "$PYTHON_BIN" scripts/frontend_release.py verify --output-dir "$STAGE_DIR"
 
 RELEASE_ID=$(jq -er .release_id "$STAGE_DIR/current.json")
@@ -39,4 +50,13 @@ rclone copyto "$REMOTE/frontend/current.json" "$READBACK_POINTER"
 cmp "$STAGE_DIR/current.json" "$READBACK_POINTER"
 rm -f "$READBACK_POINTER"
 
+# Git carries only this compact immutable deployment reference, never the corpus.
+# Write it only after the remote pointer readback passes so a commit cannot refer
+# to an R2 release that was not fully promoted.
+"$PYTHON_BIN" scripts/frontend_release.py pin \
+  --output-dir "$STAGE_DIR" \
+  --deployment-pointer "$DEPLOYMENT_POINTER" \
+  --source-revision "$SOURCE_REVISION"
+
 echo "Published frontend release $RELEASE_ID to $REMOTE/frontend"
+echo "Pinned frontend deployment pointer at $DEPLOYMENT_POINTER (source $SOURCE_REVISION)"
