@@ -4,14 +4,14 @@ import { join } from 'node:path';
 import { notFound } from 'next/navigation';
 import { buildComparableResearchContext } from '@/lib/comparableResearch.server';
 import { companyName, stripLegalSuffix } from '@/lib/companyNames';
-import tickerNames from '../../../public/ticker-names.json';
+import { readPublicJson } from '@/lib/researchSnapshot.server';
 import SymbolPageClient from './SymbolPageClient';
 
 type SymbolPageProps = {
   params: Promise<{ symbol: string }>;
 };
 
-const EXTENDED_NAMES = tickerNames as Record<string, string>;
+const EXTENDED_NAMES = readPublicJson<Record<string, string>>('ticker-names.json') ?? {};
 const SYMBOL_RE = /^[A-Z][A-Z0-9.-]{0,9}$/;
 
 function normalizeSymbol(raw: string | undefined): string {
