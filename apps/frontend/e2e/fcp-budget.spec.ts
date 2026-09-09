@@ -54,7 +54,15 @@ test('homepage cold-load FCP stays inside the production budget', async ({
 test('public landing route does not load Clerk in the critical path', async ({
   page,
 }) => {
-  await page.goto('/', { waitUntil: 'networkidle' });
+  // The public homepage intentionally performs background calendar/quote
+  // revalidation after first paint, so global `networkidle` is not a meaningful
+  // readiness signal here. Wait through the document load plus a short
+  // post-load window: that covers the rendering critical path without making
+  // the assertion depend on unrelated long-lived/background requests.
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await page.waitForLoadState('load');
+  await page.waitForTimeout(500);
+
   const clerkResources = await page.evaluate(() =>
     performance
       .getEntriesByType('resource')

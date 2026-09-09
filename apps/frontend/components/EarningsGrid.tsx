@@ -29,6 +29,11 @@ import {
   type LiveQuoteMap,
 } from '@/lib/earningsCalendarCache';
 import { parseHomeSearchParams, type HomeCalendarFilter } from '@/lib/homeSearchParams';
+import {
+  calendarCacheKey,
+  mergeCalendarReference,
+  type CalendarReference,
+} from '@/lib/calendarReference';
 import sp500Constituents from '../../../lib/data/sp500-constituents.json';
 
 // Full S&P 500 (503 constituents incl. dual-class). Used for the "S&P 500"
@@ -57,7 +62,15 @@ interface EarningsEvent {
 }
 
 export interface WeeklyData {
-  metadata: { as_of_date: string; method: string; offset?: number };
+  metadata: {
+    as_of_date: string;
+    method: string;
+    offset?: number;
+    calendar_reference_release_id?: string | null;
+    calendar_reference_receipt_id?: string | null;
+    calendar_reference_observed_at?: string | null;
+    research_as_of_date?: string | null;
+  };
   window: { start: string; end: string };
   events: EarningsEvent[];
 }
@@ -901,10 +914,22 @@ export default function EarningsGrid({
   // server/client week anchor disagrees (rare TZ-at-week-boundary case) this
   // key won't match initialWeekIso and we fall back to the cold fetch path.
   const ssrSeedIso = initialData?.window?.start?.slice(0, 10) ?? null;
-  if (ssrSeedIso) primeWeekMemory(ssrSeedIso, initialData);
-  const warmStart = hasWeekCache(initialWeekIso);
+  const initialCalendarReleaseId =
+    typeof initialData?.metadata.calendar_reference_release_id === 'string'
+      ? initialData.metadata.calendar_reference_release_id
+      : null;
+  const [calendarReleaseId, setCalendarReleaseId] = useState<string | null>(
+    initialCalendarReleaseId,
+  );
+  const initialWeekCacheKey = calendarCacheKey(initialCalendarReleaseId, initialWeekIso);
+  const ssrSeedCacheKey = ssrSeedIso
+    ? calendarCacheKey(initialCalendarReleaseId, ssrSeedIso)
+    : null;
+  // Never label server-rendered bytes with a different client-week key.
+  if (ssrSeedCacheKey && initialData) primeWeekMemory(ssrSeedCacheKey, initialData);
+  const warmStart = hasWeekCache(initialWeekCacheKey);
   const [data, setData] = useState<WeeklyData | null>(
-    () => readWeekCache<WeeklyData>(initialWeekIso),
+    () => readWeekCache<WeeklyData>(initialWeekCacheKey),
   );
   const [isFetching, setIsFetching] = useState(() => !warmStart);
   const [error, setError] = useState<string | null>(null);
@@ -926,10 +951,14 @@ export default function EarningsGrid({
     d.setDate(d.getDate() + 7 * offset);
     return isoDay(d);
   }, [thisMonday, offset]);
+  const weekCacheKey = useMemo(
+    () => calendarCacheKey(calendarReleaseId, weekStartIso),
+    [calendarReleaseId, weekStartIso],
+  );
 
   useEffect(() => {
     // Cached week → no skeleton hold (the data is already on screen).
-    if (hasWeekCache(weekStartIso)) {
+    if (hasWeekCache(weekCacheKey)) {
       setMinLoadingDoneWeek(weekStartIso);
       return;
     }
@@ -938,25 +967,40 @@ export default function EarningsGrid({
       setMinLoadingDoneWeek(weekStartIso);
     }, MIN_GRID_LOADING_MS);
     return () => window.clearTimeout(timeoutId);
-  }, [weekStartIso]);
+  }, [weekCacheKey, weekStartIso]);
 
   const fetchWeek = useCallback(
     async (iso: string) => {
       const urls = [`/weeks/${iso}.json`, offset === 0 ? '/weekly.json' : null].filter(
         Boolean,
       ) as string[];
+      let research: WeeklyData | null = null;
       for (const url of urls) {
         const res = await fetch(url);
-        if (res.ok) return (await res.json()) as WeeklyData;
+        if (res.ok) {
+          research = (await res.json()) as WeeklyData;
+          break;
+        }
       }
-      throw new Error(`no data for ${iso}`);
+      if (!research) throw new Error(`no data for ${iso}`);
+
+      let reference: CalendarReference | null = null;
+      try {
+        const response = await fetch('/calendar-reference.json', { cache: 'no-store' });
+        if (response.ok) reference = (await response.json()) as CalendarReference;
+      } catch {
+        // Transitional fallback: retained research stays visible until the
+        // first independent calendar reference has been published.
+      }
+      const merged = mergeCalendarReference(reference, research, iso);
+      return { data: merged, releaseId: reference?.release_id ?? null };
     },
     [offset],
   );
 
   useEffect(() => {
     let cancelled = false;
-    const cached = readWeekCache<WeeklyData>(weekStartIso);
+    const cached = readWeekCache<WeeklyData>(weekCacheKey);
     if (cached) {
       // Render cached week immediately, then revalidate silently below.
       setData(cached);
@@ -966,14 +1010,16 @@ export default function EarningsGrid({
     }
     setError(null);
     fetchWeek(weekStartIso)
-      .then((json) => {
+      .then(({ data: json, releaseId }) => {
         if (cancelled) return;
-        writeWeekCache(weekStartIso, json);
+        const nextCacheKey = calendarCacheKey(releaseId, weekStartIso);
+        writeWeekCache(nextCacheKey, json);
+        setCalendarReleaseId(releaseId);
         setData(json);
       })
       .catch((e) => {
         // Keep showing the cached week on a revalidation error.
-        if (!cancelled && !hasWeekCache(weekStartIso)) setError((e as Error).message);
+        if (!cancelled && !hasWeekCache(weekCacheKey)) setError((e as Error).message);
       })
       .finally(() => {
         if (!cancelled) setIsFetching(false);
@@ -981,7 +1027,7 @@ export default function EarningsGrid({
     return () => {
       cancelled = true;
     };
-  }, [weekStartIso, fetchWeek]);
+  }, [weekStartIso, weekCacheKey, fetchWeek]);
 
   // Mirror the live-quote map into the module cache so the next remount /
   // bfcache restore starts with the last-known quotes (reactions render at once).
@@ -1035,7 +1081,7 @@ export default function EarningsGrid({
 
     // Cold load → hide behind the skeleton until quotes land. Warm (cached)
     // remount → keep the last-good grid on screen and revalidate silently.
-    if (!hasWeekCache(weekStartIso)) {
+    if (!hasWeekCache(weekCacheKey)) {
       setQuotesReadyWeek(null);
       // Cold load only: cap how long we wait if batch-price hangs.
       initialReadyTimer = setTimeout(markQuotesReady, 3_000);
@@ -1151,7 +1197,7 @@ export default function EarningsGrid({
       window.removeEventListener('focus', onVisible);
       window.removeEventListener('pageshow', onPageShow);
     };
-  }, [data, weekStartIso]);
+  }, [data, weekCacheKey, weekStartIso]);
 
   // Calendar columns always follow the selected week (URL offset), so the
   // header dates stay correct while JSON for that week is still loading.
@@ -1249,7 +1295,7 @@ export default function EarningsGrid({
     weekReady &&
     minLoadingDoneWeek === weekStartIso &&
     (quotesReadyWeek === weekStartIso ||
-      (hasWeekCache(weekStartIso) && Object.keys(live).length > 0));
+      (hasWeekCache(weekCacheKey) && Object.keys(live).length > 0));
   const showSkeleton = !error && !contentReady;
 
   return (
@@ -1333,7 +1379,7 @@ export default function EarningsGrid({
         >
           {contentReady && data ? (
             <span className="mono">
-              {filteredEvents.length} reports · {data.metadata.method} · as of {data.metadata.as_of_date}
+              {filteredEvents.length} reports · calendar {data.metadata.calendar_reference_observed_at?.slice(0, 10) ?? 'retained'} · research as of {data.metadata.research_as_of_date ?? data.metadata.as_of_date}
             </span>
           ) : (
             <span className="mono" style={{ color: 'var(--ink-3)' }}>

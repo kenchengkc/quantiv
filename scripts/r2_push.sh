@@ -203,6 +203,19 @@ elif [ "$MODE" = "--skip-forecasts" ]; then
   push_small_files
   push_controls
   promote_data_release
+
+  # Daily refresh sets REFRESH_STARTED_AT before provider ingestion. At this
+  # point the options candidate was accepted or the previous snapshot was
+  # verified as fallback, so calendar reference can publish independently of
+  # can_score without changing any retained research artifacts. Other callers
+  # of --skip-forecasts intentionally remain storage-only.
+  if [ -n "${REFRESH_STARTED_AT:-}" ]; then
+    CALENDAR_REFERENCE_NOT_BEFORE="$REFRESH_STARTED_AT" \
+      bash scripts/r2_push_calendar_reference.sh
+  else
+    echo "ℹ REFRESH_STARTED_AT unset; skipping independent calendar publication"
+  fi
+
   promote_model_champion
 else
   "$PYTHON_BIN" scripts/data_release.py build --data-dir "$DATA_DIR"
