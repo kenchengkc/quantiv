@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import styles from './page.module.css';
 import { ValidationPublication } from '@/components/ValidationPublication';
-import { publishedForecastStatus, quoteEligibilityExplanation } from '@/lib/publicationPresentation';
+import { controlExceptionExplanation, publishedForecastStatus } from '@/lib/publicationPresentation';
 import { requirePublicJson } from '@/lib/researchSnapshot.server';
 
 export const metadata: Metadata = {
@@ -430,7 +430,7 @@ export default function ValidationPage() {
       </section>
 
       <section style={{ paddingTop: 52 }}>
-        <SectionTitle kicker="Production evidence">Current research controls</SectionTitle>
+        <SectionTitle kicker="Production evidence">Latest assessed research controls</SectionTitle>
         <ValidationPublication control={control} forecast={forecast} />
         <div className={styles.controlCards}>
           <div style={{ border: '1px solid var(--line)', borderRadius: 14, padding: 18, background: 'var(--bg-2)' }}>
@@ -474,18 +474,18 @@ export default function ValidationPage() {
 
           {control.exceptions.length > 0 && (
             <div style={{ marginTop: 18, borderTop: '1px solid var(--line)', paddingTop: 16 }}>
-              <div className="mono" style={{ fontSize: 10, color: 'var(--ink-3)', letterSpacing: '0.12em', textTransform: 'uppercase' }}>Current control exceptions</div>
+              <div className="mono" style={{ fontSize: 10, color: 'var(--ink-3)', letterSpacing: '0.12em', textTransform: 'uppercase' }}>Latest assessed control exceptions</div>
               <div style={{ display: 'grid', gap: 8, marginTop: 10 }}>
                 {control.exceptions.map((item) => (
                   <div key={item.code} className={styles.exception}>
                     <StatusPill status={item.severity} />
-                    <span style={{ color: 'var(--ink-2)' }}>{item.code === 'option_quote_quality_below_limit' ? quoteEligibilityExplanation(control.data) : item.summary}</span>
+                    <span style={{ color: 'var(--ink-2)' }}>{controlExceptionExplanation(item, control.data)}</span>
                     <span className="mono tnum" style={{ color: 'var(--ink-3)' }}>{item.code !== 'option_quote_quality_below_limit' && item.count != null ? count(item.count) : ''}</span>
                   </div>
                 ))}
               </div>
               <p style={{ margin: '12px 0 0', color: 'var(--ink-3)', fontSize: 11.5, lineHeight: 1.55 }}>
-                These controls assess eligibility for new research. A retained forecast receipt can remain passed while stale or ineligible options data blocks the next release. No publication threshold is relaxed.
+                These exceptions describe the assessment captured above, not live market state. They gate eligibility for new research; a retained forecast receipt can remain passed while stale or ineligible options evidence blocks the next release. No publication threshold is relaxed.
               </p>
             </div>
           )}
