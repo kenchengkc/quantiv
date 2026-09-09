@@ -96,5 +96,5 @@ export function controlExceptionExplanation(
       return `${freshness}. This is the assessed snapshot state; new research stays blocked until fresh option evidence passes controls.`;
     }
   }
-  return exception.summary?.trim() || exception.code.replaceAll('_', ' ');
+  return exception.summary?.trim() || exception.code.split('_').join(' ');
 }
