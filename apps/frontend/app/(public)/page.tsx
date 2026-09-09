@@ -1,6 +1,10 @@
 import type { Metadata } from 'next';
 import { Splash } from '@/components/Splash';
 import EarningsGrid, { type WeeklyData } from '@/components/EarningsGrid';
+import {
+  mergeCalendarReference,
+  type CalendarReference,
+} from '@/lib/calendarReference';
 import { readPublicJson } from '@/lib/researchSnapshot.server';
 
 export const metadata: Metadata = {
@@ -10,17 +14,18 @@ export const metadata: Metadata = {
 };
 
 // This page is a static artifact: the publication release is materialized before
-// `next build`, then weekly.json is rendered into the initial HTML for the LCP
-// calendar. Reading through the server publication boundary keeps TypeScript
-// independent of generated production JSON while preserving the same static page.
+// `next build`, then weekly research plus the independently dated calendar
+// reference are rendered into the initial HTML. Calendar reference is optional
+// during the transition; once materialized it is authoritative for event identity.
 export const dynamic = 'force-static';
 
 function weeklyPublication(): WeeklyData {
-  const publication = readPublicJson<WeeklyData>('weekly.json');
-  if (!publication) {
+  const research = readPublicJson<WeeklyData>('weekly.json');
+  if (!research) {
     throw new Error('Frontend publication is missing weekly.json; materialization must complete before build.');
   }
-  return publication;
+  const calendar = readPublicJson<CalendarReference>('calendar-reference.json');
+  return mergeCalendarReference(calendar, research, research.window.start);
 }
 
 export default function Home() {

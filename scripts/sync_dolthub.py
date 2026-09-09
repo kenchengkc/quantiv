@@ -838,6 +838,28 @@ def sync_earnings():
     df.to_csv(csv_path, index=False)
     print(f"  Written to {csv_path}")
 
+    # The daily calendar publisher requires explicit current-run source-fetch
+    # evidence. Record it immediately after the successful DoltHub write so a
+    # restored or later-mutated calendar cannot masquerade as a fresh fetch.
+    # Import safely in both direct-script and package/pytest execution modes.
+    if __package__:
+        from .record_calendar_source_evidence import (
+            atomic_json as write_calendar_source_evidence,
+            build_evidence as build_calendar_source_evidence,
+        )
+    else:
+        from record_calendar_source_evidence import (
+            atomic_json as write_calendar_source_evidence,
+            build_evidence as build_calendar_source_evidence,
+        )
+    source_evidence = build_calendar_source_evidence(csv_path)
+    evidence_path = data_dir() / "dolthub_earnings_metadata.json"
+    write_calendar_source_evidence(evidence_path, source_evidence)
+    print(
+        f"  Recorded calendar source evidence at {evidence_path} "
+        f"({source_evidence['synced_at']})"
+    )
+
     print(f"\n✅ Earnings sync complete: {len(df):,} rows")
     print(f"   Date range: {df['date'].min()} → {df['date'].max()}")
     print(f"   Symbols: {df['act_symbol'].nunique():,}")
