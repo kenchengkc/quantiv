@@ -1,0 +1,94 @@
+name: Refresh S&P 500 constituents
+
+# Maintains lib/data/sp500-constituents.json as reviewed reference data.
+# Upstream data is treated as untrusted: the updater validates schema, row
+# count, unique symbols, known GICS sectors and bounded membership churn.
+# Changes are proposed through one bot PR rather than committed to main.
+
+on:
+  schedule:
+    - cron: '17 13 1 * *'
+  workflow_dispatch:
+
+concurrency:
+  group: sp500-constituent-refresh
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v6.0.0
+        with:
+          python-version: '3.11'
+
+      - name: Fetch and validate current constituents
+        run: |
+          python scripts/update_sp500_constituents.py \
+            --summary-file "$RUNNER_TEMP/sp500-summary.md"
+
+      - name: Stop when snapshot is unchanged
+        id: changed
+        run: |
+          if git diff --quiet -- lib/data/sp500-constituents.json; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "S&P 500 reference already matches the validated upstream snapshot."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit validated snapshot to automation branch
+        if: steps.changed.outputs.changed == 'true'
+        env:
+          BRANCH: automation/sp500-refresh
+        run: |
+          set -euo pipefail
+          git config user.name 'quantiv-bot'
+          git config user.email 'quantiv-bot@users.noreply.github.com'
+          git switch -C "$BRANCH"
+          git add lib/data/sp500-constituents.json
+          git diff --staged --check
+          git commit -m "chore(data): refresh S&P 500 constituents"
+          git push --force-with-lease origin "HEAD:$BRANCH"
+
+      - name: Open or update refresh PR
+        if: steps.changed.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: automation/sp500-refresh
+        run: |
+          set -euo pipefail
+          {
+            echo "Automated monthly refresh of Quantiv's S&P 500 reference universe."
+            echo
+            echo "Source: \`datasets/s-and-p-500-companies\` current constituent CSV."
+            echo "The updater fails closed on malformed schema, implausible row count, duplicate symbols, unknown GICS sectors, or excessive membership churn."
+            echo
+            cat "$RUNNER_TEMP/sp500-summary.md"
+          } > "$RUNNER_TEMP/sp500-pr-body.md"
+
+          if gh pr view "$BRANCH" --repo "$GITHUB_REPOSITORY" --json number >/dev/null 2>&1; then
+            gh pr edit "$BRANCH" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "chore(data): refresh S&P 500 constituents" \
+              --body-file "$RUNNER_TEMP/sp500-pr-body.md"
+          else
+            gh pr create \
+              --repo "$GITHUB_REPOSITORY" \
+              --base main \
+              --head "$BRANCH" \
+              --title "chore(data): refresh S&P 500 constituents" \
+              --body-file "$RUNNER_TEMP/sp500-pr-body.md"
+          fi
