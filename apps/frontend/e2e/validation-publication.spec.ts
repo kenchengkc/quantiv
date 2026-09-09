@@ -4,7 +4,11 @@ import { expect, test } from '@playwright/test';
 
 type ControlPublication = {
   generated_at: string;
-  data: { source_date: string };
+  data: {
+    source_date: string;
+    expected_source_date?: string;
+    source_session_lag?: number;
+  };
 };
 
 type ForecastPublication = {
@@ -33,12 +37,23 @@ function dateLabel(value: string) {
   });
 }
 
-test('validation separates current assessment from retained forecast evidence', async ({ page }) => {
+function optionsEvidenceLabel(data: ControlPublication['data']) {
+  const lag = data.source_session_lag;
+  if (lag != null && lag > 0 && data.source_date && data.expected_source_date) {
+    return `Snapshot ${data.source_date} is ${lag} market session${lag === 1 ? '' : 's'} behind expected ${data.expected_source_date}`;
+  }
+  if (lag === 0 && data.source_date && data.expected_source_date) {
+    return `Snapshot ${data.source_date} matches the expected ${data.expected_source_date} market session`;
+  }
+  return `Snapshot ${data.source_date} is the latest assessed options evidence`;
+}
+
+test('validation separates latest assessment from retained forecast evidence', async ({ page }) => {
   await page.goto('/validation');
   const publication = page.getByRole('region', { name: 'Research publication and freshness' });
   await expect(publication.getByText(`Last forecast validation: ${dateLabel(forecast.validated_at)} ET`, { exact: true })).toBeVisible();
-  await expect(publication.getByText(`Latest assessment: ${dateLabel(control.generated_at)} ET`, { exact: true })).toBeVisible();
-  await expect(publication.getByText(`Active options snapshot: ${control.data.source_date} EOD`, { exact: true })).toBeVisible();
+  await expect(publication.getByText(`Assessment captured: ${dateLabel(control.generated_at)} ET`, { exact: true })).toBeVisible();
+  await expect(publication.getByText(`Options evidence assessed: ${optionsEvidenceLabel(control.data)}`, { exact: true })).toBeVisible();
   await expect(page.getByRole('region', { name: 'Current research status', exact: true })).toHaveCount(0);
   const performance = await page.getByRole('heading', { name: 'Does the model add information?' }).boundingBox();
   const calibration = await page.getByRole('heading', { name: 'Calibration', exact: true }).boundingBox();
