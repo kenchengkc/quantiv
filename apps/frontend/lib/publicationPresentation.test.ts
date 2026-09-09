@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  publishedForecastStatus, researchUpdatePresentation, quoteEligibilityExplanation,
+  controlExceptionExplanation, optionsSnapshotFreshness, publishedForecastStatus,
+  researchUpdatePresentation, quoteEligibilityExplanation,
   type PublicationControl, type PublishedForecast,
 } from './publicationPresentation';
 
@@ -70,5 +71,23 @@ describe('publication presentation (never changes gate semantics)', () => {
   it('uses actual gate errors when available', () => {
     expect(quoteEligibilityExplanation({ ...control.data, quote_quality_errors: ['Pair rejection rate exceeds limit'] }))
       .toContain('Pair rejection rate exceeds limit');
+  });
+
+  it('describes assessed option freshness explicitly', () => {
+    expect(optionsSnapshotFreshness(control.data))
+      .toBe('Snapshot 2026-09-01 is 3 market sessions behind expected 2026-09-04');
+    expect(optionsSnapshotFreshness({ source_date: '2026-09-04', expected_source_date: '2026-09-04', source_session_lag: 0 }))
+      .toBe('Snapshot 2026-09-04 matches the expected 2026-09-04 market session');
+  });
+
+  it('makes stale exception text identify the assessed snapshot rather than implying live state', () => {
+    expect(controlExceptionExplanation(
+      { code: 'options_stale', severity: 'critical', summary: 'options exceeds its freshness limit' },
+      control.data,
+    )).toContain('This is the assessed snapshot state');
+    expect(controlExceptionExplanation(
+      { code: 'other_warning', severity: 'warning', summary: 'Keep the upstream summary' },
+      control.data,
+    )).toBe('Keep the upstream summary');
   });
 });
