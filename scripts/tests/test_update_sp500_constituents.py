@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import io
 import json
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -14,7 +15,13 @@ def make_csv(rows: list[dict[str, str]]) -> str:
     out = io.StringIO()
     writer = csv.DictWriter(
         out,
-        fieldnames=["Symbol", "Security", "GICS Sector", "GICS Sub-Industry"],
+        fieldnames=[
+            "Symbol",
+            "Security",
+            "GICS Sector",
+            "GICS Sub-Industry",
+            "Date added",
+        ],
     )
     writer.writeheader()
     writer.writerows(rows)
@@ -28,6 +35,7 @@ def valid_rows(count: int = sp500.MIN_CONSTITUENT_ROWS) -> list[dict[str, str]]:
             "Security": f"Company {i}",
             "GICS Sector": "Industrials",
             "GICS Sub-Industry": "Industrial Conglomerates",
+            "Date added": "2020-01-01",
         }
         for i in range(count)
     ]
@@ -40,9 +48,10 @@ def test_parse_snapshot_normalizes_and_preserves_contract() -> None:
         "Security": "Berkshire Hathaway",
         "GICS Sector": "Financials",
         "GICS Sub-Industry": "Multi-Sector Holdings",
+        "Date added": "2010-02-16",
     }
 
-    parsed = sp500.parse_snapshot(make_csv(rows))
+    parsed = sp500.parse_snapshot(make_csv(rows), as_of=date(2026, 9, 9))
 
     assert parsed[0] == {
         "symbol": "BRK.B",
@@ -58,7 +67,7 @@ def test_parse_snapshot_rejects_duplicate_symbols() -> None:
     rows[1]["Symbol"] = rows[0]["Symbol"]
 
     with pytest.raises(sp500.SnapshotValidationError, match="duplicate constituent symbol"):
-        sp500.parse_snapshot(make_csv(rows))
+        sp500.parse_snapshot(make_csv(rows), as_of=date(2026, 9, 9))
 
 
 def test_parse_snapshot_rejects_unknown_sector() -> None:
@@ -66,14 +75,23 @@ def test_parse_snapshot_rejects_unknown_sector() -> None:
     rows[0]["GICS Sector"] = "Crypto"
 
     with pytest.raises(sp500.SnapshotValidationError, match="unknown GICS sector"):
-        sp500.parse_snapshot(make_csv(rows))
+        sp500.parse_snapshot(make_csv(rows), as_of=date(2026, 9, 9))
+
+
+def test_parse_snapshot_rejects_future_effective_membership() -> None:
+    rows = valid_rows()
+    rows[0]["Symbol"] = "FUTR"
+    rows[0]["Date added"] = "2026-09-21"
+
+    with pytest.raises(sp500.SnapshotValidationError, match="future effective date"):
+        sp500.parse_snapshot(make_csv(rows), as_of=date(2026, 9, 9))
 
 
 def test_parse_snapshot_rejects_implausible_row_count() -> None:
     rows = valid_rows(sp500.MIN_CONSTITUENT_ROWS - 1)
 
     with pytest.raises(sp500.SnapshotValidationError, match="unexpected S&P 500 constituent row count"):
-        sp500.parse_snapshot(make_csv(rows))
+        sp500.parse_snapshot(make_csv(rows), as_of=date(2026, 9, 9))
 
 
 def test_large_membership_churn_fails_closed() -> None:
