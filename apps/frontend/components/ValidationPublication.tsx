@@ -1,5 +1,5 @@
 import {
-  publishedForecastStatus, researchUpdatePresentation,
+  optionsSnapshotFreshness, publishedForecastStatus, researchUpdatePresentation,
   type PublicationControl, type PublishedForecast,
 } from '@/lib/publicationPresentation';
 import styles from './ValidationPublication.module.css';
@@ -17,6 +17,7 @@ export function ValidationPublication({ control, forecast }: {
 }) {
   const published = publishedForecastStatus(forecast);
   const updates = researchUpdatePresentation(control, forecast);
+  const snapshotFreshness = optionsSnapshotFreshness(control.data);
   const publishedTone = published === 'passed' ? 'up' : published === 'failed' ? 'down'
     : published === 'degraded' ? 'flag' : 'ink-3';
   return (
@@ -33,8 +34,8 @@ export function ValidationPublication({ control, forecast }: {
         <h3>New research updates</h3>
         <p className={styles.state} style={{ color: `var(--${updates.tone})` }}>{updates.label}</p>
         <p>{updates.detail}</p>
-        <p>Latest assessment: {validationDateLabel(control.generated_at)} ET</p>
-        <p>Active options snapshot: {control.data.source_date ?? 'Unavailable'} EOD</p>
+        <p>Assessment captured: {validationDateLabel(control.generated_at)} ET</p>
+        <p>Options evidence assessed: {snapshotFreshness ?? 'Unavailable'}</p>
       </div>
     </section>
   );
