@@ -83,6 +83,7 @@ export function quoteEligibilityExplanation(data: PublicationControl['data']): s
   return 'Options evidence did not pass the latest assessed freshness, quote-quality or source-capability controls.';
 }
 
+/** Render a captured control exception without implying that its snapshot is live. */
 export function controlExceptionExplanation(
   exception: PublicationControl['exceptions'][number],
   data: PublicationControl['data'],
