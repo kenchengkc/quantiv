@@ -1,9 +1,10 @@
 name: Refresh S&P 500 constituents
 
 # Maintains lib/data/sp500-constituents.json as reviewed reference data.
-# Upstream data is treated as untrusted: the updater validates schema, row
-# count, unique symbols, known GICS sectors and bounded membership churn.
-# Changes are proposed through one bot PR rather than committed to main.
+# Upstream data is treated as untrusted: the updater validates schema,
+# effective dates, row count, unique symbols, known GICS sectors and bounded
+# membership churn. Changes are proposed through one bot PR rather than
+# committed directly to main.
 
 on:
   schedule:
@@ -57,6 +58,7 @@ jobs:
           set -euo pipefail
           git config user.name 'quantiv-bot'
           git config user.email 'quantiv-bot@users.noreply.github.com'
+          git fetch origin "$BRANCH:refs/remotes/origin/$BRANCH" || true
           git switch -C "$BRANCH"
           git add lib/data/sp500-constituents.json
           git diff --staged --check
@@ -74,7 +76,7 @@ jobs:
             echo "Automated monthly refresh of Quantiv's S&P 500 reference universe."
             echo
             echo "Source: \`datasets/s-and-p-500-companies\` current constituent CSV."
-            echo "The updater fails closed on malformed schema, implausible row count, duplicate symbols, unknown GICS sectors, or excessive membership churn."
+            echo "The updater fails closed on malformed schema, premature effective dates, implausible row count, duplicate symbols, unknown GICS sectors, or excessive membership churn."
             echo
             cat "$RUNNER_TEMP/sp500-summary.md"
           } > "$RUNNER_TEMP/sp500-pr-body.md"
