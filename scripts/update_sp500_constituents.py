@@ -2,8 +2,8 @@
 """Refresh Quantiv's checked-in S&P 500 constituent reference.
 
 The upstream snapshot is deliberately treated as untrusted input. This script
-validates its schema, constituent count, ticker uniqueness, GICS sectors and
-membership churn before replacing the repository JSON.
+validates its schema, effective dates, constituent count, ticker uniqueness,
+GICS sectors and membership churn before replacing the repository JSON.
 """
 
 from __future__ import annotations
@@ -14,6 +14,7 @@ import io
 import json
 import sys
 import urllib.request
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -23,7 +24,13 @@ DEFAULT_SOURCE_URL = (
     "https://raw.githubusercontent.com/datasets/s-and-p-500-companies/"
     "main/data/constituents.csv"
 )
-EXPECTED_COLUMNS = {"Symbol", "Security", "GICS Sector", "GICS Sub-Industry"}
+EXPECTED_COLUMNS = {
+    "Symbol",
+    "Security",
+    "GICS Sector",
+    "GICS Sub-Industry",
+    "Date added",
+}
 GICS_SECTORS = {
     "Communication Services",
     "Consumer Discretionary",
@@ -57,7 +64,11 @@ def fetch_text(url: str, timeout: float = 30.0) -> str:
         return response.read().decode("utf-8-sig")
 
 
-def parse_snapshot(text: str) -> list[dict[str, str]]:
+def parse_snapshot(
+    text: str,
+    *,
+    as_of: date | None = None,
+) -> list[dict[str, str]]:
     reader = csv.DictReader(io.StringIO(text))
     fields = set(reader.fieldnames or [])
     missing = sorted(EXPECTED_COLUMNS - fields)
@@ -66,6 +77,7 @@ def parse_snapshot(text: str) -> list[dict[str, str]]:
             f"upstream CSV is missing required columns: {', '.join(missing)}"
         )
 
+    effective_as_of = as_of or date.today()
     rows: list[dict[str, str]] = []
     seen: set[str] = set()
     for line_number, source in enumerate(reader, start=2):
@@ -73,10 +85,27 @@ def parse_snapshot(text: str) -> list[dict[str, str]]:
         name = (source.get("Security") or "").strip()
         sector = (source.get("GICS Sector") or "").strip()
         industry = (source.get("GICS Sub-Industry") or "").strip()
+        date_added_text = (source.get("Date added") or "").strip()
 
         if not symbol or not name or not sector or not industry:
             raise SnapshotValidationError(
                 f"line {line_number}: symbol/name/sector/industry must be non-empty"
+            )
+        if not date_added_text:
+            raise SnapshotValidationError(
+                f"line {line_number}: Date added must be present for {symbol}"
+            )
+        try:
+            date_added = date.fromisoformat(date_added_text)
+        except ValueError as exc:
+            raise SnapshotValidationError(
+                f"line {line_number}: invalid Date added {date_added_text!r} for {symbol}"
+            ) from exc
+        if date_added > effective_as_of:
+            raise SnapshotValidationError(
+                f"line {line_number}: {symbol} has future effective date "
+                f"{date_added.isoformat()} (as of {effective_as_of.isoformat()}); "
+                "refusing to publish announced-but-not-effective membership"
             )
         if symbol in seen:
             raise SnapshotValidationError(f"duplicate constituent symbol: {symbol}")
