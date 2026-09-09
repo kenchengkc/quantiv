@@ -10,7 +10,7 @@ export type PublicationControl = {
     quote_quality_errors?: string[];
   };
   model: { status?: string };
-  exceptions: Array<{ code: string; severity: string }>;
+  exceptions: Array<{ code: string; severity: string; summary?: string; count?: number }>;
 };
 
 export type PublishedForecast = {
@@ -59,14 +59,42 @@ export function researchUpdatePresentation(control: PublicationControl, forecast
   return { label: 'Blocked', tone: 'down', detail: 'Current controls require attention before new research can be published.' } as const;
 }
 
-export function quoteEligibilityExplanation(data: PublicationControl['data']): string {
-  const details = data.quote_quality_errors?.filter((error) => typeof error === 'string' && error.trim());
-  if (details?.length) return `Options evidence did not pass current controls. ${details.join('; ')}.`;
-  // Legacy projections omitted the actual quote-quality errors. Do not claim
-  // rejection rates exceeded limits just because this composite gate failed.
+export function optionsSnapshotFreshness(data: PublicationControl['data']): string | null {
   const lag = data.source_session_lag;
   if (lag != null && lag > 0 && data.source_date && data.expected_source_date) {
-    return `Options evidence did not pass current controls. Snapshot ${data.source_date} is ${lag} market session${lag === 1 ? '' : 's'} behind expected ${data.expected_source_date}; fresh evidence is required for new research.`;
+    return `Snapshot ${data.source_date} is ${lag} market session${lag === 1 ? '' : 's'} behind expected ${data.expected_source_date}`;
   }
-  return 'Options evidence did not pass current freshness, quote-quality or source-capability controls.';
+  if (lag === 0 && data.source_date && data.expected_source_date) {
+    return `Snapshot ${data.source_date} matches the expected ${data.expected_source_date} market session`;
+  }
+  if (data.source_date) return `Snapshot ${data.source_date} is the latest assessed options evidence`;
+  return null;
+}
+
+export function quoteEligibilityExplanation(data: PublicationControl['data']): string {
+  const details = data.quote_quality_errors?.filter((error) => typeof error === 'string' && error.trim());
+  if (details?.length) return `Options evidence did not pass the latest assessed controls. ${details.join('; ')}.`;
+  // Legacy projections omitted the actual quote-quality errors. Do not claim
+  // rejection rates exceeded limits just because this composite gate failed.
+  const freshness = optionsSnapshotFreshness(data);
+  if (freshness && (data.source_session_lag ?? 0) > 0) {
+    return `Options evidence did not pass the latest assessed controls. ${freshness}; fresh evidence is required for new research.`;
+  }
+  return 'Options evidence did not pass the latest assessed freshness, quote-quality or source-capability controls.';
+}
+
+export function controlExceptionExplanation(
+  exception: PublicationControl['exceptions'][number],
+  data: PublicationControl['data'],
+): string {
+  if (exception.code === 'option_quote_quality_below_limit') {
+    return quoteEligibilityExplanation(data);
+  }
+  if (exception.code === 'options_stale') {
+    const freshness = optionsSnapshotFreshness(data);
+    if (freshness) {
+      return `${freshness}. This is the assessed snapshot state; new research stays blocked until fresh option evidence passes controls.`;
+    }
+  }
+  return exception.summary?.trim() || exception.code.replaceAll('_', ' ');
 }
