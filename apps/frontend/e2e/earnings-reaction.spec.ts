@@ -1,4 +1,5 @@
 import { test, expect, type Route } from '@playwright/test';
+import { installCalendarReference } from './helpers/calendar-fixture';
 
 /**
  * Earnings calendar (/) is public — no Clerk sign-in required.
@@ -57,6 +58,7 @@ async function installWeekFixture(
   await page.clock.setFixedTime(PINNED);
   await page.route('**/weeks/*.json', (route) => routeWeeks(route, events));
   await page.route('**/weekly.json', (route) => routeWeeks(route, events));
+  await installCalendarReference(page, weekPayload(events));
 }
 
 test.describe('earnings calendar reaction labels', () => {

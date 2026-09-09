@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { installCalendarReference } from './helpers/calendar-fixture';
 
 async function installCalendar(page: Page) {
   await page.clock.setFixedTime(new Date('2026-05-29T20:30:00Z'));
@@ -12,6 +13,7 @@ async function installCalendar(page: Page) {
   await page.route('**/weeks/*.json', (route) => route.fulfill({ json: route.request().url().includes('manifest')
     ? { current_week: '2026-05-25', as_of_date: '2026-05-29', weeks: [] } : week }));
   await page.route('**/weekly.json', (route) => route.fulfill({ json: week }));
+  await installCalendarReference(page, week);
   await page.route('**/api/stocks/batch-price*', (route) => route.fulfill({ json: {
     updated: '2026-05-29T20:30:00Z', marketOpen: false, quoteRefreshActive: false, pending: 0, data: [],
   } }));
