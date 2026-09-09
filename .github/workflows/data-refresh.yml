@@ -78,6 +78,7 @@ jobs:
       - name: Materialize prior production release from R2
         env:
           R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          R2_REQUIRE_RUNTIME_STATE: "1"
         run: bash scripts/r2_pull.sh
 
       - name: Sync latest options chain from DoltHub
@@ -357,6 +358,11 @@ jobs:
             echo "No forecast-eligible tickers missing display names."
           fi
 
+      - name: Persist cross-run runtime state to R2
+        env:
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+        run: bash scripts/r2_push.sh --runtime-state-only
+
       - name: Commit generated publication and controlled metadata
         run: |
           set -euo pipefail
@@ -364,13 +370,6 @@ jobs:
           git config --local user.name "Quantiv bot"
           git add apps/frontend/public apps/frontend/lib/popular.ts
           git add config/delisted_tickers.json config/ticker_renames.json
-          # Transitional state still required by existing generators. The
-          # canonical earnings calendar is deliberately absent: R2 owns it.
-          for f in data/market_caps.json data/popular_snapshot.json data/popular_changes.jsonl data/fmp_earnings_metadata.json data/fmp_earnings_backfill_state.json data/delisting_watch.json; do
-            if [ -f "$f" ]; then
-              git add -f "$f"
-            fi
-          done
           if git diff --staged --quiet; then
             echo "No generated source-controlled publication changes"
           else
