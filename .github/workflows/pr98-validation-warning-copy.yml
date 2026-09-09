@@ -1,0 +1,53 @@
+name: PR98 validation warning copy
+
+on:
+  push:
+    branches: [fix/validation-freshness-r2-preview]
+    paths:
+      - ".github/workflows/pr98-validation-warning-copy.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: fix/validation-freshness-r2-preview
+      - name: Apply bounded validation copy patch
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("apps/frontend/app/(public)/validation/page.tsx")
+          text = path.read_text()
+          replacements = {
+              "import { publishedForecastStatus, quoteEligibilityExplanation } from '@/lib/publicationPresentation';":
+                  "import { controlExceptionExplanation, publishedForecastStatus } from '@/lib/publicationPresentation';",
+              '<SectionTitle kicker="Production evidence">Current research controls</SectionTitle>':
+                  '<SectionTitle kicker="Production evidence">Latest assessed research controls</SectionTitle>',
+              '>Current control exceptions</div>':
+                  '>Latest assessed control exceptions</div>',
+              "{item.code === 'option_quote_quality_below_limit' ? quoteEligibilityExplanation(control.data) : item.summary}":
+                  "{controlExceptionExplanation(item, control.data)}",
+              'These controls assess eligibility for new research. A retained forecast receipt can remain passed while stale or ineligible options data blocks the next release. No publication threshold is relaxed.':
+                  'These exceptions describe the assessment captured above, not live market state. They gate eligibility for new research; a retained forecast receipt can remain passed while stale or ineligible options evidence blocks the next release. No publication threshold is relaxed.',
+          }
+          for old, new in replacements.items():
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"expected exactly one match for {old!r}, found {count}")
+              text = text.replace(old, new, 1)
+          path.write_text(text)
+          PY
+          git diff --check
+          git diff -- apps/frontend/app/'(public)'/validation/page.tsx
+      - name: Commit bounded patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/frontend/app/'(public)'/validation/page.tsx
+          git commit -m "Clarify assessed validation exceptions"
+          git push origin HEAD:fix/validation-freshness-r2-preview
