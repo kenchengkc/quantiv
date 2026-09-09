@@ -8,6 +8,7 @@ DATA_DIR="${DATA_DIR:-data}"
 REMOTE="${R2_REMOTE:-r2:${R2_BUCKET:-quantiv-data}}"
 PYTHON_BIN="${PYTHON_BIN:-python}"
 ALLOW_MISSING_EARNINGS_BASELINE="${R2_ALLOW_MISSING_EARNINGS_BASELINE:-0}"
+REQUIRE_RUNTIME_STATE="${R2_REQUIRE_RUNTIME_STATE:-0}"
 
 mkdir -p "$DATA_DIR" "$DATA_DIR/validation"
 echo "📥 Pulling from $REMOTE → $DATA_DIR/"
@@ -56,7 +57,73 @@ materialize_earnings_calendar() {
   rclone copy "$REMOTE/earnings_calendar.parquet" "$DATA_DIR/" 2>/dev/null || true
 }
 
+materialize_runtime_state() {
+  local output_dir="$DATA_DIR/runtime_state_release"
+  local pointer="$output_dir/current.json"
+  local manifest_rel archive_rel
+
+  rm -rf "$output_dir"
+  mkdir -p "$output_dir"
+  if ! rclone copyto "$REMOTE/runtime-state/current.json" "$pointer" 2>/dev/null; then
+    rm -rf "$output_dir"
+    if [ "$REQUIRE_RUNTIME_STATE" = "1" ]; then
+      echo "Missing canonical R2 runtime-state pointer; refusing to reset cross-run state" >&2
+      exit 1
+    fi
+    echo "⚠️  No runtime-state release available; continuing because this workflow does not require it"
+    return 0
+  fi
+
+  readarray -t release_paths < <(
+    "$PYTHON_BIN" - "$pointer" <<'PY'
+import json
+from pathlib import PurePosixPath
+import re
+import sys
+
+pointer = json.loads(open(sys.argv[1], encoding="utf-8").read())
+manifest = str(pointer.get("manifest", ""))
+pure = PurePosixPath(manifest)
+if pure.is_absolute() or ".." in pure.parts or not re.fullmatch(r"manifests/[0-9a-f]{64}\.json", manifest):
+    raise SystemExit(f"invalid runtime-state manifest path: {manifest!r}")
+print(manifest)
+PY
+  )
+  manifest_rel="${release_paths[0]}"
+  mkdir -p "$output_dir/$(dirname "$manifest_rel")"
+  rclone copyto \
+    "$REMOTE/runtime-state/$manifest_rel" \
+    "$output_dir/$manifest_rel"
+
+  archive_rel="$(
+    "$PYTHON_BIN" - "$output_dir/$manifest_rel" <<'PY'
+import json
+from pathlib import PurePosixPath
+import re
+import sys
+
+manifest = json.loads(open(sys.argv[1], encoding="utf-8").read())
+archive = str((manifest.get("archive") or {}).get("path", ""))
+pure = PurePosixPath(archive)
+if pure.is_absolute() or ".." in pure.parts or not re.fullmatch(r"releases/[0-9a-f]{64}\.tar\.gz", archive):
+    raise SystemExit(f"invalid runtime-state archive path: {archive!r}")
+print(archive)
+PY
+  )"
+  mkdir -p "$output_dir/$(dirname "$archive_rel")"
+  rclone copyto \
+    "$REMOTE/runtime-state/$archive_rel" \
+    "$output_dir/$archive_rel"
+
+  "$PYTHON_BIN" scripts/runtime_state.py verify --output-dir "$output_dir"
+  "$PYTHON_BIN" scripts/runtime_state.py materialize \
+    --data-dir "$DATA_DIR" \
+    --output-dir "$output_dir"
+  echo "✅ Restored verified cross-run runtime state"
+}
+
 materialize_earnings_calendar
+materialize_runtime_state
 
 # Options, daily prices, and vol history.
 rclone copy "$REMOTE/parquet" "$DATA_DIR/parquet" \

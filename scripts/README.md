@@ -2,7 +2,7 @@
 
 `scripts/` is Quantiv's operational command surface. Production entrypoints that are called directly by GitHub Actions or root `package.json` stay at the directory root so scheduled jobs have stable paths. Everything else is grouped by role.
 
-See [`.github/workflows/daily-refresh.yml`](../.github/workflows/daily-refresh.yml) for the production execution order.
+See [`.github/workflows/data-refresh.yml`](../.github/workflows/data-refresh.yml) for the nightly data/publication execution order and [`.github/workflows/model-retrain.yml`](../.github/workflows/model-retrain.yml) for the gated model-training path.
 
 ## Directory contract
 
@@ -74,8 +74,10 @@ The root contains the stable commands for ingestion, reconciliation, scoring, pu
 - `build_data_reconciliation.py`, `setup_duckdb_from_parquet.py`, `check_duckdb_freshness.py`
 - `daily_score.py`, `validate_ml_pipeline.py`, `validate_walk_forward.py`
 - `model_control_plane.py`, `package_model_bundle.py`, `activate_model_bundle.py`
-- `import_recent_to_postgres.py`, `data_release.py`, `r2_pull.sh`, `r2_push.sh`
+- `import_recent_to_postgres.py`, `data_release.py`, `runtime_state.py`, `r2_pull.sh`, `r2_push.sh`
 - shared modules such as `delisted.py`, `market_sessions.py`, `provider_utils.py`, `provider_specs.py`, and `provider_probe.py`
+
+`runtime_state.py` owns the content-addressed R2 release for cross-run restart/cursor/cache files under `data/`. `r2_pull.sh` verifies and materializes that release for consumers; `r2_push.sh --runtime-state-only` uploads immutable release members, verifies remote readback, and promotes `runtime-state/current.json` last.
 
 Keeping these paths stable avoids turning a directory cleanup into a production-workflow migration.
 
