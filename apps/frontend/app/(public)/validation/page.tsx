@@ -6,157 +6,220 @@ import { controlExceptionExplanation, publishedForecastStatus } from '@/lib/publ
 import { requirePublicJson } from '@/lib/researchSnapshot.server';
 
 export const metadata: Metadata = {
-  title: {
-    absolute: 'Research Validation | Quantiv',
-  },
+  title: 'Research Validation',
+  description:
+    'Audit Quantiv model performance, calibration, production controls, data quality, and evidence lineage.',
 };
 
-export const dynamic = 'force-static';
+type Status = 'passed' | 'degraded' | 'failed' | 'warning' | 'unavailable' | string;
 
-type ValidationBundle = {
-  schema: string;
-  generated_at: string;
-  model_source: {
-    kind: string;
-    bundle_id?: string;
-    artifact_sha256?: string;
-  };
-  validation_protocol: {
-    walk_forward: {
-      expanding_windows: number;
-      validation_window_days: number;
-      purge_days: number;
-    };
-  };
-  horizons: Array<{
-    horizon_days: number;
-    n_validation: number;
-    model_mae: number | null;
-    straddle_baseline_mae: number | null;
-    relative_mae_improvement: number | null;
-    coverage: {
-      interval_50: number | null;
-      interval_80: number | null;
-    };
-  }>;
-  weighted_calibration: {
+type HorizonValidation = {
+  horizon_days: number;
+  n_train: number | null;
+  n_validation: number;
+  model_mae: number;
+  straddle_baseline_mae: number;
+  relative_mae_improvement: number;
+  model_rmse: number | null;
+  model_r2: number | null;
+  coverage: {
     p10: number | null;
     p25: number | null;
     p50: number | null;
     p75: number | null;
     p90: number | null;
+    interval_50: number | null;
     interval_80: number | null;
   };
-  evidence?: {
-    model_bundle?: { sha256?: string; producer?: string };
-    forecast_bundle?: { sha256?: string; producer?: string };
+  feature_count: number;
+  model_version: string | null;
+  trained_at: string | null;
+};
+
+type ValidationArtifact = {
+  schema: string;
+  generated_at: string;
+  model_source: {
+    kind: 'signed_champion' | 'baked_fallback' | string;
+    bundle_id: string | null;
+    artifact_sha256: string | null;
   };
+  summary: {
+    validation_row_observations: number;
+    weighted_model_mae: number | null;
+    weighted_straddle_mae: number | null;
+    weighted_relative_mae_improvement: number | null;
+    min_relative_mae_improvement: number | null;
+    max_relative_mae_improvement: number | null;
+    weighted_coverage: Record<string, number | null>;
+  };
+  horizons: HorizonValidation[];
+  validation_protocol: {
+    target: string;
+    baseline: string;
+    chronological_holdout: boolean;
+    walk_forward: {
+      expanding_windows: number;
+      validation_window_days: number;
+      purge_days: number;
+    };
+    promotion_controls: string[];
+    decision_scope: string;
+    live_trading_eligible: boolean;
+  };
+  current_evidence: {
+    forecast_receipt_id: string | null;
+    forecast_validated_at: string | null;
+    forecast_quality: Status;
+    forecast_control_exceptions: number | null;
+    forecast_rows: number | null;
+    forecast_events: number | null;
+    control_plane_status: Status;
+    publication_eligible: boolean | null;
+    data_status: Status;
+    model_status: Status;
+    drift_status: Status;
+  };
+};
+
+type ControlPlane = {
+  status: Status;
+  publication_eligible: boolean;
+  generated_at: string;
+  data: {
+    status: Status;
+    source_date: string | null;
+    expected_source_date: string | null;
+    source_session_lag: number | null;
+    quote_quality_errors?: string[];
+    event_coverage_pct: number | null;
+    expected_events: number | null;
+    covered_events: number | null;
+    missing_events: number | null;
+    contract_rejection_rate: number | null;
+    pair_rejection_rate: number | null;
+    decision_group_rejection_rate: number | null;
+    decision_groups: number | null;
+    eligible_decision_groups: number | null;
+    contracts: number | null;
+    eligible_contracts: number | null;
+    live_trading_eligible: boolean;
+    decision_scope: string | null;
+    quarantine_records: number | null;
+    quarantine_status: Status;
+    replay_status: Status;
+    corporate_action_status: Status;
+    corporate_action_rows: number | null;
+    duplicate_rows: number | null;
+  };
+  model: {
+    status: Status;
+    drift_status: Status;
+    champion_active: boolean;
+    challenger_present: boolean;
+    fallback_bundle_available: boolean;
+    critical_features: number | null;
+    warning_features: number | null;
+    hard_missing_features: number | null;
+    shadow_roles: string[];
+  };
+  release: Record<string, Status>;
+  exceptions: Array<{
+    code: string;
+    severity: string;
+    summary: string;
+    count?: number;
+  }>;
 };
 
 type ForecastEvidence = {
   receipt_id: string;
   receipt_file: string;
   validated_at: string;
-  status: string;
+  quality: { status: Status; issue_count: number; issue_codes: string[] };
+  coverage: { rows: number; symbols: number; events: number; horizons: number[] };
   controls: { evaluated: number; exceptions: number };
-  coverage: { rows: number; events: number };
-};
-
-type ControlPlane = {
-  generated_at: string;
-  status: string;
-  publication_eligible: boolean;
-  data: {
-    status: string;
-    contracts: number;
-    eligible_contracts: number;
-    event_coverage_pct: number;
-    covered_events: number;
-    expected_events: number;
-    quarantine_records: number;
-    quarantine_status: string;
-    duplicate_rows: number;
-    replay_status: string;
-    corporate_action_status: string;
-    decision_scope?: string;
-    source_date?: string;
-    expected_source_date?: string;
-    source_session_lag?: number;
-    quote_quality_errors?: string[];
-  };
-  model: {
-    status: string;
-    champion_active: boolean;
-    drift_status: string;
-    fallback_bundle_available: boolean;
-    shadow_roles: string[];
-  };
-  exceptions: Array<{
-    code: string;
-    count?: number;
-    severity: string;
-    summary?: string;
+  artifact_bundles: Array<{
+    name: string;
+    producer: string;
+    member_count: number;
+    bytes: number;
+    sha256: string;
   }>;
 };
 
-type StatusValue = string | boolean | null | undefined;
+const validation = requirePublicJson<ValidationArtifact>('evidence', 'model-validation.json');
+const control = requirePublicJson<ControlPlane>('control-plane.json');
+const forecast = requirePublicJson<ForecastEvidence>('evidence', 'forecast.json');
 
-function pct(value: number | null | undefined, digits = 1) {
-  return value == null || !Number.isFinite(value) ? '—' : `${(value * 100).toFixed(digits)}%`;
+function pct(value: number | null | undefined, digits = 1): string {
+  if (value == null || !Number.isFinite(value)) return '—';
+  return `${(value * 100).toFixed(digits)}%`;
 }
 
-function count(value: number | null | undefined) {
-  return value == null || !Number.isFinite(value) ? '—' : value.toLocaleString('en-US');
+function count(value: number | null | undefined): string {
+  if (value == null || !Number.isFinite(value)) return '—';
+  return Math.round(value).toLocaleString('en-US');
 }
 
-function dateLabel(value: string | null | undefined) {
-  if (!value || !Number.isFinite(Date.parse(value))) return 'Unavailable';
-  return new Date(value).toLocaleString('en-US', {
-    month: 'short', day: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
-    hour12: false, timeZone: 'America/New_York',
+function dateLabel(value: string | null | undefined): string {
+  if (!value) return 'Unavailable';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleString('en-US', {
+    month: 'short',
+    day: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone: 'America/New_York',
   });
 }
 
-function shortHash(value: string | null | undefined) {
+function shortHash(value: string | null | undefined): string {
   if (!value) return 'Unavailable';
-  const normalized = value.startsWith('sha256:') ? value.slice(7) : value;
-  return normalized.length > 18 ? `${normalized.slice(0, 10)}…${normalized.slice(-6)}` : normalized;
+  const clean = value.replace(/^sha256:/, '');
+  return clean.length > 18 ? `${clean.slice(0, 10)}…${clean.slice(-8)}` : clean;
 }
 
-function statusLabel(status: StatusValue) {
-  if (status === true) return 'eligible';
-  if (status === false) return 'unavailable';
-  return String(status ?? 'unknown').replaceAll('_', ' ');
+function tone(status: Status | boolean): { label: string; color: string } {
+  if (status === true || status === 'passed' || status === 'verified' || status === 'enforced') {
+    return { label: status === true ? 'Eligible' : String(status), color: 'var(--up)' };
+  }
+  if (status === false || status === 'failed' || status === 'critical') {
+    return { label: status === false ? 'Blocked' : String(status), color: 'var(--down)' };
+  }
+  if (status === 'degraded' || status === 'warning') {
+    return { label: String(status), color: 'var(--flag)' };
+  }
+  return { label: String(status || 'unavailable'), color: 'var(--ink-3)' };
 }
 
-function statusTone(status: StatusValue) {
-  const value = statusLabel(status).toLowerCase();
-  if (['passed', 'eligible', 'active', 'verified', 'enforced', 'available'].includes(value)) return 'var(--up)';
-  if (['failed', 'critical', 'blocked'].includes(value)) return 'var(--down)';
-  if (['warning', 'degraded', 'review required'].includes(value)) return 'var(--flag)';
-  return 'var(--ink-3)';
-}
-
-function StatusPill({ status }: { status: StatusValue }) {
+function StatusPill({ status }: { status: Status | boolean }) {
+  const value = tone(status);
   return (
     <span
       className="mono"
       style={{
         display: 'inline-flex',
         alignItems: 'center',
-        gap: 7,
-        padding: '5px 10px',
+        gap: 6,
+        padding: '4px 8px',
         borderRadius: 999,
         border: '1px solid var(--line)',
-        color: statusTone(status),
-        fontSize: 9.5,
-        letterSpacing: '0.14em',
+        fontSize: 10,
+        letterSpacing: '0.08em',
         textTransform: 'uppercase',
+        color: value.color,
         whiteSpace: 'nowrap',
       }}
     >
-      <span style={{ width: 6, height: 6, borderRadius: 999, background: 'currentColor' }} />
-      {statusLabel(status)}
+      <span
+        aria-hidden
+        style={{ width: 6, height: 6, borderRadius: 999, background: value.color }}
+      />
+      {value.label}
     </span>
   );
 }
@@ -164,10 +227,19 @@ function StatusPill({ status }: { status: StatusValue }) {
 function SectionTitle({ kicker, children }: { kicker: string; children: React.ReactNode }) {
   return (
     <div style={{ marginBottom: 18 }}>
-      <div className="mono" style={{ fontSize: 10, color: 'var(--ink-3)', letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: 8 }}>
+      <div
+        className="mono"
+        style={{
+          fontSize: 10,
+          color: 'var(--ink-3)',
+          letterSpacing: '0.16em',
+          textTransform: 'uppercase',
+          marginBottom: 8,
+        }}
+      >
         {kicker}
       </div>
-      <h2 className="serif" style={{ margin: 0, fontSize: 30, lineHeight: 1.05, fontWeight: 700 }}>
+      <h2 style={{ margin: 0, fontSize: 32, fontWeight: 600, letterSpacing: '-0.025em' }}>
         {children}
       </h2>
     </div>
@@ -176,51 +248,104 @@ function SectionTitle({ kicker, children }: { kicker: string; children: React.Re
 
 function MetricCard({ label, value, detail }: { label: string; value: string; detail: string }) {
   return (
-    <div style={{ border: '1px solid var(--line)', borderRadius: 14, padding: 18, background: 'var(--bg-2)' }}>
-      <div className="mono" style={{ fontSize: 9.5, color: 'var(--ink-3)', letterSpacing: '0.14em', textTransform: 'uppercase' }}>
+    <div
+      style={{
+        minHeight: 148,
+        border: '1px solid var(--line)',
+        borderRadius: 14,
+        background: 'var(--bg-2)',
+        padding: 18,
+      }}
+    >
+      <div
+        className="mono"
+        style={{ fontSize: 10, color: 'var(--ink-3)', letterSpacing: '0.12em', textTransform: 'uppercase' }}
+      >
         {label}
       </div>
-      <div className="serif tnum" style={{ marginTop: 14, fontSize: 42, lineHeight: 1, letterSpacing: '-0.03em' }}>
+      <div className="tnum" style={{ marginTop: 18, fontSize: 32, fontWeight: 600, letterSpacing: '-0.025em' }}>
         {value}
       </div>
-      <p style={{ margin: '14px 0 0', color: 'var(--ink-3)', fontSize: 12, lineHeight: 1.55 }}>{detail}</p>
+      <div style={{ marginTop: 10, fontSize: 12, color: 'var(--ink-3)', lineHeight: 1.5 }}>{detail}</div>
     </div>
   );
 }
 
 export default function ValidationPage() {
-  const validation = requirePublicJson<ValidationBundle>('evidence', 'model-validation.json');
-  const forecast = requirePublicJson<ForecastEvidence>('evidence', 'forecast.json');
-  const control = requirePublicJson<ControlPlane>('control-plane.json');
-  const weighted = validation.weighted_calibration;
-  const modelBundle = validation.evidence?.model_bundle;
-  const forecastBundle = validation.evidence?.forecast_bundle;
+  const sourceIsFallback = validation.model_source.kind !== 'signed_champion';
+  const modelBundle = forecast.artifact_bundles.find((item) => item.name === 'model_bundle');
+  const forecastBundle = forecast.artifact_bundles.find((item) => item.name === 'forecast_snapshot');
+  const weighted = validation.summary.weighted_coverage;
 
   return (
-    <main style={{ maxWidth: 1180, margin: '0 auto', padding: '62px 28px 90px' }}>
-      <section>
-        <div className="mono" style={{ fontSize: 10, color: 'var(--ink-3)', letterSpacing: '0.16em', textTransform: 'uppercase' }}>
-          Research evidence
+    <main className="qv-m-pad" style={{ maxWidth: 1180, margin: '0 auto', padding: '0 28px 84px' }}>
+      <header style={{ padding: '32px 0 24px', borderBottom: '1px solid var(--line)' }}>
+        <div
+          className="mono"
+          style={{ fontSize: 10, color: 'var(--ink-3)', letterSpacing: '0.18em', textTransform: 'uppercase' }}
+        >
+          Model · data · evidence
         </div>
-        <h1 className="serif" style={{ margin: '14px 0 0', maxWidth: 900, fontSize: 58, lineHeight: 0.98, letterSpacing: '-0.045em' }}>
+        <h1
+          className="qv-m-h1"
+          style={{ margin: '18px 0 0', fontSize: 64, lineHeight: 0.96, fontWeight: 800, letterSpacing: '-0.035em' }}
+        >
           Research validation
         </h1>
-        <p style={{ margin: '18px 0 0', maxWidth: 760, color: 'var(--ink-2)', fontSize: 16, lineHeight: 1.65 }}>
-          Out-of-sample model evidence, calibration, publication controls, and artifact lineage for Quantiv&apos;s end-of-day research outputs.
+        <p style={{ margin: '22px 0 0', maxWidth: 760, color: 'var(--ink-2)', fontSize: 16, lineHeight: 1.65 }}>
+          Out-of-sample model performance, calibration and reproducible evidence.
+          Publication controls below distinguish the last validated forecast release from eligibility for new research.
         </p>
-      </section>
+        <p style={{ margin: '12px 0 0', color: 'var(--ink-3)', fontSize: 12 }}>
+          Latest assessment: {dateLabel(control.generated_at)} ET
+        </p>
+      </header>
 
-      <section style={{ paddingTop: 52 }}>
-        <SectionTitle kicker="Paired benchmark">Does the model add information?</SectionTitle>
-        <div className="qv-m-2col" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 14 }}>
-          {validation.horizons.slice(0, 4).map((row) => (
-            <MetricCard
-              key={row.horizon_days}
-              label={`T-${row.horizon_days}`}
-              value={pct(row.relative_mae_improvement)}
-              detail={`Relative MAE improvement vs the same-observation straddle baseline on ${count(row.n_validation)} held-out rows.`}
-            />
-          ))}
+      {sourceIsFallback && (
+        <div
+          role="note"
+          style={{
+            marginTop: 18,
+            border: '1px solid var(--line)',
+            borderRadius: 12,
+            padding: '12px 14px',
+            color: 'var(--ink-2)',
+            background: 'var(--bg-2)',
+            fontSize: 12,
+            lineHeight: 1.55,
+          }}
+        >
+          <strong style={{ color: 'var(--ink)' }}>Preview model source.</strong> This committed artifact was generated from the checked-in fallback model metadata.
+          The nightly publication job prefers the signed active champion bundle after R2 synchronization and rewrites this artifact automatically.
+        </div>
+      )}
+
+      <section style={{ paddingTop: 42 }}>
+        <SectionTitle kicker="Primary question">Does the model add information?</SectionTitle>
+        <div
+          className="qv-m-2col"
+          style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 14 }}
+        >
+          <MetricCard
+            label="Model MAE"
+            value={pct(validation.summary.weighted_model_mae, 2)}
+            detail="Validation-weighted absolute error across the six horizon-specific models."
+          />
+          <MetricCard
+            label="Straddle baseline MAE"
+            value={pct(validation.summary.weighted_straddle_mae, 2)}
+            detail="The same validation observations scored against market-implied straddle move."
+          />
+          <MetricCard
+            label="Relative MAE improvement"
+            value={pct(validation.summary.weighted_relative_mae_improvement, 1)}
+            detail={`Every horizon improves on the baseline; range ${pct(validation.summary.min_relative_mae_improvement)}–${pct(validation.summary.max_relative_mae_improvement)}.`}
+          />
+          <MetricCard
+            label="Validation row-observations"
+            value={count(validation.summary.validation_row_observations)}
+            detail="Sum of holdout rows across horizon models; not a unique-event count."
+          />
         </div>
       </section>
 
@@ -307,9 +432,6 @@ export default function ValidationPage() {
       <section style={{ paddingTop: 52 }}>
         <SectionTitle kicker="Production evidence">Latest assessed research controls</SectionTitle>
         <ValidationPublication control={control} forecast={forecast} />
-        <p style={{ margin: '12px 2px 0', color: 'var(--ink-3)', fontSize: 11.5, lineHeight: 1.55 }}>
-          The control cards below are a captured assessment from {dateLabel(control.generated_at)} ET. A failed or degraded card blocks a new research release; it does not retroactively invalidate the separately validated forecast evidence above.
-        </p>
         <div className={styles.controlCards}>
           <div style={{ border: '1px solid var(--line)', borderRadius: 14, padding: 18, background: 'var(--bg-2)' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
@@ -326,13 +448,13 @@ export default function ValidationPage() {
 
           <div style={{ border: '1px solid var(--line)', borderRadius: 14, padding: 18, background: 'var(--bg-2)' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-              <h3 style={{ margin: 0, fontSize: 20, fontWeight: 400 }}>Model control plane · assessed</h3>
+              <h3 style={{ margin: 0, fontSize: 20, fontWeight: 400 }}>Model control plane</h3>
               <StatusPill status={control.model.status} />
             </div>
             <dl style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '10px 18px', margin: '20px 0 0', fontSize: 12 }}>
-              <dt style={{ color: 'var(--ink-3)' }}>Champion active at assessment</dt><dd style={{ margin: 0 }}><StatusPill status={control.model.champion_active} /></dd>
-              <dt style={{ color: 'var(--ink-3)' }}>Drift status at assessment</dt><dd style={{ margin: 0 }}><StatusPill status={control.model.drift_status} /></dd>
-              <dt style={{ color: 'var(--ink-3)' }}>Fallback bundle at assessment</dt><dd className="mono" style={{ margin: 0 }}>{control.model.fallback_bundle_available ? 'available' : 'unavailable'}</dd>
+              <dt style={{ color: 'var(--ink-3)' }}>Champion active</dt><dd style={{ margin: 0 }}><StatusPill status={control.model.champion_active} /></dd>
+              <dt style={{ color: 'var(--ink-3)' }}>Drift status</dt><dd style={{ margin: 0 }}><StatusPill status={control.model.drift_status} /></dd>
+              <dt style={{ color: 'var(--ink-3)' }}>Fallback bundle</dt><dd className="mono" style={{ margin: 0 }}>{control.model.fallback_bundle_available ? 'available' : 'unavailable'}</dd>
               <dt style={{ color: 'var(--ink-3)' }}>Shadow roles</dt><dd className="mono" style={{ margin: 0 }}>{control.model.shadow_roles.length ? control.model.shadow_roles.join(', ') : 'none'}</dd>
             </dl>
           </div>
@@ -340,14 +462,14 @@ export default function ValidationPage() {
 
         <div style={{ marginTop: 14, border: '1px solid var(--line)', borderRadius: 14, padding: 18 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-            <h3 style={{ margin: 0, fontSize: 20, fontWeight: 400 }}>Data decision universe · assessed</h3>
+            <h3 style={{ margin: 0, fontSize: 20, fontWeight: 400 }}>Data decision universe</h3>
             <StatusPill status={control.data.status} />
           </div>
           <div className="qv-m-2col" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 14, marginTop: 18 }}>
-            <MetricCard label="Eligible contracts" value={`${count(control.data.eligible_contracts)} / ${count(control.data.contracts)}`} detail="Contracts that survived quote-quality controls in this captured assessment." />
-            <MetricCard label="Event coverage" value={pct(control.data.event_coverage_pct)} detail={`${count(control.data.covered_events)} of ${count(control.data.expected_events)} in-universe upcoming events were covered in this captured assessment.`} />
-            <MetricCard label="Quarantine records" value={count(control.data.quarantine_records)} detail={`Rejected evidence retained in this assessment; quarantine ${control.data.quarantine_status}.`} />
-            <MetricCard label="Duplicate rows" value={count(control.data.duplicate_rows)} detail={`Assessment replay ${control.data.replay_status}; corporate actions ${control.data.corporate_action_status}.`} />
+            <MetricCard label="Eligible contracts" value={`${count(control.data.eligible_contracts)} / ${count(control.data.contracts)}`} detail="Contracts surviving commercial quote-quality controls." />
+            <MetricCard label="Event coverage" value={pct(control.data.event_coverage_pct)} detail={`${count(control.data.covered_events)} of ${count(control.data.expected_events)} in-universe upcoming events currently covered.`} />
+            <MetricCard label="Quarantine records" value={count(control.data.quarantine_records)} detail={`Rejected evidence retained; quarantine ${control.data.quarantine_status}.`} />
+            <MetricCard label="Duplicate rows" value={count(control.data.duplicate_rows)} detail={`Replay ${control.data.replay_status}; corporate actions ${control.data.corporate_action_status}.`} />
           </div>
 
           {control.exceptions.length > 0 && (
@@ -407,19 +529,35 @@ export default function ValidationPage() {
               }}
             >
               <span style={{ color: 'var(--ink-3)' }}>{label}</span>
-              <span className="mono" style={{ overflowWrap: 'anywhere' }}>{value}</span>
-              <span style={{ color: 'var(--ink-4)', overflowWrap: 'anywhere' }}>{detail}</span>
+              <span className="mono" style={{ color: 'var(--ink)' }}>{value}</span>
+              <span style={{ color: 'var(--ink-3)' }}>{detail}</span>
             </div>
           ))}
         </div>
-        <p style={{ margin: '12px 2px 0', color: 'var(--ink-3)', fontSize: 11.5, lineHeight: 1.55 }}>
-          Downloads and validation evidence are immutable research artifacts. Live quote APIs are intentionally outside this evidence surface.
-        </p>
-        <div style={{ marginTop: 18 }}>
-          <Link href="/methodology" style={{ color: 'var(--accent)', fontSize: 12 }}>
-            Read the methodology →
-          </Link>
+      </section>
+
+      <section
+        style={{
+          marginTop: 52,
+          borderTop: '1px solid var(--line)',
+          borderBottom: '1px solid var(--line)',
+          padding: '20px 0',
+          display: 'flex',
+          gap: 24,
+          alignItems: 'flex-start',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+        }}
+      >
+        <div style={{ maxWidth: 760 }}>
+          <div className="mono" style={{ fontSize: 10, color: 'var(--flag)', letterSpacing: '0.12em', textTransform: 'uppercase' }}>Decision scope</div>
+          <p style={{ margin: '8px 0 0', color: 'var(--ink-2)', fontSize: 12.5, lineHeight: 1.65 }}>
+            Quantiv model outputs are end-of-day research evidence. A latest stock quote may update spot-derived inputs, but options, IV, Greeks and other snapshot features remain frozen. These results are not presented as executable option quotes or live-trading signals.
+          </p>
         </div>
+        <Link href="/about" style={{ fontSize: 12, color: 'var(--accent)', whiteSpace: 'nowrap', marginTop: 18 }}>
+          Read methodology →
+        </Link>
       </section>
     </main>
   );
