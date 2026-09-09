@@ -1,0 +1,38 @@
+name: P0 S&P 500 bootstrap
+
+on:
+  push:
+    branches: ["cleanup/p0-sp500-security-master-refresh"]
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: cleanup/p0-sp500-security-master-refresh
+
+      - name: Refresh snapshot
+        run: python scripts/update_sp500_constituents.py --summary-file "$RUNNER_TEMP/sp500-summary.md"
+
+      - name: Commit if changed
+        run: |
+          set -euo pipefail
+          git config user.name 'quantiv-bot'
+          git config user.email 'quantiv-bot@users.noreply.github.com'
+          if git diff --quiet -- lib/data/sp500-constituents.json; then
+            echo "Snapshot already current."
+            exit 0
+          fi
+          cat "$RUNNER_TEMP/sp500-summary.md"
+          git add lib/data/sp500-constituents.json
+          git diff --staged --check
+          git commit -m 'chore(data): refresh S&P 500 constituents'
+          git push origin HEAD:cleanup/p0-sp500-security-master-refresh
