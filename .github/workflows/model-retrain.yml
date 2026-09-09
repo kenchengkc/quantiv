@@ -27,7 +27,7 @@ jobs:
           cache: pip
 
       - name: Install Python dependencies
-        run: pip install -r requirements.txt
+        run: pip install --require-hashes -r requirements.txt
 
       - name: Install verified rclone
         run: bash scripts/install_rclone.sh
