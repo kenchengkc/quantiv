@@ -139,7 +139,7 @@ Requirements:
 Install dependencies and create the local environment:
 
 ```bash
-npm install
+npm ci
 python -m venv .venv
 source .venv/bin/activate
 pip install --require-hashes -r requirements.txt
@@ -230,7 +230,9 @@ python -m pytest apps/backend/tests apps/ml/tests scripts tools -q
 | [R2 setup](docs/R2_SETUP.md)                                         | Artifact storage and synchronization                           |
 | [Pipeline runbook](scripts/README.md)                                | Data-provider and scheduled-pipeline commands                  |
 | [Data layout](data/README.md)                                        | Runtime versus research artifact ownership                     |
-| [Tooling layout](tools/README.md)                                    | Frontend builders, helpers, fixtures, and tool tests            |
+| [Tooling layout](tools/README.md)                                    | Frontend builders, helpers, fixtures, and tool tests           |
+| [Contributing](CONTRIBUTING.md)                                      | Development, review, reproducibility, and control expectations |
+| [Security policy](SECURITY.md)                                       | Private vulnerability reporting and credential response        |
 
 Additional documentation is indexed in [docs/README.md](docs/README.md).
 
