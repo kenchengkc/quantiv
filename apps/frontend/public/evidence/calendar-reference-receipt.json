@@ -1,0 +1,37 @@
+{
+  "deduplicated_event_count": 14,
+  "event_count": 69,
+  "integrity": {
+    "baseline_sha256": "5a77225cd8aace82988887187164048ecd09fdaffcdedd9bb0480b283cbb6297",
+    "status": "passed",
+    "stdout_sha256": "69de4b8483ae8474c995d525f51e6b9da1ed77ab5e663bd51107a332deb77ad6"
+  },
+  "observed_at": "2026-09-09T15:07:10Z",
+  "receipt_id": "05fe3c59bcec4cbda86cc2b62654aeddf2961d04607b8e3786fcb9d44df57072",
+  "release_id": "aa46ce43cf584832eca2734db188ab0668fbed921624b457504a6dfd9e27a59c",
+  "schema": "quantiv.calendar-reference-receipt.v1",
+  "source_evidence": [
+    {
+      "date_max": "2026-11-06",
+      "date_min": "2020-01-22",
+      "metadata_sha256": "f20d32a7659088d0b189d0876d171dcfa3d9847fd6d9ee44c5f010768e0a4579",
+      "observed_at": "2026-09-09T15:07:06.529168Z",
+      "provider": "dolthub",
+      "rows": 125651,
+      "symbols": 7335
+    },
+    {
+      "from": "2026-08-10",
+      "metadata_sha256": "f264433e123accedeb40e1ad66e42a47518d972b970196b6f08ba2fa7db33c92",
+      "observed_at": "2026-09-09T15:07:10Z",
+      "provider": "fmp",
+      "to": "2026-11-08"
+    }
+  ],
+  "source_file": {
+    "path": "data/earnings_calendar.csv",
+    "sha256": "5a77225cd8aace82988887187164048ecd09fdaffcdedd9bb0480b283cbb6297"
+  },
+  "source_revision": "39b5a32e1d9413a0c9c438439317f7447fda1171",
+  "universe_id": "613bbe4919f6d5c81d6a0332c83cb3622c76d2a67214a9dc07ebbd30ad0a264a"
+}

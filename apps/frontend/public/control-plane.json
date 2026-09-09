@@ -1,100 +1,84 @@
 {
   "data": {
-    "contract_rejection_rate": 0.428305,
-    "contracts": 97762,
-    "corporate_action_rows": 28685,
+    "contract_rejection_rate": 0.519652,
+    "contracts": 113576,
+    "corporate_action_rows": 28748,
     "corporate_action_status": "enforced",
-    "covered_events": 45,
-    "decision_group_rejection_rate": 0.237288,
-    "decision_groups": 59,
+    "covered_events": 47,
+    "decision_group_rejection_rate": 0.265625,
+    "decision_groups": 64,
     "decision_scope": "end_of_day_research",
     "duplicate_rows": 0,
-    "eligible_contracts": 55890,
-    "eligible_decision_groups": 45,
-    "event_coverage_pct": 0.762712,
-    "expected_events": 59,
-    "expected_source_date": "2026-09-04",
+    "eligible_contracts": 54556,
+    "eligible_decision_groups": 47,
+    "event_coverage_pct": 0.734375,
+    "expected_events": 64,
+    "expected_source_date": "2026-09-08",
     "live_trading_eligible": false,
-    "missing_events": 14,
-    "pair_rejection_rate": 0.878296,
-    "quarantine_records": 84804,
+    "missing_events": 17,
+    "pair_rejection_rate": 0.902145,
+    "quarantine_records": 110251,
     "quarantine_status": "enforced",
-    "quote_quality_errors": [
-      "latest source date 2026-09-01 is 3 market session(s) behind expected 2026-09-04"
-    ],
+    "quote_quality_errors": [],
     "replay_status": "verified",
-    "source_date": "2026-09-01",
-    "source_session_lag": 3,
-    "status": "failed"
+    "source_date": "2026-09-08",
+    "source_session_lag": 0,
+    "status": "degraded"
   },
   "exceptions": [
     {
-      "code": "options_stale",
-      "count": 7,
-      "severity": "critical",
-      "summary": "options exceeds its freshness limit"
-    },
-    {
       "code": "upcoming_events_outside_option_universe",
-      "count": 292,
+      "count": 252,
       "severity": "warning",
       "summary": "Calendar events fall outside the current options decision universe"
     },
     {
       "code": "upcoming_events_without_option_chain",
-      "count": 14,
+      "count": 17,
       "severity": "warning",
       "summary": "In-universe earnings events have no decision-eligible option chain"
     },
     {
       "code": "forecast_horizon_coverage_below_limit",
-      "count": 12,
+      "count": 9,
       "severity": "warning",
       "summary": "One or more model horizons lack sufficient eligible option coverage"
     },
     {
-      "code": "option_quote_quality_below_limit",
-      "count": 14,
-      "severity": "critical",
-      "summary": "Option evidence on the scoped earnings decision surface exceeds the publication limit"
-    },
-    {
-      "code": "retired_source_symbols_quarantined",
-      "count": 1,
+      "code": "option_chain_diagnostics_above_limit",
+      "count": 2400,
       "severity": "warning",
-      "summary": "Latest source quotes for retired symbols are excluded from the decision universe"
+      "summary": "Chain-wide option diagnostics exceed their limits outside the scoped earnings decision surface"
     }
   ],
-  "generated_at": "2026-09-08T15:08:23.858447+00:00",
+  "generated_at": "2026-09-09T15:34:59.498162+00:00",
   "model": {
     "challenger_present": false,
     "champion_active": true,
-    "critical_features": 2,
+    "critical_features": 1,
     "drift_status": "warning",
     "fallback_bundle_available": false,
     "hard_missing_features": 0,
-    "monitored_at": "2026-09-02T15:22:44.446687+00:00",
+    "monitored_at": "2026-09-09T15:11:42.256370+00:00",
     "outcome_common_rows": 95,
     "outcome_evaluated_at": "2026-09-06T15:14:48.694772+00:00",
     "outcome_evaluations": 1,
     "outcome_minimum_rows": 30,
     "outcome_status": "passed",
     "rollback_recorded": false,
-    "shadow_roles": [
-      "previous"
-    ],
-    "snapshot_date": "2026-09-01",
+    "shadow_roles": [],
+    "snapshot_date": "2026-09-08",
     "status": "degraded",
-    "warning_features": 10
+    "warning_features": 5
   },
-  "publication_eligible": false,
+  "publication_eligible": true,
   "release": {
-    "artifact_promotion_status": "degraded",
+    "artifact_promotion_status": "passed",
     "data_r2_status": "passed",
-    "forecast_r2_status": "degraded",
-    "frontend_payload_status": "degraded",
-    "neon_import_status": "degraded"
+    "forecast_r2_status": "passed",
+    "frontend_payload_status": "passed",
+    "neon_import_status": "passed"
   },
   "schema": "quantiv.control-plane.v2",
-  "status": "failed"
+  "status": "degraded"
 }
