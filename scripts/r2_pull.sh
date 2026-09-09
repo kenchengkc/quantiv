@@ -61,13 +61,17 @@ materialize_runtime_state() {
   local output_dir="$DATA_DIR/runtime_state_release"
   local pointer="$output_dir/current.json"
   local manifest_rel archive_rel
+  local pointer_download_ok=0
 
   rm -rf "$output_dir"
   mkdir -p "$output_dir"
-  if ! rclone copyto "$REMOTE/runtime-state/current.json" "$pointer" 2>/dev/null; then
+  if rclone copyto "$REMOTE/runtime-state/current.json" "$pointer" 2>/dev/null; then
+    pointer_download_ok=1
+  fi
+  if [ "$pointer_download_ok" != "1" ] || [ ! -s "$pointer" ]; then
     rm -rf "$output_dir"
     if [ "$REQUIRE_RUNTIME_STATE" = "1" ]; then
-      echo "Missing canonical R2 runtime-state pointer; refusing to reset cross-run state" >&2
+      echo "Missing or empty canonical R2 runtime-state pointer; refusing to reset cross-run state" >&2
       exit 1
     fi
     echo "⚠️  No runtime-state release available; continuing because this workflow does not require it"
