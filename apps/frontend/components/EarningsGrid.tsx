@@ -29,6 +29,7 @@ import {
   type LiveQuoteMap,
 } from '@/lib/earningsCalendarCache';
 import { parseHomeSearchParams, type HomeCalendarFilter } from '@/lib/homeSearchParams';
+import { earningsQuoteRequestUrl } from '@/lib/earningsQuoteRequest';
 import {
   calendarCacheKey,
   mergeCalendarReference,
@@ -1072,7 +1073,8 @@ export default function EarningsGrid({
       setQuotesReadyWeek(weekStartIso);
     };
 
-    if (symbols.length === 0) {
+    const quoteRequestUrl = earningsQuoteRequestUrl(symbols);
+    if (quoteRequestUrl === null) {
       markQuotesReady();
       return () => {
         cancelled = true;
@@ -1089,7 +1091,7 @@ export default function EarningsGrid({
 
     const fetchOnce = async (): Promise<{ pending: number; marketOpen: boolean; quoteRefreshActive: boolean }> => {
       try {
-        const res = await fetch(`/api/stocks/batch-price?symbols=${symbols.join(',')}&context=earnings`, {
+        const res = await fetch(quoteRequestUrl, {
           cache: 'no-store',
         });
         if (!res.ok) {
