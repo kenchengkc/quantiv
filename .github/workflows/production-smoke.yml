@@ -11,8 +11,16 @@ on:
       - "lib/**"
       - "railway.toml"
       - "scripts/production_smoke.mjs"
+      - "scripts/verify_frontend_publication.mjs"
+      - "scripts/frontend_release.py"
+      - "scripts/materialize_frontend_release.sh"
       - "vercel.json"
   workflow_dispatch:
+  # Publication pointers are committed with GITHUB_TOKEN, which does not trigger
+  # another push workflow. Verify those releases through producer completion too.
+  workflow_run:
+    workflows: ["Frontend publication release"]
+    types: [completed]
 
 permissions:
   contents: read
@@ -23,11 +31,18 @@ concurrency:
 
 jobs:
   smoke:
+    if: >-
+      github.event_name != 'workflow_run' ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main')
     name: Public frontend and API
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The producer may commit its pointer after workflow_run.head_sha.
+          # Normal pushes still verify their exact triggering checkout.
+          ref: ${{ github.event_name == 'workflow_run' && 'main' || github.sha }}
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 20

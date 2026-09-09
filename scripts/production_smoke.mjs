@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import { readFile } from 'node:fs/promises';
+import { verifyFrontendPublication } from './verify_frontend_publication.mjs';
 
 const frontendUrl = process.env.PRODUCTION_FRONTEND_URL ?? 'https://usequantiv.com';
 const backendUrl = process.env.PRODUCTION_BACKEND_URL ?? 'https://api.usequantiv.com';
@@ -7,20 +9,20 @@ const delayMs = Number(process.env.SMOKE_DELAY_MS ?? 15_000);
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function eventually(label, check) {
+async function eventually(label, check, maxAttempts = attempts) {
   let lastError;
-  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
       await check();
       console.log(`ok: ${label}`);
       return;
     } catch (error) {
       lastError = error;
-      console.warn(`${label}: attempt ${attempt}/${attempts} failed: ${error.message}`);
-      if (attempt < attempts) await sleep(delayMs);
+      console.warn(`${label}: attempt ${attempt}/${maxAttempts} failed: ${error.message}`);
+      if (attempt < maxAttempts) await sleep(delayMs);
     }
   }
-  throw new Error(`${label} failed after ${attempts} attempts`, { cause: lastError });
+  throw new Error(`${label} failed after ${maxAttempts} attempts`, { cause: lastError });
 }
 
 async function fetchOk(url, init) {
@@ -33,6 +35,14 @@ async function fetchOk(url, init) {
   }
   return response;
 }
+
+const deploymentPointer = JSON.parse(await readFile(
+  new URL('../apps/frontend/frontend-release.json', import.meta.url), 'utf8',
+));
+await eventually('Git-pinned frontend publication', async () => {
+  const result = await verifyFrontendPublication(frontendUrl, deploymentPointer);
+  console.log(`release ${result.releaseId}: ${result.verifiedPaths.length} public files verified`);
+}, Number(process.env.SMOKE_RELEASE_ATTEMPTS ?? 40));
 
 await eventually('frontend shell and security headers', async () => {
   const response = await fetchOk(`${frontendUrl}/`);

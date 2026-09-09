@@ -6,7 +6,9 @@ import shutil
 import subprocess
 import sys
 
-from scripts.frontend_release import build_release, write_deployment_pointer
+import pytest
+
+from scripts.frontend_release import PUBLIC_MANIFEST, build_release, write_deployment_pointer
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -42,8 +44,9 @@ shutil.copyfile(source, target)
     path.chmod(0o755)
 
 
+@pytest.mark.parametrize("existing_publication", [False, True])
 def test_materializer_downloads_verified_pinned_release_and_preserves_brand(
-    tmp_path: Path,
+    tmp_path: Path, existing_publication: bool,
 ) -> None:
     source_public = tmp_path / "source-public"
     target_public = tmp_path / "target-public"
@@ -70,8 +73,9 @@ def test_materializer_downloads_verified_pinned_release_and_preserves_brand(
     _fake_rclone(fake_rclone)
 
     _write(target_public / "brand/logo.webp", b"keep-brand")
-    _write(target_public / "weekly.json", b'{"stale":true}\n')
-    _write(target_public / "symbols/STALE.json", b"{}\n")
+    if existing_publication:
+        _write(target_public / "weekly.json", b'{"stale":true}\n')
+        _write(target_public / "symbols/STALE.json", b"{}\n")
 
     env = os.environ.copy()
     env.update(
@@ -102,6 +106,7 @@ def test_materializer_downloads_verified_pinned_release_and_preserves_brand(
     assert (target_public / "weekly.json").read_bytes() == b'{"fresh":true}\n'
     assert (target_public / "symbols/AAPL.json").exists()
     assert not (target_public / "symbols/STALE.json").exists()
+    assert (target_public / PUBLIC_MANIFEST).read_bytes() == manifest.read_bytes()
 
 
 def test_default_paths_work_from_frontend_workspace_without_r2_credentials() -> None:
@@ -138,6 +143,7 @@ def test_materializer_uses_checked_in_fallback_when_credentials_are_absent(
     pointer = tmp_path / "frontend-release.json"
     _write(target_public / "weekly.json", b'{"fallback":true}\n')
     _write(target_public / "symbols/AAPL.json", b"{}\n")
+    _write(target_public / PUBLIC_MANIFEST, b'{"old":"attestation"}\n')
     pointer.write_text('{"schema":"quantiv.frontend-deployment.v1"}\n')
 
     env = os.environ.copy()
@@ -162,6 +168,7 @@ def test_materializer_uses_checked_in_fallback_when_credentials_are_absent(
     assert result.returncode == 0
     assert "source-controlled publication fallback" in result.stdout
     assert (target_public / "weekly.json").read_bytes() == b'{"fallback":true}\n'
+    assert not (target_public / PUBLIC_MANIFEST).exists()
 
 
 def test_materializer_fails_closed_without_remote_access_or_fallback(tmp_path: Path) -> None:

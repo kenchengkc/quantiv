@@ -27,6 +27,9 @@ fallback_available() {
 fallback_or_fail() {
   local reason="$1"
   if [ "$REQUIRED" != "1" ] && fallback_available; then
+    # A local fallback is not proof that the Git-pinned release was restored.
+    # Do not carry a previous build's attestation into an unverified build.
+    rm -f "$PUBLIC_DIR/frontend-release-manifest.json"
     echo "Frontend R2 materialization skipped: $reason; using source-controlled publication fallback."
     return 0
   fi

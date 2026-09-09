@@ -35,6 +35,7 @@ RELEASE_SCHEMA = "quantiv.frontend-release.v1"
 POINTER_SCHEMA = "quantiv.current-frontend-release.v1"
 DEPLOYMENT_POINTER_SCHEMA = "quantiv.frontend-deployment.v1"
 SOURCE_CONTROLLED_PREFIXES = ("brand/",)
+PUBLIC_MANIFEST = "frontend-release-manifest.json"
 
 
 def _sha256_file(path: Path) -> str:
@@ -58,7 +59,9 @@ def _atomic_json(path: Path, payload: dict[str, Any]) -> None:
 
 
 def _is_generated(relative: str) -> bool:
-    return not any(
+    # The deployment attestation describes the inventory; including it in that
+    # inventory would recursively change release identity on every rebuild.
+    return relative != PUBLIC_MANIFEST and not any(
         relative == prefix.rstrip("/") or relative.startswith(prefix)
         for prefix in SOURCE_CONTROLLED_PREFIXES
     )
@@ -294,7 +297,10 @@ def materialize_release(
     result = verify_release(output_dir, pointer_path)
     _, manifest, archive_path = _load_release(output_dir, pointer_path)
     expected = {str(item["path"]) for item in manifest.get("files") or []}
+    if PUBLIC_MANIFEST in expected:
+        raise RuntimeError("frontend archive contains reserved deployment manifest")
     public_dir.mkdir(parents=True, exist_ok=True)
+    (public_dir / PUBLIC_MANIFEST).unlink(missing_ok=True)
     with tempfile.TemporaryDirectory(prefix="quantiv-frontend-release-") as tmp:
         temp_root = Path(tmp)
         with tarfile.open(archive_path, mode="r:gz") as tar:
@@ -327,6 +333,14 @@ def materialize_release(
     }
     if materialized != expected:
         raise RuntimeError("materialized frontend publication does not match release inventory")
+    # Publish the exact verified manifest bytes last. The Git deployment pointer
+    # pins their digest, so production smoke can detect an old or mixed release.
+    pointer, _, _ = _load_release(output_dir, pointer_path)
+    manifest_bytes = (output_dir / str(pointer["manifest"])).read_bytes()
+    marker = public_dir / PUBLIC_MANIFEST
+    temporary = marker.with_name(f".{marker.name}.{os.getpid()}.tmp")
+    temporary.write_bytes(manifest_bytes)
+    os.replace(temporary, marker)
     return result
 
 
