@@ -81,8 +81,16 @@ jobs:
             cat "$RUNNER_TEMP/sp500-summary.md"
           } > "$RUNNER_TEMP/sp500-pr-body.md"
 
-          if gh pr view "$BRANCH" --repo "$GITHUB_REPOSITORY" --json number >/dev/null 2>&1; then
-            gh pr edit "$BRANCH" \
+          pr_number="$(
+            gh pr list \
+              --repo "$GITHUB_REPOSITORY" \
+              --head "$BRANCH" \
+              --state open \
+              --json number \
+              --jq '.[0].number // empty'
+          )"
+          if [ -n "$pr_number" ]; then
+            gh pr edit "$pr_number" \
               --repo "$GITHUB_REPOSITORY" \
               --title "chore(data): refresh S&P 500 constituents" \
               --body-file "$RUNNER_TEMP/sp500-pr-body.md"
