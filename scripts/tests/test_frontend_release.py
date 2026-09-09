@@ -8,6 +8,7 @@ import pytest
 
 from scripts.frontend_release import (
     DEPLOYMENT_POINTER_SCHEMA,
+    PUBLIC_MANIFEST,
     build_release,
     materialize_release,
     verify_release,
@@ -92,7 +93,7 @@ def test_materialize_replaces_generated_state_and_preserves_brand(tmp_path: Path
     target = tmp_path / "target-public"
     _write(source / "weekly.json", b'{"fresh":true}\n')
     _write(source / "weeks/2026-09-07.json", b'{"events":[]}\n')
-    build_release(source, output)
+    _, manifest, _, release = build_release(source, output)
 
     _write(target / "brand/logo.webp", b"keep-me")
     _write(target / "weekly.json", b'{"stale":true}\n')
@@ -105,3 +106,19 @@ def test_materialize_replaces_generated_state_and_preserves_brand(tmp_path: Path
     assert (target / "weekly.json").read_bytes() == b'{"fresh":true}\n'
     assert (target / "weeks/2026-09-07.json").exists()
     assert not (target / "symbols/STALE.json").exists()
+    assert (target / PUBLIC_MANIFEST).read_bytes() == manifest.read_bytes()
+    # Repackaging materialized output must not recursively inventory its marker.
+    _, _, _, rebuilt = build_release(target, tmp_path / "rebuilt")
+    assert rebuilt["release_id"] == release["release_id"]
+
+
+def test_failed_materialization_does_not_attest_unverified_release(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    output = tmp_path / "release"
+    target = tmp_path / "target"
+    _write(source / "weekly.json", b"{}\n")
+    archive, _, _, _ = build_release(source, output)
+    archive.write_bytes(b"corrupt")
+    with pytest.raises(RuntimeError, match="archive size mismatch"):
+        materialize_release(output, target)
+    assert not (target / PUBLIC_MANIFEST).exists()

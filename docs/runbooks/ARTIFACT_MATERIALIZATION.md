@@ -20,3 +20,33 @@ Publication is pointer-last: immutable `runtime-state/releases/<release-id>.tar.
 ## Local development
 
 Local workflows may use small committed fixtures or explicitly downloaded snapshots. Local convenience must not make production depend on mutable generated state committed to Git.
+
+## Frontend deployment verification
+
+After full archive verification and materialization, the build publishes the exact
+verified manifest at `/frontend-release-manifest.json`. This build-generated file
+is excluded from Git and future release inventories (to avoid recursive identities).
+A credential-free local fallback removes any previous manifest; it must not claim
+to have materialized the pinned release. Production builds need R2 read access.
+
+Production smoke compares the served manifest's byte length and SHA-256 with
+`apps/frontend/frontend-release.json` from the triggering checkout. It then checks
+the bytes of weekly, screener, control-plane, and model-validation data plus one
+week and one symbol against that verified inventory. This is a bounded deployed
+sample, not verification of every CDN object or the application code revision.
+The build-time verifier checks the full archive. No mutable `latest` pointer is
+used as the expected deployment identity.
+
+Missing manifests, mixed-release sample bytes, or an older deployed release fail
+the smoke check. Allow up to ten minutes for deployment propagation (40 attempts
+at 15-second intervals by default), then inspect the deployment rather than
+changing the expected pointer to whatever happens to be live. New main pushes
+cancel superseded smoke runs. A deliberate production rollback requires verifying
+against its explicitly selected Git-pinned release, not bypassing identity checks.
+The smoke workflow also follows successful `Frontend publication release` runs:
+their bot commits do not trigger another push workflow. That path checks out main
+after producer completion, rather than the producer's pre-publication head SHA.
+
+Run offline verifier regressions with
+`node --test scripts/tests/verify_frontend_publication.test.mjs` and materializer
+tests with `pytest scripts/tests/test_frontend_release.py scripts/tests/test_frontend_materialization.py`.
