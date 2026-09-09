@@ -15,7 +15,7 @@ test('research validation exposes model, calibration, controls, and lineage', as
     page.getByRole('heading', { name: 'Calibration', exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByRole('heading', { name: /current research controls/i }),
+    page.getByRole('heading', { name: /latest assessed research controls/i }),
   ).toBeVisible();
   await expect(
     page.getByRole('heading', { name: /evidence behind this page/i }),
