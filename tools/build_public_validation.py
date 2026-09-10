@@ -3,9 +3,9 @@
 
 The public page should never depend on hand-entered performance numbers. This
 projection verifies the active signed model control pointer and immutable bundle,
-then verifies the content-addressed model-validation receipt authenticated by the
-bundle manifest. Local/preview environments with no champion pointer may still
-fall back to the checked-in model metadata under ``apps/ml/models``.
+then verifies the immutable content-addressed model-validation receipt authenticated
+by the bundle manifest. Local/preview environments with no champion pointer may
+still fall back to the checked-in model metadata under ``apps/ml/models``.
 
 Only compact due-diligence fields are published. Absolute filesystem paths,
 model hyperparameters, feature vectors, and operational secrets stay out of
@@ -100,7 +100,9 @@ def _verify_receipt_model_members(
             raise ModelBundleError("model validation receipt has an invalid model member")
         name = Path(str(member.get("path", ""))).name
         if not name or name in by_name:
-            raise ModelBundleError("model validation receipt has duplicate or unnamed model members")
+            raise ModelBundleError(
+                "model validation receipt has duplicate or unnamed model members"
+            )
         by_name[name] = member
 
     signed_by_name: dict[str, Mapping[str, Any]] = {}
@@ -109,7 +111,9 @@ def _verify_receipt_model_members(
             raise ModelBundleError("signed model manifest has an invalid artifact member")
         name = str(artifact.get("name", ""))
         if not name or name in signed_by_name:
-            raise ModelBundleError("signed model manifest has duplicate or unnamed artifacts")
+            raise ModelBundleError(
+                "signed model manifest has duplicate or unnamed artifacts"
+            )
         signed_by_name[name] = artifact
 
     if set(by_name) != set(signed_by_name):
@@ -133,6 +137,23 @@ def _verify_receipt_model_members(
             )
 
 
+def _immutable_model_receipt_path(
+    models_root: Path,
+    manifest: Mapping[str, Any],
+) -> Path:
+    receipt_id = str(manifest.get("receipt_id", ""))
+    if not receipt_id.startswith("sha256:"):
+        raise ModelBundleError("signed model bundle has no content-addressed validation receipt")
+    digest = receipt_id.removeprefix("sha256:")
+    if len(digest) != 64:
+        raise ModelBundleError("signed model bundle has an invalid validation receipt id")
+    try:
+        int(digest, 16)
+    except ValueError as exc:
+        raise ModelBundleError("signed model bundle has an invalid validation receipt id") from exc
+    return models_root / "receipts" / f"models.{digest[:12]}.receipt.json"
+
+
 def _model_source(
     repo_root: Path,
 ) -> tuple[Path, str, str | None, dict[str, Any] | None, dict[str, Any] | None]:
@@ -154,11 +175,19 @@ def _model_source(
         manifest = verify_bundle_dir(candidate)
         if manifest.get("bundle_id") != champion_id:
             raise ModelBundleError("champion pointer and signed bundle manifest disagree")
+        try:
+            manifest_horizons = sorted(int(value) for value in manifest.get("horizons") or [])
+        except (TypeError, ValueError) as exc:
+            raise ModelBundleError("signed champion has invalid horizon declarations") from exc
+        if manifest_horizons != list(HORIZONS):
+            raise ModelBundleError(
+                "signed champion horizons do not match the public validation contract"
+            )
 
-        receipt_path = models_root / "receipts" / "latest_models.json"
+        receipt_path = _immutable_model_receipt_path(models_root, manifest)
         try:
             receipt = verify_evidence_receipt(
-                _read_required(receipt_path, "model validation receipt"),
+                _read_required(receipt_path, "immutable model validation receipt"),
                 expected_scope="models",
             )
         except ValueError as exc:
@@ -168,6 +197,14 @@ def _model_source(
         if receipt.get("receipt_id") != manifest.get("receipt_id"):
             raise ModelBundleError(
                 "champion bundle and model validation receipt identities disagree"
+            )
+        try:
+            receipt_horizons = sorted(int(value) for value in receipt.get("horizons") or [])
+        except (TypeError, ValueError) as exc:
+            raise ModelBundleError("model validation receipt has invalid horizons") from exc
+        if receipt_horizons != list(HORIZONS):
+            raise ModelBundleError(
+                "model validation receipt horizons do not match the public validation contract"
             )
 
         training_bundle = _artifact(receipt, "training_bundle")
@@ -366,7 +403,9 @@ def _evaluation_receipt(
         "walk_forward": walk_forwards,
         "metrics": rows,
     }
-    canonical = json.dumps(core, sort_keys=True, separators=(",", ":"), default=str).encode()
+    canonical = json.dumps(
+        core, sort_keys=True, separators=(",", ":"), default=str
+    ).encode()
     return {
         "receipt_id": f"sha256:{hashlib.sha256(canonical).hexdigest()}",
         **core,
@@ -389,8 +428,12 @@ def build_validation(repo_root: Path, *, generated_at: str | None = None) -> dic
     weighted_baseline = _weighted(rows, "straddle_baseline_mae")
     improvements = [float(row["relative_mae_improvement"]) for row in rows]
 
-    forecast = _read(repo_root / "apps" / "frontend" / "public" / "evidence" / "forecast.json")
-    control = _read(repo_root / "apps" / "frontend" / "public" / "control-plane.json")
+    forecast = _read(
+        repo_root / "apps" / "frontend" / "public" / "evidence" / "forecast.json"
+    )
+    control = _read(
+        repo_root / "apps" / "frontend" / "public" / "control-plane.json"
+    )
     forecast_model_bundle = next(
         (
             item
@@ -463,7 +506,9 @@ def build_validation(repo_root: Path, *, generated_at: str | None = None) -> dic
         },
         "summary": {
             "supported_horizons": list(HORIZONS),
-            "validation_row_observations": sum(int(row["n_validation"]) for row in rows),
+            "validation_row_observations": sum(
+                int(row["n_validation"]) for row in rows
+            ),
             "weighted_model_mae": weighted_model,
             "weighted_straddle_mae": weighted_baseline,
             "weighted_relative_mae_improvement": (
@@ -475,14 +520,24 @@ def build_validation(repo_root: Path, *, generated_at: str | None = None) -> dic
             "max_relative_mae_improvement": max(improvements),
             "weighted_coverage": {
                 name: _weighted_coverage(rows, name)
-                for name in ("p10", "p25", "p50", "p75", "p90", "interval_50", "interval_80")
+                for name in (
+                    "p10",
+                    "p25",
+                    "p50",
+                    "p75",
+                    "p90",
+                    "interval_50",
+                    "interval_80",
+                )
             },
         },
         "horizons": rows,
         "validation_protocol": {
             "target": "absolute earnings move magnitude",
             "baseline": "market straddle expected move",
-            "chronological_holdout": bool(holdout_splits) if source_kind == "signed_champion" else True,
+            "chronological_holdout": (
+                bool(holdout_splits) if source_kind == "signed_champion" else True
+            ),
             "holdout_splits": holdout_splits,
             "walk_forward": walk_forward_summary,
             "promotion_controls": [
@@ -500,7 +555,9 @@ def build_validation(repo_root: Path, *, generated_at: str | None = None) -> dic
             "forecast_receipt_id": forecast.get("receipt_id"),
             "forecast_validated_at": forecast.get("validated_at"),
             "forecast_quality": (forecast.get("quality") or {}).get("status"),
-            "forecast_control_exceptions": (forecast.get("controls") or {}).get("exceptions"),
+            "forecast_control_exceptions": (forecast.get("controls") or {}).get(
+                "exceptions"
+            ),
             "forecast_rows": (forecast.get("coverage") or {}).get("rows"),
             "forecast_events": (forecast.get("coverage") or {}).get("events"),
             "forecast_model_matches_evaluation": forecast_model_matches_evaluation,
@@ -520,7 +577,15 @@ def main() -> int:
     args = parser.parse_args()
 
     repo_root = args.repo_root.resolve()
-    output = args.out or repo_root / "apps" / "frontend" / "public" / "evidence" / "model-validation.json"
+    output = (
+        args.out
+        or repo_root
+        / "apps"
+        / "frontend"
+        / "public"
+        / "evidence"
+        / "model-validation.json"
+    )
     payload = build_validation(repo_root)
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
