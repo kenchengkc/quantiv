@@ -32,21 +32,25 @@
       "type": "object",
       "required": [
         "family",
-        "test_labels_used_for_hyperparameter_tuning",
-        "test_labels_used_for_early_stopping",
-        "test_labels_used_for_quantile_calibration",
-        "test_labels_used_for_promotion_decision",
+        "current_candidate_test_labels_used_for_hyperparameter_tuning",
+        "current_candidate_test_labels_used_for_early_stopping",
+        "current_candidate_test_labels_used_for_quantile_calibration",
+        "current_candidate_test_rows_used_in_common_holdout",
+        "current_run_test_rows_used_in_operational_outcome_check",
         "promotion_decision_evaluated_at",
-        "performance_gate_applied_after_decision"
+        "performance_gate_applied_after_decision",
+        "historical_model_family_exposure_status"
       ],
       "properties": {
         "family": { "type": "string", "minLength": 1 },
-        "test_labels_used_for_hyperparameter_tuning": { "const": false },
-        "test_labels_used_for_early_stopping": { "const": false },
-        "test_labels_used_for_quantile_calibration": { "const": false },
-        "test_labels_used_for_promotion_decision": { "const": false },
+        "current_candidate_test_labels_used_for_hyperparameter_tuning": { "const": false },
+        "current_candidate_test_labels_used_for_early_stopping": { "const": false },
+        "current_candidate_test_labels_used_for_quantile_calibration": { "const": false },
+        "current_candidate_test_rows_used_in_common_holdout": { "const": false },
+        "current_run_test_rows_used_in_operational_outcome_check": { "const": false },
         "promotion_decision_evaluated_at": { "type": ["string", "null"] },
-        "performance_gate_applied_after_decision": { "const": false }
+        "performance_gate_applied_after_decision": { "const": false },
+        "historical_model_family_exposure_status": { "const": "not_established" }
       },
       "additionalProperties": false
     },
