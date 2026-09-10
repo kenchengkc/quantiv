@@ -48,7 +48,7 @@ if (retained) {
   process.exit(0);
 }
 
-function buildUniverse() {
+function buildPreviewUniverse() {
   if (!existsSync(SYMBOLS)) {
     throw new Error(`symbol research directory is missing: ${SYMBOLS}`);
   }
@@ -110,7 +110,7 @@ function buildUniverse() {
   events.sort((a, b) => b.date.localeCompare(a.date) || a.ticker.localeCompare(b.ticker));
   const dates = Array.from(asOfDates).sort();
   return {
-    schema: 'quantiv.historical-event-universe.v1',
+    schema: 'quantiv.historical-event-universe.preview.v1',
     source: {
       kind: 'display_payload_fallback',
       completeness: 'display_limited',
@@ -119,7 +119,7 @@ function buildUniverse() {
       as_of_max: dates[dates.length - 1] ?? null,
     },
     evidence_rule:
-      'decision_eligible_eod pre-event straddle paired with timing-aware realized close-to-close move',
+      'display-limited decision_eligible_eod rows retained from per-symbol payloads',
     decision_scope: 'end_of_day_research',
     live_trading_eligible: false,
     event_count: events.length,
@@ -127,10 +127,10 @@ function buildUniverse() {
   };
 }
 
-const payload = buildUniverse();
+const payload = buildPreviewUniverse();
 writeFileSync(TEMP, `${JSON.stringify(payload, null, 2)}\n`);
 renameSync(TEMP, OUTPUT);
 console.log(
-  `Research history fallback: ${payload.event_count} display-limited events from ` +
+  `Research history preview: ${payload.event_count} display-limited events from ` +
     `${payload.source.symbol_payloads} symbol payloads -> ${OUTPUT}`,
 );
