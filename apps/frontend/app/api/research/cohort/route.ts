@@ -16,10 +16,22 @@ export const runtime = 'nodejs';
 
 type HistoricalUniverse = {
   schema?: string;
+  universe_id?: string;
+  generated_at?: string;
   source?: {
+    kind?: 'analytical_duckdb' | 'display_payload_fallback';
+    completeness?: 'source_level' | 'display_limited';
+    as_of_date?: string | null;
+    source_revision?: string | null;
     symbol_payloads?: number;
     as_of_min?: string | null;
     as_of_max?: string | null;
+    canonical_event_identities_before_cutoff?: number;
+  };
+  audit?: {
+    candidate_event_count?: number;
+    eligible_event_count?: number;
+    excluded_event_count?: number;
   };
   evidence_rule?: string;
   decision_scope?: string;
@@ -38,10 +50,6 @@ type ControlPlane = {
   generated_at?: string;
   status?: string;
   publication_eligible?: boolean;
-  data?: {
-    decision_scope?: string | null;
-    live_trading_eligible?: boolean;
-  };
 };
 
 function toCsv(id: string, events: CohortEvent[]): string {
@@ -98,16 +106,29 @@ export async function GET(request: Request) {
   const events = allMatching.slice(0, query.limit);
   const evidence = readPublicJson<ForecastEvidence>('evidence', 'forecast.json');
   const control = readPublicJson<ControlPlane>('control-plane.json');
-  const decisionScope = control?.data?.decision_scope ?? universe.decision_scope ?? 'end_of_day_research';
+
+  // Historical cohorts are an EOD research contract regardless of the current
+  // operational/live control snapshot. Never inherit a different live scope.
+  const decisionScope = 'end_of_day_research';
+  const sourceAsOf = universe.source?.as_of_date ?? universe.source?.as_of_max ?? null;
 
   const immutable = {
     schema: 'quantiv.historical-cohort.v1',
     source: {
       historical_universe_schema: universe.schema,
+      historical_universe_id: universe.universe_id ?? null,
+      historical_universe_kind: universe.source?.kind ?? 'display_payload_fallback',
+      historical_universe_completeness: universe.source?.completeness ?? 'display_limited',
+      historical_universe_generated_at: universe.generated_at ?? null,
+      historical_universe_source_revision: universe.source?.source_revision ?? null,
       public_symbol_payloads: universe.source?.symbol_payloads ?? null,
-      source_as_of_min: universe.source?.as_of_min ?? null,
-      source_as_of_max: universe.source?.as_of_max ?? null,
+      source_as_of_min: universe.source?.as_of_min ?? sourceAsOf,
+      source_as_of_max: universe.source?.as_of_max ?? sourceAsOf,
+      source_as_of_date: sourceAsOf,
+      source_canonical_events: universe.source?.canonical_event_identities_before_cutoff ?? null,
       eligible_event_universe: universe.event_count ?? universeEvents.length,
+      candidate_event_universe: universe.audit?.candidate_event_count ?? null,
+      excluded_event_universe: universe.audit?.excluded_event_count ?? null,
       forecast_receipt_id: evidence?.receipt_id ?? null,
       forecast_validated_at: evidence?.validated_at ?? null,
       forecast_quality: evidence?.quality?.status ?? null,
@@ -116,7 +137,7 @@ export async function GET(request: Request) {
       publication_eligible: control?.publication_eligible ?? null,
     },
     decision_scope: decisionScope,
-    live_trading_eligible: control?.data?.live_trading_eligible ?? universe.live_trading_eligible ?? false,
+    live_trading_eligible: false,
     live_quote_overlay_included: false,
     evidence_rule:
       universe.evidence_rule ??
