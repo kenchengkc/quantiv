@@ -26,11 +26,17 @@ Split and cash-dividend controls normalize the post-event price onto the pre-eve
 
 The canonical earnings table can infer an unknown reporting session from a company's reporting history, including later reported events. That inference is useful for display but is not point-in-time evidence for an old event. The research-universe builder therefore uses BMO/AMC timing only when `timing_source = reported`; inferred timings are deliberately downgraded to the conservative unknown-session rule for historical selection.
 
+### Research cutoff
+
+The production build derives its default source as-of date from the latest options snapshot. Before realized-window selection it replaces `v_ohlcv` with an in-memory snapshot containing only rows on or before that date. A near-cutoff event therefore cannot consume a later close merely because the underlying OHLCV lake is newer than the options evidence.
+
+The same cutoff is applied to research-only retired-company source recovery: retired earnings rows must be strictly before the source as-of date and retired split/dividend rows cannot be after it. The semantic contract independently rejects a realized post-close, retired source row, or corporate-action source date that lies after the declared source as-of date, even if a malformed artifact is resealed with a new hash.
+
 ## Historical membership and survivorship control
 
 The forward calendar intentionally removes companies after confirmed delisting. That is correct for current product behavior but is not a valid historical research-universe rule.
 
-`tools/build_research_history.py` therefore re-queries only the explicit retirement ledger in `config/delisted_tickers.json` from the upstream DoltHub earnings source. Those rows are inserted only into the in-memory research connection. They are never restored to the forward calendar, screener, symbol universe, or forecast path.
+`tools/build_research_history.py` therefore re-queries only the explicit retirement ledger in `config/delisted_tickers.json` from the upstream DoltHub earnings source, bounded to events before the research cutoff. Those rows are inserted only into the in-memory research connection. They are never restored to the forward calendar, screener, symbol universe, or forecast path.
 
 The operational corporate-action snapshot is also intentionally scoped to active names. To prevent a retired event from being interpreted as having zero splits or dividends merely because the company left that snapshot, the research build performs the same bounded supplement for retired-company split and dividend history and unions those rows with the verified operational action receipt in memory.
 
@@ -44,17 +50,17 @@ The source-level artifact retains and binds:
 - the number of research-only earnings rows installed;
 - the verified operational corporate-action receipt identity and combined action counts.
 
-A source-level artifact with missing, tampered, out-of-ledger, or count-inconsistent retirement evidence fails the public contract gate.
+A source-level artifact with missing, tampered, out-of-ledger, future-dated, or count-inconsistent retirement evidence fails the public contract gate.
 
 Ticker renames are a separate identity issue rather than a delisting/survivorship issue. The canonical earnings source carries same-company history onto the current symbol, while older option/OHLCV partitions can still use the event-time symbol. Those canonical events remain visible in candidate/exclusion accounting instead of silently disappearing, but event-time alias replay is not claimed complete by this change. A future point-in-time alias layer can recover those observations without altering the retirement control above.
 
 ## Build path
 
 ```text
-analytical earnings + v_eligible_straddles + v_ohlcv
+analytical earnings + v_eligible_straddles + cutoff-sealed v_ohlcv
         │
         ├── verified corporate-action control
-        └── bounded retired-company source supplement
+        └── cutoff-bounded retired-company source supplement
                          │
                          ▼
               tools/build_research_history.py
@@ -122,13 +128,15 @@ The API computes summaries over the full matching cohort before applying the ret
 
 API responses use schema `quantiv.historical-cohort.v1` and receive a `sha256:<hex>` snapshot ID. For a source-level cohort, the ID binds the complete `universe_id`, not only the rows returned to the caller. It also covers source/completeness metadata, current forecast evidence, canonical query, full matching summary/counts, exact ordered returned rows, and decision-scope declarations.
 
+The source-level `universe_id` itself is not accepted on shape alone. Publication validation reconstructs the canonical identity from every field except `universe_id` and operational `generated_at`, recomputes SHA-256, and rejects a stale or forged content address. This makes source/audit/event mutations detectable even when all individual fields remain otherwise semantically valid.
+
 This means unrelated rows omitted from a bounded response are still bound indirectly through the source-level universe identity. Replaying an old source release remains a separate retained-release API capability to implement.
 
 CSV carries the same snapshot ID in the response header and every row. The API also emits `X-Quantiv-Universe-Completeness` so a caller can distinguish `source_level` from a migration preview.
 
 ## Contract checks
 
-`tools/validate_public_contracts.py` performs semantic checks for source-level history. It rejects duplicate identities, count mismatches, nonfinite/invalid metrics, arithmetic mismatches, option-session violations, realized-window violations, malformed/tampered retirement evidence, and any attempt to mark historical cohorts live-trading eligible. The preview contract is explicitly separate and cannot satisfy the source-level path.
+`tools/validate_public_contracts.py` performs semantic checks for source-level history. It rejects duplicate identities, count mismatches, nonfinite/invalid metrics, arithmetic mismatches, option-session violations, post-cutoff realized windows, future-dated retired source evidence, malformed/tampered retirement evidence, stale `universe_id` content addresses, and any attempt to mark historical cohorts live-trading eligible. The preview contract is explicitly separate and cannot satisfy the source-level path.
 
 The repository also publishes JSON Schema documents for the source-level and preview structures. Executing every generated/API artifact through those JSON Schema documents is a broader contract-engine task; the semantic checks here do not claim that broader task is complete.
 
