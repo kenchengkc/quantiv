@@ -15,6 +15,8 @@ PUBLIC = REPO_ROOT / "apps" / "frontend" / "public"
 SCHEMAS = REPO_ROOT / "schemas"
 SHA256_RE = re.compile(r"^(?:sha256:)?[0-9a-f]{64}$")
 SYMBOL_RE = re.compile(r"^[A-Z][A-Z0-9.\-]{0,9}$")
+SOURCE_UNIVERSE_SCHEMA = "quantiv.historical-event-universe.v1"
+PREVIEW_UNIVERSE_SCHEMA = "quantiv.historical-event-universe.preview.v1"
 
 
 class ContractError(ValueError):
@@ -173,32 +175,60 @@ def _timing_bucket(value: str) -> str:
     return "other"
 
 
+def _validate_preview_research_history(payload: dict[str, Any]) -> None:
+    source = _object(payload.get("source"), "research-history.source")
+    if source.get("kind") != "display_payload_fallback":
+        raise ContractError("research-history preview must identify display_payload_fallback")
+    if source.get("completeness") != "display_limited":
+        raise ContractError("research-history preview must be marked display_limited")
+    if payload.get("decision_scope") != "end_of_day_research":
+        raise ContractError("historical research preview must remain end_of_day_research")
+    if payload.get("live_trading_eligible") is not False:
+        raise ContractError("historical research preview must never be live-trading eligible")
+    events = _list(payload.get("events"), "research-history.events")
+    if payload.get("event_count") != len(events):
+        raise ContractError("research-history.event_count must equal len(events)")
+
+
 def validate_research_history() -> None:
     path = PUBLIC / "research-history.json"
     payload = _object(_read(path), str(path))
-    if payload.get("schema") != "quantiv.historical-event-universe.v1":
+    schema = payload.get("schema")
+    source = _object(payload.get("source"), "research-history.source")
+
+    if schema == PREVIEW_UNIVERSE_SCHEMA:
+        _validate_preview_research_history(payload)
+        return
+
+    # The checked-in corpus predates the explicit preview discriminator. Permit
+    # that one migration shape in repository validation only; frontend prebuild
+    # rewrites it to PREVIEW_UNIVERSE_SCHEMA unless a source-level release has
+    # already been materialized. It can never satisfy the source-level branch.
+    if (
+        schema == SOURCE_UNIVERSE_SCHEMA
+        and source.get("kind") is None
+        and "symbol_payloads" in source
+        and payload.get("universe_id") is None
+    ):
+        if payload.get("decision_scope") != "end_of_day_research" or payload.get("live_trading_eligible") is not False:
+            raise ContractError("legacy historical research must remain EOD research-only")
+        events = _list(payload.get("events"), "research-history.events")
+        if payload.get("event_count") != len(events):
+            raise ContractError("legacy research-history event_count must equal len(events)")
+        return
+
+    if schema != SOURCE_UNIVERSE_SCHEMA:
         raise ContractError("research-history schema discriminator changed")
+    if source.get("kind") != "analytical_duckdb" or source.get("completeness") != "source_level":
+        raise ContractError("source-level research history must identify analytical_duckdb/source_level")
     if payload.get("decision_scope") != "end_of_day_research":
         raise ContractError("historical research must remain end_of_day_research")
     if payload.get("live_trading_eligible") is not False:
         raise ContractError("historical research must never be live-trading eligible")
 
-    source = _object(payload.get("source"), "research-history.source")
-    kind = source.get("kind")
-    completeness = source.get("completeness")
     events = _list(payload.get("events"), "research-history.events")
     if payload.get("event_count") != len(events):
         raise ContractError("research-history.event_count must equal len(events)")
-
-    # Legacy/source-controlled fallbacks remain available during migration, but
-    # they must be visibly distinguished from a complete analytical universe.
-    if kind == "display_payload_fallback":
-        if completeness != "display_limited":
-            raise ContractError("display research fallback must be marked display_limited")
-        return
-    if kind != "analytical_duckdb" or completeness != "source_level":
-        raise ContractError("research-history source kind/completeness is unsupported")
-
     universe_id = _string(payload.get("universe_id"), "research-history.universe_id")
     if not SHA256_RE.fullmatch(universe_id):
         raise ContractError("research-history universe_id must be SHA-256")
@@ -247,7 +277,7 @@ def validate_research_history() -> None:
             raise ContractError("historical edge arithmetic mismatch")
         if not math.isclose(ratio, realized_abs / implied, rel_tol=1e-12, abs_tol=1e-12):
             raise ContractError("historical ratio arithmetic mismatch")
-        if event["outside_implied"] is not (realized_abs > implied):
+        if event["outside_implied"] != (realized_abs > implied):
             raise ContractError("historical outside_implied arithmetic mismatch")
         if event["implied_quality_status"] != "decision_eligible_eod":
             raise ContractError("historical option evidence bypassed decision-eligible quality")
