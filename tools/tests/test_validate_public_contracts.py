@@ -152,6 +152,22 @@ def _retired_membership() -> dict:
     }
 
 
+def _seal_source_level_history(payload: dict) -> dict:
+    identity = {
+        key: value
+        for key, value in payload.items()
+        if key not in {"universe_id", "generated_at"}
+    }
+    encoded = json.dumps(
+        identity,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    ).encode()
+    payload["universe_id"] = "sha256:" + hashlib.sha256(encoded).hexdigest()
+    return payload
+
+
 def _source_level_history() -> dict:
     payload = {
         "schema": contracts.SOURCE_UNIVERSE_SCHEMA,
@@ -197,19 +213,7 @@ def _source_level_history() -> dict:
         ],
         "generated_at": "2026-09-10T00:00:00+00:00",
     }
-    identity = {
-        key: value
-        for key, value in payload.items()
-        if key not in {"universe_id", "generated_at"}
-    }
-    encoded = json.dumps(
-        identity,
-        sort_keys=True,
-        separators=(",", ":"),
-        allow_nan=False,
-    ).encode()
-    payload["universe_id"] = "sha256:" + hashlib.sha256(encoded).hexdigest()
-    return payload
+    return _seal_source_level_history(payload)
 
 
 def _write_research_history(
@@ -286,4 +290,58 @@ def test_source_level_research_history_rejects_stale_universe_id(
     _write_research_history(public, payload, monkeypatch)
 
     with pytest.raises(contracts.ContractError, match="canonical content"):
+        contracts.validate_research_history()
+
+
+def test_source_level_research_history_rejects_resealed_post_cutoff_price(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    public = tmp_path / "public"
+    payload = _source_level_history()
+    payload["events"][0]["realized_window"]["post_date"] = "2026-09-11"
+    _seal_source_level_history(payload)
+    _write_research_history(public, payload, monkeypatch)
+
+    with pytest.raises(contracts.ContractError, match="extends after source as-of"):
+        contracts.validate_research_history()
+
+
+def test_source_level_research_history_rejects_future_action_receipt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    public = tmp_path / "public"
+    payload = _source_level_history()
+    payload["source"]["retired_membership"]["corporate_action_control"]["source_options_date"] = "2026-09-11"
+    _seal_source_level_history(payload)
+    _write_research_history(public, payload, monkeypatch)
+
+    with pytest.raises(contracts.ContractError, match="corporate-action source date"):
+        contracts.validate_research_history()
+
+
+def test_source_level_research_history_rejects_future_retired_earnings_source(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    public = tmp_path / "public"
+    payload = _source_level_history()
+    row = {
+        "ticker": "OLD",
+        "date": "2026-09-10",
+        "timing": "before_market_open",
+    }
+    membership = payload["source"]["retired_membership"]
+    membership["configured_tickers"] = ["OLD"]
+    membership["earnings"] = {
+        "rows": [row],
+        "row_count": 1,
+        "pages": 1,
+        "sha256": "sha256:" + hashlib.sha256(
+            json.dumps([row], sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
+        ).hexdigest(),
+    }
+    membership["missing_earnings_tickers"] = []
+    _seal_source_level_history(payload)
+    _write_research_history(public, payload, monkeypatch)
+
+    with pytest.raises(contracts.ContractError, match="event on/after source as-of"):
         contracts.validate_research_history()
