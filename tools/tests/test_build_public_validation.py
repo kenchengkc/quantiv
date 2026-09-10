@@ -201,9 +201,36 @@ def _install_signed_champion(
         ),
     )
     assert bundle_dir.name == champion
-    _write_common_public_evidence(
-        repo, model_sha=_receipt_artifact(model_receipt, "model_bundle")["sha256"]
+
+    # Forecast validation reads models from the content-addressed bundle path,
+    # not data/models directly. The evidence bundle digest therefore differs
+    # even though every authenticated model byte is identical.
+    forecast_path = repo / "data/forecasts/forecasts_2026-01-02.parquet"
+    forecast_path.parent.mkdir(parents=True, exist_ok=True)
+    forecast_path.write_bytes(b"forecast")
+    forecast_report = {
+        "status": "passed",
+        "issues": [],
+        "stages": {
+            "forecasts": {
+                "status": "passed",
+                "horizons": list(HORIZONS),
+            }
+        },
+    }
+    forecast_receipt = build_evidence_receipt(
+        forecast_report,
+        scope="forecasts",
+        repo_root=repo,
+        data_dir=repo / "data",
+        training_dir=training,
+        models_dir=bundle_dir,
+        forecast_path=forecast_path,
+        horizons=HORIZONS,
     )
+    forecast_model_sha = _receipt_artifact(forecast_receipt, "model_bundle")["sha256"]
+    assert forecast_model_sha != _receipt_artifact(model_receipt, "model_bundle")["sha256"]
+    _write_common_public_evidence(repo, model_sha=forecast_model_sha)
     return champion, model_receipt, private
 
 
@@ -242,13 +269,18 @@ def test_build_validation_verifies_active_champion_and_run_protocol(
     champion, model_receipt, _ = _install_signed_champion(tmp_path, monkeypatch)
 
     payload = build_validation(tmp_path, generated_at="2026-01-03T00:00:00+00:00")
+    forecast = json.loads(
+        (tmp_path / "apps/frontend/public/evidence/forecast.json").read_text()
+    )
+    forecast_model_sha = forecast["artifact_bundles"][0]["sha256"]
 
     assert payload["model_source"]["kind"] == "signed_champion"
     assert payload["model_source"]["bundle_id"] == champion
     assert payload["model_source"]["verification_status"] == "verified"
     assert payload["model_source"]["source_revision"] == "source-revision-test"
     assert payload["model_source"]["model_validation_receipt_id"] == model_receipt["receipt_id"]
-    assert payload["model_source"]["artifact_sha256"] == _receipt_artifact(
+    assert payload["model_source"]["artifact_sha256"] == forecast_model_sha
+    assert payload["model_source"]["artifact_sha256"] != _receipt_artifact(
         model_receipt, "model_bundle"
     )["sha256"]
     assert payload["summary"]["weighted_model_mae"] == pytest.approx(0.03)
