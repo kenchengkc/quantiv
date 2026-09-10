@@ -12,6 +12,46 @@ import numpy as np
 import pandas as pd
 
 
+def _bootstrap_mean_difference(
+    difference: np.ndarray,
+    *,
+    draws: int,
+    seed: int,
+    clusters: np.ndarray | None = None,
+) -> tuple[float, float, int | None]:
+    """Return a reproducible percentile interval for paired error differences.
+
+    With ``clusters`` set, complete clusters are resampled instead of individual
+    rows. That keeps within-cluster dependence intact (for example repeated
+    observations from one issuer or observations in one earnings week).
+    """
+    rng = np.random.default_rng(seed)
+    boot = np.empty(draws, dtype=float)
+    cluster_count: int | None = None
+    if clusters is None:
+        for draw in range(draws):
+            indices = rng.integers(0, len(difference), size=len(difference))
+            boot[draw] = float(np.mean(difference[indices]))
+    else:
+        cluster_values = np.asarray(clusters, dtype=object)
+        unique_clusters = pd.unique(cluster_values)
+        if len(unique_clusters) < 2:
+            raise ValueError("cluster bootstrap requires at least two clusters")
+        cluster_count = int(len(unique_clusters))
+        indices_by_cluster = {
+            cluster: np.flatnonzero(cluster_values == cluster)
+            for cluster in unique_clusters
+        }
+        for draw in range(draws):
+            sampled = rng.choice(unique_clusters, size=len(unique_clusters), replace=True)
+            sampled_indices = np.concatenate(
+                [indices_by_cluster[cluster] for cluster in sampled]
+            )
+            boot[draw] = float(np.mean(difference[sampled_indices]))
+    low, high = np.quantile(boot, [0.025, 0.975])
+    return float(low), float(high), cluster_count
+
+
 def _paired_metrics(
     actual: np.ndarray,
     model: np.ndarray,
@@ -19,31 +59,37 @@ def _paired_metrics(
     *,
     draws: int,
     seed: int,
+    clusters: np.ndarray | None = None,
+    cluster_label: str | None = None,
 ) -> dict[str, Any]:
     model_error = np.abs(actual - model)
     baseline_error = np.abs(actual - baseline)
     difference = model_error - baseline_error
 
-    rng = np.random.default_rng(seed)
-    boot = np.empty(draws, dtype=float)
-    for draw in range(draws):
-        indices = rng.integers(0, len(difference), size=len(difference))
-        boot[draw] = float(np.mean(difference[indices]))
-    ci_low, ci_high = np.quantile(boot, [0.025, 0.975])
+    ci_low, ci_high, cluster_count = _bootstrap_mean_difference(
+        difference,
+        draws=draws,
+        seed=seed,
+        clusters=clusters,
+    )
 
     model_sq = np.square(actual - model)
     baseline_sq = np.square(actual - baseline)
-    return {
+    result: dict[str, Any] = {
         "n": int(len(actual)),
         "model_mae": float(np.mean(model_error)),
         "baseline_mae": float(np.mean(baseline_error)),
         "model_rmse": float(np.sqrt(np.mean(model_sq))),
         "baseline_rmse": float(np.sqrt(np.mean(baseline_sq))),
         "mean_absolute_error_difference": float(np.mean(difference)),
-        "mean_absolute_error_difference_95_ci": [float(ci_low), float(ci_high)],
+        "mean_absolute_error_difference_95_ci": [ci_low, ci_high],
         "model_win_rate": float(np.mean(model_error < baseline_error)),
         "tie_rate": float(np.mean(model_error == baseline_error)),
+        "bootstrap_unit": "rows" if clusters is None else f"cluster:{cluster_label}",
     }
+    if cluster_count is not None:
+        result["clusters"] = cluster_count
+    return result
 
 
 def compare_forecasts(
@@ -53,6 +99,7 @@ def compare_forecasts(
     model_column: str,
     baseline_column: str,
     group_column: str | None = None,
+    cluster_column: str | None = None,
     min_group_size: int = 20,
     draws: int = 5_000,
     seed: int = 17,
@@ -60,6 +107,8 @@ def compare_forecasts(
     required = [actual_column, model_column, baseline_column]
     if group_column:
         required.append(group_column)
+    if cluster_column and cluster_column not in required:
+        required.append(cluster_column)
     missing = [column for column in required if column not in frame.columns]
     if missing:
         raise ValueError(f"missing required columns: {', '.join(missing)}")
@@ -73,6 +122,8 @@ def compare_forecasts(
     for column in numeric_columns:
         work[column] = pd.to_numeric(work[column], errors="coerce")
     work = work.dropna(subset=numeric_columns)
+    if cluster_column:
+        work = work.dropna(subset=[cluster_column])
     if work.empty:
         raise ValueError("no complete finite rows available")
     if not np.isfinite(work[numeric_columns].to_numpy(dtype=float)).all():
@@ -81,6 +132,11 @@ def compare_forecasts(
     actual = work[actual_column].to_numpy(dtype=float)
     model = work[model_column].to_numpy(dtype=float)
     baseline = work[baseline_column].to_numpy(dtype=float)
+    clusters = (
+        work[cluster_column].astype(str).to_numpy(dtype=object)
+        if cluster_column
+        else None
+    )
     report: dict[str, Any] = {
         "overall": _paired_metrics(
             actual,
@@ -88,10 +144,14 @@ def compare_forecasts(
             baseline,
             draws=draws,
             seed=seed,
+            clusters=clusters,
+            cluster_label=cluster_column,
         ),
         "groups": {},
         "bootstrap_draws": draws,
     }
+    if cluster_column:
+        report["cluster_column"] = cluster_column
 
     if group_column:
         groups: dict[str, Any] = {}
@@ -100,12 +160,21 @@ def compare_forecasts(
         ):
             if len(group) < min_group_size:
                 continue
+            group_clusters = (
+                group[cluster_column].astype(str).to_numpy(dtype=object)
+                if cluster_column
+                else None
+            )
+            if group_clusters is not None and len(pd.unique(group_clusters)) < 2:
+                continue
             groups[str(name)] = _paired_metrics(
                 group[actual_column].to_numpy(dtype=float),
                 group[model_column].to_numpy(dtype=float),
                 group[baseline_column].to_numpy(dtype=float),
                 draws=draws,
                 seed=seed + offset + 1,
+                clusters=group_clusters,
+                cluster_label=cluster_column,
             )
         report["groups"] = groups
         report["group_column"] = group_column
@@ -121,6 +190,7 @@ def main() -> None:
     parser.add_argument("--model", required=True)
     parser.add_argument("--baseline", required=True)
     parser.add_argument("--group-column")
+    parser.add_argument("--cluster-column")
     parser.add_argument("--min-group-size", type=int, default=20)
     parser.add_argument("--draws", type=int, default=5_000)
     parser.add_argument("--seed", type=int, default=17)
@@ -133,6 +203,7 @@ def main() -> None:
         model_column=args.model,
         baseline_column=args.baseline,
         group_column=args.group_column,
+        cluster_column=args.cluster_column,
         min_group_size=args.min_group_size,
         draws=args.draws,
         seed=args.seed,
