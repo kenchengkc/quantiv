@@ -89,10 +89,16 @@ export async function GET(request: Request) {
   const query = parseCohortQuery(url.searchParams);
   const universe = readPublicJson<HistoricalUniverse>('research-history.json');
   const universeEvents = Array.isArray(universe?.events) ? universe.events : [];
-  if (
-    universe?.schema !== 'quantiv.historical-event-universe.v1' ||
-    universeEvents.length === 0
-  ) {
+  const isSourceLevel =
+    universe?.schema === 'quantiv.historical-event-universe.v1' &&
+    universe?.source?.kind === 'analytical_duckdb' &&
+    universe?.source?.completeness === 'source_level' &&
+    typeof universe?.universe_id === 'string';
+  const isPreview =
+    universe?.schema === 'quantiv.historical-event-universe.preview.v1' &&
+    universe?.source?.kind === 'display_payload_fallback' &&
+    universe?.source?.completeness === 'display_limited';
+  if ((!isSourceLevel && !isPreview) || universeEvents.length === 0) {
     return NextResponse.json(
       { error: 'Historical research universe is unavailable.' },
       { status: 503 },
@@ -116,9 +122,9 @@ export async function GET(request: Request) {
     schema: 'quantiv.historical-cohort.v1',
     source: {
       historical_universe_schema: universe.schema,
-      historical_universe_id: universe.universe_id ?? null,
-      historical_universe_kind: universe.source?.kind ?? 'display_payload_fallback',
-      historical_universe_completeness: universe.source?.completeness ?? 'display_limited',
+      historical_universe_id: isSourceLevel ? universe.universe_id : null,
+      historical_universe_kind: universe.source?.kind,
+      historical_universe_completeness: universe.source?.completeness,
       historical_universe_generated_at: universe.generated_at ?? null,
       historical_universe_source_revision: universe.source?.source_revision ?? null,
       public_symbol_payloads: universe.source?.symbol_payloads ?? null,
@@ -159,6 +165,7 @@ export async function GET(request: Request) {
         'Content-Disposition': `attachment; filename="quantiv-historical-cohort-${shortId}.csv"`,
         'X-Quantiv-Snapshot-Id': id,
         'X-Quantiv-Decision-Scope': decisionScope,
+        'X-Quantiv-Universe-Completeness': universe.source?.completeness ?? 'unknown',
       },
     });
   }
@@ -170,6 +177,7 @@ export async function GET(request: Request) {
         'Cache-Control': 'public, max-age=60, s-maxage=300, stale-while-revalidate=3600',
         'X-Quantiv-Snapshot-Id': id,
         'X-Quantiv-Decision-Scope': decisionScope,
+        'X-Quantiv-Universe-Completeness': universe.source?.completeness ?? 'unknown',
       },
     },
   );
