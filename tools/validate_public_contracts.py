@@ -202,6 +202,7 @@ def _validate_preview_research_history(payload: dict[str, Any]) -> None:
 
 
 def _validate_retired_membership(source: dict[str, Any]) -> None:
+    source_as_of = _date(source.get("as_of_date"), "research-history.source.as_of_date")
     membership = _object(source.get("retired_membership"), "research-history.source.retired_membership")
     _required(
         membership,
@@ -229,7 +230,7 @@ def _validate_retired_membership(source: dict[str, Any]) -> None:
         evidence = _object(raw, label)
         _required(evidence, label, "rows", "row_count", "pages", "sha256")
         rows = _list(evidence["rows"], f"{label}.rows")
-        if evidence["row_count"] != len(rows):
+        if not isinstance(evidence["row_count"], int) or evidence["row_count"] != len(rows):
             raise ContractError(f"{label} row_count does not match rows")
         if not isinstance(evidence["pages"], int) or evidence["pages"] < 0:
             raise ContractError(f"{label}.pages must be nonnegative")
@@ -252,7 +253,9 @@ def _validate_retired_membership(source: dict[str, Any]) -> None:
         ticker = _string(row["ticker"], f"retired membership earnings.rows[{index}].ticker")
         if ticker not in configured_set:
             raise ContractError("retired earnings source contains a ticker outside the retirement ledger")
-        _date(row["date"], f"retired membership earnings.rows[{index}].date")
+        event_date = _date(row["date"], f"retired membership earnings.rows[{index}].date")
+        if event_date >= source_as_of:
+            raise ContractError("retired earnings source contains an event on/after source as-of date")
         if row["timing"] not in {"before_market_open", "after_market_close", "unknown"}:
             raise ContractError("retired earnings source contains unsupported timing")
         returned_tickers.add(ticker)
@@ -266,7 +269,9 @@ def _validate_retired_membership(source: dict[str, Any]) -> None:
             ticker = _string(row.get("ticker"), f"retired membership {label}[{index}].ticker")
             if ticker not in configured_set:
                 raise ContractError(f"retired {label} source contains a ticker outside the retirement ledger")
-            _date(row.get("ex_date"), f"retired membership {label}[{index}].ex_date")
+            action_date = _date(row.get("ex_date"), f"retired membership {label}[{index}].ex_date")
+            if action_date > source_as_of:
+                raise ContractError(f"retired {label} source contains an action after source as-of date")
             for key in value_keys:
                 value = _finite(row.get(key), f"retired membership {label}[{index}].{key}")
                 if value < 0 or (label == "split" and value <= 0):
@@ -289,8 +294,20 @@ def _validate_retired_membership(source: dict[str, Any]) -> None:
         "retired_split_rows",
         "retired_dividend_rows",
     )
+    _string(control["receipt_id"], "retired membership corporate_action_control.receipt_id")
+    action_source_date = _date(
+        control["source_options_date"],
+        "retired membership corporate_action_control.source_options_date",
+    )
+    if action_source_date > source_as_of:
+        raise ContractError("corporate-action source date is after research source as-of date")
+    for key in ("split_rows", "dividend_rows", "retired_split_rows", "retired_dividend_rows"):
+        if not isinstance(control[key], int) or control[key] < 0:
+            raise ContractError(f"retired membership corporate_action_control.{key} must be nonnegative")
     if control["retired_split_rows"] != len(splits) or control["retired_dividend_rows"] != len(dividends):
         raise ContractError("retired corporate-action counts do not match retained source rows")
+    if control["split_rows"] < control["retired_split_rows"] or control["dividend_rows"] < control["retired_dividend_rows"]:
+        raise ContractError("combined corporate-action counts cannot be smaller than retired source rows")
 
 
 def validate_research_history() -> None:
@@ -402,6 +419,8 @@ def validate_research_history() -> None:
         post_adjusted = _finite(window.get("post_price_adjusted"), f"research-history.events[{index}].realized_window.post_price_adjusted")
         if pre_price <= 0 or post_adjusted <= 0:
             raise ContractError("historical realized price window contains nonpositive prices")
+        if post_date > source_as_of:
+            raise ContractError("historical realized price window extends after source as-of date")
         if bucket == "bmo":
             valid_window = pre_date < event_date and post_date >= event_date
         elif bucket == "amc":
