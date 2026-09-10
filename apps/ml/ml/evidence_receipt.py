@@ -5,12 +5,21 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
-from typing import Any, Iterable, Sequence
+from typing import Any, Iterable, Mapping, Sequence
 
 from ml.model_artifact import point_model_name, quantile_model_name
 
 
 RECEIPT_SCHEMA = "quantiv.evidence-receipt.v1"
+_RECEIPT_CORE_FIELDS = (
+    "schema",
+    "scope",
+    "quality",
+    "horizons",
+    "artifacts",
+    "reconciliation",
+)
+_RECEIPT_POINTER_FIELDS = {"validated_at", "receipt_file"}
 
 
 def _sha256_bytes(payload: bytes) -> str:
@@ -120,6 +129,54 @@ def _reconciliation_summary(report: dict[str, Any]) -> dict[str, Any]:
             if key not in {"artifact", "artifact_dir", "stage", "status"}
         }
     return summaries
+
+
+def _receipt_core(receipt: Mapping[str, Any]) -> dict[str, Any]:
+    return {field: receipt.get(field) for field in _RECEIPT_CORE_FIELDS}
+
+
+def verify_evidence_receipt(
+    receipt: Mapping[str, Any],
+    *,
+    expected_scope: str | None = None,
+) -> dict[str, Any]:
+    """Verify a receipt or its ``latest_*`` pointer by recomputing its identity.
+
+    Evidence receipts are content-addressed rather than independently signed.
+    Model bundles authenticate the model-validation receipt ID from their signed
+    manifest, so callers must still compare the verified ID with that manifest
+    when the receipt is used as model evaluation evidence.
+    """
+    allowed = {"receipt_id", *_RECEIPT_CORE_FIELDS, *_RECEIPT_POINTER_FIELDS}
+    unexpected = sorted(set(receipt) - allowed)
+    if unexpected:
+        raise ValueError(f"evidence receipt contains unexpected fields: {unexpected}")
+    if receipt.get("schema") != RECEIPT_SCHEMA:
+        raise ValueError("unsupported evidence receipt schema")
+    scope = receipt.get("scope")
+    if not isinstance(scope, str) or not scope:
+        raise ValueError("evidence receipt has no scope")
+    if expected_scope is not None and scope != expected_scope:
+        raise ValueError(
+            f"evidence receipt scope {scope!r} does not match expected {expected_scope!r}"
+        )
+    if not isinstance(receipt.get("quality"), Mapping):
+        raise ValueError("evidence receipt has no quality object")
+    if not isinstance(receipt.get("horizons"), list):
+        raise ValueError("evidence receipt horizons must be a list")
+    if not isinstance(receipt.get("artifacts"), list):
+        raise ValueError("evidence receipt artifacts must be a list")
+    if not isinstance(receipt.get("reconciliation"), Mapping):
+        raise ValueError("evidence receipt reconciliation must be an object")
+
+    core = _receipt_core(receipt)
+    canonical = json.dumps(
+        core, sort_keys=True, separators=(",", ":"), default=str
+    ).encode()
+    expected_id = f"sha256:{_sha256_bytes(canonical)}"
+    if receipt.get("receipt_id") != expected_id:
+        raise ValueError("evidence receipt id does not match its contents")
+    return {"receipt_id": expected_id, **core}
 
 
 def build_evidence_receipt(
