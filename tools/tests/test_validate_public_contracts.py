@@ -7,6 +7,8 @@ import pytest
 
 import tools.validate_public_contracts as contracts
 
+EMPTY_ROWS_SHA256 = "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+
 
 def test_committed_public_contracts_validate() -> None:
     passed = contracts.validate_repo()
@@ -116,6 +118,35 @@ def test_preview_research_history_must_be_display_limited(
         contracts.validate_research_history()
 
 
+def _retired_membership() -> dict:
+    empty = {
+        "rows": [],
+        "row_count": 0,
+        "pages": 0,
+        "sha256": EMPTY_ROWS_SHA256,
+    }
+    return {
+        "status": "verified",
+        "method": "bounded_provider_query_for_explicit_retirement_ledger",
+        "configured_tickers": [],
+        "earnings": dict(empty),
+        "corporate_actions": {
+            "splits": dict(empty),
+            "dividends": dict(empty),
+        },
+        "missing_earnings_tickers": [],
+        "installed_event_rows": 0,
+        "corporate_action_control": {
+            "receipt_id": "fixture",
+            "source_options_date": "2026-09-10",
+            "split_rows": 0,
+            "dividend_rows": 0,
+            "retired_split_rows": 0,
+            "retired_dividend_rows": 0,
+        },
+    }
+
+
 def _source_level_history() -> dict:
     return {
         "schema": contracts.SOURCE_UNIVERSE_SCHEMA,
@@ -123,6 +154,7 @@ def _source_level_history() -> dict:
             "kind": "analytical_duckdb",
             "completeness": "source_level",
             "as_of_date": "2026-09-10",
+            "retired_membership": _retired_membership(),
         },
         "evidence_rule": "fixture",
         "decision_scope": "end_of_day_research",
@@ -188,4 +220,32 @@ def test_source_level_research_history_rejects_live_scope(
     monkeypatch.setattr(contracts, "PUBLIC", public)
 
     with pytest.raises(contracts.ContractError, match="live-trading"):
+        contracts.validate_research_history()
+
+
+def test_source_level_research_history_requires_retired_membership_evidence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    public = tmp_path / "public"
+    public.mkdir()
+    payload = _source_level_history()
+    del payload["source"]["retired_membership"]
+    (public / "research-history.json").write_text(json.dumps(payload))
+    monkeypatch.setattr(contracts, "PUBLIC", public)
+
+    with pytest.raises(contracts.ContractError, match="retired_membership"):
+        contracts.validate_research_history()
+
+
+def test_source_level_research_history_rejects_tampered_membership_digest(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    public = tmp_path / "public"
+    public.mkdir()
+    payload = _source_level_history()
+    payload["source"]["retired_membership"]["earnings"]["sha256"] = "sha256:" + "b" * 64
+    (public / "research-history.json").write_text(json.dumps(payload))
+    monkeypatch.setattr(contracts, "PUBLIC", public)
+
+    with pytest.raises(contracts.ContractError, match="digest"):
         contracts.validate_research_history()
