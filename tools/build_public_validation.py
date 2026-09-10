@@ -2,10 +2,10 @@
 """Build the public institutional-research validation artifact.
 
 The public page should never depend on hand-entered performance numbers. This
-projection reads the model metadata that actually exists in the runner after
-R2 synchronization, preferring the signed champion bundle selected by the
-model control plane. Local/preview environments fall back to the baked model
-metadata under ``apps/ml/models``.
+projection verifies the active signed model control pointer and immutable bundle,
+then verifies the content-addressed model-validation receipt authenticated by the
+bundle manifest. Local/preview environments with no champion pointer may still
+fall back to the checked-in model metadata under ``apps/ml/models``.
 
 Only compact due-diligence fields are published. Absolute filesystem paths,
 model hyperparameters, feature vectors, and operational secrets stay out of
@@ -15,15 +15,30 @@ the frontend artifact.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+ML_PACKAGE_ROOT = REPO_ROOT / "apps" / "ml"
+if str(ML_PACKAGE_ROOT) not in sys.path:
+    sys.path.insert(0, str(ML_PACKAGE_ROOT))
+
+from ml.evidence_receipt import verify_evidence_receipt  # noqa: E402
+from ml.model_bundle import (  # noqa: E402
+    ModelBundleError,
+    verify_bundle_dir,
+    verify_control_pointer,
+)
+
+
 OUTPUT_PATH = REPO_ROOT / "apps" / "frontend" / "public" / "evidence" / "model-validation.json"
 HORIZONS = (1, 2, 3, 7, 14, 21)
+EVALUATION_RECEIPT_SCHEMA = "quantiv.model-evaluation-receipt.v1"
 
 
 def _read(path: Path) -> dict[str, Any]:
@@ -32,6 +47,16 @@ def _read(path: Path) -> dict[str, Any]:
     except (OSError, json.JSONDecodeError):
         return {}
     return value if isinstance(value, dict) else {}
+
+
+def _read_required(path: Path, label: str) -> dict[str, Any]:
+    try:
+        value = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ModelBundleError(f"cannot read {label}: {path}") from exc
+    if not isinstance(value, dict):
+        raise ModelBundleError(f"{label} must be a JSON object: {path}")
+    return value
 
 
 def _number(value: Any) -> float | None:
@@ -47,25 +72,115 @@ def _int(value: Any) -> int | None:
     return int(number) if number is not None else None
 
 
-def _model_source(repo_root: Path) -> tuple[Path, str, str | None]:
-    """Return metadata directory, source kind, and active bundle ID.
+def _artifact(receipt: Mapping[str, Any], name: str) -> dict[str, Any]:
+    matches = [
+        item
+        for item in (receipt.get("artifacts") or [])
+        if isinstance(item, dict) and item.get("name") == name
+    ]
+    if len(matches) != 1:
+        raise ModelBundleError(
+            f"model validation receipt must contain exactly one {name!r} artifact bundle"
+        )
+    return matches[0]
 
-    The nightly workflow pulls ``data/models`` from R2 before this script runs.
-    When a champion pointer and matching immutable bundle are present, that is
-    the authoritative source. Preview/local builds can still generate a useful
-    artifact from the checked-in fallback models.
+
+def _verify_receipt_model_members(
+    receipt_model_bundle: Mapping[str, Any],
+    manifest: Mapping[str, Any],
+) -> None:
+    receipt_members = receipt_model_bundle.get("members")
+    manifest_artifacts = manifest.get("artifacts")
+    if not isinstance(receipt_members, list) or not isinstance(manifest_artifacts, list):
+        raise ModelBundleError("model validation evidence is missing artifact members")
+
+    by_name: dict[str, Mapping[str, Any]] = {}
+    for member in receipt_members:
+        if not isinstance(member, Mapping):
+            raise ModelBundleError("model validation receipt has an invalid model member")
+        name = Path(str(member.get("path", ""))).name
+        if not name or name in by_name:
+            raise ModelBundleError("model validation receipt has duplicate or unnamed model members")
+        by_name[name] = member
+
+    signed_by_name: dict[str, Mapping[str, Any]] = {}
+    for artifact in manifest_artifacts:
+        if not isinstance(artifact, Mapping):
+            raise ModelBundleError("signed model manifest has an invalid artifact member")
+        name = str(artifact.get("name", ""))
+        if not name or name in signed_by_name:
+            raise ModelBundleError("signed model manifest has duplicate or unnamed artifacts")
+        signed_by_name[name] = artifact
+
+    if set(by_name) != set(signed_by_name):
+        raise ModelBundleError(
+            "model validation receipt artifact set does not match the signed model bundle"
+        )
+    for name, signed in signed_by_name.items():
+        receipt_member = by_name[name]
+        if receipt_member.get("sha256") != signed.get("sha256"):
+            raise ModelBundleError(
+                f"model validation receipt digest does not match signed artifact: {name}"
+            )
+        try:
+            receipt_bytes = int(receipt_member.get("bytes", -1))
+            signed_bytes = int(signed.get("bytes", -2))
+        except (TypeError, ValueError) as exc:
+            raise ModelBundleError(f"invalid artifact size evidence for {name}") from exc
+        if receipt_bytes != signed_bytes:
+            raise ModelBundleError(
+                f"model validation receipt size does not match signed artifact: {name}"
+            )
+
+
+def _model_source(
+    repo_root: Path,
+) -> tuple[Path, str, str | None, dict[str, Any] | None, dict[str, Any] | None]:
+    """Return metadata source plus verified champion manifest/evidence when active.
+
+    Presence of a production champion pointer changes the trust boundary: a bad
+    pointer, bad signature, altered bundle, or mismatched validation receipt is
+    an error. It must never be converted into a plausible-looking baked fallback.
     """
 
-    pointer_path = repo_root / "data" / "models" / "control" / "champion.json"
-    pointer = _read(pointer_path)
-    champion_id = pointer.get("champion_bundle_id")
-    if isinstance(champion_id, str) and len(champion_id) == 64:
-        candidate = repo_root / "data" / "models" / "bundles" / champion_id
-        if candidate.is_dir() and all((candidate / f"metadata_T{h}.json").is_file() for h in HORIZONS):
-            return candidate, "signed_champion", champion_id
+    models_root = repo_root / "data" / "models"
+    pointer_path = models_root / "control" / "champion.json"
+    if pointer_path.exists():
+        pointer = verify_control_pointer(
+            _read_required(pointer_path, "signed champion pointer")
+        )
+        champion_id = str(pointer["champion_bundle_id"])
+        candidate = models_root / "bundles" / champion_id
+        manifest = verify_bundle_dir(candidate)
+        if manifest.get("bundle_id") != champion_id:
+            raise ModelBundleError("champion pointer and signed bundle manifest disagree")
+
+        receipt_path = models_root / "receipts" / "latest_models.json"
+        try:
+            receipt = verify_evidence_receipt(
+                _read_required(receipt_path, "model validation receipt"),
+                expected_scope="models",
+            )
+        except ValueError as exc:
+            raise ModelBundleError(str(exc)) from exc
+        if receipt.get("quality", {}).get("status") != "passed":
+            raise ModelBundleError("champion model validation receipt is not passed")
+        if receipt.get("receipt_id") != manifest.get("receipt_id"):
+            raise ModelBundleError(
+                "champion bundle and model validation receipt identities disagree"
+            )
+
+        training_bundle = _artifact(receipt, "training_bundle")
+        model_bundle = _artifact(receipt, "model_bundle")
+        if not isinstance(training_bundle.get("sha256"), str):
+            raise ModelBundleError("model validation receipt has no training bundle digest")
+        if not isinstance(model_bundle.get("sha256"), str):
+            raise ModelBundleError("model validation receipt has no model bundle digest")
+        _verify_receipt_model_members(model_bundle, manifest)
+        return candidate, "signed_champion", champion_id, dict(manifest), receipt
 
     baked = repo_root / "apps" / "ml" / "models"
-    return baked, "baked_fallback", None
+    return baked, "baked_fallback", None, None, None
 
 
 def _horizon_row(metadata: dict[str, Any], horizon: int) -> dict[str, Any]:
@@ -102,10 +217,95 @@ def _horizon_row(metadata: dict[str, Any], horizon: int) -> dict[str, Any]:
             "interval_80_mean": _number(metadata.get("interval_width_80_mean")),
         },
         "feature_count": len(metadata.get("feature_cols") or []),
-        "quantiles": [float(value) for value in (metadata.get("quantiles") or []) if isinstance(value, (int, float))],
+        "quantiles": [
+            float(value)
+            for value in (metadata.get("quantiles") or [])
+            if isinstance(value, (int, float)) and not isinstance(value, bool)
+        ],
         "model_version": metadata.get("version"),
         "trained_at": metadata.get("trained_at"),
     }
+
+
+def _holdout_split(metadata: Mapping[str, Any], horizon: int) -> dict[str, Any]:
+    split = metadata.get("validation_split")
+    if not isinstance(split, Mapping):
+        raise ModelBundleError(
+            f"verified metadata_T{horizon}.json has no validation_split audit"
+        )
+    required = (
+        "train_start",
+        "train_end",
+        "validation_start",
+        "validation_end",
+        "purge_days",
+        "rows_total",
+        "rows_train",
+        "rows_purged",
+        "rows_validation",
+    )
+    if any(split.get(key) is None for key in required):
+        raise ModelBundleError(
+            f"verified metadata_T{horizon}.json has an incomplete validation_split audit"
+        )
+    return {"horizon_days": horizon, **{key: split[key] for key in required}}
+
+
+def _walk_forward(metadata: Mapping[str, Any], horizon: int) -> dict[str, Any]:
+    result = metadata.get("walk_forward_validation")
+    if not isinstance(result, Mapping) or result.get("status") != "passed":
+        raise ModelBundleError(
+            f"verified metadata_T{horizon}.json has no passing walk-forward audit"
+        )
+    required = (
+        "method",
+        "purge_days",
+        "test_days",
+        "requested_folds",
+        "fold_count",
+        "validation_rows",
+        "model_mae",
+        "baseline_straddle_mae",
+        "improvement_vs_straddle",
+        "folds_beating_baseline",
+        "worst_fold_ratio",
+    )
+    if any(result.get(key) is None for key in required):
+        raise ModelBundleError(
+            f"verified metadata_T{horizon}.json has an incomplete walk-forward audit"
+        )
+    return {
+        "horizon_days": horizon,
+        "status": "passed",
+        **{key: result[key] for key in required},
+    }
+
+
+def _verified_protocol(
+    metadata_by_horizon: Mapping[int, Mapping[str, Any]],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]:
+    holdouts = [
+        _holdout_split(metadata_by_horizon[horizon], horizon) for horizon in HORIZONS
+    ]
+    walk_forwards = [
+        _walk_forward(metadata_by_horizon[horizon], horizon) for horizon in HORIZONS
+    ]
+    protocol_keys = ("method", "purge_days", "test_days", "requested_folds")
+    first = walk_forwards[0]
+    for row in walk_forwards[1:]:
+        if any(row[key] != first[key] for key in protocol_keys):
+            raise ModelBundleError(
+                "walk-forward protocol differs across horizons; refusing one public protocol claim"
+            )
+    summary = {
+        "expanding_windows": int(first["requested_folds"]),
+        "validation_window_days": int(first["test_days"]),
+        "purge_days": int(first["purge_days"]),
+        "method": first["method"],
+        "source": "verified_model_metadata",
+        "horizons": walk_forwards,
+    }
+    return holdouts, walk_forwards, summary
 
 
 def _weighted(rows: list[dict[str, Any]], field: str) -> float | None:
@@ -135,14 +335,54 @@ def _weighted_coverage(rows: list[dict[str, Any]], field: str) -> float | None:
     return sum(value * weight for value, weight in pairs) / denominator
 
 
+def _evaluation_receipt(
+    *,
+    manifest: Mapping[str, Any],
+    model_receipt: Mapping[str, Any],
+    rows: list[dict[str, Any]],
+    holdout_splits: list[dict[str, Any]],
+    walk_forwards: list[dict[str, Any]],
+) -> dict[str, Any]:
+    training_bundle = _artifact(model_receipt, "training_bundle")
+    model_bundle = _artifact(model_receipt, "model_bundle")
+    metadata_sha256 = {
+        str(horizon): next(
+            str(item["sha256"])
+            for item in manifest.get("artifacts") or []
+            if isinstance(item, Mapping)
+            and item.get("name") == f"metadata_T{horizon}.json"
+        )
+        for horizon in HORIZONS
+    }
+    core = {
+        "schema": EVALUATION_RECEIPT_SCHEMA,
+        "bundle_id": manifest.get("bundle_id"),
+        "source_revision": manifest.get("source_revision"),
+        "model_validation_receipt_id": model_receipt.get("receipt_id"),
+        "training_bundle_sha256": training_bundle.get("sha256"),
+        "model_bundle_sha256": model_bundle.get("sha256"),
+        "metadata_sha256": metadata_sha256,
+        "holdout_splits": holdout_splits,
+        "walk_forward": walk_forwards,
+        "metrics": rows,
+    }
+    canonical = json.dumps(core, sort_keys=True, separators=(",", ":"), default=str).encode()
+    return {
+        "receipt_id": f"sha256:{hashlib.sha256(canonical).hexdigest()}",
+        **core,
+    }
+
+
 def build_validation(repo_root: Path, *, generated_at: str | None = None) -> dict[str, Any]:
-    metadata_dir, source_kind, bundle_id = _model_source(repo_root)
+    metadata_dir, source_kind, bundle_id, manifest, model_receipt = _model_source(repo_root)
     rows: list[dict[str, Any]] = []
+    metadata_by_horizon: dict[int, dict[str, Any]] = {}
     for horizon in HORIZONS:
         path = metadata_dir / f"metadata_T{horizon}.json"
         metadata = _read(path)
         if not metadata:
             raise FileNotFoundError(f"missing model validation metadata: {path}")
+        metadata_by_horizon[horizon] = metadata
         rows.append(_horizon_row(metadata, horizon))
 
     weighted_model = _weighted(rows, "model_mae")
@@ -151,7 +391,7 @@ def build_validation(repo_root: Path, *, generated_at: str | None = None) -> dic
 
     forecast = _read(repo_root / "apps" / "frontend" / "public" / "evidence" / "forecast.json")
     control = _read(repo_root / "apps" / "frontend" / "public" / "control-plane.json")
-    model_bundle = next(
+    forecast_model_bundle = next(
         (
             item
             for item in (forecast.get("artifact_bundles") or [])
@@ -160,13 +400,66 @@ def build_validation(repo_root: Path, *, generated_at: str | None = None) -> dic
         {},
     )
 
+    evaluation_status = "preview_unverified"
+    evaluation_receipt: dict[str, Any] | None = None
+    validation_receipt_id: str | None = None
+    source_revision: str | None = None
+    verified_model_sha: str | None = None
+    forecast_model_matches_evaluation: bool | None = None
+
+    if source_kind == "signed_champion":
+        if manifest is None or model_receipt is None:
+            raise ModelBundleError("signed champion source is missing verified provenance")
+        holdout_splits, walk_forwards, walk_forward_summary = _verified_protocol(
+            metadata_by_horizon
+        )
+        evaluation_receipt = _evaluation_receipt(
+            manifest=manifest,
+            model_receipt=model_receipt,
+            rows=rows,
+            holdout_splits=holdout_splits,
+            walk_forwards=walk_forwards,
+        )
+        evaluation_status = "verified"
+        validation_receipt_id = str(model_receipt["receipt_id"])
+        source_revision = str(manifest.get("source_revision") or "") or None
+        verified_model_sha = str(_artifact(model_receipt, "model_bundle")["sha256"])
+
+        forecast_sha = forecast_model_bundle.get("sha256")
+        if isinstance(forecast_sha, str) and forecast_sha:
+            forecast_model_matches_evaluation = forecast_sha == verified_model_sha
+            if (
+                forecast.get("quality", {}).get("status") == "passed"
+                and not forecast_model_matches_evaluation
+            ):
+                raise ModelBundleError(
+                    "passed forecast evidence does not match the verified champion model bundle"
+                )
+    else:
+        holdout_splits = []
+        walk_forward_summary = {
+            "expanding_windows": 4,
+            "validation_window_days": 60,
+            "purge_days": 5,
+            "method": "preview_default",
+            "source": "preview_unverified",
+            "horizons": [],
+        }
+
     return {
         "schema": "quantiv.public-model-validation.v1",
         "generated_at": generated_at or datetime.now(timezone.utc).isoformat(),
         "model_source": {
             "kind": source_kind,
             "bundle_id": bundle_id,
-            "artifact_sha256": model_bundle.get("sha256"),
+            "artifact_sha256": verified_model_sha,
+            "verification_status": evaluation_status,
+            "source_revision": source_revision,
+            "model_validation_receipt_id": validation_receipt_id,
+        },
+        "evaluation_evidence": {
+            "status": evaluation_status,
+            "receipt": evaluation_receipt,
         },
         "summary": {
             "supported_horizons": list(HORIZONS),
@@ -189,12 +482,9 @@ def build_validation(repo_root: Path, *, generated_at: str | None = None) -> dic
         "validation_protocol": {
             "target": "absolute earnings move magnitude",
             "baseline": "market straddle expected move",
-            "chronological_holdout": True,
-            "walk_forward": {
-                "expanding_windows": 4,
-                "validation_window_days": 60,
-                "purge_days": 5,
-            },
+            "chronological_holdout": bool(holdout_splits) if source_kind == "signed_champion" else True,
+            "holdout_splits": holdout_splits,
+            "walk_forward": walk_forward_summary,
             "promotion_controls": [
                 "point and interval validation",
                 "quantile calibration",
@@ -213,6 +503,7 @@ def build_validation(repo_root: Path, *, generated_at: str | None = None) -> dic
             "forecast_control_exceptions": (forecast.get("controls") or {}).get("exceptions"),
             "forecast_rows": (forecast.get("coverage") or {}).get("rows"),
             "forecast_events": (forecast.get("coverage") or {}).get("events"),
+            "forecast_model_matches_evaluation": forecast_model_matches_evaluation,
             "control_plane_status": control.get("status"),
             "publication_eligible": control.get("publication_eligible"),
             "data_status": (control.get("data") or {}).get("status"),
