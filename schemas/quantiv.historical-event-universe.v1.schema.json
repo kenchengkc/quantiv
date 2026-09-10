@@ -19,10 +19,17 @@
     "schema": { "const": "quantiv.historical-event-universe.v1" },
     "source": {
       "type": "object",
-      "required": ["kind", "completeness", "as_of_date", "transformation", "transformation_version"],
+      "required": [
+        "kind",
+        "completeness",
+        "as_of_date",
+        "transformation",
+        "transformation_version",
+        "retired_membership"
+      ],
       "properties": {
-        "kind": { "enum": ["analytical_duckdb", "display_payload_fallback"] },
-        "completeness": { "enum": ["source_level", "display_limited"] },
+        "kind": { "const": "analytical_duckdb" },
+        "completeness": { "const": "source_level" },
         "as_of_date": { "type": "string", "format": "date" },
         "source_revision": { "type": ["string", "null"] },
         "transformation": { "type": "string", "minLength": 1 },
@@ -37,7 +44,8 @@
         "ohlcv_date_max": { "type": ["string", "null"], "format": "date" },
         "symbol_payloads": { "type": "integer", "minimum": 0 },
         "as_of_min": { "type": ["string", "null"], "format": "date" },
-        "as_of_max": { "type": ["string", "null"], "format": "date" }
+        "as_of_max": { "type": ["string", "null"], "format": "date" },
+        "retired_membership": { "$ref": "#/$defs/retiredMembership" }
       },
       "additionalProperties": false
     },
@@ -98,6 +106,135 @@
   "$defs": {
     "ticker": { "type": "string", "pattern": "^[A-Z][A-Z0-9.\\-]{0,9}$" },
     "nullableNumber": { "type": ["number", "null"] },
+    "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "earningsSourceRow": {
+      "type": "object",
+      "required": ["ticker", "date", "timing"],
+      "properties": {
+        "ticker": { "$ref": "#/$defs/ticker" },
+        "date": { "type": "string", "format": "date" },
+        "timing": { "enum": ["before_market_open", "after_market_close", "unknown"] }
+      },
+      "additionalProperties": false
+    },
+    "splitSourceRow": {
+      "type": "object",
+      "required": ["ticker", "ex_date", "to_factor", "for_factor"],
+      "properties": {
+        "ticker": { "$ref": "#/$defs/ticker" },
+        "ex_date": { "type": "string", "format": "date" },
+        "to_factor": { "type": "number", "exclusiveMinimum": 0 },
+        "for_factor": { "type": "number", "exclusiveMinimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "dividendSourceRow": {
+      "type": "object",
+      "required": ["ticker", "ex_date", "amount"],
+      "properties": {
+        "ticker": { "$ref": "#/$defs/ticker" },
+        "ex_date": { "type": "string", "format": "date" },
+        "amount": { "type": "number", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "retiredSourceSet": {
+      "type": "object",
+      "required": ["rows", "row_count", "pages", "sha256"],
+      "properties": {
+        "rows": { "type": "array" },
+        "row_count": { "type": "integer", "minimum": 0 },
+        "pages": { "type": "integer", "minimum": 0 },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      },
+      "additionalProperties": false
+    },
+    "retiredMembership": {
+      "type": "object",
+      "required": [
+        "status",
+        "method",
+        "configured_tickers",
+        "earnings",
+        "corporate_actions",
+        "missing_earnings_tickers",
+        "installed_event_rows",
+        "corporate_action_control"
+      ],
+      "properties": {
+        "status": { "const": "verified" },
+        "method": { "const": "bounded_provider_query_for_explicit_retirement_ledger" },
+        "configured_tickers": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/ticker" }
+        },
+        "earnings": {
+          "allOf": [
+            { "$ref": "#/$defs/retiredSourceSet" },
+            {
+              "properties": {
+                "rows": { "type": "array", "items": { "$ref": "#/$defs/earningsSourceRow" } }
+              }
+            }
+          ]
+        },
+        "corporate_actions": {
+          "type": "object",
+          "required": ["splits", "dividends"],
+          "properties": {
+            "splits": {
+              "allOf": [
+                { "$ref": "#/$defs/retiredSourceSet" },
+                {
+                  "properties": {
+                    "rows": { "type": "array", "items": { "$ref": "#/$defs/splitSourceRow" } }
+                  }
+                }
+              ]
+            },
+            "dividends": {
+              "allOf": [
+                { "$ref": "#/$defs/retiredSourceSet" },
+                {
+                  "properties": {
+                    "rows": { "type": "array", "items": { "$ref": "#/$defs/dividendSourceRow" } }
+                  }
+                }
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        "missing_earnings_tickers": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/ticker" }
+        },
+        "installed_event_rows": { "type": "integer", "minimum": 0 },
+        "corporate_action_control": {
+          "type": "object",
+          "required": [
+            "receipt_id",
+            "source_options_date",
+            "split_rows",
+            "dividend_rows",
+            "retired_split_rows",
+            "retired_dividend_rows"
+          ],
+          "properties": {
+            "receipt_id": { "type": ["string", "null"] },
+            "source_options_date": { "type": ["string", "null"], "format": "date" },
+            "split_rows": { "type": "integer", "minimum": 0 },
+            "dividend_rows": { "type": "integer", "minimum": 0 },
+            "retired_split_rows": { "type": "integer", "minimum": 0 },
+            "retired_dividend_rows": { "type": "integer", "minimum": 0 }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
     "event": {
       "type": "object",
       "required": [
@@ -109,7 +246,7 @@
         "event_provenance", "option_observation", "realized_window"
       ],
       "properties": {
-        "event_id": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        "event_id": { "$ref": "#/$defs/sha256" },
         "ticker": { "$ref": "#/$defs/ticker" },
         "date": { "type": "string", "format": "date" },
         "timing": { "type": "string", "minLength": 1 },
