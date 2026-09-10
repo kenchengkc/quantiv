@@ -15,6 +15,39 @@ function finite(value) {
   return typeof value === 'number' && Number.isFinite(value);
 }
 
+function sourceLevelArtifact() {
+  if (!existsSync(OUTPUT)) return null;
+  let payload;
+  try {
+    payload = JSON.parse(readFileSync(OUTPUT, 'utf8'));
+  } catch {
+    return null;
+  }
+  if (
+    payload?.schema !== 'quantiv.historical-event-universe.v1' ||
+    payload?.source?.kind !== 'analytical_duckdb' ||
+    payload?.source?.completeness !== 'source_level'
+  ) {
+    return null;
+  }
+  if (!Array.isArray(payload.events) || payload.event_count !== payload.events.length) {
+    throw new Error('source-level research history has an invalid event count');
+  }
+  if (!payload.universe_id || !String(payload.universe_id).match(/^sha256:[0-9a-f]{64}$/)) {
+    throw new Error('source-level research history has no content-addressed universe id');
+  }
+  return payload;
+}
+
+const retained = sourceLevelArtifact();
+if (retained) {
+  console.log(
+    `Research history: preserving ${retained.event_count} source-level events ` +
+      `(${retained.universe_id.slice(0, 19)}…) -> ${OUTPUT}`,
+  );
+  process.exit(0);
+}
+
 function buildUniverse() {
   if (!existsSync(SYMBOLS)) {
     throw new Error(`symbol research directory is missing: ${SYMBOLS}`);
@@ -79,6 +112,8 @@ function buildUniverse() {
   return {
     schema: 'quantiv.historical-event-universe.v1',
     source: {
+      kind: 'display_payload_fallback',
+      completeness: 'display_limited',
       symbol_payloads: payloadCount,
       as_of_min: dates[0] ?? null,
       as_of_max: dates[dates.length - 1] ?? null,
@@ -96,5 +131,6 @@ const payload = buildUniverse();
 writeFileSync(TEMP, `${JSON.stringify(payload, null, 2)}\n`);
 renameSync(TEMP, OUTPUT);
 console.log(
-  `Research history: ${payload.event_count} eligible events from ${payload.source.symbol_payloads} symbol payloads -> ${OUTPUT}`,
+  `Research history fallback: ${payload.event_count} display-limited events from ` +
+    `${payload.source.symbol_payloads} symbol payloads -> ${OUTPUT}`,
 );
