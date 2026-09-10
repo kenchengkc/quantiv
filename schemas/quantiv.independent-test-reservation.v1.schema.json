@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quantiv.local/schemas/quantiv.independent-test-reservation.v1.schema.json",
+  "title": "Quantiv independent test reservation v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "source_revision",
+    "protocol",
+    "horizons",
+    "reservation_id",
+    "prepared_at"
+  ],
+  "properties": {
+    "schema": { "const": "quantiv.independent-test-reservation.v1" },
+    "source_revision": { "type": "string", "minLength": 1 },
+    "reservation_id": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "prepared_at": { "type": "string", "format": "date-time" },
+    "protocol": {
+      "type": "object",
+      "required": [
+        "method",
+        "test_days",
+        "requested_purge_days",
+        "label_availability_days",
+        "effective_embargo_days",
+        "target_availability_basis"
+      ],
+      "properties": {
+        "method": { "const": "latest_completed_event_period_with_label_availability_embargo" },
+        "test_days": { "type": "integer", "minimum": 1 },
+        "requested_purge_days": { "type": "integer", "minimum": 0 },
+        "label_availability_days": { "type": "integer", "minimum": 0 },
+        "effective_embargo_days": { "type": "integer", "minimum": 0 },
+        "target_availability_basis": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "horizons": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "horizon_days",
+          "source_rows",
+          "source_sha256",
+          "development_rows",
+          "development_sha256",
+          "purged_rows",
+          "final_test_rows",
+          "final_test_unique_events",
+          "final_test_sha256",
+          "development_start",
+          "development_end",
+          "embargo_start",
+          "final_test_start",
+          "final_test_end",
+          "final_test_path"
+        ],
+        "properties": {
+          "horizon_days": { "type": "integer", "minimum": 1 },
+          "source_rows": { "type": "integer", "minimum": 1 },
+          "source_sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+          "development_rows": { "type": "integer", "minimum": 1 },
+          "development_sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+          "purged_rows": { "type": "integer", "minimum": 0 },
+          "final_test_rows": { "type": "integer", "minimum": 1 },
+          "final_test_unique_events": { "type": "integer", "minimum": 1 },
+          "final_test_sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+          "development_start": { "type": "string", "format": "date" },
+          "development_end": { "type": "string", "format": "date" },
+          "embargo_start": { "type": "string", "format": "date" },
+          "final_test_start": { "type": "string", "format": "date" },
+          "final_test_end": { "type": "string", "format": "date" },
+          "final_test_path": { "type": "string", "minLength": 1 }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}
