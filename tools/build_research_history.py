@@ -31,6 +31,7 @@ from frontend_data.research_sources import (  # noqa: E402
 )
 from frontend_data.shared import DATA_DIR, EARNINGS_CSV, PUBLIC_DIR  # noqa: E402
 from sync_dolthub import EARNINGS_API, STOCKS_API, query  # noqa: E402
+from validate_public_contracts import validate_research_history  # noqa: E402
 
 
 def main() -> int:
@@ -92,6 +93,12 @@ def main() -> int:
             corporate_action_evidence=action_evidence,
         )
         write_historical_event_universe(args.output, payload)
+
+        # Publication's default artifact must pass the same semantic contract
+        # consumed by the API. A caller writing a fixture/custom output can
+        # validate that payload separately without mutating the repository path.
+        if args.output.resolve() == (PUBLIC_DIR / "research-history.json").resolve():
+            validate_research_history()
     finally:
         conn.close()
 
