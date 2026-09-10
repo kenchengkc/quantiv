@@ -70,9 +70,9 @@ def _date(value: Any, label: str) -> date:
         raise ContractError(f"{label} must be an ISO date") from exc
 
 
-def _canonical_rows_digest(rows: list[Any]) -> str:
+def _canonical_digest(value: Any) -> str:
     encoded = json.dumps(
-        rows,
+        value,
         sort_keys=True,
         separators=(",", ":"),
         allow_nan=False,
@@ -234,7 +234,7 @@ def _validate_retired_membership(source: dict[str, Any]) -> None:
         if not isinstance(evidence["pages"], int) or evidence["pages"] < 0:
             raise ContractError(f"{label}.pages must be nonnegative")
         digest = _string(evidence["sha256"], f"{label}.sha256")
-        if digest != _canonical_rows_digest(rows):
+        if digest != _canonical_digest(rows):
             raise ContractError(f"{label} digest does not match retained rows")
         return rows
 
@@ -413,6 +413,15 @@ def validate_research_history() -> None:
         expected_actual = post_adjusted / pre_price - 1.0
         if not math.isclose(actual, expected_actual, rel_tol=1e-12, abs_tol=1e-12):
             raise ContractError("historical realized move does not match adjusted price endpoints")
+
+    identity = {
+        key: value
+        for key, value in payload.items()
+        if key not in {"universe_id", "generated_at"}
+    }
+    expected_universe_id = _canonical_digest(identity)
+    if universe_id != expected_universe_id:
+        raise ContractError("research-history universe_id does not match canonical content")
 
 
 def validate_repo() -> list[str]:
