@@ -3,7 +3,13 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from ml.evidence_receipt import build_evidence_receipt, publish_evidence_receipt
+import pytest
+
+from ml.evidence_receipt import (
+    build_evidence_receipt,
+    publish_evidence_receipt,
+    verify_evidence_receipt,
+)
 
 
 def _report(validated_at: str) -> dict:
@@ -100,6 +106,20 @@ def test_receipt_id_is_reproducible_and_changes_with_artifact_content(
     assert changed["receipt_id"] != first["receipt_id"]
 
 
+def test_verify_receipt_recomputes_identity_and_checks_scope(tmp_path: Path) -> None:
+    receipt = _build(tmp_path, _report("2026-08-22T12:00:00+00:00"))
+    verified = verify_evidence_receipt(receipt, expected_scope="forecasts")
+    assert verified == receipt
+
+    tampered = json.loads(json.dumps(receipt))
+    tampered["artifacts"][0]["sha256"] = "0" * 64
+    with pytest.raises(ValueError, match="receipt id"):
+        verify_evidence_receipt(tampered, expected_scope="forecasts")
+
+    with pytest.raises(ValueError, match="scope"):
+        verify_evidence_receipt(receipt, expected_scope="models")
+
+
 def test_publish_writes_immutable_receipt_and_latest_pointer(tmp_path: Path) -> None:
     report = _report("2026-08-22T12:00:00+00:00")
     report["evidence_receipt"] = _build(tmp_path, report)
@@ -120,6 +140,9 @@ def test_publish_writes_immutable_receipt_and_latest_pointer(tmp_path: Path) -> 
     assert latest_receipt.pop("validated_at") == "2026-08-22T12:00:00+00:00"
     assert latest_receipt.pop("receipt_file") == immutable.name
     assert immutable_receipt == latest_receipt
+    assert verify_evidence_receipt(
+        json.loads(latest.read_text()), expected_scope="forecasts"
+    )["receipt_id"] == immutable_receipt["receipt_id"]
 
     rerun = _report("2026-08-22T13:00:00+00:00")
     rerun["evidence_receipt"] = _build(tmp_path, rerun)
