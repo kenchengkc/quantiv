@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import date
 
 import duckdb
+import pytest
 
 from frontend_data.research_history import build_historical_event_universe
 from frontend_data.research_sources import install_retired_earnings
@@ -99,5 +100,5 @@ def test_retired_company_can_become_eligible_research_event() -> None:
     event = payload["events"][0]
     assert event["ticker"] == "OLD"
     assert event["event_provenance"]["source"] == "dolthub_retired_membership"
-    assert event["actual"] == 0.09
+    assert event["actual"] == pytest.approx(0.09)
     assert payload["audit"]["excluded_event_count"] == 0
