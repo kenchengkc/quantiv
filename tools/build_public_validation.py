@@ -137,6 +137,46 @@ def _verify_receipt_model_members(
             )
 
 
+def _forecast_stage_model_bundle_sha(manifest: Mapping[str, Any]) -> str:
+    """Reproduce the forecast evidence receipt's path-sensitive model digest.
+
+    Evidence-receipt bundle hashes intentionally include member paths. Model
+    validation hashes files at ``data/models/<name>`` while forecast validation
+    hashes the same authenticated bytes from
+    ``data/models/bundles/<bundle_id>/<name>``. Reconstruct the latter from the
+    signed manifest so a valid forecast is compared to the correct identity.
+    """
+    bundle_id = str(manifest.get("bundle_id") or "")
+    artifacts = manifest.get("artifacts")
+    if not bundle_id or not isinstance(artifacts, list):
+        raise ModelBundleError("signed model manifest cannot identify forecast model bundle")
+
+    members: list[dict[str, Any]] = []
+    for artifact in sorted(
+        artifacts,
+        key=lambda item: str(item.get("name", "")) if isinstance(item, Mapping) else "",
+    ):
+        if not isinstance(artifact, Mapping):
+            raise ModelBundleError("signed model manifest has an invalid artifact member")
+        name = str(artifact.get("name") or "")
+        sha256 = str(artifact.get("sha256") or "")
+        try:
+            size = int(artifact.get("bytes"))
+        except (TypeError, ValueError) as exc:
+            raise ModelBundleError(f"signed artifact has invalid size: {name}") from exc
+        if not name or not sha256:
+            raise ModelBundleError("signed model manifest has incomplete artifact evidence")
+        members.append(
+            {
+                "path": f"data/models/bundles/{bundle_id}/{name}",
+                "bytes": size,
+                "sha256": sha256,
+            }
+        )
+    canonical = json.dumps(members, sort_keys=True, separators=(",", ":")).encode()
+    return hashlib.sha256(canonical).hexdigest()
+
+
 def _immutable_model_receipt_path(
     models_root: Path,
     manifest: Mapping[str, Any],
@@ -447,7 +487,7 @@ def build_validation(repo_root: Path, *, generated_at: str | None = None) -> dic
     evaluation_receipt: dict[str, Any] | None = None
     validation_receipt_id: str | None = None
     source_revision: str | None = None
-    verified_model_sha: str | None = None
+    public_model_artifact_sha: str | None = None
     forecast_model_matches_evaluation: bool | None = None
 
     if source_kind == "signed_champion":
@@ -466,11 +506,14 @@ def build_validation(repo_root: Path, *, generated_at: str | None = None) -> dic
         evaluation_status = "verified"
         validation_receipt_id = str(model_receipt["receipt_id"])
         source_revision = str(manifest.get("source_revision") or "") or None
-        verified_model_sha = str(_artifact(model_receipt, "model_bundle")["sha256"])
+        expected_forecast_model_sha = _forecast_stage_model_bundle_sha(manifest)
+        public_model_artifact_sha = expected_forecast_model_sha
 
         forecast_sha = forecast_model_bundle.get("sha256")
         if isinstance(forecast_sha, str) and forecast_sha:
-            forecast_model_matches_evaluation = forecast_sha == verified_model_sha
+            forecast_model_matches_evaluation = (
+                forecast_sha == expected_forecast_model_sha
+            )
             if (
                 forecast.get("quality", {}).get("status") == "passed"
                 and not forecast_model_matches_evaluation
@@ -495,7 +538,7 @@ def build_validation(repo_root: Path, *, generated_at: str | None = None) -> dic
         "model_source": {
             "kind": source_kind,
             "bundle_id": bundle_id,
-            "artifact_sha256": verified_model_sha,
+            "artifact_sha256": public_model_artifact_sha,
             "verification_status": evaluation_status,
             "source_revision": source_revision,
             "model_validation_receipt_id": validation_receipt_id,
