@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import re
@@ -67,6 +68,16 @@ def _date(value: Any, label: str) -> date:
         return date.fromisoformat(value)
     except ValueError as exc:
         raise ContractError(f"{label} must be an ISO date") from exc
+
+
+def _canonical_rows_digest(rows: list[Any]) -> str:
+    encoded = json.dumps(
+        rows,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    ).encode()
+    return "sha256:" + hashlib.sha256(encoded).hexdigest()
 
 
 def validate_schema_documents() -> None:
@@ -190,6 +201,98 @@ def _validate_preview_research_history(payload: dict[str, Any]) -> None:
         raise ContractError("research-history.event_count must equal len(events)")
 
 
+def _validate_retired_membership(source: dict[str, Any]) -> None:
+    membership = _object(source.get("retired_membership"), "research-history.source.retired_membership")
+    _required(
+        membership,
+        "research-history.source.retired_membership",
+        "status",
+        "method",
+        "configured_tickers",
+        "earnings",
+        "corporate_actions",
+        "missing_earnings_tickers",
+        "installed_event_rows",
+        "corporate_action_control",
+    )
+    if membership.get("status") != "verified":
+        raise ContractError("retired membership must be verified")
+    if membership.get("method") != "bounded_provider_query_for_explicit_retirement_ledger":
+        raise ContractError("retired membership method is unsupported")
+    configured = _list(membership["configured_tickers"], "retired membership configured_tickers")
+    if len(configured) != len(set(configured)) or any(
+        not isinstance(ticker, str) or not SYMBOL_RE.fullmatch(ticker) for ticker in configured
+    ):
+        raise ContractError("retired membership configured_tickers are invalid")
+
+    def source_set(raw: Any, label: str) -> list[Any]:
+        evidence = _object(raw, label)
+        _required(evidence, label, "rows", "row_count", "pages", "sha256")
+        rows = _list(evidence["rows"], f"{label}.rows")
+        if evidence["row_count"] != len(rows):
+            raise ContractError(f"{label} row_count does not match rows")
+        if not isinstance(evidence["pages"], int) or evidence["pages"] < 0:
+            raise ContractError(f"{label}.pages must be nonnegative")
+        digest = _string(evidence["sha256"], f"{label}.sha256")
+        if digest != _canonical_rows_digest(rows):
+            raise ContractError(f"{label} digest does not match retained rows")
+        return rows
+
+    earnings = source_set(membership["earnings"], "retired membership earnings")
+    actions = _object(membership["corporate_actions"], "retired membership corporate_actions")
+    _required(actions, "retired membership corporate_actions", "splits", "dividends")
+    splits = source_set(actions["splits"], "retired membership splits")
+    dividends = source_set(actions["dividends"], "retired membership dividends")
+
+    configured_set = set(configured)
+    returned_tickers: set[str] = set()
+    for index, raw in enumerate(earnings):
+        row = _object(raw, f"retired membership earnings.rows[{index}]")
+        _required(row, f"retired membership earnings.rows[{index}]", "ticker", "date", "timing")
+        ticker = _string(row["ticker"], f"retired membership earnings.rows[{index}].ticker")
+        if ticker not in configured_set:
+            raise ContractError("retired earnings source contains a ticker outside the retirement ledger")
+        _date(row["date"], f"retired membership earnings.rows[{index}].date")
+        if row["timing"] not in {"before_market_open", "after_market_close", "unknown"}:
+            raise ContractError("retired earnings source contains unsupported timing")
+        returned_tickers.add(ticker)
+
+    for label, rows, value_keys in (
+        ("split", splits, ("to_factor", "for_factor")),
+        ("dividend", dividends, ("amount",)),
+    ):
+        for index, raw in enumerate(rows):
+            row = _object(raw, f"retired membership {label}[{index}]")
+            ticker = _string(row.get("ticker"), f"retired membership {label}[{index}].ticker")
+            if ticker not in configured_set:
+                raise ContractError(f"retired {label} source contains a ticker outside the retirement ledger")
+            _date(row.get("ex_date"), f"retired membership {label}[{index}].ex_date")
+            for key in value_keys:
+                value = _finite(row.get(key), f"retired membership {label}[{index}].{key}")
+                if value < 0 or (label == "split" and value <= 0):
+                    raise ContractError(f"retired {label} source contains invalid {key}")
+
+    missing = _list(membership["missing_earnings_tickers"], "retired membership missing_earnings_tickers")
+    if set(missing) != configured_set - returned_tickers:
+        raise ContractError("retired membership missing-ticker audit does not reconcile")
+    installed = membership["installed_event_rows"]
+    if not isinstance(installed, int) or installed < 0 or installed > len(earnings):
+        raise ContractError("retired membership installed_event_rows is invalid")
+    control = _object(membership["corporate_action_control"], "retired membership corporate_action_control")
+    _required(
+        control,
+        "retired membership corporate_action_control",
+        "receipt_id",
+        "source_options_date",
+        "split_rows",
+        "dividend_rows",
+        "retired_split_rows",
+        "retired_dividend_rows",
+    )
+    if control["retired_split_rows"] != len(splits) or control["retired_dividend_rows"] != len(dividends):
+        raise ContractError("retired corporate-action counts do not match retained source rows")
+
+
 def validate_research_history() -> None:
     path = PUBLIC / "research-history.json"
     payload = _object(_read(path), str(path))
@@ -221,6 +324,7 @@ def validate_research_history() -> None:
         raise ContractError("research-history schema discriminator changed")
     if source.get("kind") != "analytical_duckdb" or source.get("completeness") != "source_level":
         raise ContractError("source-level research history must identify analytical_duckdb/source_level")
+    _validate_retired_membership(source)
     if payload.get("decision_scope") != "end_of_day_research":
         raise ContractError("historical research must remain end_of_day_research")
     if payload.get("live_trading_eligible") is not False:
