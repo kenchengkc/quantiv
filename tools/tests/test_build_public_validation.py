@@ -7,7 +7,7 @@ import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
-from ml.evidence_receipt import build_evidence_receipt
+from ml.evidence_receipt import build_evidence_receipt, publish_evidence_receipt
 from ml.model_bundle import (
     ModelBundleError,
     create_signed_bundle,
@@ -150,6 +150,7 @@ def _install_signed_champion(
 
     validation_report = {
         "status": "passed",
+        "validated_at": "2026-01-02T00:00:00+00:00",
         "issues": [],
         "stages": {
             "models": {
@@ -168,8 +169,13 @@ def _install_signed_champion(
         forecast_path=None,
         horizons=HORIZONS,
     )
-    receipt_path = models / "receipts/latest_models.json"
-    _write_json(receipt_path, model_receipt)
+    validation_report["evidence_receipt"] = model_receipt
+    _, latest_receipt_path = publish_evidence_receipt(
+        validation_report,
+        receipt_dir=models / "receipts",
+        scope="models",
+        forecast_path=None,
+    )
     report_path = repo / "data/validation/retrain_models.json"
     _write_json(report_path, validation_report)
 
@@ -178,7 +184,7 @@ def _install_signed_champion(
     bundle_dir, manifest = create_signed_bundle(
         models,
         models / "bundles",
-        receipt_path=receipt_path,
+        receipt_path=latest_receipt_path,
         validation_report_path=report_path,
         source_revision="source-revision-test",
         horizons=HORIZONS,
@@ -313,10 +319,29 @@ def test_signed_champion_rejects_mismatched_validation_receipt(
         horizons=HORIZONS,
     )
     assert changed["receipt_id"] != receipt["receipt_id"]
-    _write_json(tmp_path / "data/models/receipts/latest_models.json", changed)
+    receipt_digest = receipt["receipt_id"].removeprefix("sha256:")
+    _write_json(
+        tmp_path
+        / f"data/models/receipts/models.{receipt_digest[:12]}.receipt.json",
+        changed,
+    )
 
     with pytest.raises(ModelBundleError, match="identities disagree"):
         build_validation(tmp_path)
+
+
+def test_signed_champion_uses_immutable_receipt_not_latest_candidate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    champion, receipt, _ = _install_signed_champion(tmp_path, monkeypatch)
+    latest = json.loads(json.dumps(receipt))
+    latest["receipt_id"] = "sha256:" + "f" * 64
+    _write_json(tmp_path / "data/models/receipts/latest_models.json", latest)
+
+    payload = build_validation(tmp_path)
+
+    assert payload["model_source"]["bundle_id"] == champion
+    assert payload["model_source"]["model_validation_receipt_id"] == receipt["receipt_id"]
 
 
 def test_signed_champion_rejects_passed_forecast_from_other_model(
