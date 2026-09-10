@@ -17,6 +17,7 @@ def test_committed_public_contracts_validate() -> None:
         "forecast evidence",
         "control plane",
         "model validation",
+        "research history",
     ]
 
 
@@ -83,3 +84,108 @@ def test_model_validation_preserves_decision_scope(tmp_path: Path, monkeypatch: 
 
     with pytest.raises(contracts.ContractError, match="research-only"):
         contracts.validate_model_validation()
+
+
+def test_preview_research_history_must_be_display_limited(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    public = tmp_path / "public"
+    public.mkdir()
+    (public / "research-history.json").write_text(
+        json.dumps(
+            {
+                "schema": contracts.PREVIEW_UNIVERSE_SCHEMA,
+                "source": {
+                    "kind": "display_payload_fallback",
+                    "completeness": "source_level",
+                    "symbol_payloads": 1,
+                    "as_of_min": "2026-09-01",
+                    "as_of_max": "2026-09-01",
+                },
+                "evidence_rule": "preview",
+                "decision_scope": "end_of_day_research",
+                "live_trading_eligible": False,
+                "event_count": 0,
+                "events": [],
+            }
+        )
+    )
+    monkeypatch.setattr(contracts, "PUBLIC", public)
+
+    with pytest.raises(contracts.ContractError, match="display_limited"):
+        contracts.validate_research_history()
+
+
+def _source_level_history() -> dict:
+    return {
+        "schema": contracts.SOURCE_UNIVERSE_SCHEMA,
+        "source": {
+            "kind": "analytical_duckdb",
+            "completeness": "source_level",
+            "as_of_date": "2026-09-10",
+        },
+        "evidence_rule": "fixture",
+        "decision_scope": "end_of_day_research",
+        "live_trading_eligible": False,
+        "event_count": 1,
+        "audit": {
+            "candidate_event_count": 1,
+            "eligible_event_count": 1,
+            "excluded_event_count": 0,
+            "source_duplicate_rows_collapsed": 0,
+            "exclusion_counts": {},
+            "exclusions": [],
+        },
+        "events": [
+            {
+                "ticker": "AAPL",
+                "date": "2026-08-01",
+                "timing": "before_market_open",
+                "actual": 0.10,
+                "realized_abs": 0.10,
+                "implied": 0.08,
+                "implied_as_of": "2026-07-31",
+                "implied_expiration": "2026-08-01",
+                "implied_quality_status": "decision_eligible_eod",
+                "edge": 0.02,
+                "ratio": 1.25,
+                "outside_implied": True,
+                "realized_window": {
+                    "pre_date": "2026-07-31",
+                    "pre_price": 100.0,
+                    "post_date": "2026-08-01",
+                    "post_price_adjusted": 110.0,
+                },
+            }
+        ],
+        "universe_id": "sha256:" + "a" * 64,
+        "generated_at": "2026-09-10T00:00:00+00:00",
+    }
+
+
+def test_source_level_research_history_checks_event_arithmetic(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    public = tmp_path / "public"
+    public.mkdir()
+    payload = _source_level_history()
+    payload["events"][0]["ratio"] = 99.0
+    (public / "research-history.json").write_text(json.dumps(payload))
+    monkeypatch.setattr(contracts, "PUBLIC", public)
+
+    with pytest.raises(contracts.ContractError, match="ratio arithmetic"):
+        contracts.validate_research_history()
+
+
+def test_source_level_research_history_rejects_live_scope(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    public = tmp_path / "public"
+    public.mkdir()
+    payload = _source_level_history()
+    payload["live_trading_eligible"] = True
+    (public / "research-history.json").write_text(json.dumps(payload))
+    monkeypatch.setattr(contracts, "PUBLIC", public)
+
+    with pytest.raises(contracts.ContractError, match="live-trading"):
+        contracts.validate_research_history()
