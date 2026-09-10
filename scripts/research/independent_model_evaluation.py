@@ -1,17 +1,25 @@
 #!/usr/bin/env python3
-"""Reserve and evaluate an untouched chronological final-test period.
+"""Reserve and evaluate a current-run independent chronological final test.
 
 The weekly retrain uses two explicit phases:
 
-1. ``prepare`` copies the newest completed earnings events into a sealed staging
-   area, applies a label-availability embargo, and rewrites ``ml_training`` to
-   contain development rows only. Optuna, early stopping, walk-forward, and the
-   champion/challenger decision therefore cannot read final-test labels.
-2. ``evaluate`` runs only after a promotion decision. It verifies the promoted
-   signed bundle and the model-validation receipt, scores the sealed rows,
-   retains paired event predictions, builds a research manifest, and signs a
-   replayable evaluation receipt. Performance is reported, never used as a
-   promotion threshold in this step.
+``prepare``
+    After the existing operational outcome/rollback check, seal a recent test
+    period, exclude every exact symbol/date/horizon key present in the prediction
+    ledger used by that operational check, apply a label-availability embargo,
+    and rewrite ``ml_training`` to development-only rows. Current-candidate
+    tuning, early stopping, calibration, walk-forward, and common-holdout gates
+    therefore cannot read the reserved labels.
+
+``evaluate``
+    Only after the promotion decision, verify the promoted signed bundle and its
+    model-validation receipt, score the sealed rows, retain paired predictions,
+    build a content-addressed research manifest, and sign a replayable evaluation
+    receipt. Final-test performance is evidence and is not a post-decision gate.
+
+This establishes independence for the current candidate-selection run. It does
+not claim that pre-protocol researchers or earlier model-family iterations never
+observed the same historical labels; the receipt records that boundary explicitly.
 """
 
 from __future__ import annotations
@@ -48,8 +56,8 @@ from ml.model_bundle import (  # noqa: E402
     verify_signed_payload,
 )
 from ml.model_control import score_bundle_frame  # noqa: E402
-from scripts.research.paired_benchmark import compare_forecasts  # noqa: E402
-from scripts.research.research_manifest import (  # noqa: E402
+from research.paired_benchmark import compare_forecasts  # noqa: E402
+from research.research_manifest import (  # noqa: E402
     build_manifest,
     sha256_file,
     verify_manifest,
@@ -66,6 +74,7 @@ DEFAULT_MIN_TEST_ROWS = 100
 DEFAULT_BOOTSTRAP_DRAWS = 5_000
 DEFAULT_BOOTSTRAP_SEED = 17
 QUANTILE_LABELS = (10, 25, 50, 75, 90)
+_LEDGER_COLUMNS = ("act_symbol", "earnings_date", "model_horizon")
 
 
 def _canonical(value: Mapping[str, Any]) -> bytes:
@@ -127,6 +136,62 @@ def _normalized_training_frame(path: Path) -> pd.DataFrame:
     return frame.sort_values(["__earnings_date", *tie_breakers], kind="mergesort")
 
 
+def _ledger_evidence(
+    repo_root: Path, ledger_path: Path
+) -> tuple[set[tuple[str, str, int]], dict[str, Any]]:
+    """Return exact operational outcome keys and immutable evidence of the ledger.
+
+    ``evaluate_realized_outcomes`` can only consume a realized label after an
+    exact join to the prediction ledger on symbol, event date, and horizon. By
+    excluding every such key from the reserved test, the final-test labels are
+    disjoint from the operational rollback calculation that ran earlier in the
+    same weekly workflow.
+    """
+    if not ledger_path.exists():
+        return set(), {
+            "method": "exclude_prediction_ledger_symbol_date_horizon_keys",
+            "prediction_ledger_present": False,
+            "prediction_ledger_path": _repo_relative(repo_root, ledger_path),
+            "prediction_ledger_sha256": None,
+            "prediction_ledger_rows": 0,
+            "prediction_ledger_event_keys": 0,
+        }
+
+    available = set(pd.read_parquet(ledger_path).columns)
+    missing = sorted(set(_LEDGER_COLUMNS) - available)
+    if missing:
+        raise ValueError(
+            f"prediction ledger is missing outcome-join columns: {missing}"
+        )
+    frame = pd.read_parquet(ledger_path, columns=list(_LEDGER_COLUMNS)).copy()
+    frame["earnings_date"] = pd.to_datetime(
+        frame["earnings_date"], errors="raise"
+    ).dt.date.astype(str)
+    horizons = pd.to_numeric(frame["model_horizon"], errors="raise")
+    if not np.equal(horizons, np.floor(horizons)).all():
+        raise ValueError("prediction ledger contains non-integral model horizons")
+    frame["model_horizon"] = horizons.astype(int)
+    frame["act_symbol"] = frame["act_symbol"].astype(str).str.strip()
+    if frame["act_symbol"].eq("").any():
+        raise ValueError("prediction ledger contains blank symbols")
+    keys = set(
+        zip(
+            frame["act_symbol"],
+            frame["earnings_date"],
+            frame["model_horizon"],
+            strict=True,
+        )
+    )
+    return keys, {
+        "method": "exclude_prediction_ledger_symbol_date_horizon_keys",
+        "prediction_ledger_present": True,
+        "prediction_ledger_path": _repo_relative(repo_root, ledger_path),
+        "prediction_ledger_sha256": sha256_file(ledger_path),
+        "prediction_ledger_rows": len(frame),
+        "prediction_ledger_event_keys": len(keys),
+    }
+
+
 def _reservation_identity(core: Mapping[str, Any]) -> str:
     return _sha256_bytes(_canonical(core))
 
@@ -143,14 +208,19 @@ def prepare_independent_test(
     min_development_rows: int = DEFAULT_MIN_DEVELOPMENT_ROWS,
     min_test_rows: int = DEFAULT_MIN_TEST_ROWS,
     source_revision: str | None = None,
+    prediction_ledger_path: Path | None = None,
 ) -> dict[str, Any]:
-    """Seal the newest test period and remove it from all selection inputs."""
+    """Seal final-test rows and remove them from all current selection inputs."""
     if test_days < 1:
         raise ValueError("test_days must be at least 1")
     if purge_days < 0 or label_availability_days < 0:
         raise ValueError("purge and label-availability windows must be non-negative")
     effective_embargo = max(purge_days, label_availability_days)
     source_revision = source_revision or os.getenv("GITHUB_SHA") or "unknown"
+    ledger_path = prediction_ledger_path or (
+        repo_root / "data/models/monitoring/prediction_ledger.parquet"
+    )
+    operational_keys, operational_evidence = _ledger_evidence(repo_root, ledger_path)
 
     if staging_dir.exists():
         shutil.rmtree(staging_dir)
@@ -172,7 +242,22 @@ def prepare_independent_test(
         test_start = test_end - pd.Timedelta(days=test_days - 1)
         development_cutoff = test_start - pd.Timedelta(days=effective_embargo)
 
-        final_test = frame.loc[frame["__earnings_date"] >= test_start].copy()
+        recent = frame.loc[frame["__earnings_date"] >= test_start].copy()
+        recent_keys = pd.Series(
+            list(
+                zip(
+                    recent["__symbol"].astype(str),
+                    recent["__earnings_date"].dt.date.astype(str),
+                    [horizon] * len(recent),
+                    strict=True,
+                )
+            ),
+            index=recent.index,
+            dtype=object,
+        )
+        operational_mask = recent_keys.isin(operational_keys)
+        final_test = recent.loc[~operational_mask].copy()
+        operational_excluded = recent.loc[operational_mask].copy()
         development = frame.loc[
             frame["__earnings_date"] < development_cutoff
         ].copy()
@@ -180,6 +265,7 @@ def prepare_independent_test(
             (frame["__earnings_date"] >= development_cutoff)
             & (frame["__earnings_date"] < test_start)
         ].copy()
+
         if len(development) < min_development_rows:
             raise ValueError(
                 f"T-{horizon} has only {len(development)} development rows; "
@@ -187,13 +273,21 @@ def prepare_independent_test(
             )
         if len(final_test) < min_test_rows:
             raise ValueError(
-                f"T-{horizon} has only {len(final_test)} final-test rows; "
-                f"require {min_test_rows}"
+                f"T-{horizon} has only {len(final_test)} final-test rows after "
+                f"operational-outcome exclusions; require {min_test_rows}"
             )
         if development["__earnings_date"].max() >= development_cutoff:
             raise AssertionError("development rows crossed the embargo boundary")
-        if final_test["__earnings_date"].min() < test_start:
-            raise AssertionError("final-test rows crossed the reservation boundary")
+        final_keys = set(
+            zip(
+                final_test["__symbol"].astype(str),
+                final_test["__earnings_date"].dt.date.astype(str),
+                [horizon] * len(final_test),
+                strict=True,
+            )
+        )
+        if final_keys & operational_keys:
+            raise AssertionError("final test overlaps operational outcome ledger")
 
         development_path = staging_dir / f"development_T{horizon}.parquet"
         final_test_path = staging_dir / f"final_test_T{horizon}.parquet"
@@ -209,6 +303,7 @@ def prepare_independent_test(
                 "development_rows": len(development),
                 "development_sha256": sha256_file(development_path),
                 "purged_rows": len(purged),
+                "operational_excluded_rows": len(operational_excluded),
                 "final_test_rows": len(final_test),
                 "final_test_unique_events": int(
                     final_test[["__symbol", "__earnings_date"]]
@@ -219,17 +314,19 @@ def prepare_independent_test(
                 "development_start": development["__earnings_date"].min().date().isoformat(),
                 "development_end": development["__earnings_date"].max().date().isoformat(),
                 "embargo_start": development_cutoff.date().isoformat(),
-                "final_test_start": test_start.date().isoformat(),
-                "final_test_end": test_end.date().isoformat(),
+                "reservation_window_start": test_start.date().isoformat(),
+                "reservation_window_end": test_end.date().isoformat(),
+                "final_test_start": final_test["__earnings_date"].min().date().isoformat(),
+                "final_test_end": final_test["__earnings_date"].max().date().isoformat(),
                 "final_test_path": _repo_relative(repo_root, final_test_path),
             }
         )
 
-    identity = {
+    core = {
         "schema": RESERVATION_SCHEMA,
         "source_revision": source_revision,
         "protocol": {
-            "method": "latest_completed_event_period_with_label_availability_embargo",
+            "method": "recent_completed_events_with_label_embargo_and_operational_exclusion",
             "test_days": test_days,
             "requested_purge_days": purge_days,
             "label_availability_days": label_availability_days,
@@ -237,18 +334,18 @@ def prepare_independent_test(
             "target_availability_basis": (
                 "realized move uses the first post-earnings observation within five calendar days"
             ),
+            "operational_outcome_exclusion": operational_evidence,
         },
         "horizons": prepared,
     }
     reservation = {
-        **identity,
-        "reservation_id": _reservation_identity(identity),
+        **core,
+        "reservation_id": _reservation_identity(core),
         "prepared_at": datetime.now(UTC).isoformat(),
     }
 
-    # Only after every horizon has been staged and validated do we replace the
-    # training inputs. The runner is ephemeral, so a failed replacement aborts
-    # the retrain without mutating production storage.
+    # Replace selection inputs only after every horizon has been staged and
+    # validated. The GitHub runner is ephemeral; failure aborts before R2 push.
     for row in prepared:
         horizon = int(row["horizon_days"])
         training_path = training_dir / f"training_T{horizon}.parquet"
@@ -259,10 +356,11 @@ def prepare_independent_test(
         metadata["n_samples"] = int(row["development_rows"])
         metadata["independent_test_reservation"] = {
             "reservation_id": reservation["reservation_id"],
-            "final_test_start": row["final_test_start"],
-            "final_test_end": row["final_test_end"],
+            "reservation_window_start": row["reservation_window_start"],
+            "reservation_window_end": row["reservation_window_end"],
             "development_end": row["development_end"],
             "effective_embargo_days": effective_embargo,
+            "operational_excluded_rows": row["operational_excluded_rows"],
             "final_test_rows": row["final_test_rows"],
         }
         _atomic_json(metadata_path, metadata)
@@ -320,7 +418,7 @@ def _verify_development_binding(
         expected = str(row["development_sha256"]).removeprefix("sha256:")
         if member.get("sha256") != expected:
             raise ModelBundleError(
-                f"T-{horizon} signed model validation was not run on the reserved development data"
+                f"T-{horizon} model validation was not run on reserved development data"
             )
 
 
@@ -378,7 +476,7 @@ def verify_independent_evaluation_receipt(
         raise ModelBundleError("independent evaluation targets a different model bundle")
     if payload.get("model_validation_receipt_id") != manifest.get("receipt_id"):
         raise ModelBundleError(
-            "independent evaluation and signed model bundle disagree on validation receipt"
+            "independent evaluation and signed bundle disagree on validation receipt"
         )
     expected_id = _sha256_bytes(_canonical(_evaluation_identity(payload)))
     if payload.get("evaluation_id") != expected_id:
@@ -388,7 +486,7 @@ def verify_independent_evaluation_receipt(
     )
     if not manifest_report.get("ok"):
         raise ModelBundleError(
-            f"independent evaluation research manifest failed verification: "
+            "independent evaluation research manifest failed verification: "
             f"{manifest_report.get('errors')}"
         )
     return dict(payload)
@@ -446,15 +544,15 @@ def evaluate_independent_test(
     bootstrap_seed: int = DEFAULT_BOOTSTRAP_SEED,
     private_key: str | bytes | None = None,
 ) -> tuple[Path, dict[str, Any]]:
-    """Score the promoted bundle on sealed labels and sign the evidence release."""
+    """Score a promoted bundle on sealed labels and sign the evidence release."""
     reservation = _read_json(reservation_path)
     if reservation.get("schema") != RESERVATION_SCHEMA:
         raise ValueError("unsupported independent-test reservation schema")
-    identity = {
+    core = {
         key: reservation[key]
         for key in ("schema", "source_revision", "protocol", "horizons")
     }
-    if reservation.get("reservation_id") != _reservation_identity(identity):
+    if reservation.get("reservation_id") != _reservation_identity(core):
         raise ValueError("independent-test reservation id does not match its contents")
 
     bundle_manifest = verify_bundle_dir(bundle_dir)
@@ -464,7 +562,10 @@ def evaluate_independent_test(
         raise ModelBundleError(
             "independent final-test evaluation requires a completed promotion decision"
         )
-    if decision.get("candidate_bundle_id") != bundle_id or decision.get("champion_bundle_id") != bundle_id:
+    if (
+        decision.get("candidate_bundle_id") != bundle_id
+        or decision.get("champion_bundle_id") != bundle_id
+    ):
         raise ModelBundleError(
             "promotion decision does not select the bundle being independently evaluated"
         )
@@ -472,7 +573,7 @@ def evaluate_independent_test(
         _read_json(models_root / "control" / "champion.json")
     )
     if champion_pointer.get("champion_bundle_id") != bundle_id:
-        raise ModelBundleError("signed champion pointer does not match the evaluation bundle")
+        raise ModelBundleError("signed champion pointer does not match evaluation bundle")
 
     model_receipt = _immutable_model_receipt(
         models_root, str(bundle_manifest["receipt_id"])
@@ -493,6 +594,18 @@ def evaluate_independent_test(
         for item in bundle_manifest.get("artifacts") or []
         if isinstance(item, Mapping)
     )
+    ledger_evidence = (
+        (reservation.get("protocol") or {}).get("operational_outcome_exclusion") or {}
+    )
+    ledger_relative = ledger_evidence.get("prediction_ledger_path")
+    if ledger_evidence.get("prediction_ledger_present") and isinstance(
+        ledger_relative, str
+    ):
+        ledger_path = repo_root / ledger_relative
+        if sha256_file(ledger_path) != ledger_evidence.get("prediction_ledger_sha256"):
+            raise ValueError("prediction ledger changed after independent-test reservation")
+        manifest_paths.append(ledger_path)
+
     all_event_ids: set[str] = set()
     total_paired_rows = 0
     weighted_model_error = 0.0
@@ -510,15 +623,19 @@ def evaluate_independent_test(
             raise ValueError(f"T-{horizon} final-test row count changed after reservation")
         expected_start = pd.Timestamp(str(reserved["final_test_start"]))
         expected_end = pd.Timestamp(str(reserved["final_test_end"]))
-        if final_test["__earnings_date"].min() != expected_start or final_test["__earnings_date"].max() != expected_end:
+        if (
+            final_test["__earnings_date"].min() != expected_start
+            or final_test["__earnings_date"].max() != expected_end
+        ):
             raise ValueError(f"T-{horizon} final-test date range changed after reservation")
 
         metadata = _read_json(bundle_dir / f"metadata_T{horizon}.json")
         validation_split = metadata.get("validation_split") or {}
         validation_end = pd.Timestamp(str(validation_split.get("validation_end")))
-        if pd.isna(validation_end) or validation_end >= expected_start:
+        reservation_start = pd.Timestamp(str(reserved["reservation_window_start"]))
+        if pd.isna(validation_end) or validation_end >= reservation_start:
             raise ModelBundleError(
-                f"T-{horizon} development validation overlaps the independent final test"
+                f"T-{horizon} development validation overlaps reserved final-test window"
             )
 
         point, quantiles = score_bundle_frame(bundle_dir, horizon, final_test)
@@ -574,7 +691,6 @@ def evaluate_independent_test(
             seed=bootstrap_seed + offset * 2 + 1,
         )
         paired_metrics = issuer_bootstrap["overall"]
-        model_mae = float(mean_absolute_error(actual, point))
         report = {
             "horizon_days": horizon,
             "test_start": expected_start.date().isoformat(),
@@ -583,7 +699,7 @@ def evaluate_independent_test(
             "unique_events": int(predictions["event_id"].nunique()),
             "issuers": int(predictions["issuer"].nunique()),
             "paired_baseline_rows": len(paired),
-            "model_mae_all_rows": model_mae,
+            "model_mae_all_rows": float(mean_absolute_error(actual, point)),
             "model_rmse_all_rows": float(
                 np.sqrt(mean_squared_error(actual, point))
             ),
@@ -635,7 +751,7 @@ def evaluate_independent_test(
         as_of=str(reservation.get("prepared_at") or ""),
         git_commit=source_revision,
         metadata={
-            "purpose": "independent_final_model_evaluation",
+            "purpose": "current_run_independent_final_model_evaluation",
             "bundle_id": bundle_id,
             "reservation_id": reservation["reservation_id"],
         },
@@ -650,12 +766,14 @@ def evaluate_independent_test(
         "reservation_id": reservation["reservation_id"],
         "selection": {
             "family": SELECTION_FAMILY,
-            "test_labels_used_for_hyperparameter_tuning": False,
-            "test_labels_used_for_early_stopping": False,
-            "test_labels_used_for_quantile_calibration": False,
-            "test_labels_used_for_promotion_decision": False,
+            "current_candidate_test_labels_used_for_hyperparameter_tuning": False,
+            "current_candidate_test_labels_used_for_early_stopping": False,
+            "current_candidate_test_labels_used_for_quantile_calibration": False,
+            "current_candidate_test_rows_used_in_common_holdout": False,
+            "current_run_test_rows_used_in_operational_outcome_check": False,
             "promotion_decision_evaluated_at": decision.get("evaluated_at"),
             "performance_gate_applied_after_decision": False,
+            "historical_model_family_exposure_status": "not_established",
         },
         "protocol": {
             **dict(reservation.get("protocol") or {}),
@@ -713,6 +831,11 @@ def _parser() -> argparse.ArgumentParser:
         type=Path,
         default=REPO_ROOT / "data/independent_evaluation/pending",
     )
+    prepare.add_argument(
+        "--prediction-ledger",
+        type=Path,
+        default=REPO_ROOT / "data/models/monitoring/prediction_ledger.parquet",
+    )
     prepare.add_argument("--test-days", type=int, default=DEFAULT_TEST_DAYS)
     prepare.add_argument("--purge-days", type=int, default=DEFAULT_PURGE_DAYS)
     prepare.add_argument(
@@ -765,6 +888,7 @@ def main() -> int:
             repo_root=args.repo_root.resolve(),
             training_dir=args.training_dir.resolve(),
             staging_dir=args.staging_dir.resolve(),
+            prediction_ledger_path=args.prediction_ledger.resolve(),
             test_days=args.test_days,
             purge_days=args.purge_days,
             label_availability_days=args.label_availability_days,
@@ -786,7 +910,12 @@ def main() -> int:
             bootstrap_draws=args.bootstrap_draws,
             bootstrap_seed=args.bootstrap_seed,
         )
-        print(json.dumps({"receipt": str(receipt_path), "evaluation_id": receipt["evaluation_id"]}, indent=2))
+        print(
+            json.dumps(
+                {"receipt": str(receipt_path), "evaluation_id": receipt["evaluation_id"]},
+                indent=2,
+            )
+        )
         return 0
 
     receipt = _read_json(args.receipt.resolve())
@@ -795,7 +924,12 @@ def main() -> int:
         repo_root=args.repo_root.resolve(),
         bundle_dir=args.bundle_dir.resolve(),
     )
-    print(json.dumps({"evaluation_id": verified["evaluation_id"], "status": "verified"}, indent=2))
+    print(
+        json.dumps(
+            {"evaluation_id": verified["evaluation_id"], "status": "verified"},
+            indent=2,
+        )
+    )
     return 0
 
 
