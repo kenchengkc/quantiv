@@ -115,7 +115,7 @@ def fetch_retired_research_sources(
     retired_tickers: Iterable[str],
     action_end: date,
 ) -> dict[str, Any]:
-    """Fetch exhaustive bounded history for the explicit retirement ledger."""
+    """Fetch exhaustive source history bounded by the research cutoff."""
     tickers = sorted({str(value).strip().upper() for value in retired_tickers if str(value).strip()})
     if not tickers:
         empty_digest = _canonical_digest([])
@@ -132,12 +132,13 @@ def fetch_retired_research_sources(
         }
 
     in_list = ", ".join(_sql_literal(ticker) for ticker in tickers)
+    cutoff_literal = _sql_literal(action_end.isoformat())
     earnings_raw, earnings_pages = _paged_query(
         query_fn,
         api_url=earnings_api,
         select="act_symbol, date, `when`",
         table="earnings_calendar",
-        where=f"act_symbol IN ({in_list})",
+        where=f"act_symbol IN ({in_list}) AND date < {cutoff_literal}",
         order_by="date, act_symbol",
     )
     split_raw, split_pages = _paged_query(
@@ -147,7 +148,7 @@ def fetch_retired_research_sources(
         table="split",
         where=(
             f"act_symbol IN ({in_list}) AND ex_date BETWEEN "
-            f"{_sql_literal(ACTION_START.isoformat())} AND {_sql_literal(action_end.isoformat())}"
+            f"{_sql_literal(ACTION_START.isoformat())} AND {cutoff_literal}"
         ),
         order_by="act_symbol, ex_date",
     )
@@ -158,7 +159,7 @@ def fetch_retired_research_sources(
         table="dividend",
         where=(
             f"act_symbol IN ({in_list}) AND ex_date BETWEEN "
-            f"{_sql_literal(ACTION_START.isoformat())} AND {_sql_literal(action_end.isoformat())}"
+            f"{_sql_literal(ACTION_START.isoformat())} AND {cutoff_literal}"
         ),
         order_by="act_symbol, ex_date",
     )
