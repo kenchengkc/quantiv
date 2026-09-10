@@ -4,7 +4,7 @@ The Research Lab turns Quantiv's point-in-time historical earnings evidence into
 
 ## Evidence boundary
 
-The production research universe is built directly from the analytical DuckDB views, independently of the per-ticker page history limit. An event is eligible only when the source-level builder can establish:
+The production research universe is built directly from analytical sources, independently of the per-ticker page history limit. An event is eligible only when the source-level builder can establish:
 
 - a canonical historical earnings identity;
 - a finite signed timing-aware realized earnings move from explicit pre/post price endpoints;
@@ -26,30 +26,54 @@ Split and cash-dividend controls normalize the post-event price onto the pre-eve
 
 The canonical earnings table can infer an unknown reporting session from a company's reporting history, including later reported events. That inference is useful for display but is not point-in-time evidence for an old event. The research-universe builder therefore uses BMO/AMC timing only when `timing_source = reported`; inferred timings are deliberately downgraded to the conservative unknown-session rule for historical selection.
 
+## Historical membership and survivorship control
+
+The forward calendar intentionally removes companies after confirmed delisting. That is correct for current product behavior but is not a valid historical research-universe rule.
+
+`tools/build_research_history.py` therefore re-queries only the explicit retirement ledger in `config/delisted_tickers.json` from the upstream DoltHub earnings source. Those rows are inserted only into the in-memory research connection. They are never restored to the forward calendar, screener, symbol universe, or forecast path.
+
+The operational corporate-action snapshot is also intentionally scoped to active names. To prevent a retired event from being interpreted as having zero splits or dividends merely because the company left that snapshot, the research build performs the same bounded supplement for retired-company split and dividend history and unions those rows with the verified operational action receipt in memory.
+
+The source-level artifact retains and binds:
+
+- the exact configured retired ticker set;
+- normalized retired-company earnings source rows;
+- normalized retired split/dividend rows;
+- deterministic SHA-256 digests and provider page counts for every retained source set;
+- configured retired tickers with no upstream earnings rows;
+- the number of research-only earnings rows installed;
+- the verified operational corporate-action receipt identity and combined action counts.
+
+A source-level artifact with missing, tampered, out-of-ledger, or count-inconsistent retirement evidence fails the public contract gate.
+
+Ticker renames are a separate identity issue rather than a delisting/survivorship issue. The canonical earnings source carries same-company history onto the current symbol, while older option/OHLCV partitions can still use the event-time symbol. Those canonical events remain visible in candidate/exclusion accounting instead of silently disappearing, but event-time alias replay is not claimed complete by this change. A future point-in-time alias layer can recover those observations without altering the retirement control above.
+
 ## Build path
 
 ```text
-earnings_events + v_eligible_straddles + v_ohlcv
-              + split/dividend controls
-                        │
-                        ▼
-          tools/build_research_history.py
-                        │
-                        ▼
-          public/research-history.json
-          source = analytical_duckdb
-          completeness = source_level
-          universe_id = sha256:...
-                        │
-                        ▼
-        immutable frontend publication
-                        │
-                        ▼
-              /api/research/cohort
-                        │
-                        ├── content-addressed JSON
-                        ├── CSV export
-                        └── /research UI
+analytical earnings + v_eligible_straddles + v_ohlcv
+        │
+        ├── verified corporate-action control
+        └── bounded retired-company source supplement
+                         │
+                         ▼
+              tools/build_research_history.py
+                         │
+                         ▼
+              public/research-history.json
+              source = analytical_duckdb
+              completeness = source_level
+              universe_id = sha256:...
+                         │
+                         ▼
+             immutable frontend publication
+                         │
+                         ▼
+                 /api/research/cohort
+                         │
+             ├── content-addressed JSON
+             ├── CSV export
+             └── /research UI
 ```
 
 The daily reconciled-data path refreshes this artifact after an accepted options snapshot or a verified options fallback. The writer is atomic: a failed research-universe build does not replace the last validated artifact or weaken the data/forecast gates.
@@ -73,7 +97,7 @@ A preview has no source-level `universe_id` and must not be described as complet
 
 ## Source-level artifact and audit
 
-`quantiv.historical-event-universe.v1` carries a deterministic `universe_id` over the full source metadata, inclusion/exclusion audit and eligible event rows. `generated_at` is operational metadata and is not part of that identity.
+`quantiv.historical-event-universe.v1` carries a deterministic `universe_id` over the full source metadata, retirement-membership evidence, inclusion/exclusion audit and eligible event rows. `generated_at` is operational metadata and is not part of that identity.
 
 Each eligible event retains:
 
@@ -90,45 +114,13 @@ The canonical earnings source currently does not expose a reliable row-level ava
 
 ## Query contract
 
-Current filters are:
+Current filters are ticker substring, report session, fiscal quarter, realized move inside/outside implied, EPS beat/miss, implied-move bounds, historical observation lead bounds, sort key/direction, and a bounded returned-row limit. The browser keeps filters in the URL so a cohort can be shared exactly.
 
-- ticker substring (`q`);
-- report session (`timing=bmo|amc`);
-- fiscal quarter (`quarter=Q1|Q2|Q3|Q4`);
-- realized move inside/outside the implied move (`outcome=inside|outside`);
-- EPS beat/miss (`eps=beat|miss`);
-- minimum/maximum implied move (`minImplied`, `maxImplied` as decimal fractions);
-- minimum/maximum historical observation lead days (`minLead`, `maxLead`);
-- sorting by date, ticker, implied move, realized move, edge, realized/implied ratio, or EPS surprise;
-- sort direction and a bounded result limit.
-
-The browser keeps these filters in the URL so a cohort view can be shared exactly.
-
-## Diagnostics
-
-The API computes summaries over the full matching cohort before applying the returned-row display limit:
-
-- event and unique-symbol counts;
-- average and median implied move;
-- average and median absolute realized move;
-- mean absolute implied-vs-realized error;
-- share of events outside the implied move;
-- median and interquartile realized/implied ratio;
-- average signed move;
-- average EPS surprise where available.
-
-The current UI plots implied move on the x-axis and absolute realized move on the y-axis. The diagonal is `realized = implied`; points above it exceeded the market-priced range. Chart sampling/table-order independence is a separate research-frontend control and should not be inferred from the source-universe change alone.
+The API computes summaries over the full matching cohort before applying the returned-row limit. JSON and CSV exports carry the same content-addressed snapshot identity.
 
 ## Content identity
 
-API responses use schema `quantiv.historical-cohort.v1` and receive a `sha256:<hex>` snapshot ID. For a source-level cohort, the ID binds the complete `universe_id`, not only the rows returned to the caller. It also covers:
-
-- historical-universe source/completeness metadata;
-- current forecast evidence receipt and publication-control state;
-- canonical query;
-- summary/matching counts;
-- exact ordered returned event rows;
-- decision-scope declarations.
+API responses use schema `quantiv.historical-cohort.v1` and receive a `sha256:<hex>` snapshot ID. For a source-level cohort, the ID binds the complete `universe_id`, not only the rows returned to the caller. It also covers source/completeness metadata, current forecast evidence, canonical query, full matching summary/counts, exact ordered returned rows, and decision-scope declarations.
 
 This means unrelated rows omitted from a bounded response are still bound indirectly through the source-level universe identity. Replaying an old source release remains a separate retained-release API capability to implement.
 
@@ -136,9 +128,9 @@ CSV carries the same snapshot ID in the response header and every row. The API a
 
 ## Contract checks
 
-`tools/validate_public_contracts.py` performs semantic checks for the source-level history before publication use. It rejects duplicate identities, count mismatches, nonfinite/invalid metrics, arithmetic mismatches, option-session violations, realized-window violations and any attempt to mark historical cohorts live-trading eligible. The preview contract is explicitly separate and cannot satisfy the source-level path.
+`tools/validate_public_contracts.py` performs semantic checks for source-level history. It rejects duplicate identities, count mismatches, nonfinite/invalid metrics, arithmetic mismatches, option-session violations, realized-window violations, malformed/tampered retirement evidence, and any attempt to mark historical cohorts live-trading eligible. The preview contract is explicitly separate and cannot satisfy the source-level path.
 
-The repository also publishes JSON Schema documents for the source-level and preview structures. Executing all generated/API artifacts through the JSON Schema documents themselves is a broader contract-engine task; the semantic checks here do not claim that broader task is complete.
+The repository also publishes JSON Schema documents for the source-level and preview structures. Executing every generated/API artifact through those JSON Schema documents is a broader contract-engine task; the semantic checks here do not claim that broader task is complete.
 
 ## Decision scope
 
