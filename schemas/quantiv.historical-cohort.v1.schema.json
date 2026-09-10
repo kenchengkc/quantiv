@@ -15,7 +15,7 @@
       "type": "object",
       "required": ["public_symbol_payloads", "eligible_event_universe", "forecast_receipt_id", "control_status", "publication_eligible"],
       "properties": {
-        "public_symbol_payloads": {"type": "integer", "minimum": 0},
+        "public_symbol_payloads": {"type": ["integer", "null"], "minimum": 0},
         "eligible_event_universe": {"type": "integer", "minimum": 0},
         "source_as_of_min": {"type": ["string", "null"]},
         "source_as_of_max": {"type": ["string", "null"]},
