@@ -223,9 +223,14 @@ def _source_snapshot(conn, cutoff: date, *, source_revision: str | None) -> dict
         [cutoff],
     ).fetchone()
     options = conn.execute(
-        "SELECT COUNT(*), MIN(as_of_date), MAX(as_of_date) FROM v_eligible_straddles"
+        "SELECT COUNT(*), MIN(as_of_date), MAX(as_of_date) "
+        "FROM v_eligible_straddles WHERE as_of_date <= ?",
+        [cutoff],
     ).fetchone()
-    prices = conn.execute("SELECT COUNT(*), MIN(date), MAX(date) FROM v_ohlcv").fetchone()
+    prices = conn.execute(
+        "SELECT COUNT(*), MIN(date), MAX(date) FROM v_ohlcv WHERE date <= ?",
+        [cutoff],
+    ).fetchone()
     return {
         "kind": "analytical_duckdb",
         "completeness": "source_level",
