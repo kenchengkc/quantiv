@@ -4,7 +4,9 @@
 from __future__ import annotations
 
 import json
+import math
 import re
+from datetime import date
 from pathlib import Path
 from typing import Any, Callable
 
@@ -48,6 +50,21 @@ def _string(value: Any, label: str) -> str:
     if not isinstance(value, str) or not value:
         raise ContractError(f"{label} must be a non-empty string")
     return value
+
+
+def _finite(value: Any, label: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+        raise ContractError(f"{label} must be a finite number")
+    return float(value)
+
+
+def _date(value: Any, label: str) -> date:
+    if not isinstance(value, str):
+        raise ContractError(f"{label} must be an ISO date")
+    try:
+        return date.fromisoformat(value)
+    except ValueError as exc:
+        raise ContractError(f"{label} must be an ISO date") from exc
 
 
 def validate_schema_documents() -> None:
@@ -147,6 +164,123 @@ def validate_model_validation() -> None:
         raise ContractError("model-validation decision scope must remain EOD research-only")
 
 
+def _timing_bucket(value: str) -> str:
+    normalized = value.lower()
+    if "before" in normalized or normalized == "bmo":
+        return "bmo"
+    if "after" in normalized or normalized == "amc":
+        return "amc"
+    return "other"
+
+
+def validate_research_history() -> None:
+    path = PUBLIC / "research-history.json"
+    payload = _object(_read(path), str(path))
+    if payload.get("schema") != "quantiv.historical-event-universe.v1":
+        raise ContractError("research-history schema discriminator changed")
+    if payload.get("decision_scope") != "end_of_day_research":
+        raise ContractError("historical research must remain end_of_day_research")
+    if payload.get("live_trading_eligible") is not False:
+        raise ContractError("historical research must never be live-trading eligible")
+
+    source = _object(payload.get("source"), "research-history.source")
+    kind = source.get("kind")
+    completeness = source.get("completeness")
+    events = _list(payload.get("events"), "research-history.events")
+    if payload.get("event_count") != len(events):
+        raise ContractError("research-history.event_count must equal len(events)")
+
+    # Legacy/source-controlled fallbacks remain available during migration, but
+    # they must be visibly distinguished from a complete analytical universe.
+    if kind == "display_payload_fallback":
+        if completeness != "display_limited":
+            raise ContractError("display research fallback must be marked display_limited")
+        return
+    if kind != "analytical_duckdb" or completeness != "source_level":
+        raise ContractError("research-history source kind/completeness is unsupported")
+
+    universe_id = _string(payload.get("universe_id"), "research-history.universe_id")
+    if not SHA256_RE.fullmatch(universe_id):
+        raise ContractError("research-history universe_id must be SHA-256")
+    audit = _object(payload.get("audit"), "research-history.audit")
+    _required(audit, "research-history.audit", "candidate_event_count", "eligible_event_count", "excluded_event_count", "exclusion_counts", "exclusions")
+    exclusions = _list(audit["exclusions"], "research-history.audit.exclusions")
+    if audit["eligible_event_count"] != len(events):
+        raise ContractError("research-history eligible count does not match events")
+    if audit["excluded_event_count"] != len(exclusions):
+        raise ContractError("research-history excluded count does not match exclusions")
+    if audit["candidate_event_count"] != len(events) + len(exclusions):
+        raise ContractError("research-history candidate/eligible/excluded counts do not reconcile")
+
+    seen: set[tuple[str, str]] = set()
+    source_as_of = _date(source.get("as_of_date"), "research-history.source.as_of_date")
+    for index, raw in enumerate(events):
+        event = _object(raw, f"research-history.events[{index}]")
+        _required(
+            event,
+            f"research-history.events[{index}]",
+            "ticker", "date", "timing", "actual", "realized_abs", "implied",
+            "implied_as_of", "implied_expiration", "implied_quality_status",
+            "edge", "ratio", "outside_implied", "realized_window",
+        )
+        ticker = _string(event["ticker"], f"research-history.events[{index}].ticker")
+        if not SYMBOL_RE.fullmatch(ticker):
+            raise ContractError(f"invalid ticker in historical research row: {ticker}")
+        event_date = _date(event["date"], f"research-history.events[{index}].date")
+        if event_date >= source_as_of:
+            raise ContractError("historical research contains an event on/after source as-of date")
+        identity = (ticker, event["date"])
+        if identity in seen:
+            raise ContractError(f"duplicate historical research event: {ticker} {event['date']}")
+        seen.add(identity)
+
+        actual = _finite(event["actual"], f"research-history.events[{index}].actual")
+        realized_abs = _finite(event["realized_abs"], f"research-history.events[{index}].realized_abs")
+        implied = _finite(event["implied"], f"research-history.events[{index}].implied")
+        edge = _finite(event["edge"], f"research-history.events[{index}].edge")
+        ratio = _finite(event["ratio"], f"research-history.events[{index}].ratio")
+        if implied <= 0 or realized_abs < 0 or ratio < 0:
+            raise ContractError("historical research contains invalid move magnitudes")
+        if not math.isclose(realized_abs, abs(actual), rel_tol=1e-12, abs_tol=1e-12):
+            raise ContractError("historical realized_abs does not equal abs(actual)")
+        if not math.isclose(edge, realized_abs - implied, rel_tol=1e-12, abs_tol=1e-12):
+            raise ContractError("historical edge arithmetic mismatch")
+        if not math.isclose(ratio, realized_abs / implied, rel_tol=1e-12, abs_tol=1e-12):
+            raise ContractError("historical ratio arithmetic mismatch")
+        if event["outside_implied"] is not (realized_abs > implied):
+            raise ContractError("historical outside_implied arithmetic mismatch")
+        if event["implied_quality_status"] != "decision_eligible_eod":
+            raise ContractError("historical option evidence bypassed decision-eligible quality")
+
+        implied_as_of = _date(event["implied_as_of"], f"research-history.events[{index}].implied_as_of")
+        expiry = _date(event["implied_expiration"], f"research-history.events[{index}].implied_expiration")
+        bucket = _timing_bucket(str(event["timing"]))
+        if bucket == "amc":
+            if implied_as_of > event_date or expiry <= event_date:
+                raise ContractError("AMC historical option window violates session eligibility")
+        elif implied_as_of >= event_date or expiry < event_date:
+            raise ContractError("non-AMC historical option window violates session eligibility")
+
+        window = _object(event["realized_window"], f"research-history.events[{index}].realized_window")
+        pre_date = _date(window.get("pre_date"), f"research-history.events[{index}].realized_window.pre_date")
+        post_date = _date(window.get("post_date"), f"research-history.events[{index}].realized_window.post_date")
+        pre_price = _finite(window.get("pre_price"), f"research-history.events[{index}].realized_window.pre_price")
+        post_adjusted = _finite(window.get("post_price_adjusted"), f"research-history.events[{index}].realized_window.post_price_adjusted")
+        if pre_price <= 0 or post_adjusted <= 0:
+            raise ContractError("historical realized price window contains nonpositive prices")
+        if bucket == "bmo":
+            valid_window = pre_date < event_date and post_date >= event_date
+        elif bucket == "amc":
+            valid_window = pre_date <= event_date and post_date > event_date
+        else:
+            valid_window = pre_date < event_date and post_date > event_date
+        if not valid_window:
+            raise ContractError("historical realized price window violates session eligibility")
+        expected_actual = post_adjusted / pre_price - 1.0
+        if not math.isclose(actual, expected_actual, rel_tol=1e-12, abs_tol=1e-12):
+            raise ContractError("historical realized move does not match adjusted price endpoints")
+
+
 def validate_repo() -> list[str]:
     checks: list[tuple[str, Callable[[], None]]] = [
         ("schema documents", validate_schema_documents),
@@ -155,6 +289,7 @@ def validate_repo() -> list[str]:
         ("forecast evidence", validate_dashboard_evidence),
         ("control plane", validate_control_plane),
         ("model validation", validate_model_validation),
+        ("research history", validate_research_history),
     ]
     passed: list[str] = []
     for name, check in checks:
