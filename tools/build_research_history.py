@@ -19,6 +19,7 @@ for candidate in (REPO_ROOT / "tools", REPO_ROOT / "scripts", ML_PACKAGE_ROOT):
 
 from build_earnings_events import build_earnings_events_table, create_duckdb_views  # noqa: E402
 from delisted import delisted_tickers  # noqa: E402
+from frontend_data.research_cutoff import restrict_ohlcv_to_as_of  # noqa: E402
 from frontend_data.research_history import (  # noqa: E402
     build_historical_event_universe,
     write_historical_event_universe,
@@ -59,6 +60,11 @@ def main() -> int:
             as_of_date = row[0]
         if as_of_date is None:
             raise RuntimeError("cannot build research history without an options as-of date")
+
+        # Seal the price source before any realized-window query is executed.
+        # An event before the cutoff cannot consume a later OHLCV close even if
+        # the local price lake has advanced beyond the options research date.
+        cutoff_evidence = restrict_ohlcv_to_as_of(conn, as_of_date)
 
         # The production calendar deliberately removes confirmed delistings.
         # Historical research must not inherit that active-universe filter.
@@ -106,6 +112,11 @@ def main() -> int:
         "Research history: "
         f"{payload['event_count']} eligible / {payload['audit']['candidate_event_count']} canonical events "
         f"({payload['audit']['excluded_event_count']} excluded) -> {args.output}"
+    )
+    print(
+        "OHLCV cutoff: "
+        f"{cutoff_evidence['retained_rows']} retained / {cutoff_evidence['source_rows']} source rows; "
+        f"{cutoff_evidence['dropped_post_cutoff_rows']} post-cutoff rows inaccessible"
     )
     membership = payload["source"]["retired_membership"]
     print(
