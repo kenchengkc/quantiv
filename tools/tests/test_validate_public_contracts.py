@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -152,7 +153,7 @@ def _retired_membership() -> dict:
 
 
 def _source_level_history() -> dict:
-    return {
+    payload = {
         "schema": contracts.SOURCE_UNIVERSE_SCHEMA,
         "source": {
             "kind": "analytical_duckdb",
@@ -194,20 +195,47 @@ def _source_level_history() -> dict:
                 },
             }
         ],
-        "universe_id": "sha256:" + "a" * 64,
         "generated_at": "2026-09-10T00:00:00+00:00",
     }
+    identity = {
+        key: value
+        for key, value in payload.items()
+        if key not in {"universe_id", "generated_at"}
+    }
+    encoded = json.dumps(
+        identity,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    ).encode()
+    payload["universe_id"] = "sha256:" + hashlib.sha256(encoded).hexdigest()
+    return payload
+
+
+def _write_research_history(
+    public: Path,
+    payload: dict,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    public.mkdir()
+    (public / "research-history.json").write_text(json.dumps(payload))
+    monkeypatch.setattr(contracts, "PUBLIC", public)
+
+
+def test_source_level_research_history_accepts_sealed_fixture(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write_research_history(tmp_path / "public", _source_level_history(), monkeypatch)
+    contracts.validate_research_history()
 
 
 def test_source_level_research_history_checks_event_arithmetic(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     public = tmp_path / "public"
-    public.mkdir()
     payload = _source_level_history()
     payload["events"][0]["ratio"] = 99.0
-    (public / "research-history.json").write_text(json.dumps(payload))
-    monkeypatch.setattr(contracts, "PUBLIC", public)
+    _write_research_history(public, payload, monkeypatch)
 
     with pytest.raises(contracts.ContractError, match="ratio arithmetic"):
         contracts.validate_research_history()
@@ -217,11 +245,9 @@ def test_source_level_research_history_rejects_live_scope(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     public = tmp_path / "public"
-    public.mkdir()
     payload = _source_level_history()
     payload["live_trading_eligible"] = True
-    (public / "research-history.json").write_text(json.dumps(payload))
-    monkeypatch.setattr(contracts, "PUBLIC", public)
+    _write_research_history(public, payload, monkeypatch)
 
     with pytest.raises(contracts.ContractError, match="live-trading"):
         contracts.validate_research_history()
@@ -231,11 +257,9 @@ def test_source_level_research_history_requires_retired_membership_evidence(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     public = tmp_path / "public"
-    public.mkdir()
     payload = _source_level_history()
     del payload["source"]["retired_membership"]
-    (public / "research-history.json").write_text(json.dumps(payload))
-    monkeypatch.setattr(contracts, "PUBLIC", public)
+    _write_research_history(public, payload, monkeypatch)
 
     with pytest.raises(contracts.ContractError, match="retired_membership"):
         contracts.validate_research_history()
@@ -245,11 +269,21 @@ def test_source_level_research_history_rejects_tampered_membership_digest(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     public = tmp_path / "public"
-    public.mkdir()
     payload = _source_level_history()
     payload["source"]["retired_membership"]["earnings"]["sha256"] = "sha256:" + "b" * 64
-    (public / "research-history.json").write_text(json.dumps(payload))
-    monkeypatch.setattr(contracts, "PUBLIC", public)
+    _write_research_history(public, payload, monkeypatch)
 
     with pytest.raises(contracts.ContractError, match="digest"):
+        contracts.validate_research_history()
+
+
+def test_source_level_research_history_rejects_stale_universe_id(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    public = tmp_path / "public"
+    payload = _source_level_history()
+    payload["source"]["source_revision"] = "tampered-after-sealing"
+    _write_research_history(public, payload, monkeypatch)
+
+    with pytest.raises(contracts.ContractError, match="canonical content"):
         contracts.validate_research_history()
