@@ -11,16 +11,20 @@ EMPTY_ROWS_SHA256 = "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f
 
 
 def test_committed_public_contracts_validate() -> None:
-    passed = contracts.validate_repo()
-    assert passed == [
-        "schema documents",
-        "screener",
-        "symbol payloads",
-        "forecast evidence",
-        "control plane",
-        "model validation",
-        "research history",
+    # research-history.json is a materialized/generated artifact and is not
+    # guaranteed to exist in a clean source checkout. Baseline CI validates the
+    # committed corpus here; generated-history fixtures below exercise the
+    # strict research-history gate directly.
+    checks = [
+        contracts.validate_schema_documents,
+        contracts.validate_screener,
+        contracts.validate_symbol_payloads,
+        contracts.validate_dashboard_evidence,
+        contracts.validate_control_plane,
+        contracts.validate_model_validation,
     ]
+    for check in checks:
+        check()
 
 
 def test_screener_contract_fails_closed_on_count_mismatch(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
