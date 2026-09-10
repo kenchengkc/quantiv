@@ -71,6 +71,31 @@ def test_retired_membership_fetch_is_bounded_deterministic_and_auditable() -> No
     assert first["earnings"]["sha256"].startswith("sha256:")
 
 
+def test_retired_source_queries_are_bounded_by_research_cutoff() -> None:
+    statements: list[str] = []
+
+    def empty_query(sql: str, api_url: str) -> list[dict]:
+        del api_url
+        statements.append(sql)
+        return []
+
+    fetch_retired_research_sources(
+        empty_query,
+        earnings_api="earnings-api",
+        stocks_api="stocks-api",
+        retired_tickers={"OLD"},
+        action_end=date(2026, 1, 1),
+    )
+
+    assert len(statements) == 3
+    earnings_sql = next(sql for sql in statements if "FROM earnings_calendar" in sql)
+    split_sql = next(sql for sql in statements if "FROM split" in sql)
+    dividend_sql = next(sql for sql in statements if "FROM dividend" in sql)
+    assert "date < '2026-01-01'" in earnings_sql
+    assert "ex_date BETWEEN '2019-01-01' AND '2026-01-01'" in split_sql
+    assert "ex_date BETWEEN '2019-01-01' AND '2026-01-01'" in dividend_sql
+
+
 def test_retired_earnings_are_research_only_and_do_not_overwrite_existing_rows() -> None:
     conn = duckdb.connect()
     conn.execute(
