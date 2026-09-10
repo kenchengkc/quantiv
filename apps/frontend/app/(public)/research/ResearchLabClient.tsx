@@ -10,7 +10,7 @@ type CohortResponse = {
   schema: string;
   snapshot_id: string;
   source: {
-    public_symbol_payloads: number;
+    public_symbol_payloads: number | null;
     source_as_of_min: string | null;
     source_as_of_max: string | null;
     eligible_event_universe: number;
