@@ -12,6 +12,10 @@ import {
   sampleCalibrationEvents,
 } from '@/lib/researchChart.server';
 import {
+  verifyRetainedPublicArtifact,
+  type RetainedReleaseBinding,
+} from '@/lib/researchRelease.server';
+import {
   csvCell,
   readPublicJson,
   researchSnapshotId,
@@ -55,6 +59,14 @@ type ControlPlane = {
   generated_at?: string;
   status?: string;
   publication_eligible?: boolean;
+};
+
+type PreviewReleaseBinding = {
+  status: 'preview_unverified';
+  release_id: null;
+  manifest_sha256: null;
+  source_revision: null;
+  source_artifact: null;
 };
 
 function toCsv(id: string, events: CohortEvent[]): string {
@@ -110,6 +122,27 @@ export async function GET(request: Request) {
     );
   }
 
+  let retainedRelease: RetainedReleaseBinding | PreviewReleaseBinding;
+  if (isSourceLevel) {
+    try {
+      retainedRelease = verifyRetainedPublicArtifact('research-history.json');
+    } catch (error) {
+      console.error('Research Lab retained-release verification failed', error);
+      return NextResponse.json(
+        { error: 'Historical research release verification failed.' },
+        { status: 503 },
+      );
+    }
+  } else {
+    retainedRelease = {
+      status: 'preview_unverified',
+      release_id: null,
+      manifest_sha256: null,
+      source_revision: null,
+      source_artifact: null,
+    };
+  }
+
   const allMatching = applyCohortQuery(universeEvents, {
     ...query,
     limit: Math.max(1, universeEvents.length),
@@ -133,6 +166,7 @@ export async function GET(request: Request) {
       historical_universe_completeness: universe.source?.completeness,
       historical_universe_generated_at: universe.generated_at ?? null,
       historical_universe_source_revision: universe.source?.source_revision ?? null,
+      retained_release: retainedRelease,
       public_symbol_payloads: universe.source?.symbol_payloads ?? null,
       source_as_of_min: universe.source?.as_of_min ?? sourceAsOf,
       source_as_of_max: universe.source?.as_of_max ?? sourceAsOf,
@@ -169,6 +203,7 @@ export async function GET(request: Request) {
   };
   const id = researchSnapshotId(immutable);
   const shortId = id.slice('sha256:'.length, 'sha256:'.length + 12);
+  const retainedReleaseHeader = retainedRelease.release_id ?? 'preview-unverified';
 
   if (format === 'csv') {
     return new Response(toCsv(id, events), {
@@ -179,6 +214,7 @@ export async function GET(request: Request) {
         'X-Quantiv-Snapshot-Id': id,
         'X-Quantiv-Decision-Scope': decisionScope,
         'X-Quantiv-Universe-Completeness': universe.source?.completeness ?? 'unknown',
+        'X-Quantiv-Retained-Release': retainedReleaseHeader,
       },
     });
   }
@@ -191,6 +227,7 @@ export async function GET(request: Request) {
         'X-Quantiv-Snapshot-Id': id,
         'X-Quantiv-Decision-Scope': decisionScope,
         'X-Quantiv-Universe-Completeness': universe.source?.completeness ?? 'unknown',
+        'X-Quantiv-Retained-Release': retainedReleaseHeader,
       },
     },
   );
