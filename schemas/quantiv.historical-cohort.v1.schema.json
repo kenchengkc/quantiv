@@ -31,6 +31,24 @@
       "type": "object",
       "required": ["events", "symbols", "avgImplied", "avgRealized", "medianImplied", "medianRealized", "medianRatio", "outsideRate", "meanAbsoluteError"]
     },
+    "chart": {
+      "type": "object",
+      "required": ["population_count", "sample_count", "max_points", "sampling", "events"],
+      "properties": {
+        "population_count": {"type": "integer", "minimum": 0},
+        "sample_count": {"type": "integer", "minimum": 0, "maximum": 350},
+        "max_points": {"const": 350},
+        "sampling": {"const": "sha256_event_identity_lowest_v1"},
+        "events": {
+          "type": "array",
+          "maxItems": 350,
+          "items": {
+            "type": "object",
+            "required": ["ticker", "date", "timing", "actual", "realized_abs", "implied", "implied_as_of", "implied_quality_status", "edge", "ratio", "outside_implied"]
+          }
+        }
+      }
+    },
     "events": {
       "type": "array",
       "items": {

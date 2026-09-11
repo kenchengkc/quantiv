@@ -122,15 +122,19 @@ The canonical earnings source currently does not expose a reliable row-level ava
 
 Current filters are ticker substring, report session, fiscal quarter, realized move inside/outside implied, EPS beat/miss, implied-move bounds, historical observation lead bounds, sort key/direction, and a bounded returned-row limit. The browser keeps filters in the URL so a cohort can be shared exactly.
 
-The API computes summaries over the full matching cohort before applying the returned-row limit. JSON and CSV exports carry the same content-addressed snapshot identity.
+The API computes summaries and the calibration-chart population over the full matching cohort before applying the returned-row limit. The evidence table remains caller-sorted and caller-limited. The calibration plot is separate: it deterministically ranks each matching `ticker|date` identity by SHA-256 and plots the lowest-ranked 350 identities, or the complete matching population when fewer than 350 events qualify. Changing table sort, direction, or row limit therefore cannot change plot membership; changing a research filter intentionally can.
+
+The API exposes `chart.population_count`, `chart.sample_count`, `chart.max_points`, `chart.sampling`, and the exact sampled events. The UI displays the plotted sample count against the full filtered population so a researcher can distinguish a complete plot from a bounded visualization sample.
+
+JSON and CSV exports carry the same content-addressed snapshot identity.
 
 ## Content identity
 
-API responses use schema `quantiv.historical-cohort.v1` and receive a `sha256:<hex>` snapshot ID. For a source-level cohort, the ID binds the complete `universe_id`, not only the rows returned to the caller. It also covers source/completeness metadata, current forecast evidence, canonical query, full matching summary/counts, exact ordered returned rows, and decision-scope declarations.
+API responses use schema `quantiv.historical-cohort.v1` and receive a `sha256:<hex>` snapshot ID. For a source-level cohort, the ID binds the complete `universe_id`, not only the rows returned to the caller. It also covers source/completeness metadata, current forecast evidence, canonical query, full matching summary/counts, deterministic calibration sample metadata and rows, exact ordered returned table rows, and decision-scope declarations.
 
 The source-level `universe_id` itself is not accepted on shape alone. Publication validation reconstructs the canonical identity from every field except `universe_id` and operational `generated_at`, recomputes SHA-256, and rejects a stale or forged content address. This makes source/audit/event mutations detectable even when all individual fields remain otherwise semantically valid.
 
-This means unrelated rows omitted from a bounded response are still bound indirectly through the source-level universe identity. Replaying an old source release remains a separate retained-release API capability to implement.
+This means unrelated rows omitted from a bounded response are still bound indirectly through the source-level universe identity, while the exact chart sample is bound directly. Replaying an old source release remains a separate retained-release API capability to implement.
 
 CSV carries the same snapshot ID in the response header and every row. The API also emits `X-Quantiv-Universe-Completeness` so a caller can distinguish `source_level` from a migration preview.
 

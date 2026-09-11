@@ -7,6 +7,11 @@ import {
   type CohortEvent,
 } from '@/lib/researchCohort';
 import {
+  CALIBRATION_CHART_MAX_POINTS,
+  CALIBRATION_CHART_SAMPLING,
+  sampleCalibrationEvents,
+} from '@/lib/researchChart.server';
+import {
   csvCell,
   readPublicJson,
   researchSnapshotId,
@@ -110,6 +115,7 @@ export async function GET(request: Request) {
     limit: Math.max(1, universeEvents.length),
   });
   const events = allMatching.slice(0, query.limit);
+  const chartEvents = sampleCalibrationEvents(allMatching);
   const evidence = readPublicJson<ForecastEvidence>('evidence', 'forecast.json');
   const control = readPublicJson<ControlPlane>('control-plane.json');
 
@@ -152,6 +158,13 @@ export async function GET(request: Request) {
     matching_count: allMatching.length,
     returned_count: events.length,
     summary: summarizeCohort(allMatching),
+    chart: {
+      population_count: allMatching.length,
+      sample_count: chartEvents.length,
+      max_points: CALIBRATION_CHART_MAX_POINTS,
+      sampling: CALIBRATION_CHART_SAMPLING,
+      events: chartEvents,
+    },
     events,
   };
   const id = researchSnapshotId(immutable);
