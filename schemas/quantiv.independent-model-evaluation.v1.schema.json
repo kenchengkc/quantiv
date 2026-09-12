@@ -1,0 +1,160 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quantiv.local/schemas/quantiv.independent-model-evaluation.v1.schema.json",
+  "title": "Quantiv independent model evaluation v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "evaluation_id",
+    "evaluated_at",
+    "bundle_id",
+    "model_validation_receipt_id",
+    "training_bundle_sha256",
+    "source_revision",
+    "reservation_id",
+    "selection",
+    "protocol",
+    "summary",
+    "horizons",
+    "research_manifest",
+    "signature"
+  ],
+  "properties": {
+    "schema": { "const": "quantiv.independent-model-evaluation.v1" },
+    "evaluation_id": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "evaluated_at": { "type": "string", "format": "date-time" },
+    "bundle_id": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "model_validation_receipt_id": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "training_bundle_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "source_revision": { "type": "string", "minLength": 1 },
+    "reservation_id": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "selection": {
+      "type": "object",
+      "required": [
+        "family",
+        "current_candidate_test_labels_used_for_hyperparameter_tuning",
+        "current_candidate_test_labels_used_for_early_stopping",
+        "current_candidate_test_labels_used_for_quantile_calibration",
+        "current_candidate_test_rows_used_in_common_holdout",
+        "current_run_test_rows_used_in_operational_outcome_check",
+        "promotion_decision_evaluated_at",
+        "performance_gate_applied_after_decision",
+        "historical_model_family_exposure_status"
+      ],
+      "properties": {
+        "family": { "type": "string", "minLength": 1 },
+        "current_candidate_test_labels_used_for_hyperparameter_tuning": { "const": false },
+        "current_candidate_test_labels_used_for_early_stopping": { "const": false },
+        "current_candidate_test_labels_used_for_quantile_calibration": { "const": false },
+        "current_candidate_test_rows_used_in_common_holdout": { "const": false },
+        "current_run_test_rows_used_in_operational_outcome_check": { "const": false },
+        "promotion_decision_evaluated_at": { "type": ["string", "null"] },
+        "performance_gate_applied_after_decision": { "const": false },
+        "historical_model_family_exposure_status": { "const": "not_established" }
+      },
+      "additionalProperties": false
+    },
+    "protocol": { "type": "object" },
+    "summary": {
+      "type": "object",
+      "required": [
+        "row_observations",
+        "unique_events_across_horizons",
+        "paired_baseline_row_observations",
+        "weighted_paired_model_mae",
+        "weighted_paired_straddle_mae",
+        "weighted_paired_relative_mae_improvement",
+        "aggregate_significance_claim"
+      ],
+      "properties": {
+        "row_observations": { "type": "integer", "minimum": 1 },
+        "unique_events_across_horizons": { "type": "integer", "minimum": 1 },
+        "paired_baseline_row_observations": { "type": "integer", "minimum": 1 },
+        "weighted_paired_model_mae": { "type": "number", "minimum": 0 },
+        "weighted_paired_straddle_mae": { "type": "number", "minimum": 0 },
+        "weighted_paired_relative_mae_improvement": { "type": ["number", "null"] },
+        "aggregate_significance_claim": { "const": false }
+      },
+      "additionalProperties": false
+    },
+    "horizons": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "horizon_days",
+          "test_start",
+          "test_end",
+          "rows",
+          "unique_events",
+          "issuers",
+          "paired_baseline_rows",
+          "model_mae_all_rows",
+          "model_rmse_all_rows",
+          "model_r2_all_rows",
+          "paired_model_mae",
+          "paired_straddle_mae",
+          "paired_relative_mae_improvement",
+          "mean_absolute_error_difference",
+          "mae_difference_95_ci",
+          "coverage",
+          "input_sha256",
+          "predictions_sha256"
+        ],
+        "properties": {
+          "horizon_days": { "type": "integer", "minimum": 1 },
+          "test_start": { "type": "string", "format": "date" },
+          "test_end": { "type": "string", "format": "date" },
+          "rows": { "type": "integer", "minimum": 1 },
+          "unique_events": { "type": "integer", "minimum": 1 },
+          "issuers": { "type": "integer", "minimum": 1 },
+          "paired_baseline_rows": { "type": "integer", "minimum": 1 },
+          "model_mae_all_rows": { "type": "number", "minimum": 0 },
+          "model_rmse_all_rows": { "type": "number", "minimum": 0 },
+          "model_r2_all_rows": { "type": "number" },
+          "paired_model_mae": { "type": "number", "minimum": 0 },
+          "paired_straddle_mae": { "type": "number", "minimum": 0 },
+          "paired_relative_mae_improvement": { "type": ["number", "null"] },
+          "mean_absolute_error_difference": { "type": "number" },
+          "mae_difference_95_ci": {
+            "type": "object",
+            "required": ["issuer_clustered", "earnings_week_clustered", "conservative_envelope"],
+            "properties": {
+              "issuer_clustered": { "$ref": "#/$defs/interval" },
+              "earnings_week_clustered": { "$ref": "#/$defs/interval" },
+              "conservative_envelope": { "$ref": "#/$defs/interval" }
+            },
+            "additionalProperties": false
+          },
+          "coverage": { "type": "object" },
+          "input_sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+          "predictions_sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "research_manifest": { "type": "object" },
+    "signature": {
+      "type": "object",
+      "required": ["algorithm", "value"],
+      "properties": {
+        "algorithm": { "const": "ed25519" },
+        "value": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    }
+  },
+  "$defs": {
+    "interval": {
+      "type": "array",
+      "prefixItems": [
+        { "type": "number" },
+        { "type": "number" }
+      ],
+      "minItems": 2,
+      "maxItems": 2
+    }
+  },
+  "additionalProperties": false
+}

@@ -92,12 +92,12 @@ jobs:
           if-no-files-found: ignore
           retention-days: 90
 
-      - name: Gate — validate training artifacts
+      - name: Gate — validate full training source
         run: |
           python scripts/validate_ml_pipeline.py training \
             --report data/validation/retrain_training.json
 
-      - name: Upload training validation report
+      - name: Upload full training validation report
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -106,7 +106,28 @@ jobs:
           if-no-files-found: ignore
           retention-days: 30
 
-      - name: Train LightGBM models
+      - name: Reserve untouched independent final test
+        run: |
+          python scripts/research/independent_model_evaluation.py prepare \
+            --source-revision "$GITHUB_SHA"
+
+      - name: Gate — validate development-only training artifacts
+        run: |
+          python scripts/validate_ml_pipeline.py training \
+            --report data/validation/retrain_development_training.json
+
+      - name: Upload independent-test reservation evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: independent-test-reservation
+          path: |
+            data/independent_evaluation/pending/reservation.json
+            data/validation/retrain_development_training.json
+          if-no-files-found: ignore
+          retention-days: 90
+
+      - name: Train LightGBM models on development data
         run: python apps/ml/model_trainer.py --tune --time-decay 0.5
 
       - name: Gate — mandatory purged walk-forward validation
@@ -193,6 +214,24 @@ jobs:
             --models-dir "${{ steps.package-challenger.outputs.bundle_dir }}" \
             --report data/validation/promoted_forecasts.json \
             --publish-receipt-dir data/forecasts/receipts
+
+      - name: Evaluate promoted bundle on untouched final test
+        if: steps.model-decision.outputs.promoted == 'true'
+        env:
+          MODEL_BUNDLE_SIGNING_KEY: ${{ secrets.MODEL_BUNDLE_SIGNING_KEY }}
+        run: |
+          python scripts/research/independent_model_evaluation.py evaluate \
+            --bundle-dir "${{ steps.package-challenger.outputs.bundle_dir }}" \
+            --source-revision "$GITHUB_SHA"
+
+      - name: Upload independent final-test evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: independent-model-evaluation
+          path: data/models/evaluations/**
+          if-no-files-found: ignore
+          retention-days: 365
 
       - name: Rescore production after automatic rollback
         id: rollback-score
