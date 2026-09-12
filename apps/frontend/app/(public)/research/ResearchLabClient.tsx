@@ -10,7 +10,7 @@ type CohortResponse = {
   schema: string;
   snapshot_id: string;
   source: {
-    public_symbol_payloads: number;
+    public_symbol_payloads: number | null;
     source_as_of_min: string | null;
     source_as_of_max: string | null;
     eligible_event_universe: number;
@@ -25,6 +25,13 @@ type CohortResponse = {
   matching_count: number;
   returned_count: number;
   summary: CohortSummary;
+  chart: {
+    population_count: number;
+    sample_count: number;
+    max_points: number;
+    sampling: string;
+    events: CohortEvent[];
+  };
   events: CohortEvent[];
 };
 
@@ -94,8 +101,18 @@ function Metric({ label, value, detail }: { label: string; value: string; detail
   );
 }
 
-function CalibrationScatter({ events }: { events: CohortEvent[] }) {
-  const points = events.slice(0, 350);
+function CalibrationScatter({
+  events,
+  populationCount,
+  sampleCount,
+  sampling,
+}: {
+  events: CohortEvent[];
+  populationCount: number;
+  sampleCount: number;
+  sampling: string;
+}) {
+  const points = events;
   const maxValue = Math.max(
     0.08,
     ...points.map((event) => Math.max(event.implied, event.realized_abs)),
@@ -123,7 +140,15 @@ function CalibrationScatter({ events }: { events: CohortEvent[] }) {
           </div>
           <div style={{ marginTop: 5, fontSize: 13, color: 'var(--ink-2)' }}>Market-implied move vs. realized earnings move magnitude</div>
         </div>
-        <div className="mono" style={{ fontSize: 10, color: 'var(--ink-4)' }}>Diagonal = priced exactly</div>
+        <div
+          className="mono"
+          data-testid="calibration-sample-count"
+          title={sampling}
+          style={{ fontSize: 10, color: 'var(--ink-4)', textAlign: 'right', lineHeight: 1.45 }}
+        >
+          <div>{sampleCount} / {populationCount} plotted</div>
+          <div>Deterministic sample · diagonal = priced exactly</div>
+        </div>
       </div>
       <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Historical implied move versus realized move scatter plot" style={{ width: '100%', height: 'auto', display: 'block' }}>
         <line x1={pad} y1={height - pad} x2={width - pad} y2={pad} stroke="var(--line-2)" strokeWidth="1.5" strokeDasharray="5 5" />
@@ -350,7 +375,12 @@ export default function ResearchLabClient() {
           </section>
 
           <section style={{ marginTop: 14 }}>
-            <CalibrationScatter events={data.events} />
+            <CalibrationScatter
+              events={data.chart.events}
+              populationCount={data.chart.population_count}
+              sampleCount={data.chart.sample_count}
+              sampling={data.chart.sampling}
+            />
           </section>
 
           <section style={{ marginTop: 18, border: '1px solid var(--line)', borderRadius: 14, overflow: 'hidden' }}>

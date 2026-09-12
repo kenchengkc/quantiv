@@ -1,0 +1,319 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quantiv.local/schemas/quantiv.historical-event-universe.v1.schema.json",
+  "title": "Quantiv historical event universe v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "source",
+    "evidence_rule",
+    "decision_scope",
+    "live_trading_eligible",
+    "event_count",
+    "audit",
+    "events",
+    "universe_id",
+    "generated_at"
+  ],
+  "properties": {
+    "schema": { "const": "quantiv.historical-event-universe.v1" },
+    "source": {
+      "type": "object",
+      "required": [
+        "kind",
+        "completeness",
+        "as_of_date",
+        "transformation",
+        "transformation_version",
+        "retired_membership"
+      ],
+      "properties": {
+        "kind": { "const": "analytical_duckdb" },
+        "completeness": { "const": "source_level" },
+        "as_of_date": { "type": "string", "format": "date" },
+        "source_revision": { "type": ["string", "null"] },
+        "transformation": { "type": "string", "minLength": 1 },
+        "transformation_version": { "type": "string", "minLength": 1 },
+        "earnings_rows_before_cutoff": { "type": "integer", "minimum": 0 },
+        "canonical_event_identities_before_cutoff": { "type": "integer", "minimum": 0 },
+        "eligible_straddle_rows": { "type": "integer", "minimum": 0 },
+        "eligible_straddle_as_of_min": { "type": ["string", "null"], "format": "date" },
+        "eligible_straddle_as_of_max": { "type": ["string", "null"], "format": "date" },
+        "ohlcv_rows": { "type": "integer", "minimum": 0 },
+        "ohlcv_date_min": { "type": ["string", "null"], "format": "date" },
+        "ohlcv_date_max": { "type": ["string", "null"], "format": "date" },
+        "symbol_payloads": { "type": "integer", "minimum": 0 },
+        "as_of_min": { "type": ["string", "null"], "format": "date" },
+        "as_of_max": { "type": ["string", "null"], "format": "date" },
+        "retired_membership": { "$ref": "#/$defs/retiredMembership" }
+      },
+      "additionalProperties": false
+    },
+    "evidence_rule": { "type": "string", "minLength": 1 },
+    "decision_scope": { "const": "end_of_day_research" },
+    "live_trading_eligible": { "const": false },
+    "event_count": { "type": "integer", "minimum": 0 },
+    "audit": {
+      "type": "object",
+      "required": [
+        "candidate_event_count",
+        "eligible_event_count",
+        "excluded_event_count",
+        "source_duplicate_rows_collapsed",
+        "exclusion_counts",
+        "exclusions"
+      ],
+      "properties": {
+        "candidate_event_count": { "type": "integer", "minimum": 0 },
+        "eligible_event_count": { "type": "integer", "minimum": 0 },
+        "excluded_event_count": { "type": "integer", "minimum": 0 },
+        "source_duplicate_rows_collapsed": { "type": "integer", "minimum": 0 },
+        "exclusion_counts": {
+          "type": "object",
+          "additionalProperties": { "type": "integer", "minimum": 0 }
+        },
+        "exclusions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["ticker", "date", "reasons", "timing", "timing_source", "source_row_count"],
+            "properties": {
+              "ticker": { "$ref": "#/$defs/ticker" },
+              "date": { "type": "string", "format": "date" },
+              "reasons": {
+                "type": "array",
+                "minItems": 1,
+                "uniqueItems": true,
+                "items": { "type": "string", "minLength": 1 }
+              },
+              "timing": { "type": "string", "minLength": 1 },
+              "timing_source": { "type": "string", "minLength": 1 },
+              "source_row_count": { "type": "integer", "minimum": 1 }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "events": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/event" }
+    },
+    "universe_id": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "generated_at": { "type": "string", "format": "date-time" }
+  },
+  "$defs": {
+    "ticker": { "type": "string", "pattern": "^[A-Z][A-Z0-9.\\-]{0,9}$" },
+    "nullableNumber": { "type": ["number", "null"] },
+    "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "earningsSourceRow": {
+      "type": "object",
+      "required": ["ticker", "date", "timing"],
+      "properties": {
+        "ticker": { "$ref": "#/$defs/ticker" },
+        "date": { "type": "string", "format": "date" },
+        "timing": { "enum": ["before_market_open", "after_market_close", "unknown"] }
+      },
+      "additionalProperties": false
+    },
+    "splitSourceRow": {
+      "type": "object",
+      "required": ["ticker", "ex_date", "to_factor", "for_factor"],
+      "properties": {
+        "ticker": { "$ref": "#/$defs/ticker" },
+        "ex_date": { "type": "string", "format": "date" },
+        "to_factor": { "type": "number", "exclusiveMinimum": 0 },
+        "for_factor": { "type": "number", "exclusiveMinimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "dividendSourceRow": {
+      "type": "object",
+      "required": ["ticker", "ex_date", "amount"],
+      "properties": {
+        "ticker": { "$ref": "#/$defs/ticker" },
+        "ex_date": { "type": "string", "format": "date" },
+        "amount": { "type": "number", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "retiredSourceSet": {
+      "type": "object",
+      "required": ["rows", "row_count", "pages", "sha256"],
+      "properties": {
+        "rows": { "type": "array" },
+        "row_count": { "type": "integer", "minimum": 0 },
+        "pages": { "type": "integer", "minimum": 0 },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      },
+      "additionalProperties": false
+    },
+    "retiredMembership": {
+      "type": "object",
+      "required": [
+        "status",
+        "method",
+        "configured_tickers",
+        "earnings",
+        "corporate_actions",
+        "missing_earnings_tickers",
+        "installed_event_rows",
+        "corporate_action_control"
+      ],
+      "properties": {
+        "status": { "const": "verified" },
+        "method": { "const": "bounded_provider_query_for_explicit_retirement_ledger" },
+        "configured_tickers": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/ticker" }
+        },
+        "earnings": {
+          "allOf": [
+            { "$ref": "#/$defs/retiredSourceSet" },
+            {
+              "properties": {
+                "rows": { "type": "array", "items": { "$ref": "#/$defs/earningsSourceRow" } }
+              }
+            }
+          ]
+        },
+        "corporate_actions": {
+          "type": "object",
+          "required": ["splits", "dividends"],
+          "properties": {
+            "splits": {
+              "allOf": [
+                { "$ref": "#/$defs/retiredSourceSet" },
+                {
+                  "properties": {
+                    "rows": { "type": "array", "items": { "$ref": "#/$defs/splitSourceRow" } }
+                  }
+                }
+              ]
+            },
+            "dividends": {
+              "allOf": [
+                { "$ref": "#/$defs/retiredSourceSet" },
+                {
+                  "properties": {
+                    "rows": { "type": "array", "items": { "$ref": "#/$defs/dividendSourceRow" } }
+                  }
+                }
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        "missing_earnings_tickers": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/ticker" }
+        },
+        "installed_event_rows": { "type": "integer", "minimum": 0 },
+        "corporate_action_control": {
+          "type": "object",
+          "required": [
+            "receipt_id",
+            "source_options_date",
+            "split_rows",
+            "dividend_rows",
+            "retired_split_rows",
+            "retired_dividend_rows"
+          ],
+          "properties": {
+            "receipt_id": { "type": ["string", "null"] },
+            "source_options_date": { "type": ["string", "null"], "format": "date" },
+            "split_rows": { "type": "integer", "minimum": 0 },
+            "dividend_rows": { "type": "integer", "minimum": 0 },
+            "retired_split_rows": { "type": "integer", "minimum": 0 },
+            "retired_dividend_rows": { "type": "integer", "minimum": 0 }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "event": {
+      "type": "object",
+      "required": [
+        "event_id", "ticker", "date", "timing", "canonical_timing", "timing_source",
+        "fiscal_year", "fiscal_q", "actual", "realized_abs", "implied", "implied_as_of",
+        "implied_expiration", "implied_dte", "implied_lead_days", "implied_atm_strike",
+        "implied_straddle_abs", "implied_atm_iv", "implied_quality_status",
+        "eps_surprise_pct", "rev_surprise_pct", "edge", "ratio", "outside_implied",
+        "event_provenance", "option_observation", "realized_window"
+      ],
+      "properties": {
+        "event_id": { "$ref": "#/$defs/sha256" },
+        "ticker": { "$ref": "#/$defs/ticker" },
+        "date": { "type": "string", "format": "date" },
+        "timing": { "type": "string", "minLength": 1 },
+        "canonical_timing": { "type": "string", "minLength": 1 },
+        "timing_source": { "type": "string", "minLength": 1 },
+        "fiscal_year": { "type": ["integer", "null"] },
+        "fiscal_q": { "type": ["string", "null"] },
+        "actual": { "type": "number" },
+        "realized_abs": { "type": "number", "minimum": 0 },
+        "implied": { "type": "number", "exclusiveMinimum": 0 },
+        "implied_as_of": { "type": "string", "format": "date" },
+        "implied_expiration": { "type": ["string", "null"], "format": "date" },
+        "implied_dte": { "type": ["integer", "null"], "minimum": 0 },
+        "implied_lead_days": { "type": ["integer", "null"], "minimum": 0 },
+        "implied_atm_strike": { "$ref": "#/$defs/nullableNumber" },
+        "implied_straddle_abs": { "$ref": "#/$defs/nullableNumber" },
+        "implied_atm_iv": { "$ref": "#/$defs/nullableNumber" },
+        "implied_quality_status": { "const": "decision_eligible_eod" },
+        "eps_surprise_pct": { "$ref": "#/$defs/nullableNumber" },
+        "rev_surprise_pct": { "$ref": "#/$defs/nullableNumber" },
+        "edge": { "type": "number" },
+        "ratio": { "type": "number", "minimum": 0 },
+        "outside_implied": { "type": "boolean" },
+        "event_provenance": {
+          "type": "object",
+          "required": ["source", "source_row_count", "availability_timestamp", "availability_status"],
+          "properties": {
+            "source": { "type": "string", "minLength": 1 },
+            "source_row_count": { "type": "integer", "minimum": 1 },
+            "availability_timestamp": { "type": ["string", "null"] },
+            "availability_status": { "const": "not_available_in_canonical_source" }
+          },
+          "additionalProperties": false
+        },
+        "option_observation": {
+          "type": "object",
+          "required": ["as_of_date", "expiration", "dte", "lead_days", "call_quote_timestamp", "put_quote_timestamp", "straddle_relative_spread", "atm_delta_distance"],
+          "properties": {
+            "as_of_date": { "type": "string", "format": "date" },
+            "expiration": { "type": ["string", "null"], "format": "date" },
+            "dte": { "type": ["integer", "null"], "minimum": 0 },
+            "lead_days": { "type": ["integer", "null"], "minimum": 0 },
+            "call_quote_timestamp": { "type": ["string", "null"] },
+            "put_quote_timestamp": { "type": ["string", "null"] },
+            "straddle_relative_spread": { "$ref": "#/$defs/nullableNumber" },
+            "atm_delta_distance": { "$ref": "#/$defs/nullableNumber" }
+          },
+          "additionalProperties": false
+        },
+        "realized_window": {
+          "type": "object",
+          "required": ["pre_date", "pre_price", "post_date", "post_price_raw", "post_price_adjusted", "adjustment_method", "split_actions", "dividend_actions"],
+          "properties": {
+            "pre_date": { "type": "string", "format": "date" },
+            "pre_price": { "type": "number", "exclusiveMinimum": 0 },
+            "post_date": { "type": "string", "format": "date" },
+            "post_price_raw": { "type": "number", "exclusiveMinimum": 0 },
+            "post_price_adjusted": { "type": "number", "exclusiveMinimum": 0 },
+            "adjustment_method": { "const": "split_and_cash_dividend_total_return_normalization" },
+            "split_actions": { "type": "integer", "minimum": 0 },
+            "dividend_actions": { "type": "integer", "minimum": 0 }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

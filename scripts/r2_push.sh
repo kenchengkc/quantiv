@@ -122,6 +122,21 @@ promote_data_release() {
   echo "✅ Promoted atomic data-release pointer"
 }
 
+refresh_research_universe() {
+  # A research-universe failure must not roll back an already validated data
+  # release or prevent scoring. The builder writes atomically, so failure leaves
+  # the previous public research artifact intact for the next frontend release.
+  # A subsequent public-contract gate can decide whether that retained artifact
+  # is fresh enough to publish.
+  local source_revision="${GITHUB_SHA:-}"
+  if "$PYTHON_BIN" tools/build_research_history.py \
+      ${source_revision:+--source-revision "$source_revision"}; then
+    echo "✅ Refreshed source-level historical research universe"
+  else
+    echo "::warning::Source-level research-universe refresh failed; retaining prior research-history.json"
+  fi
+}
+
 push_runtime_state() {
   local output_dir="$DATA_DIR/runtime_state_release"
   local source_revision="${RUNTIME_STATE_SOURCE_REVISION:-}"
@@ -206,14 +221,14 @@ elif [ "$MODE" = "--skip-forecasts" ]; then
 
   # Daily refresh sets REFRESH_STARTED_AT before provider ingestion. At this
   # point the options candidate was accepted or the previous snapshot was
-  # verified as fallback, so calendar reference can publish independently of
-  # can_score without changing any retained research artifacts. Other callers
-  # of --skip-forecasts intentionally remain storage-only.
+  # verified as fallback. Refresh the full research universe from those exact
+  # analytical inputs; an atomic failure retains the prior public artifact.
   if [ -n "${REFRESH_STARTED_AT:-}" ]; then
+    refresh_research_universe
     CALENDAR_REFERENCE_NOT_BEFORE="$REFRESH_STARTED_AT" \
       bash scripts/r2_push_calendar_reference.sh
   else
-    echo "ℹ REFRESH_STARTED_AT unset; skipping independent calendar publication"
+    echo "ℹ REFRESH_STARTED_AT unset; skipping research/calendar publication"
   fi
 
   promote_model_champion

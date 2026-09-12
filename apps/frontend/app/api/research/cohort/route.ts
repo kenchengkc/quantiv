@@ -7,6 +7,15 @@ import {
   type CohortEvent,
 } from '@/lib/researchCohort';
 import {
+  CALIBRATION_CHART_MAX_POINTS,
+  CALIBRATION_CHART_SAMPLING,
+  sampleCalibrationEvents,
+} from '@/lib/researchChart.server';
+import {
+  verifyRetainedPublicArtifact,
+  type RetainedReleaseBinding,
+} from '@/lib/researchRelease.server';
+import {
   csvCell,
   readPublicJson,
   researchSnapshotId,
@@ -16,10 +25,22 @@ export const runtime = 'nodejs';
 
 type HistoricalUniverse = {
   schema?: string;
+  universe_id?: string;
+  generated_at?: string;
   source?: {
+    kind?: 'analytical_duckdb' | 'display_payload_fallback';
+    completeness?: 'source_level' | 'display_limited';
+    as_of_date?: string | null;
+    source_revision?: string | null;
     symbol_payloads?: number;
     as_of_min?: string | null;
     as_of_max?: string | null;
+    canonical_event_identities_before_cutoff?: number;
+  };
+  audit?: {
+    candidate_event_count?: number;
+    eligible_event_count?: number;
+    excluded_event_count?: number;
   };
   evidence_rule?: string;
   decision_scope?: string;
@@ -38,10 +59,14 @@ type ControlPlane = {
   generated_at?: string;
   status?: string;
   publication_eligible?: boolean;
-  data?: {
-    decision_scope?: string | null;
-    live_trading_eligible?: boolean;
-  };
+};
+
+type PreviewReleaseBinding = {
+  status: 'preview_unverified';
+  release_id: null;
+  manifest_sha256: null;
+  source_revision: null;
+  source_artifact: null;
 };
 
 function toCsv(id: string, events: CohortEvent[]): string {
@@ -81,14 +106,41 @@ export async function GET(request: Request) {
   const query = parseCohortQuery(url.searchParams);
   const universe = readPublicJson<HistoricalUniverse>('research-history.json');
   const universeEvents = Array.isArray(universe?.events) ? universe.events : [];
-  if (
-    universe?.schema !== 'quantiv.historical-event-universe.v1' ||
-    universeEvents.length === 0
-  ) {
+  const isSourceLevel =
+    universe?.schema === 'quantiv.historical-event-universe.v1' &&
+    universe?.source?.kind === 'analytical_duckdb' &&
+    universe?.source?.completeness === 'source_level' &&
+    typeof universe?.universe_id === 'string';
+  const isPreview =
+    universe?.schema === 'quantiv.historical-event-universe.preview.v1' &&
+    universe?.source?.kind === 'display_payload_fallback' &&
+    universe?.source?.completeness === 'display_limited';
+  if ((!isSourceLevel && !isPreview) || universeEvents.length === 0) {
     return NextResponse.json(
       { error: 'Historical research universe is unavailable.' },
       { status: 503 },
     );
+  }
+
+  let retainedRelease: RetainedReleaseBinding | PreviewReleaseBinding;
+  if (isSourceLevel) {
+    try {
+      retainedRelease = verifyRetainedPublicArtifact('research-history.json');
+    } catch (error) {
+      console.error('Research Lab retained-release verification failed', error);
+      return NextResponse.json(
+        { error: 'Historical research release verification failed.' },
+        { status: 503 },
+      );
+    }
+  } else {
+    retainedRelease = {
+      status: 'preview_unverified',
+      release_id: null,
+      manifest_sha256: null,
+      source_revision: null,
+      source_artifact: null,
+    };
   }
 
   const allMatching = applyCohortQuery(universeEvents, {
@@ -96,18 +148,33 @@ export async function GET(request: Request) {
     limit: Math.max(1, universeEvents.length),
   });
   const events = allMatching.slice(0, query.limit);
+  const chartEvents = sampleCalibrationEvents(allMatching);
   const evidence = readPublicJson<ForecastEvidence>('evidence', 'forecast.json');
   const control = readPublicJson<ControlPlane>('control-plane.json');
-  const decisionScope = control?.data?.decision_scope ?? universe.decision_scope ?? 'end_of_day_research';
+
+  // Historical cohorts are an EOD research contract regardless of the current
+  // operational/live control snapshot. Never inherit a different live scope.
+  const decisionScope = 'end_of_day_research';
+  const sourceAsOf = universe.source?.as_of_date ?? universe.source?.as_of_max ?? null;
 
   const immutable = {
     schema: 'quantiv.historical-cohort.v1',
     source: {
       historical_universe_schema: universe.schema,
+      historical_universe_id: isSourceLevel ? universe.universe_id : null,
+      historical_universe_kind: universe.source?.kind,
+      historical_universe_completeness: universe.source?.completeness,
+      historical_universe_generated_at: universe.generated_at ?? null,
+      historical_universe_source_revision: universe.source?.source_revision ?? null,
+      retained_release: retainedRelease,
       public_symbol_payloads: universe.source?.symbol_payloads ?? null,
-      source_as_of_min: universe.source?.as_of_min ?? null,
-      source_as_of_max: universe.source?.as_of_max ?? null,
+      source_as_of_min: universe.source?.as_of_min ?? sourceAsOf,
+      source_as_of_max: universe.source?.as_of_max ?? sourceAsOf,
+      source_as_of_date: sourceAsOf,
+      source_canonical_events: universe.source?.canonical_event_identities_before_cutoff ?? null,
       eligible_event_universe: universe.event_count ?? universeEvents.length,
+      candidate_event_universe: universe.audit?.candidate_event_count ?? null,
+      excluded_event_universe: universe.audit?.excluded_event_count ?? null,
       forecast_receipt_id: evidence?.receipt_id ?? null,
       forecast_validated_at: evidence?.validated_at ?? null,
       forecast_quality: evidence?.quality?.status ?? null,
@@ -116,7 +183,7 @@ export async function GET(request: Request) {
       publication_eligible: control?.publication_eligible ?? null,
     },
     decision_scope: decisionScope,
-    live_trading_eligible: control?.data?.live_trading_eligible ?? universe.live_trading_eligible ?? false,
+    live_trading_eligible: false,
     live_quote_overlay_included: false,
     evidence_rule:
       universe.evidence_rule ??
@@ -125,10 +192,18 @@ export async function GET(request: Request) {
     matching_count: allMatching.length,
     returned_count: events.length,
     summary: summarizeCohort(allMatching),
+    chart: {
+      population_count: allMatching.length,
+      sample_count: chartEvents.length,
+      max_points: CALIBRATION_CHART_MAX_POINTS,
+      sampling: CALIBRATION_CHART_SAMPLING,
+      events: chartEvents,
+    },
     events,
   };
   const id = researchSnapshotId(immutable);
   const shortId = id.slice('sha256:'.length, 'sha256:'.length + 12);
+  const retainedReleaseHeader = retainedRelease.release_id ?? 'preview-unverified';
 
   if (format === 'csv') {
     return new Response(toCsv(id, events), {
@@ -138,6 +213,8 @@ export async function GET(request: Request) {
         'Content-Disposition': `attachment; filename="quantiv-historical-cohort-${shortId}.csv"`,
         'X-Quantiv-Snapshot-Id': id,
         'X-Quantiv-Decision-Scope': decisionScope,
+        'X-Quantiv-Universe-Completeness': universe.source?.completeness ?? 'unknown',
+        'X-Quantiv-Retained-Release': retainedReleaseHeader,
       },
     });
   }
@@ -149,6 +226,8 @@ export async function GET(request: Request) {
         'Cache-Control': 'public, max-age=60, s-maxage=300, stale-while-revalidate=3600',
         'X-Quantiv-Snapshot-Id': id,
         'X-Quantiv-Decision-Scope': decisionScope,
+        'X-Quantiv-Universe-Completeness': universe.source?.completeness ?? 'unknown',
+        'X-Quantiv-Retained-Release': retainedReleaseHeader,
       },
     },
   );

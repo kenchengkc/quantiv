@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quantiv.local/schemas/quantiv.historical-event-universe.preview.v1.schema.json",
+  "title": "Quantiv historical event universe preview v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "source",
+    "evidence_rule",
+    "decision_scope",
+    "live_trading_eligible",
+    "event_count",
+    "events"
+  ],
+  "properties": {
+    "schema": { "const": "quantiv.historical-event-universe.preview.v1" },
+    "source": {
+      "type": "object",
+      "required": ["kind", "completeness", "symbol_payloads", "as_of_min", "as_of_max"],
+      "properties": {
+        "kind": { "const": "display_payload_fallback" },
+        "completeness": { "const": "display_limited" },
+        "symbol_payloads": { "type": "integer", "minimum": 0 },
+        "as_of_min": { "type": ["string", "null"], "format": "date" },
+        "as_of_max": { "type": ["string", "null"], "format": "date" }
+      },
+      "additionalProperties": false
+    },
+    "evidence_rule": { "type": "string", "minLength": 1 },
+    "decision_scope": { "const": "end_of_day_research" },
+    "live_trading_eligible": { "const": false },
+    "event_count": { "type": "integer", "minimum": 0 },
+    "events": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "ticker", "date", "timing", "fiscal_q", "actual", "realized_abs",
+          "implied", "implied_as_of", "implied_expiration", "implied_dte",
+          "implied_lead_days", "implied_atm_strike", "implied_atm_iv",
+          "implied_quality_status", "eps_surprise_pct", "rev_surprise_pct",
+          "edge", "ratio", "outside_implied"
+        ],
+        "properties": {
+          "ticker": { "type": "string", "pattern": "^[A-Z][A-Z0-9.\\-]{0,9}$" },
+          "date": { "type": "string", "format": "date" },
+          "timing": { "type": "string", "minLength": 1 },
+          "fiscal_q": { "type": ["string", "null"] },
+          "actual": { "type": "number" },
+          "realized_abs": { "type": "number", "minimum": 0 },
+          "implied": { "type": "number", "exclusiveMinimum": 0 },
+          "implied_as_of": { "type": "string", "format": "date" },
+          "implied_expiration": { "type": ["string", "null"], "format": "date" },
+          "implied_dte": { "type": ["integer", "number", "null"] },
+          "implied_lead_days": { "type": ["integer", "number", "null"] },
+          "implied_atm_strike": { "type": ["number", "null"] },
+          "implied_atm_iv": { "type": ["number", "null"] },
+          "implied_quality_status": { "const": "decision_eligible_eod" },
+          "eps_surprise_pct": { "type": ["number", "null"] },
+          "rev_surprise_pct": { "type": ["number", "null"] },
+          "edge": { "type": "number" },
+          "ratio": { "type": "number", "minimum": 0 },
+          "outside_implied": { "type": "boolean" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}
