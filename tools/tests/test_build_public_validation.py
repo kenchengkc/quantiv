@@ -79,7 +79,7 @@ def _write_common_public_evidence(repo: Path, *, model_sha: str = "sha256:model"
             "receipt_id": "sha256:forecast",
             "validated_at": "2026-01-02T00:00:00+00:00",
             "quality": {"status": "passed"},
-            "coverage": {"rows": 12, "events": 7},
+            "coverage": {"rows": 12, "events": 7, "horizons": list(HORIZONS)},
             "controls": {"exceptions": 0},
             "artifact_bundles": [
                 {"name": "model_bundle", "sha256": model_sha}
@@ -124,6 +124,7 @@ def _install_signed_champion(
     *,
     model_mae: float = 0.03,
     baseline_mae: float = 0.06,
+    forecast_horizons: tuple[int, ...] = HORIZONS,
 ) -> tuple[str, dict, bytes]:
     models = repo / "data/models"
     training = repo / "data/ml_training"
@@ -214,7 +215,7 @@ def _install_signed_champion(
         "stages": {
             "forecasts": {
                 "status": "passed",
-                "horizons": list(HORIZONS),
+                "horizons": list(forecast_horizons),
             }
         },
     }
@@ -231,6 +232,10 @@ def _install_signed_champion(
     forecast_model_sha = _receipt_artifact(forecast_receipt, "model_bundle")["sha256"]
     assert forecast_model_sha != _receipt_artifact(model_receipt, "model_bundle")["sha256"]
     _write_common_public_evidence(repo, model_sha=forecast_model_sha)
+    public_path = repo / "apps/frontend/public/evidence/forecast.json"
+    public = json.loads(public_path.read_text())
+    public["coverage"]["horizons"] = list(forecast_horizons)
+    _write_json(public_path, public)
     return champion, model_receipt, private
 
 
@@ -376,11 +381,15 @@ def test_signed_champion_uses_immutable_receipt_not_latest_candidate(
     assert payload["model_source"]["model_validation_receipt_id"] == receipt["receipt_id"]
 
 
+@pytest.mark.parametrize("horizons", [HORIZONS, (3, 7, 14, 21)])
 def test_signed_champion_rejects_passed_forecast_from_other_model(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, horizons
 ) -> None:
-    _install_signed_champion(tmp_path, monkeypatch)
-    _write_common_public_evidence(tmp_path, model_sha="other-model-digest")
+    _install_signed_champion(tmp_path, monkeypatch, forecast_horizons=horizons)
+    path = tmp_path / "apps/frontend/public/evidence/forecast.json"
+    forecast = json.loads(path.read_text())
+    forecast["artifact_bundles"][0]["sha256"] = "other-model-digest"
+    _write_json(path, forecast)
 
     with pytest.raises(ModelBundleError, match="forecast evidence"):
         build_validation(tmp_path)
@@ -395,4 +404,33 @@ def test_build_validation_fails_when_horizon_metadata_is_missing(tmp_path: Path)
     _write_common_public_evidence(tmp_path)
 
     with pytest.raises(FileNotFoundError, match="metadata_T21.json"):
+        build_validation(tmp_path)
+
+
+@pytest.mark.parametrize("horizons", [(3, 7, 14, 21), (1,), (21, 3)])
+def test_signed_champion_accepts_forecast_horizon_subset(tmp_path, monkeypatch, horizons):
+    _install_signed_champion(tmp_path, monkeypatch, forecast_horizons=horizons)
+    payload = build_validation(tmp_path)
+    assert payload["current_evidence"]["forecast_model_matches_evaluation"] is True
+    assert payload["summary"]["supported_horizons"] == list(HORIZONS)
+
+
+@pytest.mark.parametrize("horizons", [None, [], [999], [True], [3, 3], ["3"], "3"])
+def test_signed_champion_rejects_invalid_forecast_horizons(tmp_path, monkeypatch, horizons):
+    _install_signed_champion(tmp_path, monkeypatch)
+    path = tmp_path / "apps/frontend/public/evidence/forecast.json"
+    forecast = json.loads(path.read_text())
+    forecast["coverage"]["horizons"] = horizons
+    _write_json(path, forecast)
+    with pytest.raises(ModelBundleError, match="horizons"):
+        build_validation(tmp_path)
+
+
+def test_signed_champion_rejects_subset_digest_for_different_horizons(tmp_path, monkeypatch):
+    _install_signed_champion(tmp_path, monkeypatch, forecast_horizons=(3, 7, 14, 21))
+    path = tmp_path / "apps/frontend/public/evidence/forecast.json"
+    forecast = json.loads(path.read_text())
+    forecast["coverage"]["horizons"] = [1, 2, 3, 7, 14, 21]
+    _write_json(path, forecast)
+    with pytest.raises(ModelBundleError, match="forecast evidence"):
         build_validation(tmp_path)
