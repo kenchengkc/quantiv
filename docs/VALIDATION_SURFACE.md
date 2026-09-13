@@ -13,7 +13,7 @@ The page reads `apps/frontend/public/evidence/model-validation.json`, schema `qu
 3. the immutable model-validation receipt selected by the signed bundle's `receipt_id` (`data/models/receipts/models.<receipt-prefix>.receipt.json`), including its recomputed content identity, `models` scope, and passed quality;
 4. equality between the signed manifest's `receipt_id` and that recomputed model-validation receipt ID;
 5. equality between every model-validation receipt member and the corresponding artifact authenticated by the signed bundle manifest; and
-6. when a passed forecast receipt exposes a model-bundle digest, equality between that digest and the verified champion model bundle used for the evaluation projection.
+6. when a passed forecast receipt exposes a model-bundle digest, equality between that digest and the verified champion artifacts for the forecast receipt's declared horizons.
 
 The mutable `data/models/receipts/latest_models.json` pointer is deliberately **not** used to establish active-champion evaluation identity. A later challenger can legitimately advance that pointer without being promoted; the champion's signed manifest remains the authority for which immutable validation receipt belongs to the active bundle.
 
@@ -74,3 +74,20 @@ npm run test:e2e --workspace=apps/frontend -- validation.spec.ts
 ```
 
 The focused provenance tests cover receipt tampering, invalid signed pointers, altered signed-bundle metadata, model-validation receipt mismatch, mutable latest-candidate movement, forecast/model mismatch, and run-derived protocol projection. The normal repository CI also runs the broader frontend, Python, generated-data, worker, and container checks.
+
+### Forecast horizon subsets
+
+Daily forecasts need not cover every champion horizon. The receipt hashes only
+the model and metadata files for horizons actually scored. Public validation
+therefore reconstructs that subset digest from the signed champion manifest,
+using `coverage.horizons` from the forecast evidence. Missing, empty, duplicate,
+non-integer or unsupported horizon declarations are rejected. A different model
+or a digest for a different horizon set still fails the publication check.
+The public model source digest and evaluation metrics continue to identify all
+supported champion horizons.
+
+This distinction fixes the September 12, 2026 refresh failure, where a valid
+forecast for horizons 3, 7, 14 and 21 was compared with an all-horizon digest.
+Recovery uses a new refresh from the fixed revision; rerunning the old workflow
+revision retains the faulty comparison. Do not bypass the provenance gate or
+edit an immutable receipt to make a retry pass.

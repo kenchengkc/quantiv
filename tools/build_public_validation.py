@@ -31,6 +31,7 @@ if str(ML_PACKAGE_ROOT) not in sys.path:
 from ml.evidence_receipt import verify_evidence_receipt  # noqa: E402
 from ml.model_bundle import (  # noqa: E402
     ModelBundleError,
+    required_artifact_names,
     verify_bundle_dir,
     verify_control_pointer,
 )
@@ -137,7 +138,9 @@ def _verify_receipt_model_members(
             )
 
 
-def _forecast_stage_model_bundle_sha(manifest: Mapping[str, Any]) -> str:
+def _forecast_stage_model_bundle_sha(
+    manifest: Mapping[str, Any], horizons: list[int] | tuple[int, ...] = HORIZONS
+) -> str:
     """Reproduce the forecast evidence receipt's path-sensitive model digest.
 
     Evidence-receipt bundle hashes intentionally include member paths. Model
@@ -145,12 +148,14 @@ def _forecast_stage_model_bundle_sha(manifest: Mapping[str, Any]) -> str:
     hashes the same authenticated bytes from
     ``data/models/bundles/<bundle_id>/<name>``. Reconstruct the latter from the
     signed manifest so a valid forecast is compared to the correct identity.
+    Forecast receipts hash only the horizons actually scored on that date.
     """
     bundle_id = str(manifest.get("bundle_id") or "")
     artifacts = manifest.get("artifacts")
     if not bundle_id or not isinstance(artifacts, list):
         raise ModelBundleError("signed model manifest cannot identify forecast model bundle")
 
+    required_names = set(required_artifact_names(horizons))
     members: list[dict[str, Any]] = []
     for artifact in sorted(
         artifacts,
@@ -159,6 +164,8 @@ def _forecast_stage_model_bundle_sha(manifest: Mapping[str, Any]) -> str:
         if not isinstance(artifact, Mapping):
             raise ModelBundleError("signed model manifest has an invalid artifact member")
         name = str(artifact.get("name") or "")
+        if name not in required_names:
+            continue
         sha256 = str(artifact.get("sha256") or "")
         try:
             size = int(artifact.get("bytes"))
@@ -173,6 +180,8 @@ def _forecast_stage_model_bundle_sha(manifest: Mapping[str, Any]) -> str:
                 "sha256": sha256,
             }
         )
+    if len(members) != len(required_names):
+        raise ModelBundleError("signed model manifest is missing forecast horizon artifacts")
     canonical = json.dumps(members, sort_keys=True, separators=(",", ":")).encode()
     return hashlib.sha256(canonical).hexdigest()
 
@@ -511,8 +520,16 @@ def build_validation(repo_root: Path, *, generated_at: str | None = None) -> dic
 
         forecast_sha = forecast_model_bundle.get("sha256")
         if isinstance(forecast_sha, str) and forecast_sha:
+            forecast_horizons = (forecast.get("coverage") or {}).get("horizons")
+            if (
+                not isinstance(forecast_horizons, list)
+                or not forecast_horizons
+                or any(type(horizon) is not int or horizon not in HORIZONS for horizon in forecast_horizons)
+                or len(set(forecast_horizons)) != len(forecast_horizons)
+            ):
+                raise ModelBundleError("forecast evidence has invalid or missing horizons")
             forecast_model_matches_evaluation = (
-                forecast_sha == expected_forecast_model_sha
+                forecast_sha == _forecast_stage_model_bundle_sha(manifest, forecast_horizons)
             )
             if (
                 forecast.get("quality", {}).get("status") == "passed"
