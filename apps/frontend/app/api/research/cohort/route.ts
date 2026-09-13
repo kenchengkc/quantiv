@@ -12,6 +12,10 @@ import {
   sampleCalibrationEvents,
 } from '@/lib/researchChart.server';
 import {
+  readVerifiedRetainedPublicJson,
+  type RetainedReleaseBinding,
+} from '@/lib/researchRelease.server';
+import {
   csvCell,
   readPublicJson,
   researchSnapshotId,
@@ -57,6 +61,31 @@ type ControlPlane = {
   publication_eligible?: boolean;
 };
 
+type PreviewReleaseBinding = {
+  status: 'preview_unverified';
+  release_id: null;
+  manifest_sha256: null;
+  source_revision: null;
+  source_artifact: null;
+};
+
+function isSourceLevelUniverse(universe: HistoricalUniverse | null | undefined): boolean {
+  return (
+    universe?.schema === 'quantiv.historical-event-universe.v1' &&
+    universe?.source?.kind === 'analytical_duckdb' &&
+    universe?.source?.completeness === 'source_level' &&
+    typeof universe?.universe_id === 'string'
+  );
+}
+
+function isPreviewUniverse(universe: HistoricalUniverse | null | undefined): boolean {
+  return (
+    universe?.schema === 'quantiv.historical-event-universe.preview.v1' &&
+    universe?.source?.kind === 'display_payload_fallback' &&
+    universe?.source?.completeness === 'display_limited'
+  );
+}
+
 function toCsv(id: string, events: CohortEvent[]): string {
   const columns: Array<keyof CohortEvent | 'snapshot_id'> = [
     'snapshot_id',
@@ -92,17 +121,48 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const format = url.searchParams.get('format') === 'csv' ? 'csv' : 'json';
   const query = parseCohortQuery(url.searchParams);
-  const universe = readPublicJson<HistoricalUniverse>('research-history.json');
-  const universeEvents = Array.isArray(universe?.events) ? universe.events : [];
-  const isSourceLevel =
-    universe?.schema === 'quantiv.historical-event-universe.v1' &&
-    universe?.source?.kind === 'analytical_duckdb' &&
-    universe?.source?.completeness === 'source_level' &&
-    typeof universe?.universe_id === 'string';
-  const isPreview =
-    universe?.schema === 'quantiv.historical-event-universe.preview.v1' &&
-    universe?.source?.kind === 'display_payload_fallback' &&
-    universe?.source?.completeness === 'display_limited';
+  let universe = readPublicJson<HistoricalUniverse>('research-history.json');
+
+  let retainedRelease: RetainedReleaseBinding | PreviewReleaseBinding;
+  if (isSourceLevelUniverse(universe)) {
+    try {
+      const verified = readVerifiedRetainedPublicJson<HistoricalUniverse>('research-history.json');
+      universe = verified.value;
+      if (!isSourceLevelUniverse(universe)) {
+        throw new Error('verified Research Lab source is not a source-level universe');
+      }
+      retainedRelease = verified.binding;
+    } catch (error) {
+      console.error('Research Lab retained-release verification failed', error);
+      return NextResponse.json(
+        { error: 'Historical research release verification failed.' },
+        { status: 503 },
+      );
+    }
+  } else if (isPreviewUniverse(universe)) {
+    retainedRelease = {
+      status: 'preview_unverified',
+      release_id: null,
+      manifest_sha256: null,
+      source_revision: null,
+      source_artifact: null,
+    };
+  } else {
+    return NextResponse.json(
+      { error: 'Historical research universe is unavailable.' },
+      { status: 503 },
+    );
+  }
+
+  if (!universe) {
+    return NextResponse.json(
+      { error: 'Historical research universe is unavailable.' },
+      { status: 503 },
+    );
+  }
+  const universeEvents = Array.isArray(universe.events) ? universe.events : [];
+  const isSourceLevel = isSourceLevelUniverse(universe);
+  const isPreview = isPreviewUniverse(universe);
   if ((!isSourceLevel && !isPreview) || universeEvents.length === 0) {
     return NextResponse.json(
       { error: 'Historical research universe is unavailable.' },
@@ -133,6 +193,7 @@ export async function GET(request: Request) {
       historical_universe_completeness: universe.source?.completeness,
       historical_universe_generated_at: universe.generated_at ?? null,
       historical_universe_source_revision: universe.source?.source_revision ?? null,
+      retained_release: retainedRelease,
       public_symbol_payloads: universe.source?.symbol_payloads ?? null,
       source_as_of_min: universe.source?.as_of_min ?? sourceAsOf,
       source_as_of_max: universe.source?.as_of_max ?? sourceAsOf,
@@ -169,6 +230,7 @@ export async function GET(request: Request) {
   };
   const id = researchSnapshotId(immutable);
   const shortId = id.slice('sha256:'.length, 'sha256:'.length + 12);
+  const retainedReleaseHeader = retainedRelease.release_id ?? 'preview-unverified';
 
   if (format === 'csv') {
     return new Response(toCsv(id, events), {
@@ -179,6 +241,7 @@ export async function GET(request: Request) {
         'X-Quantiv-Snapshot-Id': id,
         'X-Quantiv-Decision-Scope': decisionScope,
         'X-Quantiv-Universe-Completeness': universe.source?.completeness ?? 'unknown',
+        'X-Quantiv-Retained-Release': retainedReleaseHeader,
       },
     });
   }
@@ -191,6 +254,7 @@ export async function GET(request: Request) {
         'X-Quantiv-Snapshot-Id': id,
         'X-Quantiv-Decision-Scope': decisionScope,
         'X-Quantiv-Universe-Completeness': universe.source?.completeness ?? 'unknown',
+        'X-Quantiv-Retained-Release': retainedReleaseHeader,
       },
     },
   );
