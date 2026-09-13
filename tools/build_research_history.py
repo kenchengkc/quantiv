@@ -19,6 +19,7 @@ for candidate in (REPO_ROOT / "tools", REPO_ROOT / "scripts", ML_PACKAGE_ROOT):
 
 from build_earnings_events import build_earnings_events_table, create_duckdb_views  # noqa: E402
 from delisted import delisted_tickers  # noqa: E402
+from frontend_data.research_arithmetic import normalize_public_research_arithmetic  # noqa: E402
 from frontend_data.research_cutoff import restrict_ohlcv_to_as_of  # noqa: E402
 from frontend_data.research_history import (  # noqa: E402
     build_historical_event_universe,
@@ -98,6 +99,10 @@ def main() -> int:
             installed_event_rows=installed_retired,
             corporate_action_evidence=action_evidence,
         )
+        # Primitive public observations are quantized for deterministic browser
+        # payloads. Re-derive dependent arithmetic from those exact published
+        # primitives and refresh the universe content address before validation.
+        payload = normalize_public_research_arithmetic(payload)
         write_historical_event_universe(args.output, payload)
 
         # Publication's default artifact must pass the same semantic contract
