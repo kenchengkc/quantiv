@@ -62,6 +62,12 @@ function addDays(iso: string, days: number): string {
  * ticker, earnings date, and a known normalized reporting session all match.
  * A revised date/session therefore renders dates-only instead of carrying old
  * options/model metrics onto a different event.
+ *
+ * The reference is authoritative only inside its declared publication window.
+ * If the browser advances to a week the retained reference does not fully cover
+ * (for example across a Sunday→Monday rollover before the next refresh), keep
+ * the retained research week instead of misreading "not published" as "zero
+ * earnings".
  */
 export function mergeCalendarReference<
   TEvent extends CalendarReferenceEvent,
@@ -75,6 +81,8 @@ export function mergeCalendarReference<
 
   const start = weekStart.slice(0, 10);
   const end = addDays(start, 4);
+  if (start < reference.window.start || end > reference.window.end) return research;
+
   const researchByExactIdentity = new Map<string, TEvent>();
   for (const event of research.events ?? []) {
     const timing = normalizeCalendarTiming(event.timing);
