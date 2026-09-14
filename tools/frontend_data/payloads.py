@@ -792,3 +792,36 @@ def build_week_events(conn, as_of_date: date, week_start: date, week_end: date,
             flush=True,
         )
     return events
+
+
+def preserve_reported_events(
+    events: list[dict],
+    prior_events: list[dict],
+    today: date,
+    canonical: set[tuple[str, str]] | None = None,
+) -> list[dict]:
+    """Carry already-reported events forward from the previously published bundle.
+
+    compute_em_math only answers for a pre-event observation, so once an earnings
+    date has passed its expected-move row can never be rebuilt — a plain rebuild
+    drops the event and the calendar renders it with no forecast. Rows for
+    reported events therefore have to come from the last published bundle, while
+    still-upcoming events stay fail-closed on whatever the fresh build produced.
+
+    Fresh rows win on (ticker, earnings_date) collisions so a late EPS actual or
+    a corrected realized move replaces the retained row. Non-canonical dates are
+    never resurrected: a revision the dedup just collapsed (PLUS 5/20→5/28)
+    would otherwise come back as a duplicate.
+    """
+    fresh_keys = {(e["ticker"], e["earnings_date"]) for e in events}
+    cutoff = today.isoformat()
+    retained = [
+        event
+        for event in prior_events
+        if (event["ticker"], event["earnings_date"]) not in fresh_keys
+        and event["earnings_date"] <= cutoff
+        and (canonical is None or (event["ticker"], event["earnings_date"]) in canonical)
+    ]
+    if not retained:
+        return events
+    return sorted([*events, *retained], key=lambda e: (e["earnings_date"], e["ticker"]))

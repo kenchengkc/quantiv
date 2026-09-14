@@ -33,6 +33,7 @@ from frontend_data.payloads import (
     build_symbol_detail,
     build_week_events,
     collapse_duplicate_earnings,
+    preserve_reported_events,
 )
 from frontend_data.realized_moves import (
     enrich_hist_move_avg_from_twelvedata,
@@ -171,39 +172,31 @@ def main():
         events = build_week_events(conn, as_of_date, wk_start, wk_end, ml_lookup, provider_lookup,
                                    require_ml=require_ml, canonical=canonical_keys)
 
-        # Past-week preservation: once a week is fully in the past, the
-        # rebuild loses events whose options chains have rolled off
-        # (compute_em_math returns None for past-dated expiries). Friday's
-        # 45-event bundle for May 11-15 shrank to 8 events by Monday for
-        # this reason. Merge new events with the prior committed bundle —
-        # new entries win on (ticker, date) collisions so any post-hoc
-        # data update (e.g. an EPS actual landing late) replaces the
-        # stale entry, but events with expired options are preserved
-        # from the original "when this week was current" build.
-        if wk_end < today:
+        # Reported-event preservation: an expected move is only observable
+        # before the print, so once an earnings date passes compute_em_math
+        # returns None for it forever and the rebuild drops the row — the
+        # calendar keeps the event (calendar-reference is authoritative for
+        # membership) but renders it without a forecast.
+        #
+        # This has to run while the week is still current. Reporters erode from
+        # the bundle the day after they report, so a guard that waited for the
+        # whole week to end only ever read back a file that had already lost
+        # its Mon-Thu rows: the Sep 7 week went 13 events (Tue) → 9 (Wed) →
+        # 5 (Thu), and preservation then faithfully retained the surviving 5.
+        if wk_start <= today:
             wk_path = PUBLIC_DIR / "weeks" / f"{wk_start.isoformat()}.json"
             if wk_path.exists():
                 try:
                     prior = json.loads(wk_path.read_text())
-                    prior_events = prior.get("events", [])
-                    new_keys = {(e["ticker"], e["earnings_date"]) for e in events}
-                    preserved = [
-                        e for e in prior_events
-                        if (e["ticker"], e["earnings_date"]) not in new_keys
-                        # Don't resurrect a date the dedup just collapsed away:
-                        # a revised estimate (e.g. WSM 05-20/28 superseded by
-                        # 05-21) would otherwise be re-preserved here and
-                        # reintroduce the duplicate. Keep only canonical keys.
-                        and (canonical_keys is None
-                             or (e["ticker"], e["earnings_date"]) in canonical_keys)
-                    ]
-                    if preserved:
+                    merged = preserve_reported_events(
+                        events, prior.get("events", []), today, canonical_keys
+                    )
+                    if len(merged) > len(events):
                         print(
-                            f"    preserving {len(preserved)} events from prior bundle "
-                            f"(options data expired since first build)"
+                            f"    preserving {len(merged) - len(events)} reported events "
+                            "from prior bundle (pre-event options no longer observable)"
                         )
-                        events.extend(preserved)
-                        events.sort(key=lambda e: (e["earnings_date"], e["ticker"]))
+                    events = merged
                 except (json.JSONDecodeError, OSError) as exc:
                     print(f"    ⚠ could not read prior bundle: {exc}")
 
