@@ -132,6 +132,33 @@ describe('calendar reference overlay', () => {
     expect(mergeCalendarReference(null, retained, '2026-09-07')).toBe(retained);
   });
 
+  it('falls back to retained research when the reference does not cover the selected week', () => {
+    const retained = research([
+      { ticker: 'CCL', earnings_date: '2026-09-28', timing: 'bmo', em_ml_pct: 0.05 },
+      { ticker: 'NKE', earnings_date: '2026-09-28', timing: 'amc', em_ml_pct: 0.04 },
+    ]);
+    retained.window = { start: '2026-09-28', end: '2026-10-02' };
+    const staleReference = {
+      ...reference([]),
+      window: { start: '2026-08-31', end: '2026-09-25' },
+    };
+
+    expect(mergeCalendarReference(staleReference, retained, '2026-09-28')).toBe(retained);
+  });
+
+  it('falls back when the reference covers only part of the selected week', () => {
+    const retained = research([
+      { ticker: 'MU', earnings_date: '2026-09-30', timing: 'amc', em_ml_pct: 0.07 },
+    ]);
+    retained.window = { start: '2026-09-28', end: '2026-10-02' };
+    const partialReference = {
+      ...reference([{ ticker: 'MU', earnings_date: '2026-09-30', timing: 'amc' }]),
+      window: { start: '2026-09-07', end: '2026-09-30' },
+    };
+
+    expect(mergeCalendarReference(partialReference, retained, '2026-09-28')).toBe(retained);
+  });
+
   it('keys week caches by calendar release identity', () => {
     expect(calendarCacheKey('release-a', '2026-09-07')).toBe('release-a:2026-09-07');
     expect(calendarCacheKey('release-b', '2026-09-07')).not.toBe(
