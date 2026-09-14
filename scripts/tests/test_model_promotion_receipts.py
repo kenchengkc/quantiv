@@ -6,11 +6,22 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
+import model_promotion_receipts as receipts
 from model_promotion_receipts import (
     attach_decision_evidence,
     build_promotion_receipts,
     verify_promotion_receipts,
 )
+
+
+@pytest.fixture(autouse=True)
+def _isolated_repo_root(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    source = receipts.FEATURE_ENGINEERING_PATH.read_text()
+    feature_path = tmp_path / "apps" / "ml" / "feature_engineering.py"
+    feature_path.parent.mkdir(parents=True, exist_ok=True)
+    feature_path.write_text(source)
+    monkeypatch.setattr(receipts, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(receipts, "FEATURE_ENGINEERING_PATH", feature_path)
 
 
 def _write_training(root: Path, horizon: int, *, snapshot_offset: int | None = None, leaked: bool = False) -> None:
