@@ -14,9 +14,8 @@ ML_PACKAGE_ROOT = REPO_ROOT / "apps" / "ml"
 if str(ML_PACKAGE_ROOT) not in sys.path:
     sys.path.insert(0, str(ML_PACKAGE_ROOT))
 
-from ml.model_bundle import (  # noqa: E402 - standalone script path setup
-    create_signed_bundle,
-)
+from ml.model_bundle import create_signed_bundle  # noqa: E402 - standalone script path setup
+from model_promotion_receipts import build_promotion_receipts  # noqa: E402
 
 
 def _atomic_json(path: Path, payload: dict) -> None:
@@ -29,6 +28,12 @@ def _atomic_json(path: Path, payload: dict) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--models-dir", type=Path, default=REPO_ROOT / "data" / "models")
+    parser.add_argument(
+        "--training-dir",
+        type=Path,
+        default=REPO_ROOT / "data" / "ml_training",
+        help="Exact training artifacts whose temporal integrity is bound to promotion evidence.",
+    )
     parser.add_argument(
         "--validation-report",
         type=Path,
@@ -64,6 +69,15 @@ def main() -> int:
                 "bundle_dir": str(bundle_dir),
                 "receipt_id": manifest["receipt_id"],
             },
+        )
+        temporal, statistical = build_promotion_receipts(
+            args.output_manifest,
+            training_dir=args.training_dir,
+            source_revision=args.source_revision,
+        )
+        print(
+            "Promotion evidence: "
+            f"temporal={temporal['receipt_id']} statistical={statistical['receipt_id']}"
         )
 
     return 0
