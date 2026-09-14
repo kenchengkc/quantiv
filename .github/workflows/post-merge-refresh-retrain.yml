@@ -99,3 +99,5 @@ jobs:
             -f sha="$sha" \
             -f branch=main >/dev/null
           echo "Removed $path from main."
+
+# Trigger after workflow registration.
