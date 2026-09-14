@@ -75,6 +75,26 @@ def test_unsafe_request_id_is_replaced():
         assert len(res.headers["x-request-id"]) == 32
 
 
+def test_telemetry_survives_a_frozen_wall_clock():
+    """Latency is measured on the monotonic clock, not the wall clock.
+
+    Tests pin the replay window by freezing `hmac_auth.time`. Measuring latency
+    through that same module made every one of those tests fail on a missing
+    `perf_counter`, so the two clocks have to stay independent.
+    """
+    from types import SimpleNamespace
+
+    from middleware import hmac_auth
+
+    frozen = SimpleNamespace(time=lambda: 1_800_000_000.0)
+    with patch.object(hmac_auth, "time", frozen), patch.dict(
+        os.environ, {"BACKEND_SHARED_SECRET": ""}, clear=False
+    ):
+        res = TestClient(_app("/health")).get("/health")
+        assert res.status_code == 200
+        assert len(res.headers["x-request-id"]) == 32
+
+
 def test_health_exempt_without_hmac():
     with patch.dict(os.environ, {"BACKEND_SHARED_SECRET": "s3cr3t"}, clear=False):
         app = Starlette(routes=[Route("/health", lambda r: JSONResponse({"status": "ok"}))])

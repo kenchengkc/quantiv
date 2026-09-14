@@ -15,6 +15,11 @@ import time
 import uuid
 from collections.abc import Iterable
 
+# Latency is measured on the monotonic clock, bound here rather than reached
+# through `time` so that freezing the wall clock (which tests do to pin the
+# replay window) cannot silently stop request telemetry from being emitted.
+from time import perf_counter
+
 import structlog
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
@@ -88,11 +93,11 @@ class HmacAuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         request_id = _correlation_id(request)
         request.state.request_id = request_id
-        started = time.perf_counter()
+        started = perf_counter()
         try:
             response = await self._authenticated_response(request, call_next)
         except Exception:  # noqa: BLE001 - record then preserve framework exception behavior
-            duration_ms = round((time.perf_counter() - started) * 1000, 3)
+            duration_ms = round((perf_counter() - started) * 1000, 3)
             logger.exception(
                 "backend_request_exception",
                 request_id=request_id,
@@ -102,7 +107,7 @@ class HmacAuthMiddleware(BaseHTTPMiddleware):
             )
             raise
 
-        duration_ms = round((time.perf_counter() - started) * 1000, 3)
+        duration_ms = round((perf_counter() - started) * 1000, 3)
         response.headers["X-Request-ID"] = request_id
         logger.info(
             "backend_request_complete",
