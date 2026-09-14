@@ -24,9 +24,9 @@
     "p25": 0.022503,
     "p50": 0.051032,
     "p75": 0.090252,
-    "p90": 0.122576,
+    "p90": 0.123982,
     "em_method": "ml_lightgbm",
-    "timing": "after_market_close"
+    "timing": "before_market_open"
   },
   "straddle_features": [
     {
@@ -67,7 +67,7 @@
   "earnings_history": [
     {
       "date": "2026-09-22",
-      "timing": "after_market_close",
+      "timing": "before_market_open",
       "q": "Q4 26",
       "fiscal_year": 2026,
       "fiscal_q": "Q4",
@@ -353,5 +353,5 @@
     "iv_mom_week": 0.0277,
     "iv_mom_month": null
   },
-  "next_earnings_timing": "after_market_close"
+  "next_earnings_timing": "before_market_open"
 }
