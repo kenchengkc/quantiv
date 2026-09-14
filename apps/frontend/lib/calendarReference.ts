@@ -57,11 +57,15 @@ function addDays(iso: string, days: number): string {
 }
 
 /**
- * Treat calendar-reference as authoritative for event identity while research
- * remains an optional, immutable overlay. Research is inherited only when the
- * ticker, earnings date, and a known normalized reporting session all match.
- * A revised date/session therefore renders dates-only instead of carrying old
- * options/model metrics onto a different event.
+ * Treat calendar-reference as authoritative for ticker/date membership while
+ * research remains an optional, immutable overlay. A known reference session
+ * is authoritative and research is inherited only when it matches. An unknown
+ * reference session is absence of session evidence, not a contradictory value:
+ * when ticker/date match and retained research has a known session, preserve the
+ * research row and its ML/options metrics rather than erasing valid evidence.
+ *
+ * A revised ticker/date or a conflicting known session still renders dates-only
+ * so old options/model metrics can never migrate onto a different event.
  *
  * The reference is authoritative only inside its declared publication window.
  * If the browser advances to a week the retained reference does not fully cover
@@ -83,34 +87,42 @@ export function mergeCalendarReference<
   const end = addDays(start, 4);
   if (start < reference.window.start || end > reference.window.end) return research;
 
-  const researchByExactIdentity = new Map<string, TEvent>();
+  const researchByTickerDate = new Map<string, TEvent>();
   for (const event of research.events ?? []) {
-    const timing = normalizeCalendarTiming(event.timing);
-    if (!KNOWN_SESSIONS.has(timing)) continue;
-    researchByExactIdentity.set(`${event.ticker}|${event.earnings_date}|${timing}`, event);
+    researchByTickerDate.set(`${event.ticker}|${event.earnings_date}`, event);
   }
 
   const events: CalendarOverlayEvent<TEvent>[] = reference.events
     .filter((event) => event.earnings_date >= start && event.earnings_date <= end)
     .map((event): CalendarOverlayEvent<TEvent> => {
-      const timing = normalizeCalendarTiming(event.timing);
-      const researchMatch = KNOWN_SESSIONS.has(timing)
-        ? researchByExactIdentity.get(`${event.ticker}|${event.earnings_date}|${timing}`)
-        : undefined;
-      if (researchMatch) {
+      const referenceTiming = normalizeCalendarTiming(event.timing);
+      const researchMatch = researchByTickerDate.get(`${event.ticker}|${event.earnings_date}`);
+      const researchTiming = normalizeCalendarTiming(researchMatch?.timing);
+      const referenceSessionKnown = KNOWN_SESSIONS.has(referenceTiming);
+      const researchSessionKnown = KNOWN_SESSIONS.has(researchTiming);
+      const sessionsCompatible =
+        researchMatch != null &&
+        researchSessionKnown &&
+        (!referenceSessionKnown || referenceTiming === researchTiming);
+
+      if (researchMatch && sessionsCompatible) {
         return {
           ...researchMatch,
           ticker: event.ticker,
           earnings_date: event.earnings_date,
-          timing,
+          // A known reference session remains authoritative. When the reference
+          // is unknown, retain the known research session so the row stays in
+          // the correct BMO/AMC/DMH group together with its matched metrics.
+          timing: referenceSessionKnown ? referenceTiming : researchTiming,
         };
       }
       // Do not spread any research object here. Absence of metrics is the
-      // fail-closed state for revised/unmatched/unknown-session events.
+      // fail-closed state for revised dates, known-session conflicts, or rows
+      // whose session remains unknown in both sources.
       return {
         ticker: event.ticker,
         earnings_date: event.earnings_date,
-        timing,
+        timing: referenceTiming,
       };
     })
     .sort((a, b) => a.earnings_date.localeCompare(b.earnings_date) || a.ticker.localeCompare(b.ticker));
