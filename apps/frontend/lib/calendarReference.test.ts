@@ -34,7 +34,7 @@ const research = (events: Event[]): ResearchWeek<Event> => ({
 });
 
 describe('calendar reference overlay', () => {
-  it('preserves research only for an exact ticker/date/known-session match', () => {
+  it('preserves research for an exact ticker/date/known-session match', () => {
     const merged = mergeCalendarReference(
       reference([{ ticker: 'AAA', earnings_date: '2026-09-08', timing: 'bmo' }]),
       research([{
@@ -52,6 +52,22 @@ describe('calendar reference overlay', () => {
     expect(merged.metadata.research_as_of_date).toBe('2026-09-04');
   });
 
+  it('preserves matched ML research when the reference session is unknown', () => {
+    const merged = mergeCalendarReference(
+      reference([{ ticker: 'FDX', earnings_date: '2026-09-16', timing: 'unknown' }]),
+      research([{
+        ticker: 'FDX', earnings_date: '2026-09-16', timing: 'after_market_close',
+        em_ml_pct: 0.039443, em_straddle_pct: 0.040161, p25: 0.019459, p75: 0.063145,
+      }]),
+      '2026-09-14',
+    );
+
+    expect(merged.events[0]).toEqual({
+      ticker: 'FDX', earnings_date: '2026-09-16', timing: 'amc',
+      em_ml_pct: 0.039443, em_straddle_pct: 0.040161, p25: 0.019459, p75: 0.063145,
+    });
+  });
+
   it('renders a revised date without inherited research metrics', () => {
     const merged = mergeCalendarReference(
       reference([{ ticker: 'AAA', earnings_date: '2026-09-09', timing: 'bmo' }]),
@@ -66,7 +82,7 @@ describe('calendar reference overlay', () => {
     ]);
   });
 
-  it('renders a changed session without inherited research metrics', () => {
+  it('renders a changed known session without inherited research metrics', () => {
     const merged = mergeCalendarReference(
       reference([{ ticker: 'AAA', earnings_date: '2026-09-08', timing: 'amc' }]),
       research([{
@@ -78,7 +94,7 @@ describe('calendar reference overlay', () => {
     expect(merged.events[0]).toEqual({ ticker: 'AAA', earnings_date: '2026-09-08', timing: 'amc' });
   });
 
-  it('never inherits research when the reference session is unknown', () => {
+  it('never inherits research when both sessions are unknown', () => {
     const merged = mergeCalendarReference(
       reference([{ ticker: 'AAA', earnings_date: '2026-09-08', timing: 'unknown' }]),
       research([{
