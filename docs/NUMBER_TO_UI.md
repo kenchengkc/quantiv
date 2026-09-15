@@ -109,7 +109,7 @@ The same paired-options definitions feed research features and product publicati
 
 `scripts/build_data_reconciliation.py` summarizes source coverage, duplicate keys, quote rejection, upcoming-event chain coverage, ticker lifecycle, corporate actions, quarantine, and replay controls.
 
-A critical exception sets `decision_safe=false` and stops scoring/publication. Advisory gaps can publish as `degraded`, but the exception remains visible.
+A critical exception sets `decision_safe=false` and stops scoring/publication. Standing coverage notices remain visible on the exception list without changing overall status to `advisory`. Actionable warnings can publish as `advisory`.
 
 ### Step 4 — expected-move fields are built
 
@@ -327,7 +327,8 @@ Examples:
 - failed/interrupted model download → previous verified bundle remains active;
 - Railway prediction unavailable → browser can retain validated nightly ML fields;
 - quote provider gap → last-confirmed/fallback/unavailable state rather than fabricated tick;
-- advisory coverage/drift warning → publication may remain eligible but state is `degraded` and visible.
+- standing coverage/universe notices → overall may remain `passed` while the exception stays visible;
+- actionable instrumentation warning → publication may remain eligible but state is `advisory` and visible.
 
 ## 8. Where to read next
 

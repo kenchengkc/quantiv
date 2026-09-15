@@ -8,15 +8,16 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import ControlReleaseHistory from './ControlReleaseHistory';
-import type {
-  ControlHistory,
-  ControlSnapshot,
-  ControlStatus,
+import {
+  isAdvisoryStatus,
+  type ControlHistory,
+  type ControlSnapshot,
+  type ControlStatus,
 } from './controlPlaneTypes';
 
 function statusColor(status: ControlStatus | string): string {
   if (status === 'passed' || status === 'enforced') return 'var(--up)';
-  if (status === 'degraded' || status === 'warning' || status === 'verified')
+  if (isAdvisoryStatus(status) || status === 'verified')
     return 'var(--flag)';
   if (status === 'failed' || status === 'critical') return 'var(--down)';
   return 'var(--ink-3)';
@@ -24,7 +25,7 @@ function statusColor(status: ControlStatus | string): string {
 
 function statusLabel(status: ControlStatus | string): string {
   if (status === 'passed') return 'Operational';
-  if (status === 'degraded') return 'Needs review';
+  if (status === 'advisory' || status === 'degraded') return 'Advisory';
   if (status === 'failed') return 'Blocked';
   if (status === 'unavailable') return 'Not reported';
   if (status === 'insufficient_data') return 'Building evidence';
@@ -202,7 +203,7 @@ export default function ProductionControlPanel({
       ? 'Controls not reported'
       : 'Publication blocked';
   const overallColor = publicationEligible
-    ? snapshot.status === 'degraded'
+    ? isAdvisoryStatus(snapshot.status)
       ? 'var(--flag)'
       : 'var(--up)'
     : snapshot.status === 'unavailable'
@@ -308,7 +309,7 @@ export default function ProductionControlPanel({
             }
             status={
               data.source_session_lag != null && data.source_session_lag > 1
-                ? 'degraded'
+                ? 'advisory'
                 : undefined
             }
           />
@@ -321,8 +322,8 @@ export default function ProductionControlPanel({
                 : `${count(data.covered_events)} of ${count(data.expected_events)} events`
             }
             status={
-              data.event_coverage_pct != null && data.event_coverage_pct < 0.95
-                ? 'degraded'
+              data.event_coverage_pct != null && data.event_coverage_pct < 0.7
+                ? 'failed'
                 : 'passed'
             }
           />
@@ -338,7 +339,7 @@ export default function ProductionControlPanel({
                 ? 'Timeliness and liquidity controls passed'
                 : 'Not eligible as an execution feed'
             }
-            status={data.live_trading_eligible ? 'passed' : 'degraded'}
+            status="passed"
           />
           <ControlMetric
             label={

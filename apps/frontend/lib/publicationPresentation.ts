@@ -23,17 +23,17 @@ export type PublishedForecast = {
 const OPTIONS_ONLY = new Set([
   'options_stale', 'event_quote_coverage_below_limit', 'option_quote_quality_below_limit',
 ]);
-const ACCEPTABLE = new Set(['passed', 'degraded', 'warning']);
+const ACCEPTABLE = new Set(['passed', 'advisory', 'degraded', 'warning']);
 
-export function publishedForecastStatus(forecast: PublishedForecast): 'passed' | 'failed' | 'unavailable' | 'degraded' {
+export function publishedForecastStatus(forecast: PublishedForecast): 'passed' | 'failed' | 'unavailable' | 'advisory' {
   if (forecast.quality.status === 'failed'
     || (forecast.quality.issue_count ?? 0) > 0 || (forecast.controls.exceptions ?? 0) > 0) return 'failed';
   if (!forecast.receipt_id || !forecast.validated_at
     || !Number.isFinite(Date.parse(forecast.validated_at))) return 'unavailable';
   if (forecast.quality.status === 'passed' && forecast.quality.issue_count === 0
     && forecast.controls.exceptions === 0) return 'passed';
-  return forecast.quality.status === 'degraded' || forecast.quality.status === 'warning'
-    ? 'degraded' : 'unavailable';
+  return forecast.quality.status === 'advisory' || forecast.quality.status === 'degraded' || forecast.quality.status === 'warning'
+    ? 'advisory' : 'unavailable';
 }
 
 export function researchUpdatePresentation(control: PublicationControl, forecast: PublishedForecast) {
