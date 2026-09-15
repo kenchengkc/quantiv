@@ -1,4 +1,4 @@
-# Quantiv 📈
+# Quantiv
 
 > Decision-ready earnings research: market pricing, historical outcomes, and calibrated ML in one fast, auditable dashboard.
 
