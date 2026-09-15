@@ -19,6 +19,7 @@ from frontend_data.payloads import (
     load_published_calendar_keys,
     ml_gate_drops_event,
     published_symbol_dates,
+    week_em_averages,
 )
 
 
@@ -128,3 +129,19 @@ def test_load_published_calendar_events_skips_bad_rows(tmp_path: Path):
     assert load_published_calendar_events(tmp_path) == [
         ("HUBG", date(2026, 9, 17), "unknown"),
     ]
+
+
+def test_week_em_averages_ignore_dates_only_published_rows():
+    """Last week's published reporters have no recomputable expected move.
+
+    The 2026-09-15 scheduled refresh crashed on KeyError: 'em_straddle_pct'
+    while summarizing the Sep 7 week of 20 dates-only rows.
+    """
+    events = [
+        {"ticker": "CASY", "earnings_date": "2026-09-08"},
+        {"ticker": "KFY", "earnings_date": "2026-09-09", "em_straddle_pct": None, "em_iv_pct": None},
+        {"ticker": "ADBE", "earnings_date": "2026-09-10", "em_straddle_pct": 0.10, "em_iv_pct": 0.12},
+        {"ticker": "ORCL", "earnings_date": "2026-09-10", "em_straddle_pct": 0.30, "em_iv_pct": 0.18},
+    ]
+    assert week_em_averages(events) == (0.20, 0.15)
+    assert week_em_averages(events[:2]) == (0.0, 0.0)

@@ -904,6 +904,8 @@ def build_week_events(conn, as_of_date: date, week_start: date, week_end: date,
                     "realized_move_pct": jsonable(realized_move),
                     "as_of_date": as_of_date.isoformat(),
                     "em_method": None,
+                    "em_straddle_pct": None,
+                    "em_iv_pct": None,
                     **extras,
                     **provider_fields,
                 })
@@ -970,6 +972,28 @@ def build_week_events(conn, as_of_date: date, week_start: date, week_end: date,
             flush=True,
         )
     return events
+
+
+def week_em_averages(events: list[dict]) -> tuple[float, float]:
+    """Mean straddle/IV expected moves for a week payload.
+
+    Dates-only published rows omit a priced expected move (or set it to null)
+    once the print has passed. The week summary still has to build.
+    """
+    straddles = [
+        event["em_straddle_pct"]
+        for event in events
+        if event.get("em_straddle_pct") is not None
+    ]
+    ivs = [
+        event["em_iv_pct"]
+        for event in events
+        if event.get("em_iv_pct") is not None
+    ]
+    return (
+        sum(straddles) / len(straddles) if straddles else 0.0,
+        sum(ivs) / len(ivs) if ivs else 0.0,
+    )
 
 
 def preserve_reported_events(
