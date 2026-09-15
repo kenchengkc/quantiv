@@ -60,9 +60,9 @@ function addDays(iso: string, days: number): string {
  * Treat calendar-reference as authoritative for ticker/date membership while
  * research remains an optional, immutable overlay. A known reference session
  * is authoritative and research is inherited only when it matches. An unknown
- * reference session is absence of session evidence, not a contradictory value:
- * when ticker/date match and retained research has a known session, preserve the
- * research row and its ML/options metrics rather than erasing valid evidence.
+ * session is absence of session evidence, not a contradictory value: overlay
+ * on an exact ticker/date match when sessions do not disagree, including when
+ * both sides are still unknown.
  *
  * A revised ticker/date or a conflicting known session still renders dates-only
  * so old options/model metrics can never migrate onto a different event.
@@ -100,10 +100,17 @@ export function mergeCalendarReference<
       const researchTiming = normalizeCalendarTiming(researchMatch?.timing);
       const referenceSessionKnown = KNOWN_SESSIONS.has(referenceTiming);
       const researchSessionKnown = KNOWN_SESSIONS.has(researchTiming);
+      // Same ticker+date is the same event. A known BMO/AMC/DMH disagreement
+      // is a different reaction window, so those metrics stay fail-closed.
+      // Unknown is missing session evidence, not a conflicting value: overlay
+      // when both sides are unknown, or when research has a known session the
+      // reference does not contradict.
+      const knownSessionConflict =
+        referenceSessionKnown && researchSessionKnown && referenceTiming !== researchTiming;
       const sessionsCompatible =
         researchMatch != null &&
-        researchSessionKnown &&
-        (!referenceSessionKnown || referenceTiming === researchTiming);
+        !knownSessionConflict &&
+        (researchSessionKnown || !referenceSessionKnown);
 
       if (researchMatch && sessionsCompatible) {
         return {
@@ -111,14 +118,17 @@ export function mergeCalendarReference<
           ticker: event.ticker,
           earnings_date: event.earnings_date,
           // A known reference session remains authoritative. When the reference
-          // is unknown, retain the known research session so the row stays in
+          // is unknown, retain a known research session so the row stays in
           // the correct BMO/AMC/DMH group together with its matched metrics.
-          timing: referenceSessionKnown ? referenceTiming : researchTiming,
+          timing: referenceSessionKnown
+            ? referenceTiming
+            : researchSessionKnown
+              ? researchTiming
+              : referenceTiming,
         };
       }
       // Do not spread any research object here. Absence of metrics is the
-      // fail-closed state for revised dates, known-session conflicts, or rows
-      // whose session remains unknown in both sources.
+      // fail-closed state for revised dates or known-session conflicts.
       return {
         ticker: event.ticker,
         earnings_date: event.earnings_date,

@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import json
 import math
 from datetime import date, datetime, timedelta
+from pathlib import Path
 
 from fiscal_calendar import display_fiscal_year, load_fiscal_year_naming
 from math_baseline import compute_em_math
@@ -650,11 +652,71 @@ def collapse_duplicate_earnings(conn, start: date, end: date):
     return keep, dropped
 
 
+def load_published_calendar_keys(public_dir: Path) -> set[tuple[str, str]]:
+    """Ticker/date identities already shown by calendar-reference.json.
+
+    Missing or unreadable files fail closed to an empty set so a first-run
+    build (no reference published yet) keeps the historical ML-coverage gate
+    instead of widening the research universe.
+    """
+    path = public_dir / "calendar-reference.json"
+    if not path.is_file():
+        return set()
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return set()
+    keys: set[tuple[str, str]] = set()
+    for event in payload.get("events") or []:
+        if not isinstance(event, dict):
+            continue
+        ticker = str(event.get("ticker") or "").strip().upper()
+        earnings_date = str(event.get("earnings_date") or "")[:10]
+        if ticker and len(earnings_date) == 10:
+            keys.add((ticker, earnings_date))
+    return keys
+
+
+def ml_gate_drops_event(
+    ticker: str,
+    earnings_iso: str,
+    today: date,
+    ml_lookup: dict[tuple[str, str], dict],
+    require_ml: bool,
+    published: set[tuple[str, str]] | None = None,
+) -> bool:
+    """Whether the ML-coverage gate should discard this event entirely.
+
+    daily_score.py keys a forecast to the earnings date it scored. When a
+    provider revises that date the forecast stays keyed to the superseded one,
+    so it can never be reused: its horizon anchors the old date. Requiring ML
+    then discarded the event outright — which used to mean "don't show it", but
+    calendar-reference is now authoritative for membership, so the row is
+    published anyway and simply renders with no expected move at all.
+
+    An event the calendar already publishes is therefore never dropped here. It
+    falls through to the options-math baseline priced at its current date, which
+    is the same evidence the surrounding weeks publish when ML is unavailable.
+    Events outside the published calendar keep the strict gate, so an unscored
+    event does not quietly widen the research universe.
+    """
+    if not require_ml:
+        return False
+    if ml_lookup.get((ticker, earnings_iso)) is not None:
+        return False
+    # Past earnings are never scored (daily_score only covers upcoming events),
+    # so their absence from ml_lookup is expected rather than a coverage gap.
+    if earnings_iso < today.isoformat():
+        return False
+    return (ticker, earnings_iso) not in (published or set())
+
+
 def build_week_events(conn, as_of_date: date, week_start: date, week_end: date,
                       ml_lookup: dict[tuple[str, str], dict],
                       provider_lookup: dict[str, dict] | None = None,
                       require_ml: bool = True,
-                      canonical: set[tuple[str, str]] | None = None) -> list[dict]:
+                      canonical: set[tuple[str, str]] | None = None,
+                      published: set[tuple[str, str]] | None = None) -> list[dict]:
     # realized_move: signed regular-session close-to-close move ACROSS the
     # print, for events already reported. Same timing-aware bracket as
     # build_symbol_detail (BMO → prev close→report-day close; AMC → report-day
@@ -716,6 +778,10 @@ def build_week_events(conn, as_of_date: date, week_start: date, week_end: date,
     skipped_no_ml = 0
     skipped_no_options = 0
     skipped_dupe = 0
+    # Named so the build log says which published calendar rows will render
+    # without an expected move, instead of only an aggregate skip count.
+    published_without_ml: list[str] = []
+    published_without_options: list[str] = []
     today = date.today()
     for i, (
         ticker,
@@ -733,26 +799,50 @@ def build_week_events(conn, as_of_date: date, week_start: date, week_end: date,
         if canonical is not None and (ticker, earnings_dt.isoformat()) not in canonical:
             skipped_dupe += 1
             continue
-        fc = ml_lookup.get((ticker, earnings_dt.isoformat()))
-        # Require ML only for *future* earnings. Past earnings within the same
-        # week (e.g. Mon/Tue when today is Wed) fall back to options_math —
-        # daily_score.py only scores upcoming events, so forecasts are absent
-        # for past dates by design.
-        if require_ml and not fc and earnings_dt >= today:
+        earnings_iso = earnings_dt.isoformat()
+        fc = ml_lookup.get((ticker, earnings_iso))
+        if ml_gate_drops_event(ticker, earnings_iso, today, ml_lookup, require_ml, published):
             skipped_no_ml += 1
             continue
         em = compute_em_math(conn, ticker, as_of_date, earnings_dt, timing)
+        is_published = (ticker, earnings_iso) in (published or set())
         if not em:
-            skipped_no_options += 1
+            if is_published:
+                published_without_options.append(f"{ticker} {earnings_iso}")
+                extras = screener_extras(conn, ticker, earnings_dt, as_of_date)
+                provider_fields = provider_event_fields(
+                    (provider_lookup or {}).get(str(ticker).upper())
+                )
+                # Keep the published identity so realized move / EPS can overlay
+                # even when the expected move can no longer be recomputed.
+                events.append({
+                    "ticker": ticker,
+                    "earnings_date": earnings_iso,
+                    "timing": timing or "unknown",
+                    "fiscal_q": fiscal_q,
+                    "eps_actual": jsonable(eps_actual),
+                    "eps_estimate": jsonable(eps_estimate),
+                    "revenue_actual": jsonable(revenue_actual),
+                    "revenue_estimate": jsonable(revenue_estimate),
+                    "realized_move_pct": jsonable(realized_move),
+                    "as_of_date": as_of_date.isoformat(),
+                    "em_method": None,
+                    **extras,
+                    **provider_fields,
+                })
+            else:
+                skipped_no_options += 1
             continue
+        if fc is None and is_published:
+            published_without_ml.append(f"{ticker} {earnings_iso}")
         if i % 25 == 0 or i == len(rows):
             print(f"    event {i}/{len(rows)}: {ticker} {earnings_dt}", flush=True)
         ml = ml_fields(fc)
         extras = screener_extras(conn, ticker, earnings_dt, as_of_date)
         provider_fields = provider_event_fields((provider_lookup or {}).get(str(ticker).upper()))
-        event = {
+        events.append({
             "ticker": ticker,
-            "earnings_date": earnings_dt.isoformat(),
+            "earnings_date": earnings_iso,
             "timing": timing or "unknown",
             "fiscal_q": fiscal_q,
             "eps_actual": jsonable(eps_actual),
@@ -777,18 +867,29 @@ def build_week_events(conn, as_of_date: date, week_start: date, week_end: date,
             "skew_atm": jsonable(em.get("skew_atm")),
             "term_slope": jsonable(em.get("term_slope")),
             "em_method": "ml_lightgbm" if ml else "options_math",
-            "confidence": "high" if ml else "high",
+            "confidence": "high",
             **extras,
             **provider_fields,
             **ml,
-        }
-        events.append(event)
+        })
     events.sort(key=lambda e: (e["earnings_date"], e["ticker"]))
     if skipped_no_ml or skipped_no_options or skipped_dupe:
         print(
             f"    skipped: {skipped_no_ml} (no ML forecast), "
             f"{skipped_no_options} (no options data), "
             f"{skipped_dupe} (duplicate revised date)",
+            flush=True,
+        )
+    if published_without_ml:
+        print(
+            f"    published calendar rows priced from options math only "
+            f"({len(published_without_ml)}): {', '.join(published_without_ml)}",
+            flush=True,
+        )
+    if published_without_options:
+        print(
+            f"    ⚠ published calendar rows with NO expected move "
+            f"({len(published_without_options)}): {', '.join(published_without_options)}",
             flush=True,
         )
     return events
