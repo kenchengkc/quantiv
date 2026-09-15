@@ -1,31 +1,29 @@
 {
   "data": {
-    "contract_rejection_rate": 0.519134,
-    "contracts": 129406,
-    "corporate_action_rows": 28760,
+    "contract_rejection_rate": 0.504484,
+    "contracts": 129582,
+    "corporate_action_rows": 28822,
     "corporate_action_status": "enforced",
     "covered_events": 30,
     "decision_group_rejection_rate": 0.268293,
     "decision_groups": 41,
     "decision_scope": "end_of_day_research",
     "duplicate_rows": 0,
-    "eligible_contracts": 62227,
+    "eligible_contracts": 64210,
     "eligible_decision_groups": 30,
     "event_coverage_pct": 0.731707,
     "expected_events": 41,
     "expected_source_date": "2026-09-14",
     "live_trading_eligible": false,
     "missing_events": 11,
-    "pair_rejection_rate": 0.900669,
-    "quarantine_records": 125455,
+    "pair_rejection_rate": 0.894044,
+    "quarantine_records": 123298,
     "quarantine_status": "enforced",
-    "quote_quality_errors": [
-      "latest source date 2026-09-11 is 1 market session(s) behind expected 2026-09-14"
-    ],
+    "quote_quality_errors": [],
     "replay_status": "verified",
-    "source_date": "2026-09-11",
-    "source_session_lag": 1,
-    "status": "failed"
+    "source_date": "2026-09-14",
+    "source_session_lag": 0,
+    "status": "degraded"
   },
   "exceptions": [
     {
@@ -41,13 +39,19 @@
       "summary": "In-universe earnings events have no decision-eligible option chain"
     },
     {
-      "code": "option_quote_quality_below_limit",
-      "count": 11,
-      "severity": "critical",
-      "summary": "Option evidence on the scoped earnings decision surface exceeds the publication limit"
+      "code": "forecast_horizon_coverage_below_limit",
+      "count": 1,
+      "severity": "warning",
+      "summary": "One or more model horizons lack sufficient eligible option coverage"
+    },
+    {
+      "code": "option_chain_diagnostics_above_limit",
+      "count": 2495,
+      "severity": "warning",
+      "summary": "Chain-wide option diagnostics exceed their limits outside the scoped earnings decision surface"
     }
   ],
-  "generated_at": "2026-09-15T05:52:42.438027+00:00",
+  "generated_at": "2026-09-15T18:04:18.848004+00:00",
   "model": {
     "challenger_present": true,
     "champion_active": true,
@@ -55,7 +59,7 @@
     "drift_status": "warning",
     "fallback_bundle_available": false,
     "hard_missing_features": 0,
-    "monitored_at": "2026-09-14T17:01:12.638181+00:00",
+    "monitored_at": "2026-09-15T17:31:51.213447+00:00",
     "outcome_common_rows": null,
     "outcome_evaluated_at": "2026-09-14T01:54:36.293833+00:00",
     "outcome_evaluations": 2,
@@ -65,18 +69,18 @@
     "shadow_roles": [
       "challenger"
     ],
-    "snapshot_date": "2026-09-11",
+    "snapshot_date": "2026-09-14",
     "status": "degraded",
     "warning_features": 2
   },
-  "publication_eligible": false,
+  "publication_eligible": true,
   "release": {
-    "artifact_promotion_status": "degraded",
+    "artifact_promotion_status": "passed",
     "data_r2_status": "passed",
-    "forecast_r2_status": "degraded",
-    "frontend_payload_status": "degraded",
-    "neon_import_status": "degraded"
+    "forecast_r2_status": "passed",
+    "frontend_payload_status": "passed",
+    "neon_import_status": "passed"
   },
   "schema": "quantiv.control-plane.v2",
-  "status": "failed"
+  "status": "degraded"
 }
