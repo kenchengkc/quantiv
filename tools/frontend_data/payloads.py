@@ -613,6 +613,8 @@ def collapse_duplicate_earnings(conn, start: date, end: date):
     Rule (matches the confirmed report date 5/5 on known cases):
       1. prefer the row that already has reported actuals (the confirmed date),
       2. otherwise the latest date (the most recent revision).
+    apply_published_canonical then replaces any remaining DuckDB date that
+    disagrees with the live calendar-reference identity.
     Returns (keep, dropped): keep is the set of (ticker, iso_date) to retain;
     dropped is [(ticker, dropped_iso, kept_iso)] for the build log.
     """
@@ -650,6 +652,47 @@ def collapse_duplicate_earnings(conn, start: date, end: date):
         if rn != 1
     ]
     return keep, dropped
+
+
+def apply_published_canonical(
+    canonical: set[tuple[str, str]],
+    published: set[tuple[str, str]],
+) -> tuple[set[tuple[str, str]], list[tuple[str, str, str]]]:
+    """Keep the published calendar date when DuckDB collapsed a different one.
+
+    AIR's homepage identity is 2026-09-21; DuckDB's latest revision is 2026-09-22.
+    Pricing the 22nd leaves Monday as a dates-only overlay dash.
+    """
+    if not published:
+        return canonical, []
+    published_tickers = {ticker for ticker, _iso in published}
+    kept = {key for key in canonical if key[0] not in published_tickers}
+    kept |= set(published)
+    published_iso = {ticker: iso for ticker, iso in published}
+    dropped = [
+        (ticker, iso, published_iso.get(ticker, "?"))
+        for ticker, iso in sorted(canonical)
+        if ticker in published_tickers and (ticker, iso) not in published
+    ]
+    return kept, dropped
+
+
+def resolve_event_timing(duckdb_timing: str | None, published_timing: str | None) -> str:
+    """Published BMO/AMC/DMH wins so week JSON matches calendar-reference overlay."""
+    published = (published_timing or "").strip().lower()
+    if published in {"bmo", "amc", "dmh", "before_market_open", "after_market_close", "during_market_hours"}:
+        return published
+    return duckdb_timing or "unknown"
+
+
+def _published_timing(
+    published: dict[tuple[str, str], str] | set[tuple[str, str]] | None,
+    ticker: str,
+    iso: str,
+) -> str | None:
+    if isinstance(published, dict):
+        return published.get((ticker, iso))
+    return None
 
 
 def load_published_calendar_events(public_dir: Path) -> list[tuple[str, date, str]]:
@@ -793,7 +836,7 @@ def build_week_events(conn, as_of_date: date, week_start: date, week_end: date,
                       provider_lookup: dict[str, dict] | None = None,
                       require_ml: bool = True,
                       canonical: set[tuple[str, str]] | None = None,
-                      published: set[tuple[str, str]] | None = None) -> list[dict]:
+                      published: dict[tuple[str, str], str] | set[tuple[str, str]] | None = None) -> list[dict]:
     # realized_move: signed regular-session close-to-close move ACROSS the
     # print, for events already reported. Same timing-aware bracket as
     # build_symbol_detail (BMO → prev close→report-day close; AMC → report-day
@@ -877,6 +920,9 @@ def build_week_events(conn, as_of_date: date, week_start: date, week_end: date,
             skipped_dupe += 1
             continue
         earnings_iso = earnings_dt.isoformat()
+        timing = resolve_event_timing(
+            timing, _published_timing(published, ticker, earnings_iso)
+        )
         fc = ml_lookup.get((ticker, earnings_iso))
         if ml_gate_drops_event(ticker, earnings_iso, today, ml_lookup, require_ml, published):
             skipped_no_ml += 1
@@ -951,6 +997,96 @@ def build_week_events(conn, as_of_date: date, week_start: date, week_end: date,
             **provider_fields,
             **ml,
         })
+
+    have = {(event["ticker"], event["earnings_date"]) for event in events}
+    published_items = (
+        published.items() if isinstance(published, dict) else
+        [((ticker, iso), None) for ticker, iso in (published or [])]
+    )
+    for (ticker, iso), pub_timing in published_items:
+        earn_dt = date.fromisoformat(iso)
+        if earn_dt < week_start or earn_dt > week_end or (ticker, iso) in have:
+            continue
+        if canonical is not None and (ticker, iso) not in canonical:
+            continue
+        try:
+            row = conn.execute(
+                """
+                SELECT timing, fiscal_q, eps_actual, eps_estimate,
+                       revenue_actual, revenue_estimate
+                FROM earnings_events
+                WHERE ticker = ? AND earnings_dt = ?
+                LIMIT 1
+                """,
+                [ticker, earn_dt],
+            ).fetchone()
+        except Exception:
+            row = None
+        duckdb_timing = row[0] if row else None
+        timing = resolve_event_timing(duckdb_timing, pub_timing)
+        fiscal_q = row[1] if row else None
+        eps_actual = row[2] if row else None
+        eps_estimate = row[3] if row else None
+        revenue_actual = row[4] if row else None
+        revenue_estimate = row[5] if row else None
+        fc = ml_lookup.get((ticker, iso))
+        em = compute_em_math(conn, ticker, as_of_date, earn_dt, timing)
+        extras = screener_extras(conn, ticker, earn_dt, as_of_date)
+        provider_fields = provider_event_fields((provider_lookup or {}).get(str(ticker).upper()))
+        if not em:
+            published_without_options.append(f"{ticker} {iso}")
+            events.append({
+                "ticker": ticker,
+                "earnings_date": iso,
+                "timing": timing or "unknown",
+                "fiscal_q": fiscal_q,
+                "eps_actual": jsonable(eps_actual),
+                "eps_estimate": jsonable(eps_estimate),
+                "revenue_actual": jsonable(revenue_actual),
+                "revenue_estimate": jsonable(revenue_estimate),
+                "realized_move_pct": None,
+                "as_of_date": as_of_date.isoformat(),
+                "em_method": None,
+                "em_straddle_pct": None,
+                "em_iv_pct": None,
+                **extras,
+                **provider_fields,
+            })
+            have.add((ticker, iso))
+            continue
+        if fc is None:
+            published_without_ml.append(f"{ticker} {iso}")
+        ml = ml_fields(fc)
+        events.append({
+            "ticker": ticker,
+            "earnings_date": iso,
+            "timing": timing or "unknown",
+            "fiscal_q": fiscal_q,
+            "eps_actual": jsonable(eps_actual),
+            "eps_estimate": jsonable(eps_estimate),
+            "revenue_actual": jsonable(revenue_actual),
+            "revenue_estimate": jsonable(revenue_estimate),
+            "realized_move_pct": None,
+            "as_of_date": as_of_date.isoformat(),
+            "spot_price": jsonable(em["estimated_spot"]),
+            "atm_strike": jsonable(em["atm_strike"]),
+            "atm_iv": jsonable(em["avg_iv"]),
+            "em_straddle_pct": jsonable(em["em_baseline_straddle"]),
+            "em_iv_pct": jsonable(em["em_baseline_iv"]),
+            "em_straddle_abs": jsonable(em["straddle_price"]),
+            "expiry_date": em["expiry_date"],
+            "days_to_expiry": em["days_to_expiry"],
+            "lead_time_days": em["lead_time_days"],
+            "skew_atm": jsonable(em.get("skew_atm")),
+            "term_slope": jsonable(em.get("term_slope")),
+            "em_method": "ml_lightgbm" if ml else "options_math",
+            "confidence": "high",
+            **extras,
+            **provider_fields,
+            **ml,
+        })
+        have.add((ticker, iso))
+
     events.sort(key=lambda e: (e["earnings_date"], e["ticker"]))
     if skipped_no_ml or skipped_no_options or skipped_dupe:
         print(
