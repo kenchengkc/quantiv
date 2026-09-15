@@ -14,11 +14,13 @@ from pathlib import Path
 
 from frontend_data.payloads import (
     align_symbol_detail_to_published,
+    apply_published_canonical,
     apply_published_symbol_dates,
     load_published_calendar_events,
     load_published_calendar_keys,
     ml_gate_drops_event,
     published_symbol_dates,
+    resolve_event_timing,
     week_em_averages,
 )
 
@@ -145,3 +147,35 @@ def test_week_em_averages_ignore_dates_only_published_rows():
     ]
     assert week_em_averages(events) == (0.20, 0.15)
     assert week_em_averages(events[:2]) == (0.0, 0.0)
+
+
+def test_apply_published_canonical_keeps_calendar_date_over_duckdb_revision():
+    """AIR's homepage date is Sep 21; DuckDB collapse kept the Sep 22 revision."""
+    canonical = {("AIR", "2026-09-22"), ("FERG", "2026-09-22")}
+    published = {("AIR", "2026-09-21"), ("FERG", "2026-09-22")}
+    kept, dropped = apply_published_canonical(canonical, published)
+    assert ("AIR", "2026-09-21") in kept
+    assert ("AIR", "2026-09-22") not in kept
+    assert ("FERG", "2026-09-22") in kept
+    assert dropped == [("AIR", "2026-09-22", "2026-09-21")]
+
+
+def test_apply_published_canonical_injects_calendar_only_identities():
+    """APOG is on the published week but missing from DuckDB's collapse window."""
+    canonical = {("FERG", "2026-09-22")}
+    published = {("FERG", "2026-09-22"), ("APOG", "2026-09-22")}
+    kept, dropped = apply_published_canonical(canonical, published)
+    assert ("APOG", "2026-09-22") in kept
+    assert dropped == []
+
+
+def test_resolve_event_timing_published_session_wins_over_duckdb():
+    """AZO's calendar is AMC; DuckDB's BMO same-day row would fail the overlay."""
+    assert resolve_event_timing("bmo", "amc") == "amc"
+    assert resolve_event_timing("after_market_close", "bmo") == "bmo"
+
+
+def test_resolve_event_timing_unknown_published_keeps_research_session():
+    assert resolve_event_timing("bmo", "unknown") == "bmo"
+    assert resolve_event_timing(None, None) == "unknown"
+    assert resolve_event_timing("amc", "") == "amc"

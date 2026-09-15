@@ -30,6 +30,7 @@ from frontend_data.forecast_artifacts import (
 )
 from frontend_data.payloads import (
     align_symbol_detail_to_published,
+    apply_published_canonical,
     apply_published_symbol_dates,
     build_screener_payload,
     build_symbol_detail,
@@ -155,11 +156,24 @@ def main():
     # Event identities the currently published calendar already displays. These
     # rows render on the homepage whether or not research produced a row for
     # them, so they must not be dropped by the ML-coverage gate — see
-    # payloads.ml_gate_drops_event.
+    # payloads.ml_gate_drops_event. Canonical collapse must also keep these
+    # dates: a later DuckDB revision (AIR 9/21→9/22) otherwise prices a day
+    # the overlay will not attach to.
     published_events = load_published_calendar_events(PUBLIC_DIR)
     published_keys = {(ticker, earn_dt.isoformat()) for ticker, earn_dt, _ in published_events}
+    published_timings = {
+        (ticker, earn_dt.isoformat()): timing for ticker, earn_dt, timing in published_events
+    }
     published_for_symbols = published_symbol_dates(published_events, today)
+    canonical_keys, published_swaps = apply_published_canonical(canonical_keys, published_keys)
     print(f"  Published calendar reference: {len(published_keys)} event identities")
+    if published_swaps:
+        print(
+            f"  Published calendar dates replaced {len(published_swaps)} "
+            "DuckDB canonical date(s):"
+        )
+        for tk, dropped_iso, kept in published_swaps:
+            print(f"    {tk}: dropped {dropped_iso} → kept {kept} (calendar)")
 
     if skip_weeks:
         print("⏭️  --resume/--skip-weeks: reading existing weeks/*.json from disk", flush=True)
@@ -185,7 +199,7 @@ def main():
         require_ml = offset in (0, 1)
         events = build_week_events(conn, as_of_date, wk_start, wk_end, ml_lookup, provider_lookup,
                                    require_ml=require_ml, canonical=canonical_keys,
-                                   published=published_keys)
+                                   published=published_timings)
 
         # Reported-event preservation: an expected move is only observable
         # before the print, so once an earnings date passes compute_em_math
