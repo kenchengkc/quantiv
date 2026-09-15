@@ -64,9 +64,10 @@ def test_snapshot_is_compact_and_does_not_expose_artifact_ids() -> None:
         },
     )
 
-    assert snapshot["status"] == "degraded"
+    assert snapshot["status"] == "passed"
     assert snapshot["schema"] == "quantiv.control-plane.v2"
     assert snapshot["publication_eligible"] is True
+    assert snapshot["data"]["status"] == "passed"
     assert snapshot["data"]["quarantine_records"] == 42
     assert snapshot["data"]["decision_group_rejection_rate"] == 0.04
     assert snapshot["data"]["eligible_decision_groups"] == 48
@@ -121,7 +122,7 @@ def test_quote_failure_reason_is_preserved_without_changing_gate() -> None:
     assert snapshot["publication_eligible"] is False
 
 
-def test_feature_drift_degrades_model_health_without_blocking_publication() -> None:
+def test_feature_drift_is_advisory_when_the_sample_is_large_enough() -> None:
     snapshot = build_snapshot(
         {"quality": {"status": "passed", "decision_safe": True}},
         {
@@ -133,9 +134,36 @@ def test_feature_drift_degrades_model_health_without_blocking_publication() -> N
         generated_at="now",
     )
 
-    assert snapshot["status"] == "degraded"
+    assert snapshot["status"] == "advisory"
     assert snapshot["publication_eligible"] is True
-    assert snapshot["model"]["status"] == "degraded"
+    assert snapshot["model"]["status"] == "advisory"
+
+
+def test_small_sample_drift_does_not_leave_the_model_advisory() -> None:
+    snapshot = build_snapshot(
+        {"quality": {"status": "passed", "decision_safe": True}},
+        {
+            "status": "passed",
+            "feature_drift": {
+                "status": "warning",
+                "critical_features": 0,
+                "horizons": {
+                    "21": {
+                        "rows": 23,
+                        "warning_features": 2,
+                        "critical_features": 0,
+                    }
+                },
+            },
+        },
+        {"champion_bundle_id": "champion"},
+        {},
+        generated_at="now",
+    )
+
+    assert snapshot["status"] == "passed"
+    assert snapshot["publication_eligible"] is True
+    assert snapshot["model"]["status"] == "passed"
 
 
 def test_critical_drift_blocks_publication() -> None:

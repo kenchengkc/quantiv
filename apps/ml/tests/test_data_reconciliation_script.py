@@ -291,7 +291,7 @@ def test_script_reconciles_source_quotes_and_events(tmp_path: Path) -> None:
 
     assert result.returncode == 0, result.stdout + result.stderr
     assert report["quality"]["decision_safe"] is True
-    assert report["quality"]["status"] == "degraded"
+    assert report["quality"]["status"] == "passed"
     assert report["event_coverage"]["calendar_events"] == 3
     assert report["event_coverage"]["expected_events"] == 2
     assert report["event_coverage"]["covered_events"] == 2

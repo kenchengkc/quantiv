@@ -9,6 +9,32 @@ from typing import Any
 
 RECONCILIATION_SCHEMA = "quantiv.data-reconciliation.v2"
 
+# Expected EOD-research notices. They stay on the exception list so coverage
+# gaps remain visible, but they do not pull quality off `passed` when the
+# publication floor still holds.
+STANDING_WARNING_CODES = frozenset(
+    {
+        "upcoming_events_outside_option_universe",
+        "option_chain_diagnostics_above_limit",
+        "retired_source_symbols_quarantined",
+    }
+)
+COVERAGE_FLOOR_WARNING_CODES = frozenset(
+    {
+        "upcoming_events_without_option_chain",
+        "forecast_horizon_coverage_below_limit",
+    }
+)
+
+
+def warning_is_standing(code: str, event_coverage: dict[str, Any] | None = None) -> bool:
+    """Whether a warning is standing research noise rather than a publication risk."""
+    if code in STANDING_WARNING_CODES:
+        return True
+    if code in COVERAGE_FLOOR_WARNING_CODES:
+        return (event_coverage or {}).get("status") != "failed"
+    return False
+
 
 def _canonical_id(payload: dict[str, Any]) -> str:
     canonical = json.dumps(
@@ -372,14 +398,20 @@ def build_reconciliation_manifest(
 
     critical_count = sum(item["severity"] == "critical" for item in exceptions)
     warning_count = sum(item["severity"] == "warning" for item in exceptions)
+    actionable_warnings = sum(
+        1
+        for item in exceptions
+        if item["severity"] == "warning"
+        and not warning_is_standing(str(item.get("code") or ""), event_coverage)
+    )
     core = {
         "schema": RECONCILIATION_SCHEMA,
         "quality": {
             "status": (
                 "failed"
                 if critical_count
-                else "degraded"
-                if warning_count
+                else "advisory"
+                if actionable_warnings
                 else "passed"
             ),
             "decision_safe": critical_count == 0,
