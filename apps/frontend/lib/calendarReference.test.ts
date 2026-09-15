@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   calendarCacheKey,
+  daysUntilEarnings,
+  displayEarningsDate,
   mergeCalendarReference,
   normalizeCalendarTiming,
+  publishedEventForTicker,
+  researchMatchesPublishedDate,
   type CalendarReference,
   type ResearchWeek,
 } from './calendarReference';
@@ -209,5 +213,48 @@ describe('calendar reference overlay', () => {
     expect(normalizeCalendarTiming('after-market-close')).toBe('amc');
     expect(normalizeCalendarTiming('During market hours')).toBe('dmh');
     expect(normalizeCalendarTiming('TBD')).toBe('unknown');
+  });
+
+  it('uses the upcoming calendar date instead of a stale research print', () => {
+    const hubg = publishedEventForTicker(
+      [
+        { ticker: 'HUBG', earnings_date: '2026-09-17', timing: 'unknown' },
+        { ticker: 'PRGS', earnings_date: '2026-09-29', timing: 'unknown' },
+      ],
+      'HUBG',
+      '2026-09-15',
+    );
+    expect(hubg?.earnings_date).toBe('2026-09-17');
+    expect(displayEarningsDate({
+      todayIso: '2026-09-15',
+      publishedDate: hubg?.earnings_date,
+      nextEarnings: '2026-08-27',
+      researchDate: '2026-08-27',
+    })).toBe('2026-09-17');
+    expect(daysUntilEarnings('2026-09-17', '2026-09-15')).toBe(2);
+    expect(daysUntilEarnings('2026-09-15', '2026-09-15')).toBe(0);
+    expect(daysUntilEarnings('2026-08-27', '2026-09-15')).toBeNull();
+    expect(researchMatchesPublishedDate('2026-08-27', '2026-09-17')).toBe(false);
+  });
+
+  it('prefers an upcoming research date when the calendar has not published yet', () => {
+    expect(displayEarningsDate({
+      todayIso: '2026-09-15',
+      nextEarnings: '2026-08-27',
+      researchDate: '2026-09-29',
+    })).toBe('2026-09-29');
+  });
+
+  it('prefers the soonest upcoming published print when a ticker has two dates', () => {
+    expect(
+      publishedEventForTicker(
+        [
+          { ticker: 'CNXC', earnings_date: '2026-09-09', timing: 'amc' },
+          { ticker: 'CNXC', earnings_date: '2026-09-29', timing: 'unknown' },
+        ],
+        'cnxc',
+        '2026-09-15',
+      )?.earnings_date,
+    ).toBe('2026-09-29');
   });
 });

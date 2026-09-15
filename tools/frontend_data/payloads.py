@@ -652,6 +652,36 @@ def collapse_duplicate_earnings(conn, start: date, end: date):
     return keep, dropped
 
 
+def load_published_calendar_events(public_dir: Path) -> list[tuple[str, date, str]]:
+    """Ticker, date, and session from calendar-reference.json.
+
+    Missing or unreadable files fail closed to an empty list so a first-run
+    build (no reference published yet) keeps research-only symbol dates.
+    """
+    path = public_dir / "calendar-reference.json"
+    if not path.is_file():
+        return []
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    events: list[tuple[str, date, str]] = []
+    for event in payload.get("events") or []:
+        if not isinstance(event, dict):
+            continue
+        ticker = str(event.get("ticker") or "").strip().upper()
+        earnings_date = str(event.get("earnings_date") or "")[:10]
+        if not ticker or len(earnings_date) != 10:
+            continue
+        try:
+            earn_dt = date.fromisoformat(earnings_date)
+        except ValueError:
+            continue
+        timing = str(event.get("timing") or "unknown")
+        events.append((ticker, earn_dt, timing))
+    return events
+
+
 def load_published_calendar_keys(public_dir: Path) -> set[tuple[str, str]]:
     """Ticker/date identities already shown by calendar-reference.json.
 
@@ -659,22 +689,69 @@ def load_published_calendar_keys(public_dir: Path) -> set[tuple[str, str]]:
     build (no reference published yet) keeps the historical ML-coverage gate
     instead of widening the research universe.
     """
-    path = public_dir / "calendar-reference.json"
-    if not path.is_file():
-        return set()
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return set()
-    keys: set[tuple[str, str]] = set()
-    for event in payload.get("events") or []:
-        if not isinstance(event, dict):
-            continue
-        ticker = str(event.get("ticker") or "").strip().upper()
-        earnings_date = str(event.get("earnings_date") or "")[:10]
-        if ticker and len(earnings_date) == 10:
-            keys.add((ticker, earnings_date))
-    return keys
+    return {
+        (ticker, earn_dt.isoformat())
+        for ticker, earn_dt, _timing in load_published_calendar_events(public_dir)
+    }
+
+
+def published_symbol_dates(
+    events: list[tuple[str, date, str]],
+    today: date,
+) -> dict[str, tuple[date, str]]:
+    """Soonest upcoming published print per ticker; else the latest past date.
+
+    Homepage membership is calendar-reference. Symbol pages and the watchlist
+    Reports column used DuckDB's next_earnings, which can lag a revision and
+    then render as a negative countdown while the calendar still lists the
+    name next week.
+    """
+    latest: dict[str, tuple[date, str]] = {}
+    upcoming: dict[str, tuple[date, str]] = {}
+    for ticker, earn_dt, timing in events:
+        prev_latest = latest.get(ticker)
+        if prev_latest is None or earn_dt > prev_latest[0]:
+            latest[ticker] = (earn_dt, timing)
+        if earn_dt >= today:
+            prev_upcoming = upcoming.get(ticker)
+            if prev_upcoming is None or earn_dt < prev_upcoming[0]:
+                upcoming[ticker] = (earn_dt, timing)
+    return {**latest, **upcoming}
+
+
+def apply_published_symbol_dates(
+    tickers_needing_detail: dict[str, date | None],
+    published: dict[str, tuple[date, str]],
+) -> None:
+    """Overwrite (or add) per-ticker detail dates from the published calendar."""
+    for ticker, (earn_dt, _timing) in published.items():
+        tickers_needing_detail[ticker] = earn_dt
+
+
+def align_symbol_detail_to_published(
+    detail: dict,
+    published_date: date | None,
+    published_timing: str | None = None,
+) -> dict:
+    """Force next_earnings onto the published date; drop a mismatched EM.
+
+    An expected move is event-identity-specific. If research scored a
+    superseded print, attaching it to the new calendar date would show a
+    forecast for a different event.
+    """
+    if not detail or published_date is None:
+        return detail
+    iso = published_date.isoformat()
+    detail["next_earnings"] = iso
+    if published_timing:
+        detail["next_earnings_timing"] = published_timing
+    em = detail.get("expected_move")
+    em_date = str((em or {}).get("earnings_date") or "")[:10]
+    if em and em_date != iso:
+        detail["expected_move"] = None
+    elif em and published_timing:
+        em["timing"] = published_timing
+    return detail
 
 
 def ml_gate_drops_event(

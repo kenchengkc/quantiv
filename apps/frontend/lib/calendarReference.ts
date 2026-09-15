@@ -159,3 +159,72 @@ export function mergeCalendarReference<
 export function calendarCacheKey(releaseId: string | null | undefined, weekStart: string): string {
   return `${releaseId || 'legacy'}:${weekStart}`;
 }
+
+export function localTodayIso(now = new Date()): string {
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+/** The calendar-reference event to display for a ticker. Upcoming dates win
+ *  over a superseded research print so "Reports in" cannot go negative while
+ *  the homepage still lists the name next week. */
+export function publishedEventForTicker(
+  events: readonly CalendarReferenceEvent[] | undefined,
+  ticker: string,
+  todayIso: string,
+): CalendarReferenceEvent | null {
+  const rows = (events ?? []).filter(
+    (event) => event.ticker.toUpperCase() === ticker.toUpperCase(),
+  );
+  if (rows.length === 0) return null;
+  const today = todayIso.slice(0, 10);
+  const upcoming = rows
+    .filter((event) => event.earnings_date >= today)
+    .sort((a, b) => a.earnings_date.localeCompare(b.earnings_date));
+  if (upcoming.length > 0) return upcoming[0];
+  return [...rows].sort((a, b) => b.earnings_date.localeCompare(a.earnings_date))[0];
+}
+
+/** Date shown in Reports / Reports-in. Published calendar identity wins;
+ *  otherwise the latest still-upcoming research date. */
+export function displayEarningsDate(args: {
+  todayIso: string;
+  publishedDate?: string | null;
+  nextEarnings?: string | null;
+  researchDate?: string | null;
+}): string | null {
+  if (args.publishedDate) return args.publishedDate.slice(0, 10);
+  const today = args.todayIso.slice(0, 10);
+  const dates = [args.nextEarnings, args.researchDate]
+    .map((value) => value?.slice(0, 10) ?? null)
+    .filter((value): value is string => Boolean(value));
+  const upcoming = dates.filter((value) => value >= today).sort();
+  if (upcoming.length > 0) return upcoming[upcoming.length - 1];
+  return dates.sort().at(-1) ?? null;
+}
+
+export function researchMatchesPublishedDate(
+  researchDate: string | null | undefined,
+  publishedDate: string | null | undefined,
+): boolean {
+  return Boolean(
+    researchDate &&
+      publishedDate &&
+      researchDate.slice(0, 10) === publishedDate.slice(0, 10),
+  );
+}
+
+/** Whole days until `iso`. Null when missing or already in the past so a
+ *  stale research print cannot render as "Reports · -19d". */
+export function daysUntilEarnings(iso: string | null | undefined, todayIso: string): number | null {
+  if (!iso) return null;
+  const date = iso.slice(0, 10);
+  const today = todayIso.slice(0, 10);
+  const start = Date.parse(`${today}T00:00:00Z`);
+  const target = Date.parse(`${date}T00:00:00Z`);
+  if (!Number.isFinite(start) || !Number.isFinite(target)) return null;
+  const days = Math.round((target - start) / 86_400_000);
+  return days < 0 ? null : days;
+}

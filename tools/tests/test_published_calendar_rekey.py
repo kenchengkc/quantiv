@@ -12,7 +12,14 @@ import json
 from datetime import date
 from pathlib import Path
 
-from frontend_data.payloads import load_published_calendar_keys, ml_gate_drops_event
+from frontend_data.payloads import (
+    align_symbol_detail_to_published,
+    apply_published_symbol_dates,
+    load_published_calendar_events,
+    load_published_calendar_keys,
+    ml_gate_drops_event,
+    published_symbol_dates,
+)
 
 
 TODAY = date(2026, 9, 15)
@@ -60,3 +67,64 @@ def test_load_published_calendar_keys_reads_identities(tmp_path: Path):
 
 def test_load_published_calendar_keys_missing_file_is_empty(tmp_path: Path):
     assert load_published_calendar_keys(tmp_path) == set()
+
+
+def test_published_symbol_dates_prefers_upcoming_print():
+    events = [
+        ("HUBG", date(2026, 8, 27), "unknown"),
+        ("HUBG", date(2026, 9, 17), "unknown"),
+        ("PRGS", date(2026, 6, 30), "unknown"),
+        ("PRGS", date(2026, 9, 29), "amc"),
+        ("FIZZ", date(2026, 9, 9), "bmo"),
+    ]
+    got = published_symbol_dates(events, TODAY)
+    assert got["HUBG"] == (date(2026, 9, 17), "unknown")
+    assert got["PRGS"] == (date(2026, 9, 29), "amc")
+    assert got["FIZZ"] == (date(2026, 9, 9), "bmo")
+
+
+def test_apply_published_symbol_dates_overwrites_stale_research():
+    tickers = {"HUBG": date(2026, 8, 27), "AAPL": date(2026, 10, 1)}
+    apply_published_symbol_dates(
+        tickers,
+        {"HUBG": (date(2026, 9, 17), "unknown")},
+    )
+    assert tickers["HUBG"] == date(2026, 9, 17)
+    assert tickers["AAPL"] == date(2026, 10, 1)
+
+
+def test_align_symbol_detail_drops_mismatched_expected_move():
+    detail = {
+        "next_earnings": "2026-08-27",
+        "next_earnings_timing": "unknown",
+        "expected_move": {"earnings_date": "2026-08-27", "straddle_pct": 0.08},
+    }
+    align_symbol_detail_to_published(detail, date(2026, 9, 17), "unknown")
+    assert detail["next_earnings"] == "2026-09-17"
+    assert detail["expected_move"] is None
+
+
+def test_align_symbol_detail_keeps_matching_expected_move():
+    detail = {
+        "next_earnings": "2026-09-17",
+        "expected_move": {"earnings_date": "2026-09-17", "straddle_pct": 0.08},
+    }
+    align_symbol_detail_to_published(detail, date(2026, 9, 17), "amc")
+    assert detail["expected_move"]["earnings_date"] == "2026-09-17"
+    assert detail["expected_move"]["timing"] == "amc"
+    assert detail["next_earnings_timing"] == "amc"
+
+
+def test_load_published_calendar_events_skips_bad_rows(tmp_path: Path):
+    (tmp_path / "calendar-reference.json").write_text(
+        json.dumps({
+            "events": [
+                {"ticker": "HUBG", "earnings_date": "2026-09-17", "timing": "unknown"},
+                {"ticker": "BAD", "earnings_date": "not-a-date"},
+            ]
+        }),
+        encoding="utf-8",
+    )
+    assert load_published_calendar_events(tmp_path) == [
+        ("HUBG", date(2026, 9, 17), "unknown"),
+    ]
