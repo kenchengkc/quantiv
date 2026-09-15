@@ -60,6 +60,11 @@ jobs:
           # most recently completed US session should be available even across
           # DST changes. If not, surface the stale provider state as a failed
           # workflow so it cannot silently leave prior-day AMC moves unresolved.
+          #
+          # GitHub can delay this cron by hours. If it lands after 09:25 ET the
+          # route correctly no-ops (skipped=market_open) so grouped-daily cannot
+          # clobber live Finnhub/Alpaca ticks. That is a late runner, not stale
+          # Polygon data — earlier overnight passes already ran.
           if [ "$SCHEDULE" = "17 8 * * 2-6" ]; then
             python - <<'PY'
           import json
@@ -68,10 +73,18 @@ jobs:
           with open('/tmp/broad.json', encoding='utf-8') as fh:
               payload = json.load(fh)
 
+          skipped = payload.get('skipped')
+          if skipped == 'market_open':
+              print(
+                  '::notice::08:17 UTC watchdog ran after the quote-refresh window '
+                  'opened (GitHub delayed the schedule). Live ticks were left in place; '
+                  'not treating skipped=market_open as stale grouped-daily.'
+              )
+              sys.exit(0)
+
           if payload.get('groupedIsCurrent') is not True:
               latest = payload.get('latestSession')
               prior = payload.get('priorSession')
-              skipped = payload.get('skipped')
               print(
                   '::error::Final overnight broad refresh still has stale grouped-daily '
                   f'data (latestSession={latest}, priorSession={prior}, skipped={skipped})'
