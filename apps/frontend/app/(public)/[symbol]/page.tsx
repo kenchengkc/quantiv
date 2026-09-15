@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { notFound } from 'next/navigation';
 import { buildComparableResearchContext } from '@/lib/comparableResearch.server';
 import { companyName, stripLegalSuffix } from '@/lib/companyNames';
+import type { CalendarReference } from '@/lib/calendarReference';
 import { readPublicJson } from '@/lib/researchSnapshot.server';
 import SymbolPageClient from './SymbolPageClient';
 
@@ -109,6 +110,7 @@ export default async function SymbolPage({ params }: SymbolPageProps) {
   if (!isKnownSymbol(symbol)) notFound();
   const initialData = readSymbolPayload(symbol);
   const comparableContext = buildComparableResearchContext(initialData);
+  const calendar = readPublicJson<CalendarReference>('calendar-reference.json');
 
   return (
     <SymbolPageClient
@@ -116,6 +118,7 @@ export default async function SymbolPage({ params }: SymbolPageProps) {
       initialData={initialData}
       initialEvidence={readForecastEvidence()}
       comparableContext={comparableContext}
+      calendarEvents={calendar?.events ?? []}
     />
   );
 }

@@ -6,6 +6,15 @@ import { useParams, useRouter } from 'next/navigation';
 import SymbolResearchExport, { ComparableHistoryLink } from '@/components/SymbolResearchExport';
 import type { ComparableResearchContext } from '@/lib/comparableResearch';
 import { companyName } from '@/lib/companyNames';
+import {
+  daysUntilEarnings,
+  displayEarningsDate,
+  localTodayIso,
+  publishedEventForTicker,
+  researchMatchesPublishedDate,
+  type CalendarReference,
+  type CalendarReferenceEvent,
+} from '@/lib/calendarReference';
 import { normalizeForecastQuantiles } from '@/lib/forecastQuantiles';
 import { listingExchangeLabel } from '@/lib/listingExchanges';
 import { useEnsureCompanyNames } from '@/lib/useCompanyNames';
@@ -40,6 +49,7 @@ const EMPTY_LIVE_PREDICTION: LivePredictionState = {
   error: null,
   updatedAt: 0,
 };
+const EMPTY_CALENDAR_EVENTS: CalendarReferenceEvent[] = [];
 
 function initialSymbolDetail(value: unknown, symbol: string): SymbolDetail | null {
   if (!value || typeof value !== 'object') return null;
@@ -61,15 +71,6 @@ function livePredictionUnavailableMessage(status: number | null): string {
   return 'The spot-updated forecast is unavailable right now.';
 }
 
-function daysFromToday(iso?: string | null): number | null {
-  if (!iso) return null;
-  const [y, m, d] = iso.slice(0, 10).split('-').map(Number);
-  if (!y || !m || !d) return null;
-  const target = new Date(y, m - 1, d);
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  return Math.round((target.getTime() - today.getTime()) / 86_400_000);
-}
 function timingText(t?: string | null) {
   const k = (t || '').toLowerCase();
   if (k === 'bmo' || k === 'before_market_open' || k === 'before_open') return 'Before open';
@@ -195,11 +196,13 @@ export default function SymbolPage({
   initialEvidence = null,
   initialSymbol,
   comparableContext = null,
+  calendarEvents: initialCalendarEvents = EMPTY_CALENDAR_EVENTS,
 }: {
   initialData?: unknown;
   initialEvidence?: unknown;
   initialSymbol?: string;
   comparableContext?: ComparableResearchContext | null;
+  calendarEvents?: CalendarReferenceEvent[];
 }) {
   // Triggers EDGAR ticker-names fetch + re-render so the header company
   // name resolves even when the symbol isn't in the S&P 500 or curated map.
@@ -226,6 +229,30 @@ export default function SymbolPage({
   // wraps Alpaca's IEX feed; we cache aggressively server-side and
   // refresh once a minute client-side during the regular session.
   const [intraday, setIntraday] = useState<IntradaySeries | null>(null);
+  const [calendarEvents, setCalendarEvents] = useState<CalendarReferenceEvent[]>(
+    initialCalendarEvents,
+  );
+
+  useEffect(() => {
+    setCalendarEvents(initialCalendarEvents);
+  }, [initialCalendarEvents]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/calendar-reference.json', { cache: 'no-store' });
+        if (!res.ok) return;
+        const json = (await res.json()) as CalendarReference;
+        if (!cancelled && Array.isArray(json.events)) setCalendarEvents(json.events);
+      } catch {
+        // Seeded publication dates remain until the independent calendar is readable.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Fetch intraday bars + auto-refresh every 60s during regular hours
   // so the sparkline stays in sync with the live price tick above it.
@@ -417,11 +444,18 @@ export default function SymbolPage({
     inFlightPredictionKeyRef.current = null;
   }, [symbol]);
 
+  const todayIso = localTodayIso();
+  const publishedEvent = publishedEventForTicker(calendarEvents, symbol, todayIso);
+  const researchMatchesPublished =
+    !publishedEvent ||
+    researchMatchesPublishedDate(data?.expected_move?.earnings_date, publishedEvent.earnings_date);
+
   const livePredictionRequest = useMemo(() => {
     const em = data?.expected_move;
     const horizon = em?.model_horizon;
     const earningsDate = em?.earnings_date ?? data?.next_earnings ?? null;
     const price = live?.price ?? data?.spot_price ?? null;
+    if (!researchMatchesPublished) return null;
     if (!symbol || !data || !em || !horizon || !earningsDate || !price || price <= 0) {
       return null;
     }
@@ -437,7 +471,7 @@ export default function SymbolPage({
         earnings_date: eventDate,
       },
     };
-  }, [data, live?.price, symbol]);
+  }, [data, live?.price, researchMatchesPublished, symbol]);
 
   const loadLivePrediction = useCallback(
     async (force = false) => {
@@ -547,7 +581,7 @@ export default function SymbolPage({
     );
   }
 
-  const em = data.expected_move;
+  const em = researchMatchesPublished ? data.expected_move : undefined;
   const liveForSymbol = live?.symbol === symbol ? live : null;
   const intradayForSymbol = intraday?.symbol === symbol ? intraday : null;
   const livePrice = liveForSymbol?.price ?? null;
@@ -576,9 +610,16 @@ export default function SymbolPage({
         : 0;
 
   const straddlePct = em?.straddle_pct ?? 0;
-  const earningsDate = em?.earnings_date ?? data.next_earnings ?? null;
-  const earningsTiming = timingText(em?.timing ?? data.next_earnings_timing);
-  const daysLeft = daysFromToday(earningsDate);
+  const earningsDate = displayEarningsDate({
+    todayIso,
+    publishedDate: publishedEvent?.earnings_date,
+    nextEarnings: data.next_earnings,
+    researchDate: data.expected_move?.earnings_date,
+  });
+  const earningsTiming = timingText(
+    publishedEvent?.timing ?? em?.timing ?? data.next_earnings_timing,
+  );
+  const daysLeft = daysUntilEarnings(earningsDate, todayIso);
   const eventLabel = eventLabelFor(data, earningsDate);
 
   const snapshotQuantiles = normalizeForecastQuantiles(

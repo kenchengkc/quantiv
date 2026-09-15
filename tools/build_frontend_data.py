@@ -29,12 +29,15 @@ from frontend_data.forecast_artifacts import (
     publish_forecast_evidence,
 )
 from frontend_data.payloads import (
+    align_symbol_detail_to_published,
+    apply_published_symbol_dates,
     build_screener_payload,
     build_symbol_detail,
     build_week_events,
     collapse_duplicate_earnings,
-    load_published_calendar_keys,
+    load_published_calendar_events,
     preserve_reported_events,
+    published_symbol_dates,
 )
 from frontend_data.realized_moves import (
     enrich_hist_move_avg_from_twelvedata,
@@ -152,7 +155,9 @@ def main():
     # rows render on the homepage whether or not research produced a row for
     # them, so they must not be dropped by the ML-coverage gate — see
     # payloads.ml_gate_drops_event.
-    published_keys = load_published_calendar_keys(PUBLIC_DIR)
+    published_events = load_published_calendar_events(PUBLIC_DIR)
+    published_keys = {(ticker, earn_dt.isoformat()) for ticker, earn_dt, _ in published_events}
+    published_for_symbols = published_symbol_dates(published_events, today)
     print(f"  Published calendar reference: {len(published_keys)} event identities")
 
     if skip_weeks:
@@ -343,6 +348,8 @@ def main():
             ).fetchone()
             tickers_needing_detail[ticker] = row[0] if row else None
 
+    apply_published_symbol_dates(tickers_needing_detail, published_for_symbols)
+
     generated = 0
     skipped_resume = 0
     total_details = len(tickers_needing_detail)
@@ -386,6 +393,9 @@ def main():
                     detail["expected_move"]["timing"] = timing
                     # em_method is already set inside build_symbol_detail based
                     # on whether an ML forecast was attached; don't overwrite.
+            published = published_for_symbols.get(ticker)
+            if published:
+                align_symbol_detail_to_published(detail, published[0], published[1])
             write_to_public(
                 f"symbols/{ticker}.json",
                 json.dumps(detail, indent=2, default=str),

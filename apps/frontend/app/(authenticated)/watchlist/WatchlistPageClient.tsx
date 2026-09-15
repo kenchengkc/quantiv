@@ -4,6 +4,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { GripVertical, X, Plus, ChevronUp, ChevronDown, Check } from 'lucide-react';
 import { companyName } from '@/lib/companyNames';
+import {
+  daysUntilEarnings,
+  displayEarningsDate,
+  localTodayIso,
+  publishedEventForTicker,
+  researchMatchesPublishedDate,
+  type CalendarReference,
+  type CalendarReferenceEvent,
+} from '@/lib/calendarReference';
 import { useEnsureCompanyNames } from '@/lib/useCompanyNames';
 import { useWatchlist } from '@/lib/watchlist';
 import { TickerLogo } from '@/components/TickerLogo';
@@ -94,15 +103,6 @@ function shortDate(iso?: string | null) {
     month: 'short',
     day: 'numeric',
   });
-}
-function daysFromToday(iso?: string | null): number | null {
-  if (!iso) return null;
-  const [y, m, d] = iso.slice(0, 10).split('-').map(Number);
-  if (!y || !m || !d) return null;
-  const target = new Date(y, m - 1, d);
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  return Math.round((target.getTime() - today.getTime()) / 86_400_000);
 }
 function timingText(t?: string | null) {
   const k = (t || '').toLowerCase();
@@ -395,6 +395,7 @@ export default function WatchlistPage() {
 
   const { symbols: tickers, isLoaded: hydrated, remove: removeOne, reorder: reorderAll } = useWatchlist();
   const [summaries, setSummaries] = useState<Record<string, SymbolSummary>>({});
+  const [calendarEvents, setCalendarEvents] = useState<CalendarReferenceEvent[]>([]);
   const [live, setLive] = useState<Record<string, Tick>>({});
   const [liveMl, setLiveMl] = useState<Record<string, WatchlistMlState>>({});
   const mlFetchRef = useRef<{ key: string; at: number }>({ key: '', at: 0 });
@@ -427,6 +428,25 @@ export default function WatchlistPage() {
       document.removeEventListener('keydown', onKeyDown);
     };
   }, [pendingDelete]);
+
+  // Published calendar dates are the Reports-column identity. Symbol JSON can
+  // still carry a superseded research print, which used to render as "-19d".
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/calendar-reference.json', { cache: 'no-store' });
+        if (!res.ok) return;
+        const json = (await res.json()) as CalendarReference;
+        if (!cancelled && Array.isArray(json.events)) setCalendarEvents(json.events);
+      } catch {
+        // Keep research dates until the independent calendar is readable.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Load per-symbol summary from pre-generated /symbols/*.json
   useEffect(() => {
@@ -569,10 +589,18 @@ export default function WatchlistPage() {
 
   const mlCandidates = useMemo<WatchlistMlCandidate[]>(() => {
     if (!hydrated || tickers.length === 0) return [];
+    const todayIso = localTodayIso();
     const out: WatchlistMlCandidate[] = [];
     for (const symbol of tickers) {
       const summary = summaries[symbol];
       const em = summary?.expected_move;
+      const published = publishedEventForTicker(calendarEvents, symbol, todayIso);
+      if (
+        published &&
+        !researchMatchesPublishedDate(em?.earnings_date, published.earnings_date)
+      ) {
+        continue;
+      }
       const horizon = em?.model_horizon;
       const earningsDate = em?.earnings_date ?? summary?.next_earnings ?? null;
       const liveSpot = live[symbol]?.price;
@@ -589,7 +617,7 @@ export default function WatchlistPage() {
       if (out.length >= 100) break;
     }
     return out;
-  }, [hydrated, live, summaries, tickers]);
+  }, [calendarEvents, hydrated, live, summaries, tickers]);
 
   useEffect(() => {
     if (!hydrated || mlCandidates.length === 0) return;
@@ -803,10 +831,22 @@ export default function WatchlistPage() {
           {tickers.map((t, i) => {
             const sum = summaries[t];
             const em = sum?.expected_move;
-            const earningsIso = em?.earnings_date ?? sum?.next_earnings ?? null;
+            const todayIso = localTodayIso();
+            const published = publishedEventForTicker(calendarEvents, t, todayIso);
+            const earningsIso = displayEarningsDate({
+              todayIso,
+              publishedDate: published?.earnings_date,
+              nextEarnings: sum?.next_earnings,
+              researchDate: em?.earnings_date,
+            });
             const earningsLabel = shortDate(earningsIso);
-            const timing = timingText(em?.timing ?? sum?.next_earnings_timing);
-            const dte = daysFromToday(earningsIso);
+            const timing = timingText(
+              published?.timing ?? em?.timing ?? sum?.next_earnings_timing,
+            );
+            const dte = daysUntilEarnings(earningsIso, todayIso);
+            const emMatches =
+              !published ||
+              researchMatchesPublishedDate(em?.earnings_date, published.earnings_date);
             const tick = live[t];
             const quotePending = tick === undefined;
             const quoteDelay = (i % 12) * 35;
@@ -822,9 +862,9 @@ export default function WatchlistPage() {
             const spot = quotePending ? null : tick?.price ?? sum?.spot_price ?? null;
             const mlCandidate = mlCandidates.find((item) => item.symbol === t);
             const mlState = liveMl[t]?.key === mlCandidate?.key ? liveMl[t] : undefined;
-            const liveMlPct = mlState?.status === 'ready' ? mlState.response?.em_ml_pct ?? null : null;
-            const staticMlPct = em?.em_ml_pct ?? null;
-            const mathMovePct = em?.straddle_pct ?? em?.iv_pct ?? null;
+            const liveMlPct = emMatches && mlState?.status === 'ready' ? mlState.response?.em_ml_pct ?? null : null;
+            const staticMlPct = emMatches ? em?.em_ml_pct ?? null : null;
+            const mathMovePct = emMatches ? em?.straddle_pct ?? em?.iv_pct ?? null : null;
             const movePct = liveMlPct ?? staticMlPct ?? mathMovePct;
             const moveLabel = liveMlLabel(mlState, staticMlPct !== null, mathMovePct !== null);
             const up = tickPctR !== null && !tickFlat && tickPctR >= 0;
