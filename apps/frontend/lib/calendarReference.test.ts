@@ -94,16 +94,32 @@ describe('calendar reference overlay', () => {
     expect(merged.events[0]).toEqual({ ticker: 'AAA', earnings_date: '2026-09-08', timing: 'amc' });
   });
 
-  it('never inherits research when both sessions are unknown', () => {
+  it('renders a known reference session without inheriting unknown-session research', () => {
     const merged = mergeCalendarReference(
-      reference([{ ticker: 'AAA', earnings_date: '2026-09-08', timing: 'unknown' }]),
+      reference([{ ticker: 'AAA', earnings_date: '2026-09-08', timing: 'amc' }]),
       research([{
         ticker: 'AAA', earnings_date: '2026-09-08', timing: 'unknown', em_ml_pct: 0.06,
       }]),
       '2026-09-07',
     );
 
-    expect(merged.events[0]).toEqual({ ticker: 'AAA', earnings_date: '2026-09-08', timing: 'unknown' });
+    expect(merged.events[0]).toEqual({ ticker: 'AAA', earnings_date: '2026-09-08', timing: 'amc' });
+  });
+
+  it('overlays research when ticker/date match and both sessions are unknown', () => {
+    const merged = mergeCalendarReference(
+      reference([{ ticker: 'AAA', earnings_date: '2026-09-08', timing: 'unknown' }]),
+      research([{
+        ticker: 'AAA', earnings_date: '2026-09-08', timing: 'unknown',
+        em_ml_pct: 0.06, em_straddle_pct: 0.09,
+      }]),
+      '2026-09-07',
+    );
+
+    expect(merged.events[0]).toEqual({
+      ticker: 'AAA', earnings_date: '2026-09-08', timing: 'unknown',
+      em_ml_pct: 0.06, em_straddle_pct: 0.09,
+    });
   });
 
   it('uses reference membership: adds dates-only events and removes stale research rows', () => {

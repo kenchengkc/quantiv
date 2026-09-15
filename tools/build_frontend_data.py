@@ -33,6 +33,7 @@ from frontend_data.payloads import (
     build_symbol_detail,
     build_week_events,
     collapse_duplicate_earnings,
+    load_published_calendar_keys,
     preserve_reported_events,
 )
 from frontend_data.realized_moves import (
@@ -147,6 +148,13 @@ def main():
         for tk, dropped_iso, kept in sorted(dropped_dupes):
             print(f"    {tk}: dropped {dropped_iso} → kept {kept}")
 
+    # Event identities the currently published calendar already displays. These
+    # rows render on the homepage whether or not research produced a row for
+    # them, so they must not be dropped by the ML-coverage gate — see
+    # payloads.ml_gate_drops_event.
+    published_keys = load_published_calendar_keys(PUBLIC_DIR)
+    print(f"  Published calendar reference: {len(published_keys)} event identities")
+
     if skip_weeks:
         print("⏭️  --resume/--skip-weeks: reading existing weeks/*.json from disk", flush=True)
         for offset in WEEK_OFFSETS:
@@ -170,7 +178,8 @@ def main():
         # options_math baseline for those; enforce ML on current + next week.
         require_ml = offset in (0, 1)
         events = build_week_events(conn, as_of_date, wk_start, wk_end, ml_lookup, provider_lookup,
-                                   require_ml=require_ml, canonical=canonical_keys)
+                                   require_ml=require_ml, canonical=canonical_keys,
+                                   published=published_keys)
 
         # Reported-event preservation: an expected move is only observable
         # before the print, so once an earnings date passes compute_em_math
