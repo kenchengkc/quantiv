@@ -38,6 +38,7 @@ from frontend_data.payloads import (
     load_published_calendar_events,
     preserve_reported_events,
     published_symbol_dates,
+    week_em_averages,
 )
 from frontend_data.realized_moves import (
     enrich_hist_move_avg_from_twelvedata,
@@ -228,12 +229,7 @@ def main():
             )
 
         print(f"📅 week {wk_start} (offset {offset:+d}) → {len(events)} events")
-        em_straddle_vals = [
-            e["em_straddle_pct"] for e in events if e["em_straddle_pct"] is not None
-        ]
-        em_iv_vals = [
-            e["em_iv_pct"] for e in events if e["em_iv_pct"] is not None
-        ]
+        avg_em_straddle_pct, avg_em_iv_pct = week_em_averages(events)
         payload = {
             "metadata": {
                 "version": "v4_multi_week",
@@ -246,14 +242,8 @@ def main():
             "events": events,
             "summary": {
                 "total_events": len(events),
-                "avg_em_straddle_pct": (
-                    sum(em_straddle_vals) / len(em_straddle_vals)
-                    if em_straddle_vals else 0
-                ),
-                "avg_em_iv_pct": (
-                    sum(em_iv_vals) / len(em_iv_vals)
-                    if em_iv_vals else 0
-                ),
+                "avg_em_straddle_pct": avg_em_straddle_pct,
+                "avg_em_iv_pct": avg_em_iv_pct,
             },
         }
         week_payloads[wk_start] = payload
