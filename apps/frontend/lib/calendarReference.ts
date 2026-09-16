@@ -53,6 +53,23 @@ type LegacyForecastOverlay = {
   hist_move_avg_4q?: number | null;
 };
 
+function historicalCompatPct(event: LegacyForecastOverlay | null | undefined): number | null {
+  if (!event) return null;
+  const resolved = resolveDisplayForecastCompat({
+    hist_move_med_4q: event.hist_move_med_4q,
+    hist_move_avg_4q: event.hist_move_avg_4q,
+  });
+  return resolved.method === 'historical' ? resolved.pct : null;
+}
+
+function median(values: number[]): number | null {
+  if (values.length === 0) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  if (sorted.length % 2 === 1) return sorted[middle];
+  return (sorted[middle - 1] + sorted[middle]) / 2;
+}
+
 export function normalizeCalendarTiming(value: string | null | undefined): 'bmo' | 'amc' | 'dmh' | 'unknown' {
   const key = (value ?? '').trim().toLowerCase().split('-').join('_').split(' ').join('_');
   if (key === 'bmo' || key === 'before_market_open' || key === 'before_open') return 'bmo';
@@ -76,8 +93,12 @@ function addDays(iso: string, days: number): string {
  * on an exact ticker/date match when sessions do not disagree, including when
  * both sides are still unknown.
  *
- * A revised ticker/date or a conflicting known session still renders dates-only
- * so old options/model metrics can never migrate onto a different event.
+ * A revised ticker/date or a conflicting known session still rejects old
+ * options/model metrics. During migration from older pinned public releases,
+ * point-in-time historical summaries may still supply display-only fallback
+ * provenance because they are independent of the revised event's option/model
+ * identity. If no ticker history exists, a median of the legacy week's
+ * historical summaries is used only as a temporary historical prior.
  *
  * The reference is authoritative only inside its declared publication window.
  * If the browser advances to a week the retained reference does not fully cover
@@ -100,9 +121,15 @@ export function mergeCalendarReference<
   if (start < reference.window.start || end > reference.window.end) return research;
 
   const researchByTickerDate = new Map<string, TEvent>();
+  const legacyHistoryByTicker = new Map<string, number>();
   for (const event of research.events ?? []) {
     researchByTickerDate.set(`${event.ticker}|${event.earnings_date}`, event);
+    const historicalPct = historicalCompatPct(event as TEvent & LegacyForecastOverlay);
+    if (historicalPct != null && !legacyHistoryByTicker.has(event.ticker)) {
+      legacyHistoryByTicker.set(event.ticker, historicalPct);
+    }
   }
+  const legacyHistoricalPrior = median([...legacyHistoryByTicker.values()]);
 
   const events: CalendarOverlayEvent<TEvent>[] = reference.events
     .filter((event) => event.earnings_date >= start && event.earnings_date <= end)
@@ -131,18 +158,24 @@ export function mergeCalendarReference<
         // R2 can temporarily serve a pre-migration week artifact while the
         // independent calendar reference is newer. Preserve strict ML/options
         // semantics, but hydrate history-only exact matches so the UI does not
-        // turn an available historical estimate into a dash. Revised dates or
-        // conflicting sessions still take the fail-closed branch below.
-        const historicalCompat =
+        // turn an available historical estimate into a dash. If the old row has
+        // no usable display estimate at all, use the legacy prior rather than a
+        // synthetic zero.
+        const displayCompat =
           compatForecast.method === 'historical' && compatForecast.pct != null
             ? {
                 display_forecast_pct: compatForecast.pct,
                 display_forecast_method: 'historical' as const,
               }
-            : {};
+            : compatForecast.pct == null && legacyHistoricalPrior != null
+              ? {
+                  display_forecast_pct: legacyHistoricalPrior,
+                  display_forecast_method: 'historical_prior' as const,
+                }
+              : {};
         return {
           ...researchMatch,
-          ...historicalCompat,
+          ...displayCompat,
           ticker: event.ticker,
           earnings_date: event.earnings_date,
           // A known reference session remains authoritative. When the reference
@@ -155,12 +188,29 @@ export function mergeCalendarReference<
               : referenceTiming,
         };
       }
-      // Do not spread any research object here. Absence of metrics is the
-      // fail-closed state for revised dates or known-session conflicts.
+
+      // Do not spread the stale research row here. A revised date or conflicting
+      // session may reuse only ticker-level historical context; old ML/options
+      // remain fail-closed. If that is unavailable, the legacy week median is a
+      // presentation-only prior until the canonical R2 release catches up.
+      const tickerHistoricalPct = legacyHistoryByTicker.get(event.ticker) ?? null;
+      const fallbackDisplay =
+        tickerHistoricalPct != null
+          ? {
+              display_forecast_pct: tickerHistoricalPct,
+              display_forecast_method: 'historical' as const,
+            }
+          : legacyHistoricalPrior != null
+            ? {
+                display_forecast_pct: legacyHistoricalPrior,
+                display_forecast_method: 'historical_prior' as const,
+              }
+            : {};
       return {
         ticker: event.ticker,
         earnings_date: event.earnings_date,
         timing: referenceTiming,
+        ...fallbackDisplay,
       };
     })
     .sort((a, b) => a.earnings_date.localeCompare(b.earnings_date) || a.ticker.localeCompare(b.ticker));
