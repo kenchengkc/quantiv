@@ -17,6 +17,19 @@
         "source_date": { "type": ["string", "null"] },
         "expected_source_date": { "type": ["string", "null"] },
         "event_coverage_pct": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+        "display_forecast_coverage_pct": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+        "display_forecast_events": { "type": ["number", "null"], "minimum": 0 },
+        "display_forecast_method_mix": {
+          "type": ["object", "null"],
+          "properties": {
+            "ml": { "type": "integer", "minimum": 0 },
+            "options_math": { "type": "integer", "minimum": 0 },
+            "options_indicative": { "type": "integer", "minimum": 0 },
+            "historical": { "type": "integer", "minimum": 0 },
+            "historical_prior": { "type": "integer", "minimum": 0 }
+          },
+          "additionalProperties": false
+        },
         "contracts": { "type": ["number", "null"], "minimum": 0 },
         "eligible_contracts": { "type": ["number", "null"], "minimum": 0 },
         "decision_scope": { "type": ["string", "null"] },
