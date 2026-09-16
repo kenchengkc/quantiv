@@ -65,4 +65,26 @@ describe('display forecast helpers', () => {
       ),
     ).toEqual({ pct: 0.081, method: 'historical' });
   });
+
+  it('uses legacy calendar history instead of a dash when canonical display fields are absent', () => {
+    expect(
+      resolveDisplayForecastCompat({
+        em_ml_pct: null,
+        em_straddle_pct: null,
+        em_iv_pct: null,
+        hist_move_med_4q: 0.091,
+        hist_move_avg_4q: 0.102694,
+      }),
+    ).toEqual({ pct: 0.091, method: 'historical' });
+
+    expect(
+      resolveDisplayForecastCompat({
+        em_ml_pct: null,
+        em_straddle_pct: null,
+        em_iv_pct: null,
+        hist_move_med_4q: null,
+        hist_move_avg_4q: 0.102694,
+      }),
+    ).toEqual({ pct: 0.102694, method: 'historical' });
+  });
 });
