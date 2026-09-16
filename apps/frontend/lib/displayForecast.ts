@@ -91,13 +91,20 @@ export function finiteDisplayForecast(value: number | null | undefined): number 
  * Transitional read compatibility for source-controlled JSON generated before
  * the display-forecast contract landed. Canonical fields always win; only when
  * they are absent do we reconstruct the old presentation hierarchy (ML first,
- * then strict options/IV). This is display-only and never changes analytical
- * eligibility or ML-only filtering.
+ * then strict options/IV, then an explicitly supplied point-in-time historical
+ * estimate). This is display-only and never changes analytical eligibility or
+ * ML-only filtering.
  */
 export function resolveDisplayForecastCompat(
   fields: LegacyDisplayForecastFields | null | undefined,
+  historicalFallbackPct: number | null | undefined = null,
 ): { pct: number | null; method: DisplayForecastMethod | null } {
-  if (!fields) return { pct: null, method: null };
+  const historical = finiteDisplayForecast(historicalFallbackPct);
+  if (!fields) {
+    return historical != null
+      ? { pct: historical, method: 'historical' }
+      : { pct: null, method: null };
+  }
 
   const canonical = finiteDisplayForecast(fields.display_forecast_pct);
   if (canonical != null) {
@@ -116,6 +123,8 @@ export function resolveDisplayForecastCompat(
     finiteDisplayForecast(fields.em_iv_pct) ??
     finiteDisplayForecast(fields.iv_pct);
   if (implied != null) return { pct: implied, method: 'options_math' };
+
+  if (historical != null) return { pct: historical, method: 'historical' };
 
   return { pct: null, method: fields.display_forecast_method ?? null };
 }
