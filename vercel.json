@@ -3,5 +3,12 @@
   "buildCommand": "npm run build --workspace=apps/frontend",
   "installCommand": "npm ci",
   "framework": "nextjs",
-  "regions": ["iad1"]
+  "regions": ["iad1"],
+  "git": {
+    "deploymentEnabled": {
+      "main": true,
+      "preview-*": true,
+      "*": false
+    }
+  }
 }
