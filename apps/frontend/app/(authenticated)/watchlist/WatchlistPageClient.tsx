@@ -5,6 +5,12 @@ import Link from 'next/link';
 import { GripVertical, X, Plus, ChevronUp, ChevronDown, Check } from 'lucide-react';
 import { companyName } from '@/lib/companyNames';
 import {
+  displayForecastLabel,
+  finiteDisplayForecast,
+  type DisplayForecastFields,
+  type DisplayForecastMethod,
+} from '@/lib/displayForecast';
+import {
   daysUntilEarnings,
   displayEarningsDate,
   localTodayIso,
@@ -20,10 +26,10 @@ import { TickerLogo } from '@/components/TickerLogo';
 type SymbolSummary = {
   symbol: string;
   spot_price: number | null;
-  expected_move?: {
+  expected_move?: DisplayForecastFields & {
     earnings_date?: string;
-    straddle_pct: number | null;
-    iv_pct: number | null;
+    straddle_pct?: number | null;
+    iv_pct?: number | null;
     em_ml_pct?: number | null;
     em_ml_abs?: number | null;
     model_horizon?: number | null;
@@ -33,7 +39,7 @@ type SymbolSummary = {
     p50?: number | null;
     p75?: number | null;
     p90?: number | null;
-    dte: number;
+    dte?: number | null;
     timing?: string;
     lead_time_days?: number;
   };
@@ -111,19 +117,14 @@ function timingText(t?: string | null) {
   return null;
 }
 
-function liveMlLabel(
+function watchlistForecastLabel(
   liveState: WatchlistMlState | undefined,
-  hasStaticMl: boolean,
-  hasMathMove: boolean,
+  staticMethod: DisplayForecastMethod | null | undefined,
 ): string {
-  if (liveState?.status === 'ready') {
-    return liveState.response?.source === 'nightly_fallback'
-      ? 'Snapshot ML'
-      : 'Spot-updated ML';
+  if (liveState?.status === 'ready' && liveState.response?.source !== 'nightly_fallback') {
+    return 'Spot-updated ML';
   }
-  if (hasStaticMl) return 'Snapshot ML';
-  if (hasMathMove) return 'Straddle';
-  return '';
+  return staticMethod ? displayForecastLabel(staticMethod) : '';
 }
 
 function MarketStatusBadge({ marketOpen }: { marketOpen: boolean | null }) {
@@ -862,11 +863,22 @@ export default function WatchlistPage() {
             const spot = quotePending ? null : tick?.price ?? sum?.spot_price ?? null;
             const mlCandidate = mlCandidates.find((item) => item.symbol === t);
             const mlState = liveMl[t]?.key === mlCandidate?.key ? liveMl[t] : undefined;
-            const liveMlPct = emMatches && mlState?.status === 'ready' ? mlState.response?.em_ml_pct ?? null : null;
-            const staticMlPct = emMatches ? em?.em_ml_pct ?? null : null;
-            const mathMovePct = emMatches ? em?.straddle_pct ?? em?.iv_pct ?? null : null;
-            const movePct = liveMlPct ?? staticMlPct ?? mathMovePct;
-            const moveLabel = liveMlLabel(mlState, staticMlPct !== null, mathMovePct !== null);
+            // A genuine spot-updated model response may override the static
+            // publication estimate. A nightly fallback is not a new model result,
+            // so fall back to the one canonical display field from the payload.
+            const liveMlPct =
+              emMatches &&
+              mlState?.status === 'ready' &&
+              mlState.response?.source !== 'nightly_fallback'
+                ? finiteDisplayForecast(mlState.response?.em_ml_pct)
+                : null;
+            const staticDisplayPct = emMatches
+              ? finiteDisplayForecast(em?.display_forecast_pct)
+              : null;
+            const movePct = liveMlPct ?? staticDisplayPct;
+            const moveLabel = liveMlPct != null
+              ? 'Spot-updated ML'
+              : watchlistForecastLabel(mlState, emMatches ? em?.display_forecast_method : null);
             const up = tickPctR !== null && !tickFlat && tickPctR >= 0;
             const quoteColor = tickPctR === null
               ? 'var(--ink-4)'
@@ -1154,7 +1166,7 @@ export default function WatchlistPage() {
                       whiteSpace: 'nowrap',
                     }}
                   >
-                    {moveLabel || 'Snapshot ML'}
+                    {moveLabel || 'Expected move'}
                   </div>
                 </div>
 
