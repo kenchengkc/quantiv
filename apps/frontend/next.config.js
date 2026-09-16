@@ -48,6 +48,11 @@ const SECURITY_HEADERS = [
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Produce a minimal self-contained build that includes only the
+  // node_modules files actually imported by the app.  This dramatically
+  // reduces the per-deployment size on Vercel and keeps deployment
+  // storage well within the Hobby-tier limit.
+  output: 'standalone',
   async headers() {
     return [
       {

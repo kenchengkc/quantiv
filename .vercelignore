@@ -28,6 +28,30 @@ __pycache__/
 apps/backend/
 apps/ml/
 
+# Cloudflare Workers (deployed separately via wrangler)
+workers/
+
+# Python scripts and tools — not needed for frontend build
+scripts/
+tools/
+lib/
+
+# Project documentation
+docs/
+
+# JSON schemas (dev/CI only)
+schemas/
+
+# Environment config directory (Vercel uses dashboard env vars)
+config/
+
+# Root-level Python / infra files
+requirements.txt
+railway.toml
+railway.worker.toml
+*.py
+.dockerignore
+
 # Dolt data
 dolt/
 
@@ -37,6 +61,16 @@ dolt/
 # IDE
 .vscode/
 .idea/
+.claude/
 
 # OS
 .DS_Store
+
+# Test artifacts
+test-results/
+playwright-report/
+.pytest_cache/
+.ruff_cache/
+.mplcache/
+.tmp/
+coverage/
