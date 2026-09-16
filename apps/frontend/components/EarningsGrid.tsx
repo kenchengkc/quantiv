@@ -35,30 +35,28 @@ import {
   mergeCalendarReference,
   type CalendarReference,
 } from '@/lib/calendarReference';
+import {
+  displayForecastLabel,
+  finiteDisplayForecast,
+  type DisplayForecastFields,
+  type DisplayForecastMethod,
+} from '@/lib/displayForecast';
+import forecastStyles from './DisplayForecast.module.css';
 import sp500Constituents from '../../../lib/data/sp500-constituents.json';
 
-// Full S&P 500 (503 constituents incl. dual-class). Used for the "S&P 500"
-// filter instead of the tiny POPULAR_WEIGHT map.
 const SP500_SET: Set<string> = new Set(
   (sp500Constituents as { symbol: string }[]).map((c) => c.symbol),
 );
 
-interface EarningsEvent {
+interface EarningsEvent extends DisplayForecastFields {
   ticker: string;
   earnings_date: string;
   timing: string;
   em_straddle_pct?: number | null;
   em_iv_pct?: number | null;
-  // LightGBM median expected move (calibrated to realized — the straddle
-  // structurally over-states realized by ~2×) and its 80% prediction interval
-  // and its 50% interquartile range (p25–p75). Preferred over the raw straddle
-  // for the headline ± move, matching the screener / symbol / watchlist surfaces.
   em_ml_pct?: number | null;
   p25?: number | null;
   p75?: number | null;
-  // Signed regular-session close-to-close move across the print, populated by
-  // build_frontend_data for already-reported events. Shown (marked as the
-  // earnings-day reaction) instead of the live tick once the date has passed.
   realized_move_pct?: number | null;
 }
 
@@ -80,15 +78,6 @@ type Filter = HomeCalendarFilter;
 
 const MIN_OFFSET = -1;
 const MAX_OFFSET = 2;
-// Three gates run in parallel before the calendar's real rows render.
-// Each stops a different class of "looks loaded but isn't" jitter:
-//   MIN_GRID_LOADING_MS    — minimum skeleton hold so a cache-warm fetch
-//                            doesn't strobe the skeleton on/off in <100 ms.
-//   batch-price first poll — cold loads wait for the first quote batch
-//                            (3 s cap) so rows don't paint without CLOSE/LIVE.
-//   LOGO_PRELOAD_TIMEOUT_MS — caps background logo preload. Calendar rows
-//                            don't wait for this because logo boxes have
-//                            fixed dimensions and can resolve in place.
 const MIN_GRID_LOADING_MS = 750;
 const LOGO_PRELOAD_TIMEOUT_MS = 1_500;
 const OFFSETS: { v: number; l: string }[] = [
@@ -125,18 +114,44 @@ function fmtMovePct(v: number | null | undefined, digits = 1) {
   return `${(Math.abs(v) * 100).toFixed(digits)}%`;
 }
 
-/** Hover card for the ± expected-move column — ML, implied straddle, typical band. */
+function legacyForecastMethod(ev: EarningsEvent): DisplayForecastMethod | null {
+  if (ev.em_ml_pct != null) return 'ml';
+  if (ev.em_straddle_pct != null || ev.em_iv_pct != null) return 'options_math';
+  return null;
+}
+
+function forecastClass(method: DisplayForecastMethod | null): string {
+  if (method === 'ml') return `${forecastStyles.base} ${forecastStyles.ml}`;
+  if (method === 'options_math') return `${forecastStyles.base} ${forecastStyles.options}`;
+  if (method === 'options_indicative') return `${forecastStyles.base} ${forecastStyles.indicative}`;
+  if (method === 'historical') return `${forecastStyles.base} ${forecastStyles.historical}`;
+  if (method === 'historical_prior') return `${forecastStyles.base} ${forecastStyles.prior}`;
+  return forecastStyles.base;
+}
+
+function TooltipLine({ label, value, muted = false, marginTop = 0 }: { label: string; value: string; muted?: boolean; marginTop?: number }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginTop }}>
+      <span style={{ color: 'var(--ink-3)', fontSize: 10 }}>{label}</span>
+      <span className="mono tnum" style={{ color: muted ? 'var(--ink-4)' : 'var(--ink)' }}>
+        {value}
+      </span>
+    </div>
+  );
+}
+
+/** Compact provenance surface for the calendar headline expected move. */
 function ExpectedMoveHover({
   movePct,
   impliedPct,
-  isCalibrated,
+  method,
   bandLo,
   bandHi,
   children,
 }: {
   movePct: number | null;
   impliedPct: number | null;
-  isCalibrated: boolean;
+  method: DisplayForecastMethod | null;
   bandLo: number | null | undefined;
   bandHi: number | null | undefined;
   children: React.ReactNode;
@@ -153,14 +168,13 @@ function ExpectedMoveHover({
 
   useEffect(() => () => clearTimer(), []);
 
-  const mlLine = isCalibrated && movePct != null ? fmtMovePct(movePct) : null;
-  const straddleLine =
-    impliedPct != null ? fmtMovePct(impliedPct) : !isCalibrated && movePct != null ? fmtMovePct(movePct) : null;
+  const moveLine = fmtMovePct(movePct);
+  const impliedLine = fmtMovePct(impliedPct);
   const bandLine =
-    bandLo != null && bandHi != null
+    method === 'ml' && bandLo != null && bandHi != null
       ? `${fmtMovePct(bandLo)}–${fmtMovePct(bandHi)}`
       : null;
-  const hasTooltip = mlLine != null || straddleLine != null || bandLine != null;
+  const hasTooltip = moveLine != null;
 
   return (
     <div
@@ -204,7 +218,7 @@ function ExpectedMoveHover({
             border: '1px solid var(--line-2)',
             borderRadius: 8,
             boxShadow: '0 12px 32px rgba(0,0,0,0.55)',
-            minWidth: 168,
+            minWidth: 188,
             fontSize: 11,
             lineHeight: 1.45,
             color: 'var(--ink-2)',
@@ -216,43 +230,37 @@ function ExpectedMoveHover({
             pointerEvents: 'none',
           }}
         >
-          {mlLine != null && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
-              <span style={{ color: 'var(--ink-3)', fontSize: 10 }}>ML</span>
-              <span className="mono tnum" style={{ color: 'var(--ink)' }}>
-                ±{mlLine}
-              </span>
-            </div>
+          {method === 'ml' && moveLine && (
+            <TooltipLine label="ML forecast" value={`±${moveLine}`} />
           )}
-          {straddleLine != null && (
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                gap: 12,
-                marginTop: mlLine != null ? 4 : 0,
-              }}
-            >
-              <span style={{ color: 'var(--ink-3)', fontSize: 10 }}>Implied</span>
-              <span className="mono tnum" style={{ color: 'var(--ink)' }}>
-                ±{straddleLine}
-              </span>
-            </div>
+          {method === 'ml' && impliedLine && (
+            <TooltipLine label="Market implied" value={`±${impliedLine}`} marginTop={4} />
+          )}
+          {(method === 'options_math' || method === 'options_indicative') && moveLine && (
+            <>
+              <TooltipLine label="Market implied" value={`±${moveLine}`} />
+              <TooltipLine label="ML forecast" value="Unavailable" muted marginTop={4} />
+            </>
+          )}
+          {method === 'historical' && moveLine && (
+            <>
+              <TooltipLine label="Historical median" value={`±${moveLine}`} />
+              <TooltipLine label="ML forecast" value="Unavailable" muted marginTop={4} />
+              <TooltipLine label="Market implied" value="Unavailable" muted marginTop={4} />
+            </>
+          )}
+          {method === 'historical_prior' && moveLine && (
+            <>
+              <TooltipLine label="Historical prior" value={`±${moveLine}`} />
+              <TooltipLine label="ML forecast" value="Unavailable" muted marginTop={4} />
+              <TooltipLine label="Market implied" value="Unavailable" muted marginTop={4} />
+            </>
+          )}
+          {method == null && moveLine && (
+            <TooltipLine label={displayForecastLabel(method)} value={`±${moveLine}`} />
           )}
           {bandLine != null && (
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                gap: 12,
-                marginTop: 4,
-              }}
-            >
-              <span style={{ color: 'var(--ink-3)', fontSize: 10 }}>Typical</span>
-              <span className="mono tnum" style={{ color: 'var(--ink)' }}>
-                {bandLine}
-              </span>
-            </div>
+            <TooltipLine label="Typical" value={bandLine} marginTop={4} />
           )}
         </div>
       )}
@@ -267,17 +275,14 @@ function TickerRow({
   ev: EarningsEvent;
   live?: LiveMap[string];
 }) {
-  // Headline ± move: the calibrated ML median (≈0.5–0.7× the straddle, which
-  // structurally over-states realized), falling back to the implied straddle
-  // when no model forecast exists. The p25–p75 interquartile range (the "typical
-  // half" — where the move lands ~50% of the time) rides along as the band.
   const impliedPct = ev.em_straddle_pct ?? ev.em_iv_pct ?? null;
-  const movePct = ev.em_ml_pct ?? impliedPct;
-  const isCalibrated = ev.em_ml_pct != null;
-  const bandLo = ev.p25;
-  const bandHi = ev.p75;
-  // Prefer the nightly-built realized move; until it lands, fall back to the
-  // post-close KV backfill, but only when it's for *this* event's date.
+  const method = ev.display_forecast_method ?? legacyForecastMethod(ev);
+  const movePct =
+    finiteDisplayForecast(ev.display_forecast_pct) ??
+    finiteDisplayForecast(ev.em_ml_pct) ??
+    finiteDisplayForecast(impliedPct);
+  const bandLo = method === 'ml' ? ev.p25 : null;
+  const bandHi = method === 'ml' ? ev.p75 : null;
   const realizedFromBackfill =
     live?.realizedDate && live.realizedDate === ev.earnings_date
       ? live.realizedMovePct ?? null
@@ -289,8 +294,6 @@ function TickerRow({
     liveChangePct: live?.changePct ?? null,
   });
   const changePct = reaction.changePct;
-  // Round to display precision before deciding flat — avoids "−0.00 (-0.00%)"
-  // showing as a down move because the underlying float was -1e-5.
   const pctRounded = changePct !== null ? Math.round(changePct * 10000) / 10000 : null;
   const flat = pctRounded === 0;
   const up = !flat && (changePct ?? 0) >= 0;
@@ -318,8 +321,6 @@ function TickerRow({
         e.currentTarget.style.background = 'transparent';
       }}
     >
-      {/* Keep the company hover target separate from the move breakdown.
-          Leaving this area cancels pending timers as well as visible cards. */}
       <div
         data-calendar-identity
         style={{ display: 'grid', gridTemplateColumns: '24px minmax(0, 1fr)', alignItems: 'center', gap: 8, minWidth: 0 }}
@@ -385,15 +386,15 @@ function TickerRow({
       <ExpectedMoveHover
         movePct={movePct}
         impliedPct={impliedPct}
-        isCalibrated={isCalibrated}
+        method={method}
         bandLo={bandLo}
         bandHi={bandHi}
       >
-        <div className="serif tnum" style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink-2)' }}>
+        <div className={`serif tnum ${forecastClass(method)}`}>
           {movePct != null ? (
             <>
               ±{(movePct * 100).toFixed(1)}
-              <span style={{ fontSize: 9, color: 'var(--ink-3)', marginLeft: 1 }}>%</span>
+              <span style={{ fontSize: 9, color: 'currentColor', opacity: 0.72, marginLeft: 1 }}>%</span>
             </>
           ) : (
             <span style={{ fontSize: 11, color: 'var(--ink-4)' }}>—</span>
@@ -430,9 +431,6 @@ function Group({
   if (list.length === 0) return null;
   return (
     <div style={{ marginBottom: 12 }}>
-      {/* Stronger session separator: tinted background + colored left rule
-          + slightly bolder label so BMO/AMC sections are visually distinct
-          inside a single day cell. */}
       <div
         style={{
           display: 'flex',
@@ -574,7 +572,7 @@ function FilterInfo({ filter }: { filter: Filter }) {
   const msg = {
     popular: 'Ranked by a 70/30 blend of 90-day dollar volume and market cap.',
     sp500: 'S&P 500 constituents only.',
-    movers: 'Tickers whose implied move is ≥ 10% this week.',
+    movers: 'Tickers whose expected move is ≥ 10% this week.',
     all: 'Every confirmed earnings report in our calendar.',
   }[filter];
   return (
@@ -637,14 +635,9 @@ function WeekHeader({
               alignItems: 'center',
               gap: 8,
               flexWrap: 'wrap',
-              // Reserve the row's height so the MARKET CLOSED badge can
-              // appear without pushing the headline below it. The badge
-              // is ~22px tall; matching that here keeps the row stable
-              // whether the badge is rendered or not.
               minHeight: 22,
             }}
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/brand/QuantivIcon.webp"
               alt=""
@@ -653,9 +646,6 @@ function WeekHeader({
               style={{
                 display: 'inline-block',
                 objectFit: 'contain',
-                // Brand asset has a solid black background. Screen-blend
-                // it onto the page so only the ring + tail survive against
-                // the dark background.
                 mixBlendMode: 'screen',
               }}
             />
@@ -673,10 +663,6 @@ function WeekHeader({
                 color: 'var(--ink-3)',
                 letterSpacing: '0.08em',
                 fontSize: 9.5,
-                // visibility (not display) keeps the badge in the
-                // layout flow regardless of marketOpen, so the row
-                // height is fixed and there's no CLS when the API
-                // result flips marketOpen from true → false.
                 visibility: marketOpen ? 'hidden' : 'visible',
               }}
               aria-hidden={marketOpen}
@@ -848,27 +834,15 @@ export default function EarningsGrid({
 }: {
   initialOffset?: number;
   initialFilter?: Filter;
-  // Current-week calendar (weekly.json) rendered into the server HTML so the
-  // grid — the LCP element — paints from the first byte instead of after a
-  // hydrate → fetch → 750ms-hold round-trip. Only supplied for offset 0.
   initialData?: WeeklyData | null;
 }) {
-  // Triggers the one-time EDGAR ticker-names fetch + re-render on
-  // arrival so non-S&P-500 tickers in the weekly view get their real
-  // names instead of echoing the ticker symbol.
   useEnsureCompanyNames();
 
-  // Persist (offset, filter) in the URL so that navigating to a ticker and
-  // hitting back returns the user to the same week + filter they were on.
   const [offset, setOffset] = useState(initialOffset);
   const [filter, setFilter] = useState<Filter>(initialFilter);
   const [urlStateReady, setUrlStateReady] = useState(false);
   const [search, setSearch] = useState('');
 
-  // The homepage itself is statically rendered for a fast edge-cached first
-  // paint. Apply a non-default week/filter from the URL only after hydration,
-  // then keep browser history navigation in sync without turning `/` back into
-  // a per-request server render.
   useEffect(() => {
     const syncFromUrl = () => {
       const params = new URLSearchParams(window.location.search);
@@ -886,8 +860,6 @@ export default function EarningsGrid({
     return () => window.removeEventListener('popstate', syncFromUrl);
   }, []);
 
-  // Mirror state → URL query. Omit default values so a fresh landing stays
-  // on a clean `/` URL.
   useEffect(() => {
     if (!urlStateReady) return;
     const next = new URLSearchParams();
@@ -895,25 +867,15 @@ export default function EarningsGrid({
     if (filter !== 'popular') next.set('filter', filter);
     const qs = next.toString();
     const url = qs ? `/?${qs}` : '/';
-    // The URL is display state, not new server data. Preserve Next's existing
-    // history state and avoid an RSC navigation/refetch for every filter click.
     if (`${window.location.pathname}${window.location.search}` !== url) {
       window.history.replaceState(window.history.state, '', url);
     }
   }, [offset, filter, urlStateReady]);
-  // Seed from the module cache so a back-nav / bfcache remount paints the
-  // last-good week + quotes on the first frame (no skeleton, no label-less gap).
   const initialWeekIso = (() => {
     const d = mondayOf(new Date());
     d.setDate(d.getDate() + 7 * initialOffset);
     return isoDay(d);
   })();
-  // Fold the server-rendered week into the in-memory cache before the warm
-  // flags below read it, so SSR + first client render both paint the grid
-  // (no skeleton, no 750ms hold, no quote-wait). The mount effect still
-  // revalidates from the CDN, so a stale build-time copy self-heals. If the
-  // server/client week anchor disagrees (rare TZ-at-week-boundary case) this
-  // key won't match initialWeekIso and we fall back to the cold fetch path.
   const ssrSeedIso = initialData?.window?.start?.slice(0, 10) ?? null;
   const initialCalendarReleaseId =
     typeof initialData?.metadata.calendar_reference_release_id === 'string'
@@ -926,7 +888,6 @@ export default function EarningsGrid({
   const ssrSeedCacheKey = ssrSeedIso
     ? calendarCacheKey(initialCalendarReleaseId, ssrSeedIso)
     : null;
-  // Never label server-rendered bytes with a different client-week key.
   if (ssrSeedCacheKey && initialData) primeWeekMemory(ssrSeedCacheKey, initialData);
   const warmStart = hasWeekCache(initialWeekCacheKey);
   const [data, setData] = useState<WeeklyData | null>(
@@ -936,8 +897,6 @@ export default function EarningsGrid({
   const [error, setError] = useState<string | null>(null);
   const [live, setLive] = useState<LiveMap>(() => readLiveQuoteCache());
   const [marketOpen, setMarketOpen] = useState<boolean>(true);
-  // On a warm (cached) remount, treat the artificial min-loading hold and the
-  // quotes-ready gate as already satisfied so the grid shows on frame one.
   const [minLoadingDoneWeek, setMinLoadingDoneWeek] = useState<string | null>(
     () => (warmStart ? initialWeekIso : null),
   );
@@ -958,7 +917,6 @@ export default function EarningsGrid({
   );
 
   useEffect(() => {
-    // Cached week → no skeleton hold (the data is already on screen).
     if (hasWeekCache(weekCacheKey)) {
       setMinLoadingDoneWeek(weekStartIso);
       return;
@@ -990,8 +948,7 @@ export default function EarningsGrid({
         const response = await fetch('/calendar-reference.json', { cache: 'no-store' });
         if (response.ok) reference = (await response.json()) as CalendarReference;
       } catch {
-        // Transitional fallback: retained research stays visible until the
-        // first independent calendar reference has been published.
+        // Retained research stays visible until the independent calendar is readable.
       }
       const merged = mergeCalendarReference(reference, research, iso);
       return { data: merged, releaseId: reference?.release_id ?? null };
@@ -1003,7 +960,6 @@ export default function EarningsGrid({
     let cancelled = false;
     const cached = readWeekCache<WeeklyData>(weekCacheKey);
     if (cached) {
-      // Render cached week immediately, then revalidate silently below.
       setData(cached);
       setIsFetching(false);
     } else {
@@ -1019,7 +975,6 @@ export default function EarningsGrid({
         setData(json);
       })
       .catch((e) => {
-        // Keep showing the cached week on a revalidation error.
         if (!cancelled && !hasWeekCache(weekCacheKey)) setError((e as Error).message);
       })
       .finally(() => {
@@ -1030,8 +985,6 @@ export default function EarningsGrid({
     };
   }, [weekStartIso, weekCacheKey, fetchWeek]);
 
-  // Mirror the live-quote map into the module cache so the next remount /
-  // bfcache restore starts with the last-known quotes (reactions render at once).
   useEffect(() => {
     writeLiveQuoteCache(live);
   }, [live]);
@@ -1081,11 +1034,8 @@ export default function EarningsGrid({
       };
     }
 
-    // Cold load → hide behind the skeleton until quotes land. Warm (cached)
-    // remount → keep the last-good grid on screen and revalidate silently.
     if (!hasWeekCache(weekCacheKey)) {
       setQuotesReadyWeek(null);
-      // Cold load only: cap how long we wait if batch-price hangs.
       initialReadyTimer = setTimeout(markQuotesReady, 3_000);
     }
 
@@ -1116,10 +1066,6 @@ export default function EarningsGrid({
         setLive((prev) => {
           const next: LiveMap = { ...prev };
           for (const t of json.data) {
-            // The realized backfill stands alone — it arrives post-close when
-            // there may be no fresh live price, so capture it even if price is
-            // null. Only overwrite the live price with non-null values so we
-            // never *remove* a price that landed on an earlier poll.
             if (t.price === null && t.realizedMovePct == null) continue;
             const prevEntry = next[t.symbol];
             next[t.symbol] = {
@@ -1142,11 +1088,6 @@ export default function EarningsGrid({
       }
     };
 
-    // Phase 1: wait for one quote response, then keep polling pending symbols
-    // in the background. A handful of slow/missing quotes should not hold the
-    // entire calendar behind a skeleton.
-    // Phase 2: gentle 30s loop while market is open. When closed, drop to a
-    // very slow 5-min heartbeat — quotes are frozen anyway, no need to spin.
     const fastPoll = async (attempt = 0) => {
       if (cancelled) return;
       if (document.visibilityState !== 'visible') {
@@ -1161,7 +1102,6 @@ export default function EarningsGrid({
       } else {
         const slowLoop = () => {
           if (cancelled) return;
-          // 30s while Finnhub refresh window (incl. post-close settlement), 5min otherwise.
           const interval = lastQuoteRefreshActive ? 30_000 : 300_000;
           timer = setTimeout(async () => {
             if (document.visibilityState === 'visible') {
@@ -1175,15 +1115,11 @@ export default function EarningsGrid({
     };
     fastPoll();
 
-    // Re-poll immediately when the tab regains focus — covers the
-    // "I clicked into a ticker, came back, dashboard is stale" case.
     const onVisible = () => {
       if (document.visibilityState === 'visible' && !cancelled) {
         fetchOnce();
       }
     };
-    // Back/forward (incl. bfcache restore from an external tab): refetch
-    // quotes immediately so CLOSE/LIVE/REALIZED labels and % stay in sync.
     const onPageShow = () => {
       if (!cancelled) fetchOnce();
     };
@@ -1201,8 +1137,6 @@ export default function EarningsGrid({
     };
   }, [data, weekCacheKey, weekStartIso]);
 
-  // Calendar columns always follow the selected week (URL offset), so the
-  // header dates stay correct while JSON for that week is still loading.
   const days = useMemo(() => {
     const weekStart = parseLocalDate(weekStartIso);
     return Array.from({ length: 5 }, (_, i) => {
@@ -1238,16 +1172,17 @@ export default function EarningsGrid({
     let list = data.events;
     if (filter === 'popular') list = list.filter((e) => (POPULAR_WEIGHT[e.ticker] ?? 0) >= 76);
     if (filter === 'sp500') list = list.filter((e) => SP500_SET.has(e.ticker));
-    if (filter === 'movers') list = list.filter((e) => (e.em_straddle_pct ?? e.em_iv_pct ?? 0) >= 0.10);
+    if (filter === 'movers') {
+      list = list.filter((e) => {
+        const display = finiteDisplayForecast(e.display_forecast_pct);
+        const legacy = e.em_ml_pct ?? e.em_straddle_pct ?? e.em_iv_pct ?? 0;
+        return (display ?? legacy) >= 0.10;
+      });
+    }
     if (search) list = list.filter((e) => e.ticker.startsWith(search));
     return list;
   }, [data, filter, search]);
 
-  // Preload logos for the entire week's events, not just the currently
-  // visible filter slice. Keying readiness on the week (not the filter)
-  // means switching Popular ↔ S&P 500 ↔ Movers ↔ All is instant — no
-  // skeleton flash, no second preload pass when a filter exposes tickers
-  // that weren't in the previous slice.
   const allTickerKey = useMemo(() => {
     if (!data) return '';
     return Array.from(new Set(data.events.map((e) => e.ticker))).join('|');
@@ -1266,9 +1201,6 @@ export default function EarningsGrid({
 
     let cancelled = false;
     void preloadTickerLogos(uncached, LOGO_PRELOAD_TIMEOUT_MS).then(() => {
-      // Warm the module-level logo cache for subsequent renders. Individual
-      // TickerLogo components have fixed dimensions and fallback states, so
-      // the calendar can render immediately while images settle.
       if (cancelled) return;
     });
 
@@ -1289,10 +1221,6 @@ export default function EarningsGrid({
   }, [days, filteredEvents]);
 
   const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
-  // Keep the initial skeleton only until weekly data is present, the first
-  // quote batch returned or briefly timed out, and the minimum hold elapsed.
-  // Logo boxes have fixed dimensions and resolve in place, so waiting on every
-  // third-party logo turns one slow image into a 4-6s calendar load.
   const contentReady =
     weekReady &&
     minLoadingDoneWeek === weekStartIso &&
@@ -1328,8 +1256,6 @@ export default function EarningsGrid({
         </div>
       )}
 
-      {/* Fixed shell height keeps the Suspense fallback, in-component
-          skeleton, and loaded calendar at the same document position. */}
       <div className="qv-calendar-shell">
         {showSkeleton && !error && <CalendarGridSkeleton days={days} today={today} />}
 
