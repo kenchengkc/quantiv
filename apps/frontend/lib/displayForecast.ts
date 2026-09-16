@@ -36,6 +36,8 @@ type LegacyDisplayForecastFields = DisplayForecastFields & {
   em_iv_pct?: number | null;
   straddle_pct?: number | null;
   iv_pct?: number | null;
+  hist_move_med_4q?: number | null;
+  hist_move_avg_4q?: number | null;
 };
 
 export function displayForecastLabel(method: DisplayForecastMethod | null | undefined): string {
@@ -88,21 +90,23 @@ export function finiteDisplayForecast(value: number | null | undefined): number 
 }
 
 /**
- * Transitional read compatibility for source-controlled JSON generated before
- * the display-forecast contract landed. Canonical fields always win; only when
+ * Transitional read compatibility for public JSON generated before the
+ * display-forecast contract landed. Canonical fields always win; only when
  * they are absent do we reconstruct the old presentation hierarchy (ML first,
- * then strict options/IV, then an explicitly supplied point-in-time historical
- * estimate). This is display-only and never changes analytical eligibility or
- * ML-only filtering.
+ * then strict options/IV, then point-in-time historical summary fields carried
+ * by the legacy calendar payload). An explicitly supplied history estimate has
+ * priority over legacy summary fields because callers can calculate it from a
+ * richer symbol history. This is display-only and never changes analytical
+ * eligibility or ML-only filtering.
  */
 export function resolveDisplayForecastCompat(
   fields: LegacyDisplayForecastFields | null | undefined,
   historicalFallbackPct: number | null | undefined = null,
 ): { pct: number | null; method: DisplayForecastMethod | null } {
-  const historical = finiteDisplayForecast(historicalFallbackPct);
+  const explicitHistorical = finiteDisplayForecast(historicalFallbackPct);
   if (!fields) {
-    return historical != null
-      ? { pct: historical, method: 'historical' }
+    return explicitHistorical != null
+      ? { pct: explicitHistorical, method: 'historical' }
       : { pct: null, method: null };
   }
 
@@ -124,6 +128,10 @@ export function resolveDisplayForecastCompat(
     finiteDisplayForecast(fields.iv_pct);
   if (implied != null) return { pct: implied, method: 'options_math' };
 
+  const historical =
+    explicitHistorical ??
+    finiteDisplayForecast(fields.hist_move_med_4q) ??
+    finiteDisplayForecast(fields.hist_move_avg_4q);
   if (historical != null) return { pct: historical, method: 'historical' };
 
   return { pct: null, method: fields.display_forecast_method ?? null };
