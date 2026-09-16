@@ -224,6 +224,61 @@ are projected into the same static week/screener/symbol payloads used for the ma
 
 The browser therefore receives a research snapshot whose model and market context were validated together.
 
+## 2.5. Canonical display forecast
+
+The strict research fields above are intentionally allowed to be absent for an individual published calendar event. A model can lack a usable feature row, and the latest option pair can fail the decision-quality gate even when there is still enough information to show a reasonable presentation estimate. The UI no longer rebuilds a fallback from null fields on its own.
+
+`tools/frontend_data/display_forecast.py` resolves one canonical `display_forecast_pct` before publication:
+
+```text
+validated ML
+    ↓ unavailable
+strict decision-eligible options math
+    ↓ unavailable
+indicative options under display-only quote policy
+    ↓ unavailable
+median absolute move from recent ticker earnings
+    ↓ insufficient ticker history
+recent universe-level earnings-move prior
+```
+
+The display-only options policy is intentionally looser than the research/ML input gate and lives in `config/option_display_quality.json`. It may rescue a commercially plausible but wider market for presentation, but it never upgrades that quote to decision-eligible research evidence. Crossed/nonpositive markets and other structurally invalid pairs remain unusable.
+
+The generated row carries explicit provenance:
+
+```text
+display_forecast_pct
+display_forecast_method
+display_forecast_as_of
+ml_status
+options_status
+fallback_reason
+historical_event_count
+```
+
+Allowed methods are:
+
+```text
+ml
+options_math
+options_indicative
+historical
+historical_prior
+```
+
+The separation is important. `em_ml_pct` remains a true validated ML forecast only. `em_straddle_pct` remains strict option evidence only. An indicative-options or historical display estimate never backfills those analytical fields, never creates synthetic Greeks/IV, and never changes strict reconciliation coverage.
+
+Before screener/manifest publication, the frontend-data build fails closed unless every upcoming published calendar identity in the generated span has exactly one finite positive display forecast. It also emits `data/validation/display_forecast_status.json` so method mix and display coverage can be observed separately from strict option coverage.
+
+Compact surfaces consume the same field rather than inventing their own hierarchy:
+
+- calendar expected-move cell: static `display_forecast_pct` plus provenance tooltip;
+- screener expected-move column and “Big movers” preset: `display_forecast_pct`;
+- watchlist expected move: `display_forecast_pct`, except a genuinely successful spot-updated ML response may override it interactively;
+- symbol page: headline/provenance can render from the display estimate even when strict options panels are absent.
+
+This is a presentation continuity mechanism, not a relaxation of the model/research control plane.
+
 ## 3. Spot-updated ML mode
 
 The symbol page can optionally ask Railway to re-score a stored feature vector using a newer stock price.
@@ -298,7 +353,7 @@ apps/frontend/public/control-plane.json
 
 The forecast receipt identifies the validated artifact bundle, coverage, controls, observation/scoring windows, and validation status.
 
-The control-plane snapshot summarizes current data/model/release state and advisory exceptions.
+The control-plane snapshot summarizes current data/model/release state and advisory exceptions. Display-forecast coverage and method mix can appear there as presentation observability, but those values do not alter strict data/model publication eligibility.
 
 These are intentionally projections rather than full operational manifests: the product can answer “what evidence supports this?” without publishing secrets, filesystem paths, or admin controls.
 
@@ -308,6 +363,7 @@ These are intentionally projections rather than full operational manifests: the 
 |---|---|
 | Raw historical data | immutable/reconciled CSV + Parquet release |
 | Analytical option eligibility | DuckDB views + reconciliation controls |
+| Canonical presentation estimate | generated `display_forecast_*` fields + display status artifact |
 | ML feature order | active model-bundle metadata/schema |
 | Active production model | signed champion control decision / activated bundle |
 | Published forecast | validated forecast artifact + evidence receipt |
@@ -322,10 +378,12 @@ Quantiv is designed to degrade explicitly rather than manufacture freshness.
 Examples:
 
 - bad option rows → quarantined rather than selected;
+- strict option pair unavailable → presentation may use an explicitly labeled indicative/historical display estimate while strict analytical fields stay null;
+- no usable ticker history → presentation falls back to the recent universe prior rather than inventing ticker-specific evidence;
 - critical reconciliation exception → scoring/publication blocked;
 - rejected challenger → previous champion remains active;
 - failed/interrupted model download → previous verified bundle remains active;
-- Railway prediction unavailable → browser can retain validated nightly ML fields;
+- Railway prediction unavailable → browser retains the canonical validated nightly display estimate;
 - quote provider gap → last-confirmed/fallback/unavailable state rather than fabricated tick;
 - standing coverage/universe notices → overall may remain `passed` while the exception stays visible;
 - actionable instrumentation warning → publication may remain eligible but state is `advisory` and visible.
