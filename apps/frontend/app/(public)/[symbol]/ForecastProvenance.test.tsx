@@ -13,13 +13,13 @@ describe('ForecastProvenance', () => {
         asOf="2026-09-14"
       />,
     );
-    expect(screen.getByText('Options-implied estimate')).toBeInTheDocument();
-    expect(screen.getByText('ML unavailable')).toBeInTheDocument();
+    expect(screen.getByText('Options-implied estimate')).toBeTruthy();
+    expect(screen.getByText('ML unavailable')).toBeTruthy();
     expect(
       screen.getByText(
         'Indicative market estimate; current option quotes did not meet the stricter ML-input quality threshold.',
       ),
-    ).toBeInTheDocument();
+    ).toBeTruthy();
   });
 
   it('explains ticker-history fallback', () => {
@@ -32,9 +32,9 @@ describe('ForecastProvenance', () => {
         historicalEventCount={4}
       />,
     );
-    expect(screen.getByText('Historical estimate')).toBeInTheDocument();
-    expect(screen.getByText('Market-implied estimate unavailable')).toBeInTheDocument();
-    expect(screen.getByText('Median absolute move across the last 4 earnings events.')).toBeInTheDocument();
+    expect(screen.getByText('Historical estimate')).toBeTruthy();
+    expect(screen.getByText('Market-implied estimate unavailable')).toBeTruthy();
+    expect(screen.getByText('Median absolute move across the last 4 earnings events.')).toBeTruthy();
   });
 
   it('explains broad historical prior', () => {
@@ -47,11 +47,11 @@ describe('ForecastProvenance', () => {
         historicalEventCount={1}
       />,
     );
-    expect(screen.getByText('Historical prior')).toBeInTheDocument();
+    expect(screen.getByText('Historical prior')).toBeTruthy();
     expect(
       screen.getByText(
         "Limited company-specific history; estimate uses Quantiv's recent earnings-event historical baseline.",
       ),
-    ).toBeInTheDocument();
+    ).toBeTruthy();
   });
 });
