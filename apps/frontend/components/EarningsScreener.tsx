@@ -6,7 +6,11 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Info } from 'lucide-react';
 import { TableVirtuoso, type TableComponents } from 'react-virtuoso';
 import { companyName } from '@/lib/companyNames';
-import { displayForecastLabel, type DisplayForecastFields } from '@/lib/displayForecast';
+import {
+  displayForecastLabel,
+  resolveDisplayForecastCompat,
+  type DisplayForecastFields,
+} from '@/lib/displayForecast';
 import { useEnsureCompanyNames } from '@/lib/useCompanyNames';
 import { useTickerHover } from '@/components/TickerHoverCard';
 import {
@@ -746,7 +750,16 @@ function dedupeEvents(rows: ScreenerEvent[]): ScreenerEvent[] {
     const k = `${ev.ticker}|${ev.earnings_date}`;
     if (seen.has(k)) continue;
     seen.add(k);
-    out.push(ev);
+    const compat = resolveDisplayForecastCompat(ev);
+    out.push(
+      compat.pct != null && ev.display_forecast_pct == null
+        ? {
+            ...ev,
+            display_forecast_pct: compat.pct,
+            display_forecast_method: compat.method,
+          }
+        : ev,
+    );
   }
   return out;
 }
