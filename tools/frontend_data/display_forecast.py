@@ -423,6 +423,7 @@ def _ticker_historical_moves(
             FROM v_ohlcv
             WHERE act_symbol = e.ticker
               AND date <= e.earnings_dt + INTERVAL '5' DAY
+              AND date <= ?
               AND (
                 ((LOWER(COALESCE(e.timing, 'unknown')) IN ('before_market_open','bmo','before_open')
                    OR LOWER(COALESCE(e.timing, 'unknown')) LIKE '%before%') AND date >= e.earnings_dt)
@@ -438,7 +439,7 @@ def _ticker_historical_moves(
         ORDER BY e.earnings_dt DESC
         LIMIT ?
         """,
-        [ticker.upper(), cutoff, limit],
+        [cutoff, ticker.upper(), cutoff, limit],
     ).fetchall()
     values = [_finite_positive(row[0]) for row in rows]
     return [value for value in values if value is not None]
@@ -485,6 +486,7 @@ def build_universe_historical_prior(
             FROM v_ohlcv
             WHERE act_symbol = e.ticker
               AND date <= e.earnings_dt + INTERVAL '5' DAY
+              AND date <= ?
               AND (
                 ((LOWER(COALESCE(e.timing, 'unknown')) IN ('before_market_open','bmo','before_open')
                    OR LOWER(COALESCE(e.timing, 'unknown')) LIKE '%before%') AND date >= e.earnings_dt)
@@ -498,7 +500,7 @@ def build_universe_historical_prior(
         ) post ON TRUE
         WHERE e.earnings_dt >= ? AND e.earnings_dt < ?
         """,
-        [start, cutoff],
+        [cutoff, start, cutoff],
     ).fetchall()
     values: list[float] = []
     symbols: set[str] = set()
