@@ -144,6 +144,19 @@ def test_ml_wins_over_all_fallbacks():
     assert result.options_status == "decision_eligible"
 
 
+def test_ml_display_as_of_uses_model_snapshot_date():
+    conn = _conn()
+    result = _resolve(
+        conn,
+        ml_forecast={
+            "em_ml_pct": 0.041,
+            "ml_snapshot_date": "2026-09-09",
+        },
+    )
+    assert result.method == "ml"
+    assert result.as_of == "2026-09-09"
+
+
 def test_strict_options_used_when_ml_missing():
     conn = _conn()
     result = _resolve(
@@ -273,6 +286,31 @@ def test_one_prior_event_uses_universe_prior():
     assert result.method == "historical_prior"
     assert result.pct == 0.055
     assert result.fallback_reason == "insufficient_ticker_history"
+    assert result.historical_event_count == 1
+
+
+def test_ticker_history_does_not_use_events_after_forecast_cutoff():
+    conn = _conn()
+    known_event = date(2026, 9, 10)
+    future_event = date(2026, 9, 18)
+    conn.executemany(
+        "INSERT INTO earnings_events VALUES ('PAYX', ?, 'unknown')",
+        [(known_event,), (future_event,)],
+    )
+    conn.executemany(
+        "INSERT INTO v_ohlcv VALUES (?, 'PAYX', ?)",
+        [
+            (known_event - timedelta(days=1), 100.0),
+            (known_event + timedelta(days=1), 104.0),
+            (future_event - timedelta(days=1), 100.0),
+            (future_event + timedelta(days=1), 120.0),
+        ],
+    )
+
+    result = _resolve(conn)
+
+    assert result.method == "historical_prior"
+    assert result.pct == pytest.approx(0.055)
     assert result.historical_event_count == 1
 
 
