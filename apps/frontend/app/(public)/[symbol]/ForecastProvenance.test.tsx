@@ -3,6 +3,19 @@ import { describe, expect, it } from 'vitest';
 import ForecastProvenance from './ForecastProvenance';
 
 describe('ForecastProvenance', () => {
+  it('does not duplicate a normal ML forecast already shown in the ticker hero', () => {
+    render(
+      <ForecastProvenance
+        method="ml"
+        displayPct={0.04}
+        mlPct={0.04}
+        optionsPct={0.087}
+        asOf="2026-09-09"
+      />,
+    );
+    expect(screen.queryByTestId('forecast-provenance')).toBeNull();
+  });
+
   it('explains indicative options without implying the model is broken', () => {
     render(
       <ForecastProvenance
