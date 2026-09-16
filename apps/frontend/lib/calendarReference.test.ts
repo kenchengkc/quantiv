@@ -17,6 +17,11 @@ type Event = {
   timing: string;
   em_ml_pct?: number | null;
   em_straddle_pct?: number | null;
+  em_iv_pct?: number | null;
+  hist_move_med_4q?: number | null;
+  hist_move_avg_4q?: number | null;
+  display_forecast_pct?: number | null;
+  display_forecast_method?: 'ml' | 'options_math' | 'options_indicative' | 'historical' | 'historical_prior' | null;
   p25?: number | null;
   p75?: number | null;
 };
@@ -54,6 +59,30 @@ describe('calendar reference overlay', () => {
     }]);
     expect(merged.metadata.calendar_reference_release_id).toBe('calendar-123');
     expect(merged.metadata.research_as_of_date).toBe('2026-09-04');
+  });
+
+  it('hydrates a matched legacy history-only row so the calendar does not render a dash', () => {
+    const merged = mergeCalendarReference(
+      reference([{ ticker: 'APOG', earnings_date: '2026-09-22', timing: 'bmo' }]),
+      research([{
+        ticker: 'APOG',
+        earnings_date: '2026-09-22',
+        timing: 'before_market_open',
+        em_ml_pct: null,
+        em_straddle_pct: null,
+        em_iv_pct: null,
+        hist_move_avg_4q: 0.102694,
+      }]),
+      '2026-09-21',
+    );
+
+    expect(merged.events[0]).toMatchObject({
+      ticker: 'APOG',
+      earnings_date: '2026-09-22',
+      timing: 'bmo',
+      display_forecast_pct: 0.102694,
+      display_forecast_method: 'historical',
+    });
   });
 
   it('preserves matched ML research when the reference session is unknown', () => {
