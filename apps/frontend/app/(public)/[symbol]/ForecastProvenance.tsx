@@ -11,10 +11,8 @@ function fmtPct(value: number | null | undefined): string | null {
 export default function ForecastProvenance({
   method,
   displayPct,
-  mlPct,
   optionsPct,
   historicalEventCount,
-  asOf,
 }: {
   method: DisplayForecastMethod | null | undefined;
   displayPct: number | null;
