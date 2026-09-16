@@ -174,6 +174,39 @@ def test_payx_like_pair_becomes_indicative():
     assert result.pct > 0
 
 
+def test_indicative_selection_advances_to_next_spanning_expiry():
+    conn = _conn()
+    first_expiry = date(2026, 9, 25)
+    second_expiry = date(2026, 10, 2)
+    # Nearest expiry is structurally valid but too wide for the display policy.
+    _pair(
+        conn,
+        expiry=first_expiry,
+        call_bid=0.05,
+        call_ask=2.05,
+        put_bid=0.05,
+        put_ask=2.05,
+    )
+    # The next spanning expiry is usable and should be selected instead of
+    # abandoning options and falling through to historical context.
+    _pair(
+        conn,
+        expiry=second_expiry,
+        call_bid=2.0,
+        call_ask=3.0,
+        put_bid=2.0,
+        put_ask=3.0,
+        call_delta=0.5,
+        put_delta=-0.5,
+    )
+
+    result = _resolve(conn)
+
+    assert result.method == "options_indicative"
+    assert result.selected_options_details is not None
+    assert result.selected_options_details["expiry_date"] == second_expiry.isoformat()
+
+
 def test_ful_like_pair_rejects_190pct_leg_and_uses_history():
     conn = _conn()
     # Put midpoint 1.05, spread 2.0 => ~190.5% relative spread.
