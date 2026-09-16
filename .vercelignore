@@ -32,7 +32,11 @@ apps/ml/
 workers/
 
 # Python scripts and tools — not needed for frontend build
+# (keep scripts required by the prebuild hook)
 scripts/
+!scripts/materialize_frontend_release.sh
+!scripts/frontend_release.py
+!scripts/install_rclone.sh
 tools/
 lib/
 
