@@ -1,0 +1,29 @@
+.base {
+  font-size: 14px;
+  transition: color 120ms ease, opacity 120ms ease;
+}
+
+.ml {
+  color: var(--ink-2);
+  font-weight: 650;
+}
+
+.options {
+  color: color-mix(in oklab, var(--brand-blue-1) 88%, var(--ink-2));
+  font-weight: 590;
+}
+
+.indicative {
+  color: color-mix(in oklab, var(--brand-blue-1) 62%, var(--ink-3));
+  font-weight: 565;
+}
+
+.historical {
+  color: var(--ink-3);
+  font-weight: 550;
+}
+
+.prior {
+  color: var(--ink-4);
+  font-weight: 540;
+}
