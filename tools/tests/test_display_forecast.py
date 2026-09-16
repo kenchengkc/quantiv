@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import date, timedelta
 
 import duckdb
+import pytest
 
 from frontend_data.display_forecast import (
     DisplayPolicy,
@@ -186,7 +187,7 @@ def test_ful_like_pair_rejects_190pct_leg_and_uses_history():
     _history(conn, "PAYX", [0.03, 0.05, 0.07, 0.09])
     result = _resolve(conn)
     assert result.method == "historical"
-    assert result.pct == 0.06
+    assert result.pct == pytest.approx(0.06)
     assert result.options_status == "unavailable"
     assert result.fallback_reason == "quote_quality"
     assert result.historical_event_count == 4
