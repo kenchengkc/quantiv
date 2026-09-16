@@ -18,6 +18,7 @@ import {
 import {
   displayForecastLabel,
   finiteDisplayForecast,
+  resolveDisplayForecastCompat,
   type DisplayForecastMethod,
 } from '@/lib/displayForecast';
 import { normalizeForecastQuantiles } from '@/lib/forecastQuantiles';
@@ -210,8 +211,6 @@ export default function SymbolPage({
   comparableContext?: ComparableResearchContext | null;
   calendarEvents?: CalendarReferenceEvent[];
 }) {
-  // Triggers EDGAR ticker-names fetch + re-render so the header company
-  // name resolves even when the symbol isn't in the S&P 500 or curated map.
   useEnsureCompanyNames();
   useEnsureListingExchanges();
 
@@ -231,9 +230,6 @@ export default function SymbolPage({
   const [toast, setToast] = useState<{ msg: string; key: number } | null>(null);
   const lastPredictionFetchAtRef = useRef(0);
   const inFlightPredictionKeyRef = useRef<string | null>(null);
-  // Intraday sparkline state. Bars come from /api/stocks/intraday which
-  // wraps Alpaca's IEX feed; we cache aggressively server-side and
-  // refresh once a minute client-side during the regular session.
   const [intraday, setIntraday] = useState<IntradaySeries | null>(null);
   const [calendarEvents, setCalendarEvents] = useState<CalendarReferenceEvent[]>(
     initialCalendarEvents,
@@ -260,9 +256,6 @@ export default function SymbolPage({
     };
   }, []);
 
-  // Fetch intraday bars + auto-refresh every 60s during regular hours
-  // so the sparkline stays in sync with the live price tick above it.
-  // The endpoint caches at the edge for 30s, so polling is cheap.
   useEffect(() => {
     if (!symbol) return;
     let cancelled = false;
@@ -303,8 +296,6 @@ export default function SymbolPage({
       }
     };
     void load();
-    // Poll once a minute; only active while the tab is visible to avoid
-    // burning quota on backgrounded pages.
     intervalId = setInterval(() => {
       if (document.visibilityState === 'visible') void load();
     }, 60_000);
@@ -413,7 +404,6 @@ export default function SymbolPage({
         const delay = attempt < 10 ? 2_000 : 8_000;
         timer = setTimeout(() => void fastPoll(attempt + 1), delay);
       } else {
-        // Slow loop: 30 s while quote refresh is active (incl. post-close), 5 min otherwise.
         const slowLoop = () => {
           if (cancelled) return;
           const interval = lastQuoteRefreshActive ? 30_000 : 300_000;
@@ -588,18 +578,20 @@ export default function SymbolPage({
   }
 
   const em = researchMatchesPublished ? data.expected_move : undefined;
+  const historySeries = buildHistorySeries(data.earnings_history);
+  const comparisonHistory = historySeries.slice(-8);
+  const compatibilityHistory = historySeries.slice(-4);
+  const historicalMedianMovePct = medianAbsoluteHistoryMove(comparisonHistory);
+  const historicalCompatPct =
+    compatibilityHistory.length >= 2
+      ? medianAbsoluteHistoryMove(compatibilityHistory)
+      : null;
+
   const liveForSymbol = live?.symbol === symbol ? live : null;
   const intradayForSymbol = intraday?.symbol === symbol ? intraday : null;
   const livePrice = liveForSymbol?.price ?? null;
   const quotePending = !quoteReady && livePrice == null;
   const spot = livePrice ?? data.spot_price ?? 0;
-  // Anchor the headline day-change to the OFFICIAL previous close from
-  // batch-price (the Polygon prevclose override), not Alpaca's intraday
-  // previousClose. The intraday value is the prior session's last IEX bar, and
-  // for an AMC earnings reporter that bar already includes part of the
-  // after-hours move — anchoring to it understates the reaction (ADBE read
-  // −1.5% off the ~17:00 after-hours print vs the true −6.4% off the official
-  // close). Fall back to intraday's close only when batch-price has none.
   const previousCloseForChange = liveForSymbol?.previousClose ?? intradayForSymbol?.previousClose ?? null;
   const useLiveChangeFallback = liveForSymbol != null;
   const change =
@@ -656,22 +648,12 @@ export default function SymbolPage({
     rawActivePredictionPct != null && Number.isFinite(rawActivePredictionPct)
       ? Math.max(0, rawActivePredictionPct)
       : null;
-  const staticDisplayPct =
-    finiteDisplayForecast(em?.display_forecast_pct) ??
-    finiteDisplayForecast(em?.em_ml_pct) ??
-    finiteDisplayForecast(em?.straddle_pct) ??
-    finiteDisplayForecast(em?.iv_pct);
+  const compatDisplayForecast = resolveDisplayForecastCompat(em, historicalCompatPct);
+  const staticDisplayPct = compatDisplayForecast.pct;
   const displayForecastPct =
     showingLivePrediction && activePredictionPct != null ? activePredictionPct : staticDisplayPct;
   const displayForecastMethod: DisplayForecastMethod | null =
-    showingLivePrediction && activePredictionPct != null
-      ? 'ml'
-      : em?.display_forecast_method ??
-        (em?.em_ml_pct != null
-          ? 'ml'
-          : em?.straddle_pct != null || em?.iv_pct != null
-            ? 'options_math'
-            : null);
+    showingLivePrediction && activePredictionPct != null ? 'ml' : compatDisplayForecast.method;
   const quantileMeta = showingLivePrediction
     ? livePrediction.response?.source === 'nightly_fallback'
       ? 'Nightly snapshot · spot update unavailable'
@@ -683,9 +665,6 @@ export default function SymbolPage({
     predictionMode === 'spot_updated' && livePrediction.status === 'unavailable' ? livePrediction.error : null;
 
   const termRows = buildTermRows(data.straddle_features, em?.expiration ?? null);
-  const historySeries = buildHistorySeries(data.earnings_history);
-  const comparisonHistory = historySeries.slice(-8);
-  const historicalMedianMovePct = medianAbsoluteHistoryMove(comparisonHistory);
   const hasOptionsEvidence = Boolean(
     em &&
       em.atm_strike != null &&
@@ -705,7 +684,8 @@ export default function SymbolPage({
           change={change}
           changePct={changePct}
           quotePending={quotePending}
-          emPct={displayForecastPct ?? 0}
+          emPct={displayForecastPct}
+          emMethod={displayForecastMethod}
           daysLeft={daysLeft}
           earningsDate={earningsDate}
           earningsTiming={earningsTiming}
@@ -728,20 +708,22 @@ export default function SymbolPage({
         />
       </Reveal>
 
-      {em && displayForecastPct != null && (
+      {displayForecastPct != null && (
         <Reveal>
           <ForecastProvenance
             method={displayForecastMethod}
             displayPct={displayForecastPct}
-            mlPct={activePredictionPct ?? finiteDisplayForecast(em.em_ml_pct)}
-            optionsPct={finiteDisplayForecast(em.straddle_pct ?? em.iv_pct)}
-            historicalEventCount={em.historical_event_count}
-            asOf={em.display_forecast_as_of ?? em.ml_snapshot_date ?? data.as_of_date}
+            mlPct={activePredictionPct ?? finiteDisplayForecast(em?.em_ml_pct)}
+            optionsPct={finiteDisplayForecast(em?.straddle_pct ?? em?.iv_pct)}
+            historicalEventCount={
+              em?.historical_event_count ??
+              (displayForecastMethod === 'historical' ? compatibilityHistory.length : null)
+            }
+            asOf={em?.display_forecast_as_of ?? em?.ml_snapshot_date ?? data.as_of_date}
           />
         </Reveal>
       )}
 
-      {/* Start with the research question, then the historical evidence. */}
       {em && spot > 0 && (
         <Reveal>
           <MoveComparisonChart
@@ -786,7 +768,6 @@ export default function SymbolPage({
         </Reveal>
       )}
 
-      {/* Supporting options inputs render only when genuine options evidence exists. */}
       {em && hasOptionsEvidence && em.atm_strike != null && em.dte != null && (
         <Reveal delay={80}>
           <div
@@ -869,7 +850,6 @@ export default function SymbolPage({
         </Reveal>
       )}
 
-      {/* Greeks panel */}
       {termRows.length > 0 && (
         <Reveal delay={240}>
           <div style={{ marginTop: 18 }}>
@@ -878,7 +858,6 @@ export default function SymbolPage({
         </Reveal>
       )}
 
-      {/* Research evidence only documents analytical evidence that actually exists. */}
       <Reveal style={{ marginTop: 22 }}>
         {em && (em.em_ml_pct != null || em.straddle_pct != null) && (
           <ResearchSnapshotRibbon
@@ -893,7 +872,6 @@ export default function SymbolPage({
         <SymbolResearchExport symbol={symbol} />
       </Reveal>
 
-      {/* Footer */}
       <Reveal delay={280}>
         <div
           style={{
