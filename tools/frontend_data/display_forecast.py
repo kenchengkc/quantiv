@@ -613,7 +613,7 @@ def resolve_display_forecast(
 
     prior = universe_prior or build_universe_historical_prior(
         conn,
-        cutoff=earnings_date,
+        cutoff=as_of_date,
         window_days=active_policy.universe_prior_window_days,
     )
     prior_pct = _finite_positive(prior.get("median_abs_move"))
