@@ -4,26 +4,28 @@
 }
 
 .ml {
-  color: var(--ink-2);
-  font-weight: 650;
+  color: var(--brand-blue-1);
+  font-weight: 700;
 }
 
 .options {
-  color: color-mix(in oklab, var(--brand-blue-1) 88%, var(--ink-2));
-  font-weight: 590;
+  color: color-mix(in oklab, var(--brand-blue-1) 72%, var(--ink-2));
+  font-weight: 620;
 }
 
 .indicative {
-  color: color-mix(in oklab, var(--brand-blue-1) 62%, var(--ink-3));
+  color: color-mix(in oklab, var(--brand-blue-1) 50%, var(--ink-3));
   font-weight: 565;
 }
 
 .historical {
   color: var(--ink-3);
-  font-weight: 550;
+  font-weight: 520;
+  font-style: italic;
 }
 
 .prior {
   color: var(--ink-4);
-  font-weight: 540;
+  font-weight: 500;
+  font-style: italic;
 }
