@@ -37,6 +37,9 @@ HISTORY_OUTPUT_PATH = (
 PUBLIC_VALIDATION_OUTPUT_PATH = (
     REPO_ROOT / "apps" / "frontend" / "public" / "evidence" / "model-validation.json"
 )
+DEFAULT_DISPLAY_FORECAST_STATUS_PATH = (
+    REPO_ROOT / "data" / "validation" / "display_forecast_status.json"
+)
 DEFAULT_HISTORY_LIMIT = 30
 
 
@@ -212,11 +215,13 @@ def build_snapshot(
     *,
     generated_at: str,
     release: dict[str, Any] | None = None,
+    display_forecast_status: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     quality = reconciliation.get("quality") or {}
     source = reconciliation.get("source_reconciliation") or {}
     quote = reconciliation.get("quote_quality") or {}
     events = reconciliation.get("event_coverage") or {}
+    display = display_forecast_status or {}
     controls = reconciliation.get("pipeline_controls") or {}
     quarantine = controls.get("quarantine") or {}
     replay = controls.get("idempotent_replay") or {}
@@ -280,6 +285,14 @@ def build_snapshot(
             "expected_events": _number(events.get("expected_events")),
             "covered_events": _number(events.get("covered_events")),
             "missing_events": _number(events.get("missing_events")),
+            # Display coverage is intentionally adjacent to, never a replacement
+            # for, strict decision-eligible options coverage.
+            "display_forecast_coverage_pct": _number(display.get("coverage_pct")),
+            "display_forecast_events": _number(display.get("published_upcoming_events")),
+            "display_forecast_covered_events": _number(display.get("with_display_forecast")),
+            "display_forecast_method_mix": (
+                display.get("method_mix") if isinstance(display.get("method_mix"), dict) else {}
+            ),
             "contract_rejection_rate": _number(quote.get("contract_rejection_rate")),
             "pair_rejection_rate": _number(quote.get("pair_rejection_rate")),
             "decision_group_rejection_rate": _number(
@@ -417,6 +430,14 @@ def build_history_entry(
         "expected_events": _number(data.get("expected_events")),
         "covered_events": _number(data.get("covered_events")),
         "missing_events": _number(data.get("missing_events")),
+        "display_forecast_coverage_pct": _number(data.get("display_forecast_coverage_pct")),
+        "display_forecast_events": _number(data.get("display_forecast_events")),
+        "display_forecast_covered_events": _number(data.get("display_forecast_covered_events")),
+        "display_forecast_method_mix": (
+            data.get("display_forecast_method_mix")
+            if isinstance(data.get("display_forecast_method_mix"), dict)
+            else {}
+        ),
         "contract_rejection_rate": _number(data.get("contract_rejection_rate")),
         "pair_rejection_rate": _number(data.get("pair_rejection_rate")),
         "decision_group_rejection_rate": _number(
@@ -523,6 +544,11 @@ def main() -> int:
     parser.add_argument("--outcome-receipt", type=Path, default=REPO_ROOT / "data/models/monitoring/latest_outcomes.receipt.json")
     parser.add_argument("--history-output", type=Path, default=HISTORY_OUTPUT_PATH)
     parser.add_argument("--history-limit", type=int, default=DEFAULT_HISTORY_LIMIT)
+    parser.add_argument(
+        "--display-forecast-status",
+        type=Path,
+        default=DEFAULT_DISPLAY_FORECAST_STATUS_PATH,
+    )
     args = parser.parse_args()
 
     outcomes, outcome_history = _read_verified_outcomes(
@@ -540,6 +566,7 @@ def main() -> int:
         outcome_history,
         generated_at=generated_at,
         release=build_release_status(environment),
+        display_forecast_status=_read(args.display_forecast_status),
     )
     history = update_history(
         _read(args.history_output),
