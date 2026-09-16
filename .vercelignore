@@ -34,17 +34,15 @@ workers/
 # Python tools — not needed for frontend build
 # NOTE: scripts/ is intentionally kept — the prebuild hook calls
 # scripts/materialize_frontend_release.sh and scripts/frontend_release.py.
+# NOTE: root lib/ and config/ are intentionally kept because the frontend
+# imports lib/data/sp500-constituents.json and config/market_sessions.json.
 tools/
-/lib/
 
 # Project documentation
 docs/
 
 # JSON schemas (dev/CI only)
 schemas/
-
-# Environment config directory (Vercel uses dashboard env vars)
-config/
 
 # Root-level Python / infra files
 requirements.txt
