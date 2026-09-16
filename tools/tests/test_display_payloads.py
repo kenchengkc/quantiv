@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from datetime import date
 
+import duckdb
 import pytest
 
 from frontend_data.display_forecast import DisplayForecastError
 from frontend_data.display_payloads import (
     build_display_forecast_status,
+    enrich_upcoming_event,
     validate_upcoming_display_forecasts,
 )
 
@@ -36,6 +38,27 @@ def test_upcoming_published_event_requires_finite_display_forecast():
     published = [("PAYX", date(2026, 9, 23), "bmo")]
     week = {date(2026, 9, 21): _payload(_indicative_event())}
     validate_upcoming_display_forecasts(published, week, today=date(2026, 9, 16))
+
+
+def test_enrichment_preserves_ml_snapshot_date_as_display_provenance():
+    conn = duckdb.connect()
+    event = {
+        "ticker": "AIR",
+        "earnings_date": "2026-09-21",
+        "timing": "unknown",
+        "em_ml_pct": 0.07,
+        "ml_snapshot_date": "2026-09-09",
+    }
+
+    enrich_upcoming_event(
+        conn,
+        event,
+        as_of_date=date(2026, 9, 14),
+        today=date(2026, 9, 16),
+    )
+
+    assert event["display_forecast_method"] == "ml"
+    assert event["display_forecast_as_of"] == "2026-09-09"
 
 
 def test_upcoming_published_event_with_dash_state_fails_closed():
