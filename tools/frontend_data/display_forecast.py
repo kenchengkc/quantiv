@@ -518,6 +518,15 @@ def build_universe_historical_prior(
     }
 
 
+def _forecast_as_of(ml_forecast: dict[str, Any] | None, fallback: date) -> str:
+    raw = (ml_forecast or {}).get("ml_snapshot_date") or (ml_forecast or {}).get("snapshot_date")
+    if isinstance(raw, date):
+        return raw.isoformat()
+    if isinstance(raw, str) and raw:
+        return raw[:10]
+    return fallback.isoformat()
+
+
 def resolve_display_forecast(
     conn: duckdb.DuckDBPyConnection,
     *,
@@ -538,7 +547,7 @@ def resolve_display_forecast(
         return DisplayForecast(
             pct=ml_pct,
             method="ml",
-            as_of=as_of_date.isoformat(),
+            as_of=_forecast_as_of(ml_forecast, as_of_date),
             ml_status="available",
             options_status=(
                 "decision_eligible"
@@ -597,7 +606,7 @@ def resolve_display_forecast(
     historical = _ticker_historical_moves(
         conn,
         ticker=ticker,
-        cutoff=earnings_date,
+        cutoff=as_of_date,
         limit=active_policy.ticker_history_window_events,
     )
     if len(historical) >= active_policy.min_ticker_history_events:
