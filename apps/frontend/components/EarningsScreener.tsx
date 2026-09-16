@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Info } from 'lucide-react';
 import { TableVirtuoso, type TableComponents } from 'react-virtuoso';
 import { companyName } from '@/lib/companyNames';
+import { displayForecastLabel, type DisplayForecastFields } from '@/lib/displayForecast';
 import { useEnsureCompanyNames } from '@/lib/useCompanyNames';
 import { useTickerHover } from '@/components/TickerHoverCard';
 import {
@@ -54,7 +55,7 @@ export interface ProviderEnrichment {
   signal_score?: number | null;
 }
 
-export interface ScreenerEvent {
+export interface ScreenerEvent extends DisplayForecastFields {
   ticker: string;
   earnings_date: string;
   timing: string;
@@ -497,8 +498,8 @@ function FilterHint({
   );
 }
 
-/** Numeric % cell with a horizontal magnitude bar — used for Straddle EM
- *  so the eye can rank rows visually before reading the number. */
+/** Numeric % cell with a horizontal magnitude bar — used for the canonical
+ *  display expected move so the eye can rank rows before reading the number. */
 function MoveBar({ value, max }: { value: number | null | undefined; max: number }) {
   if (value == null || !Number.isFinite(value)) {
     return <span style={{ color: 'var(--ink-4)' }}>—</span>;
@@ -643,7 +644,7 @@ function ScreenerSkeletonRow({ delayMs }: { delayMs: number }) {
       <td style={{ padding: '16px 14px' }}>
         <span aria-hidden style={{ display: 'inline-block', ...bar(20, 26, 10, 999) }} />
       </td>
-      {/* Straddle EM — wider, mimics text + bar block */}
+      {/* Expected move — wider, mimics text + bar block */}
       <td style={{ padding: '16px 14px' }}>
         <span
           aria-hidden
@@ -921,7 +922,7 @@ export default function EarningsScreener() {
       } else if (preset === 'cheap_vol') {
         if (ev.iv_rank == null || ev.iv_rank > 0.30) return false;
       } else if (preset === 'big_movers') {
-        const m = ev.em_straddle_pct ?? 0;
+        const m = ev.display_forecast_pct ?? 0;
         if (m < 0.10) return false;
       } else if (preset === 'confident') {
         const bw = band80(ev);
@@ -948,7 +949,7 @@ export default function EarningsScreener() {
         case 'date':
           return finite(new Date(ev.earnings_date).getTime());
         case 'straddle':
-          return finite(ev.em_straddle_pct);
+          return finite(ev.display_forecast_pct);
         case 'ml':
           return finite(ev.em_ml_pct);
         case 'iv':
@@ -1004,7 +1005,7 @@ export default function EarningsScreener() {
       const he = histEdge(e);
       if (he != null && he >= 0.20) rich++;
       if (e.iv_rank != null && e.iv_rank <= 0.30) cheap++;
-      if (e.em_straddle_pct != null && e.em_straddle_pct >= 0.10) big++;
+      if (e.display_forecast_pct != null && e.display_forecast_pct >= 0.10) big++;
       if (e.atm_iv != null && Number.isFinite(e.atm_iv)) {
         ivSum += e.atm_iv;
         ivCount++;
@@ -1022,10 +1023,10 @@ export default function EarningsScreener() {
     };
   }, [sorted]);
 
-  // Largest straddle EM in the visible set, used to scale the MoveBar so
-  // the bar lengths read relative to the current view, not an absolute.
-  const maxStraddle = useMemo(() => {
-    return Math.max(0.04, ...sorted.map((e) => e.em_straddle_pct ?? 0));
+  // Largest canonical display forecast in the visible set, used to scale
+  // the compact expected-move bar without changing analytical straddle fields.
+  const maxDisplayForecast = useMemo(() => {
+    return Math.max(0.04, ...sorted.map((e) => e.display_forecast_pct ?? 0));
   }, [sorted]);
 
   useEffect(() => {
@@ -1350,9 +1351,9 @@ export default function EarningsScreener() {
               ratio: summary.big / Math.max(1, sorted.length),
               isPct: false,
               tone: 'var(--brand-blue-1)',
-              kicker: 'Straddle EM',
+              kicker: 'Expected move',
               label: 'Big movers',
-              desc: 'Straddle pricing a ≥ 10% one-day move on print.',
+              desc: 'Canonical display estimate of at least 10% for the earnings print.',
             },
             {
               key: 'iv',
@@ -1630,7 +1631,7 @@ export default function EarningsScreener() {
           {([
             ['rich_vol',   'Rich vs hist',   'Implied move ≥ 20% above last-4Q realized average'],
             ['cheap_vol',  'Cheap IV',       'IV Rank ≤ 30%; options trading near 52-week lows'],
-            ['big_movers', 'Big movers',     'Implied move ≥ 10%'],
+            ['big_movers', 'Big movers',     'Expected move ≥ 10%'],
             ['confident',  'Tight bands',    'P90−P10 ≤ 8%; model is highly confident'],
             ['crowded',    'Crowded flow',   'Short interest ≥ 3 days to cover or options put/call flow is materially imbalanced'],
           ] as [string, string, string][]).map(([key, label, tip]) => {
@@ -1857,7 +1858,7 @@ export default function EarningsScreener() {
             >
               Session
             </th>
-            {th('straddle', 'Straddle EM', 'One-day move priced by the print-expiry ATM straddle.')}
+            {th('straddle', 'Expected move', 'Canonical display estimate: ML, strict or indicative options, or a historical fallback.')}
             {th('hist_avg', 'Hist 4Q avg', 'Mean absolute close-to-close move over the last 4 prints.')}
             {th('hist_edge', 'Hist edge', '(Straddle EM − hist 4Q avg) / hist 4Q avg. Positive = richer.')}
             {th('short', 'Short DTC', 'Short-interest days to cover from provider enrichment. Higher = more crowded borrow/short positioning.')}
@@ -1955,8 +1956,11 @@ export default function EarningsScreener() {
                   );
                 })()}
               </td>
-              <td style={{ padding: '16px 14px' }}>
-                <MoveBar value={ev.em_straddle_pct} max={maxStraddle} />
+              <td
+                title={displayForecastLabel(ev.display_forecast_method)}
+                style={{ padding: '16px 14px' }}
+              >
+                <MoveBar value={ev.display_forecast_pct} max={maxDisplayForecast} />
               </td>
               <td className="mono tnum" style={{ textAlign: 'right', padding: '16px 14px', color: 'var(--ink-2)' }}>
                 {pct1(ev.hist_move_avg_4q)}
