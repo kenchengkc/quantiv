@@ -1,3 +1,5 @@
+import { resolveDisplayForecastCompat } from './displayForecast';
+
 export type CalendarReferenceEvent = {
   ticker: string;
   earnings_date: string;
@@ -40,6 +42,16 @@ export type CalendarOverlayMetadata<TMetadata extends { as_of_date?: string }> =
   };
 
 const KNOWN_SESSIONS = new Set(['bmo', 'amc', 'dmh']);
+
+type LegacyForecastOverlay = {
+  display_forecast_pct?: number | null;
+  display_forecast_method?: 'ml' | 'options_math' | 'options_indicative' | 'historical' | 'historical_prior' | null;
+  em_ml_pct?: number | null;
+  em_straddle_pct?: number | null;
+  em_iv_pct?: number | null;
+  hist_move_med_4q?: number | null;
+  hist_move_avg_4q?: number | null;
+};
 
 export function normalizeCalendarTiming(value: string | null | undefined): 'bmo' | 'amc' | 'dmh' | 'unknown' {
   const key = (value ?? '').trim().toLowerCase().split('-').join('_').split(' ').join('_');
@@ -113,8 +125,24 @@ export function mergeCalendarReference<
         (researchSessionKnown || !referenceSessionKnown);
 
       if (researchMatch && sessionsCompatible) {
+        const compatForecast = resolveDisplayForecastCompat(
+          researchMatch as TEvent & LegacyForecastOverlay,
+        );
+        // R2 can temporarily serve a pre-migration week artifact while the
+        // independent calendar reference is newer. Preserve strict ML/options
+        // semantics, but hydrate history-only exact matches so the UI does not
+        // turn an available historical estimate into a dash. Revised dates or
+        // conflicting sessions still take the fail-closed branch below.
+        const historicalCompat =
+          compatForecast.method === 'historical' && compatForecast.pct != null
+            ? {
+                display_forecast_pct: compatForecast.pct,
+                display_forecast_method: 'historical' as const,
+              }
+            : {};
         return {
           ...researchMatch,
+          ...historicalCompat,
           ticker: event.ticker,
           earnings_date: event.earnings_date,
           // A known reference session remains authoritative. When the reference
