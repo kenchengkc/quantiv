@@ -38,7 +38,26 @@
           "iv_rank": { "type": ["number", "null"] },
           "hist_move_avg_4q": { "type": ["number", "null"] },
           "lead_time_days": { "type": ["number", "null"] },
-          "em_method": { "type": ["string", "null"] }
+          "em_method": { "type": ["string", "null"] },
+          "display_forecast_pct": { "type": ["number", "null"], "exclusiveMinimum": 0 },
+          "display_forecast_method": {
+            "type": ["string", "null"],
+            "enum": ["ml", "options_math", "options_indicative", "historical", "historical_prior", null]
+          },
+          "display_forecast_as_of": { "type": ["string", "null"] },
+          "ml_status": {
+            "type": ["string", "null"],
+            "enum": ["available", "unavailable_inputs", "unavailable_model", "unavailable_event", null]
+          },
+          "options_status": {
+            "type": ["string", "null"],
+            "enum": ["decision_eligible", "indicative", "unavailable", null]
+          },
+          "fallback_reason": {
+            "type": ["string", "null"],
+            "enum": ["quote_quality", "no_same_strike_pair", "no_event_expiry", "insufficient_ticker_history", null]
+          },
+          "historical_event_count": { "type": ["integer", "null"], "minimum": 0 }
         },
         "additionalProperties": true
       }
