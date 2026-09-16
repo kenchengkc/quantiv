@@ -31,12 +31,9 @@ apps/ml/
 # Cloudflare Workers (deployed separately via wrangler)
 workers/
 
-# Python scripts and tools — not needed for frontend build
-# (keep scripts required by the prebuild hook)
-scripts/
-!scripts/materialize_frontend_release.sh
-!scripts/frontend_release.py
-!scripts/install_rclone.sh
+# Python tools — not needed for frontend build
+# NOTE: scripts/ is intentionally kept — the prebuild hook calls
+# scripts/materialize_frontend_release.sh and scripts/frontend_release.py.
 tools/
 lib/
 
@@ -53,7 +50,6 @@ config/
 requirements.txt
 railway.toml
 railway.worker.toml
-*.py
 .dockerignore
 
 # Dolt data
