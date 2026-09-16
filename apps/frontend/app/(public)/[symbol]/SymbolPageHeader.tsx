@@ -6,6 +6,7 @@ import { ChevronLeft } from 'lucide-react';
 import type { MetricKey } from '@/lib/metricGlossary';
 import { MetricHelp } from '@/components/MetricExplainer';
 import { TickerLogo } from '@/components/TickerLogo';
+import { displayForecastLabel, type DisplayForecastMethod } from '@/lib/displayForecast';
 import type { ProviderEnrichment } from './symbolPageTypes';
 import { parseLocalDate } from './symbolPageUtils';
 
@@ -50,8 +51,6 @@ function WatchlistButton({
     setBusy(true);
 
     try {
-      // Keep the public ticker route static and Clerk-free. Auth and the
-      // current watchlist are resolved only when the user asks to mutate it.
       const current = await fetch('/api/watchlist', { cache: 'no-store' });
       if (current.status === 401) {
         window.location.assign(
@@ -288,7 +287,6 @@ export function Toast({
   );
 }
 
-// ---------- KPI card ----------
 export function KpiCard({
   label,
   value,
@@ -587,12 +585,6 @@ export function ProviderSignalsPanel({
   );
 }
 
-// ---------- Hero sparkline ----------
-//
-// Renders the 1D price curve under the ticker symbol + spot price. Draws
-// the real Alpaca IEX 5-min bars when available. While bars are loading,
-// render a neutral placeholder so the page does not flash a fake red/green
-// price path before real data arrives.
 type SparkBar = { t: string; c: number };
 
 function buildNeutralSparkPlaceholder(): { x: number; y: number }[] {
@@ -630,9 +622,6 @@ function HeroSpark({
 }) {
   const pts = useMemo(() => {
     if (bars && bars.length >= 2) {
-      // Normalize real bars with a robust central range. A single odd IEX
-      // print should not flatten the rest of the session into a nearly
-      // horizontal line.
       const closes = bars.map((b) => b.c);
       const sorted = [...closes].sort((a, b) => a - b);
       const mid = closes.reduce((sum, value) => sum + value, 0) / closes.length;
@@ -657,7 +646,6 @@ function HeroSpark({
       const n = bars.length;
       return bars.map((b, i) => ({
         x: n === 1 ? 0.5 : i / (n - 1),
-        // Invert so lower price → lower on screen (SVG y grows down).
         y: Math.max(0.04, Math.min(0.96, 1 - (b.c - lo) / span)),
       }));
     }
@@ -707,10 +695,6 @@ function HeroSpark({
   );
 }
 
-// ---------- Back-to-calendar button ----------
-// Pill button used in the DetailHero left column. Mirrors the qv-card hover
-// treatment (border lifts from --line → --line-2, content brightens) so it
-// reads as interactive alongside the cards below it.
 function BackToCalendarButton({
   onClick,
   label,
@@ -752,11 +736,6 @@ function BackToCalendarButton({
   );
 }
 
-// Reads the previous in-app pathname (recorded by PrevRouteTracker in
-// providers.tsx) and maps it to a back-button label + landing path. The
-// path is only consulted as a fallback when the browser has no history
-// entry to pop — the click handler still prefers router.back() so the
-// scroll position and URL params on /screener are preserved.
 export function usePrevAppLocation(): { label: string; path: string } {
   const [loc, setLoc] = useState<{ label: string; path: string }>({
     label: 'Earnings Calendar',
@@ -773,7 +752,6 @@ export function usePrevAppLocation(): { label: string; path: string } {
   return loc;
 }
 
-// ---------- Detail hero (gradient split card) ----------
 export function DetailHero({
   ticker,
   symbol,
@@ -782,6 +760,7 @@ export function DetailHero({
   changePct,
   quotePending,
   emPct,
+  emMethod,
   daysLeft,
   earningsDate,
   earningsTiming,
@@ -801,15 +780,13 @@ export function DetailHero({
   change: number;
   changePct: number;
   quotePending: boolean;
-  emPct: number;
+  emPct: number | null;
+  emMethod: DisplayForecastMethod | null;
   daysLeft: number | null;
   earningsDate: string | null;
   earningsTiming: string | null;
   eventLabel: string;
   quoteLabel: string;
-  /** Real 5-min IEX bars for the 1D sparkline. `null` while loading or
-   *  when the API returns no data. The chart renders a neutral placeholder
-   *  in that case so it never looks like real red/green price action. */
   intradayBars: SparkBar[] | null;
   intradayLoading: boolean;
   intradaySessionDate: string | null;
@@ -822,11 +799,6 @@ export function DetailHero({
     Math.round(change * 100) / 100 === 0 &&
     Math.round(changePct * 10000) / 10000 === 0;
   const up = !flat && change >= 0;
-  // The sparkline and its % both track the authoritative day change (vs the
-  // official previous close, from batch-price) so the ticker page matches the
-  // calendar. The IEX bars provide the intraday shape only — they previously
-  // drove a first-bar→last-bar % that excluded the overnight earnings gap and
-  // disagreed with the calendar's LIVE %.
   const sparkUp = up;
   const sparkCaption = (() => {
     if (intradayLoading) return 'IEX bars loading';
@@ -841,8 +813,20 @@ export function DetailHero({
       ? 'IEX · today · 08:00-17:00 ET'
       : `IEX · latest session · ${dateLabel}`;
   })();
-  const lower = spot * (1 - emPct);
-  const upper = spot * (1 + emPct);
+  const hasForecast = emPct != null && Number.isFinite(emPct) && emPct > 0;
+  const lower = hasForecast ? spot * (1 - emPct) : null;
+  const upper = hasForecast ? spot * (1 + emPct) : null;
+  const forecastLabel = displayForecastLabel(emMethod);
+  const forecastSource =
+    emMethod === 'ml'
+      ? 'via ML forecast'
+      : emMethod === 'options_math' || emMethod === 'options_indicative'
+        ? 'via market-implied move'
+        : emMethod === 'historical'
+          ? 'historical median reference'
+          : emMethod === 'historical_prior'
+            ? 'historical prior reference'
+            : null;
   const earningsLine = (() => {
     if (!earningsDate) return null;
     const d = parseLocalDate(earningsDate);
@@ -987,9 +971,6 @@ export function DetailHero({
           </div>
 
           <div style={{ minHeight: 0 }}>
-            {/* Real 1D intraday sparkline (Alpaca IEX 5-min bars). Sits
-                above the small caption row so the chart reads as a
-                visual answer to the session % printed beneath it. */}
             <div style={{ height: 42 }}>
               <HeroSpark
                 ticker={symbol}
@@ -1045,8 +1026,6 @@ export function DetailHero({
                             : 'var(--down)',
                     }}
                   >
-                    {/* Authoritative day change vs official previous close (the
-                        same number the calendar's LIVE % shows). */}
                     {changePct == null
                       ? '--'
                       : `${changePct >= 0 ? '+' : ''}${(changePct * 100).toFixed(2)}%`}
@@ -1158,19 +1137,15 @@ export function DetailHero({
                 textTransform: 'uppercase',
               }}
             >
-              Options-implied move
+              Expected move · {forecastLabel}
             </div>
             <div
               className="serif tnum qv-detail-em"
               style={{
-                fontSize: 64,
-                // Bumped from 0.9 to 1.0 so the headline carries its own
-                // proper line-box. Combined with the marginTop on the
-                // range line below, this gives the gradient number room
-                // to breathe instead of being clipped at the bottom.
+                fontSize: hasForecast ? 64 : 34,
                 fontWeight: 800,
                 lineHeight: 1.06,
-                letterSpacing: '-0.04em',
+                letterSpacing: hasForecast ? '-0.04em' : '-0.02em',
                 marginTop: 12,
                 background:
                   'linear-gradient(135deg, var(--brand-blue-1), var(--accent-hi))',
@@ -1179,30 +1154,36 @@ export function DetailHero({
                 backgroundClip: 'text',
               }}
             >
-              ±{(emPct * 100).toFixed(1)}
-              <span
-                style={{
-                  fontSize: 24,
-                  fontWeight: 600,
-                  color: 'var(--ink-3)',
-                  WebkitTextFillColor: 'var(--ink-3)',
-                  marginLeft: 4,
-                }}
+              {hasForecast ? (
+                <>
+                  ±{(emPct * 100).toFixed(1)}
+                  <span
+                    style={{
+                      fontSize: 24,
+                      fontWeight: 600,
+                      color: 'var(--ink-3)',
+                      WebkitTextFillColor: 'var(--ink-3)',
+                      marginLeft: 4,
+                    }}
+                  >
+                    %
+                  </span>
+                </>
+              ) : (
+                'Unavailable'
+              )}
+            </div>
+            {hasForecast && lower != null && upper != null && (
+              <div
+                className="mono tnum"
+                style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 30 }}
               >
-                %
-              </span>
-            </div>
-            {/* Generous gap so the price-range line is clearly its own
-                element, not a sub-line glued to the gradient headline. */}
-            <div
-              className="mono tnum"
-              style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 30 }}
-            >
-              <span style={{ color: 'var(--down)' }}>${lower.toFixed(2)}</span>
-              {' · '}
-              <span style={{ color: 'var(--up)' }}>${upper.toFixed(2)}</span>
-              {' · via ATM straddle'}
-            </div>
+                <span style={{ color: 'var(--down)' }}>${lower.toFixed(2)}</span>
+                {' · '}
+                <span style={{ color: 'var(--up)' }}>${upper.toFixed(2)}</span>
+                {forecastSource ? ` · ${forecastSource}` : ''}
+              </div>
+            )}
           </div>
         </div>
       </div>
