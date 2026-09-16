@@ -15,6 +15,8 @@ const rows: ResearchScreenerEvent[] = [
     em_method: 'ml_lightgbm',
     em_straddle_pct: 0.08,
     em_ml_pct: 0.06,
+    display_forecast_pct: 0.06,
+    display_forecast_method: 'ml',
     hist_move_avg_4q: 0.05,
     iv_rank: 0.8,
     p10: 0.02,
@@ -28,6 +30,8 @@ const rows: ResearchScreenerEvent[] = [
     em_method: 'ml_lightgbm',
     em_straddle_pct: 0.11,
     em_ml_pct: 0.09,
+    display_forecast_pct: 0.09,
+    display_forecast_method: 'ml',
     hist_move_avg_4q: 0.10,
     iv_rank: 0.2,
     p10: 0.02,
@@ -40,6 +44,8 @@ const rows: ResearchScreenerEvent[] = [
     spot_price: 8,
     em_method: 'options_math',
     em_straddle_pct: 0.15,
+    display_forecast_pct: 0.15,
+    display_forecast_method: 'options_math',
     hist_move_avg_4q: 0.05,
     iv_rank: 0.5,
   },
@@ -88,6 +94,34 @@ describe('screener research query', () => {
     const result = applyScreenerResearchQuery(rows, query);
 
     expect(result.map((row) => row.ticker)).toEqual(['MSFT', 'AAPL']);
+  });
+
+  it('uses canonical display forecasts for big movers and expected-move sorting', () => {
+    const displayDriven: ResearchScreenerEvent[] = [
+      {
+        ...rows[0],
+        ticker: 'HIST',
+        em_method: null,
+        em_ml_pct: null,
+        em_straddle_pct: null,
+        display_forecast_pct: 0.12,
+        display_forecast_method: 'historical',
+      },
+      {
+        ...rows[1],
+        ticker: 'STRICT',
+        em_straddle_pct: 0.14,
+        display_forecast_pct: 0.07,
+        display_forecast_method: 'ml',
+      },
+    ];
+    const query = parseScreenerResearchQuery(
+      new URLSearchParams('preset=big_movers&sort=straddle&dir=desc'),
+    );
+
+    expect(applyScreenerResearchQuery(displayDriven, query).map((row) => row.ticker)).toEqual([
+      'HIST',
+    ]);
   });
 
   it('uses deterministic ticker tie-breaking', () => {
