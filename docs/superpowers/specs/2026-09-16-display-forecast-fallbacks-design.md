@@ -8,7 +8,7 @@ Branch: `feature/display-forecast-fallbacks`
 
 Quantiv will guarantee a user-facing expected-move estimate for every published upcoming earnings event while preserving strict research and ML quality controls.
 
-The presentation layer will resolve a canonical display forecast using this hierarchy:
+The presentation layer resolves a canonical display forecast using this hierarchy:
 
 1. Validated ML expected move.
 2. Decision-eligible options math.
@@ -27,7 +27,7 @@ The main product invariant is:
 - Eliminate uninformative `—` expected-move cells for upcoming published earnings events.
 - Preserve strict ML/data-quality gates.
 - Distinguish ML, validated options, indicative options, and historical estimates without adding horizontal clutter to the homepage calendar.
-- Make the forecast method and fallback reason explicit in public payloads instead of inferring state from null fields.
+- Make forecast method and fallback reason explicit in public payloads instead of inferring state from null fields.
 - Keep calendar, screener, watchlist, and ticker pages consistent by resolving the display forecast once in backend payload generation.
 - Preserve point-in-time correctness for historical events and revised earnings dates.
 - Improve diagnostics and observability around fallback usage.
@@ -35,7 +35,7 @@ The main product invariant is:
 ## Non-goals
 
 - Loosening ML quote-quality gates.
-- Replacing the existing LightGBM model or its validation process.
+- Replacing the existing LightGBM model or validation process.
 - Treating historical or indicative estimates as calibrated ML forecasts.
 - Synthesizing Greeks, IV, quantiles, or option analytics when supporting evidence does not exist.
 - Building a sector- or market-cap-conditioned historical prior in this change.
@@ -53,13 +53,14 @@ Requirements:
 
 - Forecast exists for the exact event date.
 - Existing model/control-plane requirements pass.
-- Existing public ML fields remain unchanged.
+- Existing public ML fields retain their current meaning.
 
 Result:
 
 - `display_forecast_method = "ml"`
 - `display_forecast_pct = em_ml_pct`
 - `ml_status = "available"`
+- `display_forecast_as_of` is the ML snapshot/scoring date represented by the published forecast metadata.
 
 ### 2. Decision-eligible options math
 
@@ -72,6 +73,7 @@ Result:
 - `display_forecast_method = "options_math"`
 - `options_status = "decision_eligible"`
 - `display_forecast_pct` uses the current straddle-implied percentage.
+- `display_forecast_as_of = as_of_date` for the options snapshot.
 - `ml_status` records why ML was unavailable.
 
 ### 3. Indicative options math
@@ -102,13 +104,13 @@ Initial display-quality policy:
 }
 ```
 
-These values are intentionally separate from `config/option_quote_quality.json` and will live in a new checked-in display policy file. The implementation must retain these as the initial production defaults. Historical analysis may motivate a later explicit config change, but implementation must not silently alter the thresholds.
+These values are intentionally separate from `config/option_quote_quality.json` and live in a new checked-in display policy file. The implementation must use these as the initial production defaults. Historical analysis may motivate a later explicit config change, but implementation must not silently alter the thresholds.
 
 Pair selection:
 
-1. Choose the nearest structurally valid expiry that spans the earnings event.
-2. Build same-strike call/put candidates for that expiry.
-3. Prefer valid delta-based ATM distance when both deltas are valid:
+1. Enumerate all structurally valid expiries that span the event and fall inside the configured post-event window, in ascending expiry order.
+2. For each expiry, build same-strike call/put candidates and remove structurally invalid pairs.
+3. Compute ATM relevance. When both deltas are valid, use:
 
    `abs(call_delta - 0.5) + abs(put_delta + 0.5)`
 
@@ -116,14 +118,14 @@ Pair selection:
 
    `abs(strike / spot - 1)`
 
-5. Rank candidates by:
+5. Within an expiry, rank candidates by:
    - ATM relevance,
    - combined straddle relative spread,
    - worst individual-leg relative spread,
    - strike proximity to spot,
    - strike as a deterministic final tie-breaker.
-
-The selected pair must satisfy the display-quality ceilings above.
+6. Select the best candidate that satisfies the display-quality ceilings. If an expiry has no display-eligible pair, continue to the next spanning expiry rather than immediately falling back to history.
+7. Use the first expiry in ascending order that contains a display-eligible pair.
 
 Expected-move calculation:
 
@@ -140,6 +142,7 @@ Result:
 
 - `display_forecast_method = "options_indicative"`
 - `options_status = "indicative"`
+- `display_forecast_as_of = as_of_date`
 - `fallback_reason = "quote_quality"` when strict eligibility failed only because of decision-quality rules.
 
 ### 4. Ticker historical median
@@ -149,7 +152,7 @@ If there is no display-eligible options pair, use the median absolute realized m
 Requirements:
 
 - Only events strictly before the target event may contribute.
-- Realized moves must use the existing timing-aware OHLCV bracket.
+- Realized moves use the existing timing-aware OHLCV bracket.
 - At least two valid prior realized events are required.
 - Use up to four most recent valid prior events.
 
@@ -162,7 +165,8 @@ Result:
 - `display_forecast_method = "historical"`
 - `options_status = "unavailable"`
 - `historical_event_count` is 2-4.
-- `fallback_reason` reflects why options failed, e.g. `no_same_strike_pair`, `no_event_expiry`, or `quote_quality`.
+- `display_forecast_as_of` is the forecast cutoff/as-of date, not the date of the latest realized event.
+- `fallback_reason` reflects why options failed, such as `no_same_strike_pair`, `no_event_expiry`, or `quote_quality`.
 
 ### 5. Universe historical prior
 
@@ -179,12 +183,24 @@ Prior artifact fields:
 - `event_count`
 - `symbol_count`
 
-The prior must be point-in-time safe. Events after the target forecast cutoff may not contribute.
+The daily publication path emits the prior for the current forecast cutoff. Historical reconstruction must use the same prior calculation at the historical cutoff; it must not reuse a later prior artifact.
 
 Result:
 
 - `display_forecast_method = "historical_prior"`
+- `display_forecast_as_of` is the forecast cutoff.
 - `fallback_reason = "insufficient_ticker_history"`
+
+## ML status semantics
+
+`ml_status` is independent from the selected display method:
+
+- `available`: exact validated ML forecast exists.
+- `unavailable_inputs`: model infrastructure exists but the event could not be scored with acceptable current inputs.
+- `unavailable_model`: champion/model service or required model artifact was unavailable for this event/horizon.
+- `unavailable_event`: no exact ML forecast exists for the current published event identity, including a revised earnings date keyed differently from a prior forecast.
+
+The compact UI only needs `ML unavailable`; detailed diagnostics and logs may use the specific status.
 
 ## Earnings-session and expiry semantics
 
@@ -193,7 +209,7 @@ Retain the existing event timing rules:
 - AMC / after-close: the EOD observation may be from the event date and expiry must be strictly after the earnings date.
 - BMO / non-AMC: the EOD observation must be before the event and expiry may be on or after the earnings date.
 
-Indicative selection must use the same temporal semantics as strict options math. A generic near-term straddle that does not span the earnings event must never stand in for an earnings expected move.
+Indicative selection uses the same temporal semantics as strict options math. A generic near-term straddle that does not span the earnings event must never stand in for an earnings expected move.
 
 ## Canonical backend resolver
 
@@ -224,7 +240,7 @@ historical_event_count
 selected_options_details
 ```
 
-Week payload generation, screener generation, symbol-detail generation, and watchlist-facing data must consume the same resolver output. Frontend code must not independently reimplement the fallback hierarchy.
+Week payload generation, screener generation, symbol-detail generation, and watchlist-facing data consume the same resolver output. Frontend code must not independently reimplement the fallback hierarchy.
 
 ## Public payload contract
 
@@ -269,7 +285,7 @@ historical_event_count: number | null;
 
 The same method/status metadata belongs in the ticker's `expected_move` payload so the dashboard can render provenance consistently.
 
-For upcoming published calendar events, `display_forecast_pct` must be finite and greater than zero.
+For upcoming published calendar events, `display_forecast_pct` is finite and greater than zero.
 
 ## Symbol detail behavior
 
@@ -283,9 +299,9 @@ A ticker page can still be built from:
 - canonical display forecast,
 - provider enrichments.
 
-Options-specific structures remain empty/absent when evidence is unavailable.
+The expected-move percentage headline must render without requiring a positive spot value. Dollar ranges, scenario analysis, and options-specific panels remain spot/evidence dependent.
 
-Detailed options panels must not receive fabricated fields.
+Options-specific structures remain empty/absent when evidence is unavailable. Detailed options panels must not receive fabricated fields.
 
 ## Homepage calendar UX
 
@@ -303,11 +319,11 @@ Method differentiation uses subtle semantic text treatment:
 
 Define semantic CSS variables/classes rather than scattering hard-coded method-specific values through `EarningsGrid.tsx`.
 
-Color is supplemental; meaning must remain accessible through tooltip text.
+Color is supplemental; meaning remains accessible through tooltip text.
 
 ## Expected-move hover UX
 
-The compact expected-move hover becomes the explicit provenance surface.
+The compact expected-move hover is the explicit provenance surface.
 
 ML example:
 
@@ -342,7 +358,7 @@ Market implied     Unavailable
 
 Use `ML unavailable`, not `ML not working`.
 
-The hover should remain compact and should not expose implementation-detail warnings such as exact spread failures.
+The hover remains compact and does not expose implementation-detail warnings such as exact spread failures.
 
 ## Ticker dashboard UX
 
@@ -375,7 +391,7 @@ Also show:
 - `ML unavailable`
 - `Market-implied estimate unavailable`
 
-Options-only panels must remain absent when current options evidence does not exist.
+Options-only panels remain absent when current options evidence does not exist.
 
 ### Historical prior
 
@@ -385,7 +401,7 @@ No fake Greeks, IV, term structure, options scenario analysis, or ML prediction 
 
 ## Screener and watchlist
 
-Screener and watchlist must use `display_forecast_pct` for their compact expected-move number.
+Screener and watchlist use `display_forecast_pct` for their compact expected-move number.
 
 They must not independently fall back through `em_ml_pct`, `em_straddle_pct`, and `em_iv_pct`.
 
@@ -393,13 +409,13 @@ Method-based styling may be reused where layout permits, but consistency of the 
 
 ## Historical event behavior
 
-Already-reported events should preserve the actual pre-event forecast that was published whenever possible.
+Already-reported events preserve the actual pre-event forecast that was published whenever possible.
 
 Do not recompute an expected move after the earnings event using post-event information.
 
-If a historical event must be reconstructed, every fallback input must be point-in-time safe relative to that event.
+If a historical event must be reconstructed, every fallback input, including ticker history and universe prior, must be recomputed at that historical cutoff. Later earnings, later option snapshots, and later priors may not leak backward.
 
-The existing reported-event preservation behavior remains conceptually correct and should be adapted to preserve the new display metadata too.
+The existing reported-event preservation behavior remains conceptually correct and is adapted to preserve the new display metadata too.
 
 ## Revised earnings dates
 
@@ -438,11 +454,11 @@ A healthy example may therefore report:
 
 Add warning/degraded observability for abnormal fallback mix growth, especially `historical` and `historical_prior`, without redefining the existing ML publication gate.
 
-Reconciliation/debug artifacts should retain the selected indicative pair and strict rejection reason so a PAYX-like event can be diagnosed without manually reconstructing raw chains.
+Reconciliation/debug artifacts retain the selected indicative pair and strict rejection reason so a PAYX-like event can be diagnosed without manually reconstructing raw chains.
 
 ## Build-time invariant
 
-Frontend-data generation must fail before publication if an upcoming event in `calendar-reference.json` lacks a valid display forecast.
+Frontend-data generation fails before publication if an upcoming event in `calendar-reference.json` lacks a valid display forecast.
 
 For every upcoming published event:
 
@@ -453,6 +469,8 @@ For every upcoming published event:
 - method/status combinations are internally consistent.
 
 This makes `never a dash` a data-contract guarantee rather than a React fallback.
+
+Reported events should preserve their original display forecast and provenance. If an older reported row lacks one, reconstruction is allowed only through the point-in-time-safe historical rules above.
 
 ## Logging and observability
 
@@ -478,7 +496,7 @@ Retain strict quote-quality diagnostics separately.
 
 ## Configuration
 
-Add a separate checked-in display-quality policy, e.g.:
+Add a separate checked-in display-quality policy:
 
 `config/option_display_quality.json`
 
@@ -511,17 +529,19 @@ Cover at least:
 4. CBRL-like moderately wide ATM pair -> indicative when display policy passes.
 5. FUL-like ~190% leg spread -> options rejected; ticker history used.
 6. No same-strike pair -> historical.
-7. Only one valid prior earnings move -> universe prior.
-8. Crossed or negative quote -> never indicative.
-9. AMC expiry on earnings date -> reject; expiry must be after.
-10. BMO/non-AMC expiry on earnings date -> allowed.
-11. Exact revised calendar identity -> no reuse of superseded ML forecast.
-12. Upcoming published event -> non-null positive display forecast.
-13. Fallback method -> `em_ml_pct` remains null.
-14. Historical fallback -> no fabricated options fields.
-15. Reported-event preservation retains method/provenance fields.
-16. Universe prior uses only point-in-time-safe events.
-17. Resolver returns deterministic pair selection under ties.
+7. Nearest spanning expiry has no display-eligible pair but a later expiry does -> later expiry is selected.
+8. Only one valid prior earnings move -> universe prior.
+9. Crossed or negative quote -> never indicative.
+10. AMC expiry on earnings date -> reject; expiry must be after.
+11. BMO/non-AMC expiry on earnings date -> allowed.
+12. Exact revised calendar identity -> no reuse of superseded ML forecast.
+13. Upcoming published event -> non-null positive display forecast.
+14. Fallback method -> `em_ml_pct` remains null.
+15. Historical fallback -> no fabricated options fields.
+16. Reported-event preservation retains method/provenance fields.
+17. Universe prior uses only point-in-time-safe events.
+18. Resolver returns deterministic pair selection under ties.
+19. Historical headline can render without spot while spot-dependent panels remain absent.
 
 ### Frontend cases
 
@@ -531,7 +551,7 @@ Cover at least:
 - ML, validated options, indicative options, historical, and historical-prior methods receive distinct semantic styles without changing column width.
 - Hover explicitly shows `ML unavailable` for non-ML methods.
 - Historical hover shows `Market implied unavailable`.
-- Ticker page renders headline forecast without strict options evidence.
+- Ticker page renders headline forecast without strict options evidence or spot.
 - ML-only controls/quantiles do not appear as if valid under historical fallback.
 - Options panels do not render fabricated data.
 - Screener/watchlist show the same display forecast as the calendar.
