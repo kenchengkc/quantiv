@@ -52,4 +52,17 @@ describe('display forecast helpers', () => {
       }),
     ).toEqual({ pct: 0.07, method: 'historical' });
   });
+
+  it('uses a historical compatibility estimate when legacy public data has no ML or options move', () => {
+    expect(
+      resolveDisplayForecastCompat(
+        {
+          em_ml_pct: null,
+          em_straddle_pct: null,
+          em_iv_pct: null,
+        },
+        0.081,
+      ),
+    ).toEqual({ pct: 0.081, method: 'historical' });
+  });
 });
