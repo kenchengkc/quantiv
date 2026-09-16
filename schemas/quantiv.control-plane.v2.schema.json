@@ -19,6 +19,7 @@
         "event_coverage_pct": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
         "display_forecast_coverage_pct": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
         "display_forecast_events": { "type": ["number", "null"], "minimum": 0 },
+        "display_forecast_covered_events": { "type": ["number", "null"], "minimum": 0 },
         "display_forecast_method_mix": {
           "type": ["object", "null"],
           "properties": {
