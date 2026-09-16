@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-const css = readFileSync(new URL('./DisplayForecast.module.css', import.meta.url), 'utf8');
+const css = readFileSync(resolve(process.cwd(), 'components/DisplayForecast.module.css'), 'utf8');
 
 function rule(name: string): string {
   const match = css.match(new RegExp(`\\.${name}\\s*\\{([^}]*)\\}`));
