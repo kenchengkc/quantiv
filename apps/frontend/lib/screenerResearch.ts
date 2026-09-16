@@ -1,5 +1,8 @@
 import sp500Constituents from '../../../lib/data/sp500-constituents.json';
-import type { DisplayForecastFields } from './displayForecast';
+import {
+  resolveDisplayForecastCompat,
+  type DisplayForecastFields,
+} from './displayForecast';
 
 const SP500_SET = new Set(
   (sp500Constituents as { symbol: string }[]).map((row) => row.symbol),
@@ -42,6 +45,7 @@ export type ResearchScreenerEvent = Record<string, unknown> &
     spot_price?: number | null;
     atm_iv?: number | null;
     em_straddle_pct?: number | null;
+    em_iv_pct?: number | null;
     em_ml_pct?: number | null;
     em_method?: string | null;
     lead_time_days?: number | null;
@@ -210,7 +214,7 @@ export function applyScreenerResearchQuery(
       const value = finite(event.iv_rank);
       if (value == null || value > 0.3) return false;
     } else if (query.preset === 'big_movers') {
-      if ((finite(event.display_forecast_pct) ?? 0) < 0.1) return false;
+      if ((resolveDisplayForecastCompat(event).pct ?? 0) < 0.1) return false;
     } else if (query.preset === 'confident') {
       const width = band80(event);
       if (width == null || width > 0.08) return false;
@@ -237,7 +241,7 @@ export function applyScreenerResearchQuery(
       // Keep the existing URL sort key for backwards compatibility, but the
       // visible expected-move column is now the canonical display estimate.
       case 'straddle':
-        return finite(event.display_forecast_pct);
+        return resolveDisplayForecastCompat(event).pct;
       case 'ml':
         return finite(event.em_ml_pct);
       case 'iv':
