@@ -3,6 +3,7 @@ import {
   displayForecastClass,
   displayForecastLabel,
   finiteDisplayForecast,
+  resolveStaticDisplayForecast,
 } from './displayForecast';
 
 describe('display forecast helpers', () => {
@@ -27,5 +28,29 @@ describe('display forecast helpers', () => {
     expect(finiteDisplayForecast(0)).toBeNull();
     expect(finiteDisplayForecast(Number.NaN)).toBeNull();
     expect(finiteDisplayForecast(null)).toBeNull();
+  });
+
+  it('prefers canonical display fields but keeps pre-migration payloads readable', () => {
+    expect(
+      resolveStaticDisplayForecast({
+        display_forecast_pct: 0.055,
+        display_forecast_method: 'historical',
+        em_ml_pct: 0.08,
+        em_straddle_pct: 0.10,
+      }),
+    ).toEqual({ pct: 0.055, method: 'historical' });
+
+    expect(resolveStaticDisplayForecast({ em_ml_pct: 0.06, em_straddle_pct: 0.08 })).toEqual({
+      pct: 0.06,
+      method: 'ml',
+    });
+    expect(resolveStaticDisplayForecast({ em_straddle_pct: 0.08 })).toEqual({
+      pct: 0.08,
+      method: 'options_math',
+    });
+    expect(resolveStaticDisplayForecast({ em_iv_pct: 0.07 })).toEqual({
+      pct: 0.07,
+      method: 'options_math',
+    });
   });
 });
