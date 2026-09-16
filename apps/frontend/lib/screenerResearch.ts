@@ -1,4 +1,5 @@
 import sp500Constituents from '../../../lib/data/sp500-constituents.json';
+import type { DisplayForecastFields } from './displayForecast';
 
 const SP500_SET = new Set(
   (sp500Constituents as { symbol: string }[]).map((row) => row.symbol),
@@ -33,29 +34,30 @@ export type ScreenerSortKey =
 export type ScreenerSortDir = 'asc' | 'desc';
 export type ScreenerTiming = 'all' | 'bmo' | 'amc';
 
-export type ResearchScreenerEvent = Record<string, unknown> & {
-  ticker: string;
-  earnings_date: string;
-  timing?: string | null;
-  spot_price?: number | null;
-  atm_iv?: number | null;
-  em_straddle_pct?: number | null;
-  em_ml_pct?: number | null;
-  em_method?: string | null;
-  lead_time_days?: number | null;
-  skew_atm?: number | null;
-  p10?: number | null;
-  p90?: number | null;
-  iv_rank?: number | null;
-  hist_move_avg_4q?: number | null;
-  iv_crush_pct?: number | null;
-  short_days_to_cover?: number | null;
-  put_call_volume_ratio?: number | null;
-  provider_enrichment?: {
-    short_interest?: { days_to_cover?: number | null } | null;
-    options_flow?: { put_call_volume_ratio?: number | null } | null;
-  } | null;
-};
+export type ResearchScreenerEvent = Record<string, unknown> &
+  DisplayForecastFields & {
+    ticker: string;
+    earnings_date: string;
+    timing?: string | null;
+    spot_price?: number | null;
+    atm_iv?: number | null;
+    em_straddle_pct?: number | null;
+    em_ml_pct?: number | null;
+    em_method?: string | null;
+    lead_time_days?: number | null;
+    skew_atm?: number | null;
+    p10?: number | null;
+    p90?: number | null;
+    iv_rank?: number | null;
+    hist_move_avg_4q?: number | null;
+    iv_crush_pct?: number | null;
+    short_days_to_cover?: number | null;
+    put_call_volume_ratio?: number | null;
+    provider_enrichment?: {
+      short_interest?: { days_to_cover?: number | null } | null;
+      options_flow?: { put_call_volume_ratio?: number | null } | null;
+    } | null;
+  };
 
 export type ScreenerResearchQuery = {
   q: string;
@@ -197,6 +199,8 @@ export function applyScreenerResearchQuery(
     if (query.timing !== 'all') {
       if (timingBucket(event.timing) !== query.timing) return false;
     }
+    // ML-only remains an analytical filter: display fallbacks never masquerade
+    // as model rows.
     if (query.mlOnly && event.em_method !== 'ml_lightgbm') return false;
 
     if (query.preset === 'rich_vol') {
@@ -206,7 +210,7 @@ export function applyScreenerResearchQuery(
       const value = finite(event.iv_rank);
       if (value == null || value > 0.3) return false;
     } else if (query.preset === 'big_movers') {
-      if ((finite(event.em_straddle_pct) ?? 0) < 0.1) return false;
+      if ((finite(event.display_forecast_pct) ?? 0) < 0.1) return false;
     } else if (query.preset === 'confident') {
       const width = band80(event);
       if (width == null || width > 0.08) return false;
@@ -230,8 +234,10 @@ export function applyScreenerResearchQuery(
         const timestamp = new Date(event.earnings_date).getTime();
         return Number.isFinite(timestamp) ? timestamp : null;
       }
+      // Keep the existing URL sort key for backwards compatibility, but the
+      // visible expected-move column is now the canonical display estimate.
       case 'straddle':
-        return finite(event.em_straddle_pct);
+        return finite(event.display_forecast_pct);
       case 'ml':
         return finite(event.em_ml_pct);
       case 'iv':
