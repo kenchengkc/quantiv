@@ -63,7 +63,7 @@ The page preserves the existing decision boundary:
 - current stock price may update spot-derived inputs only;
 - options, IV, Greeks, and other market features remain tied to their validated snapshot.
 
-`degraded` is intentionally different from `failed`. Advisory coverage or drift warnings remain visible when publication is still decision-safe; critical controls fail publication closed.
+`advisory` is intentionally different from `failed`. Standing coverage notices remain visible when publication is still decision-safe; they do not rename the plane. Actionable instrumentation warnings use `advisory`. Critical controls fail publication closed. Older snapshots may still say `degraded`.
 
 ## Verification
 

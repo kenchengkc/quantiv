@@ -37,7 +37,7 @@ The dashboard evidence receipt identifies the exact validated forecast release a
 
 ### Control plane
 
-The control plane summarizes data, model, release, and exception state. `degraded` is distinct from `failed`: an advisory coverage/drift condition can remain publication-eligible, while critical conditions block publication. Consumers must inspect `publication_eligible` rather than treating every non-`passed` state as equivalent.
+The control plane summarizes data, model, release, and exception state. `advisory` is distinct from `failed`: a remaining instrumentation warning can stay publication-eligible, while critical conditions block publication. Standing EOD-research notices (out-of-universe calendar names, chain-wide quote diagnostics, in-universe names without a commercial chain while coverage stays above the floor, and retired symbols successfully excluded from the decision universe) stay on the exception list and do not pull overall status off `passed`. Consumers must inspect `publication_eligible` rather than treating every non-`passed` state as equivalent. Older snapshots may still say `degraded`; treat that as `advisory`.
 
 `generated_at` dates the latest control assessment, not the retained forecast validation. Validation presents these dates separately. A passed retained forecast receipt does not imply that a new research release is eligible. An options-only hold is labeled "Held" in the presentation, with the underlying failed controls and blocked publication still explicit. Other critical controls remain "Blocked". Optional `data.quote_quality_errors` preserves the actual reasons for a composite options gate failure (including freshness); clients must not infer rejection-rate failures from its generic exception code alone.
 
@@ -79,7 +79,7 @@ Clients should:
 
 Clients should not:
 
-- reinterpret `degraded` as `failed`;
+- reinterpret `advisory` or legacy `degraded` as `failed`;
 - call EOD option/ML research “live” because the stock quote is live;
 - strip evidence IDs from exported research state;
 - assume a browser rendering is the authoritative source when a generated public artifact exists.

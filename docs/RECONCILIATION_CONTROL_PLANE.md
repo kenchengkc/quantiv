@@ -78,9 +78,16 @@ not demonstrate that the provider-backed daily workflow recovered.
 
 ## Status semantics
 
-- `passed`: no exceptions.
-- `degraded`: no critical exception, but coverage gaps or instrumentation work
-  remain. Publication may proceed because `decision_safe` is true.
+- `passed`: no critical exceptions, and no warnings that affect publication.
+  Standing EOD-research notices (names outside the options universe, chain-wide
+  quote diagnostics, in-universe names without a commercial chain while
+  aggregate coverage stays above the floor, and retired symbols successfully
+  excluded from the decision universe) remain on the exception list
+  without changing this status.
+- `advisory`: no critical exception, but an actionable warning remains
+  (instrumentation, replay, or coverage below the publication floor).
+  Publication may proceed because `decision_safe` is true. Older snapshots may
+  still say `degraded`; treat that as `advisory`.
 - `failed`: one or more critical exceptions; strict mode exits nonzero.
 
 ## Enforced publication controls

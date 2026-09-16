@@ -4,15 +4,16 @@ import {
   decisionAvailability,
   recentControlRuns,
 } from './controlHistoryViewModel';
-import type {
-  ControlHistory,
-  ControlHistoryRun,
-  ControlStatus,
+import {
+  isAdvisoryStatus,
+  type ControlHistory,
+  type ControlHistoryRun,
+  type ControlStatus,
 } from './controlPlaneTypes';
 
 function statusColor(run: ControlHistoryRun): string {
   if (!run.publication_eligible || run.status === 'failed') return 'var(--down)';
-  if (run.status === 'degraded') return 'var(--flag)';
+  if (isAdvisoryStatus(run.status)) return 'var(--flag)';
   return 'var(--up)';
 }
 
@@ -236,6 +237,7 @@ function ControlTimeline({ runs }: { runs: ControlHistoryRun[] }) {
 
 function compactStatus(value: string | null | undefined): string {
   if (!value || value === 'unavailable') return 'Not recorded';
+  if (value === 'degraded' || value === 'advisory') return 'advisory';
   return value.replace(/_/g, ' ');
 }
 
@@ -244,7 +246,7 @@ function stateColor(value: string | null | undefined): string {
     return 'var(--up)';
   }
   if (value === 'failed' || value === 'critical') return 'var(--down)';
-  if (value === 'degraded' || value === 'warning') return 'var(--flag)';
+  if (isAdvisoryStatus(value)) return 'var(--flag)';
   return 'var(--ink-4)';
 }
 

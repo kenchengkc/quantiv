@@ -12,11 +12,24 @@ const forecast: PublishedForecast = {
 const control: PublicationControl = {
   generated_at: '2026-09-06T06:13:20Z', publication_eligible: false,
   data: { status: 'failed', source_date: '2026-09-01', expected_source_date: '2026-09-04', source_session_lag: 3 },
-  model: { status: 'degraded' },
+  model: { status: 'advisory' },
   exceptions: [{ code: 'option_quote_quality_below_limit', severity: 'critical' }],
 };
 
 describe('publication presentation (never changes gate semantics)', () => {
+  it('maps advisory forecast quality without treating it as failed', () => {
+    expect(publishedForecastStatus({
+      ...forecast,
+      quality: { status: 'advisory', issue_count: 0 },
+      controls: { exceptions: 0 },
+    })).toBe('advisory');
+    expect(publishedForecastStatus({
+      ...forecast,
+      quality: { status: 'degraded', issue_count: 0 },
+      controls: { exceptions: 0 },
+    })).toBe('advisory');
+  });
+
   it('separates passed retained checks from held new research', () => {
     expect(publishedForecastStatus(forecast)).toBe('passed');
     expect(researchUpdatePresentation(control, forecast)).toMatchObject({ label: 'Held', tone: 'flag' });

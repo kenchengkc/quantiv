@@ -19,14 +19,14 @@ export function ValidationPublication({ control, forecast }: {
   const updates = researchUpdatePresentation(control, forecast);
   const snapshotFreshness = optionsSnapshotFreshness(control.data);
   const publishedTone = published === 'passed' ? 'up' : published === 'failed' ? 'down'
-    : published === 'degraded' ? 'flag' : 'ink-3';
+    : published === 'advisory' ? 'flag' : 'ink-3';
   return (
     <section aria-label="Research publication and freshness" className={styles.summary}>
       <div>
         <h3>Published forecast checks</h3>
         <p className={styles.state} style={{ color: `var(--${publishedTone})` }}>
           {published === 'passed' ? 'Passed' : published === 'failed' ? 'Failed'
-            : published === 'degraded' ? 'Review required' : 'Unavailable'}
+            : published === 'advisory' ? 'Advisory' : 'Unavailable'}
         </p>
         <p>Last forecast validation: {validationDateLabel(forecast.validated_at)} ET</p>
       </div>

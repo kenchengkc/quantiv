@@ -11,7 +11,7 @@ export const metadata: Metadata = {
     'Audit Quantiv model performance, calibration, production controls, data quality, and evidence lineage.',
 };
 
-type Status = 'passed' | 'degraded' | 'failed' | 'warning' | 'unavailable' | string;
+type Status = 'passed' | 'advisory' | 'degraded' | 'failed' | 'warning' | 'unavailable' | string;
 
 type HorizonValidation = {
   horizon_days: number;
@@ -190,8 +190,8 @@ function tone(status: Status | boolean): { label: string; color: string } {
   if (status === false || status === 'failed' || status === 'critical') {
     return { label: status === false ? 'Blocked' : String(status), color: 'var(--down)' };
   }
-  if (status === 'degraded' || status === 'warning') {
-    return { label: String(status), color: 'var(--flag)' };
+  if (status === 'advisory' || status === 'degraded' || status === 'warning') {
+    return { label: status === 'warning' ? 'warning' : 'advisory', color: 'var(--flag)' };
   }
   return { label: String(status || 'unavailable'), color: 'var(--ink-3)' };
 }

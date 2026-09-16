@@ -89,9 +89,9 @@ def _write_common_public_evidence(repo: Path, *, model_sha: str = "sha256:model"
     _write_json(
         repo / "apps/frontend/public/control-plane.json",
         {
-            "status": "degraded",
+            "status": "advisory",
             "publication_eligible": True,
-            "data": {"status": "degraded"},
+            "data": {"status": "advisory"},
             "model": {"status": "passed", "drift_status": "warning"},
         },
     )

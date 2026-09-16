@@ -1,4 +1,8 @@
-export type ControlStatus = 'passed' | 'degraded' | 'failed' | 'unavailable';
+export type ControlStatus = 'passed' | 'advisory' | 'degraded' | 'failed' | 'unavailable';
+
+export function isAdvisoryStatus(status: string | undefined | null): boolean {
+  return status === 'advisory' || status === 'degraded' || status === 'warning';
+}
 
 export type ControlException = {
   code: string;

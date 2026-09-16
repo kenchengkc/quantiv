@@ -99,7 +99,7 @@ def test_manifest_is_reproducible_and_surfaces_coverage_gaps() -> None:
 
     assert first["manifest_id"] == second["manifest_id"]
     assert first["quality"] == {
-        "status": "degraded",
+        "status": "passed",
         "decision_safe": True,
         "critical_exceptions": 0,
         "warnings": 1,
@@ -109,7 +109,31 @@ def test_manifest_is_reproducible_and_surfaces_coverage_gaps() -> None:
     }
 
 
-def test_sparse_horizon_coverage_is_advisory_when_aggregate_coverage_passes() -> None:
+def test_unverified_replay_is_advisory() -> None:
+    base = _manifest("2026-08-22T12:00:00+00:00")
+    manifest = build_reconciliation_manifest(
+        generated_at="2026-08-22T12:00:00+00:00",
+        datasets=base["datasets"],
+        event_coverage=base["event_coverage"],
+        duplicates=base["duplicates"],
+        symbol_mappings=base["symbol_mappings"],
+        corporate_actions=base["corporate_actions"],
+        pipeline_controls={
+            "quarantine": {"status": "enforced", "mode": "compact_parquet_ledger"},
+            "idempotent_replay": {"status": "missing"},
+        },
+        quote_quality={"status": "passed", "rejected_contracts": 5},
+        source_reconciliation={"status": "passed"},
+    )
+
+    assert manifest["quality"]["status"] == "advisory"
+    assert manifest["quality"]["decision_safe"] is True
+    assert "idempotent_replay_not_verified" in {
+        issue["code"] for issue in manifest["exceptions"]
+    }
+
+
+def test_sparse_horizon_coverage_stays_passed_when_aggregate_coverage_passes() -> None:
     base = _manifest("2026-08-22T12:00:00+00:00")
     event_coverage = {
         **base["event_coverage"],
@@ -131,7 +155,7 @@ def test_sparse_horizon_coverage_is_advisory_when_aggregate_coverage_passes() ->
         if issue["code"] == "forecast_horizon_coverage_below_limit"
     )
     assert horizon_issue["severity"] == "warning"
-    assert manifest["quality"]["status"] == "degraded"
+    assert manifest["quality"]["status"] == "passed"
     assert manifest["quality"]["decision_safe"] is True
     assert manifest["quality"]["critical_exceptions"] == 0
 
@@ -163,6 +187,7 @@ def test_chain_wide_quote_failure_is_diagnostic_when_event_surface_passes() -> N
         "upcoming_in_universe_earnings_events"
     )
     assert quote["status"] == "degraded"
+    assert manifest["quality"]["status"] == "passed"
     assert manifest["quality"]["decision_safe"] is True
     assert "option_quote_quality_below_limit" not in {
         issue["code"] for issue in manifest["exceptions"]

@@ -77,12 +77,38 @@ def _read_verified_outcomes(
     return _read(report_path), _read(history_path)
 
 
+# Keep in sync with apps/ml/ml/data_reconciliation.py standing-warning codes.
+STANDING_WARNING_CODES = frozenset(
+    {
+        "upcoming_events_outside_option_universe",
+        "option_chain_diagnostics_above_limit",
+        "retired_source_symbols_quarantined",
+    }
+)
+COVERAGE_FLOOR_WARNING_CODES = frozenset(
+    {
+        "upcoming_events_without_option_chain",
+        "forecast_horizon_coverage_below_limit",
+    }
+)
+# Matches apps/ml/ml/model_control.py feature_drift_report(min_rows=100).
+DRIFT_MATERIAL_ROWS = 100
+
+
+def _warning_is_standing(code: str, event_coverage: dict[str, Any] | None = None) -> bool:
+    if code in STANDING_WARNING_CODES:
+        return True
+    if code in COVERAGE_FLOOR_WARNING_CODES:
+        return (event_coverage or {}).get("status") != "failed"
+    return False
+
+
 def _status(*values: str | None) -> str:
     normalized = {value for value in values if value}
     if "failed" in normalized or "critical" in normalized:
         return "failed"
-    if "degraded" in normalized or "warning" in normalized:
-        return "degraded"
+    if "advisory" in normalized or "degraded" in normalized or "warning" in normalized:
+        return "advisory"
     if "passed" in normalized or "ok" in normalized:
         return "passed"
     return "unavailable"
@@ -94,9 +120,62 @@ def _stage_status(value: str | None) -> str:
         return "passed"
     if normalized in {"failed", "failure", "cancelled", "timed_out"}:
         return "failed"
-    if normalized in {"warning", "degraded"}:
-        return "degraded"
+    if normalized in {"warning", "degraded", "advisory"}:
+        return "advisory"
     return "unavailable"
+
+
+def _drift_is_material(drift: dict[str, Any]) -> bool:
+    """PSI/missingness warnings on tiny scored cohorts are not a model incident."""
+    status = str(drift.get("status") or "")
+    if status == "critical":
+        return True
+    if status != "warning":
+        return False
+    horizons = drift.get("horizons")
+    if not isinstance(horizons, dict) or not horizons:
+        return True
+    for row in horizons.values():
+        if not isinstance(row, dict):
+            continue
+        flagged = int(row.get("warning_features") or 0) + int(
+            row.get("critical_features") or 0
+        )
+        if flagged and int(row.get("rows") or 0) >= DRIFT_MATERIAL_ROWS:
+            return True
+    return False
+
+
+def _model_status(monitoring: dict[str, Any]) -> str:
+    if not monitoring:
+        return "unavailable"
+    drift = monitoring.get("feature_drift") or {}
+    monitor = _status(monitoring.get("status"))
+    if monitor == "failed" or str(drift.get("status") or "") == "critical":
+        return "failed"
+    if _drift_is_material(drift):
+        return "advisory"
+    return monitor
+
+
+def _data_status(reconciliation: dict[str, Any]) -> str:
+    quality = reconciliation.get("quality") or {}
+    if not quality:
+        return "unavailable"
+    raw = _status(quality.get("status"))
+    if raw == "failed":
+        return "failed"
+    if raw == "unavailable":
+        return "unavailable"
+    event_coverage = reconciliation.get("event_coverage") or {}
+    actionable = [
+        item
+        for item in (reconciliation.get("exceptions") or [])
+        if isinstance(item, dict)
+        and item.get("severity") == "warning"
+        and not _warning_is_standing(str(item.get("code") or ""), event_coverage)
+    ]
+    return "advisory" if actionable else "passed"
 
 
 def build_release_status(environment: dict[str, str]) -> dict[str, str]:
@@ -109,8 +188,8 @@ def build_release_status(environment: dict[str, str]) -> dict[str, str]:
         promotion_status = "failed"
     elif all(status == "passed" for status in core):
         promotion_status = "passed"
-    elif any(status == "degraded" for status in core):
-        promotion_status = "degraded"
+    elif any(status == "advisory" for status in core):
+        promotion_status = "advisory"
     else:
         promotion_status = "unavailable"
     return {
@@ -155,16 +234,14 @@ def build_snapshot(
 
     drift = monitoring.get("feature_drift") or {}
     shadow_scoring = monitoring.get("shadow_scoring") or {}
-    model_status = _status(monitoring.get("status"), drift.get("status"))
-    if not monitoring:
-        model_status = "unavailable"
-    data_status = _status(quality.get("status"))
+    model_status = _model_status(monitoring)
+    data_status = _data_status(reconciliation)
     if data_status == "unavailable" and model_status == "unavailable":
         overall_status = "unavailable"
     elif "failed" in {data_status, model_status}:
         overall_status = "failed"
     elif "unavailable" in {data_status, model_status}:
-        overall_status = "degraded"
+        overall_status = "advisory"
     else:
         overall_status = _status(data_status, model_status)
 
@@ -183,7 +260,7 @@ def build_snapshot(
 
     publication_eligible = bool(quality.get("decision_safe")) and model_status in {
         "passed",
-        "degraded",
+        "advisory",
     }
 
     return {
