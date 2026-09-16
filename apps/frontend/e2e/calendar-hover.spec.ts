@@ -7,8 +7,22 @@ async function installCalendar(page: Page) {
   const week = {
     metadata: { as_of_date: '2026-05-29', method: 'fixture' },
     window: { start: '2026-05-25', end: '2026-05-29' },
-    events: [{ ticker: 'AVGO', earnings_date: '2026-05-28', timing: 'before_market_open',
-      em_ml_pct: 0.07, em_straddle_pct: 0.13, p25: 0.04, p75: 0.11 }],
+    events: [{
+      ticker: 'AVGO',
+      earnings_date: '2026-05-28',
+      timing: 'before_market_open',
+      em_ml_pct: 0.07,
+      em_straddle_pct: 0.13,
+      p25: 0.04,
+      p75: 0.11,
+      display_forecast_pct: 0.07,
+      display_forecast_method: 'ml',
+      display_forecast_as_of: '2026-05-29',
+      ml_status: 'available',
+      options_status: 'decision_eligible',
+      fallback_reason: null,
+      historical_event_count: 4,
+    }],
   };
   await page.route('**/weeks/*.json', (route) => route.fulfill({ json: route.request().url().includes('manifest')
     ? { current_week: '2026-05-25', as_of_date: '2026-05-29', weeks: [] } : week }));
@@ -38,8 +52,8 @@ for (const width of [1440, 768, 390]) {
     await expect(movePopup).toBeVisible();
     await page.waitForTimeout(1100);
     await expect(namePopup).toHaveCount(0);
-    await expect(movePopup).toContainText('ML');
-    await expect(movePopup).toContainText('Implied');
+    await expect(movePopup).toContainText('ML forecast');
+    await expect(movePopup).toContainText('Market implied');
     await expect(movePopup).toContainText('Typical');
     await testInfo.attach(`move-hover-${width}`, { body: await page.screenshot(), contentType: 'image/png' });
 
