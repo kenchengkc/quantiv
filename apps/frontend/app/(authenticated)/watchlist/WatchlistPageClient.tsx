@@ -7,6 +7,7 @@ import { companyName } from '@/lib/companyNames';
 import {
   displayForecastLabel,
   finiteDisplayForecast,
+  resolveDisplayForecastCompat,
   type DisplayForecastFields,
   type DisplayForecastMethod,
 } from '@/lib/displayForecast';
@@ -865,20 +866,21 @@ export default function WatchlistPage() {
             const mlState = liveMl[t]?.key === mlCandidate?.key ? liveMl[t] : undefined;
             // A genuine spot-updated model response may override the static
             // publication estimate. A nightly fallback is not a new model result,
-            // so fall back to the one canonical display field from the payload.
+            // so fall back to the canonical display field. The compatibility
+            // helper only bridges pre-migration symbol JSON until regeneration.
             const liveMlPct =
               emMatches &&
               mlState?.status === 'ready' &&
               mlState.response?.source !== 'nightly_fallback'
                 ? finiteDisplayForecast(mlState.response?.em_ml_pct)
                 : null;
-            const staticDisplayPct = emMatches
-              ? finiteDisplayForecast(em?.display_forecast_pct)
-              : null;
-            const movePct = liveMlPct ?? staticDisplayPct;
+            const staticDisplay = emMatches
+              ? resolveDisplayForecastCompat(em)
+              : { pct: null, method: null };
+            const movePct = liveMlPct ?? staticDisplay.pct;
             const moveLabel = liveMlPct != null
               ? 'Spot-updated ML'
-              : watchlistForecastLabel(mlState, emMatches ? em?.display_forecast_method : null);
+              : watchlistForecastLabel(mlState, staticDisplay.method);
             const up = tickPctR !== null && !tickFlat && tickPctR >= 0;
             const quoteColor = tickPctR === null
               ? 'var(--ink-4)'
