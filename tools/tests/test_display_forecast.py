@@ -174,6 +174,31 @@ def test_payx_like_pair_becomes_indicative():
     assert result.pct > 0
 
 
+def test_indicative_expected_move_uses_eod_spot_not_atm_strike():
+    conn = _conn()
+    conn.execute(
+        "INSERT INTO v_ohlcv VALUES (?, 'PAYX', 100.0)",
+        [AS_OF],
+    )
+    _pair(
+        conn,
+        strike=120.0,
+        call_bid=2.0,
+        call_ask=3.0,
+        call_delta=0.5,
+        put_bid=7.0,
+        put_ask=8.0,
+        put_delta=-0.5,
+    )
+
+    result = _resolve(conn)
+
+    assert result.method == "options_indicative"
+    assert result.pct == pytest.approx(0.10)
+    assert result.selected_options_details is not None
+    assert result.selected_options_details["estimated_spot"] == pytest.approx(100.0)
+
+
 def test_indicative_selection_advances_to_next_spanning_expiry():
     conn = _conn()
     first_expiry = date(2026, 9, 25)
