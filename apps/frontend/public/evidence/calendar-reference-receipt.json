@@ -1,44 +1,37 @@
 {
-  "deduplicated_event_count": 5,
-  "event_count": 55,
+  "deduplicated_event_count": 9,
+  "event_count": 56,
   "integrity": {
     "baseline_sha256": "7157b320eb944303a7075120491f112bdb072ab680f6a20e6e5cd5e134c8f2ee",
     "status": "passed",
-    "stdout_sha256": "99eef006b9c5abb6b35f562ef9d84a50ec92dd76a48f6fc43594a1031c4d10b1"
+    "stdout_sha256": "1da8684403df2793b66e4165b5def9b883553fbbd20a721be1a7bc895293d93c"
   },
-  "observed_at": "2026-09-15T17:19:44Z",
-  "receipt_id": "8540e885f55075546a6f75c9477932d7798d2d476591eb9b802064306f40d216",
-  "release_id": "5576797d0e59faa114c73225fe2d96bb5aaed0831dd1d53be812ee490d39f918",
+  "observed_at": "2026-09-16T16:05:19Z",
+  "receipt_id": "19f71d5208e340c245444742cfaef2a03732da2808bad21cabca6558b588558b",
+  "release_id": "b08eb29261801b8c463496128318328d2baabf60ee1c54a70daadc61aea4e03f",
   "schema": "quantiv.calendar-reference-receipt.v1",
   "source_evidence": [
     {
       "date_max": "2026-11-14",
       "date_min": "2020-01-22",
-      "metadata_sha256": "612679e75429ee64b8eafd53508ff05dbd166ef6782b97f2e3fc14559419a30b",
-      "observed_at": "2026-09-15T17:19:26.265163Z",
+      "metadata_sha256": "88be291671c1c9ce4f51e35ee12aba672e3cd6975544e66356326c20aaafd21b",
+      "observed_at": "2026-09-16T16:05:13.743165Z",
       "provider": "dolthub",
       "rows": 126876,
       "symbols": 7337
     },
     {
-      "from": "2026-08-16",
-      "metadata_sha256": "5ff1bb3f2ea3a22215ef040a3c6c14b50399d12e03f6d24d07b3536f94a13f20",
-      "observed_at": "2026-09-15T17:19:37Z",
-      "provider": "finnhub",
-      "to": "2026-11-14"
-    },
-    {
-      "from": "2026-08-16",
-      "metadata_sha256": "858282e518ede9fdb9d63ee72a67bd96d2e4033512b2316d58ce8b8d0b2d6eb2",
-      "observed_at": "2026-09-15T17:19:44Z",
+      "from": "2026-08-17",
+      "metadata_sha256": "0d949b5158f0a26e3f45654bd7811ef240c181600737e49156c2b13664147584",
+      "observed_at": "2026-09-16T16:05:19Z",
       "provider": "fmp",
-      "to": "2026-11-14"
+      "to": "2026-11-15"
     }
   ],
   "source_file": {
     "path": "data/earnings_calendar.csv",
-    "sha256": "7157b320eb944303a7075120491f112bdb072ab680f6a20e6e5cd5e134c8f2ee"
+    "sha256": "ecbea0f72a1738bd1ce8dd909e869f08cf35cbee8c39c007794a43a2cc620d0a"
   },
-  "source_revision": "6d7dcc31ffdf557af432e5a0e96ee00d8e3748a4",
+  "source_revision": "5865cef793e4043cdbc4e7b9a5343420030a00f6",
   "universe_id": "c8c664e821efb8dc7d2a89a2d3ebb24ef2930bb92434a3c41c1d6e166784ab3c"
 }
