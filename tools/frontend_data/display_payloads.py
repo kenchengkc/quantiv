@@ -20,6 +20,20 @@ DISPLAY_METHODS = {
     "historical",
     "historical_prior",
 }
+ML_STATUSES = {
+    "available",
+    "unavailable_inputs",
+    "unavailable_model",
+    "unavailable_event",
+}
+OPTIONS_STATUSES = {"decision_eligible", "indicative", "unavailable"}
+FALLBACK_REASONS = {
+    None,
+    "quote_quality",
+    "no_same_strike_pair",
+    "no_event_expiry",
+    "insufficient_ticker_history",
+}
 
 
 def _finite_positive(value: Any) -> float | None:
@@ -98,6 +112,73 @@ def _event_identity_map(week_payloads: dict[date, dict[str, Any]]) -> dict[tuple
     return out
 
 
+def _validate_display_provenance(
+    event: dict[str, Any],
+    *,
+    identity: str,
+    errors: list[str],
+) -> None:
+    pct = _finite_positive(event.get("display_forecast_pct"))
+    method = event.get("display_forecast_method")
+    ml_status = event.get("ml_status")
+    options_status = event.get("options_status")
+    fallback_reason = event.get("fallback_reason")
+    as_of = event.get("display_forecast_as_of")
+
+    if pct is None:
+        errors.append(f"{identity}: invalid display_forecast_pct")
+    if method not in DISPLAY_METHODS:
+        errors.append(f"{identity}: invalid display_forecast_method={method!r}")
+        return
+    if ml_status not in ML_STATUSES:
+        errors.append(f"{identity}: invalid ml_status={ml_status!r}")
+    if options_status not in OPTIONS_STATUSES:
+        errors.append(f"{identity}: invalid options_status={options_status!r}")
+    if fallback_reason not in FALLBACK_REASONS:
+        errors.append(f"{identity}: invalid fallback_reason={fallback_reason!r}")
+    if not isinstance(as_of, str) or not as_of:
+        errors.append(f"{identity}: missing display_forecast_as_of")
+
+    if method == "ml":
+        if ml_status != "available":
+            errors.append(f"{identity}: ML method without available ML status")
+        if options_status not in {"decision_eligible", "unavailable"}:
+            errors.append(f"{identity}: ML method with incoherent options status={options_status!r}")
+        if fallback_reason is not None:
+            errors.append(f"{identity}: ML method must not carry a fallback reason")
+        return
+
+    if ml_status == "available":
+        errors.append(f"{identity}: fallback method with available ML status")
+
+    if method == "options_math":
+        if options_status != "decision_eligible":
+            errors.append(f"{identity}: strict options method without decision-eligible options")
+        if fallback_reason is not None:
+            errors.append(f"{identity}: strict options method must not carry a fallback reason")
+    elif method == "options_indicative":
+        if options_status != "indicative":
+            errors.append(f"{identity}: indicative options method without indicative options status")
+        if fallback_reason != "quote_quality":
+            errors.append(f"{identity}: indicative options method must identify quote_quality fallback")
+    elif method == "historical":
+        if options_status != "unavailable":
+            errors.append(f"{identity}: historical method must have unavailable options status")
+        count = event.get("historical_event_count")
+        if not isinstance(count, int) or isinstance(count, bool) or count <= 0:
+            errors.append(f"{identity}: historical method requires positive historical_event_count")
+        if fallback_reason not in {"quote_quality", "no_same_strike_pair", "no_event_expiry"}:
+            errors.append(f"{identity}: historical method has incoherent fallback_reason={fallback_reason!r}")
+    elif method == "historical_prior":
+        if options_status != "unavailable":
+            errors.append(f"{identity}: historical prior must have unavailable options status")
+        count = event.get("historical_event_count")
+        if not isinstance(count, int) or isinstance(count, bool) or count < 0:
+            errors.append(f"{identity}: historical prior requires nonnegative historical_event_count")
+        if fallback_reason != "insufficient_ticker_history":
+            errors.append(f"{identity}: historical prior must identify insufficient_ticker_history")
+
+
 def validate_upcoming_display_forecasts(
     published_events: list[tuple[str, date, str]],
     week_payloads: dict[date, dict[str, Any]],
@@ -120,20 +201,12 @@ def validate_upcoming_display_forecasts(
             continue
         if windows and not any(start <= earnings_date <= end for start, end in windows):
             continue
+        identity = f"{ticker} {earnings_date}"
         event = rows.get((ticker.upper(), earnings_date.isoformat()))
         if event is None:
-            errors.append(f"{ticker} {earnings_date}: missing week row")
+            errors.append(f"{identity}: missing week row")
             continue
-        pct = _finite_positive(event.get("display_forecast_pct"))
-        method = event.get("display_forecast_method")
-        if pct is None:
-            errors.append(f"{ticker} {earnings_date}: invalid display_forecast_pct")
-        if method not in DISPLAY_METHODS:
-            errors.append(f"{ticker} {earnings_date}: invalid display_forecast_method={method!r}")
-        if method == "ml" and event.get("ml_status") != "available":
-            errors.append(f"{ticker} {earnings_date}: ML method without available ML status")
-        if method in {"options_math", "options_indicative", "historical", "historical_prior"} and event.get("ml_status") == "available":
-            errors.append(f"{ticker} {earnings_date}: fallback method with available ML status")
+        _validate_display_provenance(event, identity=identity, errors=errors)
     if errors:
         raise DisplayForecastError("display forecast invariant failed:\n  " + "\n  ".join(errors))
 
