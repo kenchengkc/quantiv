@@ -124,6 +124,35 @@ describe('screener research query', () => {
     ]);
   });
 
+  it('keeps pre-migration screener rows usable until regenerated payloads land', () => {
+    const legacyRows: ResearchScreenerEvent[] = [
+      {
+        ...rows[0],
+        ticker: 'LEGACYML',
+        display_forecast_pct: undefined,
+        display_forecast_method: undefined,
+        em_ml_pct: 0.12,
+        em_straddle_pct: 0.14,
+      },
+      {
+        ...rows[1],
+        ticker: 'LEGACYOPT',
+        display_forecast_pct: undefined,
+        display_forecast_method: undefined,
+        em_ml_pct: null,
+        em_straddle_pct: 0.11,
+      },
+    ];
+    const query = parseScreenerResearchQuery(
+      new URLSearchParams('preset=big_movers&sort=straddle&dir=desc'),
+    );
+
+    expect(applyScreenerResearchQuery(legacyRows, query).map((row) => row.ticker)).toEqual([
+      'LEGACYML',
+      'LEGACYOPT',
+    ]);
+  });
+
   it('uses deterministic ticker tie-breaking', () => {
     const tied = [
       { ...rows[0], ticker: 'ZZZ', em_straddle_pct: 0.08, em_ml_pct: 0.06 },
