@@ -148,6 +148,35 @@ def _raw_options_source(conn: duckdb.DuckDBPyConnection) -> str | None:
     return None
 
 
+def _eod_spot(
+    conn: duckdb.DuckDBPyConnection,
+    *,
+    ticker: str,
+    as_of_date: date,
+) -> float | None:
+    """Return the latest point-in-time EOD close available at the option cutoff."""
+
+    if not _relation_exists(conn, "v_ohlcv"):
+        return None
+    try:
+        row = conn.execute(
+            """
+            SELECT close
+            FROM v_ohlcv
+            WHERE UPPER(CAST(act_symbol AS VARCHAR)) = ?
+              AND CAST(date AS DATE) <= ?
+              AND TRY_CAST(close AS DOUBLE) > 0
+              AND isfinite(TRY_CAST(close AS DOUBLE))
+            ORDER BY CAST(date AS DATE) DESC
+            LIMIT 1
+            """,
+            [ticker.upper(), as_of_date],
+        ).fetchone()
+    except duckdb.Error:
+        return None
+    return _finite_positive(row[0]) if row else None
+
+
 def _pair_rows(
     conn: duckdb.DuckDBPyConnection,
     *,
@@ -191,19 +220,15 @@ def _pair_rows(
               AND isfinite(bid) AND isfinite(ask)
               AND bid >= 0 AND ask >= 0 AND ask >= bid
               AND (bid + ask) > 0
-        ), nearest_expiry AS (
-            SELECT MIN(expiry_date) AS expiry_date
+        ), spanning AS (
+            SELECT *
             FROM structurally_valid
             WHERE expiry_date {expiry_cmp} ?
               AND expiry_date <= ?
         ), calls AS (
-            SELECT * FROM structurally_valid
-            WHERE side = 'C'
-              AND expiry_date = (SELECT expiry_date FROM nearest_expiry)
+            SELECT * FROM spanning WHERE side = 'C'
         ), puts AS (
-            SELECT * FROM structurally_valid
-            WHERE side = 'P'
-              AND expiry_date = (SELECT expiry_date FROM nearest_expiry)
+            SELECT * FROM spanning WHERE side = 'P'
         )
         SELECT
             c.expiry_date,
@@ -216,7 +241,7 @@ def _pair_rows(
             p.delta AS put_delta
         FROM calls c
         JOIN puts p USING (as_of_date, ticker, expiry_date, strike)
-        ORDER BY c.strike
+        ORDER BY c.expiry_date, c.strike
         """,
         [ticker.upper(), as_of_date, earnings_date, max_expiry],
     ).fetchall()
@@ -249,8 +274,16 @@ def _pair_rows(
         straddle_spread = (
             float(call_ask) + float(put_ask) - float(call_bid) - float(put_bid)
         ) / straddle_mid
-        valid_call_delta = call_delta is not None and math.isfinite(float(call_delta)) and 0 <= float(call_delta) <= 1
-        valid_put_delta = put_delta is not None and math.isfinite(float(put_delta)) and -1 <= float(put_delta) <= 0
+        valid_call_delta = (
+            call_delta is not None
+            and math.isfinite(float(call_delta))
+            and 0 <= float(call_delta) <= 1
+        )
+        valid_put_delta = (
+            put_delta is not None
+            and math.isfinite(float(put_delta))
+            and -1 <= float(put_delta) <= 0
+        )
         delta_distance = (
             abs(float(call_delta) - 0.5) + abs(float(put_delta) + 0.5)
             if valid_call_delta and valid_put_delta
@@ -298,50 +331,62 @@ def _select_indicative_pair(
     if not pairs:
         return None, failure_reason
 
-    delta_spot_candidates = [
-        row for row in pairs if row["call_delta"] is not None
-    ]
-    if delta_spot_candidates:
-        spot_row = min(
-            delta_spot_candidates,
-            key=lambda row: (abs(row["call_delta"] - 0.5), row["strike"]),
+    actual_spot = _eod_spot(conn, ticker=ticker, as_of_date=as_of_date)
+    expiries = sorted({row["expiry_date"] for row in pairs})
+    for expiry in expiries:
+        expiry_pairs = [row for row in pairs if row["expiry_date"] == expiry]
+        delta_spot_candidates = [
+            row for row in expiry_pairs if row["call_delta"] is not None
+        ]
+        if actual_spot is not None:
+            estimated_spot = actual_spot
+            spot_source = "eod_close"
+        elif delta_spot_candidates:
+            spot_row = min(
+                delta_spot_candidates,
+                key=lambda row: (abs(row["call_delta"] - 0.5), row["strike"]),
+            )
+            estimated_spot = float(spot_row["strike"])
+            spot_source = "call_delta_strike_proxy"
+        else:
+            estimated_spot = float(median(row["strike"] for row in expiry_pairs))
+            spot_source = "median_strike_proxy"
+
+        eligible: list[dict[str, Any]] = []
+        for row in expiry_pairs:
+            atm_metric = row["atm_delta_distance"]
+            if atm_metric is None:
+                atm_metric = abs(row["strike"] / estimated_spot - 1.0)
+            worst_leg = max(row["call_relative_spread"], row["put_relative_spread"])
+            if worst_leg > policy.max_leg_relative_spread:
+                continue
+            if row["straddle_relative_spread"] > policy.max_straddle_relative_spread:
+                continue
+            if atm_metric > policy.max_atm_delta_distance:
+                continue
+            enriched = dict(row)
+            enriched["estimated_spot"] = estimated_spot
+            enriched["spot_source"] = spot_source
+            enriched["atm_metric"] = atm_metric
+            enriched["worst_leg_relative_spread"] = worst_leg
+            eligible.append(enriched)
+
+        if not eligible:
+            continue
+
+        selected = min(
+            eligible,
+            key=lambda row: (
+                row["atm_metric"],
+                row["straddle_relative_spread"],
+                row["worst_leg_relative_spread"],
+                abs(row["strike"] / row["estimated_spot"] - 1.0),
+                row["strike"],
+            ),
         )
-        estimated_spot = float(spot_row["strike"])
-    else:
-        estimated_spot = float(median(row["strike"] for row in pairs))
+        return selected, "quote_quality"
 
-    eligible: list[dict[str, Any]] = []
-    for row in pairs:
-        atm_metric = row["atm_delta_distance"]
-        if atm_metric is None:
-            atm_metric = abs(row["strike"] / estimated_spot - 1.0)
-        worst_leg = max(row["call_relative_spread"], row["put_relative_spread"])
-        if worst_leg > policy.max_leg_relative_spread:
-            continue
-        if row["straddle_relative_spread"] > policy.max_straddle_relative_spread:
-            continue
-        if atm_metric > policy.max_atm_delta_distance:
-            continue
-        enriched = dict(row)
-        enriched["estimated_spot"] = estimated_spot
-        enriched["atm_metric"] = atm_metric
-        enriched["worst_leg_relative_spread"] = worst_leg
-        eligible.append(enriched)
-
-    if not eligible:
-        return None, "quote_quality"
-
-    selected = min(
-        eligible,
-        key=lambda row: (
-            row["atm_metric"],
-            row["straddle_relative_spread"],
-            row["worst_leg_relative_spread"],
-            abs(row["strike"] / row["estimated_spot"] - 1.0),
-            row["strike"],
-        ),
-    )
-    return selected, "quote_quality"
+    return None, "quote_quality"
 
 
 def _ticker_historical_moves(
