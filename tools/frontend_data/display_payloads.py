@@ -82,7 +82,10 @@ def enrich_upcoming_event(
         earnings_date=earnings_date,
         timing=event.get("timing"),
         as_of_date=as_of_date,
-        ml_forecast={"em_ml_pct": event.get("em_ml_pct")},
+        ml_forecast={
+            "em_ml_pct": event.get("em_ml_pct"),
+            "ml_snapshot_date": event.get("ml_snapshot_date"),
+        },
         strict_options=_strict_options_from_event(event),
     )
     event.update(result.public_fields())
