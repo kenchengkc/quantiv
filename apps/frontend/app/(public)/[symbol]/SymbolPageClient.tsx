@@ -15,6 +15,11 @@ import {
   type CalendarReference,
   type CalendarReferenceEvent,
 } from '@/lib/calendarReference';
+import {
+  displayForecastLabel,
+  finiteDisplayForecast,
+  type DisplayForecastMethod,
+} from '@/lib/displayForecast';
 import { normalizeForecastQuantiles } from '@/lib/forecastQuantiles';
 import { listingExchangeLabel } from '@/lib/listingExchanges';
 import { useEnsureCompanyNames } from '@/lib/useCompanyNames';
@@ -31,6 +36,7 @@ import { buildHistorySeries, GreeksPanel, HistoryBlock, medianAbsoluteHistoryMov
 import ScenarioRiskPanel from './ScenarioRiskPanel';
 import ResearchSnapshotRibbon from './ResearchSnapshotRibbon';
 import MoveComparisonChart from './MoveComparisonChart';
+import ForecastProvenance from './ForecastProvenance';
 import { SymbolPageLoading, SymbolPageUnavailable } from './SymbolPageStates';
 import type {
   IntradaySeries,
@@ -609,7 +615,7 @@ export default function SymbolPage({
         ? (liveForSymbol?.changePct ?? 0)
         : 0;
 
-  const straddlePct = em?.straddle_pct ?? 0;
+  const straddlePct = finiteDisplayForecast(em?.straddle_pct) ?? 0;
   const earningsDate = displayEarningsDate({
     todayIso,
     publishedDate: publishedEvent?.earnings_date,
@@ -650,6 +656,22 @@ export default function SymbolPage({
     rawActivePredictionPct != null && Number.isFinite(rawActivePredictionPct)
       ? Math.max(0, rawActivePredictionPct)
       : null;
+  const staticDisplayPct =
+    finiteDisplayForecast(em?.display_forecast_pct) ??
+    finiteDisplayForecast(em?.em_ml_pct) ??
+    finiteDisplayForecast(em?.straddle_pct) ??
+    finiteDisplayForecast(em?.iv_pct);
+  const displayForecastPct =
+    showingLivePrediction && activePredictionPct != null ? activePredictionPct : staticDisplayPct;
+  const displayForecastMethod: DisplayForecastMethod | null =
+    showingLivePrediction && activePredictionPct != null
+      ? 'ml'
+      : em?.display_forecast_method ??
+        (em?.em_ml_pct != null
+          ? 'ml'
+          : em?.straddle_pct != null || em?.iv_pct != null
+            ? 'options_math'
+            : null);
   const quantileMeta = showingLivePrediction
     ? livePrediction.response?.source === 'nightly_fallback'
       ? 'Nightly snapshot · spot update unavailable'
@@ -664,6 +686,12 @@ export default function SymbolPage({
   const historySeries = buildHistorySeries(data.earnings_history);
   const comparisonHistory = historySeries.slice(-8);
   const historicalMedianMovePct = medianAbsoluteHistoryMove(comparisonHistory);
+  const hasOptionsEvidence = Boolean(
+    em &&
+      em.atm_strike != null &&
+      em.dte != null &&
+      (em.straddle_pct != null || em.straddle_abs != null || em.atm_iv != null || em.iv_pct != null),
+  );
 
   return (
     <div className="qv-m-pad qv-symbol-page-shell" style={{ maxWidth: 1100, margin: '0 auto', padding: '0 28px 80px' }}>
@@ -677,7 +705,7 @@ export default function SymbolPage({
           change={change}
           changePct={changePct}
           quotePending={quotePending}
-          emPct={straddlePct}
+          emPct={displayForecastPct ?? 0}
           daysLeft={daysLeft}
           earningsDate={earningsDate}
           earningsTiming={earningsTiming}
@@ -699,6 +727,19 @@ export default function SymbolPage({
           onToast={showToast}
         />
       </Reveal>
+
+      {em && displayForecastPct != null && (
+        <Reveal>
+          <ForecastProvenance
+            method={displayForecastMethod}
+            displayPct={displayForecastPct}
+            mlPct={activePredictionPct ?? finiteDisplayForecast(em.em_ml_pct)}
+            optionsPct={finiteDisplayForecast(em.straddle_pct ?? em.iv_pct)}
+            historicalEventCount={em.historical_event_count}
+            asOf={em.display_forecast_as_of ?? em.ml_snapshot_date ?? data.as_of_date}
+          />
+        </Reveal>
+      )}
 
       {/* Start with the research question, then the historical evidence. */}
       {em && spot > 0 && (
@@ -745,8 +786,8 @@ export default function SymbolPage({
         </Reveal>
       )}
 
-      {/* Supporting options inputs lead into expiry and risk detail. */}
-      {em && (
+      {/* Supporting options inputs render only when genuine options evidence exists. */}
+      {em && hasOptionsEvidence && em.atm_strike != null && em.dte != null && (
         <Reveal delay={80}>
           <div
             className="qv-m-2col"
@@ -837,9 +878,9 @@ export default function SymbolPage({
         </Reveal>
       )}
 
-      {/* Provenance and exports follow the analysis they document. */}
+      {/* Research evidence only documents analytical evidence that actually exists. */}
       <Reveal style={{ marginTop: 22 }}>
-        {em && (
+        {em && (em.em_ml_pct != null || em.straddle_pct != null) && (
           <ResearchSnapshotRibbon
             evidence={initialEvidence}
             optionsDate={data.as_of_date}
@@ -867,15 +908,8 @@ export default function SymbolPage({
             gap: 10,
           }}
         >
-          <span className="mono">Options data · as of {data.as_of_date}</span>
-          <span>
-            Method:{' '}
-            {em?.em_method === 'ml_lightgbm'
-              ? 'ML forecast'
-              : em?.em_method === 'ensemble'
-                ? 'Math + ML'
-                : 'options math baseline'}
-          </span>
+          <span className="mono">Research data · as of {data.as_of_date}</span>
+          <span>Method: {displayForecastLabel(displayForecastMethod)}</span>
         </div>
       </Reveal>
     </div>
