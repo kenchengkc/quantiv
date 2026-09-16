@@ -21,6 +21,12 @@ import duckdb
 sys.path.append(str(Path(__file__).parent))
 sys.path.append(str(Path(__file__).resolve().parent.parent / "apps" / "ml"))
 from build_earnings_events import build_earnings_events_table, create_duckdb_views
+from frontend_data.display_payloads import (
+    build_display_forecast_status,
+    enrich_upcoming_events,
+    ensure_symbol_display_detail,
+    validate_upcoming_display_forecasts,
+)
 from frontend_data.forecast_artifacts import (
     build_dashboard_evidence as build_dashboard_evidence,
     load_ml_forecasts,
@@ -184,8 +190,9 @@ def main():
                 print(f"  ❌ missing {wk_path.name} — run without --resume to rebuild it")
                 sys.exit(1)
             payload = json.loads(wk_path.read_text())
-            week_payloads[wk_start] = payload
             events = payload.get("events", [])
+            enrich_upcoming_events(conn, events, as_of_date=as_of_date, today=today)
+            week_payloads[wk_start] = payload
             print(f"📅 week {wk_start} (offset {offset:+d}) → {len(events)} events (cached)")
             for ev in events:
                 tickers_needing_detail.setdefault(ev["ticker"], date.fromisoformat(ev["earnings_date"]))
@@ -241,6 +248,11 @@ def main():
                 + (f", {twelve_realized} from TwelveData" if twelve_realized else ""),
                 flush=True,
             )
+
+        # Presentation fallbacks resolve only after the strict research row is
+        # built. This keeps ML/decision eligibility untouched while guaranteeing
+        # a useful headline for every upcoming published event.
+        enrich_upcoming_events(conn, events, as_of_date=as_of_date, today=today)
 
         print(f"📅 week {wk_start} (offset {offset:+d}) → {len(events)} events")
         avg_em_straddle_pct, avg_em_iv_pct = week_em_averages(events)
@@ -309,6 +321,32 @@ def main():
             label="weekly calendar",
         )
 
+    # Never-dash is a build contract, not a React fallback. Validate before
+    # manifest/screener publication and retain a compact runtime status artifact
+    # for the control-plane projection.
+    validate_upcoming_display_forecasts(
+        published_events,
+        week_payloads,
+        today=today,
+    )
+    display_status = build_display_forecast_status(
+        published_events,
+        week_payloads,
+        today=today,
+        generated_at=datetime.now().isoformat(),
+    )
+    mix = display_status["method_mix"]
+    print(
+        "  forecast methods: "
+        + " ".join(f"{method}={mix.get(method, 0)}" for method in sorted(mix)),
+        flush=True,
+    )
+    validation_dir = DATA_DIR / "validation"
+    validation_dir.mkdir(parents=True, exist_ok=True)
+    (validation_dir / "display_forecast_status.json").write_text(
+        json.dumps(display_status, indent=2), encoding="utf-8"
+    )
+
     # Primary weekly.json points at the current week (back-compat for any old consumers).
     if not skip_weeks:
         write_to_public("weekly.json", json.dumps(week_payloads[this_monday], indent=2, default=str))
@@ -354,6 +392,13 @@ def main():
 
     apply_published_symbol_dates(tickers_needing_detail, published_for_symbols)
 
+    display_events = {
+        (str(event.get("ticker") or "").upper(), str(event.get("earnings_date") or "")[:10]): event
+        for payload in week_payloads.values()
+        for event in payload.get("events", [])
+        if event.get("ticker") and event.get("earnings_date")
+    }
+
     generated = 0
     skipped_resume = 0
     total_details = len(tickers_needing_detail)
@@ -383,6 +428,20 @@ def main():
             create_duckdb_views(conn, DATA_DIR)
         try:
             detail = build_symbol_detail(conn, ticker, as_of_date, earn_dt, ml_lookup, provider_lookup)
+            display_event = (
+                display_events.get((ticker.upper(), earn_dt.isoformat()))
+                if earn_dt is not None
+                else None
+            )
+            detail = ensure_symbol_display_detail(
+                conn,
+                detail,
+                ticker=ticker,
+                as_of_date=as_of_date,
+                earnings_date=earn_dt,
+                display_event=display_event,
+                provider_fields=provider_event_fields((provider_lookup or {}).get(ticker.upper())),
+            )
             if not detail:
                 continue
             # Attach timing (BMO/AMC/unknown) from the earnings row, surfaced on the detail page.
