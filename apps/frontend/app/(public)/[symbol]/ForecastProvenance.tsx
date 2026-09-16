@@ -23,19 +23,26 @@ export default function ForecastProvenance({
   historicalEventCount?: number | null;
   asOf?: string | null;
 }) {
-  if (displayPct == null || !Number.isFinite(displayPct) || displayPct <= 0) return null;
+  // The ticker hero already makes a normal ML forecast explicit. This card is
+  // reserved for fallback provenance, where "ML unavailable" and the weaker
+  // estimate source add information rather than repeat the hero.
+  if (
+    method === 'ml' ||
+    displayPct == null ||
+    !Number.isFinite(displayPct) ||
+    displayPct <= 0
+  ) {
+    return null;
+  }
 
   const headline = fmtPct(displayPct);
-  const ml = fmtPct(mlPct);
   const options = fmtPct(optionsPct);
   const title =
-    method === 'ml'
-      ? 'ML forecast'
-      : method === 'options_math' || method === 'options_indicative'
-        ? 'Options-implied estimate'
-        : method === 'historical'
-          ? 'Historical estimate'
-          : 'Historical prior';
+    method === 'options_math' || method === 'options_indicative'
+      ? 'Options-implied estimate'
+      : method === 'historical'
+        ? 'Historical estimate'
+        : 'Historical prior';
 
   return (
     <div className="qv-card" data-testid="forecast-provenance" style={{ marginTop: 18, padding: '18px 20px' }}>
@@ -50,22 +57,12 @@ export default function ForecastProvenance({
           <div style={{ marginTop: 7, fontSize: 13, color: 'var(--ink-2)', fontWeight: 650 }}>{title}</div>
         </div>
         <div style={{ minWidth: 230, fontSize: 12, lineHeight: 1.55, color: 'var(--ink-3)' }}>
-          {method === 'ml' ? (
-            <>
-              <div>ML forecast <span className="mono tnum" style={{ color: 'var(--ink)' }}>{ml ?? headline}</span></div>
-              {options && <div>Options implied <span className="mono tnum" style={{ color: 'var(--ink-2)' }}>{options}</span></div>}
-              {asOf && <div style={{ marginTop: 3, color: 'var(--ink-4)' }}>Research snapshot · {asOf}</div>}
-            </>
-          ) : (
-            <>
-              <div><strong style={{ color: 'var(--ink-2)' }}>ML unavailable</strong></div>
-              {(method === 'options_math' || method === 'options_indicative') && (
-                <div>Market implied <span className="mono tnum" style={{ color: 'var(--ink)' }}>{headline}</span></div>
-              )}
-              {(method === 'historical' || method === 'historical_prior') && (
-                <div>Market-implied estimate unavailable</div>
-              )}
-            </>
+          <div><strong style={{ color: 'var(--ink-2)' }}>ML unavailable</strong></div>
+          {(method === 'options_math' || method === 'options_indicative') && (
+            <div>Market implied <span className="mono tnum" style={{ color: 'var(--ink)' }}>{options ?? headline}</span></div>
+          )}
+          {(method === 'historical' || method === 'historical_prior') && (
+            <div>Market-implied estimate unavailable</div>
           )}
         </div>
       </div>
