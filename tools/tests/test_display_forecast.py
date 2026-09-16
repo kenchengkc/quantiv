@@ -276,6 +276,36 @@ def test_one_prior_event_uses_universe_prior():
     assert result.historical_event_count == 1
 
 
+def test_generated_universe_prior_uses_forecast_cutoff_not_target_date():
+    conn = _conn()
+    known_event = date(2026, 9, 10)
+    future_event = date(2026, 9, 18)
+    conn.executemany(
+        "INSERT INTO earnings_events VALUES (?, ?, 'unknown')",
+        [
+            ("KNOWN", known_event),
+            ("FUTURE", future_event),
+        ],
+    )
+    conn.executemany(
+        "INSERT INTO v_ohlcv VALUES (?, ?, ?)",
+        [
+            (known_event - timedelta(days=1), "KNOWN", 100.0),
+            (known_event + timedelta(days=1), "KNOWN", 104.0),
+            # These rows deliberately simulate information that exists before
+            # the target earnings event but only after the forecast cutoff.
+            (future_event - timedelta(days=1), "FUTURE", 100.0),
+            (future_event + timedelta(days=1), "FUTURE", 120.0),
+        ],
+    )
+
+    result = _resolve(conn, universe_prior=None)
+
+    assert result.method == "historical_prior"
+    assert result.pct == pytest.approx(0.04)
+    assert result.as_of == AS_OF.isoformat()
+
+
 def test_crossed_quote_is_never_indicative():
     conn = _conn()
     _pair(conn, call_bid=4.50, call_ask=2.65)
