@@ -1,3 +1,5 @@
+import type { DisplayForecastFields } from '@/lib/displayForecast';
+
 export interface Straddle {
   expiration: string;
   dte: number;
@@ -16,21 +18,21 @@ export interface Straddle {
   call_theta: number | null;
 }
 
-export interface ExpectedMove {
+export interface ExpectedMove extends DisplayForecastFields {
   earnings_date?: string;
-  expiration: string;
-  dte: number;
-  lead_time_days?: number;
-  atm_strike: number;
-  atm_iv: number | null;
-  straddle_abs: number | null;
-  straddle_pct: number | null;
-  iv_pct: number | null;
+  expiration?: string | null;
+  dte?: number | null;
+  lead_time_days?: number | null;
+  atm_strike?: number | null;
+  atm_iv?: number | null;
+  straddle_abs?: number | null;
+  straddle_pct?: number | null;
+  iv_pct?: number | null;
   skew_atm?: number | null;
   term_slope?: number | null;
   total_vega?: number | null;
   timing?: string;
-  em_method?: 'options_math' | 'ml_lightgbm' | 'ensemble';
+  em_method?: 'options_math' | 'ml_lightgbm' | 'ensemble' | null;
   em_ml_pct?: number | null;
   em_ml_abs?: number | null;
   correction_factor?: number | null;
@@ -93,7 +95,7 @@ export interface SymbolDetail {
   symbol: string;
   as_of_date: string;
   spot_price: number | null;
-  expected_move?: ExpectedMove;
+  expected_move?: ExpectedMove | null;
   straddle_features: Straddle[];
   earnings_history?: Array<{
     date: string;
