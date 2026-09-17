@@ -25,6 +25,7 @@ ML_PACKAGE_ROOT = REPO_ROOT / "apps" / "ml"
 if str(ML_PACKAGE_ROOT) not in sys.path:
     sys.path.insert(0, str(ML_PACKAGE_ROOT))
 
+from ml.live_forecast_validation import validate_live_forecast_artifact  # noqa: E402
 from ml.model_bundle import (  # noqa: E402
     create_signed_control_pointer,
     create_signed_registry,
@@ -32,7 +33,6 @@ from ml.model_bundle import (  # noqa: E402
     verify_control_pointer,
     verify_registry,
 )
-from ml.pipeline_validation import validate_forecast_artifact  # noqa: E402
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -143,9 +143,9 @@ def provenance_rollback(
     control_dir = models_root / "control"
     pointer_path = control_dir / "champion.json"
     registry_path = control_dir / "registry.json"
-    # Run the production forecast validator inside the mutation command too;
+    # Run the production live forecast validator inside the mutation command too;
     # a caller cannot bypass validation by omitting a workflow step/report.
-    validate_forecast_artifact(
+    validate_live_forecast_artifact(
         candidate_forecast, models_dir=models_root / "bundles" / target_bundle_id,
     )
 
@@ -185,7 +185,9 @@ def provenance_rollback(
 
     # Sign everything before replacing forecast/control files. Preserve the
     # displaced evidence for recovery if a filesystem or downstream step fails.
-    archive_id = hashlib.sha256(json.dumps(decision_summary, sort_keys=True).encode()).hexdigest()
+    archive_id = hashlib.sha256(
+        json.dumps(decision_summary, sort_keys=True).encode()
+    ).hexdigest()
     archive = models_root / "provenance_recovery" / archive_id
     archive.mkdir(parents=True, exist_ok=False)
     shutil.copy2(pointer_path, archive / "champion.json")
@@ -193,7 +195,9 @@ def provenance_rollback(
     for old in production_forecast_dir.glob("forecasts_*.parquet"):
         shutil.copy2(old, archive / old.name)
     production_forecast = _promote_forecast(
-        candidate_forecast, production_forecast_dir, expected_bundle_id=target_bundle_id,
+        candidate_forecast,
+        production_forecast_dir,
+        expected_bundle_id=target_bundle_id,
     )
     _atomic_json(registry_path, new_registry)
     _atomic_json(pointer_path, new_pointer)
@@ -219,7 +223,9 @@ def provenance_rollback(
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--models-root", type=Path, default=REPO_ROOT / "data" / "models")
+    parser.add_argument(
+        "--models-root", type=Path, default=REPO_ROOT / "data" / "models"
+    )
     parser.add_argument("--expected-current-bundle-id", required=True)
     parser.add_argument("--target-bundle-id", required=True)
     parser.add_argument("--candidate-forecast", type=Path)
