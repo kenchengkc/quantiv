@@ -6,7 +6,8 @@ from pathlib import Path
 
 import pandas as pd
 
-from ml.pipeline_validation import FORECAST_REQUIRED_COLUMNS, validate_forecast_artifact
+from ml.live_forecast_validation import validate_live_forecast_artifact
+from ml.pipeline_validation import FORECAST_REQUIRED_COLUMNS
 
 
 def test_forecast_gate_accepts_ml_inference_without_strict_options(tmp_path: Path) -> None:
@@ -14,7 +15,13 @@ def test_forecast_gate_accepts_ml_inference_without_strict_options(tmp_path: Pat
     forecast_path = tmp_path / "forecasts" / "forecasts_2026-09-17.parquet"
     models_dir = tmp_path / "models"
     models_dir.mkdir(parents=True)
-    feature_cols = ["atm_iv", "dte", "em_iv_pct", "straddle_pct", "hist_move_avg_4q"]
+    feature_cols = [
+        "atm_iv",
+        "dte",
+        "em_iv_pct",
+        "straddle_pct",
+        "hist_move_avg_4q",
+    ]
     (models_dir / "metadata_T7.json").write_text(
         json.dumps({"feature_cols": feature_cols})
     )
@@ -52,7 +59,7 @@ def test_forecast_gate_accepts_ml_inference_without_strict_options(tmp_path: Pat
     forecast_path.parent.mkdir(parents=True)
     frame.to_parquet(forecast_path, index=False)
 
-    report = validate_forecast_artifact(
+    report = validate_live_forecast_artifact(
         forecast_path,
         models_dir=models_dir,
         now=now,
