@@ -40,6 +40,11 @@ class FinalizationResult:
     candidate_source_date: str | None
     critical_codes: tuple[str, ...]
     quarantined_source_dates: tuple[str, ...] = ()
+    # `can_score` retains its original strict meaning: the newest options
+    # candidate is decision-safe. `can_refresh` is broader and means the rest
+    # of the nightly pipeline may proceed after either accepting that candidate
+    # or restoring the atomically published fallback snapshot.
+    can_refresh: bool = False
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -145,7 +150,9 @@ def _validated_manifest(path: Path, not_before: str | None) -> dict[str, Any]:
         quality.get("critical_exceptions") != critical_count
         or quality["decision_safe"] != (critical_count == 0)
     ):
-        raise RuntimeError("reconciliation decision contradicts its critical exceptions")
+        raise RuntimeError(
+            "reconciliation decision contradicts its critical exceptions"
+        )
     if not_before is not None:
         try:
             generated = datetime.fromisoformat(str(manifest.get("generated_at")))
@@ -155,7 +162,9 @@ def _validated_manifest(path: Path, not_before: str | None) -> dict[str, Any]:
         except ValueError as exc:
             raise RuntimeError("reconciliation freshness cannot be verified") from exc
         if generated < started:
-            raise RuntimeError("reconciliation manifest predates this refresh; refusing stale evidence")
+            raise RuntimeError(
+                "reconciliation manifest predates this refresh; refusing stale evidence"
+            )
     return manifest
 
 
@@ -164,11 +173,16 @@ def _require_source_date(manifest: dict[str, Any], expected: str | None) -> None
         (manifest.get(section) or {}).get("source_date") != expected
         for section in ("source_reconciliation", "quote_quality")
     ):
-        raise RuntimeError("reconciliation source date does not match the active options partition")
+        raise RuntimeError(
+            "reconciliation source date does not match the active options partition"
+        )
 
 
 def verify_fallback(
-    *, manifest_path: Path, data_dir: Path, not_before: str | None = None,
+    *,
+    manifest_path: Path,
+    data_dir: Path,
+    not_before: str | None = None,
 ) -> None:
     """Recheck the restored universe before publishing independent datasets."""
     manifest = _validated_manifest(manifest_path, not_before)
@@ -183,15 +197,21 @@ def verify_fallback(
     ):
         raise RuntimeError("fallback no longer matches the published options snapshot")
     _require_source_date(manifest, published_date)
-    unexpected = sorted(set(_critical_codes(manifest)) - SOFT_FALLBACK_CRITICAL_CODES)
+    unexpected = sorted(
+        set(_critical_codes(manifest)) - SOFT_FALLBACK_CRITICAL_CODES
+    )
     if unexpected:
         raise RuntimeError(
-            "restored fallback contains non-options critical failures: " + ", ".join(unexpected)
+            "restored fallback contains non-options critical failures: "
+            + ", ".join(unexpected)
         )
     status["fallback_manifest_id"] = manifest.get("manifest_id")
     status["fallback_verified_at"] = datetime.now(timezone.utc).isoformat()
     _atomic_json(status_path, status)
-    print(f"Restored fallback verified: {published_date}; new scoring remains disabled")
+    print(
+        f"Restored fallback verified: {published_date}; "
+        "strict options scoring remains disabled, independent refresh may continue"
+    )
 
 
 def _write_github_outputs(path: Path | None, result: FinalizationResult) -> None:
@@ -201,6 +221,7 @@ def _write_github_outputs(path: Path | None, result: FinalizationResult) -> None
     with path.open("a") as handle:
         handle.write(f"options_state={result.state}\n")
         handle.write(f"can_score={'true' if result.can_score else 'false'}\n")
+        handle.write(f"can_refresh={'true' if result.can_refresh else 'false'}\n")
         handle.write(f"active_source_date={result.active_source_date or ''}\n")
         handle.write(f"candidate_source_date={result.candidate_source_date or ''}\n")
 
@@ -232,6 +253,8 @@ def _status_payload(
     quarantined_source_dates: tuple[str, ...] = (),
     quarantine_dir: Path | None = None,
 ) -> dict[str, Any]:
+    strict_candidate_accepted = state == "accepted"
+    refresh_scoring_allowed = state in {"accepted", "fallback"}
     return {
         "schema": "quantiv.options-snapshot-status.v1",
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -245,8 +268,16 @@ def _status_payload(
         "candidate_quarantine": str(quarantine_dir) if quarantine_dir else None,
         "policy": {
             "thresholds_changed": False,
-            "scoring_allowed": state == "accepted",
-            "fallback_mode": "last_published_snapshot" if state == "fallback" else None,
+            # Backward-compatible strict signal: only a newly accepted options
+            # candidate is decision-safe for options research.
+            "scoring_allowed": strict_candidate_accepted,
+            "strict_options_candidate_accepted": strict_candidate_accepted,
+            # A verified published fallback is still safe as the active input
+            # for independent ML/frontend refresh; its source date remains old.
+            "refresh_scoring_allowed": refresh_scoring_allowed,
+            "fallback_mode": (
+                "last_published_snapshot" if state == "fallback" else None
+            ),
         },
     }
 
@@ -268,7 +299,9 @@ def _quarantine_unpublished_partitions(
     candidate_date: str | None,
 ) -> tuple[Path | None, tuple[str, ...]]:
     partitions = _option_partitions(data_dir)
-    unpublished_dates = tuple(sorted(date for date in partitions if date > published_date))
+    unpublished_dates = tuple(
+        sorted(date for date in partitions if date > published_date)
+    )
     if not unpublished_dates:
         return None, ()
 
@@ -329,6 +362,7 @@ def finalize_snapshot(
         result = FinalizationResult(
             state="accepted",
             can_score=True,
+            can_refresh=True,
             active_source_date=active_date,
             candidate_source_date=candidate_date,
             critical_codes=critical_codes,
@@ -353,6 +387,7 @@ def finalize_snapshot(
         result = FinalizationResult(
             state="blocked",
             can_score=False,
+            can_refresh=False,
             active_source_date=published_date,
             candidate_source_date=candidate_date,
             critical_codes=critical_codes,
@@ -382,7 +417,8 @@ def finalize_snapshot(
     _require_source_date(manifest, latest_local)
     if published_date not in partitions:
         raise RuntimeError(
-            f"published options snapshot {published_date} is missing locally; refusing fallback"
+            f"published options snapshot {published_date} is missing locally; "
+            "refusing fallback"
         )
 
     quarantine_dir, quarantined_dates = _quarantine_unpublished_partitions(
@@ -396,13 +432,15 @@ def finalize_snapshot(
     remaining = _option_partitions(data_dir)
     if max(remaining, default=None) != published_date:
         raise RuntimeError(
-            "options fallback did not restore the published snapshot as the newest local partition"
+            "options fallback did not restore the published snapshot as the "
+            "newest local partition"
         )
 
     _update_sync_metadata(data_dir, published_date, candidate_date)
     result = FinalizationResult(
         state="fallback",
         can_score=False,
+        can_refresh=True,
         active_source_date=published_date,
         candidate_source_date=candidate_date,
         critical_codes=critical_codes,
@@ -425,7 +463,8 @@ def finalize_snapshot(
     print(
         "Options candidate rejected; retaining published fallback "
         f"{published_date}. Quarantined {len(quarantined_dates)} unpublished "
-        "options partition(s). Scoring/publication of new options research is disabled."
+        "options partition(s). Strict options candidate scoring is disabled; "
+        "the independent refresh may continue after fallback verification."
     )
     return result
 
@@ -449,22 +488,34 @@ def main() -> int:
     )
     parser.add_argument(
         "--not-before",
-        help="Require reconciliation evidence generated at or after this ISO refresh-start timestamp.",
+        help=(
+            "Require reconciliation evidence generated at or after this ISO "
+            "refresh-start timestamp."
+        ),
     )
     parser.add_argument(
-        "--verify-fallback", action="store_true",
-        help="Validate the rebuilt fallback report before R2 promotion; never enable scoring.",
+        "--verify-fallback",
+        action="store_true",
+        help=(
+            "Validate the rebuilt fallback report before R2 promotion; never "
+            "enable strict options scoring."
+        ),
     )
     parser.add_argument(
         "--github-output",
         type=Path,
         default=None,
-        help="Append options_state/can_score outputs for the calling Actions step.",
+        help=(
+            "Append options_state/can_score/can_refresh outputs for the calling "
+            "Actions step."
+        ),
     )
     args = parser.parse_args()
     if args.verify_fallback:
         verify_fallback(
-            manifest_path=args.manifest, data_dir=args.data_dir, not_before=args.not_before,
+            manifest_path=args.manifest,
+            data_dir=args.data_dir,
+            not_before=args.not_before,
         )
         return 0
     finalize_snapshot(
