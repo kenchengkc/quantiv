@@ -227,7 +227,7 @@ jobs:
             --github-output "$GITHUB_OUTPUT"
 
       - name: Restore validated fallback after rejected options candidate
-        if: steps.options_gate.outputs.can_score != 'true'
+        if: steps.options_gate.outputs.options_state == 'fallback'
         run: |
           python scripts/setup_duckdb_from_parquet.py
           python scripts/sync_dolthub.py --corporate-actions
@@ -259,11 +259,11 @@ jobs:
         run: bash scripts/r2_push.sh --skip-forecasts
 
       - name: Score upcoming earnings
-        if: steps.options_gate.outputs.can_score == 'true'
+        if: steps.options_gate.outputs.can_refresh == 'true'
         run: python scripts/daily_score.py --days-ahead 21
 
       - name: Gate — validate scored ML and IV forecasts
-        if: steps.options_gate.outputs.can_score == 'true'
+        if: steps.options_gate.outputs.can_refresh == 'true'
         run: |
           python scripts/validate_ml_pipeline.py forecasts \
             --report data/validation/daily_forecasts.json \
@@ -279,7 +279,7 @@ jobs:
           retention-days: 14
 
       - name: Monitor champion, shadows, and feature drift
-        if: steps.options_gate.outputs.can_score == 'true'
+        if: steps.options_gate.outputs.can_refresh == 'true'
         env:
           MODEL_BUNDLE_SIGNING_KEY: ${{ secrets.MODEL_BUNDLE_SIGNING_KEY }}
         run: |
@@ -290,7 +290,7 @@ jobs:
           fi
 
       - name: Import recent forecasts to Neon
-        if: steps.options_gate.outputs.can_score == 'true'
+        if: steps.options_gate.outputs.can_refresh == 'true'
         id: neon_import
         continue-on-error: true
         env:
@@ -298,7 +298,7 @@ jobs:
         run: python -u scripts/import_recent_to_postgres.py --full
 
       - name: Push forecasts to R2
-        if: steps.options_gate.outputs.can_score == 'true'
+        if: steps.options_gate.outputs.can_refresh == 'true'
         env:
           R2_BUCKET: ${{ secrets.R2_BUCKET }}
         run: bash scripts/r2_push.sh --forecasts-only
@@ -317,7 +317,7 @@ jobs:
         run: python -u tools/build_popular_weights.py
 
       - name: Build frontend JSON
-        if: steps.options_gate.outputs.can_score == 'true'
+        if: steps.options_gate.outputs.can_refresh == 'true'
         env:
           TWELVEDATA_API_KEY: ${{ secrets.TWELVEDATA_API_KEY }}
           TWELVEDATA_REALIZED_FALLBACK: "1"
@@ -332,9 +332,9 @@ jobs:
       - name: Build production control snapshot
         env:
           CONTROL_DATA_R2_STATUS: passed
-          CONTROL_FORECAST_R2_STATUS: ${{ steps.options_gate.outputs.can_score == 'true' && 'passed' || 'degraded' }}
-          CONTROL_FRONTEND_PAYLOAD_STATUS: ${{ steps.options_gate.outputs.can_score == 'true' && 'passed' || 'degraded' }}
-          CONTROL_NEON_IMPORT_STATUS: ${{ steps.options_gate.outputs.can_score == 'true' && steps.neon_import.outcome || 'degraded' }}
+          CONTROL_FORECAST_R2_STATUS: ${{ steps.options_gate.outputs.can_refresh == 'true' && 'passed' || 'degraded' }}
+          CONTROL_FRONTEND_PAYLOAD_STATUS: ${{ steps.options_gate.outputs.can_refresh == 'true' && 'passed' || 'degraded' }}
+          CONTROL_NEON_IMPORT_STATUS: ${{ steps.options_gate.outputs.can_refresh == 'true' && steps.neon_import.outcome || 'degraded' }}
         run: python -u tools/build_control_plane_snapshot.py
 
       - name: Refresh ticker names for newly priced symbols
