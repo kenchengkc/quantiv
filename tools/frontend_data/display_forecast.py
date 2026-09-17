@@ -1,7 +1,7 @@
 """Resolve one canonical user-facing earnings expected move.
 
 This module is deliberately separate from the strict research option-quality
-contract.  It may use a structurally sane, lower-quality options pair for
+contract. It may use structurally sane lower-quality option evidence for
 presentation, or point-in-time historical fallbacks, but those values never
 feed ML training/scoring or decision-eligible options coverage.
 """
@@ -126,15 +126,7 @@ def _relation_exists(conn: duckdb.DuckDBPyConnection, name: str) -> bool:
 
 
 def _raw_options_source(conn: duckdb.DuckDBPyConnection) -> str | None:
-    """Return a provider-level relation suitable for display-only pairing.
-
-    The scheduled full analytical setup exposes ``v_options`` / ``v_options_raw``.
-    ``build_frontend_data.py`` historically creates only the strict
-    ``v_options_chain`` view, so its fallback is to scan the same local raw
-    Parquet partitions directly.  The strict view is intentionally not used for
-    indicative selection because it has already removed the quotes we need to
-    distinguish from truly absent markets.
-    """
+    """Return provider-level option rows suitable for display-only estimates."""
 
     if _relation_exists(conn, "v_options"):
         return "v_options"
@@ -192,71 +184,75 @@ def _pair_rows(
 
     expiry_cmp = ">" if _is_after_close(timing) else ">="
     max_expiry = earnings_date + timedelta(days=policy.max_post_event_expiry_days)
-    rows = conn.execute(
-        f"""
-        WITH raw AS (
+    try:
+        rows = conn.execute(
+            f"""
+            WITH raw AS (
+                SELECT
+                    CAST(date AS DATE) AS as_of_date,
+                    UPPER(CAST(act_symbol AS VARCHAR)) AS ticker,
+                    CAST(expiration AS DATE) AS expiry_date,
+                    TRY_CAST(strike AS DOUBLE) AS strike,
+                    CASE
+                        WHEN UPPER(CAST(call_put AS VARCHAR)) IN ('C', 'CALL') THEN 'C'
+                        WHEN UPPER(CAST(call_put AS VARCHAR)) IN ('P', 'PUT') THEN 'P'
+                        ELSE NULL
+                    END AS side,
+                    TRY_CAST(bid AS DOUBLE) AS bid,
+                    TRY_CAST(ask AS DOUBLE) AS ask,
+                    TRY_CAST(delta AS DOUBLE) AS delta
+                FROM {source}
+                WHERE UPPER(CAST(act_symbol AS VARCHAR)) = ?
+                  AND CAST(date AS DATE) = ?
+            ), structurally_valid AS (
+                SELECT *
+                FROM raw
+                WHERE strike IS NOT NULL AND strike > 0
+                  AND side IS NOT NULL
+                  AND bid IS NOT NULL AND ask IS NOT NULL
+                  AND isfinite(bid) AND isfinite(ask)
+                  AND bid >= 0 AND ask >= 0 AND ask >= bid
+                  AND (bid + ask) > 0
+            ), spanning AS (
+                SELECT *
+                FROM structurally_valid
+                WHERE expiry_date {expiry_cmp} ?
+                  AND expiry_date <= ?
+            ), calls AS (
+                SELECT * FROM spanning WHERE side = 'C'
+            ), puts AS (
+                SELECT * FROM spanning WHERE side = 'P'
+            )
             SELECT
-                CAST(date AS DATE) AS as_of_date,
-                UPPER(CAST(act_symbol AS VARCHAR)) AS ticker,
-                CAST(expiration AS DATE) AS expiry_date,
-                TRY_CAST(strike AS DOUBLE) AS strike,
-                CASE
-                    WHEN UPPER(CAST(call_put AS VARCHAR)) IN ('C', 'CALL') THEN 'C'
-                    WHEN UPPER(CAST(call_put AS VARCHAR)) IN ('P', 'PUT') THEN 'P'
-                    ELSE NULL
-                END AS side,
-                TRY_CAST(bid AS DOUBLE) AS bid,
-                TRY_CAST(ask AS DOUBLE) AS ask,
-                TRY_CAST(delta AS DOUBLE) AS delta
+                c.expiry_date,
+                c.strike,
+                c.bid AS call_bid,
+                c.ask AS call_ask,
+                c.delta AS call_delta,
+                p.bid AS put_bid,
+                p.ask AS put_ask,
+                p.delta AS put_delta
+            FROM calls c
+            JOIN puts p USING (as_of_date, ticker, expiry_date, strike)
+            ORDER BY c.expiry_date, c.strike
+            """,
+            [ticker.upper(), as_of_date, earnings_date, max_expiry],
+        ).fetchall()
+
+        expiry_exists = conn.execute(
+            f"""
+            SELECT COUNT(*)
             FROM {source}
             WHERE UPPER(CAST(act_symbol AS VARCHAR)) = ?
               AND CAST(date AS DATE) = ?
-        ), structurally_valid AS (
-            SELECT *
-            FROM raw
-            WHERE strike IS NOT NULL AND strike > 0
-              AND side IS NOT NULL
-              AND bid IS NOT NULL AND ask IS NOT NULL
-              AND isfinite(bid) AND isfinite(ask)
-              AND bid >= 0 AND ask >= 0 AND ask >= bid
-              AND (bid + ask) > 0
-        ), spanning AS (
-            SELECT *
-            FROM structurally_valid
-            WHERE expiry_date {expiry_cmp} ?
-              AND expiry_date <= ?
-        ), calls AS (
-            SELECT * FROM spanning WHERE side = 'C'
-        ), puts AS (
-            SELECT * FROM spanning WHERE side = 'P'
-        )
-        SELECT
-            c.expiry_date,
-            c.strike,
-            c.bid AS call_bid,
-            c.ask AS call_ask,
-            c.delta AS call_delta,
-            p.bid AS put_bid,
-            p.ask AS put_ask,
-            p.delta AS put_delta
-        FROM calls c
-        JOIN puts p USING (as_of_date, ticker, expiry_date, strike)
-        ORDER BY c.expiry_date, c.strike
-        """,
-        [ticker.upper(), as_of_date, earnings_date, max_expiry],
-    ).fetchall()
+              AND CAST(expiration AS DATE) {expiry_cmp} ?
+              AND CAST(expiration AS DATE) <= ?
+            """,
+            [ticker.upper(), as_of_date, earnings_date, max_expiry],
+        ).fetchone()[0]
+    except duckdb.Error:
+        return [], "no_event_expiry"
 
-    expiry_exists = conn.execute(
-        f"""
-        SELECT COUNT(*)
-        FROM {source}
-        WHERE UPPER(CAST(act_symbol AS VARCHAR)) = ?
-          AND CAST(date AS DATE) = ?
-          AND CAST(expiration AS DATE) {expiry_cmp} ?
-          AND CAST(expiration AS DATE) <= ?
-        """,
-        [ticker.upper(), as_of_date, earnings_date, max_expiry],
-    ).fetchone()[0]
     if not expiry_exists:
         return [], "no_event_expiry"
     if not rows:
@@ -387,6 +383,197 @@ def _select_indicative_pair(
         return selected, "quote_quality"
 
     return None, "quote_quality"
+
+
+def _valid_leg_quote(
+    bid: Any,
+    ask: Any,
+    max_relative_spread: float,
+) -> tuple[bool, float | None]:
+    """Validate a quote only when quote fields exist; IV itself can be provider-supplied."""
+
+    if bid is None and ask is None:
+        return True, None
+    if bid is None or ask is None:
+        return False, None
+    try:
+        bid_value = float(bid)
+        ask_value = float(ask)
+    except (TypeError, ValueError):
+        return False, None
+    if not math.isfinite(bid_value) or not math.isfinite(ask_value):
+        return False, None
+    if bid_value < 0 or ask_value < 0 or ask_value < bid_value:
+        return False, None
+    midpoint = (bid_value + ask_value) / 2.0
+    if midpoint <= 0:
+        return False, None
+    relative_spread = (ask_value - bid_value) / midpoint
+    return relative_spread <= max_relative_spread, relative_spread
+
+
+def _select_indicative_iv(
+    conn: duckdb.DuckDBPyConnection,
+    *,
+    ticker: str,
+    as_of_date: date,
+    earnings_date: date,
+    timing: str | None,
+    policy: DisplayPolicy,
+    pair_failure_reason: FallbackReason,
+) -> tuple[dict[str, Any] | None, FallbackReason]:
+    """Build an IV expected move without requiring a same-strike call/put pair."""
+
+    source = _raw_options_source(conn)
+    if not source or pair_failure_reason == "no_event_expiry":
+        return None, pair_failure_reason or "no_event_expiry"
+
+    expiry_cmp = ">" if _is_after_close(timing) else ">="
+    max_expiry = earnings_date + timedelta(days=policy.max_post_event_expiry_days)
+    try:
+        rows = conn.execute(
+            f"""
+            SELECT
+                CAST(expiration AS DATE) AS expiry_date,
+                TRY_CAST(strike AS DOUBLE) AS strike,
+                CASE
+                    WHEN UPPER(CAST(call_put AS VARCHAR)) IN ('C', 'CALL') THEN 'C'
+                    WHEN UPPER(CAST(call_put AS VARCHAR)) IN ('P', 'PUT') THEN 'P'
+                    ELSE NULL
+                END AS side,
+                TRY_CAST(bid AS DOUBLE) AS bid,
+                TRY_CAST(ask AS DOUBLE) AS ask,
+                TRY_CAST(iv AS DOUBLE) AS iv,
+                TRY_CAST(delta AS DOUBLE) AS delta
+            FROM {source}
+            WHERE UPPER(CAST(act_symbol AS VARCHAR)) = ?
+              AND CAST(date AS DATE) = ?
+              AND CAST(expiration AS DATE) {expiry_cmp} ?
+              AND CAST(expiration AS DATE) <= ?
+              AND TRY_CAST(strike AS DOUBLE) > 0
+              AND TRY_CAST(iv AS DOUBLE) > 0
+              AND TRY_CAST(iv AS DOUBLE) <= 5
+              AND isfinite(TRY_CAST(iv AS DOUBLE))
+            ORDER BY expiry_date, strike, side
+            """,
+            [ticker.upper(), as_of_date, earnings_date, max_expiry],
+        ).fetchall()
+    except duckdb.Error:
+        # Some compact/unit-test views intentionally omit IV. In that case the
+        # hierarchy simply continues to historical evidence.
+        return None, pair_failure_reason
+
+    if not rows:
+        return None, pair_failure_reason
+
+    actual_spot = _eod_spot(conn, ticker=ticker, as_of_date=as_of_date)
+    expiries = sorted({row[0] for row in rows if row[0] is not None})
+    for expiry in expiries:
+        expiry_rows = [row for row in rows if row[0] == expiry]
+        if not expiry_rows:
+            continue
+        proxy_spot = actual_spot or float(median(float(row[1]) for row in expiry_rows))
+        spot_source = "eod_close" if actual_spot is not None else "median_strike_proxy"
+
+        candidates: dict[str, list[dict[str, Any]]] = {"C": [], "P": []}
+        for _, strike_raw, side, bid, ask, iv_raw, delta_raw in expiry_rows:
+            if side not in candidates:
+                continue
+            strike = _finite_positive(strike_raw)
+            iv = _finite_positive(iv_raw)
+            if strike is None or iv is None or iv > 5:
+                continue
+            quote_ok, relative_spread = _valid_leg_quote(
+                bid,
+                ask,
+                policy.max_leg_relative_spread,
+            )
+            if not quote_ok:
+                continue
+
+            target_delta = 0.5 if side == "C" else -0.5
+            delta: float | None = None
+            if delta_raw is not None:
+                try:
+                    candidate_delta = float(delta_raw)
+                except (TypeError, ValueError):
+                    candidate_delta = math.nan
+                if math.isfinite(candidate_delta) and (
+                    (side == "C" and 0 <= candidate_delta <= 1)
+                    or (side == "P" and -1 <= candidate_delta <= 0)
+                ):
+                    delta = candidate_delta
+
+            atm_metric = (
+                abs(delta - target_delta)
+                if delta is not None
+                else abs(strike / proxy_spot - 1.0)
+            )
+            if atm_metric > policy.max_atm_delta_distance:
+                continue
+            candidates[side].append(
+                {
+                    "side": side,
+                    "strike": strike,
+                    "iv": iv,
+                    "delta": delta,
+                    "atm_metric": atm_metric,
+                    "relative_spread": relative_spread,
+                    "moneyness_distance": abs(strike / proxy_spot - 1.0),
+                }
+            )
+
+        selected: dict[str, dict[str, Any]] = {}
+        for side in ("C", "P"):
+            if not candidates[side]:
+                continue
+            selected[side] = min(
+                candidates[side],
+                key=lambda row: (
+                    row["atm_metric"],
+                    row["relative_spread"] is None,
+                    row["relative_spread"]
+                    if row["relative_spread"] is not None
+                    else math.inf,
+                    row["moneyness_distance"],
+                    row["strike"],
+                ),
+            )
+
+        if not selected:
+            continue
+
+        dte = (expiry - as_of_date).days
+        if dte <= 0:
+            continue
+        sides_used = [side for side in ("C", "P") if side in selected]
+        avg_iv = sum(selected[side]["iv"] for side in sides_used) / len(sides_used)
+        iv_em_pct = avg_iv * math.sqrt(dte / 365.0)
+        if not math.isfinite(iv_em_pct) or iv_em_pct <= 0:
+            continue
+
+        details: dict[str, Any] = {
+            "estimator": "atm_iv",
+            "expiry_date": expiry,
+            "dte": dte,
+            "avg_iv": avg_iv,
+            "iv_em_pct": iv_em_pct,
+            "sides_used": sides_used,
+            "estimated_spot": proxy_spot,
+            "spot_source": spot_source,
+        }
+        for side, prefix in (("C", "call"), ("P", "put")):
+            row = selected.get(side)
+            if row is None:
+                continue
+            details[f"{prefix}_strike"] = row["strike"]
+            details[f"{prefix}_iv"] = row["iv"]
+            details[f"{prefix}_delta"] = row["delta"]
+            details[f"{prefix}_atm_metric"] = row["atm_metric"]
+            details[f"{prefix}_relative_spread"] = row["relative_spread"]
+        return details, pair_failure_reason
+
+    return None, pair_failure_reason
 
 
 def _ticker_historical_moves(
@@ -529,6 +716,13 @@ def _forecast_as_of(ml_forecast: dict[str, Any] | None, fallback: date) -> str:
     return fallback.isoformat()
 
 
+def _missing_ml_status(ml_forecast: dict[str, Any] | None) -> MLStatus:
+    status = (ml_forecast or {}).get("ml_status")
+    if status in {"unavailable_inputs", "unavailable_model", "unavailable_event"}:
+        return status
+    return "unavailable_inputs"
+
+
 def resolve_display_forecast(
     conn: duckdb.DuckDBPyConnection,
     *,
@@ -560,6 +754,7 @@ def resolve_display_forecast(
             fallback_reason=None,
         )
 
+    ml_status = _missing_ml_status(ml_forecast)
     strict_pct = _finite_positive(
         (strict_options or {}).get("em_baseline_straddle")
         or (strict_options or {}).get("straddle_pct")
@@ -569,7 +764,7 @@ def resolve_display_forecast(
             pct=strict_pct,
             method="options_math",
             as_of=as_of_date.isoformat(),
-            ml_status="unavailable_inputs",
+            ml_status=ml_status,
             options_status="decision_eligible",
             fallback_reason=None,
             selected_options_details={
@@ -595,13 +790,39 @@ def resolve_display_forecast(
             details = dict(indicative)
             if isinstance(details.get("expiry_date"), date):
                 details["expiry_date"] = details["expiry_date"].isoformat()
+            details.setdefault("estimator", "straddle_mid")
             return DisplayForecast(
                 pct=float(pct),
                 method="options_indicative",
                 as_of=as_of_date.isoformat(),
-                ml_status="unavailable_inputs",
+                ml_status=ml_status,
                 options_status="indicative",
                 fallback_reason="quote_quality",
+                selected_options_details=details,
+            )
+
+    iv_details, iv_failure_reason = _select_indicative_iv(
+        conn,
+        ticker=ticker,
+        as_of_date=as_of_date,
+        earnings_date=earnings_date,
+        timing=timing,
+        policy=active_policy,
+        pair_failure_reason=failure_reason,
+    )
+    if iv_details is not None:
+        pct = _finite_positive(iv_details.get("iv_em_pct"))
+        if pct is not None:
+            details = dict(iv_details)
+            if isinstance(details.get("expiry_date"), date):
+                details["expiry_date"] = details["expiry_date"].isoformat()
+            return DisplayForecast(
+                pct=pct,
+                method="options_indicative",
+                as_of=as_of_date.isoformat(),
+                ml_status=ml_status,
+                options_status="indicative",
+                fallback_reason=iv_failure_reason or "quote_quality",
                 selected_options_details=details,
             )
 
@@ -616,9 +837,9 @@ def resolve_display_forecast(
             pct=float(median(historical)),
             method="historical",
             as_of=as_of_date.isoformat(),
-            ml_status="unavailable_inputs",
+            ml_status=ml_status,
             options_status="unavailable",
-            fallback_reason=failure_reason,
+            fallback_reason=iv_failure_reason,
             historical_event_count=len(historical),
         )
 
@@ -636,7 +857,7 @@ def resolve_display_forecast(
         pct=prior_pct,
         method="historical_prior",
         as_of=str(prior.get("as_of_date") or as_of_date.isoformat()),
-        ml_status="unavailable_inputs",
+        ml_status=ml_status,
         options_status="unavailable",
         fallback_reason="insufficient_ticker_history",
         historical_event_count=len(historical),
