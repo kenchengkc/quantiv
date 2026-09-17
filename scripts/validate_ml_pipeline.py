@@ -16,21 +16,23 @@ ML_PACKAGE_ROOT = REPO_ROOT / "apps" / "ml"
 if str(ML_PACKAGE_ROOT) not in sys.path:
     sys.path.insert(0, str(ML_PACKAGE_ROOT))
 
-from ml.pipeline_validation import (  # noqa: E402 - standalone script path setup
-    DEFAULT_HORIZONS,
-    PipelineValidationError,
-    latest_forecast_path,
-    validate_forecast_artifact,
-    validate_model_artifacts,
-    validate_training_artifacts,
-)
 from ml.evidence_receipt import (  # noqa: E402 - standalone script path setup
     build_evidence_receipt,
     publish_evidence_receipt,
 )
+from ml.live_forecast_validation import (  # noqa: E402 - standalone script path setup
+    validate_live_forecast_artifact,
+)
 from ml.model_bundle import (  # noqa: E402 - standalone script path setup
     ModelBundleError,
     resolve_champion_bundle,
+)
+from ml.pipeline_validation import (  # noqa: E402 - standalone script path setup
+    DEFAULT_HORIZONS,
+    PipelineValidationError,
+    latest_forecast_path,
+    validate_model_artifacts,
+    validate_training_artifacts,
 )
 
 
@@ -110,7 +112,7 @@ def main() -> int:
             else:
                 if forecast_path is None:
                     raise PipelineValidationError([])
-                result = validate_forecast_artifact(
+                result = validate_live_forecast_artifact(
                     forecast_path,
                     models_dir=models_dir,
                     max_age_days=args.max_forecast_age_days,
