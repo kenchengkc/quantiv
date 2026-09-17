@@ -51,11 +51,7 @@ logger = logging.getLogger(__name__)
 
 
 def _sanitize_for_json(value: Any) -> Any:
-    """Recursively replace non-finite floats with None so the result is
-    strict-JSON safe. We can't rely on pandas' `.where(..., None)` because
-    float64 columns coerce the None back to NaN — we have to walk the dict
-    tree after `to_dict()` instead.
-    """
+    """Recursively replace non-finite floats with None for strict JSON."""
     if isinstance(value, float):
         return value if math.isfinite(value) else None
     if isinstance(value, dict):
@@ -70,7 +66,7 @@ def get_data_dir() -> Path:
 
 
 def load_models(models_dir: Path) -> Dict[int, dict]:
-    """Load the best-guess model and the high/low band models for each target."""
+    """Load the point and quantile models for every available trained horizon."""
     models = {}
     bundle_id = None
     manifest_path = models_dir / "manifest.json"
@@ -88,7 +84,9 @@ def load_models(models_dir: Path) -> Dict[int, dict]:
         native_features = list(estimator.feature_name())
         feature_cols = list(meta.get("feature_cols") or native_features)
         if not feature_cols:
-            logger.warning(f"T-{horizon} model unusable (no estimator or feature schema) — skipping")
+            logger.warning(
+                f"T-{horizon} model unusable (no estimator or feature schema) — skipping"
+            )
             continue
         if feature_cols != native_features:
             raise ValueError(f"T-{horizon} native model schema does not match metadata")
@@ -109,20 +107,34 @@ def load_models(models_dir: Path) -> Dict[int, dict]:
                 continue
             q_estimator = load_native_model(q_path)
             if list(q_estimator.feature_name()) != feature_cols:
-                raise ValueError(f"T-{horizon} q{int(alpha * 100):02d} schema mismatch")
+                raise ValueError(
+                    f"T-{horizon} q{int(alpha * 100):02d} schema mismatch"
+                )
             entry["quantile_models"][alpha] = q_estimator
 
         models[horizon] = entry
-        q_str = f" + {len(entry['quantile_models'])} quantile" if entry["quantile_models"] else ""
-        logger.info(f"Loaded T-{horizon} model (MAE={meta.get('val_mae', '?')}){q_str}")
+        q_str = (
+            f" + {len(entry['quantile_models'])} quantile"
+            if entry["quantile_models"]
+            else ""
+        )
+        logger.info(
+            f"Loaded T-{horizon} model (MAE={meta.get('val_mae', '?')}){q_str}"
+        )
 
     return models
 
 
-def get_upcoming_features(conn: duckdb.DuckDBPyConnection, days_ahead: int) -> pd.DataFrame:
-    """Features for symbols with earnings in the next `days_ahead` days.
+def get_upcoming_features(
+    conn: duckdb.DuckDBPyConnection,
+    days_ahead: int,
+) -> pd.DataFrame:
+    """Build point-in-time live features for upcoming earnings.
 
-    Same columns as feature_engineering.py (options, past earnings, realized vol).
+    The row spine comes from ticker OHLCV snapshots, not strict straddle
+    eligibility. Option features are LEFT JOINed and may therefore be NULL;
+    LightGBM handles those values as missing features rather than losing the
+    entire event/snapshot observation.
     """
     ensure_corporate_action_views(conn)
     adjusted_post = adjusted_post_price_sql(
@@ -136,6 +148,20 @@ def get_upcoming_features(conn: duckdb.DuckDBPyConnection, days_ahead: int) -> p
         SELECT act_symbol, date AS earnings_date, timing
         FROM v_earnings
         WHERE date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '{days_ahead}' DAY
+    ),
+    snapshot_spine AS (
+        SELECT
+            u.act_symbol,
+            u.earnings_date,
+            u.timing,
+            px.date AS snapshot_date,
+            px.close AS snapshot_close
+        FROM upcoming u
+        JOIN v_ohlcv px
+          ON px.act_symbol = u.act_symbol
+         AND px.date < u.earnings_date
+         AND (u.earnings_date - px.date) BETWEEN 1 AND 25
+         AND px.close > 0
     ),
 
     -- Past earnings moves for history features
@@ -211,7 +237,8 @@ def get_upcoming_features(conn: duckdb.DuckDBPyConnection, days_ahead: int) -> p
         GROUP BY act_symbol, earnings_date
     ),
 
-    -- Event vol decomposition
+    -- Event-vol decomposition remains strict-option-derived. Missing strict
+    -- option evidence yields NULL event-vol features on the OHLCV spine.
     event_vol AS (
         SELECT
             sf.act_symbol,
@@ -280,13 +307,13 @@ def get_upcoming_features(conn: duckdb.DuckDBPyConnection, days_ahead: int) -> p
     )
 
     SELECT
-        sf.act_symbol,
-        u.earnings_date,
-        u.timing,
-        sf.date AS snapshot_date,
-        (u.earnings_date - sf.date) AS lead_days,
+        sp.act_symbol,
+        sp.earnings_date,
+        sp.timing,
+        sp.snapshot_date,
+        (sp.earnings_date - sp.snapshot_date) AS lead_days,
 
-        -- Core options
+        -- Core options (nullable when no strict straddle exists)
         sf.atm_iv,
         sf.atm_strike,
         sf.atm_strike AS call_strike,
@@ -322,7 +349,7 @@ def get_upcoming_features(conn: duckdb.DuckDBPyConnection, days_ahead: int) -> p
         -- Market context
         rv.volume_ratio_20d,
         rv.drift_5d,
-        COALESCE(rv.close, sf.atm_strike) AS spot_price,
+        COALESCE(rv.close, sp.snapshot_close, sf.atm_strike) AS spot_price,
 
         sf.em_straddle,
         sf.em_iv,
@@ -391,33 +418,31 @@ def get_upcoming_features(conn: duckdb.DuckDBPyConnection, days_ahead: int) -> p
         (vh.iv_current - vh.iv_week_ago) AS iv_mom_week,
         (vh.iv_current - vh.iv_month_ago) AS iv_mom_month
 
-    FROM upcoming u
-    JOIN v_straddle_features sf
-        ON sf.act_symbol = u.act_symbol
-        AND sf.date < u.earnings_date
-        AND (u.earnings_date - sf.date) BETWEEN 1 AND 25
+    FROM snapshot_spine sp
+    LEFT JOIN v_straddle_features sf
+        ON sf.act_symbol = sp.act_symbol
+        AND sf.date = sp.snapshot_date
         AND (
-            (LOWER(COALESCE(u.timing, '')) = 'amc' AND sf.expiration > u.earnings_date)
-            OR (LOWER(COALESCE(u.timing, '')) != 'amc' AND sf.expiration >= u.earnings_date)
+            (LOWER(COALESCE(sp.timing, '')) = 'amc' AND sf.expiration > sp.earnings_date)
+            OR (LOWER(COALESCE(sp.timing, '')) != 'amc' AND sf.expiration >= sp.earnings_date)
         )
     LEFT JOIN v_realized_vol rv
-        ON rv.act_symbol = sf.act_symbol AND rv.date = sf.date
+        ON rv.act_symbol = sp.act_symbol AND rv.date = sp.snapshot_date
     LEFT JOIN event_vol ev
-        ON ev.act_symbol = sf.act_symbol
-        AND ev.snapshot_date = sf.date
-        AND ev.earnings_date = u.earnings_date
+        ON ev.act_symbol = sp.act_symbol
+        AND ev.snapshot_date = sp.snapshot_date
+        AND ev.earnings_date = sp.earnings_date
     LEFT JOIN trailing_stats ts
-        ON ts.act_symbol = u.act_symbol
-        AND ts.earnings_date = u.earnings_date
-    LEFT JOIN macro mc ON mc.date = sf.date
+        ON ts.act_symbol = sp.act_symbol
+        AND ts.earnings_date = sp.earnings_date
+    LEFT JOIN macro mc ON mc.date = sp.snapshot_date
     LEFT JOIN v_volhist vh
-        ON vh.act_symbol = sf.act_symbol AND vh.date = sf.date
-    WHERE sf.atm_iv > 0 AND sf.atm_strike > 0
+        ON vh.act_symbol = sp.act_symbol AND vh.date = sp.snapshot_date
     QUALIFY ROW_NUMBER() OVER (
-        PARTITION BY sf.act_symbol, sf.date, u.earnings_date
-        ORDER BY sf.expiration ASC
+        PARTITION BY sp.act_symbol, sp.snapshot_date, sp.earnings_date
+        ORDER BY sf.expiration ASC NULLS LAST
     ) = 1
-    ORDER BY u.earnings_date, sf.act_symbol, lead_days
+    ORDER BY sp.earnings_date, sp.act_symbol, lead_days
     """
     return conn.execute(sql).fetchdf()
 
@@ -447,34 +472,23 @@ def score(df: pd.DataFrame, models: Dict[int, dict]) -> pd.DataFrame:
 
         # Persist the exact feature vector used at scoring time so the
         # /api/ml/predict route can re-run inference later with a live spot
-        # substituted in. Stored as a JSON string per row → loaded into a
-        # JSONB column by scripts/import_recent_to_postgres.py.
-        #
-        # NaN/Inf handling: walk each record dict via _sanitize_for_json to
-        # replace non-finite floats with None before json.dumps. pandas'
-        # `.where(..., None)` doesn't work here — float64 columns coerce
-        # None back to NaN. allow_nan=False then crashes loud on any leak
-        # rather than emitting the JSON5-ish `NaN` token that Postgres
-        # JSONB rejects.
+        # substituted in.
         feature_records = X.to_dict(orient="records")
         hdf["feature_vector"] = [
             json.dumps(_sanitize_for_json(row), default=str, allow_nan=False)
             for row in feature_records
         ]
 
-        # Point prediction
         pred = np.clip(m["model"].predict(X), 0.0, None)
         hdf["em_ml_pct"] = pred
         hdf["em_ml_abs"] = pred * hdf["spot_price"]
 
-        # Quantile predictions
         q_models = m.get("quantile_models", {})
         if q_models:
             for alpha, qm in q_models.items():
                 col = f"p{int(alpha * 100):02d}"
                 hdf[col] = qm.predict(X)
         else:
-            # Fallback: Gaussian bands from residual_std
             residual_std = m["residual_std"]
             hdf["p10"] = pred - 1.28 * residual_std
             hdf["p25"] = pred - 0.67 * residual_std
@@ -482,9 +496,6 @@ def score(df: pd.DataFrame, models: Dict[int, dict]) -> pd.DataFrame:
             hdf["p75"] = pred + 0.67 * residual_std
             hdf["p90"] = pred + 1.28 * residual_std
 
-        # Quantile heads are trained independently and can occasionally
-        # cross. The target is an absolute move, so enforce nonnegative,
-        # monotone bands before persisting or serving them.
         quantile_cols = [
             col for col in ("p10", "p25", "p50", "p75", "p90") if col in hdf
         ]
@@ -493,7 +504,6 @@ def score(df: pd.DataFrame, models: Dict[int, dict]) -> pd.DataFrame:
                 hdf[quantile_cols].to_numpy(dtype=float)
             )
 
-        # Math baselines
         hdf["em_math_pct"] = hdf["straddle_pct"]
         hdf["em_event_vol_pct"] = hdf.get("event_move_implied", np.nan)
         hdf["correction_factor"] = pred / hdf["straddle_pct"].clip(lower=0.001)
@@ -513,9 +523,6 @@ def score(df: pd.DataFrame, models: Dict[int, dict]) -> pd.DataFrame:
     return pd.concat(results, ignore_index=True)
 
 
-# Serving (DuckDB view, frontend JSON, Neon import) always reads the newest
-# forecasts_YYYY-MM-DD.parquet. Older snapshots are only useful for a short
-# debug window; without a cap they accumulate forever on R2 via pull+score+sync.
 FORECAST_RETENTION_DAYS = 14
 _FORECAST_SNAPSHOT_RE = re.compile(r"^forecasts_(\d{4}-\d{2}-\d{2})\.parquet$")
 
@@ -573,34 +580,31 @@ def save_forecasts(
         "model_horizon", "model_bundle_id", "spot_price", "atm_iv",
         "atm_strike", "call_strike", "put_strike",
         "call_bid", "call_ask", "call_mid", "call_relative_spread",
-        "call_volume", "call_open_interest",
-        "call_quote_timestamp",
+        "call_volume", "call_open_interest", "call_quote_timestamp",
         "put_bid", "put_ask", "put_mid", "put_relative_spread",
-        "put_volume", "put_open_interest",
-        "put_quote_timestamp",
+        "put_volume", "put_open_interest", "put_quote_timestamp",
         "straddle_bid", "straddle_ask", "straddle_mid",
         "straddle_relative_spread", "quote_timestamp_precision",
         "market_data_mode", "quote_quality_status", "liquidity_tier",
         "liquidity_tier_method", "quote_rejection_reason",
         "em_math_pct", "em_event_vol_pct", "em_ml_pct", "em_ml_abs",
-        "correction_factor",
-        "p10", "p25", "p50", "p75", "p90",
+        "correction_factor", "p10", "p25", "p50", "p75", "p90",
         "iv_crush_pct", "event_vol_fraction",
         "hist_move_avg_4q", "hist_straddle_accuracy",
         "iv_rv_ratio_20d", "parkinson_rv_20d", "vol_of_vol_20d",
-        "scored_at",
-        # Feature vector used at scoring time — consumed by the API's
-        # re-inference path. JSON string in the Parquet so DuckDB and
-        # Pandas readers don't have to know the schema.
-        "feature_vector",
+        "scored_at", "feature_vector",
     ]
     out = df[[c for c in out_cols if c in df.columns]].copy()
-    serving_key_cols = ["act_symbol", "earnings_date", "snapshot_date", "model_horizon"]
+    serving_key_cols = [
+        "act_symbol", "earnings_date", "snapshot_date", "model_horizon"
+    ]
     if all(c in out.columns for c in serving_key_cols):
         duplicate_mask = out.duplicated(serving_key_cols, keep=False)
         if duplicate_mask.any():
             duplicate_rows = int(duplicate_mask.sum())
-            unique_keys = int(out.loc[duplicate_mask, serving_key_cols].drop_duplicates().shape[0])
+            unique_keys = int(
+                out.loc[duplicate_mask, serving_key_cols].drop_duplicates().shape[0]
+            )
             logger.warning(
                 "Forecast output has %d rows sharing %d serving keys; "
                 "keeping the first event-covering expiry per key",
@@ -617,19 +621,23 @@ def save_forecasts(
         logger.info("Saved %d candidate forecasts → %s", len(out), output_path)
         return
 
-    # Production Parquet
     today = datetime.now().strftime("%Y-%m-%d")
     parquet_path = forecast_dir / f"forecasts_{today}.parquet"
     out.to_parquet(parquet_path, index=False)
     logger.info(f"Saved {len(out)} forecasts → {parquet_path}")
     pruned = prune_forecast_snapshots(forecast_dir)
     if pruned:
-        logger.info("Pruned %d forecast snapshot(s) older than %d days", pruned, FORECAST_RETENTION_DAYS)
+        logger.info(
+            "Pruned %d forecast snapshot(s) older than %d days",
+            pruned,
+            FORECAST_RETENTION_DAYS,
+        )
 
-    # DuckDB
     db_path = os.getenv("DUCKDB_PATH", str(data_dir / "quantiv.duckdb"))
     conn = duckdb.connect(db_path)
-    conn.execute("CREATE TABLE IF NOT EXISTS ml_forecasts AS SELECT * FROM out WHERE 1=0")
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS ml_forecasts AS SELECT * FROM out WHERE 1=0"
+    )
     conn.execute("INSERT INTO ml_forecasts SELECT * FROM out")
     n = conn.execute("SELECT COUNT(*) FROM ml_forecasts").fetchone()[0]
     conn.close()
@@ -637,7 +645,9 @@ def save_forecasts(
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Score upcoming earnings with trained models")
+    parser = argparse.ArgumentParser(
+        description="Score upcoming earnings with trained models"
+    )
     parser.add_argument("--days-ahead", type=int, default=14)
     parser.add_argument("--models-dir", type=Path, default=None)
     parser.add_argument(
@@ -668,19 +678,25 @@ def main():
     db_path = os.getenv("DUCKDB_PATH", str(data_dir / "quantiv.duckdb"))
     conn = duckdb.connect(db_path, read_only=False)
 
-    # Optional views: empty stand-ins if daily prices are missing.
-    views = [r[0] for r in conn.execute(
-        "SELECT table_name FROM information_schema.tables WHERE table_type='VIEW'"
-    ).fetchall()]
+    views = [
+        r[0]
+        for r in conn.execute(
+            "SELECT table_name FROM information_schema.tables WHERE table_type='VIEW'"
+        ).fetchall()
+    ]
     if "v_ohlcv" not in views:
-        logger.warning("v_ohlcv not found — skipping past-move stats that need daily prices")
+        logger.warning(
+            "v_ohlcv not found — skipping past-move stats that need daily prices"
+        )
         conn.execute("""
             CREATE OR REPLACE VIEW v_ohlcv AS
             SELECT NULL::VARCHAR AS act_symbol, NULL::DATE AS date,
                    NULL::DOUBLE AS close WHERE 1=0
         """)
     if "v_realized_vol" not in views:
-        logger.warning("v_realized_vol not found — realized-vol features will be empty")
+        logger.warning(
+            "v_realized_vol not found — realized-vol features will be empty"
+        )
         conn.execute("""
             CREATE OR REPLACE VIEW v_realized_vol AS
             SELECT NULL::VARCHAR AS act_symbol, NULL::DATE AS date,
@@ -710,14 +726,21 @@ def main():
             """)
     if "v_volhist" not in views:
         volhist_glob = (
-            data_dir / "parquet" / "volatility_history" / "year=*" / "month=*" / "*.parquet"
+            data_dir
+            / "parquet"
+            / "volatility_history"
+            / "year=*"
+            / "month=*"
+            / "*.parquet"
         )
         if "v_volhist_raw" in views:
             conn.execute("""
                 CREATE OR REPLACE VIEW v_volhist AS
                 SELECT * EXCLUDE (month, year) FROM v_volhist_raw
             """)
-        elif list(data_dir.glob("parquet/volatility_history/year=*/month=*/*.parquet")):
+        elif list(
+            data_dir.glob("parquet/volatility_history/year=*/month=*/*.parquet")
+        ):
             conn.execute(f"""
                 CREATE OR REPLACE VIEW v_volhist AS
                 SELECT
@@ -736,7 +759,9 @@ def main():
                 FROM read_parquet('{volhist_glob}')
             """)
         else:
-            logger.warning("v_volhist not found — volatility-history features will be empty")
+            logger.warning(
+                "v_volhist not found — volatility-history features will be empty"
+            )
             conn.execute("""
                 CREATE OR REPLACE VIEW v_volhist AS
                 SELECT NULL::DATE AS date, NULL::VARCHAR AS act_symbol,
@@ -769,21 +794,27 @@ def main():
             .agg(
                 spot=("spot_price", "first"),
                 em_math=("em_math_pct", "first"),
-                em_event=("em_event_vol_pct", "first") if "em_event_vol_pct" in forecasts.columns else ("em_math_pct", "first"),
+                em_event=("em_event_vol_pct", "first")
+                if "em_event_vol_pct" in forecasts.columns
+                else ("em_math_pct", "first"),
                 em_ml=("em_ml_pct", "first"),
                 correction=("correction_factor", "first"),
-                **({
-                    "p10": ("p10", "first"),
-                    "p50": ("p50", "first"),
-                    "p90": ("p90", "first"),
-                } if has_quantiles else {}),
+                **(
+                    {
+                        "p10": ("p10", "first"),
+                        "p50": ("p50", "first"),
+                        "p90": ("p90", "first"),
+                    }
+                    if has_quantiles
+                    else {}
+                ),
             )
             .sort_values("earnings_date")
             .head(30)
         )
-        print(f"\n{'='*90}")
+        print(f"\n{'=' * 90}")
         print("UPCOMING EARNINGS FORECASTS")
-        print(f"{'='*90}")
+        print(f"{'=' * 90}")
         pd.set_option("display.float_format", "{:.4f}".format)
         pd.set_option("display.max_columns", 20)
         pd.set_option("display.width", 120)
