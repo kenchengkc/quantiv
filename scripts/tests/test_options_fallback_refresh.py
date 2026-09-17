@@ -75,7 +75,8 @@ def test_verified_published_fallback_allows_refresh_scoring(tmp_path: Path) -> N
     result = finalize_snapshot(manifest_path=manifest_path, data_dir=data_dir)
 
     assert result.state == "fallback"
-    assert result.can_score is True
+    assert result.can_score is False
+    assert result.can_refresh is True
     assert result.active_source_date == published_date
     assert not candidate.exists()
     status = json.loads(
