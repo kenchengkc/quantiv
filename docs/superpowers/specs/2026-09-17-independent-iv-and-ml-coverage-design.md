@@ -1,7 +1,7 @@
 # Independent IV and ML Coverage Fallback
 
 Date: 2026-09-17
-Status: Approved design
+Status: Implemented design
 Branch: `fix/independent-iv-forecast-fallback`
 
 ## Summary
@@ -27,8 +27,9 @@ The strict analytical fields and strict option-quality views retain their existi
 - Allow IV estimation when calls and puts do not share one strike, and allow a single clean near-ATM side when the opposite side is unusable.
 - Keep strict straddle and ML research semantics unchanged.
 - Remove the inner-join dependency that makes strict straddle availability a prerequisite for creating ML scoring rows.
+- Validate ML-only rows without weakening the existing strict options forecast validator.
 - Allow the nightly refresh to continue ML/frontend publication against a verified published options fallback when only the options candidate is stale or fails options-specific quality gates.
-- Improve ML availability diagnostics without pretending an untrained horizon is a validated model.
+- Preserve more precise ML availability diagnostics when upstream producers can identify the reason, without pretending an untrained horizon is a validated model.
 
 ## Non-goals
 
@@ -36,12 +37,13 @@ The strict analytical fields and strict option-quality views retain their existi
 - Loosening `v_eligible_straddles`, `v_straddle_features`, reconciliation thresholds, or strict options publication quality.
 - Training new LightGBM horizons in this change.
 - Using a T-k model on a different lead-time feature vector without validation.
-- Fabricating bid/ask, Greeks, straddle price, or quantiles for IV-only rows.
+- Fabricating bid/ask, Greeks, straddle price, or quantiles for IV-only display rows.
 - Hiding stale options evidence; IV estimates retain the actual options snapshot `as_of_date`.
+- Calling a restored stale options fallback "decision safe" merely because the rest of the refresh can continue.
 
 ## Independent IV estimator
 
-The display resolver must search individual option contracts only after strict and relaxed same-strike straddle selection fail.
+The display resolver searches individual option contracts only after strict and relaxed same-strike straddle selection fail.
 
 For each expiry in ascending order that spans the earnings event and is within the existing display-policy post-event window:
 
@@ -61,7 +63,7 @@ Public behavior remains `display_forecast_method = "options_indicative"` and `op
 
 ## ML scoring independence
 
-`get_upcoming_features()` must use an OHLCV-backed snapshot spine rather than `v_straddle_features` as the row-generating relation.
+`get_upcoming_features()` uses an OHLCV-backed snapshot spine rather than `v_straddle_features` as the row-generating relation.
 
 The snapshot spine contains each upcoming event and each available ticker OHLCV date that is:
 
@@ -74,27 +76,44 @@ Realized-volatility, historical-earnings, macro, volatility-history, timing, cal
 
 LightGBM receives `NaN` for unavailable option features rather than losing the entire scoring row. Existing model artifacts, exact trained horizons, and quantile heads remain unchanged.
 
+## Live forecast validation
+
+The existing `pipeline_validation.validate_forecast_artifact()` remains the unchanged strict validator for forecast rows that carry option evidence.
+
+`live_forecast_validation.validate_live_forecast_artifact()` composes that validator:
+
+- any row carrying any strict option evidence is routed through the existing strict validator and must still satisfy quote completeness, same-strike consistency, spread limits, labels, IV math, straddle math, and handoff checks;
+- a row with no strict option evidence at all may be accepted as ML-only if its serving key, model bundle, model horizon, feature-vector schema, point estimate, quantiles, absolute move, point-in-time dates, and freshness all validate;
+- partially populated option rows are never reclassified as ML-only and therefore fail closed through the strict path.
+
+This separation is required because a valid LightGBM prediction may contain missing option features, while a published strict options estimate still requires complete decision-eligible market evidence.
+
 ## Horizon behavior
 
 This change does not score a T-7 model on T-5 inputs. Exact trained-horizon matching remains the validation boundary.
 
 Coverage improves because exact trained-horizon rows can now exist even when strict options were absent on that snapshot date. Existing forecast selection may continue to publish the closest available exact-horizon forecast for the event.
 
-When model metadata is available to the display resolver and no forecast exists, the resolver may classify `ml_status = "unavailable_model"` only when no trained horizon could have produced a pre-cutoff snapshot for the event. Otherwise it reports `unavailable_inputs`. If metadata cannot be read, it fails conservatively to `unavailable_inputs`.
+The display resolver preserves a caller-provided `ml_status` from the allowed unavailable states (`unavailable_inputs`, `unavailable_model`, `unavailable_event`) and defaults conservatively to `unavailable_inputs` when no more precise upstream classification is available.
 
 ## Options fallback refresh behavior
 
 An options candidate that fails only the existing soft options-specific fallback codes still rolls back to the last published options partition. After that rollback is complete and the published partition is verified as the newest active local partition, ML scoring and frontend publication may continue.
 
-`FinalizationResult.can_score` therefore means "the refresh may safely continue scoring with the active options state", not "the latest candidate passed strict options reconciliation".
+The two safety signals remain intentionally separate:
 
-The options status artifact must continue to distinguish:
+- `FinalizationResult.can_score` means the newest options candidate itself passed strict options reconciliation and is decision-safe. It is `true` only for `state = "accepted"`.
+- `FinalizationResult.can_refresh` means the independent downstream refresh may proceed using the active local options state. It is `true` for an accepted candidate and for a successfully restored published fallback.
+
+The workflow restores and re-reconciles a fallback before downstream refresh. A failed fallback verification stops the job before ML scoring or frontend publication.
+
+The options status artifact distinguishes:
 
 - `state = "accepted"` for a fresh decision-safe candidate;
-- `state = "fallback"` for a verified published fallback;
+- `state = "fallback"` for a restored published fallback;
 - `state = "blocked"` for unrelated critical failures.
 
-For fallback state, strict options decision safety remains false in policy metadata even though ML/frontend refresh may continue.
+For fallback state, `strict_options_candidate_accepted = false` and the backward-compatible strict `scoring_allowed = false`, while `refresh_scoring_allowed = true`. This makes the degraded options state explicit without freezing independent refresh work.
 
 ## Diagnostics and invariants
 
@@ -103,6 +122,8 @@ For fallback state, strict options decision safety remains false in policy metad
 - IV-only selection never changes strict event coverage or reconciliation counts.
 - A missing same-strike pair is not synonymous with missing implied-volatility evidence.
 - ML feature rows are no longer removed solely because `v_straddle_features` has no row.
+- ML-only forecast rows can pass the live forecast gate without fabricating strict option evidence.
+- Rows that contain any strict option evidence remain subject to every existing strict quote-quality gate.
 - Non-options critical reconciliation failures still block refresh.
 - Options fallback keeps its true source date so stale market evidence is visible.
 - Existing public display method enums remain backward compatible.
