@@ -25,7 +25,12 @@ ML_PACKAGE_ROOT = REPO_ROOT / "apps" / "ml"
 if str(ML_PACKAGE_ROOT) not in sys.path:
     sys.path.insert(0, str(ML_PACKAGE_ROOT))
 
-from ml.live_forecast_validation import validate_live_forecast_artifact  # noqa: E402
+# Keep the historical module-level validator name as the rollback test seam while
+# routing production validation through the live contract that accepts truly
+# optionless ML rows and delegates any option-bearing row to the strict validator.
+from ml.live_forecast_validation import (  # noqa: E402
+    validate_live_forecast_artifact as validate_forecast_artifact,
+)
 from ml.model_bundle import (  # noqa: E402
     create_signed_control_pointer,
     create_signed_registry,
@@ -145,7 +150,7 @@ def provenance_rollback(
     registry_path = control_dir / "registry.json"
     # Run the production live forecast validator inside the mutation command too;
     # a caller cannot bypass validation by omitting a workflow step/report.
-    validate_live_forecast_artifact(
+    validate_forecast_artifact(
         candidate_forecast, models_dir=models_root / "bundles" / target_bundle_id,
     )
 
