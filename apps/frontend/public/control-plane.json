@@ -5,38 +5,42 @@
     "corporate_action_rows": 28822,
     "corporate_action_status": "enforced",
     "covered_events": 38,
-    "decision_group_rejection_rate": 0.254902,
-    "decision_groups": 51,
+    "decision_group_rejection_rate": 0.283019,
+    "decision_groups": 53,
     "decision_scope": "end_of_day_research",
+    "display_forecast_coverage_pct": null,
+    "display_forecast_covered_events": null,
+    "display_forecast_events": null,
+    "display_forecast_method_mix": {},
     "duplicate_rows": 0,
     "eligible_contracts": 64210,
     "eligible_decision_groups": 38,
-    "event_coverage_pct": 0.745098,
-    "expected_events": 51,
-    "expected_source_date": "2026-09-15",
+    "event_coverage_pct": 0.716981,
+    "expected_events": 53,
+    "expected_source_date": "2026-09-16",
     "live_trading_eligible": false,
-    "missing_events": 13,
+    "missing_events": 15,
     "pair_rejection_rate": 0.894044,
     "quarantine_records": 123298,
     "quarantine_status": "enforced",
     "quote_quality_errors": [
-      "latest source date 2026-09-14 is 1 market session(s) behind expected 2026-09-15"
+      "latest source date 2026-09-14 is 2 market session(s) behind expected 2026-09-16"
     ],
     "replay_status": "verified",
     "source_date": "2026-09-14",
-    "source_session_lag": 1,
+    "source_session_lag": 2,
     "status": "failed"
   },
   "exceptions": [
     {
       "code": "upcoming_events_outside_option_universe",
-      "count": 169,
+      "count": 153,
       "severity": "warning",
       "summary": "Calendar events fall outside the current options decision universe"
     },
     {
       "code": "upcoming_events_without_option_chain",
-      "count": 13,
+      "count": 15,
       "severity": "warning",
       "summary": "In-universe earnings events have no decision-eligible option chain"
     },
@@ -48,12 +52,12 @@
     },
     {
       "code": "option_quote_quality_below_limit",
-      "count": 13,
+      "count": 15,
       "severity": "critical",
       "summary": "Option evidence on the scoped earnings decision surface exceeds the publication limit"
     }
   ],
-  "generated_at": "2026-09-16T16:18:41.774048+00:00",
+  "generated_at": "2026-09-17T15:52:53.675961+00:00",
   "model": {
     "challenger_present": true,
     "champion_active": true,
