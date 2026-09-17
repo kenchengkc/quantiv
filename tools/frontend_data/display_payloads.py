@@ -85,6 +85,7 @@ def enrich_upcoming_event(
         ml_forecast={
             "em_ml_pct": event.get("em_ml_pct"),
             "ml_snapshot_date": event.get("ml_snapshot_date"),
+            "ml_status": event.get("ml_status"),
         },
         strict_options=_strict_options_from_event(event),
     )
@@ -104,7 +105,9 @@ def enrich_upcoming_events(
     return events
 
 
-def _event_identity_map(week_payloads: dict[date, dict[str, Any]]) -> dict[tuple[str, str], dict[str, Any]]:
+def _event_identity_map(
+    week_payloads: dict[date, dict[str, Any]],
+) -> dict[tuple[str, str], dict[str, Any]]:
     out: dict[tuple[str, str], dict[str, Any]] = {}
     for payload in week_payloads.values():
         for event in payload.get("events") or []:
@@ -146,7 +149,9 @@ def _validate_display_provenance(
         if ml_status != "available":
             errors.append(f"{identity}: ML method without available ML status")
         if options_status not in {"decision_eligible", "unavailable"}:
-            errors.append(f"{identity}: ML method with incoherent options status={options_status!r}")
+            errors.append(
+                f"{identity}: ML method with incoherent options status={options_status!r}"
+            )
         if fallback_reason is not None:
             errors.append(f"{identity}: ML method must not carry a fallback reason")
         return
@@ -156,30 +161,56 @@ def _validate_display_provenance(
 
     if method == "options_math":
         if options_status != "decision_eligible":
-            errors.append(f"{identity}: strict options method without decision-eligible options")
+            errors.append(
+                f"{identity}: strict options method without decision-eligible options"
+            )
         if fallback_reason is not None:
-            errors.append(f"{identity}: strict options method must not carry a fallback reason")
+            errors.append(
+                f"{identity}: strict options method must not carry a fallback reason"
+            )
     elif method == "options_indicative":
         if options_status != "indicative":
-            errors.append(f"{identity}: indicative options method without indicative options status")
-        if fallback_reason != "quote_quality":
-            errors.append(f"{identity}: indicative options method must identify quote_quality fallback")
+            errors.append(
+                f"{identity}: indicative options method without indicative options status"
+            )
+        if fallback_reason not in {"quote_quality", "no_same_strike_pair"}:
+            errors.append(
+                f"{identity}: indicative options method has incoherent "
+                f"fallback_reason={fallback_reason!r}"
+            )
     elif method == "historical":
         if options_status != "unavailable":
-            errors.append(f"{identity}: historical method must have unavailable options status")
+            errors.append(
+                f"{identity}: historical method must have unavailable options status"
+            )
         count = event.get("historical_event_count")
         if not isinstance(count, int) or isinstance(count, bool) or count <= 0:
-            errors.append(f"{identity}: historical method requires positive historical_event_count")
-        if fallback_reason not in {"quote_quality", "no_same_strike_pair", "no_event_expiry"}:
-            errors.append(f"{identity}: historical method has incoherent fallback_reason={fallback_reason!r}")
+            errors.append(
+                f"{identity}: historical method requires positive historical_event_count"
+            )
+        if fallback_reason not in {
+            "quote_quality",
+            "no_same_strike_pair",
+            "no_event_expiry",
+        }:
+            errors.append(
+                f"{identity}: historical method has incoherent "
+                f"fallback_reason={fallback_reason!r}"
+            )
     elif method == "historical_prior":
         if options_status != "unavailable":
-            errors.append(f"{identity}: historical prior must have unavailable options status")
+            errors.append(
+                f"{identity}: historical prior must have unavailable options status"
+            )
         count = event.get("historical_event_count")
         if not isinstance(count, int) or isinstance(count, bool) or count < 0:
-            errors.append(f"{identity}: historical prior requires nonnegative historical_event_count")
+            errors.append(
+                f"{identity}: historical prior requires nonnegative historical_event_count"
+            )
         if fallback_reason != "insufficient_ticker_history":
-            errors.append(f"{identity}: historical prior must identify insufficient_ticker_history")
+            errors.append(
+                f"{identity}: historical prior must identify insufficient_ticker_history"
+            )
 
 
 def validate_upcoming_display_forecasts(
@@ -192,7 +223,10 @@ def validate_upcoming_display_forecasts(
 
     rows = _event_identity_map(week_payloads)
     windows = [
-        (date.fromisoformat(payload["window"]["start"]), date.fromisoformat(payload["window"]["end"]))
+        (
+            date.fromisoformat(payload["window"]["start"]),
+            date.fromisoformat(payload["window"]["end"]),
+        )
         for payload in week_payloads.values()
         if isinstance(payload.get("window"), dict)
         and payload["window"].get("start")
@@ -211,7 +245,9 @@ def validate_upcoming_display_forecasts(
             continue
         _validate_display_provenance(event, identity=identity, errors=errors)
     if errors:
-        raise DisplayForecastError("display forecast invariant failed:\n  " + "\n  ".join(errors))
+        raise DisplayForecastError(
+            "display forecast invariant failed:\n  " + "\n  ".join(errors)
+        )
 
 
 def build_display_forecast_status(
@@ -223,7 +259,10 @@ def build_display_forecast_status(
 ) -> dict[str, Any]:
     rows = _event_identity_map(week_payloads)
     windows = [
-        (date.fromisoformat(payload["window"]["start"]), date.fromisoformat(payload["window"]["end"]))
+        (
+            date.fromisoformat(payload["window"]["start"]),
+            date.fromisoformat(payload["window"]["end"]),
+        )
         for payload in week_payloads.values()
         if isinstance(payload.get("window"), dict)
         and payload["window"].get("start")
@@ -239,7 +278,10 @@ def build_display_forecast_status(
         if event is not None:
             selected.append(event)
     mix = Counter(str(event.get("display_forecast_method")) for event in selected)
-    covered = sum(_finite_positive(event.get("display_forecast_pct")) is not None for event in selected)
+    covered = sum(
+        _finite_positive(event.get("display_forecast_pct")) is not None
+        for event in selected
+    )
     expected = len(selected)
     return {
         "schema": "quantiv.display-forecast-status.v1",
@@ -247,7 +289,9 @@ def build_display_forecast_status(
         "published_upcoming_events": expected,
         "with_display_forecast": covered,
         "coverage_pct": covered / expected if expected else 1.0,
-        "method_mix": {method: int(mix.get(method, 0)) for method in sorted(DISPLAY_METHODS)},
+        "method_mix": {
+            method: int(mix.get(method, 0)) for method in sorted(DISPLAY_METHODS)
+        },
     }
 
 
@@ -269,7 +313,10 @@ def display_fields_from_event(event: dict[str, Any] | None) -> dict[str, Any]:
     }
 
 
-def _symbol_history(conn: duckdb.DuckDBPyConnection, ticker: str) -> list[dict[str, Any]]:
+def _symbol_history(
+    conn: duckdb.DuckDBPyConnection,
+    ticker: str,
+) -> list[dict[str, Any]]:
     try:
         rows = conn.execute(
             """
@@ -297,7 +344,16 @@ def _symbol_history(conn: duckdb.DuckDBPyConnection, ticker: str) -> list[dict[s
             "revenue_actual": jsonable(revenue_actual),
             "revenue_estimate": jsonable(revenue_estimate),
         }
-        for earnings_dt, timing, fiscal_year, fiscal_q, eps_actual, eps_estimate, revenue_actual, revenue_estimate in rows
+        for (
+            earnings_dt,
+            timing,
+            fiscal_year,
+            fiscal_q,
+            eps_actual,
+            eps_estimate,
+            revenue_actual,
+            revenue_estimate,
+        ) in rows
     ]
 
 
