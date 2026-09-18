@@ -204,6 +204,49 @@ def decide(args: argparse.Namespace) -> int:
     return 0
 
 
+def drift_reference_cohort(
+    forecasts: pd.DataFrame,
+) -> tuple[pd.DataFrame, dict[str, Any]]:
+    """Select rows comparable to the champion's strict-option training reference.
+
+    Optionless ML rows are valid live forecasts after the independent-scoring
+    change, but their intentionally missing strict-option features are not
+    comparable to a training reference built from decision-eligible straddles.
+    Keep those rows in shadow scoring while excluding them from PSI/missingness
+    drift against that reference.
+    """
+    if "em_math_pct" not in forecasts.columns:
+        raise ValueError("forecast artifact lacks em_math_pct for drift cohort selection")
+
+    em_math = pd.to_numeric(forecasts["em_math_pct"], errors="coerce")
+    strict_mask = em_math.notna() & (em_math > 0) & (em_math < float("inf"))
+    cohort = forecasts.loc[strict_mask].copy()
+
+    by_horizon: dict[str, dict[str, int]] = {}
+    horizons = pd.to_numeric(forecasts["model_horizon"], errors="coerce")
+    for horizon in sorted(horizons.dropna().astype(int).unique()):
+        horizon_mask = horizons == horizon
+        rows = int(horizon_mask.sum())
+        strict_rows = int((horizon_mask & strict_mask).sum())
+        by_horizon[str(horizon)] = {
+            "rows": rows,
+            "strict_option_rows": strict_rows,
+            "optionless_rows": rows - strict_rows,
+        }
+
+    total_rows = len(forecasts)
+    strict_rows = int(strict_mask.sum())
+    optionless_rows = total_rows - strict_rows
+    diagnostics = {
+        "rows": total_rows,
+        "strict_option_rows": strict_rows,
+        "optionless_rows": optionless_rows,
+        "optionless_share": optionless_rows / total_rows if total_rows else 0.0,
+        "by_horizon": by_horizon,
+    }
+    return cohort, diagnostics
+
+
 def monitor(args: argparse.Namespace) -> int:
     control_dir = args.models_root / "control"
     pointer = verify_control_pointer(_read_json(control_dir / "champion.json"))
@@ -261,7 +304,9 @@ def monitor(args: argparse.Namespace) -> int:
     monitoring_dir = args.models_root / "monitoring"
     ledger_path = monitoring_dir / "prediction_ledger.parquet"
     ledger = append_prediction_ledger(ledger_path, ledger_rows)
-    drift = feature_drift_report(forecasts, champion_dir)
+    drift_population, drift_population_diagnostics = drift_reference_cohort(forecasts)
+    drift = feature_drift_report(drift_population, champion_dir)
+    drift["reference_population"] = drift_population_diagnostics
     report = {
         "schema": "quantiv.model-monitoring.v1",
         "status": "failed" if drift["status"] == "critical" else "passed",
