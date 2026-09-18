@@ -13,7 +13,7 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 if str(REPO_ROOT / "scripts") not in sys.path:
     sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
-from model_control_plane import evaluate_outcomes  # noqa: E402
+from model_control_plane import drift_reference_cohort, evaluate_outcomes  # noqa: E402
 from ml.model_bundle import verify_outcome_receipt  # noqa: E402
 
 
@@ -60,3 +60,28 @@ def test_insufficient_outcomes_are_retained_and_signed(tmp_path, monkeypatch) ->
         history_path=history,
         public_key=public_pem,
     )
+
+
+
+def test_drift_reference_cohort_uses_only_strict_option_rows() -> None:
+    import pandas as pd
+
+    forecasts = pd.DataFrame(
+        {
+            "model_horizon": [7, 7, 14, 14],
+            "em_math_pct": [0.08, None, 0.06, float("nan")],
+            "feature_vector": ["{}", "{}", "{}", "{}"],
+        }
+    )
+
+    cohort, diagnostics = drift_reference_cohort(forecasts)
+
+    assert cohort.index.tolist() == [0, 2]
+    assert diagnostics["rows"] == 4
+    assert diagnostics["strict_option_rows"] == 2
+    assert diagnostics["optionless_rows"] == 2
+    assert diagnostics["optionless_share"] == 0.5
+    assert diagnostics["by_horizon"] == {
+        "7": {"rows": 2, "strict_option_rows": 1, "optionless_rows": 1},
+        "14": {"rows": 2, "strict_option_rows": 1, "optionless_rows": 1},
+    }
