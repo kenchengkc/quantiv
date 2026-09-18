@@ -1,37 +1,44 @@
 {
-  "deduplicated_event_count": 9,
-  "event_count": 56,
+  "deduplicated_event_count": 6,
+  "event_count": 54,
   "integrity": {
-    "baseline_sha256": "ecbea0f72a1738bd1ce8dd909e869f08cf35cbee8c39c007794a43a2cc620d0a",
+    "baseline_sha256": "49d3589c211b214136087bee3c43ac6d6bf4908ff05a452502c58fd9c0aa6ba9",
     "status": "passed",
-    "stdout_sha256": "d909a58236c9017fdf98db8e2eba110add23068602d12bec902ede5363e44aed"
+    "stdout_sha256": "a8b931466329ee43f8cce8f8ecf3d8ed2f40ec83cb2ee5f57ab62e43bec5f9e7"
   },
-  "observed_at": "2026-09-17T15:40:06Z",
-  "receipt_id": "84226a7ad09824e615797a15ee19e74834f243c42035ee61074b470b17d73161",
-  "release_id": "b08eb29261801b8c463496128318328d2baabf60ee1c54a70daadc61aea4e03f",
+  "observed_at": "2026-09-18T06:13:31Z",
+  "receipt_id": "93c8ab5c0f1550bbc3cd55f915d75d832927475b1071891a6fb7ed7c6871a644",
+  "release_id": "0d272eebf6f905bd3a886c2cd70242e5b91505692c9e2ed1672dc367f1d46f4a",
   "schema": "quantiv.calendar-reference-receipt.v1",
   "source_evidence": [
     {
-      "date_max": "2026-11-14",
+      "date_max": "2026-11-17",
       "date_min": "2020-01-22",
-      "metadata_sha256": "2172bcd9fbd986a9720c22d31c2091add8280fc5563f2789afd36f57ea65ea3f",
-      "observed_at": "2026-09-17T15:39:56.166884Z",
+      "metadata_sha256": "8f4e0d45c3ea212e60f13aef9647a45fe75932f7e16b0aa2150b376e8efbc813",
+      "observed_at": "2026-09-18T06:13:12.685845Z",
       "provider": "dolthub",
-      "rows": 126876,
+      "rows": 127018,
       "symbols": 7337
     },
     {
-      "from": "2026-08-18",
-      "metadata_sha256": "95e68880236348d749982e695b9daa476f1e91e184a8ac6779071e64cbf4513a",
-      "observed_at": "2026-09-17T15:40:06Z",
+      "from": "2026-08-19",
+      "metadata_sha256": "e19345abff35b2d25dc77865fd70b941b2784e0ae24a071c6a7e381830dcee37",
+      "observed_at": "2026-09-18T06:13:24Z",
+      "provider": "finnhub",
+      "to": "2026-11-17"
+    },
+    {
+      "from": "2026-08-19",
+      "metadata_sha256": "cd7096c28e7c9c08643be6884c55d9ab6859fe33373c11f1c28f241bebef47e7",
+      "observed_at": "2026-09-18T06:13:31Z",
       "provider": "fmp",
-      "to": "2026-11-16"
+      "to": "2026-11-17"
     }
   ],
   "source_file": {
     "path": "data/earnings_calendar.csv",
-    "sha256": "ecbea0f72a1738bd1ce8dd909e869f08cf35cbee8c39c007794a43a2cc620d0a"
+    "sha256": "49d3589c211b214136087bee3c43ac6d6bf4908ff05a452502c58fd9c0aa6ba9"
   },
-  "source_revision": "c358669cb3665d2889f6b00b4d25374848211d15",
+  "source_revision": "b0361503297ebd7b7115676375f70b752164f98f",
   "universe_id": "c8c664e821efb8dc7d2a89a2d3ebb24ef2930bb92434a3c41c1d6e166784ab3c"
 }

@@ -2,15 +2,7 @@
   "symbol": "NVDA",
   "as_of_date": "2026-09-14",
   "spot_price": 210.0,
-  "expected_move": {
-    "expiration": "2026-09-28",
-    "dte": 14,
-    "atm_strike": 210.0,
-    "atm_iv": 0.3156,
-    "straddle_abs": 10.55,
-    "straddle_pct": 0.050238,
-    "iv_pct": 0.061809
-  },
+  "expected_move": null,
   "straddle_features": [
     {
       "expiration": "2026-09-28",
@@ -82,6 +74,29 @@
     }
   ],
   "earnings_history": [
+    {
+      "date": "2026-11-17",
+      "timing": "after_market_close",
+      "q": "Q3 27",
+      "fiscal_year": 2027,
+      "fiscal_q": "Q3",
+      "actual": null,
+      "implied": null,
+      "implied_as_of": null,
+      "implied_expiration": null,
+      "implied_dte": null,
+      "implied_lead_days": null,
+      "implied_atm_strike": null,
+      "implied_straddle_abs": null,
+      "implied_atm_iv": null,
+      "implied_quality_status": null,
+      "eps_actual": null,
+      "eps_estimate": 2.5231,
+      "eps_surprise_pct": null,
+      "revenue_actual": null,
+      "revenue_estimate": 111273704778.0,
+      "rev_surprise_pct": null
+    },
     {
       "date": "2026-08-26",
       "timing": "after_market_close",
@@ -334,32 +349,9 @@
       "revenue_actual": null,
       "revenue_estimate": null,
       "rev_surprise_pct": null
-    },
-    {
-      "date": "2023-11-21",
-      "timing": "after_market_close",
-      "q": "Q4 23",
-      "fiscal_year": 2023,
-      "fiscal_q": "Q4",
-      "actual": -0.024588,
-      "implied": 0.09175,
-      "implied_as_of": "2023-11-21",
-      "implied_expiration": "2023-12-08",
-      "implied_dte": 17,
-      "implied_lead_days": 0,
-      "implied_atm_strike": 500.0,
-      "implied_straddle_abs": 45.875,
-      "implied_atm_iv": 0.53305,
-      "implied_quality_status": "decision_eligible_eod",
-      "eps_actual": null,
-      "eps_estimate": null,
-      "eps_surprise_pct": null,
-      "revenue_actual": null,
-      "revenue_estimate": null,
-      "rev_surprise_pct": null
     }
   ],
-  "next_earnings": null,
+  "next_earnings": "2026-11-17",
   "vol_regime": {
     "iv_current": 0.3337,
     "iv_rank": 0.102041,
@@ -369,5 +361,6 @@
     "hv_rank": 0.668774,
     "iv_mom_week": 0.0011,
     "iv_mom_month": null
-  }
+  },
+  "next_earnings_timing": "after_market_close"
 }
