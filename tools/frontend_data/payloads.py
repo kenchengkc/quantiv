@@ -929,15 +929,20 @@ def build_week_events(conn, as_of_date: date, week_start: date, week_end: date,
             continue
         em = compute_em_math(conn, ticker, as_of_date, earnings_dt, timing)
         is_published = (ticker, earnings_iso) in (published or set())
+        ml = ml_fields(fc)
         if not em:
             if is_published:
                 published_without_options.append(f"{ticker} {earnings_iso}")
+                if not ml:
+                    published_without_ml.append(f"{ticker} {earnings_iso}")
                 extras = screener_extras(conn, ticker, earnings_dt, as_of_date)
                 provider_fields = provider_event_fields(
                     (provider_lookup or {}).get(str(ticker).upper())
                 )
-                # Keep the published identity so realized move / EPS can overlay
-                # even when the expected move can no longer be recomputed.
+                # Keep ML keyed to this exact event identity even when strict
+                # options math is unavailable. The display resolver can then
+                # prefer validated ML without coupling publication to a
+                # same-strike decision-eligible option pair.
                 events.append({
                     "ticker": ticker,
                     "earnings_date": earnings_iso,
@@ -949,20 +954,20 @@ def build_week_events(conn, as_of_date: date, week_start: date, week_end: date,
                     "revenue_estimate": jsonable(revenue_estimate),
                     "realized_move_pct": jsonable(realized_move),
                     "as_of_date": as_of_date.isoformat(),
-                    "em_method": None,
+                    "em_method": "ml_lightgbm" if ml else None,
                     "em_straddle_pct": None,
                     "em_iv_pct": None,
                     **extras,
                     **provider_fields,
+                    **ml,
                 })
             else:
                 skipped_no_options += 1
             continue
-        if fc is None and is_published:
+        if not ml and is_published:
             published_without_ml.append(f"{ticker} {earnings_iso}")
         if i % 25 == 0 or i == len(rows):
             print(f"    event {i}/{len(rows)}: {ticker} {earnings_dt}", flush=True)
-        ml = ml_fields(fc)
         extras = screener_extras(conn, ticker, earnings_dt, as_of_date)
         provider_fields = provider_event_fields((provider_lookup or {}).get(str(ticker).upper()))
         events.append({
@@ -1030,11 +1035,14 @@ def build_week_events(conn, as_of_date: date, week_start: date, week_end: date,
         revenue_actual = row[4] if row else None
         revenue_estimate = row[5] if row else None
         fc = ml_lookup.get((ticker, iso))
+        ml = ml_fields(fc)
         em = compute_em_math(conn, ticker, as_of_date, earn_dt, timing)
         extras = screener_extras(conn, ticker, earn_dt, as_of_date)
         provider_fields = provider_event_fields((provider_lookup or {}).get(str(ticker).upper()))
         if not em:
             published_without_options.append(f"{ticker} {iso}")
+            if not ml:
+                published_without_ml.append(f"{ticker} {iso}")
             events.append({
                 "ticker": ticker,
                 "earnings_date": iso,
@@ -1046,17 +1054,17 @@ def build_week_events(conn, as_of_date: date, week_start: date, week_end: date,
                 "revenue_estimate": jsonable(revenue_estimate),
                 "realized_move_pct": None,
                 "as_of_date": as_of_date.isoformat(),
-                "em_method": None,
+                "em_method": "ml_lightgbm" if ml else None,
                 "em_straddle_pct": None,
                 "em_iv_pct": None,
                 **extras,
                 **provider_fields,
+                **ml,
             })
             have.add((ticker, iso))
             continue
-        if fc is None:
+        if not ml:
             published_without_ml.append(f"{ticker} {iso}")
-        ml = ml_fields(fc)
         events.append({
             "ticker": ticker,
             "earnings_date": iso,
