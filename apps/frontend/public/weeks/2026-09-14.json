@@ -1,8 +1,8 @@
 {
   "metadata": {
     "version": "v4_multi_week",
-    "generated_at": "2026-09-18T06:31:08.144166",
-    "as_of_date": "2026-09-14",
+    "generated_at": "2026-09-18T15:16:42.356438",
+    "as_of_date": "2026-09-17",
     "method": "ATM straddle + IV baseline",
     "offset": 0
   },
@@ -21,23 +21,13 @@
       "revenue_actual": null,
       "revenue_estimate": 22592632531.0,
       "realized_move_pct": 0.013788,
-      "as_of_date": "2026-09-14",
-      "spot_price": 312.5,
-      "atm_strike": 312.5,
-      "atm_iv": 0.303191,
-      "em_straddle_pct": 0.042,
-      "em_iv_pct": 0.052634,
-      "em_straddle_abs": 13.125,
-      "expiry_date": "2026-09-25",
-      "days_to_expiry": 11,
-      "lead_time_days": 2,
-      "skew_atm": -0.005436,
-      "term_slope": 0.11994,
-      "em_method": "options_math",
-      "confidence": "high",
-      "iv_rank": 0.29527,
+      "as_of_date": "2026-09-17",
+      "em_method": null,
+      "em_straddle_pct": null,
+      "em_iv_pct": null,
+      "iv_rank": 0.293422,
       "hist_move_avg_4q": 0.009487,
-      "iv_crush_pct": 0.1169
+      "iv_crush_pct": 0.022099
     },
     {
       "ticker": "LEN",
@@ -49,23 +39,13 @@
       "revenue_actual": 8046120000.0,
       "revenue_estimate": 8389932256.0,
       "realized_move_pct": 0.017101,
-      "as_of_date": "2026-09-14",
-      "spot_price": 80.0,
-      "atm_strike": 80.0,
-      "atm_iv": 0.5604,
-      "em_straddle_pct": 0.076563,
-      "em_iv_pct": 0.097285,
-      "em_straddle_abs": 6.125,
-      "expiry_date": "2026-09-25",
-      "days_to_expiry": 11,
-      "lead_time_days": 2,
-      "skew_atm": -0.016035,
-      "term_slope": -0.054456,
-      "em_method": "options_math",
-      "confidence": "high",
-      "iv_rank": 0.582069,
+      "as_of_date": "2026-09-17",
+      "em_method": null,
+      "em_straddle_pct": null,
+      "em_iv_pct": null,
+      "iv_rank": 0.305287,
       "hist_move_avg_4q": 0.040578,
-      "iv_crush_pct": 0.121584
+      "iv_crush_pct": 0.614518
     },
     {
       "ticker": "HUBG",
@@ -77,18 +57,18 @@
       "revenue_actual": null,
       "revenue_estimate": null,
       "realized_move_pct": null,
-      "as_of_date": "2026-09-14",
+      "as_of_date": "2026-09-17",
       "em_method": null,
       "em_straddle_pct": null,
       "em_iv_pct": null,
-      "iv_rank": 0.584011,
+      "iv_rank": 0.589277,
       "hist_move_avg_4q": 0.010109,
-      "iv_crush_pct": 0.574908
+      "iv_crush_pct": 0.815497
     }
   ],
   "summary": {
     "total_events": 3,
-    "avg_em_straddle_pct": 0.0592815,
-    "avg_em_iv_pct": 0.0749595
+    "avg_em_straddle_pct": 0.0,
+    "avg_em_iv_pct": 0.0
   }
 }

@@ -1,17 +1,17 @@
 {
   "schema": "quantiv.dashboard-evidence.v1",
-  "receipt_id": "sha256:f0c3ccf5d528c77b72e289d7f3dd54df689f5bb2288fd9e238eaeb99fe6c3700",
-  "receipt_file": "forecasts_2026-09-18.f0c3ccf5d528.receipt.json",
-  "validated_at": "2026-09-18T06:28:07.102247+00:00",
+  "receipt_id": "sha256:0d7fa5de47d0b8a1a9176c581533b0bbbfdf7778c6d0a7fd558ae6df6e752e4c",
+  "receipt_file": "forecasts_2026-09-18.0d7fa5de47d0.receipt.json",
+  "validated_at": "2026-09-18T15:14:01.262918+00:00",
   "quality": {
     "status": "passed",
     "issue_count": 0,
     "issue_codes": []
   },
   "coverage": {
-    "rows": 306,
-    "symbols": 161,
-    "events": 162,
+    "rows": 294,
+    "symbols": 124,
+    "events": 158,
     "horizons": [
       1,
       2,
@@ -24,8 +24,8 @@
   "observation_window": {
     "earnings_max": "2026-10-08",
     "earnings_min": "2026-09-18",
-    "scored_at_max": "2026-09-18T06:28:04.323549+00:00",
-    "scored_at_min": "2026-09-18T06:28:04.202139+00:00",
+    "scored_at_max": "2026-09-18T15:13:57.731929+00:00",
+    "scored_at_min": "2026-09-18T15:13:57.554314+00:00",
     "snapshot_max": "2026-09-17",
     "snapshot_min": "2026-08-28"
   },
@@ -43,8 +43,8 @@
       "ml_only_point_outside_band": 0,
       "ml_only_quantile_crossings": 0,
       "non_finite_ml_rows": 0,
-      "optionless_ml_rows": 274,
-      "strict_option_rows": 32,
+      "optionless_ml_rows": 224,
+      "strict_option_rows": 70,
       "strict_reconciliation": {
         "absolute_move_mismatches": 0,
         "blank_symbols": 0,
@@ -61,7 +61,7 @@
         "invalid_quote_quality_labels": 0,
         "iv_formula_mismatches": 0,
         "leg_mid_mismatches": 0,
-        "max_point_median_gap": 0.007671383488854697,
+        "max_point_median_gap": 0.016324467671023413,
         "non_finite_values": 0,
         "out_of_range_move_rows": 0,
         "point_outside_band": 0,
@@ -85,8 +85,8 @@
       "name": "forecast_snapshot",
       "producer": "scripts/daily_score.py",
       "member_count": 1,
-      "bytes": 207567,
-      "sha256": "412e4fd910ee332f7984e9788bf885a85fb4416b2f689d4132c7a162b340c617"
+      "bytes": 219143,
+      "sha256": "38ced6dcb6feaede92593c56fa42d6f103ce41aa4444e2b4d296ffd9502fbf4e"
     }
   ]
 }

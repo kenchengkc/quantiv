@@ -1,77 +1,75 @@
 {
   "data": {
-    "contract_rejection_rate": 0.504484,
-    "contracts": 129582,
+    "contract_rejection_rate": 0.622926,
+    "contracts": 136058,
     "corporate_action_rows": 28822,
     "corporate_action_status": "enforced",
-    "covered_events": 31,
-    "decision_group_rejection_rate": 0.261905,
-    "decision_groups": 42,
+    "covered_events": 40,
+    "decision_group_rejection_rate": 0.245283,
+    "decision_groups": 53,
     "decision_scope": "end_of_day_research",
     "display_forecast_coverage_pct": 1.0,
-    "display_forecast_covered_events": 31,
-    "display_forecast_events": 31,
+    "display_forecast_covered_events": 32,
+    "display_forecast_events": 32,
     "display_forecast_method_mix": {
       "historical": 0,
       "historical_prior": 0,
-      "ml": 31,
+      "ml": 32,
       "options_indicative": 0,
       "options_math": 0
     },
     "duplicate_rows": 0,
-    "eligible_contracts": 64210,
-    "eligible_decision_groups": 31,
-    "event_coverage_pct": 0.738095,
-    "expected_events": 42,
+    "eligible_contracts": 51304,
+    "eligible_decision_groups": 40,
+    "event_coverage_pct": 0.754717,
+    "expected_events": 53,
     "expected_source_date": "2026-09-17",
     "live_trading_eligible": false,
-    "missing_events": 11,
-    "pair_rejection_rate": 0.894044,
-    "quarantine_records": 123298,
+    "missing_events": 13,
+    "pair_rejection_rate": 0.928766,
+    "quarantine_records": 147937,
     "quarantine_status": "enforced",
-    "quote_quality_errors": [
-      "latest source date 2026-09-14 is 3 market session(s) behind expected 2026-09-17"
-    ],
+    "quote_quality_errors": [],
     "replay_status": "verified",
-    "source_date": "2026-09-14",
-    "source_session_lag": 3,
-    "status": "failed"
+    "source_date": "2026-09-17",
+    "source_session_lag": 0,
+    "status": "passed"
   },
   "exceptions": [
     {
       "code": "upcoming_events_outside_option_universe",
-      "count": 190,
+      "count": 121,
       "severity": "warning",
       "summary": "Calendar events fall outside the current options decision universe"
     },
     {
       "code": "upcoming_events_without_option_chain",
-      "count": 11,
+      "count": 13,
       "severity": "warning",
       "summary": "In-universe earnings events have no decision-eligible option chain"
     },
     {
       "code": "forecast_horizon_coverage_below_limit",
-      "count": 1,
+      "count": 4,
       "severity": "warning",
       "summary": "One or more model horizons lack sufficient eligible option coverage"
     },
     {
-      "code": "option_quote_quality_below_limit",
-      "count": 11,
-      "severity": "critical",
-      "summary": "Option evidence on the scoped earnings decision surface exceeds the publication limit"
+      "code": "option_chain_diagnostics_above_limit",
+      "count": 3634,
+      "severity": "warning",
+      "summary": "Chain-wide option diagnostics exceed their limits outside the scoped earnings decision surface"
     }
   ],
-  "generated_at": "2026-09-18T07:05:36.531539+00:00",
+  "generated_at": "2026-09-18T15:53:07.235880+00:00",
   "model": {
     "challenger_present": true,
     "champion_active": true,
     "critical_features": 0,
-    "drift_status": "passed",
+    "drift_status": "warning",
     "fallback_bundle_available": false,
     "hard_missing_features": 0,
-    "monitored_at": "2026-09-18T06:28:10.268382+00:00",
+    "monitored_at": "2026-09-18T15:14:04.153856+00:00",
     "outcome_common_rows": null,
     "outcome_evaluated_at": "2026-09-14T01:54:36.293833+00:00",
     "outcome_evaluations": 2,
@@ -83,9 +81,9 @@
     ],
     "snapshot_date": "2026-09-17",
     "status": "passed",
-    "warning_features": 0
+    "warning_features": 6
   },
-  "publication_eligible": false,
+  "publication_eligible": true,
   "release": {
     "artifact_promotion_status": "passed",
     "data_r2_status": "passed",
@@ -94,5 +92,5 @@
     "neon_import_status": "passed"
   },
   "schema": "quantiv.control-plane.v2",
-  "status": "failed"
+  "status": "passed"
 }
