@@ -3,27 +3,71 @@
   "overrides": [
     {
       "symbol": "PVH",
-      "match": { "fiscal_year": 2027, "fiscal_q": "Q1" },
-      "set": { "date": "2026-06-03", "timing": "amc" },
+      "match": {
+        "fiscal_year": 2027,
+        "fiscal_q": "Q1"
+      },
+      "set": {
+        "date": "2026-06-03",
+        "timing": "amc"
+      },
       "note": "manual move +1 trading day, AMC"
     },
     {
       "symbol": "FIVE",
-      "match": { "fiscal_year": 2027, "fiscal_q": "Q1" },
-      "set": { "date": "2026-06-03", "timing": "amc" },
+      "match": {
+        "fiscal_year": 2027,
+        "fiscal_q": "Q1"
+      },
+      "set": {
+        "date": "2026-06-03",
+        "timing": "amc"
+      },
       "note": "manual move +1 trading day, AMC"
     },
     {
       "symbol": "LULU",
-      "match": { "fiscal_year": 2027, "fiscal_q": "Q1" },
-      "set": { "date": "2026-06-04", "timing": "amc" },
+      "match": {
+        "fiscal_year": 2027,
+        "fiscal_q": "Q1"
+      },
+      "set": {
+        "date": "2026-06-04",
+        "timing": "amc"
+      },
       "note": "manual move +1 trading day, AMC"
     },
     {
       "symbol": "FAST",
-      "match": { "date": "2026-07-13", "fiscal_year": 2026, "fiscal_q": "Q2" },
-      "set": { "date": "2026-07-14", "timing": "bmo" },
+      "match": {
+        "date": "2026-07-13",
+        "fiscal_year": 2026,
+        "fiscal_q": "Q2"
+      },
+      "set": {
+        "date": "2026-07-14",
+        "timing": "bmo"
+      },
       "note": "Finnhub/DoltHub stuck on estimated 07-13; company PR sets the Q2 call for Tue 2026-07-14 9:00am CT, results out same morning (BMO). Date kept in match so the 2026-04-13 row, also labeled FY2026 Q2, stays untouched."
+    },
+    {
+      "symbol": "FERG",
+      "match": {
+        "date": "2026-09-22"
+      },
+      "set": {
+        "date": "2026-11-09",
+        "timing": "unknown"
+      },
+      "note": "Company IR lists next results on 2026-11-09; Sep 22 upcoming row is stale. Session not announced."
+    },
+    {
+      "symbol": "BXMT",
+      "match": {
+        "date": "2026-09-24"
+      },
+      "action": "remove",
+      "note": "No Q3 2026 earnings date announced on BXMT IR as of 2026-09-19; Sep 24 row is a phantom estimate. Re-add when direct announcement/provider consensus exists."
     }
   ]
 }
