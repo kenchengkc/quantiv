@@ -44,6 +44,7 @@ from frontend_data.payloads import (
     build_symbol_detail,
     build_week_events,
     collapse_duplicate_earnings,
+    enrich_reported_event_forecasts,
     load_published_calendar_events,
     preserve_reported_events,
     published_symbol_dates,
@@ -194,6 +195,12 @@ def main():
                 sys.exit(1)
             payload = json.loads(wk_path.read_text())
             events = payload.get("events", [])
+            enrich_reported_event_forecasts(
+                conn,
+                events,
+                today=today,
+                archive=event_forecast_archive,
+            )
             enrich_upcoming_events(conn, events, as_of_date=as_of_date, today=today)
             week_payloads[wk_start] = payload
             print(f"📅 week {wk_start} (offset {offset:+d}) → {len(events)} events (cached)")
@@ -238,6 +245,18 @@ def main():
                     events = merged
                 except (json.JSONDecodeError, OSError) as exc:
                     print(f"    ⚠ could not read prior bundle: {exc}")
+
+        reported_forecasts = enrich_reported_event_forecasts(
+            conn,
+            events,
+            today=today,
+            archive=event_forecast_archive,
+        )
+        if reported_forecasts:
+            print(
+                f"    frozen reported forecasts refreshed: {reported_forecasts}",
+                flush=True,
+            )
 
         ohlcv_realized = enrich_realized_moves_from_ohlcv(conn, events)
         twelve_realized = enrich_realized_moves_from_twelvedata(
