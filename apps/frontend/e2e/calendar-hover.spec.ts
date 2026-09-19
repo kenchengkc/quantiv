@@ -13,6 +13,7 @@ async function installCalendar(page: Page) {
       timing: 'before_market_open',
       em_ml_pct: 0.07,
       em_straddle_pct: 0.13,
+      em_iv_pct: 0.15,
       p25: 0.04,
       p75: 0.11,
       display_forecast_pct: 0.07,
@@ -34,7 +35,8 @@ async function installCalendar(page: Page) {
   await page.goto('/');
   await page.getByRole('button', { name: 'All', exact: true }).click();
   const row = page.locator('.qv-calendar-shell a[href="/AVGO"]');
-  await expect(row).toContainText('7.0%');
+  await expect(row).toContainText('15.0%');
+  await expect(row).toContainText('IV forecast');
   return row;
 }
 
@@ -52,9 +54,10 @@ for (const width of [1440, 768, 390]) {
     await expect(movePopup).toBeVisible();
     await page.waitForTimeout(1100);
     await expect(namePopup).toHaveCount(0);
+    await expect(movePopup).toContainText('IV forecast');
+    await expect(movePopup).toContainText('Straddle implied');
     await expect(movePopup).toContainText('ML forecast');
-    await expect(movePopup).toContainText('Market implied');
-    await expect(movePopup).toContainText('Typical');
+    await expect(movePopup).not.toContainText('Historical median');
     await testInfo.attach(`move-hover-${width}`, { body: await page.screenshot(), contentType: 'image/png' });
 
     // An already-visible name card must disappear when crossing to the move.
