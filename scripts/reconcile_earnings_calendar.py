@@ -124,12 +124,18 @@ DIRECT_TITLE_ACTIONS = (
 )
 DIRECT_TITLE_RESULTS = (
     "earnings",
-    " results ",
     "financial results",
     "quarter results",
     "quarterly results",
     "conference call",
 )
+
+QUARTER_WORDS = {
+    "first": "Q1",
+    "second": "Q2",
+    "third": "Q3",
+    "fourth": "Q4",
+}
 DIRECT_TITLE_PAST = (
     "top estimates",
     "beats estimates",
@@ -181,9 +187,86 @@ def is_direct_earnings_announcement_title(title: str) -> bool:
     text = f" {_clean_text(title).lower()} "
     if any(term in text for term in DIRECT_TITLE_PAST):
         return False
-    return any(term in text for term in DIRECT_TITLE_ACTIONS) and any(
-        term in text for term in DIRECT_TITLE_RESULTS
+    if not any(term in text for term in DIRECT_TITLE_ACTIONS):
+        return False
+    if any(term in text for term in DIRECT_TITLE_RESULTS):
+        return True
+    quarter_context = re.search(
+        r"\\b(?:first|second|third|fourth)\\s+quarter\\b|\\bq[1-4]\\b",
+        text,
+        flags=re.IGNORECASE,
     )
+    return bool(quarter_context and " results " in text)
+
+
+def extract_fiscal_identity(text: str) -> dict[str, Any]:
+    cleaned = _clean_text(text)
+
+    patterns: list[tuple[re.Pattern[str], str]] = [
+        (
+            re.compile(
+                r"\\b(20\\d{2})\\s+(first|second|third|fourth)\\s+quarter\\b",
+                re.IGNORECASE,
+            ),
+            "year_first",
+        ),
+        (
+            re.compile(
+                r"\\b(first|second|third|fourth)\\s+quarter"
+                r"(?:\\s+(?:of\\s+)?)?(?:fiscal(?:\\s+year)?\\s*)?(20\\d{2})\\b",
+                re.IGNORECASE,
+            ),
+            "quarter_first",
+        ),
+        (
+            re.compile(r"\\bfy\\s*(20\\d{2})\\s*q([1-4])\\b", re.IGNORECASE),
+            "fy_q",
+        ),
+        (
+            re.compile(r"\\bq([1-4])\\s*(?:fy\\s*)?(20\\d{2})\\b", re.IGNORECASE),
+            "q_fy",
+        ),
+    ]
+
+    for pattern, mode in patterns:
+        match = pattern.search(cleaned)
+        if not match:
+            continue
+        if mode == "year_first":
+            fiscal_year = int(match.group(1))
+            fiscal_q = QUARTER_WORDS[match.group(2).lower()]
+        elif mode == "quarter_first":
+            fiscal_q = QUARTER_WORDS[match.group(1).lower()]
+            fiscal_year = int(match.group(2))
+        elif mode == "fy_q":
+            fiscal_year = int(match.group(1))
+            fiscal_q = f"Q{match.group(2)}"
+        else:
+            fiscal_q = f"Q{match.group(1)}"
+            fiscal_year = int(match.group(2))
+        return {"fiscal_year": fiscal_year, "fiscal_q": fiscal_q}
+
+    quarter_match = re.search(
+        r"\\b(first|second|third|fourth)\\s+quarter\\b",
+        cleaned,
+        flags=re.IGNORECASE,
+    )
+    if quarter_match:
+        nearby = cleaned[
+            quarter_match.start() : min(len(cleaned), quarter_match.end() + 60)
+        ]
+        year_match = re.search(
+            r"\\bfiscal(?:\\s+year)?\\s+(20\\d{2})\\b",
+            nearby,
+            flags=re.IGNORECASE,
+        )
+        if year_match:
+            return {
+                "fiscal_year": int(year_match.group(1)),
+                "fiscal_q": QUARTER_WORDS[quarter_match.group(1).lower()],
+            }
+
+    return {}
 
 
 def _session_from_text(text: str) -> str:
@@ -552,6 +635,16 @@ def choose_canonical_event(
         "confidence": confidence,
         "date_sources": date_sources,
         "timing_sources": timing_sources,
+        "fiscal_year": (
+            announcement.get("fiscal_year")
+            if announcement is not None
+            else None
+        ),
+        "fiscal_q": (
+            announcement.get("fiscal_q")
+            if announcement is not None
+            else None
+        ),
     }
 
 
@@ -779,6 +872,7 @@ def _announcement_from_article(
     )
     if parsed is None:
         return None
+    fiscal_identity = extract_fiscal_identity(f"{title}. {body}")
     return {
         "provider": provider,
         "date": parsed["date"],
@@ -788,6 +882,7 @@ def _announcement_from_article(
         "direct": True,
         "title": _clean_text(title)[:180],
         "url": url,
+        **fiscal_identity,
     }
 
 
@@ -1173,6 +1268,8 @@ def reconcile_calendar(
                     "direct",
                     "title",
                     "url",
+                    "fiscal_year",
+                    "fiscal_q",
                 )
             }
             for row in announcements_by_symbol.get(symbol, [])
@@ -1191,9 +1288,17 @@ def reconcile_calendar(
         else:
             replacement = {column: None for column in OUTPUT_COLUMNS}
             replacement["act_symbol"] = symbol
-            replacement["fiscal_year"] = chosen_date.year
-            replacement["fiscal_q"] = fiscal_q_from_date(chosen_date)
+            replacement["fiscal_year"] = (
+                decision.get("fiscal_year") or chosen_date.year
+            )
+            replacement["fiscal_q"] = (
+                decision.get("fiscal_q") or fiscal_q_from_date(chosen_date)
+            )
 
+        if decision.get("fiscal_year") is not None:
+            replacement["fiscal_year"] = decision["fiscal_year"]
+        if decision.get("fiscal_q"):
+            replacement["fiscal_q"] = decision["fiscal_q"]
         replacement["date"] = chosen_date
         replacement["timing"] = decision["timing"]
         replacement["source"] = _append_source(
