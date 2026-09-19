@@ -9,8 +9,8 @@ import {
 describe('display forecast helpers', () => {
   it('uses compact provenance labels', () => {
     expect(displayForecastLabel('ml')).toBe('ML forecast');
-    expect(displayForecastLabel('options_math')).toBe('Market implied');
-    expect(displayForecastLabel('options_indicative')).toBe('Market implied');
+    expect(displayForecastLabel('options_math')).toBe('IV forecast');
+    expect(displayForecastLabel('options_indicative')).toBe('IV forecast');
     expect(displayForecastLabel('historical')).toBe('Historical median');
     expect(displayForecastLabel('historical_prior')).toBe('Historical prior');
   });
@@ -30,17 +30,17 @@ describe('display forecast helpers', () => {
     expect(finiteDisplayForecast(null)).toBeNull();
   });
 
-  it('bridges pre-migration ML and options fields without overriding canonical display data', () => {
+  it('bridges legacy fields using IV/options before ML and historical data', () => {
     expect(resolveDisplayForecastCompat({ em_ml_pct: 0.12, em_straddle_pct: 0.14 })).toEqual({
-      pct: 0.12,
-      method: 'ml',
+      pct: 0.14,
+      method: 'options_math',
     });
     expect(resolveDisplayForecastCompat({ em_ml_pct: null, em_straddle_pct: 0.11 })).toEqual({
       pct: 0.11,
       method: 'options_math',
     });
     expect(resolveDisplayForecastCompat({ em_ml_pct: null, straddle_pct: 0.09, iv_pct: 0.10 })).toEqual({
-      pct: 0.09,
+      pct: 0.10,
       method: 'options_math',
     });
     expect(
@@ -49,8 +49,9 @@ describe('display forecast helpers', () => {
         display_forecast_method: 'historical',
         em_ml_pct: 0.12,
         em_straddle_pct: 0.14,
+        em_iv_pct: 0.16,
       }),
-    ).toEqual({ pct: 0.07, method: 'historical' });
+    ).toEqual({ pct: 0.16, method: 'options_math' });
   });
 
   it('uses a historical compatibility estimate when legacy public data has no ML or options move', () => {
