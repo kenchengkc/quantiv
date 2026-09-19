@@ -236,38 +236,30 @@ function ExpectedMoveHover({
             pointerEvents: 'none',
           }}
         >
-          {(ivLine || method === 'options_math' || method === 'options_indicative') && (
-            <TooltipLine
-              label="IV forecast"
-              value={`±${ivLine ?? moveLine ?? '—'}`}
-              muted={ivLine == null && moveLine == null}
-            />
-          )}
-          {straddleLine && (
+          {ivLine ? (
+            <TooltipLine label="IV forecast" value={`±${ivLine}`} />
+          ) : straddleLine ? (
+            <TooltipLine label="Straddle implied" value={`±${straddleLine}`} />
+          ) : method === 'ml' && moveLine ? (
+            <TooltipLine label="ML forecast" value={`±${mlLine ?? moveLine}`} />
+          ) : method === 'historical' && moveLine ? (
+            <TooltipLine label="Historical median" value={`±${moveLine}`} />
+          ) : method === 'historical_prior' && moveLine ? (
+            <TooltipLine label="Historical prior" value={`±${moveLine}`} />
+          ) : moveLine ? (
+            <TooltipLine label={displayForecastLabel(method)} value={`±${moveLine}`} />
+          ) : null}
+          {ivLine && straddleLine && (
             <TooltipLine label="Straddle implied" value={`±${straddleLine}`} marginTop={4} />
           )}
-          {mlLine ? (
+          {mlLine && method !== 'ml' && (
             <TooltipLine label="ML forecast" value={`±${mlLine}`} marginTop={4} />
-          ) : method !== 'ml' ? (
+          )}
+          {!ivLine && !straddleLine && (method === 'historical' || method === 'historical_prior') && (
+            <TooltipLine label="IV forecast" value="Unavailable" muted marginTop={4} />
+          )}
+          {!mlLine && method !== 'ml' && (
             <TooltipLine label="ML forecast" value="Unavailable" muted marginTop={4} />
-          ) : null}
-          {method === 'ml' && moveLine && !mlLine && (
-            <TooltipLine label="ML forecast" value={`±${moveLine}`} />
-          )}
-          {method === 'historical' && moveLine && !ivLine && !straddleLine && !mlLine && (
-            <>
-              <TooltipLine label="Historical median" value={`±${moveLine}`} />
-              <TooltipLine label="IV forecast" value="Unavailable" muted marginTop={4} />
-            </>
-          )}
-          {method === 'historical_prior' && moveLine && !ivLine && !straddleLine && !mlLine && (
-            <>
-              <TooltipLine label="Historical prior" value={`±${moveLine}`} />
-              <TooltipLine label="IV forecast" value="Unavailable" muted marginTop={4} />
-            </>
-          )}
-          {method == null && moveLine && !ivLine && !straddleLine && !mlLine && (
-            <TooltipLine label={displayForecastLabel(method)} value={`±${moveLine}`} />
           )}
           {bandLine != null && (
             <TooltipLine label="Typical" value={bandLine} marginTop={4} />
