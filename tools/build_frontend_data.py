@@ -29,6 +29,7 @@ from frontend_data.display_payloads import (
 )
 from frontend_data.forecast_artifacts import (
     build_dashboard_evidence as build_dashboard_evidence,
+    load_event_forecast_archive,
     load_ml_forecasts,
     load_provider_enrichments,
     provider_event_fields as provider_event_fields,
@@ -36,6 +37,7 @@ from frontend_data.forecast_artifacts import (
 )
 from frontend_data.payloads import (
     align_symbol_detail_to_published,
+    attach_frozen_event_forecasts,
     apply_published_canonical,
     apply_published_symbol_dates,
     build_screener_payload,
@@ -104,6 +106,7 @@ def main():
     build_earnings_events_table(conn, EARNINGS_CSV)
     create_duckdb_views(conn, DATA_DIR)
     ml_lookup = load_ml_forecasts()
+    event_forecast_archive = load_event_forecast_archive()
     provider_lookup = load_provider_enrichments()
 
     as_of_row = conn.execute("SELECT MAX(as_of_date) FROM v_options_chain").fetchone()
@@ -459,6 +462,13 @@ def main():
             published = published_for_symbols.get(ticker)
             if published:
                 align_symbol_detail_to_published(detail, published[0], published[1])
+            detail = attach_frozen_event_forecasts(
+                detail,
+                ticker,
+                event_forecast_archive,
+                current_event_date=published[0] if published else earn_dt,
+                today=today,
+            )
             write_to_public(
                 f"symbols/{ticker}.json",
                 json.dumps(detail, indent=2, default=str),
