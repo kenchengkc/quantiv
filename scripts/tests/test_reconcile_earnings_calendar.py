@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import date
 
 from reconcile_earnings_calendar import (
+    alpha_article_mentions_symbol,
     choose_canonical_event,
     extract_earnings_announcement,
     is_direct_earnings_announcement_title,
@@ -206,4 +207,48 @@ def test_extractor_rejects_past_results_article() -> None:
             published_on=date(2026, 9, 18),
         )
         is None
+    )
+
+
+
+def test_prior_quarter_announcement_cannot_override_current_event() -> None:
+    decision = choose_canonical_event(
+        current=_vote("dolthub", "2026-09-24", "bmo"),
+        baseline=_vote("baseline", "2026-09-24", "bmo"),
+        structured_votes=[],
+        announcements=[
+            _announcement(
+                "finnhub_company_news",
+                "2026-07-30",
+                "bmo",
+                direct=True,
+                published_on="2026-07-14",
+            )
+        ],
+        as_of=date(2026, 9, 19),
+    )
+
+    assert decision["date"] == "2026-09-24"
+    assert decision["reason"] == "baseline_sticky"
+
+
+def test_alpha_news_requires_target_ticker_relevance() -> None:
+    assert alpha_article_mentions_symbol(
+        {
+            "ticker_sentiment": [
+                {"ticker": "JEF", "relevance_score": "0.91"},
+                {"ticker": "SPY", "relevance_score": "0.10"},
+            ]
+        },
+        "JEF",
+    )
+    assert not alpha_article_mentions_symbol(
+        {
+            "ticker_sentiment": [
+                {"ticker": "ZS", "relevance_score": "0.98"},
+                {"ticker": "ACN", "relevance_score": "0.02"},
+            ]
+        },
+        "ACN",
+        min_relevance=0.1,
     )
