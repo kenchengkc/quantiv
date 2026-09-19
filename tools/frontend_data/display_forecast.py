@@ -735,30 +735,26 @@ def resolve_display_forecast(
     universe_prior: dict[str, Any] | None = None,
     policy: DisplayPolicy | None = None,
 ) -> DisplayForecast:
-    """Resolve the best available display estimate without weakening research gates."""
+    """Resolve the user-facing forecast with IV/options evidence first.
+
+    The headline is intentionally market-implied whenever point-in-time option
+    evidence exists. ML remains preserved as a separate research/model signal
+    and becomes the headline only when no usable IV/options estimate is
+    available. Historical estimates remain the final presentation fallback.
+    """
 
     active_policy = policy or load_display_policy()
     ml_pct = _finite_positive((ml_forecast or {}).get("em_ml_pct"))
-    if ml_pct is not None:
-        return DisplayForecast(
-            pct=ml_pct,
-            method="ml",
-            as_of=_forecast_as_of(ml_forecast, as_of_date),
-            ml_status="available",
-            options_status=(
-                "decision_eligible"
-                if _finite_positive((strict_options or {}).get("em_baseline_straddle"))
-                is not None
-                else "unavailable"
-            ),
-            fallback_reason=None,
-        )
+    ml_status: MLStatus = (
+        "available" if ml_pct is not None else _missing_ml_status(ml_forecast)
+    )
 
-    ml_status = _missing_ml_status(ml_forecast)
-    strict_pct = _finite_positive(
+    strict_iv = _finite_positive((strict_options or {}).get("em_baseline_iv"))
+    strict_straddle = _finite_positive(
         (strict_options or {}).get("em_baseline_straddle")
         or (strict_options or {}).get("straddle_pct")
     )
+    strict_pct = strict_iv or strict_straddle
     if strict_pct is not None:
         return DisplayForecast(
             pct=strict_pct,
@@ -768,13 +764,19 @@ def resolve_display_forecast(
             options_status="decision_eligible",
             fallback_reason=None,
             selected_options_details={
+                "estimator": "atm_iv" if strict_iv is not None else "straddle_mid",
                 "expiry_date": (strict_options or {}).get("expiry_date"),
+                "dte": (strict_options or {}).get("dte"),
+                "atm_iv": (strict_options or {}).get("atm_iv"),
                 "atm_strike": (strict_options or {}).get("atm_strike"),
                 "straddle_price": (strict_options or {}).get("straddle_price"),
             },
         )
 
-    indicative, failure_reason = _select_indicative_pair(
+    # Evaluate both display-only option paths before considering ML. Prefer the
+    # IV-based estimate; the paired-straddle estimate remains the next option
+    # fallback when IV itself is not usable.
+    indicative_pair, pair_failure_reason = _select_indicative_pair(
         conn,
         ticker=ticker,
         as_of_date=as_of_date,
@@ -782,25 +784,6 @@ def resolve_display_forecast(
         timing=timing,
         policy=active_policy,
     )
-    if indicative is not None:
-        spot = _finite_positive(indicative.get("estimated_spot"))
-        straddle = _finite_positive(indicative.get("straddle_mid"))
-        pct = straddle / spot if straddle is not None and spot is not None else None
-        if pct is not None and math.isfinite(pct) and pct > 0:
-            details = dict(indicative)
-            if isinstance(details.get("expiry_date"), date):
-                details["expiry_date"] = details["expiry_date"].isoformat()
-            details.setdefault("estimator", "straddle_mid")
-            return DisplayForecast(
-                pct=float(pct),
-                method="options_indicative",
-                as_of=as_of_date.isoformat(),
-                ml_status=ml_status,
-                options_status="indicative",
-                fallback_reason="quote_quality",
-                selected_options_details=details,
-            )
-
     iv_details, iv_failure_reason = _select_indicative_iv(
         conn,
         ticker=ticker,
@@ -808,7 +791,7 @@ def resolve_display_forecast(
         earnings_date=earnings_date,
         timing=timing,
         policy=active_policy,
-        pair_failure_reason=failure_reason,
+        pair_failure_reason=pair_failure_reason,
     )
     if iv_details is not None:
         pct = _finite_positive(iv_details.get("iv_em_pct"))
@@ -825,6 +808,35 @@ def resolve_display_forecast(
                 fallback_reason=iv_failure_reason or "quote_quality",
                 selected_options_details=details,
             )
+
+    if indicative_pair is not None:
+        spot = _finite_positive(indicative_pair.get("estimated_spot"))
+        straddle = _finite_positive(indicative_pair.get("straddle_mid"))
+        pct = straddle / spot if straddle is not None and spot is not None else None
+        if pct is not None and math.isfinite(pct) and pct > 0:
+            details = dict(indicative_pair)
+            if isinstance(details.get("expiry_date"), date):
+                details["expiry_date"] = details["expiry_date"].isoformat()
+            details.setdefault("estimator", "straddle_mid")
+            return DisplayForecast(
+                pct=float(pct),
+                method="options_indicative",
+                as_of=as_of_date.isoformat(),
+                ml_status=ml_status,
+                options_status="indicative",
+                fallback_reason="quote_quality",
+                selected_options_details=details,
+            )
+
+    if ml_pct is not None:
+        return DisplayForecast(
+            pct=ml_pct,
+            method="ml",
+            as_of=_forecast_as_of(ml_forecast, as_of_date),
+            ml_status="available",
+            options_status="unavailable",
+            fallback_reason=None,
+        )
 
     historical = _ticker_historical_moves(
         conn,
