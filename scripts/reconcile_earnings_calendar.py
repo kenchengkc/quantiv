@@ -320,8 +320,32 @@ def _latest_announcement(rows: list[Announcement]) -> Announcement:
     )
 
 
+def alpha_article_mentions_symbol(
+    article: dict[str, Any],
+    symbol: str,
+    *,
+    min_relevance: float = 0.1,
+) -> bool:
+    """Require Alpha Vantage news to be materially relevant to the target ticker."""
+    target = symbol.strip().upper()
+    for item in article.get("ticker_sentiment") or []:
+        if not isinstance(item, dict):
+            continue
+        if str(item.get("ticker") or "").strip().upper() != target:
+            continue
+        try:
+            relevance = float(item.get("relevance_score"))
+        except (TypeError, ValueError):
+            continue
+        if relevance >= min_relevance:
+            return True
+    return False
+
+
 def _announcement_decision(
     announcements: list[Announcement],
+    *,
+    as_of: date | None = None,
 ) -> tuple[Announcement | None, str | None]:
     valid = [
         {
@@ -329,7 +353,12 @@ def _announcement_decision(
             "timing": normalize_timing(row.get("timing")),
         }
         for row in announcements
-        if row.get("date") and (row.get("official") or row.get("direct"))
+        if row.get("date")
+        and (row.get("official") or row.get("direct"))
+        and (
+            as_of is None
+            or date.fromisoformat(str(row.get("date"))[:10]) >= as_of
+        )
     ]
     official = [row for row in valid if row.get("official")]
     if official:
@@ -392,6 +421,7 @@ def choose_canonical_event(
     baseline: Vote | None,
     structured_votes: list[Vote],
     announcements: list[Announcement],
+    as_of: date | None = None,
 ) -> dict[str, Any]:
     current = (
         {
@@ -413,7 +443,10 @@ def choose_canonical_event(
     )
     votes = _distinct_votes(structured_votes)
 
-    announcement, announcement_reason = _announcement_decision(announcements)
+    announcement, announcement_reason = _announcement_decision(
+        announcements,
+        as_of=as_of,
+    )
     if announcement is not None:
         chosen_date = str(announcement["date"])[:10]
         reason = announcement_reason
@@ -876,6 +909,8 @@ def fetch_alphavantage_announcements(
     for row in rows or []:
         if not isinstance(row, dict):
             continue
+        if not alpha_article_mentions_symbol(row, symbol):
+            continue
         item = _announcement_from_article(
             provider="alphavantage_news",
             title=str(row.get("title") or ""),
@@ -1072,6 +1107,7 @@ def reconcile_calendar(
             baseline=baseline_vote,
             structured_votes=votes,
             announcements=announcements_by_symbol.get(symbol, []),
+            as_of=start,
         )
         decision["structured_votes"] = [
             {
