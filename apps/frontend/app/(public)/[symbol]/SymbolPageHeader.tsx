@@ -821,7 +821,7 @@ export function DetailHero({
     emMethod === 'ml'
       ? 'via ML forecast'
       : emMethod === 'options_math' || emMethod === 'options_indicative'
-        ? 'via market-implied move'
+        ? 'via IV forecast'
         : emMethod === 'historical'
           ? 'historical median reference'
           : emMethod === 'historical_prior'

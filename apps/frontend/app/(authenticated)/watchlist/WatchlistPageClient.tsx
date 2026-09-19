@@ -119,12 +119,10 @@ function timingText(t?: string | null) {
 }
 
 function watchlistForecastLabel(
-  liveState: WatchlistMlState | undefined,
+  useLiveMl: boolean,
   staticMethod: DisplayForecastMethod | null | undefined,
 ): string {
-  if (liveState?.status === 'ready' && liveState.response?.source !== 'nightly_fallback') {
-    return 'Spot-updated ML';
-  }
+  if (useLiveMl) return 'Spot-updated ML';
   return staticMethod ? displayForecastLabel(staticMethod) : '';
 }
 
@@ -864,10 +862,10 @@ export default function WatchlistPage() {
             const spot = quotePending ? null : tick?.price ?? sum?.spot_price ?? null;
             const mlCandidate = mlCandidates.find((item) => item.symbol === t);
             const mlState = liveMl[t]?.key === mlCandidate?.key ? liveMl[t] : undefined;
-            // A genuine spot-updated model response may override the static
-            // publication estimate. A nightly fallback is not a new model result,
-            // so fall back to the canonical display field. The compatibility
-            // helper only bridges pre-migration symbol JSON until regeneration.
+            // Keep the same product hierarchy as the calendar and ticker hero:
+            // IV/options first, then ML, then historical context. A spot-updated
+            // ML response may replace only a historical/no-data fallback; it must
+            // never displace an available point-in-time IV/options forecast.
             const liveMlPct =
               emMatches &&
               mlState?.status === 'ready' &&
@@ -877,10 +875,14 @@ export default function WatchlistPage() {
             const staticDisplay = emMatches
               ? resolveDisplayForecastCompat(em)
               : { pct: null, method: null };
-            const movePct = liveMlPct ?? staticDisplay.pct;
-            const moveLabel = liveMlPct != null
-              ? 'Spot-updated ML'
-              : watchlistForecastLabel(mlState, staticDisplay.method);
+            const staticIsHistorical =
+              staticDisplay.method === 'historical' ||
+              staticDisplay.method === 'historical_prior';
+            const useLiveMl =
+              liveMlPct != null &&
+              (staticDisplay.pct == null || staticIsHistorical);
+            const movePct = useLiveMl ? liveMlPct : staticDisplay.pct;
+            const moveLabel = watchlistForecastLabel(useLiveMl, staticDisplay.method);
             const up = tickPctR !== null && !tickFlat && tickPctR >= 0;
             const quoteColor = tickPctR === null
               ? 'var(--ink-4)'
@@ -1161,9 +1163,12 @@ export default function WatchlistPage() {
                       fontSize: 9,
                       letterSpacing: '0.08em',
                       textTransform: 'uppercase',
-                      color: mlState?.status === 'ready' && mlState.response?.source !== 'nightly_fallback'
+                      color: useLiveMl
                         ? 'var(--accent)'
-                        : 'var(--ink-4)',
+                        : staticDisplay.method === 'options_math' ||
+                            staticDisplay.method === 'options_indicative'
+                          ? 'var(--brand-blue-1)'
+                          : 'var(--ink-4)',
                       visibility: moveLabel ? 'visible' : 'hidden',
                       whiteSpace: 'nowrap',
                     }}

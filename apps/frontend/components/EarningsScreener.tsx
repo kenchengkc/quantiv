@@ -752,7 +752,7 @@ function dedupeEvents(rows: ScreenerEvent[]): ScreenerEvent[] {
     seen.add(k);
     const compat = resolveDisplayForecastCompat(ev);
     out.push(
-      compat.pct != null && ev.display_forecast_pct == null
+      compat.pct != null
         ? {
             ...ev,
             display_forecast_pct: compat.pct,
