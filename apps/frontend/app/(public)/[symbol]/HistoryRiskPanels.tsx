@@ -60,7 +60,19 @@ export function buildHistorySeries(
     .map((h) => {
       const d = new Date(h.date);
       const yy = String(d.getFullYear() % 100).padStart(2, '0');
-      const q = h.q ?? `Q${Math.floor(d.getMonth() / 3) + 1} ${yy}`;
+      const fiscalYear =
+        h.fiscal_year != null && Number.isFinite(Number(h.fiscal_year))
+          ? String(Number(h.fiscal_year) % 100).padStart(2, '0')
+          : null;
+      const fiscalQuarter =
+        typeof h.fiscal_q === 'string' && /^Q[1-4]$/i.test(h.fiscal_q.trim())
+          ? h.fiscal_q.trim().toUpperCase()
+          : null;
+      const q =
+        h.q ??
+        (fiscalQuarter && fiscalYear
+          ? `${fiscalQuarter} ${fiscalYear}`
+          : `Q${Math.floor(d.getMonth() / 3) + 1} ${yy}`);
       const implied =
         h.implied != null && Number.isFinite(h.implied)
           ? Math.abs(h.implied)
