@@ -48,9 +48,14 @@ import sys
 from pathlib import Path
 from typing import Any
 
+import pandas as pd
+
+from sync_finnhub_earnings import normalize_existing
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_OVERRIDES = REPO_ROOT / "config" / "earnings_overrides.json"
 DEFAULT_CSV = REPO_ROOT / "data" / "earnings_calendar.csv"
+DEFAULT_PARQUET = REPO_ROOT / "data" / "earnings_calendar.parquet"
 
 MATCHABLE = ("date", "timing", "fiscal_year", "fiscal_q")
 SETTABLE = ("date", "timing", "fiscal_year", "fiscal_q", "eps_estimate", "revenue_estimate")
@@ -141,11 +146,46 @@ def apply_overrides(rows: list[dict[str, str]], fieldnames: list[str],
     return out, log
 
 
+def apply_override_artifacts(
+    csv_path: Path,
+    parquet_path: Path,
+    overrides: list[dict[str, Any]],
+) -> list[str]:
+    """Apply the same override set to the canonical CSV and Parquet artifacts."""
+    if not csv_path.exists():
+        raise FileNotFoundError(f"earnings CSV not found: {csv_path}")
+    if not parquet_path.exists():
+        raise FileNotFoundError(f"earnings Parquet not found: {parquet_path}")
+
+    with csv_path.open(newline="") as fh:
+        reader = csv.DictReader(fh)
+        fieldnames = list(reader.fieldnames or [])
+        rows = [dict(row) for row in reader]
+    if "act_symbol" not in fieldnames:
+        raise ValueError("earnings CSV missing 'act_symbol' column")
+
+    new_rows, log = apply_overrides(rows, fieldnames, overrides)
+    frame = normalize_existing(pd.DataFrame(new_rows, columns=fieldnames))
+
+    csv_tmp = csv_path.with_name(f".{csv_path.name}.tmp")
+    parquet_tmp = parquet_path.with_name(f".{parquet_path.name}.tmp")
+    try:
+        frame.to_csv(csv_tmp, index=False, lineterminator="\n")
+        frame.to_parquet(parquet_tmp, index=False)
+        parquet_tmp.replace(parquet_path)
+        csv_tmp.replace(csv_path)
+    finally:
+        csv_tmp.unlink(missing_ok=True)
+        parquet_tmp.unlink(missing_ok=True)
+    return log
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--overrides", type=Path, default=DEFAULT_OVERRIDES)
     parser.add_argument("--csv", type=Path, default=DEFAULT_CSV)
+    parser.add_argument("--parquet", type=Path, default=DEFAULT_PARQUET)
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--allow-missing", action="store_true",
                         help="Exit 0 (no-op) if the overrides file is absent.")
@@ -189,15 +229,13 @@ def main() -> int:
         print("dry run: no file written")
         return 0
 
-    tmp = args.csv.with_suffix(".csv.tmp")
-    with tmp.open("w", newline="") as fh:
-        # lineterminator="\n" preserves the file's existing LF endings (csv's
-        # default is CRLF, which would rewrite every line).
-        writer = csv.DictWriter(fh, fieldnames=fieldnames, lineterminator="\n")
-        writer.writeheader()
-        writer.writerows(new_rows)
-    tmp.replace(args.csv)
+    try:
+        apply_override_artifacts(args.csv, args.parquet, overrides)
+    except (FileNotFoundError, ValueError, OSError) as exc:
+        print(f"failed to apply earnings overrides: {exc}", file=sys.stderr)
+        return 1
     print(f"wrote {args.csv}")
+    print(f"wrote {args.parquet}")
     return 0
 
 
