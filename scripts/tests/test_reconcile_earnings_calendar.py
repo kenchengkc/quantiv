@@ -190,6 +190,9 @@ def test_generic_earnings_news_is_not_direct_announcement_evidence() -> None:
     assert not is_direct_earnings_announcement_title(
         "Nike Suffers a Larger Drop Than the General Market: Key Insights"
     )
+    assert not is_direct_earnings_announcement_title(
+        "Company Announces Results of Tender Offer on September 29"
+    )
 
 
 def test_extracts_date_and_session_from_forward_announcement() -> None:
