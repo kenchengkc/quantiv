@@ -314,6 +314,26 @@ def _session_from_text(text: str) -> str:
     ):
         return "amc"
 
+    lower = text.lower()
+    mentions_call = "call" in lower or "conference" in lower
+    release_linked_to_call = bool(
+        re.search(
+            r"(?:results|earnings|release|materials).{0,80}"
+            r"(?:issued|released|published|available).{0,40}"
+            r"(?:before|prior to).{0,40}(?:call|conference)",
+            lower,
+            flags=re.S,
+        )
+        or re.search(
+            r"(?:issued|released|published|available).{0,80}"
+            r"(?:before|prior to).{0,40}(?:call|conference)",
+            lower,
+            flags=re.S,
+        )
+    )
+    if mentions_call and not release_linked_to_call:
+        return "unknown"
+
     times: list[int] = []
     for match in TIME_RE.finditer(text):
         hour = int(match.group(1))
@@ -478,8 +498,21 @@ def _announcement_decision(
     return None, None
 
 
+_INTERNAL_CALENDAR_PROVIDERS = {"dolthub_calendar", "baseline", "current"}
+
+
 def _structured_date_consensus(votes: list[Vote]) -> tuple[str | None, list[str]]:
-    distinct = _distinct_votes(votes)
+    """Return a date only when two independent external calendars agree.
+
+    The current/DoltHub row and the prior published baseline are anchors, not
+    independent votes. Counting either of them as corroboration can manufacture
+    confidence when a vendor simply repeats the same projected date.
+    """
+    distinct = [
+        vote
+        for vote in _distinct_votes(votes)
+        if vote["provider"] not in _INTERNAL_CALENDAR_PROVIDERS
+    ]
     by_date: dict[str, list[str]] = defaultdict(list)
     for vote in distinct:
         by_date[vote["date"]].append(vote["provider"])
@@ -495,29 +528,6 @@ def _structured_date_consensus(votes: list[Vote]) -> tuple[str | None, list[str]
     if len(ranked) > 1 and len(ranked[1][1]) == len(providers):
         return None, []
     return best_date, sorted(providers)
-
-
-def _session_consensus(votes: list[Vote], event_date: str) -> tuple[str | None, list[str]]:
-    distinct = _distinct_votes(votes)
-    by_timing: dict[str, list[str]] = defaultdict(list)
-    for vote in distinct:
-        if vote["date"] != event_date:
-            continue
-        timing = normalize_timing(vote.get("timing"))
-        if timing in {"bmo", "amc", "dmh"}:
-            by_timing[timing].append(vote["provider"])
-    if not by_timing:
-        return None, []
-    ranked = sorted(
-        by_timing.items(),
-        key=lambda item: (-len(item[1]), item[0]),
-    )
-    timing, providers = ranked[0]
-    if len(providers) < 2:
-        return None, []
-    if len(ranked) > 1 and len(ranked[1][1]) == len(providers):
-        return None, []
-    return timing, sorted(providers)
 
 
 def choose_canonical_event(
@@ -614,34 +624,9 @@ def choose_canonical_event(
             timing = announcement_timing
             timing_sources = [str(announcement.get("provider") or "announcement")]
 
-    if timing == "unknown":
-        consensus_timing, session_sources = _session_consensus(votes, chosen_date)
-        if consensus_timing:
-            timing = consensus_timing
-            timing_sources = session_sources
-
     if (
         timing == "unknown"
         and baseline_confirmed
-        and baseline
-        and baseline.get("date") == chosen_date
-        and baseline.get("timing") != "unknown"
-    ):
-        timing = str(baseline["timing"])
-        timing_sources = ["baseline"]
-
-    # A single vendor cannot flip an established session. For unconfirmed
-    # events prefer the fresh base row over a merely sticky baseline.
-    if (
-        timing == "unknown"
-        and current
-        and current.get("date") == chosen_date
-        and current.get("timing") != "unknown"
-    ):
-        timing = str(current["timing"])
-        timing_sources = [str(current.get("provider") or "current")]
-    if (
-        timing == "unknown"
         and baseline
         and baseline.get("date") == chosen_date
         and baseline.get("timing") != "unknown"
@@ -949,14 +934,14 @@ def load_company_names(path: Path = TICKER_NAMES_PATH) -> dict[str, str]:
     }
 
 
-def finnhub_article_mentions_company(
-    article: dict[str, Any],
+def headline_mentions_company(
+    headline: str,
     symbol: str,
     company_name: str | None,
 ) -> bool:
-    """Require target identity in the headline; related-ticker tags are insufficient."""
+    """Require the target ticker or company identity in an announcement headline."""
     target = symbol.strip().upper()
-    headline = _clean_text(str(article.get("headline") or article.get("title") or ""))
+    headline = _clean_text(headline)
     if not target or not headline:
         return False
 
@@ -979,8 +964,20 @@ def finnhub_article_mentions_company(
     ]
     if not company_tokens:
         return False
-
     return any(token in headline_words for token in company_tokens)
+
+
+def finnhub_article_mentions_company(
+    article: dict[str, Any],
+    symbol: str,
+    company_name: str | None,
+) -> bool:
+    """Related-ticker tags alone are insufficient evidence for Finnhub news."""
+    return headline_mentions_company(
+        str(article.get("headline") or article.get("title") or ""),
+        symbol,
+        company_name,
+    )
 
 
 def fetch_finnhub_announcements(
@@ -1034,6 +1031,7 @@ def fetch_twelvedata_announcements(
     *,
     today: date,
     key: str | None,
+    company_name: str | None = None,
 ) -> tuple[list[Announcement], dict[str, Any]]:
     if not key:
         return [], {"status": "missing_key"}
@@ -1070,9 +1068,12 @@ def fetch_twelvedata_announcements(
     for row in rows or []:
         if not isinstance(row, dict):
             continue
+        title = str(row.get("title") or "")
+        if not headline_mentions_company(title, symbol, company_name):
+            continue
         item = _announcement_from_article(
             provider="twelvedata_press_release",
-            title=str(row.get("title") or ""),
+            title=title,
             body=str(row.get("body") or ""),
             published_on=_parse_iso_day(row.get("datetime")),
             official=True,
@@ -1093,6 +1094,7 @@ def fetch_alphavantage_announcements(
     *,
     today: date,
     key: str | None,
+    company_name: str | None = None,
 ) -> tuple[list[Announcement], dict[str, Any]]:
     if not key:
         return [], {"status": "missing_key"}
@@ -1126,11 +1128,14 @@ def fetch_alphavantage_announcements(
     for row in rows or []:
         if not isinstance(row, dict):
             continue
+        title = str(row.get("title") or "")
         if not alpha_article_mentions_symbol(row, symbol):
+            continue
+        if not headline_mentions_company(title, symbol, company_name):
             continue
         item = _announcement_from_article(
             provider="alphavantage_news",
-            title=str(row.get("title") or ""),
+            title=title,
             body=str(row.get("summary") or ""),
             published_on=_parse_iso_day(row.get("time_published")),
             official=False,
@@ -1447,6 +1452,7 @@ def _candidate_symbols(
     end: date,
     allowed_symbols: set[str] | None = None,
     max_symbols: int | None = None,
+    preliminary_decisions: dict[str, dict[str, Any]] | None = None,
 ) -> list[str]:
     nearest: dict[str, date] = {}
 
@@ -1477,9 +1483,57 @@ def _candidate_symbols(
         if start <= vote_date <= end:
             add(vote.get("symbol"), vote_date)
 
-    ordered = sorted(
-        nearest,
-        key=lambda symbol: (abs((nearest[symbol] - start).days), symbol),
+    def external_dates(decision: dict[str, Any]) -> set[str]:
+        return {
+            str(vote.get("date") or "")[:10]
+            for vote in decision.get("structured_votes") or []
+            if str(vote.get("provider") or "") not in _INTERNAL_CALENDAR_PROVIDERS
+            and vote.get("date")
+        }
+
+    def needs_lookup(symbol: str) -> bool:
+        if preliminary_decisions is None:
+            return True
+        decision = preliminary_decisions.get(symbol) or {}
+        reason = str(decision.get("reason") or "")
+        chosen = str(decision.get("date") or "")[:10]
+        conflicts = bool(
+            chosen and any(candidate != chosen for candidate in external_dates(decision))
+        )
+        if reason == "baseline_confirmed":
+            return conflicts
+        return reason not in {"no_candidate", "official_announcement", "direct_announcement"}
+
+    def risk_rank(symbol: str) -> tuple[int, int, str]:
+        decision = (preliminary_decisions or {}).get(symbol) or {}
+        reason = str(decision.get("reason") or "")
+        chosen = str(decision.get("date") or "")[:10]
+        timing = normalize_timing(decision.get("timing"))
+        external = external_dates(decision)
+        conflicts = bool(chosen and any(candidate != chosen for candidate in external))
+
+        if reason == "uncorroborated_new_event":
+            rank = 0
+        elif reason == "structured_consensus":
+            rank = 1
+        elif conflicts:
+            rank = 2
+        elif reason in {"baseline_sticky", "current_base"} and timing == "unknown":
+            rank = 3
+        elif reason in {"baseline_sticky", "current_base"}:
+            rank = 4
+        else:
+            rank = 5
+        return rank, abs((nearest[symbol] - start).days), symbol
+
+    candidates = [symbol for symbol in nearest if needs_lookup(symbol)]
+    ordered = (
+        sorted(candidates, key=risk_rank)
+        if preliminary_decisions is not None
+        else sorted(
+            candidates,
+            key=lambda symbol: (abs((nearest[symbol] - start).days), symbol),
+        )
     )
     if max_symbols is not None:
         ordered = ordered[:max_symbols]
@@ -1524,6 +1578,7 @@ def _collect_announcements(
             symbol,
             today=today,
             key=twelvedata_key,
+            company_name=(company_names or {}).get(symbol),
         )
         evidence[symbol].extend(rows)
         status["twelvedata_press_releases"][symbol] = meta
@@ -1544,6 +1599,7 @@ def _collect_announcements(
             symbol,
             today=today,
             key=alphavantage_key,
+            company_name=(company_names or {}).get(symbol),
         )
         evidence[symbol].extend(rows)
         status["alphavantage_news"][symbol] = meta
@@ -1645,6 +1701,7 @@ def main() -> int:
         end=announcement_end,
         allowed_symbols=allowed_symbols,
         max_symbols=args.announcement_max_symbols,
+        preliminary_decisions=preliminary_report["decisions"],
     )
     company_names = load_company_names()
     announcements, announcement_status = _collect_announcements(
