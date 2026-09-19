@@ -192,7 +192,7 @@ def is_direct_earnings_announcement_title(title: str) -> bool:
     if any(term in text for term in DIRECT_TITLE_RESULTS):
         return True
     quarter_context = re.search(
-        r"\\b(?:first|second|third|fourth)\\s+quarter\\b|\\bq[1-4]\\b",
+        r"\b(?:first|second|third|fourth)\s+quarter\b|\bq[1-4]\b",
         text,
         flags=re.IGNORECASE,
     )
@@ -205,25 +205,25 @@ def extract_fiscal_identity(text: str) -> dict[str, Any]:
     patterns: list[tuple[re.Pattern[str], str]] = [
         (
             re.compile(
-                r"\\b(20\\d{2})\\s+(first|second|third|fourth)\\s+quarter\\b",
+                r"\b(20\d{2})\s+(first|second|third|fourth)\s+quarter\b",
                 re.IGNORECASE,
             ),
             "year_first",
         ),
         (
             re.compile(
-                r"\\b(first|second|third|fourth)\\s+quarter"
-                r"(?:\\s+(?:of\\s+)?)?(?:fiscal(?:\\s+year)?\\s*)?(20\\d{2})\\b",
+                r"\b(first|second|third|fourth)\s+quarter"
+                r"(?:\s+(?:of\s+)?)?(?:fiscal(?:\s+year)?\s*)?(20\d{2})\b",
                 re.IGNORECASE,
             ),
             "quarter_first",
         ),
         (
-            re.compile(r"\\bfy\\s*(20\\d{2})\\s*q([1-4])\\b", re.IGNORECASE),
+            re.compile(r"\bfy\s*(20\d{2})\s*q([1-4])\b", re.IGNORECASE),
             "fy_q",
         ),
         (
-            re.compile(r"\\bq([1-4])\\s*(?:fy\\s*)?(20\\d{2})\\b", re.IGNORECASE),
+            re.compile(r"\bq([1-4])\s*(?:fy\s*)?(20\d{2})\b", re.IGNORECASE),
             "q_fy",
         ),
     ]
@@ -247,7 +247,7 @@ def extract_fiscal_identity(text: str) -> dict[str, Any]:
         return {"fiscal_year": fiscal_year, "fiscal_q": fiscal_q}
 
     quarter_match = re.search(
-        r"\\b(first|second|third|fourth)\\s+quarter\\b",
+        r"\b(first|second|third|fourth)\s+quarter\b",
         cleaned,
         flags=re.IGNORECASE,
     )
@@ -256,7 +256,7 @@ def extract_fiscal_identity(text: str) -> dict[str, Any]:
             quarter_match.start() : min(len(cleaned), quarter_match.end() + 60)
         ]
         year_match = re.search(
-            r"\\bfiscal(?:\\s+year)?\\s+(20\\d{2})\\b",
+            r"\bfiscal(?:\s+year)?\s+(20\d{2})\b",
             nearby,
             flags=re.IGNORECASE,
         )
@@ -267,7 +267,6 @@ def extract_fiscal_identity(text: str) -> dict[str, Any]:
             }
 
     return {}
-
 
 def _session_from_text(text: str) -> str:
     lower = text.lower()
