@@ -274,7 +274,7 @@ Before screener/manifest publication, the frontend-data build fails closed unles
 
 Compact surfaces consume the same field rather than inventing their own hierarchy:
 
-- calendar expected-move cell: IV/options-first `display_forecast_pct`, with the method visible before hover and IV/straddle/ML detail in the tooltip;
+- calendar expected-move cell: IV/options-first `display_forecast_pct` with no extra method label under the number; IV/straddle/ML provenance stays in the hover tooltip;
 - screener expected-move column and “Big movers” preset: the same IV/options-first display resolver;
 - watchlist expected move: IV/options first; spot-updated ML may replace only a historical/no-data fallback, never a usable IV/options estimate;
 - symbol page: the large headline expected move uses the same IV/options-first resolver; spot-updated ML remains a separate model-comparison signal rather than replacing the headline;
