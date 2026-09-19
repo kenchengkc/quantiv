@@ -231,11 +231,13 @@ The strict research fields above are intentionally allowed to be absent for an i
 `tools/frontend_data/display_forecast.py` resolves one canonical `display_forecast_pct` before publication:
 
 ```text
-validated ML
+strict point-in-time IV expected move
     ↓ unavailable
-strict decision-eligible options math
+strict decision-eligible straddle expected move
     ↓ unavailable
-indicative options under display-only quote policy
+indicative IV / options under display-only quote policy
+    ↓ unavailable
+validated ML expected move
     ↓ unavailable
 median absolute move from recent ticker earnings
     ↓ insufficient ticker history
@@ -272,10 +274,11 @@ Before screener/manifest publication, the frontend-data build fails closed unles
 
 Compact surfaces consume the same field rather than inventing their own hierarchy:
 
-- calendar expected-move cell: static `display_forecast_pct` plus provenance tooltip;
-- screener expected-move column and “Big movers” preset: `display_forecast_pct`;
-- watchlist expected move: `display_forecast_pct`, except a genuinely successful spot-updated ML response may override it interactively;
-- symbol page: headline/provenance can render from the display estimate even when strict options panels are absent.
+- calendar expected-move cell: IV/options-first `display_forecast_pct`, with the method visible before hover and IV/straddle/ML detail in the tooltip;
+- screener expected-move column and “Big movers” preset: the same IV/options-first display resolver;
+- watchlist expected move: IV/options first; spot-updated ML may replace only a historical/no-data fallback, never a usable IV/options estimate;
+- symbol page: the large headline expected move uses the same IV/options-first resolver; spot-updated ML remains a separate model-comparison signal rather than replacing the headline;
+- reported events freeze point-in-time IV/options evidence and ML separately, then continue to show IV/options first without recomputing from post-event data.
 
 This is a presentation continuity mechanism, not a relaxation of the model/research control plane.
 
@@ -378,7 +381,7 @@ Quantiv is designed to degrade explicitly rather than manufacture freshness.
 Examples:
 
 - bad option rows → quarantined rather than selected;
-- strict option pair unavailable → presentation may use an explicitly labeled indicative/historical display estimate while strict analytical fields stay null;
+- strict IV/option evidence unavailable → presentation may use indicative options or validated ML before an explicitly labeled historical fallback, while strict analytical fields stay null;
 - no usable ticker history → presentation falls back to the recent universe prior rather than inventing ticker-specific evidence;
 - critical reconciliation exception → scoring/publication blocked;
 - rejected challenger → previous champion remains active;
