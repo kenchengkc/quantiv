@@ -7,11 +7,13 @@ from datetime import date
 import pandas as pd
 
 from reconcile_earnings_calendar import (
+    _clean_text,
     alpha_article_mentions_symbol,
     choose_canonical_event,
     extract_earnings_announcement,
     extract_fiscal_identity,
     finnhub_article_mentions_company,
+    headline_mentions_company,
     is_direct_earnings_announcement_title,
     reconcile_calendar,
     _candidate_symbols,
@@ -111,7 +113,47 @@ def test_two_independent_structured_sources_can_move_date() -> None:
     assert decision["confidence"] == "corroborated"
 
 
-def test_single_vendor_session_cannot_flip_existing_session() -> None:
+def test_dolthub_plus_one_vendor_is_not_independent_corroboration() -> None:
+    current = _vote("dolthub_calendar", "2026-09-30")
+    baseline = _vote("baseline", "2026-09-29")
+    votes = [
+        current,
+        _vote("finnhub_calendar", "2026-09-30"),
+    ]
+
+    decision = choose_canonical_event(
+        current=current,
+        baseline=baseline,
+        structured_votes=votes,
+        announcements=[],
+    )
+
+    assert decision["date"] == "2026-09-29"
+    assert decision["reason"] == "baseline_sticky"
+
+
+def test_external_calendar_consensus_never_establishes_session() -> None:
+    current = _vote("dolthub_calendar", "2026-09-29", "bmo")
+    baseline = _vote("baseline", "2026-09-29", "bmo")
+    votes = [
+        current,
+        _vote("finnhub_calendar", "2026-09-30", "amc"),
+        _vote("fmp_calendar", "2026-09-30", "amc"),
+    ]
+
+    decision = choose_canonical_event(
+        current=current,
+        baseline=baseline,
+        structured_votes=votes,
+        announcements=[],
+    )
+
+    assert decision["date"] == "2026-09-30"
+    assert decision["reason"] == "structured_consensus"
+    assert decision["timing"] == "unknown"
+
+
+def test_unconfirmed_calendar_sessions_are_not_published() -> None:
     current = _vote("dolthub", "2026-10-01", "bmo")
     baseline = _vote("baseline", "2026-10-01", "amc")
     votes = [
@@ -128,7 +170,7 @@ def test_single_vendor_session_cannot_flip_existing_session() -> None:
     )
 
     assert decision["date"] == "2026-10-01"
-    assert decision["timing"] == "bmo"
+    assert decision["timing"] == "unknown"
 
 
 def test_two_sources_must_agree_before_session_changes_with_new_date() -> None:
@@ -288,6 +330,82 @@ def test_announcement_candidates_are_frontend_bounded_and_nearest_first() -> Non
     )
 
     assert symbols == ["DDD", "AAA"]
+
+
+def test_announcement_candidates_prioritize_risk_and_skip_stable_confirmed_rows() -> None:
+    current = pd.DataFrame(
+        [
+            {"act_symbol": "AAA", "date": date(2026, 9, 20)},
+            {"act_symbol": "BBB", "date": date(2026, 9, 21)},
+            {"act_symbol": "CCC", "date": date(2026, 9, 22)},
+        ]
+    )
+    baseline = current.copy()
+    provider_votes = [
+        {
+            "provider": "finnhub_calendar",
+            "symbol": "DDD",
+            "date": "2026-09-23",
+            "timing": "unknown",
+        }
+    ]
+    decisions = {
+        "AAA": {
+            "date": "2026-09-20",
+            "timing": "amc",
+            "reason": "baseline_confirmed",
+            "structured_votes": [
+                {
+                    "provider": "finnhub_calendar",
+                    "date": "2026-09-20",
+                    "timing": "unknown",
+                }
+            ],
+        },
+        "BBB": {
+            "date": "2026-09-21",
+            "timing": "amc",
+            "reason": "baseline_confirmed",
+            "structured_votes": [
+                {
+                    "provider": "alphavantage_calendar",
+                    "date": "2026-09-22",
+                    "timing": "unknown",
+                }
+            ],
+        },
+        "CCC": {
+            "date": "2026-09-22",
+            "timing": "unknown",
+            "reason": "baseline_sticky",
+            "structured_votes": [],
+        },
+        "DDD": {
+            "date": None,
+            "timing": "unknown",
+            "reason": "uncorroborated_new_event",
+            "structured_votes": [
+                {
+                    "provider": "finnhub_calendar",
+                    "date": "2026-09-23",
+                    "timing": "unknown",
+                }
+            ],
+        },
+    }
+
+    symbols = _candidate_symbols(
+        current,
+        baseline,
+        provider_votes,
+        start=date(2026, 9, 19),
+        end=date(2026, 10, 10),
+        allowed_symbols={"AAA", "BBB", "CCC", "DDD"},
+        max_symbols=2,
+        preliminary_decisions=decisions,
+    )
+
+    assert symbols == ["DDD", "BBB"]
 
 
 
@@ -520,3 +638,58 @@ def test_morning_release_language_maps_to_bmo() -> None:
         text,
         published_on=date(2026, 8, 31),
     ) == {"date": "2026-09-30", "timing": "bmo"}
+
+
+
+def test_all_announcement_transports_require_target_company_in_headline() -> None:
+    assert headline_mentions_company(
+        "NIKE, Inc. Announces First Quarter Fiscal 2027 Earnings",
+        "NKE",
+        "Nike",
+    )
+    assert headline_mentions_company(
+        "Datadog (DDOG) to Report Third Quarter Earnings",
+        "DDOG",
+        "Datadog",
+    )
+    assert not headline_mentions_company(
+        "IDEX Gears Up to Report Q2 Earnings",
+        "FERG",
+        "Ferguson Enterprises",
+    )
+
+
+def test_clean_text_removes_malformed_script_and_style_closing_tags() -> None:
+    raw = (
+        "Before"
+        "<script>window.secret = 'remove';</script\t\n junk>"
+        "Middle"
+        "<style>.hidden { display: none; }</style extra>"
+        "After"
+    )
+
+    assert _clean_text(raw) == "Before Middle After"
+
+
+def test_conference_call_time_alone_does_not_set_release_session() -> None:
+    text = (
+        "Example Corp will report third quarter results on October 2, 2026. "
+        "The company will host a conference call at 8:00 a.m. ET."
+    )
+
+    assert extract_earnings_announcement(
+        text,
+        published_on=date(2026, 9, 20),
+    ) == {"date": "2026-10-02", "timing": "unknown"}
+
+
+def test_results_explicitly_issued_before_morning_call_map_to_bmo() -> None:
+    text = (
+        "Example Corp will report third quarter results on October 2, 2026. "
+        "Financial results will be issued before the conference call at 8:00 a.m. ET."
+    )
+
+    assert extract_earnings_announcement(
+        text,
+        published_on=date(2026, 9, 20),
+    ) == {"date": "2026-10-02", "timing": "bmo"}
