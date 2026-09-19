@@ -5,7 +5,7 @@ The frontend rebuild cannot recompute an earnings forecast after the event. This
 tool walks prior committed week bundles and restores the strongest pre-event
 forecast that Quantiv actually published for each reported event:
 
-    ML forecast > strict options math > IV-only indicative options.
+    IV-based options forecast > strict straddle > frozen ML forecast.
 
 Fresh post-event facts (realized move, EPS/revenue actuals, corrected timing)
 remain authoritative. Only forecast/pricing fields are frozen from history.
@@ -122,21 +122,38 @@ def _positive(value: Any) -> float | None:
     return number if math.isfinite(number) and number > 0 else None
 
 
+def _is_after_close(timing: Any) -> bool:
+    normalized = str(timing or "").strip().lower()
+    return normalized in {"after_market_close", "amc", "after_close"} or "after" in normalized
+
+
+def _option_evidence_is_pre_event(event: dict) -> bool:
+    earnings_date = str(event.get("earnings_date") or "")[:10]
+    as_of = str(event.get("as_of_date") or "")[:10]
+    if not earnings_date or not as_of:
+        return False
+    if _is_after_close(event.get("timing")):
+        return as_of <= earnings_date
+    return as_of < earnings_date
+
+
 def _forecast_rank(event: dict) -> tuple[int, str]:
+    as_of = str(event.get("as_of_date") or "")[:10]
+    options_are_pre_event = _option_evidence_is_pre_event(event)
+
+    iv = _positive(event.get("em_iv_pct"))
+    if iv is not None and options_are_pre_event:
+        return (4, as_of)
+
+    strict = _positive(event.get("em_straddle_pct"))
+    if strict is not None and options_are_pre_event:
+        return (3, as_of)
+
     earnings_date = str(event.get("earnings_date") or "")[:10]
     ml = _positive(event.get("em_ml_pct"))
     ml_as_of = str(event.get("ml_snapshot_date") or "")[:10]
     if ml is not None and ml_as_of and (not earnings_date or ml_as_of < earnings_date):
-        return (3, ml_as_of)
-
-    strict = _positive(event.get("em_straddle_pct"))
-    as_of = str(event.get("as_of_date") or "")[:10]
-    if strict is not None:
-        return (2, as_of)
-
-    iv = _positive(event.get("em_iv_pct"))
-    if iv is not None:
-        return (1, as_of)
+        return (2, ml_as_of)
     return (0, "")
 
 
@@ -145,8 +162,38 @@ def _normalize_forecast(event: dict) -> dict:
     ml = _positive(row.get("em_ml_pct"))
     strict = _positive(row.get("em_straddle_pct"))
     iv = _positive(row.get("em_iv_pct"))
+    options_are_pre_event = _option_evidence_is_pre_event(row)
 
-    if ml is not None:
+    if iv is not None and options_are_pre_event:
+        decision_eligible = strict is not None
+        row.update(
+            {
+                "em_method": "options_math" if decision_eligible else row.get("em_method"),
+                "display_forecast_pct": iv,
+                "display_forecast_method": (
+                    "options_math" if decision_eligible else "options_indicative"
+                ),
+                "display_forecast_as_of": row.get("as_of_date"),
+                "ml_status": "available" if ml is not None else "unavailable_event",
+                "options_status": "decision_eligible" if decision_eligible else "indicative",
+                "fallback_reason": None if decision_eligible else "no_same_strike_pair",
+                "forecast_frozen": True,
+            }
+        )
+    elif strict is not None and options_are_pre_event:
+        row.update(
+            {
+                "em_method": "options_math",
+                "display_forecast_pct": strict,
+                "display_forecast_method": "options_math",
+                "display_forecast_as_of": row.get("as_of_date"),
+                "ml_status": "available" if ml is not None else "unavailable_event",
+                "options_status": "decision_eligible",
+                "fallback_reason": None,
+                "forecast_frozen": True,
+            }
+        )
+    elif ml is not None:
         row.update(
             {
                 "em_method": "ml_lightgbm",
@@ -155,37 +202,77 @@ def _normalize_forecast(event: dict) -> dict:
                 "display_forecast_as_of": row.get("ml_snapshot_date")
                 or row.get("as_of_date"),
                 "ml_status": "available",
-                "options_status": "decision_eligible" if strict is not None else "unavailable",
+                "options_status": "unavailable",
                 "fallback_reason": None,
-                "forecast_frozen": True,
-            }
-        )
-    elif strict is not None:
-        row.update(
-            {
-                "em_method": "options_math",
-                "display_forecast_pct": strict,
-                "display_forecast_method": "options_math",
-                "display_forecast_as_of": row.get("as_of_date"),
-                "ml_status": "unavailable_event",
-                "options_status": "decision_eligible",
-                "fallback_reason": None,
-                "forecast_frozen": True,
-            }
-        )
-    elif iv is not None:
-        row.update(
-            {
-                "display_forecast_pct": iv,
-                "display_forecast_method": "options_indicative",
-                "display_forecast_as_of": row.get("as_of_date"),
-                "ml_status": "unavailable_event",
-                "options_status": "indicative",
-                "fallback_reason": "no_same_strike_pair",
                 "forecast_frozen": True,
             }
         )
     return row
+
+
+def _symbol_history_candidate(key: EventKey) -> dict | None:
+    """Build point-in-time option evidence from the generated symbol history.
+
+    Symbol history often retains the final event-day IV/straddle observation
+    even after the compact week row has been rebuilt without forecast fields.
+    Reusing that exact observation keeps the overview and symbol dashboard on
+    the same frozen number without inventing a post-event estimate.
+    """
+
+    ticker, event_date = key
+    path = SYMBOLS_DIR / f"{ticker}.json"
+    if not path.exists():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+
+    row = next(
+        (
+            item
+            for item in payload.get("earnings_history") or []
+            if str(item.get("date") or "")[:10] == event_date
+        ),
+        None,
+    )
+    if row is None:
+        return None
+
+    implied_as_of = str(row.get("implied_as_of") or "")[:10]
+    if not implied_as_of:
+        return None
+    timing = row.get("timing")
+    candidate: dict[str, Any] = {
+        "ticker": ticker,
+        "earnings_date": event_date,
+        "timing": timing,
+        "as_of_date": implied_as_of,
+        "expiry_date": row.get("implied_expiration"),
+        "days_to_expiry": row.get("implied_dte"),
+        "lead_time_days": row.get("implied_lead_days"),
+        "atm_strike": row.get("implied_atm_strike"),
+        "atm_iv": row.get("implied_atm_iv"),
+        "em_straddle_abs": row.get("implied_straddle_abs"),
+        "em_straddle_pct": row.get("implied"),
+    }
+
+    atm_iv = _positive(row.get("implied_atm_iv"))
+    dte = _positive(row.get("implied_dte"))
+    if atm_iv is not None and dte is not None:
+        candidate["em_iv_pct"] = atm_iv * math.sqrt(dte / 365.0)
+
+    for field in ML_HISTORY_FIELDS:
+        value = row.get(field)
+        if value is not None:
+            candidate[field] = value
+
+    quality = row.get("implied_quality_status")
+    if quality not in {None, "decision_eligible_eod"}:
+        candidate["em_straddle_pct"] = None
+        candidate["em_iv_pct"] = None
+
+    return candidate if _forecast_rank(candidate)[0] > 0 else None
 
 
 def _merge_forecast(current: dict, historical: dict) -> dict:
@@ -247,6 +334,17 @@ def recover_week(
             previous = best.get(key)
             if previous is None or _forecast_rank(event) > _forecast_rank(previous):
                 best[key] = event
+
+    # The symbol history can retain a later, exact pre-event IV observation
+    # than the compact week bundle. Prefer it when it has stronger/newer
+    # point-in-time evidence.
+    for key in targets:
+        symbol_candidate = _symbol_history_candidate(key)
+        if symbol_candidate is None:
+            continue
+        previous = best.get(key)
+        if previous is None or _forecast_rank(symbol_candidate) > _forecast_rank(previous):
+            best[key] = symbol_candidate
 
     changed: dict[EventKey, dict] = {}
     for key in sorted(targets):
