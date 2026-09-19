@@ -188,8 +188,8 @@ def normalize_timing(value: Any) -> str:
 
 def _clean_text(value: str) -> str:
     text = html.unescape(value or "")
-    text = re.sub(r"<script\b[^>]*>.*?</script>", " ", text, flags=re.I | re.S)
-    text = re.sub(r"<style\b[^>]*>.*?</style>", " ", text, flags=re.I | re.S)
+    text = re.sub(r"<script\b[^>]*>.*?</script\b[^>]*>", " ", text, flags=re.I | re.S)
+    text = re.sub(r"<style\b[^>]*>.*?</style\b[^>]*>", " ", text, flags=re.I | re.S)
     text = re.sub(r"<[^>]+>", " ", text)
     return re.sub(r"\s+", " ", text).strip()
 
@@ -1552,7 +1552,6 @@ def _collect_announcements(
     alphavantage_delay: float,
     alpha_news_max: int,
     company_names: dict[str, str] | None = None,
-    preliminary_decisions: dict[str, dict[str, Any]] | None = None,
 ) -> tuple[dict[str, list[Announcement]], dict[str, Any]]:
     evidence: dict[str, list[Announcement]] = defaultdict(list)
     status: dict[str, Any] = {
@@ -1710,7 +1709,6 @@ def main() -> int:
         alphavantage_delay=args.alphavantage_delay,
         alpha_news_max=args.alpha_news_max,
         company_names=company_names,
-        preliminary_decisions=preliminary_report["decisions"],
     )
 
     reconciled, reconciliation = reconcile_calendar(
