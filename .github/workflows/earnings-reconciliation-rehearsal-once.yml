@@ -1,4 +1,4 @@
-name: Earnings reconciliation rehearsal one-shot
+name: Earnings reconciliation published-release rehearsal one-shot
 
 on:
   push:
@@ -54,10 +54,7 @@ jobs:
           R2_REQUIRE_RUNTIME_STATE: "1"
         run: bash scripts/r2_pull.sh
 
-      - name: Sync fresh Dolt earnings baseline
-        run: python scripts/sync_dolthub.py --earnings
-
-      - name: Rehearse reconciliation
+      - name: Rehearse reconciliation on published calendar
         env:
           FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
           FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
@@ -68,8 +65,13 @@ jobs:
             --days-ahead 60 \
             --announcement-days-ahead 35 \
             --alpha-news-max 20 \
-            --report /tmp/earnings_calendar_reconciliation.json \
-            --dry-run
+            --report /tmp/earnings_calendar_reconciliation.json
+
+      - name: Apply verified bootstrap overrides
+        run: python scripts/apply_earnings_overrides.py --allow-missing
+
+      - name: Verify reconciled calendar integrity
+        run: python scripts/check_earnings_calendar_integrity.py --require-baseline
 
       - name: Print near-term decisions
         if: always()
@@ -92,6 +94,23 @@ jobs:
               indent=2, sort_keys=True
           ))
           print("nontrivial_count:", len(report.get("nontrivial_decisions", {})))
+          PY
+          python - <<'PY'
+          import csv, json
+          from pathlib import Path
+          watch = {"AIR","FERG","BXMT","CCL","CAG","FDS","JEF","PRGS","ACN","MKC","NKE","APOG"}
+          rows = []
+          with Path("data/earnings_calendar.csv").open() as fh:
+              for row in csv.DictReader(fh):
+                  if row.get("act_symbol") in watch and "2026-09-19" <= row.get("date","") <= "2026-11-15":
+                      rows.append({
+                          "ticker": row.get("act_symbol"),
+                          "date": row.get("date"),
+                          "timing": row.get("timing"),
+                          "source": row.get("source"),
+                      })
+          print("final_watch_rows:")
+          print(json.dumps(sorted(rows, key=lambda r:(r["date"],r["ticker"])), indent=2))
           PY
           fi
 
