@@ -227,6 +227,74 @@ def _history_rows(history, ticker: str, historical_options: dict[date, dict]) ->
     return rows[:12]
 
 
+def attach_frozen_event_forecasts(
+    detail: dict | None,
+    ticker: str,
+    archive: dict[tuple[str, str], dict] | None,
+    *,
+    current_event_date: date | None = None,
+    today: date | None = None,
+) -> dict | None:
+    """Attach final pre-event ML snapshots to symbol history and reported hero.
+
+    The archive is keyed by exact (ticker, earnings_date). Historical rows keep
+    their realized/EPS outcomes from the fresh build; only ML forecast fields are
+    added. For the currently published event, once it has reported, the same
+    frozen ML snapshot remains the ticker-page expected move instead of falling
+    through to a historical-median display fallback.
+    """
+    if detail is None or not archive:
+        return detail
+
+    symbol = ticker.upper()
+    history = detail.get("earnings_history") or []
+    for row in history:
+        event_iso = str(row.get("date") or "")[:10]
+        fc = archive.get((symbol, event_iso))
+        if not fc:
+            continue
+        fields = ml_fields(fc)
+        if fields.get("em_ml_pct") is None:
+            continue
+        row.update(fields)
+        row["forecast_frozen"] = True
+
+    if current_event_date is None:
+        return detail
+    cutoff = today or date.today()
+    if current_event_date > cutoff:
+        return detail
+
+    event_iso = current_event_date.isoformat()
+    fc = archive.get((symbol, event_iso))
+    if not fc:
+        return detail
+    fields = ml_fields(fc)
+    forecast_pct = fields.get("em_ml_pct")
+    if forecast_pct is None:
+        return detail
+
+    current = detail.get("expected_move") or {}
+    current_date = str(current.get("earnings_date") or "")[:10]
+    if current_date and current_date != event_iso:
+        current = {}
+
+    frozen = {
+        **current,
+        "earnings_date": event_iso,
+        **fields,
+        "em_method": "ml_lightgbm",
+        "display_forecast_pct": forecast_pct,
+        "display_forecast_method": "ml",
+        "display_forecast_as_of": fields.get("ml_snapshot_date"),
+        "ml_status": "available",
+        "fallback_reason": None,
+        "forecast_frozen": True,
+    }
+    detail["expected_move"] = frozen
+    return detail
+
+
 def build_symbol_detail(conn, ticker: str, as_of_date: date, earnings_dt: date | None,
                         ml_lookup: dict[tuple[str, str], dict] | None = None,
                         provider_lookup: dict[str, dict] | None = None) -> dict | None:
@@ -1142,21 +1210,70 @@ def preserve_reported_events(
     today: date,
     canonical: set[tuple[str, str]] | None = None,
 ) -> list[dict]:
-    """Carry already-reported events forward from the previously published bundle.
+    """Carry the last pre-event forecast forward while refreshing outcomes.
 
-    compute_em_math only answers for a pre-event observation, so once an earnings
-    date has passed its expected-move row can never be rebuilt — a plain rebuild
-    drops the event and the calendar renders it with no forecast. Rows for
-    reported events therefore have to come from the last published bundle, while
-    still-upcoming events stay fail-closed on whatever the fresh build produced.
-
-    Fresh rows win on (ticker, earnings_date) collisions so a late EPS actual or
-    a corrected realized move replaces the retained row. Non-canonical dates are
-    never resurrected: a revision the dedup just collapsed (PLUS 5/20→5/28)
-    would otherwise come back as a duplicate.
+    Fresh rows still win for realized moves, EPS/revenue actuals, corrected
+    timing, and other post-event facts. Forecast/pricing fields are different:
+    once the event reports they must remain the last published pre-event values,
+    because recomputing them after the print either fails or leaks post-event
+    information into a supposedly point-in-time forecast.
     """
-    fresh_keys = {(e["ticker"], e["earnings_date"]) for e in events}
+    forecast_fields = {
+        "as_of_date",
+        "spot_price",
+        "atm_strike",
+        "atm_iv",
+        "em_straddle_pct",
+        "em_iv_pct",
+        "em_straddle_abs",
+        "expiry_date",
+        "days_to_expiry",
+        "lead_time_days",
+        "skew_atm",
+        "term_slope",
+        "em_method",
+        "confidence",
+        "em_ml_pct",
+        "em_ml_abs",
+        "correction_factor",
+        "model_horizon",
+        "ml_snapshot_date",
+        "p10",
+        "p25",
+        "p50",
+        "p75",
+        "p90",
+        "display_forecast_pct",
+        "display_forecast_method",
+        "display_forecast_as_of",
+        "ml_status",
+        "options_status",
+        "fallback_reason",
+        "historical_event_count",
+    }
+
     cutoff = today.isoformat()
+    prior_by_key = {
+        (event["ticker"], event["earnings_date"]): event
+        for event in prior_events
+    }
+    merged_fresh: list[dict] = []
+    fresh_keys: set[tuple[str, str]] = set()
+
+    for event in events:
+        key = (event["ticker"], event["earnings_date"])
+        fresh_keys.add(key)
+        prior = prior_by_key.get(key)
+        if prior is None or event["earnings_date"] > cutoff:
+            merged_fresh.append(event)
+            continue
+
+        merged = {**prior, **event}
+        for field in forecast_fields:
+            if prior.get(field) is not None:
+                merged[field] = prior[field]
+        merged_fresh.append(merged)
+
     retained = [
         event
         for event in prior_events
@@ -1164,6 +1281,7 @@ def preserve_reported_events(
         and event["earnings_date"] <= cutoff
         and (canonical is None or (event["ticker"], event["earnings_date"]) in canonical)
     ]
-    if not retained:
-        return events
-    return sorted([*events, *retained], key=lambda e: (e["earnings_date"], e["ticker"]))
+    return sorted(
+        [*merged_fresh, *retained],
+        key=lambda event: (event["earnings_date"], event["ticker"]),
+    )
