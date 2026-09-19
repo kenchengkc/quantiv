@@ -39,6 +39,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
 
       - name: Setup Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -328,6 +329,10 @@ jobs:
           TWELVEDATA_VALIDATION_DELTA_PCT: "0.005"
           TWELVEDATA_SHARE_PROVIDER_LEDGER: "1"
         run: python -u tools/build_frontend_data.py
+
+      - name: Restore frozen forecasts for reported events
+        if: steps.options_gate.outputs.can_refresh == 'true'
+        run: python scripts/restore_reported_forecasts.py --apply
 
       - name: Build production control snapshot
         env:
