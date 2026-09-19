@@ -9,6 +9,7 @@ import json
 import os
 import re
 import sys
+import time
 from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
@@ -484,10 +485,19 @@ def _score(provider: dict[str, dict[str, Any]]) -> dict[str, Any]:
 
 def run() -> dict[str, Any]:
     providers: dict[str, Any] = {}
+    delays = {
+        "twelvedata_press_releases": 8.0,
+        "alphavantage_news": 1.1,
+        "massive_stock_news": 0.15,
+        "finnhub_company_news": 0.15,
+    }
     for provider_name, fetcher in FETCHERS.items():
         by_symbol: dict[str, Any] = {}
-        for symbol in TRUTH:
+        symbols = list(TRUTH)
+        for index, symbol in enumerate(symbols):
             by_symbol[symbol] = fetcher(symbol)
+            if index + 1 < len(symbols):
+                time.sleep(delays[provider_name])
         providers[provider_name] = {
             "symbols": by_symbol,
             "score": _score(by_symbol),
