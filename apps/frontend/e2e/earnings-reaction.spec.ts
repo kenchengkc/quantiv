@@ -161,7 +161,7 @@ test.describe('earnings calendar reaction labels', () => {
 
     const row = page.getByRole('link', { name: /CALB/i }).first();
     await expect(row).toContainText('13.0%');
-    await expect(row).toContainText('IV forecast');
+    await expect(row).not.toContainText('IV forecast');
     await expect(row).not.toContainText('4.0–11.0%');
 
     const move = row.locator('[data-calendar-move]');
