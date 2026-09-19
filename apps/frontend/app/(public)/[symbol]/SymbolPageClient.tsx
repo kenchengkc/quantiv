@@ -37,7 +37,6 @@ import { buildHistorySeries, GreeksPanel, HistoryBlock, medianAbsoluteHistoryMov
 import ScenarioRiskPanel from './ScenarioRiskPanel';
 import ResearchSnapshotRibbon from './ResearchSnapshotRibbon';
 import MoveComparisonChart from './MoveComparisonChart';
-import ForecastProvenance from './ForecastProvenance';
 import { SymbolPageLoading, SymbolPageUnavailable } from './SymbolPageStates';
 import type {
   IntradaySeries,
@@ -451,7 +450,7 @@ export default function SymbolPage({
     const horizon = em?.model_horizon;
     const earningsDate = em?.earnings_date ?? data?.next_earnings ?? null;
     const price = live?.price ?? data?.spot_price ?? null;
-    if (!researchMatchesPublished) return null;
+    if (!researchMatchesPublished || em?.forecast_frozen) return null;
     if (!symbol || !data || !em || !horizon || !earningsDate || !price || price <= 0) {
       return null;
     }
@@ -634,7 +633,10 @@ export default function SymbolPage({
   const liveQuantiles =
     livePrediction.status === 'ready' ? normalizeForecastQuantiles(livePrediction.response?.quantiles) : null;
   const showingLivePrediction =
-    predictionMode === 'spot_updated' && livePrediction.status === 'ready' && livePrediction.response != null;
+    livePredictionRequest != null &&
+    predictionMode === 'spot_updated' &&
+    livePrediction.status === 'ready' &&
+    livePrediction.response != null;
   const modelIsSpotUpdated =
     showingLivePrediction &&
     (livePrediction.response?.inference_mode === 'spot_updated_snapshot' ||
@@ -658,9 +660,11 @@ export default function SymbolPage({
     ? livePrediction.response?.source === 'nightly_fallback'
       ? 'Nightly snapshot · spot update unavailable'
       : `End-of-day research · latest stock price only; options and other inputs remain frozen at ${livePrediction.response?.feature_snapshot_date ?? 'the nightly snapshot'}.`
-    : em?.ml_snapshot_date
-      ? `Nightly LightGBM snapshot from ${em.ml_snapshot_date}.`
-      : 'LightGBM ensemble · range of plausible absolute moves on print day';
+    : em?.forecast_frozen && em?.ml_snapshot_date
+      ? `Final pre-event LightGBM snapshot from ${em.ml_snapshot_date} · frozen after earnings.`
+      : em?.ml_snapshot_date
+        ? `Nightly LightGBM snapshot from ${em.ml_snapshot_date}.`
+        : 'LightGBM ensemble · range of plausible absolute moves on print day';
   const liveUnavailableReason =
     predictionMode === 'spot_updated' && livePrediction.status === 'unavailable' ? livePrediction.error : null;
 
@@ -707,22 +711,6 @@ export default function SymbolPage({
           onToast={showToast}
         />
       </Reveal>
-
-      {displayForecastPct != null && (
-        <Reveal>
-          <ForecastProvenance
-            method={displayForecastMethod}
-            displayPct={displayForecastPct}
-            mlPct={activePredictionPct ?? finiteDisplayForecast(em?.em_ml_pct)}
-            optionsPct={finiteDisplayForecast(em?.straddle_pct ?? em?.iv_pct)}
-            historicalEventCount={
-              em?.historical_event_count ??
-              (displayForecastMethod === 'historical' ? compatibilityHistory.length : null)
-            }
-            asOf={em?.display_forecast_as_of ?? em?.ml_snapshot_date ?? data.as_of_date}
-          />
-        </Reveal>
-      )}
 
       {em && spot > 0 && (
         <Reveal>

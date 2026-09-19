@@ -7,7 +7,12 @@ import math
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
-from fiscal_calendar import display_fiscal_year, load_fiscal_year_naming
+from fiscal_calendar import (
+    load_fiscal_year_ends,
+    load_fiscal_year_naming,
+    reporting_fiscal_period,
+    reporting_quarter_label,
+)
 from math_baseline import compute_em_math
 
 from .forecast_artifacts import ml_fields, provider_event_fields
@@ -66,43 +71,10 @@ def _surprise_pct(actual, estimate):
     return (a - e) / abs(e)
 
 
-# Curated ticker -> fiscal-year naming offset (see tools/fiscal_calendar.py).
-# Loaded once; empty when the config is absent so the build is unaffected.
+# Fiscal metadata is normalized from the issuer calendar rather than the report
+# date's calendar quarter. Unknown tickers default to a December fiscal year.
 _FY_NAMING = load_fiscal_year_naming()
-
-
-def _corrected_fiscal_year(symbol, fiscal_year, source):
-    """Vendor labels (Finnhub) name a fiscal year by its END year; some
-    retailers name it by the START year. Apply the curated per-ticker offset,
-    but only to vendor-end-year rows (source contains 'finnhub'). DoltHub-only
-    rows use a different (calendar-ordinal) labeling and are left untouched."""
-    if fiscal_year is None:
-        return None
-    if not (source and "finnhub" in str(source).lower()):
-        return fiscal_year
-    try:
-        return display_fiscal_year(symbol, int(fiscal_year), _FY_NAMING)
-    except (TypeError, ValueError):
-        return fiscal_year
-
-
-def _quarter_label(fiscal_year, fiscal_q, fallback_date):
-    """Render 'Q3 24' from a (already naming-corrected) fiscal_year/fiscal_q.
-    Falls back to a calendar-month inference when either piece is missing —
-    correct for ~70% of names, wrong for non-calendar-year filers, but
-    no worse than the current frontend default."""
-    fy = fiscal_year
-    fq = (fiscal_q or "").upper() if isinstance(fiscal_q, str) else None
-    if not fq or fq not in {"Q1", "Q2", "Q3", "Q4"}:
-        month = fallback_date.month
-        fq = f"Q{(month - 1) // 3 + 1}"
-    if fy is None:
-        fy = fallback_date.year
-    try:
-        yy = str(int(fy) % 100).zfill(2)
-    except (TypeError, ValueError):
-        yy = str(fallback_date.year % 100).zfill(2)
-    return f"{fq} {yy}"
+_FYE_MONTHS = load_fiscal_year_ends()
 
 
 def _historical_option_evidence(conn, ticker: str, cutoff: date) -> dict[date, dict]:
@@ -186,14 +158,24 @@ def _history_row(d, timing, fiscal_year, fiscal_q, eps_actual, eps_estimate,
                  rev_actual, rev_estimate, actual_move, symbol=None, source=None,
                  option_evidence=None):
     """Shape one realized earnings event with point-in-time options evidence."""
-    fy = _corrected_fiscal_year(symbol, fiscal_year, source)
+    fy, fq = reporting_fiscal_period(
+        symbol,
+        d,
+        fiscal_year_ends=_FYE_MONTHS,
+        naming=_FY_NAMING,
+    )
     evidence = option_evidence or {}
     return {
         "date": d.isoformat(),
         "timing": timing,
-        "q": _quarter_label(fy, fiscal_q, d),
-        "fiscal_year": int(fy) if fy is not None else None,
-        "fiscal_q": (fiscal_q or "").upper() or None,
+        "q": reporting_quarter_label(
+            symbol,
+            d,
+            fiscal_year_ends=_FYE_MONTHS,
+            naming=_FY_NAMING,
+        ),
+        "fiscal_year": fy,
+        "fiscal_q": fq,
         # Signed close-to-close realized move (e.g. +0.034 = +3.4%).
         # NULL when OHLCV doesn't bracket the event.
         "actual": jsonable(actual_move),
@@ -213,6 +195,159 @@ def _history_row(d, timing, fiscal_year, fiscal_q, eps_actual, eps_estimate,
         "revenue_estimate": jsonable(rev_estimate),
         "rev_surprise_pct": jsonable(_surprise_pct(rev_actual, rev_estimate)),
     }
+
+
+def _history_rows(history, ticker: str, historical_options: dict[date, dict]) -> list[dict]:
+    """Normalize fiscal periods and collapse duplicate source dates per quarter."""
+    best: dict[tuple[int, str], tuple[tuple[int, date], dict]] = {}
+    for d, t, fy, fq, epa, epe, rva, rve, actual, source in history:
+        row = _history_row(
+            d,
+            t,
+            fy,
+            fq,
+            epa,
+            epe,
+            rva,
+            rve,
+            actual,
+            symbol=ticker,
+            source=source,
+            option_evidence=historical_options.get(d),
+        )
+        key = (row["fiscal_year"], row["fiscal_q"])
+        source_priority = 1 if source and "finnhub" in str(source).lower() else 0
+        score = (source_priority, d)
+        current = best.get(key)
+        if current is None or score > current[0]:
+            best[key] = (score, row)
+
+    rows = [item[1] for item in best.values()]
+    rows.sort(key=lambda row: row["date"], reverse=True)
+    return rows[:12]
+
+
+def attach_frozen_event_forecasts(
+    detail: dict | None,
+    ticker: str,
+    archive: dict[tuple[str, str], dict] | None,
+    *,
+    current_event_date: date | None = None,
+    today: date | None = None,
+) -> dict | None:
+    """Attach point-in-time forecasts to reported symbol history and hero.
+
+    ML remains the preferred frozen forecast when the durable ML archive has an
+    exact (ticker, earnings_date) snapshot. If no archived ML exists, reuse the
+    strict historical option evidence already selected for that event instead of
+    dropping through to a historical-median presentation estimate.
+    """
+    if detail is None:
+        return detail
+
+    symbol = ticker.upper()
+    archive = archive or {}
+    history = detail.get("earnings_history") or []
+
+    # Historical rows can carry both the strict option-implied range and the
+    # model forecast. That makes the event study a genuine forecast-vs-realized
+    # record instead of reconstructing a new estimate after the event.
+    for row in history:
+        event_iso = str(row.get("date") or "")[:10]
+        fc = archive.get((symbol, event_iso))
+        if not fc:
+            continue
+        fields = ml_fields(fc)
+        if fields.get("em_ml_pct") is None:
+            continue
+        row.update(fields)
+        row["forecast_frozen"] = True
+
+    if current_event_date is None:
+        return detail
+    cutoff = today or date.today()
+    if current_event_date > cutoff:
+        return detail
+
+    event_iso = current_event_date.isoformat()
+    fc = archive.get((symbol, event_iso))
+    fields = ml_fields(fc)
+    forecast_pct = fields.get("em_ml_pct")
+    if forecast_pct is not None:
+        current = detail.get("expected_move") or {}
+        current_date = str(current.get("earnings_date") or "")[:10]
+        if current_date and current_date != event_iso:
+            current = {}
+
+        frozen = {
+            **current,
+            "earnings_date": event_iso,
+            **fields,
+            "em_method": "ml_lightgbm",
+            "display_forecast_pct": forecast_pct,
+            "display_forecast_method": "ml",
+            "display_forecast_as_of": fields.get("ml_snapshot_date"),
+            "ml_status": "available",
+            "fallback_reason": None,
+            "forecast_frozen": True,
+        }
+        detail["expected_move"] = frozen
+        return detail
+
+    # No archived ML snapshot: the history builder may still have exact,
+    # decision-eligible pre-event option evidence. That evidence is strictly
+    # point-in-time and therefore a better frozen fallback than a newly
+    # calculated historical median.
+    history_row = next(
+        (row for row in history if str(row.get("date") or "")[:10] == event_iso),
+        None,
+    )
+    if not history_row:
+        return detail
+
+    implied = history_row.get("implied")
+    quality = history_row.get("implied_quality_status")
+    try:
+        implied_pct = float(implied)
+    except (TypeError, ValueError):
+        implied_pct = 0.0
+    if not math.isfinite(implied_pct) or implied_pct <= 0:
+        return detail
+    if quality not in {None, "decision_eligible_eod"}:
+        return detail
+
+    atm_iv = history_row.get("implied_atm_iv")
+    dte = history_row.get("implied_dte")
+    try:
+        iv_pct = (
+            float(atm_iv) * math.sqrt(float(dte) / 365.0)
+            if atm_iv is not None and dte is not None and float(dte) > 0
+            else None
+        )
+    except (TypeError, ValueError):
+        iv_pct = None
+
+    detail["expected_move"] = {
+        "earnings_date": event_iso,
+        "timing": history_row.get("timing"),
+        "expiration": history_row.get("implied_expiration"),
+        "dte": history_row.get("implied_dte"),
+        "lead_time_days": history_row.get("implied_lead_days"),
+        "atm_strike": history_row.get("implied_atm_strike"),
+        "atm_iv": history_row.get("implied_atm_iv"),
+        "straddle_abs": history_row.get("implied_straddle_abs"),
+        "straddle_pct": implied_pct,
+        "iv_pct": jsonable(iv_pct),
+        "em_method": "options_math",
+        "display_forecast_pct": implied_pct,
+        "display_forecast_method": "options_math",
+        "display_forecast_as_of": history_row.get("implied_as_of"),
+        "ml_status": "unavailable_event",
+        "options_status": "decision_eligible",
+        "fallback_reason": None,
+        "forecast_frozen": True,
+    }
+    return detail
 
 
 def build_symbol_detail(conn, ticker: str, as_of_date: date, earnings_dt: date | None,
@@ -341,7 +476,7 @@ def build_symbol_detail(conn, ticker: str, as_of_date: date, earnings_dt: date |
                 ORDER BY pre.date DESC NULLS LAST, post.date ASC NULLS LAST
             ) = 1
             ORDER BY e.earnings_dt DESC
-            LIMIT 12
+            LIMIT 20
             """,
             [ticker],
         ).fetchall()
@@ -356,7 +491,7 @@ def build_symbol_detail(conn, ticker: str, as_of_date: date, earnings_dt: date |
                 FROM earnings_events
                 WHERE ticker = ?
                 ORDER BY earnings_dt DESC
-                LIMIT 12
+                LIMIT 20
                 """,
                 [ticker],
             ).fetchall()
@@ -463,23 +598,7 @@ def build_symbol_detail(conn, ticker: str, as_of_date: date, earnings_dt: date |
         "spot_price": jsonable(spot),
         "expected_move": em,
         "straddle_features": straddles,
-        "earnings_history": [
-            _history_row(
-                d,
-                t,
-                fy,
-                fq,
-                epa,
-                epe,
-                rva,
-                rve,
-                a,
-                symbol=ticker,
-                source=src,
-                option_evidence=historical_options.get(d),
-            )
-            for d, t, fy, fq, epa, epe, rva, rve, a, src in history
-        ],
+        "earnings_history": _history_rows(history, ticker, historical_options),
         "next_earnings": earnings_dt.isoformat() if earnings_dt else None,
         "vol_regime": vol_regime,
         **provider_fields,
@@ -1146,21 +1265,70 @@ def preserve_reported_events(
     today: date,
     canonical: set[tuple[str, str]] | None = None,
 ) -> list[dict]:
-    """Carry already-reported events forward from the previously published bundle.
+    """Carry the last pre-event forecast forward while refreshing outcomes.
 
-    compute_em_math only answers for a pre-event observation, so once an earnings
-    date has passed its expected-move row can never be rebuilt — a plain rebuild
-    drops the event and the calendar renders it with no forecast. Rows for
-    reported events therefore have to come from the last published bundle, while
-    still-upcoming events stay fail-closed on whatever the fresh build produced.
-
-    Fresh rows win on (ticker, earnings_date) collisions so a late EPS actual or
-    a corrected realized move replaces the retained row. Non-canonical dates are
-    never resurrected: a revision the dedup just collapsed (PLUS 5/20→5/28)
-    would otherwise come back as a duplicate.
+    Fresh rows still win for realized moves, EPS/revenue actuals, corrected
+    timing, and other post-event facts. Forecast/pricing fields are different:
+    once the event reports they must remain the last published pre-event values,
+    because recomputing them after the print either fails or leaks post-event
+    information into a supposedly point-in-time forecast.
     """
-    fresh_keys = {(e["ticker"], e["earnings_date"]) for e in events}
+    forecast_fields = {
+        "as_of_date",
+        "spot_price",
+        "atm_strike",
+        "atm_iv",
+        "em_straddle_pct",
+        "em_iv_pct",
+        "em_straddle_abs",
+        "expiry_date",
+        "days_to_expiry",
+        "lead_time_days",
+        "skew_atm",
+        "term_slope",
+        "em_method",
+        "confidence",
+        "em_ml_pct",
+        "em_ml_abs",
+        "correction_factor",
+        "model_horizon",
+        "ml_snapshot_date",
+        "p10",
+        "p25",
+        "p50",
+        "p75",
+        "p90",
+        "display_forecast_pct",
+        "display_forecast_method",
+        "display_forecast_as_of",
+        "ml_status",
+        "options_status",
+        "fallback_reason",
+        "historical_event_count",
+    }
+
     cutoff = today.isoformat()
+    prior_by_key = {
+        (event["ticker"], event["earnings_date"]): event
+        for event in prior_events
+    }
+    merged_fresh: list[dict] = []
+    fresh_keys: set[tuple[str, str]] = set()
+
+    for event in events:
+        key = (event["ticker"], event["earnings_date"])
+        fresh_keys.add(key)
+        prior = prior_by_key.get(key)
+        if prior is None or event["earnings_date"] > cutoff:
+            merged_fresh.append(event)
+            continue
+
+        merged = {**prior, **event}
+        for field in forecast_fields:
+            if prior.get(field) is not None:
+                merged[field] = prior[field]
+        merged_fresh.append(merged)
+
     retained = [
         event
         for event in prior_events
@@ -1168,6 +1336,7 @@ def preserve_reported_events(
         and event["earnings_date"] <= cutoff
         and (canonical is None or (event["ticker"], event["earnings_date"]) in canonical)
     ]
-    if not retained:
-        return events
-    return sorted([*events, *retained], key=lambda e: (e["earnings_date"], e["ticker"]))
+    return sorted(
+        [*merged_fresh, *retained],
+        key=lambda event: (event["earnings_date"], event["ticker"]),
+    )

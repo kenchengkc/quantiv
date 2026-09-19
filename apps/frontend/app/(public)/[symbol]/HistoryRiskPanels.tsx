@@ -21,6 +21,15 @@ export type HistoryPoint = {
   impliedAtmStrike: number | null;
   impliedStraddleAbs: number | null;
   impliedAtmIv: number | null;
+  /** Final pre-event ML expected move, frozen once the event reports. */
+  model: number | null;
+  modelAsOf: string | null;
+  modelHorizon: number | null;
+  modelP10: number | null;
+  modelP25: number | null;
+  modelP50: number | null;
+  modelP75: number | null;
+  modelP90: number | null;
   /** Signed realized move (e.g. -0.034 = -3.4%). */
   actual: number;
   /** Non-GAAP EPS fundamentals from Finnhub. */
@@ -60,7 +69,19 @@ export function buildHistorySeries(
     .map((h) => {
       const d = new Date(h.date);
       const yy = String(d.getFullYear() % 100).padStart(2, '0');
-      const q = h.q ?? `Q${Math.floor(d.getMonth() / 3) + 1} ${yy}`;
+      const fiscalYear =
+        h.fiscal_year != null && Number.isFinite(Number(h.fiscal_year))
+          ? String(Number(h.fiscal_year) % 100).padStart(2, '0')
+          : null;
+      const fiscalQuarter =
+        typeof h.fiscal_q === 'string' && /^Q[1-4]$/i.test(h.fiscal_q.trim())
+          ? h.fiscal_q.trim().toUpperCase()
+          : null;
+      const q =
+        h.q ??
+        (fiscalQuarter && fiscalYear
+          ? `${fiscalQuarter} ${fiscalYear}`
+          : `Q${Math.floor(d.getMonth() / 3) + 1} ${yy}`);
       const implied =
         h.implied != null && Number.isFinite(h.implied)
           ? Math.abs(h.implied)
@@ -77,6 +98,17 @@ export function buildHistorySeries(
         impliedAtmStrike: pickNum(h.implied_atm_strike),
         impliedStraddleAbs: pickNum(h.implied_straddle_abs),
         impliedAtmIv: pickNum(h.implied_atm_iv),
+        model:
+          h.em_ml_pct != null && Number.isFinite(h.em_ml_pct)
+            ? Math.abs(h.em_ml_pct)
+            : null,
+        modelAsOf: h.ml_snapshot_date ?? null,
+        modelHorizon: pickNum(h.model_horizon),
+        modelP10: pickNum(h.p10),
+        modelP25: pickNum(h.p25),
+        modelP50: pickNum(h.p50),
+        modelP75: pickNum(h.p75),
+        modelP90: pickNum(h.p90),
         actual: h.actual,
         epsActual: pickNum(h.eps_actual),
         epsEstimate: pickNum(h.eps_estimate),
@@ -107,6 +139,13 @@ export function eventStudyEvidenceCounts(history: HistoryPoint[]) {
     (point) =>
       point.implied != null && Math.abs(point.actual) > point.implied,
   ).length;
+  const modelObservations = history.filter(
+    (point) => point.model != null,
+  ).length;
+  const modelExceedances = history.filter(
+    (point) =>
+      point.model != null && Math.abs(point.actual) > point.model,
+  ).length;
   const epsObservations = history.filter(
     (point) => point.epsSurprise != null,
   ).length;
@@ -116,6 +155,8 @@ export function eventStudyEvidenceCounts(history: HistoryPoint[]) {
   return {
     impliedObservations,
     impliedExceedances,
+    modelObservations,
+    modelExceedances,
     epsObservations,
     epsBeats,
   };
@@ -148,6 +189,15 @@ export function historyRowsToCsv(
     'implied_straddle_abs',
     'implied_atm_iv_pct',
     'exceeded_implied',
+    'ml_forecast_pct',
+    'ml_snapshot_date',
+    'ml_model_horizon',
+    'ml_p10_pct',
+    'ml_p25_pct',
+    'ml_p50_pct',
+    'ml_p75_pct',
+    'ml_p90_pct',
+    'exceeded_ml_forecast',
     'eps_actual',
     'eps_estimate',
     'eps_surprise_pct',
@@ -172,6 +222,15 @@ export function historyRowsToCsv(
     point.impliedStraddleAbs,
     point.impliedAtmIv == null ? null : (point.impliedAtmIv * 100).toFixed(6),
     point.implied == null ? null : Math.abs(point.actual) > point.implied,
+    point.model == null ? null : (point.model * 100).toFixed(6),
+    point.modelAsOf,
+    point.modelHorizon,
+    point.modelP10 == null ? null : (point.modelP10 * 100).toFixed(6),
+    point.modelP25 == null ? null : (point.modelP25 * 100).toFixed(6),
+    point.modelP50 == null ? null : (point.modelP50 * 100).toFixed(6),
+    point.modelP75 == null ? null : (point.modelP75 * 100).toFixed(6),
+    point.modelP90 == null ? null : (point.modelP90 * 100).toFixed(6),
+    point.model == null ? null : Math.abs(point.actual) > point.model,
     point.epsActual,
     point.epsEstimate,
     point.epsSurprise == null ? null : (point.epsSurprise * 100).toFixed(6),
@@ -271,6 +330,7 @@ export function HistoryBlock({
         );
 
   const hasImplied = history.some((h) => h.implied != null);
+  const hasModel = history.some((h) => h.model != null);
   const hasEps = history.some((h) => h.epsSurprise != null);
 
   const W = 700;
@@ -280,7 +340,11 @@ export function HistoryBlock({
   const max =
     Math.max(
       ...history.map((h) =>
-        Math.max(h.implied != null ? h.implied : 0, Math.abs(h.actual)),
+        Math.max(
+          h.implied != null ? h.implied : 0,
+          h.model != null ? h.model : 0,
+          Math.abs(h.actual),
+        ),
       ),
     ) * 1.18 || 0.05;
   const y = (v: number) => H / 2 - (v / max) * (H / 2 - 26);
@@ -295,6 +359,8 @@ export function HistoryBlock({
   const {
     impliedObservations,
     impliedExceedances,
+    modelObservations,
+    modelExceedances,
     epsObservations,
     epsBeats,
   } = eventStudyEvidenceCounts(history);
@@ -356,9 +422,13 @@ export function HistoryBlock({
             <MetricHelp metric="history" align="left" />
           </div>
           <div style={{ fontSize: 14, color: 'var(--ink-3)', marginTop: 4 }}>
-            {hasImplied
-              ? 'Realized earnings reactions versus the option-implied range available before each event.'
-              : 'Close-to-close earnings reactions; historical option ranges are not available for this cohort.'}
+            {hasModel && hasImplied
+              ? 'Realized reactions versus each quarter’s frozen pre-event ML forecast and option-implied range.'
+              : hasModel
+                ? 'Realized reactions versus the final ML forecast frozen before each earnings event.'
+                : hasImplied
+                  ? 'Realized earnings reactions versus the option-implied range available before each event.'
+                  : 'Close-to-close earnings reactions; pre-event forecast history is not available for this cohort.'}
           </div>
         </div>
         <button
@@ -472,6 +542,7 @@ export function HistoryBlock({
           className="mono tnum"
           style={{ display: 'flex', gap: 9, color: 'var(--ink-4)', fontSize: 9.5 }}
         >
+          {hasModel ? <span>Outside ML {modelExceedances}/{modelObservations}</span> : null}
           {hasEps ? <span>EPS beat {epsBeats}/{epsObservations}</span> : null}
         </div>
       </div>
@@ -551,7 +622,7 @@ export function HistoryBlock({
         {/* Faint trajectory line connecting realized dots — only when
             implied bands are absent, so the chart still feels composed
             in the no-options-history case. */}
-        {!hasImplied && history.length > 1 && (
+        {!hasImplied && !hasModel && history.length > 1 && (
           <path
             d={history
               .map((h, i) => {
@@ -643,6 +714,28 @@ export function HistoryBlock({
                     y2={y(-impliedDecimal)}
                     stroke="var(--brand-blue-1)"
                     strokeWidth="1.2"
+                  />
+                </>
+              )}
+              {h.model != null && (
+                <>
+                  <line
+                    x1={cx - 18}
+                    x2={cx + 18}
+                    y1={y(h.model)}
+                    y2={y(h.model)}
+                    stroke="var(--accent-hi)"
+                    strokeWidth="1.4"
+                    strokeDasharray="3 2"
+                  />
+                  <line
+                    x1={cx - 18}
+                    x2={cx + 18}
+                    y1={y(-h.model)}
+                    y2={y(-h.model)}
+                    stroke="var(--accent-hi)"
+                    strokeWidth="1.4"
+                    strokeDasharray="3 2"
                   />
                 </>
               )}
@@ -754,6 +847,24 @@ export function HistoryBlock({
                     Expires {hovered_.impliedExpiration} · {hovered_.impliedDte ?? '–'} DTE
                   </div>
                 )}
+              </div>
+            )}
+            {hovered_.model != null && (
+              <div
+                className="mono tnum"
+                style={{
+                  borderTop: '1px solid var(--line)',
+                  marginTop: 6,
+                  paddingTop: 5,
+                  fontSize: 9,
+                  color: 'var(--accent-hi)',
+                }}
+              >
+                <div>ML forecast ±{(hovered_.model * 100).toFixed(1)}%</div>
+                <div style={{ color: 'var(--ink-4)', marginTop: 2 }}>
+                  Frozen {hovered_.modelAsOf ?? 'pre-event snapshot'}
+                  {hovered_.modelHorizon != null ? ` · T-${hovered_.modelHorizon}` : ''}
+                </div>
               </div>
             )}
             {hovered_.epsSurprise != null && (
@@ -876,6 +987,18 @@ export function HistoryBlock({
               }}
             />
             Implied range
+          </span>
+        )}
+        {hasModel && (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <span
+              style={{
+                width: 18,
+                height: 0,
+                borderTop: '1.4px dashed var(--accent-hi)',
+              }}
+            />
+            Frozen ML forecast
           </span>
         )}
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
