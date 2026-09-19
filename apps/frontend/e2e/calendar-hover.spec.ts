@@ -36,7 +36,7 @@ async function installCalendar(page: Page) {
   await page.getByRole('button', { name: 'All', exact: true }).click();
   const row = page.locator('.qv-calendar-shell a[href="/AVGO"]');
   await expect(row).toContainText('15.0%');
-  await expect(row).toContainText('IV forecast');
+  await expect(row).not.toContainText('IV forecast');
   return row;
 }
 
