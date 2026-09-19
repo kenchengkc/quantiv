@@ -3,7 +3,12 @@ import pandas as pd
 import pytest
 
 from ml.pipeline_validation import FORECAST_REQUIRED_COLUMNS
-from scripts.daily_score import get_upcoming_features, save_forecasts, score
+from scripts.daily_score import (
+    get_upcoming_features,
+    save_forecasts,
+    score,
+    update_event_forecast_archive,
+)
 
 
 class _ConstantModel:
@@ -113,3 +118,76 @@ def test_save_forecasts_rejects_incomplete_artifact_before_writing(tmp_path):
         )
 
     assert not (tmp_path / "candidate.parquet").exists()
+
+
+
+def test_event_forecast_archive_keeps_latest_pre_event_snapshot(tmp_path):
+    forecast_dir = tmp_path / "forecasts"
+    forecast_dir.mkdir()
+
+    older = pd.DataFrame(
+        [
+            {
+                "act_symbol": "MU",
+                "earnings_date": "2026-09-16",
+                "snapshot_date": "2026-09-14",
+                "model_horizon": 2,
+                "em_ml_pct": 0.071,
+                "scored_at": "2026-09-14T22:00:00",
+            }
+        ]
+    )
+    older.to_parquet(forecast_dir / "forecasts_2026-09-14.parquet", index=False)
+
+    latest = pd.DataFrame(
+        [
+            {
+                "act_symbol": "MU",
+                "earnings_date": "2026-09-16",
+                "snapshot_date": "2026-09-15",
+                "model_horizon": 1,
+                "em_ml_pct": 0.083,
+                "scored_at": "2026-09-15T22:00:00",
+            }
+        ]
+    )
+
+    archive_path = update_event_forecast_archive(latest, forecast_dir)
+    assert archive_path is not None
+
+    archived = pd.read_parquet(archive_path)
+    assert len(archived) == 1
+    assert str(archived.iloc[0]["snapshot_date"])[:10] == "2026-09-15"
+    assert archived.iloc[0]["em_ml_pct"] == pytest.approx(0.083)
+
+
+def test_event_forecast_archive_never_uses_post_event_snapshot(tmp_path):
+    forecast_dir = tmp_path / "forecasts"
+    forecast_dir.mkdir()
+
+    rows = pd.DataFrame(
+        [
+            {
+                "act_symbol": "TEST",
+                "earnings_date": "2026-09-16",
+                "snapshot_date": "2026-09-15",
+                "model_horizon": 1,
+                "em_ml_pct": 0.05,
+                "scored_at": "2026-09-15T22:00:00",
+            },
+            {
+                "act_symbol": "TEST",
+                "earnings_date": "2026-09-16",
+                "snapshot_date": "2026-09-16",
+                "model_horizon": 1,
+                "em_ml_pct": 0.99,
+                "scored_at": "2026-09-16T22:00:00",
+            },
+        ]
+    )
+
+    archive_path = update_event_forecast_archive(rows, forecast_dir)
+    archived = pd.read_parquet(archive_path)
+
+    assert len(archived) == 1
+    assert archived.iloc[0]["em_ml_pct"] == pytest.approx(0.05)
