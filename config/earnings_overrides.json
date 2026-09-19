@@ -115,6 +115,93 @@
         "timing": "unknown"
       },
       "note": "Carnival IR confirms the Q3 earnings event on 2026-09-29. Release session is left unknown until direct evidence confirms it."
+    },
+    {
+      "symbol": "AIR",
+      "match": {
+        "date": "2026-09-21"
+      },
+      "set": {
+        "date": "2026-09-29",
+        "timing": "amc",
+        "fiscal_year": 2027,
+        "fiscal_q": "Q1"
+      },
+      "note": "AAR IR confirms FY2027 Q1 results on 2026-09-29 after NYSE close; bootstrap correction for Sep 18 bad-calendar row."
+    },
+    {
+      "symbol": "CAG",
+      "match": {
+        "date": "2026-09-29"
+      },
+      "set": {
+        "date": "2026-09-30",
+        "timing": "bmo",
+        "fiscal_year": 2027,
+        "fiscal_q": "Q1"
+      },
+      "note": "Conagra IR confirms FY2027 Q1 results on 2026-09-30 with materials issued that morning before the 9:30am ET Q&A."
+    },
+    {
+      "symbol": "FDS",
+      "match": {
+        "date": "2026-09-30"
+      },
+      "set": {
+        "timing": "bmo",
+        "fiscal_year": 2026,
+        "fiscal_q": "Q4"
+      },
+      "note": "FactSet IR confirms Q4 FY2026 results on 2026-09-30 with presentation at 8:30am ET and call at 9:00am ET."
+    },
+    {
+      "symbol": "NKE",
+      "match": {
+        "date": "2026-09-28"
+      },
+      "set": {
+        "date": "2026-10-01",
+        "timing": "amc",
+        "fiscal_year": 2027,
+        "fiscal_q": "Q1"
+      },
+      "note": "NIKE IR confirms FY2027 Q1 results on 2026-10-01 following the close of regular market trading."
+    },
+    {
+      "symbol": "ACN",
+      "match": {
+        "date": "2026-10-01"
+      },
+      "set": {
+        "timing": "bmo",
+        "fiscal_year": 2026,
+        "fiscal_q": "Q4"
+      },
+      "note": "Accenture confirms FY2026 Q4/full-year earnings call at 8:00am ET on 2026-10-01 with the earnings release issued before the call."
+    },
+    {
+      "symbol": "APOG",
+      "match": {
+        "date": "2026-10-06"
+      },
+      "set": {
+        "timing": "bmo",
+        "fiscal_year": 2027,
+        "fiscal_q": "Q2"
+      },
+      "note": "Apogee IR confirms FY2027 Q2 results on 2026-10-06 before market open, with an 8:00am CT call."
+    },
+    {
+      "symbol": "MKC",
+      "match": {
+        "date": "2026-10-01"
+      },
+      "set": {
+        "timing": "bmo",
+        "fiscal_year": 2026,
+        "fiscal_q": "Q3"
+      },
+      "note": "McCormick IR confirms 2026 Q3 results call on 2026-10-01 at 8:00am ET; applies if reconciliation restores the row."
     }
   ]
 }
