@@ -1202,6 +1202,11 @@ def reconcile_calendar(
             *decision.get("date_sources", []),
         )
 
+        # The selected current row is the event identity being reconciled.
+        # Always replace that anchor, even when an announcement moves the event
+        # by more than the nearby-duplicate cleanup window.
+        if current_row is not None:
+            drop_indices.add(int(current_row.name))
         for index, row in current_rows.iterrows():
             if abs((row["date"] - chosen_date).days) <= 35:
                 drop_indices.add(int(index))
