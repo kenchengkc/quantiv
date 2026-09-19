@@ -9,6 +9,13 @@ from typing import Any
 
 import duckdb
 
+from fiscal_calendar import (
+    load_fiscal_year_ends,
+    load_fiscal_year_naming,
+    reporting_fiscal_period,
+    reporting_quarter_label,
+)
+
 from .display_forecast import DisplayForecastError, resolve_display_forecast
 from .shared import jsonable
 
@@ -34,6 +41,9 @@ FALLBACK_REASONS = {
     "no_event_expiry",
     "insufficient_ticker_history",
 }
+
+_FY_NAMING = load_fiscal_year_naming()
+_FYE_MONTHS = load_fiscal_year_ends()
 
 
 def _finite_positive(value: Any) -> float | None:
@@ -321,21 +331,45 @@ def _symbol_history(
         rows = conn.execute(
             """
             SELECT earnings_dt, timing, fiscal_year, fiscal_q,
-                   eps_actual, eps_estimate, revenue_actual, revenue_estimate
+                   eps_actual, eps_estimate, revenue_actual, revenue_estimate, source
             FROM earnings_events
             WHERE ticker = ?
             ORDER BY earnings_dt DESC
-            LIMIT 12
+            LIMIT 20
             """,
             [ticker],
         ).fetchall()
     except duckdb.Error:
         return []
-    return [
-        {
+
+    best: dict[tuple[int, str], tuple[tuple[int, date], dict[str, Any]]] = {}
+    for (
+        earnings_dt,
+        timing,
+        _fiscal_year,
+        _fiscal_q,
+        eps_actual,
+        eps_estimate,
+        revenue_actual,
+        revenue_estimate,
+        source,
+    ) in rows:
+        fiscal_year, fiscal_q = reporting_fiscal_period(
+            ticker,
+            earnings_dt,
+            fiscal_year_ends=_FYE_MONTHS,
+            naming=_FY_NAMING,
+        )
+        item = {
             "date": earnings_dt.isoformat(),
             "timing": timing or "unknown",
-            "fiscal_year": int(fiscal_year) if fiscal_year is not None else None,
+            "q": reporting_quarter_label(
+                ticker,
+                earnings_dt,
+                fiscal_year_ends=_FYE_MONTHS,
+                naming=_FY_NAMING,
+            ),
+            "fiscal_year": fiscal_year,
             "fiscal_q": fiscal_q,
             "actual": None,
             "implied": None,
@@ -344,17 +378,16 @@ def _symbol_history(
             "revenue_actual": jsonable(revenue_actual),
             "revenue_estimate": jsonable(revenue_estimate),
         }
-        for (
-            earnings_dt,
-            timing,
-            fiscal_year,
-            fiscal_q,
-            eps_actual,
-            eps_estimate,
-            revenue_actual,
-            revenue_estimate,
-        ) in rows
-    ]
+        key = (fiscal_year, fiscal_q)
+        source_priority = 1 if source and "finnhub" in str(source).lower() else 0
+        score = (source_priority, earnings_dt)
+        current = best.get(key)
+        if current is None or score > current[0]:
+            best[key] = (score, item)
+
+    history = [item[1] for item in best.values()]
+    history.sort(key=lambda item: item["date"], reverse=True)
+    return history[:12]
 
 
 def ensure_symbol_display_detail(
