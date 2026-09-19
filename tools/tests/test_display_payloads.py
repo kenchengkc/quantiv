@@ -61,6 +61,40 @@ def test_enrichment_preserves_ml_snapshot_date_as_display_provenance():
     assert event["display_forecast_as_of"] == "2026-09-09"
 
 
+def test_enrichment_prefers_strict_iv_even_when_ml_is_available():
+    conn = duckdb.connect()
+    event = {
+        "ticker": "GIS",
+        "earnings_date": "2026-09-23",
+        "timing": "bmo",
+        "em_ml_pct": 0.043,
+        "ml_snapshot_date": "2026-09-16",
+        "em_straddle_pct": 0.0867,
+        "em_iv_pct": 0.1052,
+        "expiry_date": "2026-10-16",
+        "days_to_expiry": 28,
+        "atm_iv": 0.3797,
+    }
+
+    enrich_upcoming_event(
+        conn,
+        event,
+        as_of_date=date(2026, 9, 18),
+        today=date(2026, 9, 19),
+    )
+
+    assert event["display_forecast_method"] == "options_math"
+    assert event["display_forecast_pct"] == pytest.approx(0.1052)
+    assert event["ml_status"] == "available"
+    assert event["options_status"] == "decision_eligible"
+
+    validate_upcoming_display_forecasts(
+        [("GIS", date(2026, 9, 23), "bmo")],
+        {date(2026, 9, 21): _payload(event)},
+        today=date(2026, 9, 19),
+    )
+
+
 def test_upcoming_published_event_with_dash_state_fails_closed():
     published = [("PAYX", date(2026, 9, 23), "bmo")]
     event = _indicative_event()
