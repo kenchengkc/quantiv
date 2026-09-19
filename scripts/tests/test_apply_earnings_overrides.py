@@ -6,7 +6,7 @@ import sys
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
-from apply_earnings_overrides import apply_overrides  # noqa: E402
+from apply_earnings_overrides import apply_override_artifacts, apply_overrides  # noqa: E402
 
 FIELDS = ["act_symbol", "date", "timing", "fiscal_year", "fiscal_q", "source"]
 
@@ -72,3 +72,50 @@ def test_unmatched_set_warns_and_is_skipped():
     }])
     assert out == rows  # unchanged
     assert any(line.startswith("WARN") for line in log)
+
+
+
+def test_artifact_override_keeps_csv_and_parquet_event_keys_aligned(tmp_path) -> None:
+    import pandas as pd
+
+    csv_path = tmp_path / "earnings_calendar.csv"
+    parquet_path = tmp_path / "earnings_calendar.parquet"
+    frame = pd.DataFrame(
+        [
+            {
+                "act_symbol": "AIR",
+                "date": "2026-09-22",
+                "timing": "unknown",
+                "fiscal_year": 2027,
+                "fiscal_q": "Q1",
+                "eps_actual": None,
+                "eps_estimate": 1.0,
+                "revenue_actual": None,
+                "revenue_estimate": None,
+                "source": "dolthub",
+            }
+        ]
+    )
+    frame.to_csv(csv_path, index=False)
+    frame.to_parquet(parquet_path, index=False)
+
+    logs = apply_override_artifacts(
+        csv_path,
+        parquet_path,
+        [
+            {
+                "symbol": "AIR",
+                "match": {"date": "2026-09-22"},
+                "set": {"date": "2026-09-29", "timing": "amc"},
+            }
+        ],
+    )
+
+    csv_frame = pd.read_csv(csv_path, keep_default_na=False)
+    parquet_frame = pd.read_parquet(parquet_path)
+
+    assert csv_frame["date"].astype(str).tolist() == ["2026-09-29"]
+    assert parquet_frame["date"].astype(str).str[:10].tolist() == ["2026-09-29"]
+    assert csv_frame["timing"].tolist() == ["amc"]
+    assert parquet_frame["timing"].tolist() == ["amc"]
+    assert any("AIR" in line for line in logs)
