@@ -448,11 +448,22 @@ def choose_canonical_event(
         announcements,
         as_of=as_of,
     )
+    baseline_confirmed = bool(
+        baseline
+        and baseline.get("date")
+        and str(baseline.get("confidence") or "").lower()
+        in {"confirmed", "manual"}
+    )
     if announcement is not None:
         chosen_date = str(announcement["date"])[:10]
         reason = announcement_reason
         confidence = "confirmed"
         date_sources = [str(announcement.get("provider") or "announcement")]
+    elif baseline_confirmed:
+        chosen_date = baseline["date"]
+        reason = "baseline_confirmed"
+        confidence = "confirmed"
+        date_sources = ["baseline"]
     else:
         consensus_date, consensus_sources = _structured_date_consensus(votes)
         if consensus_date:
@@ -505,8 +516,18 @@ def choose_canonical_event(
             timing = consensus_timing
             timing_sources = session_sources
 
-    # A single vendor cannot flip an established session. Prefer the fresh base
-    # row over a previously polluted baseline when both refer to the chosen date.
+    if (
+        timing == "unknown"
+        and baseline_confirmed
+        and baseline
+        and baseline.get("date") == chosen_date
+        and baseline.get("timing") != "unknown"
+    ):
+        timing = str(baseline["timing"])
+        timing_sources = ["baseline"]
+
+    # A single vendor cannot flip an established session. For unconfirmed
+    # events prefer the fresh base row over a merely sticky baseline.
     if (
         timing == "unknown"
         and current
@@ -937,10 +958,28 @@ def _load_calendar(path: Path) -> pd.DataFrame:
 
 
 def _row_vote(row: pd.Series | dict[str, Any], provider: str) -> Vote:
+    source_parts = {
+        part.strip()
+        for part in str(row.get("source") or "").split("+")
+        if part.strip()
+    }
+    confidence = (
+        "confirmed"
+        if source_parts.intersection(
+            {
+                "override",
+                "twelvedata_press_release",
+                "finnhub_company_news",
+                "alphavantage_news",
+            }
+        )
+        else "projected"
+    )
     return {
         "provider": provider,
         "date": str(row["date"])[:10],
         "timing": normalize_timing(row.get("timing")),
+        "confidence": confidence,
     }
 
 
