@@ -7,7 +7,12 @@ import math
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
-from fiscal_calendar import display_fiscal_year, load_fiscal_year_naming
+from fiscal_calendar import (
+    load_fiscal_year_ends,
+    load_fiscal_year_naming,
+    reporting_fiscal_period,
+    reporting_quarter_label,
+)
 from math_baseline import compute_em_math
 
 from .forecast_artifacts import ml_fields, provider_event_fields
@@ -66,43 +71,10 @@ def _surprise_pct(actual, estimate):
     return (a - e) / abs(e)
 
 
-# Curated ticker -> fiscal-year naming offset (see tools/fiscal_calendar.py).
-# Loaded once; empty when the config is absent so the build is unaffected.
+# Fiscal metadata is normalized from the issuer calendar rather than the report
+# date's calendar quarter. Unknown tickers default to a December fiscal year.
 _FY_NAMING = load_fiscal_year_naming()
-
-
-def _corrected_fiscal_year(symbol, fiscal_year, source):
-    """Vendor labels (Finnhub) name a fiscal year by its END year; some
-    retailers name it by the START year. Apply the curated per-ticker offset,
-    but only to vendor-end-year rows (source contains 'finnhub'). DoltHub-only
-    rows use a different (calendar-ordinal) labeling and are left untouched."""
-    if fiscal_year is None:
-        return None
-    if not (source and "finnhub" in str(source).lower()):
-        return fiscal_year
-    try:
-        return display_fiscal_year(symbol, int(fiscal_year), _FY_NAMING)
-    except (TypeError, ValueError):
-        return fiscal_year
-
-
-def _quarter_label(fiscal_year, fiscal_q, fallback_date):
-    """Render 'Q3 24' from a (already naming-corrected) fiscal_year/fiscal_q.
-    Falls back to a calendar-month inference when either piece is missing —
-    correct for ~70% of names, wrong for non-calendar-year filers, but
-    no worse than the current frontend default."""
-    fy = fiscal_year
-    fq = (fiscal_q or "").upper() if isinstance(fiscal_q, str) else None
-    if not fq or fq not in {"Q1", "Q2", "Q3", "Q4"}:
-        month = fallback_date.month
-        fq = f"Q{(month - 1) // 3 + 1}"
-    if fy is None:
-        fy = fallback_date.year
-    try:
-        yy = str(int(fy) % 100).zfill(2)
-    except (TypeError, ValueError):
-        yy = str(fallback_date.year % 100).zfill(2)
-    return f"{fq} {yy}"
+_FYE_MONTHS = load_fiscal_year_ends()
 
 
 def _historical_option_evidence(conn, ticker: str, cutoff: date) -> dict[date, dict]:
@@ -186,14 +158,24 @@ def _history_row(d, timing, fiscal_year, fiscal_q, eps_actual, eps_estimate,
                  rev_actual, rev_estimate, actual_move, symbol=None, source=None,
                  option_evidence=None):
     """Shape one realized earnings event with point-in-time options evidence."""
-    fy = _corrected_fiscal_year(symbol, fiscal_year, source)
+    fy, fq = reporting_fiscal_period(
+        symbol,
+        d,
+        fiscal_year_ends=_FYE_MONTHS,
+        naming=_FY_NAMING,
+    )
     evidence = option_evidence or {}
     return {
         "date": d.isoformat(),
         "timing": timing,
-        "q": _quarter_label(fy, fiscal_q, d),
-        "fiscal_year": int(fy) if fy is not None else None,
-        "fiscal_q": (fiscal_q or "").upper() or None,
+        "q": reporting_quarter_label(
+            symbol,
+            d,
+            fiscal_year_ends=_FYE_MONTHS,
+            naming=_FY_NAMING,
+        ),
+        "fiscal_year": fy,
+        "fiscal_q": fq,
         # Signed close-to-close realized move (e.g. +0.034 = +3.4%).
         # NULL when OHLCV doesn't bracket the event.
         "actual": jsonable(actual_move),
@@ -213,6 +195,36 @@ def _history_row(d, timing, fiscal_year, fiscal_q, eps_actual, eps_estimate,
         "revenue_estimate": jsonable(rev_estimate),
         "rev_surprise_pct": jsonable(_surprise_pct(rev_actual, rev_estimate)),
     }
+
+
+def _history_rows(history, ticker: str, historical_options: dict[date, dict]) -> list[dict]:
+    """Normalize fiscal periods and collapse duplicate source dates per quarter."""
+    best: dict[tuple[int, str], tuple[tuple[int, date], dict]] = {}
+    for d, t, fy, fq, epa, epe, rva, rve, actual, source in history:
+        row = _history_row(
+            d,
+            t,
+            fy,
+            fq,
+            epa,
+            epe,
+            rva,
+            rve,
+            actual,
+            symbol=ticker,
+            source=source,
+            option_evidence=historical_options.get(d),
+        )
+        key = (row["fiscal_year"], row["fiscal_q"])
+        source_priority = 1 if source and "finnhub" in str(source).lower() else 0
+        score = (source_priority, d)
+        current = best.get(key)
+        if current is None or score > current[0]:
+            best[key] = (score, row)
+
+    rows = [item[1] for item in best.values()]
+    rows.sort(key=lambda row: row["date"], reverse=True)
+    return rows[:12]
 
 
 def build_symbol_detail(conn, ticker: str, as_of_date: date, earnings_dt: date | None,
@@ -341,7 +353,7 @@ def build_symbol_detail(conn, ticker: str, as_of_date: date, earnings_dt: date |
                 ORDER BY pre.date DESC NULLS LAST, post.date ASC NULLS LAST
             ) = 1
             ORDER BY e.earnings_dt DESC
-            LIMIT 12
+            LIMIT 20
             """,
             [ticker],
         ).fetchall()
@@ -356,7 +368,7 @@ def build_symbol_detail(conn, ticker: str, as_of_date: date, earnings_dt: date |
                 FROM earnings_events
                 WHERE ticker = ?
                 ORDER BY earnings_dt DESC
-                LIMIT 12
+                LIMIT 20
                 """,
                 [ticker],
             ).fetchall()
@@ -463,23 +475,7 @@ def build_symbol_detail(conn, ticker: str, as_of_date: date, earnings_dt: date |
         "spot_price": jsonable(spot),
         "expected_move": em,
         "straddle_features": straddles,
-        "earnings_history": [
-            _history_row(
-                d,
-                t,
-                fy,
-                fq,
-                epa,
-                epe,
-                rva,
-                rve,
-                a,
-                symbol=ticker,
-                source=src,
-                option_evidence=historical_options.get(d),
-            )
-            for d, t, fy, fq, epa, epe, rva, rve, a, src in history
-        ],
+        "earnings_history": _history_rows(history, ticker, historical_options),
         "next_earnings": earnings_dt.isoformat() if earnings_dt else None,
         "vol_regime": vol_regime,
         **provider_fields,
