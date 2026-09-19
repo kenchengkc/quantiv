@@ -59,3 +59,31 @@ def test_skip_forecasts_path_publishes_only_timestamped_daily_calendar() -> None
     assert 'CALENDAR_REFERENCE_NOT_BEFORE="$REFRESH_STARTED_AT"' in skip_block
     assert "bash scripts/r2_push_calendar_reference.sh" in skip_block
     assert "$SHELL" not in skip_block
+
+
+
+def test_earnings_reconciliation_precedes_manual_authority_and_integrity_gate() -> None:
+    workflow = yaml.safe_load((ROOT / ".github/workflows/data-refresh.yml").read_text())
+    steps = workflow["jobs"]["refresh"]["steps"]
+
+    dolt = next(step for step in steps if step["name"] == "Sync earnings calendar")
+    reconcile = next(
+        step for step in steps if step["name"] == "Reconcile near-term earnings calendar"
+    )
+    fmp = next(step for step in steps if step["name"] == "Overlay EPS and revenue from FMP")
+    overrides = next(step for step in steps if step["name"] == "Apply manual earnings overrides")
+    lifecycle = next(
+        step for step in steps if step["name"] == "Apply ticker lifecycle to earnings artifacts"
+    )
+    integrity = next(
+        step
+        for step in steps
+        if step["name"] == "Gate — earnings calendar integrity against prior release"
+    )
+
+    assert "reconcile_earnings_calendar.py" in reconcile["run"]
+    assert "sync_finnhub_earnings.py" not in reconcile["run"]
+    assert "apply_earnings_overrides.py" in overrides["run"]
+    assert steps.index(dolt) < steps.index(reconcile) < steps.index(fmp)
+    assert steps.index(fmp) < steps.index(overrides) < steps.index(lifecycle)
+    assert steps.index(lifecycle) < steps.index(integrity)
