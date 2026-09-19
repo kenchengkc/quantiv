@@ -10,6 +10,8 @@ from __future__ import annotations
 
 from datetime import date
 
+import pytest
+
 from frontend_data.payloads import attach_frozen_event_forecasts, preserve_reported_events
 
 
@@ -212,7 +214,7 @@ def test_upcoming_event_does_not_replace_current_expected_move_with_archive():
 
 
 
-def test_reported_symbol_uses_strict_historical_options_before_historical_median():
+def test_reported_symbol_uses_iv_forecast_before_historical_median():
     detail = {
         "expected_move": None,
         "earnings_history": [
@@ -243,13 +245,13 @@ def test_reported_symbol_uses_strict_historical_options_before_historical_median
 
     expected = result["expected_move"]
     assert expected["display_forecast_method"] == "options_math"
-    assert expected["display_forecast_pct"] == 0.081714
+    assert expected["display_forecast_pct"] == pytest.approx(0.62145 * (9 / 365.0) ** 0.5)
     assert expected["display_forecast_as_of"] == "2026-09-09"
     assert expected["options_status"] == "decision_eligible"
     assert expected["forecast_frozen"] is True
 
 
-def test_archived_ml_still_wins_over_historical_options():
+def test_historical_iv_wins_over_archived_ml_but_ml_is_preserved():
     detail = {
         "expected_move": None,
         "earnings_history": [
@@ -259,6 +261,8 @@ def test_archived_ml_still_wins_over_historical_options():
                 "actual": 0.013,
                 "implied": 0.0498,
                 "implied_as_of": "2026-09-16",
+                "implied_dte": 16,
+                "implied_atm_iv": 0.29635,
                 "implied_quality_status": "decision_eligible_eod",
             }
         ],
@@ -281,5 +285,9 @@ def test_archived_ml_still_wins_over_historical_options():
         today=date(2026, 9, 17),
     )
 
-    assert result["expected_move"]["display_forecast_method"] == "ml"
-    assert result["expected_move"]["display_forecast_pct"] == 0.036898
+    assert result["expected_move"]["display_forecast_method"] == "options_math"
+    assert result["expected_move"]["display_forecast_pct"] == pytest.approx(
+        0.29635 * (16 / 365.0) ** 0.5
+    )
+    assert result["expected_move"]["em_ml_pct"] == 0.036898
+    assert result["expected_move"]["ml_status"] == "available"
