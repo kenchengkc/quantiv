@@ -405,22 +405,6 @@ function TickerRow({
             <span style={{ fontSize: 11, color: 'var(--ink-4)' }}>—</span>
           )}
         </div>
-        {movePct != null && (
-          <div
-            className="mono"
-            style={{
-              fontSize: 8,
-              color: method === 'options_math' || method === 'options_indicative'
-                ? 'var(--brand-blue-1)'
-                : 'var(--ink-4)',
-              letterSpacing: '0.06em',
-              textTransform: 'uppercase',
-              marginTop: 2,
-            }}
-          >
-            {displayForecastLabel(method)}
-          </div>
-        )}
         {bandLo != null && bandHi != null && (
           <div
             className="mono tnum"
