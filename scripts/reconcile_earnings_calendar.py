@@ -38,6 +38,7 @@ from sync_finnhub_earnings import (
     default_data_dir,
     et_today,
     fiscal_q_from_date,
+    load_frontend_symbol_universe,
     normalize_existing,
     write_outputs,
 )
@@ -1191,25 +1192,45 @@ def _candidate_symbols(
     *,
     start: date,
     end: date,
+    allowed_symbols: set[str] | None = None,
+    max_symbols: int | None = None,
 ) -> list[str]:
-    symbols: set[str] = set()
+    nearest: dict[str, date] = {}
+
+    def add(symbol: Any, event_date: date) -> None:
+        normalized = str(symbol or "").strip().upper()
+        if not normalized:
+            return
+        if allowed_symbols is not None and normalized not in allowed_symbols:
+            return
+        prior = nearest.get(normalized)
+        if prior is None or abs((event_date - start).days) < abs((prior - start).days):
+            nearest[normalized] = event_date
+
     for df in (current_df, baseline_df):
         if df.empty:
             continue
-        symbols.update(
-            df.loc[
-                df["date"].map(lambda value: start <= value <= end),
-                "act_symbol",
-            ].tolist()
-        )
+        for _, row in df.iterrows():
+            event_date = row.get("date")
+            if not isinstance(event_date, date) or not start <= event_date <= end:
+                continue
+            add(row.get("act_symbol"), event_date)
+
     for vote in provider_votes:
         try:
             vote_date = date.fromisoformat(str(vote["date"]))
-        except ValueError:
+        except (TypeError, ValueError):
             continue
         if start <= vote_date <= end:
-            symbols.add(str(vote.get("symbol") or "").upper())
-    return sorted(symbol for symbol in symbols if symbol)
+            add(vote.get("symbol"), vote_date)
+
+    ordered = sorted(
+        nearest,
+        key=lambda symbol: (abs((nearest[symbol] - start).days), symbol),
+    )
+    if max_symbols is not None:
+        ordered = ordered[:max_symbols]
+    return ordered
 
 
 def _collect_announcements(
@@ -1293,6 +1314,7 @@ def main() -> int:
     parser.add_argument("--twelvedata-delay", type=float, default=8.0)
     parser.add_argument("--alphavantage-delay", type=float, default=1.1)
     parser.add_argument("--alpha-news-max", type=int, default=20)
+    parser.add_argument("--announcement-max-symbols", type=int, default=80)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
@@ -1302,6 +1324,8 @@ def main() -> int:
         parser.error("--announcement-days-ahead must be between 1 and --days-ahead")
     if args.alpha_news_max < 0:
         parser.error("--alpha-news-max cannot be negative")
+    if args.announcement_max_symbols < 1:
+        parser.error("--announcement-max-symbols must be positive")
 
     today = et_today()
     end = today + timedelta(days=args.days_ahead)
@@ -1354,12 +1378,15 @@ def main() -> int:
     )
     del preliminary
 
+    frontend_symbols = set(load_frontend_symbol_universe())
     symbols = _candidate_symbols(
         current_df,
         baseline_df,
         provider_votes,
         start=today,
         end=announcement_end,
+        allowed_symbols=frontend_symbols or None,
+        max_symbols=args.announcement_max_symbols,
     )
     announcements, announcement_status = _collect_announcements(
         symbols,
