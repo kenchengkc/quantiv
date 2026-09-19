@@ -134,12 +134,13 @@ test.describe('earnings calendar reaction labels', () => {
     await expect(page.getByRole('link', { name: /ZZZ/i }).first()).toBeVisible();
   });
 
-  test('headline ± uses the calibrated ML move + p25–p75 band, not the straddle', async ({
+  test('headline prefers the options-implied forecast over ML when both exist', async ({
     page,
   }) => {
-    // CALB has both an inflated straddle (±13%) and a calibrated ML move (±7%)
-    // with a 50% interquartile range of 4–11%. The grid must show the ML move and
-    // the IQR band, matching the screener/symbol surfaces — never the raw straddle.
+    // CALB has both a strict options-implied move (±13%) and an ML move (±7%).
+    // Product display policy is options/IV first, so the calendar headline must
+    // show the options-implied number and label it as the IV forecast. The ML
+    // estimate remains available as secondary evidence in the hover breakdown.
     await installWeekFixture(page, [
       {
         ticker: 'CALB',
@@ -159,9 +160,18 @@ test.describe('earnings calendar reaction labels', () => {
     await page.waitForTimeout(1_000);
 
     const row = page.getByRole('link', { name: /CALB/i }).first();
-    await expect(row).toContainText('7.0%');        // calibrated ML move
-    await expect(row).toContainText('4.0–11.0%');   // p25–p75 IQR band
-    await expect(row).not.toContainText('13.0%');   // never the raw straddle
+    await expect(row).toContainText('13.0%');
+    await expect(row).toContainText('IV forecast');
+    await expect(row).not.toContainText('4.0–11.0%');
+
+    const move = row.locator('[data-calendar-move]');
+    await move.hover();
+    const tooltip = page.getByRole('tooltip', { name: 'Expected move breakdown' });
+    await expect(tooltip).toContainText('Straddle implied');
+    await expect(tooltip).toContainText('13.0%');
+    await expect(tooltip).toContainText('ML forecast');
+    await expect(tooltip).toContainText('7.0%');
+    await expect(tooltip).not.toContainText('Historical median');
   });
 
   test('smoke: real calendar renders the shell and week navigation', async ({ page }) => {
