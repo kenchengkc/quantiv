@@ -693,3 +693,40 @@ def test_results_explicitly_issued_before_morning_call_map_to_bmo() -> None:
         text,
         published_on=date(2026, 9, 20),
     ) == {"date": "2026-10-02", "timing": "bmo"}
+
+
+
+def test_confirmed_event_with_unknown_session_stays_in_announcement_lookup_budget() -> None:
+    current = pd.DataFrame(
+        [
+            {"act_symbol": "AAA", "date": date(2026, 9, 20)},
+            {"act_symbol": "BBB", "date": date(2026, 9, 21)},
+        ]
+    )
+    baseline = current.copy()
+    decisions = {
+        "AAA": {
+            "date": "2026-09-20",
+            "timing": "amc",
+            "reason": "baseline_confirmed",
+            "structured_votes": [],
+        },
+        "BBB": {
+            "date": "2026-09-21",
+            "timing": "unknown",
+            "reason": "baseline_confirmed",
+            "structured_votes": [],
+        },
+    }
+
+    symbols = _candidate_symbols(
+        current,
+        baseline,
+        [],
+        start=date(2026, 9, 19),
+        end=date(2026, 10, 10),
+        allowed_symbols={"AAA", "BBB"},
+        preliminary_decisions=decisions,
+    )
+
+    assert symbols == ["BBB"]
