@@ -12,6 +12,7 @@ from ml.provider_signal_policy import (
 )
 
 from .shared import (
+    EVENT_FORECAST_ARCHIVE_PATH,
     FORECAST_RECEIPT_PATH,
     FORECASTS_DIR,
     PROVIDER_ENRICHMENTS_DIR,
@@ -56,6 +57,46 @@ def load_ml_forecasts() -> dict[tuple[str, str], dict]:
         key = (row["act_symbol"], row["earnings_date"].isoformat())
         out[key] = row
     print(f"🤖 Loaded {len(out)} ML forecasts from {latest.name}")
+    return out
+
+
+def load_event_forecast_archive() -> dict[tuple[str, str], dict]:
+    """Return the durable final pre-event ML forecast for each earnings event."""
+    path = EVENT_FORECAST_ARCHIVE_PATH
+    if not path.exists():
+        return {}
+    try:
+        import pandas as pd
+        frame = pd.read_parquet(path)
+    except Exception as exc:
+        print(f"⚠️  Could not read {path.name}: {exc}")
+        return {}
+    if frame.empty:
+        return {}
+
+    required = {"act_symbol", "earnings_date", "snapshot_date"}
+    if not required <= set(frame.columns):
+        print(
+            f"⚠️  Ignoring {path.name}; missing columns "
+            f"{sorted(required - set(frame.columns))}"
+        )
+        return {}
+
+    frame = frame.copy()
+    frame["earnings_date"] = pd.to_datetime(
+        frame["earnings_date"], errors="coerce"
+    ).dt.date
+    frame["snapshot_date"] = pd.to_datetime(
+        frame["snapshot_date"], errors="coerce"
+    ).dt.date
+    frame = frame.dropna(subset=["act_symbol", "earnings_date", "snapshot_date"])
+    frame["act_symbol"] = frame["act_symbol"].astype(str).str.upper().str.strip()
+
+    out: dict[tuple[str, str], dict] = {}
+    for row in frame.to_dict(orient="records"):
+        key = (str(row["act_symbol"]), row["earnings_date"].isoformat())
+        out[key] = row
+    print(f"🧊 Loaded {len(out)} frozen event ML forecasts from {path.name}")
     return out
 
 
