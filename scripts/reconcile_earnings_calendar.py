@@ -1067,7 +1067,8 @@ def _priority_symbols_for_alpha(
             "structured_consensus": 3,
             "direct_announcement": 4,
             "official_announcement": 5,
-        }.get(str(reason), 6)
+            "baseline_confirmed": 6,
+        }.get(str(reason), 7)
         return rank, symbol
 
     return sorted(symbols, key=priority)[:max_symbols]
@@ -1081,6 +1082,7 @@ def reconcile_calendar(
     end: date,
     structured_votes: list[Vote],
     announcements_by_symbol: dict[str, list[Announcement]],
+    allowed_symbols: set[str] | None = None,
 ) -> tuple[pd.DataFrame, dict[str, Any]]:
     current_df = normalize_existing(current_df)
     baseline_df = normalize_existing(baseline_df)
@@ -1100,6 +1102,8 @@ def reconcile_calendar(
     )
     symbols.update(provider_map)
     symbols.update(announcements_by_symbol)
+    if allowed_symbols is not None:
+        symbols.intersection_update(allowed_symbols)
 
     drop_indices: set[int] = set()
     replacement_rows: list[dict[str, Any]] = []
@@ -1407,6 +1411,9 @@ def main() -> int:
     )
     provider_votes.extend(fmp_votes)
 
+    frontend_symbols = set(load_frontend_symbol_universe())
+    allowed_symbols = frontend_symbols or None
+
     preliminary, preliminary_report = reconcile_calendar(
         current_df,
         baseline_df,
@@ -1414,17 +1421,17 @@ def main() -> int:
         end=end,
         structured_votes=provider_votes,
         announcements_by_symbol={},
+        allowed_symbols=allowed_symbols,
     )
     del preliminary
 
-    frontend_symbols = set(load_frontend_symbol_universe())
     symbols = _candidate_symbols(
         current_df,
         baseline_df,
         provider_votes,
         start=today,
         end=announcement_end,
-        allowed_symbols=frontend_symbols or None,
+        allowed_symbols=allowed_symbols,
         max_symbols=args.announcement_max_symbols,
     )
     announcements, announcement_status = _collect_announcements(
@@ -1447,6 +1454,7 @@ def main() -> int:
         end=end,
         structured_votes=provider_votes,
         announcements_by_symbol=announcements,
+        allowed_symbols=allowed_symbols,
     )
 
     report = {
