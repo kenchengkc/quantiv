@@ -122,6 +122,59 @@ function formatQuarterLabel(q: { q: number; year: number }): string {
   return `Q${q.q} ${q.year}`;
 }
 
+function frozenHistoryForecastForEvent(
+  data: SymbolDetail,
+  earningsDate: string | null,
+  todayIso: string,
+) {
+  const eventIso = earningsDate?.slice(0, 10) ?? null;
+  if (!eventIso || eventIso >= todayIso) return null;
+  const row = (data.earnings_history ?? []).find(
+    (item) => item.date.slice(0, 10) === eventIso,
+  );
+  if (!row) return null;
+
+  const timing = (row.timing ?? '').toLowerCase();
+  const afterClose =
+    timing === 'amc' ||
+    timing === 'after_market_close' ||
+    timing === 'after_close' ||
+    timing.includes('after');
+  const impliedAsOf = row.implied_as_of?.slice(0, 10) ?? null;
+  const optionPointInTime =
+    impliedAsOf != null &&
+    (afterClose ? impliedAsOf <= eventIso : impliedAsOf < eventIso) &&
+    (row.implied_quality_status == null ||
+      row.implied_quality_status === 'decision_eligible_eod');
+
+  const atmIv = finiteDisplayForecast(row.implied_atm_iv);
+  const dte =
+    row.implied_dte != null && Number.isFinite(row.implied_dte) && row.implied_dte > 0
+      ? row.implied_dte
+      : null;
+  const ivPct =
+    optionPointInTime && atmIv != null && dte != null
+      ? atmIv * Math.sqrt(dte / 365)
+      : null;
+  const straddlePct = optionPointInTime
+    ? finiteDisplayForecast(row.implied)
+    : null;
+
+  const mlSnapshot = row.ml_snapshot_date?.slice(0, 10) ?? null;
+  const mlPct =
+    mlSnapshot != null && mlSnapshot < eventIso
+      ? finiteDisplayForecast(row.em_ml_pct)
+      : null;
+
+  return {
+    row,
+    ivPct,
+    straddlePct,
+    mlPct,
+    mlSnapshot,
+  };
+}
+
 function eventLabelFor(data: SymbolDetail, earningsDate: string | null): string {
   const history = data.earnings_history ?? [];
   const eventDate = earningsDate?.slice(0, 10) ?? null;
@@ -619,14 +672,20 @@ export default function SymbolPage({
   const daysLeft = daysUntilEarnings(earningsDate, todayIso);
   const eventLabel = eventLabelFor(data, earningsDate);
 
+  const frozenHistoryForecast = frozenHistoryForecastForEvent(
+    data,
+    earningsDate,
+    todayIso,
+  );
+  const modelSnapshot = em ?? frozenHistoryForecast?.row ?? null;
   const snapshotQuantiles = normalizeForecastQuantiles(
-    em
+    modelSnapshot
       ? {
-          '10': em.p10,
-          '25': em.p25,
-          '50': em.p50,
-          '75': em.p75,
-          '90': em.p90,
+          '10': modelSnapshot.p10,
+          '25': modelSnapshot.p25,
+          '50': modelSnapshot.p50,
+          '75': modelSnapshot.p75,
+          '90': modelSnapshot.p90,
         }
       : null,
   );
@@ -645,12 +704,30 @@ export default function SymbolPage({
   const quantiles = showingLivePrediction && liveQuantiles ? liveQuantiles : snapshotQuantiles;
   const rawActivePredictionPct = showingLivePrediction
     ? (livePrediction.response?.em_ml_pct ?? null)
-    : (em?.em_ml_pct ?? null);
+    : (em?.em_ml_pct ?? frozenHistoryForecast?.mlPct ?? null);
   const activePredictionPct =
     rawActivePredictionPct != null && Number.isFinite(rawActivePredictionPct)
       ? Math.max(0, rawActivePredictionPct)
       : null;
-  const compatDisplayForecast = resolveDisplayForecastCompat(em, historicalCompatPct);
+  const headlineForecastFields = {
+    ...(em ?? {}),
+    iv_pct:
+      finiteDisplayForecast(em?.iv_pct) ??
+      frozenHistoryForecast?.ivPct ??
+      null,
+    straddle_pct:
+      finiteDisplayForecast(em?.straddle_pct) ??
+      frozenHistoryForecast?.straddlePct ??
+      null,
+    em_ml_pct:
+      finiteDisplayForecast(em?.em_ml_pct) ??
+      frozenHistoryForecast?.mlPct ??
+      null,
+  };
+  const compatDisplayForecast = resolveDisplayForecastCompat(
+    headlineForecastFields,
+    historicalCompatPct,
+  );
   const staticDisplayPct = compatDisplayForecast.pct;
   // The hero is the canonical product forecast, which is IV/options-first.
   // Spot-updated ML remains available in the model comparison panel but must
@@ -661,10 +738,10 @@ export default function SymbolPage({
     ? livePrediction.response?.source === 'nightly_fallback'
       ? 'Nightly snapshot · spot update unavailable'
       : `End-of-day research · latest stock price only; options and other inputs remain frozen at ${livePrediction.response?.feature_snapshot_date ?? 'the nightly snapshot'}.`
-    : em?.forecast_frozen && em?.ml_snapshot_date
-      ? `Final pre-event LightGBM snapshot from ${em.ml_snapshot_date} · frozen after earnings.`
-      : em?.ml_snapshot_date
-        ? `Nightly LightGBM snapshot from ${em.ml_snapshot_date}.`
+    : em?.forecast_frozen && (em?.ml_snapshot_date ?? frozenHistoryForecast?.mlSnapshot)
+      ? `Final pre-event LightGBM snapshot from ${em?.ml_snapshot_date ?? frozenHistoryForecast?.mlSnapshot} · frozen after earnings.`
+      : (em?.ml_snapshot_date ?? frozenHistoryForecast?.mlSnapshot)
+        ? `Nightly LightGBM snapshot from ${em?.ml_snapshot_date ?? frozenHistoryForecast?.mlSnapshot}.`
         : 'LightGBM ensemble · range of plausible absolute moves on print day';
   const liveUnavailableReason =
     predictionMode === 'spot_updated' && livePrediction.status === 'unavailable' ? livePrediction.error : null;
