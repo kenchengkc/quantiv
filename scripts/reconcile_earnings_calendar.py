@@ -123,6 +123,7 @@ DIRECT_TITLE_ACTIONS = (
 )
 DIRECT_TITLE_RESULTS = (
     "earnings",
+    " results ",
     "financial results",
     "quarter results",
     "quarterly results",
