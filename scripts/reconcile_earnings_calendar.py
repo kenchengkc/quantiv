@@ -47,6 +47,7 @@ from sync_finnhub_earnings import (
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_BASELINE = REPO_ROOT / "data" / "validation" / "earnings_calendar_baseline.csv"
 DEFAULT_REPORT = REPO_ROOT / "data" / "validation" / "earnings_calendar_reconciliation.json"
+TICKER_NAMES_PATH = REPO_ROOT / "apps" / "frontend" / "public" / "ticker-names.json"
 
 MONTHS = {
     name.lower(): index
@@ -144,6 +145,16 @@ DIRECT_TITLE_PAST = (
     "reports better",
     "revenues top",
 )
+DIRECT_TITLE_PROJECTED = (
+    " projected ",
+    " estimated ",
+    " estimate ",
+    " expected ",
+    " expects ",
+    " forecast ",
+    " forecasts ",
+    " likely ",
+)
 
 Vote = dict[str, Any]
 Announcement = dict[str, Any]
@@ -186,6 +197,8 @@ def _clean_text(value: str) -> str:
 def is_direct_earnings_announcement_title(title: str) -> bool:
     text = f" {_clean_text(title).lower()} "
     if any(term in text for term in DIRECT_TITLE_PAST):
+        return False
+    if any(term in text for term in DIRECT_TITLE_PROJECTED):
         return False
     if not any(term in text for term in DIRECT_TITLE_ACTIONS):
         return False
@@ -885,11 +898,88 @@ def _announcement_from_article(
     }
 
 
+_COMPANY_NAME_STOPWORDS = {
+    "the",
+    "and",
+    "of",
+    "inc",
+    "incorporated",
+    "corp",
+    "corporation",
+    "company",
+    "co",
+    "plc",
+    "holdings",
+    "holding",
+    "group",
+    "enterprises",
+    "enterprise",
+    "technologies",
+    "technology",
+    "international",
+    "limited",
+    "ltd",
+    "sa",
+    "nv",
+}
+
+
+def load_company_names(path: Path = TICKER_NAMES_PATH) -> dict[str, str]:
+    if not path.exists():
+        return {}
+    try:
+        payload = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError):
+        return {}
+    if not isinstance(payload, dict):
+        return {}
+    return {
+        str(symbol).strip().upper(): str(name).strip()
+        for symbol, name in payload.items()
+        if str(symbol).strip() and str(name).strip()
+    }
+
+
+def finnhub_article_mentions_company(
+    article: dict[str, Any],
+    symbol: str,
+    company_name: str | None,
+) -> bool:
+    """Require target identity in the headline; related-ticker tags are insufficient."""
+    target = symbol.strip().upper()
+    headline = _clean_text(str(article.get("headline") or article.get("title") or ""))
+    if not target or not headline:
+        return False
+
+    if re.search(rf"(?i)(?:\\$|\\()\\s*{re.escape(target)}\\s*\\)?\\b", headline):
+        return True
+
+    name = _clean_text(company_name or "")
+    if not name:
+        return False
+
+    headline_words = {
+        token.lower()
+        for token in re.findall(r"[A-Za-z0-9]+", headline)
+        if token
+    }
+    company_tokens = [
+        token.lower()
+        for token in re.findall(r"[A-Za-z0-9]+", name)
+        if token.lower() not in _COMPANY_NAME_STOPWORDS and len(token) >= 3
+    ]
+    if not company_tokens:
+        return False
+
+    return any(token in headline_words for token in company_tokens)
+
+
 def fetch_finnhub_announcements(
     symbol: str,
     *,
     today: date,
     key: str | None,
+    company_name: str | None = None,
 ) -> tuple[list[Announcement], dict[str, Any]]:
     if not key:
         return [], {"status": "missing_key"}
@@ -909,6 +999,8 @@ def fetch_finnhub_announcements(
     evidence: list[Announcement] = []
     for row in rows:
         if not isinstance(row, dict):
+            continue
+        if not finnhub_article_mentions_company(row, symbol, company_name):
             continue
         item = _announcement_from_article(
             provider="finnhub_company_news",
@@ -1396,6 +1488,7 @@ def _collect_announcements(
     twelvedata_delay: float,
     alphavantage_delay: float,
     alpha_news_max: int,
+    company_names: dict[str, str] | None = None,
     preliminary_decisions: dict[str, dict[str, Any]] | None = None,
 ) -> tuple[dict[str, list[Announcement]], dict[str, Any]]:
     evidence: dict[str, list[Announcement]] = defaultdict(list)
@@ -1410,6 +1503,7 @@ def _collect_announcements(
             symbol,
             today=today,
             key=finnhub_key,
+            company_name=(company_names or {}).get(symbol),
         )
         evidence[symbol].extend(rows)
         status["finnhub_company_news"][symbol] = meta
@@ -1543,6 +1637,7 @@ def main() -> int:
         allowed_symbols=allowed_symbols,
         max_symbols=args.announcement_max_symbols,
     )
+    company_names = load_company_names()
     announcements, announcement_status = _collect_announcements(
         symbols,
         today=today,
@@ -1553,6 +1648,7 @@ def main() -> int:
         twelvedata_delay=args.twelvedata_delay,
         alphavantage_delay=args.alphavantage_delay,
         alpha_news_max=args.alpha_news_max,
+        company_names=company_names,
         preliminary_decisions=preliminary_report["decisions"],
     )
 
