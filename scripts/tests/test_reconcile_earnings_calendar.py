@@ -10,6 +10,7 @@ from reconcile_earnings_calendar import (
     alpha_article_mentions_symbol,
     choose_canonical_event,
     extract_earnings_announcement,
+    extract_fiscal_identity,
     is_direct_earnings_announcement_title,
     reconcile_calendar,
     _candidate_symbols,
@@ -401,3 +402,50 @@ def test_large_direct_announcement_move_replaces_old_anchor_without_duplicate() 
     rows = reconciled[reconciled["act_symbol"].eq("FERG")]
     assert rows["date"].tolist() == [date(2026, 11, 9)]
     assert rows["timing"].tolist() == ["bmo"]
+
+
+
+def test_extracts_fiscal_identity_from_direct_announcement_title() -> None:
+    assert extract_fiscal_identity(
+        "McCormick & Company to Report 2026 Third Quarter Financial Results on October 1, 2026"
+    ) == {"fiscal_year": 2026, "fiscal_q": "Q3"}
+    assert extract_fiscal_identity(
+        "AAR to announce first quarter fiscal year 2027 results on September 29, 2026"
+    ) == {"fiscal_year": 2027, "fiscal_q": "Q1"}
+
+
+def test_new_announcement_event_uses_announced_fiscal_identity_not_report_month() -> None:
+    current = pd.DataFrame(columns=[
+        "act_symbol", "date", "timing", "fiscal_year", "fiscal_q",
+        "eps_actual", "eps_estimate", "revenue_actual", "revenue_estimate", "source",
+    ])
+    baseline = current.copy()
+    announcements = {
+        "MKC": [
+            {
+                "provider": "finnhub_company_news",
+                "date": "2026-10-01",
+                "timing": "bmo",
+                "official": False,
+                "direct": True,
+                "published_on": "2026-09-16",
+                "fiscal_year": 2026,
+                "fiscal_q": "Q3",
+            }
+        ]
+    }
+
+    reconciled, _ = reconcile_calendar(
+        current,
+        baseline,
+        start=date(2026, 9, 19),
+        end=date(2026, 11, 18),
+        structured_votes=[],
+        announcements_by_symbol=announcements,
+        allowed_symbols={"MKC"},
+    )
+
+    row = reconciled[reconciled["act_symbol"].eq("MKC")].iloc[0]
+    assert row["date"] == date(2026, 10, 1)
+    assert row["fiscal_year"] == 2026
+    assert row["fiscal_q"] == "Q3"
