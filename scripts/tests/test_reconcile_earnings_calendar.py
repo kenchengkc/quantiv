@@ -494,3 +494,29 @@ def test_finnhub_news_must_identify_target_company_not_only_related_peer() -> No
         "DDOG",
         "Datadog",
     )
+
+
+
+def test_forward_earnings_date_beats_press_release_dateline() -> None:
+    text = (
+        "MINNEAPOLIS, September 15, 2026 — Apogee Enterprises today announced "
+        "the company will report its fiscal 2027 second quarter results on "
+        "Tuesday, October 6, 2026, before the market opens."
+    )
+    assert extract_earnings_announcement(
+        text,
+        published_on=date(2026, 9, 15),
+    ) == {"date": "2026-10-06", "timing": "bmo"}
+
+
+def test_morning_release_language_maps_to_bmo() -> None:
+    text = (
+        "Conagra Brands will release its fiscal 2027 first quarter results on "
+        "Wednesday, September 30, 2026. A press release and supplemental "
+        "materials will be issued that morning prior to a live question-and-answer "
+        "session at 9:30 a.m. ET."
+    )
+    assert extract_earnings_announcement(
+        text,
+        published_on=date(2026, 8, 31),
+    ) == {"date": "2026-09-30", "timing": "bmo"}
