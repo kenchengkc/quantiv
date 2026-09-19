@@ -120,6 +120,7 @@ describe('screener research query', () => {
     );
 
     expect(applyScreenerResearchQuery(displayDriven, query).map((row) => row.ticker)).toEqual([
+      'STRICT',
       'HIST',
     ]);
   });
