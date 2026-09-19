@@ -57,12 +57,16 @@ def _finite_positive(value: Any) -> float | None:
 
 
 def _strict_options_from_event(event: dict[str, Any]) -> dict[str, Any] | None:
-    pct = _finite_positive(event.get("em_straddle_pct"))
-    if pct is None:
+    iv_pct = _finite_positive(event.get("em_iv_pct"))
+    straddle_pct = _finite_positive(event.get("em_straddle_pct"))
+    if iv_pct is None and straddle_pct is None:
         return None
     return {
-        "em_baseline_straddle": pct,
+        "em_baseline_iv": iv_pct,
+        "em_baseline_straddle": straddle_pct,
         "expiry_date": event.get("expiry_date"),
+        "dte": event.get("days_to_expiry"),
+        "atm_iv": event.get("atm_iv"),
         "atm_strike": event.get("atm_strike"),
         "straddle_price": event.get("em_straddle_abs"),
     }
@@ -158,16 +162,16 @@ def _validate_display_provenance(
     if method == "ml":
         if ml_status != "available":
             errors.append(f"{identity}: ML method without available ML status")
-        if options_status not in {"decision_eligible", "unavailable"}:
+        if options_status != "unavailable":
             errors.append(
-                f"{identity}: ML method with incoherent options status={options_status!r}"
+                f"{identity}: ML method requires unavailable options status, got {options_status!r}"
             )
         if fallback_reason is not None:
             errors.append(f"{identity}: ML method must not carry a fallback reason")
         return
 
-    if ml_status == "available":
-        errors.append(f"{identity}: fallback method with available ML status")
+    if method in {"historical", "historical_prior"} and ml_status == "available":
+        errors.append(f"{identity}: historical fallback with available ML status")
 
     if method == "options_math":
         if options_status != "decision_eligible":
