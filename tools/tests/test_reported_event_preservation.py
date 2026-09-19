@@ -12,7 +12,11 @@ from datetime import date
 
 import pytest
 
-from frontend_data.payloads import attach_frozen_event_forecasts, preserve_reported_events
+from frontend_data.payloads import (
+    attach_frozen_event_forecasts,
+    enrich_reported_event_forecasts,
+    preserve_reported_events,
+)
 
 
 def _event(ticker: str, earnings_date: str, **extra) -> dict:
@@ -291,3 +295,83 @@ def test_historical_iv_wins_over_archived_ml_but_ml_is_preserved():
     )
     assert result["expected_move"]["em_ml_pct"] == 0.036898
     assert result["expected_move"]["ml_status"] == "available"
+
+
+
+def test_reported_calendar_and_symbol_share_the_same_frozen_iv_forecast(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    evidence = {
+        "implied": 0.10087,
+        "implied_as_of": "2026-09-09",
+        "implied_expiration": "2026-09-25",
+        "implied_dte": 16,
+        "implied_lead_days": 1,
+        "implied_atm_strike": 23.0,
+        "implied_straddle_abs": 2.32,
+        "implied_atm_iv": 0.5927,
+        "implied_quality_status": "decision_eligible_eod",
+    }
+    monkeypatch.setattr(
+        "frontend_data.payloads._historical_option_evidence",
+        lambda _conn, ticker, _cutoff: (
+            {date(2026, 9, 10): evidence} if ticker == "M" else {}
+        ),
+    )
+    archive = {
+        ("M", "2026-09-10"): {
+            "act_symbol": "M",
+            "earnings_date": date(2026, 9, 10),
+            "snapshot_date": date(2026, 9, 9),
+            "model_horizon": 1,
+            "em_ml_pct": 0.055115,
+        }
+    }
+    calendar = [
+        _event(
+            "M",
+            "2026-09-10",
+            timing="bmo",
+            display_forecast_pct=0.025883,
+            display_forecast_method="historical",
+        )
+    ]
+
+    changed = enrich_reported_event_forecasts(
+        object(),
+        calendar,
+        today=date(2026, 9, 19),
+        archive=archive,
+    )
+
+    expected_iv = 0.5927 * (16 / 365.0) ** 0.5
+    assert changed == 1
+    assert calendar[0]["display_forecast_method"] == "options_math"
+    assert calendar[0]["display_forecast_pct"] == pytest.approx(expected_iv)
+    assert calendar[0]["em_iv_pct"] == pytest.approx(expected_iv)
+    assert calendar[0]["em_straddle_pct"] == pytest.approx(0.10087)
+    assert calendar[0]["em_ml_pct"] == pytest.approx(0.055115)
+
+    detail = {
+        "expected_move": None,
+        "earnings_history": [
+            {
+                "date": "2026-09-10",
+                "timing": "bmo",
+                **evidence,
+            }
+        ],
+    }
+    symbol = attach_frozen_event_forecasts(
+        detail,
+        "M",
+        archive,
+        current_event_date=date(2026, 9, 10),
+        today=date(2026, 9, 19),
+    )
+
+    assert symbol["expected_move"]["display_forecast_method"] == "options_math"
+    assert symbol["expected_move"]["display_forecast_pct"] == pytest.approx(expected_iv)
+    assert symbol["expected_move"]["display_forecast_pct"] == pytest.approx(
+        calendar[0]["display_forecast_pct"]
+    )
