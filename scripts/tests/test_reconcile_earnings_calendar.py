@@ -11,6 +11,7 @@ from reconcile_earnings_calendar import (
     choose_canonical_event,
     extract_earnings_announcement,
     extract_fiscal_identity,
+    finnhub_article_mentions_company,
     is_direct_earnings_announcement_title,
     reconcile_calendar,
     _candidate_symbols,
@@ -452,3 +453,44 @@ def test_new_announcement_event_uses_announced_fiscal_identity_not_report_month(
     assert row["date"] == date(2026, 10, 1)
     assert row["fiscal_year"] == 2026
     assert row["fiscal_q"] == "Q3"
+
+
+def test_projected_or_estimated_headlines_are_not_direct_announcements() -> None:
+    assert not is_direct_earnings_announcement_title(
+        "AAR (AIR) Projected to Release Quarterly Earnings on Tuesday"
+    )
+    assert not is_direct_earnings_announcement_title(
+        "Example Corp Expected to Report Third Quarter Earnings Next Week"
+    )
+
+
+def test_finnhub_news_must_identify_target_company_not_only_related_peer() -> None:
+    peer_article = {
+        "headline": "IDEX Gears Up to Report Q2 Earnings: What's in the Cards?",
+        "related": "FERG",
+    }
+    assert not finnhub_article_mentions_company(
+        peer_article,
+        "FERG",
+        "Ferguson Enterprises",
+    )
+
+    company_article = {
+        "headline": "Ferguson Enterprises to Report Third Quarter Results",
+        "related": "FERG",
+    }
+    assert finnhub_article_mentions_company(
+        company_article,
+        "FERG",
+        "Ferguson Enterprises",
+    )
+
+    ticker_article = {
+        "headline": "Datadog (DDOG) to Report Third Quarter Earnings",
+        "related": "DDOG",
+    }
+    assert finnhub_article_mentions_company(
+        ticker_article,
+        "DDOG",
+        "Datadog",
+    )
