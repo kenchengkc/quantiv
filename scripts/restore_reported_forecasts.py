@@ -381,8 +381,13 @@ def _republish_manifest_and_screener() -> None:
     (PUBLIC_DIR / "screener.json").write_text(
         json.dumps(screener, indent=2, default=str), encoding="utf-8"
     )
+    current_week = week_payloads.get(this_monday)
+    if current_week is not None:
+        (PUBLIC_DIR / "weekly.json").write_text(
+            json.dumps(current_week, indent=2, default=str), encoding="utf-8"
+        )
     print(
-        f"  republished weeks/manifest.json and screener.json "
+        f"  republished weekly.json, weeks/manifest.json and screener.json "
         f"({screener['metadata']['event_count']} events)"
     )
 
