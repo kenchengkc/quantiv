@@ -37,7 +37,7 @@ import {
 } from '@/lib/calendarReference';
 import {
   displayForecastLabel,
-  finiteDisplayForecast,
+  resolveDisplayForecastCompat,
   type DisplayForecastFields,
   type DisplayForecastMethod,
 } from '@/lib/displayForecast';
@@ -115,8 +115,8 @@ function fmtMovePct(v: number | null | undefined, digits = 1) {
 }
 
 function legacyForecastMethod(ev: EarningsEvent): DisplayForecastMethod | null {
+  if (ev.em_iv_pct != null || ev.em_straddle_pct != null) return 'options_math';
   if (ev.em_ml_pct != null) return 'ml';
-  if (ev.em_straddle_pct != null || ev.em_iv_pct != null) return 'options_math';
   return null;
 }
 
@@ -143,14 +143,18 @@ function TooltipLine({ label, value, muted = false, marginTop = 0 }: { label: st
 /** Compact provenance surface for the calendar headline expected move. */
 function ExpectedMoveHover({
   movePct,
-  impliedPct,
+  ivPct,
+  straddlePct,
+  mlPct,
   method,
   bandLo,
   bandHi,
   children,
 }: {
   movePct: number | null;
-  impliedPct: number | null;
+  ivPct: number | null;
+  straddlePct: number | null;
+  mlPct: number | null;
   method: DisplayForecastMethod | null;
   bandLo: number | null | undefined;
   bandHi: number | null | undefined;
@@ -169,7 +173,9 @@ function ExpectedMoveHover({
   useEffect(() => () => clearTimer(), []);
 
   const moveLine = fmtMovePct(movePct);
-  const impliedLine = fmtMovePct(impliedPct);
+  const ivLine = fmtMovePct(ivPct);
+  const straddleLine = fmtMovePct(straddlePct);
+  const mlLine = fmtMovePct(mlPct);
   const bandLine =
     method === 'ml' && bandLo != null && bandHi != null
       ? `${fmtMovePct(bandLo)}–${fmtMovePct(bandHi)}`
@@ -230,33 +236,37 @@ function ExpectedMoveHover({
             pointerEvents: 'none',
           }}
         >
-          {method === 'ml' && moveLine && (
+          {(ivLine || method === 'options_math' || method === 'options_indicative') && (
+            <TooltipLine
+              label="IV forecast"
+              value={`±${ivLine ?? moveLine ?? '—'}`}
+              muted={ivLine == null && moveLine == null}
+            />
+          )}
+          {straddleLine && (
+            <TooltipLine label="Straddle implied" value={`±${straddleLine}`} marginTop={4} />
+          )}
+          {mlLine ? (
+            <TooltipLine label="ML forecast" value={`±${mlLine}`} marginTop={4} />
+          ) : method !== 'ml' ? (
+            <TooltipLine label="ML forecast" value="Unavailable" muted marginTop={4} />
+          ) : null}
+          {method === 'ml' && moveLine && !mlLine && (
             <TooltipLine label="ML forecast" value={`±${moveLine}`} />
           )}
-          {method === 'ml' && impliedLine && (
-            <TooltipLine label="Market implied" value={`±${impliedLine}`} marginTop={4} />
-          )}
-          {(method === 'options_math' || method === 'options_indicative') && moveLine && (
-            <>
-              <TooltipLine label="Market implied" value={`±${moveLine}`} />
-              <TooltipLine label="ML forecast" value="Unavailable" muted marginTop={4} />
-            </>
-          )}
-          {method === 'historical' && moveLine && (
+          {method === 'historical' && moveLine && !ivLine && !straddleLine && !mlLine && (
             <>
               <TooltipLine label="Historical median" value={`±${moveLine}`} />
-              <TooltipLine label="ML forecast" value="Unavailable" muted marginTop={4} />
-              <TooltipLine label="Market implied" value="Unavailable" muted marginTop={4} />
+              <TooltipLine label="IV forecast" value="Unavailable" muted marginTop={4} />
             </>
           )}
-          {method === 'historical_prior' && moveLine && (
+          {method === 'historical_prior' && moveLine && !ivLine && !straddleLine && !mlLine && (
             <>
               <TooltipLine label="Historical prior" value={`±${moveLine}`} />
-              <TooltipLine label="ML forecast" value="Unavailable" muted marginTop={4} />
-              <TooltipLine label="Market implied" value="Unavailable" muted marginTop={4} />
+              <TooltipLine label="IV forecast" value="Unavailable" muted marginTop={4} />
             </>
           )}
-          {method == null && moveLine && (
+          {method == null && moveLine && !ivLine && !straddleLine && !mlLine && (
             <TooltipLine label={displayForecastLabel(method)} value={`±${moveLine}`} />
           )}
           {bandLine != null && (
@@ -275,12 +285,12 @@ function TickerRow({
   ev: EarningsEvent;
   live?: LiveMap[string];
 }) {
-  const impliedPct = ev.em_straddle_pct ?? ev.em_iv_pct ?? null;
-  const method = ev.display_forecast_method ?? legacyForecastMethod(ev);
-  const movePct =
-    finiteDisplayForecast(ev.display_forecast_pct) ??
-    finiteDisplayForecast(ev.em_ml_pct) ??
-    finiteDisplayForecast(impliedPct);
+  const ivPct = ev.em_iv_pct ?? null;
+  const straddlePct = ev.em_straddle_pct ?? null;
+  const mlPct = ev.em_ml_pct ?? null;
+  const resolvedForecast = resolveDisplayForecastCompat(ev);
+  const method = resolvedForecast.method ?? legacyForecastMethod(ev);
+  const movePct = resolvedForecast.pct;
   const bandLo = method === 'ml' ? ev.p25 : null;
   const bandHi = method === 'ml' ? ev.p75 : null;
   const realizedFromBackfill =
@@ -385,7 +395,9 @@ function TickerRow({
       </div>
       <ExpectedMoveHover
         movePct={movePct}
-        impliedPct={impliedPct}
+        ivPct={ivPct}
+        straddlePct={straddlePct}
+        mlPct={mlPct}
         method={method}
         bandLo={bandLo}
         bandHi={bandHi}
@@ -400,6 +412,22 @@ function TickerRow({
             <span style={{ fontSize: 11, color: 'var(--ink-4)' }}>—</span>
           )}
         </div>
+        {movePct != null && (
+          <div
+            className="mono"
+            style={{
+              fontSize: 8,
+              color: method === 'options_math' || method === 'options_indicative'
+                ? 'var(--brand-blue-1)'
+                : 'var(--ink-4)',
+              letterSpacing: '0.06em',
+              textTransform: 'uppercase',
+              marginTop: 2,
+            }}
+          >
+            {displayForecastLabel(method)}
+          </div>
+        )}
         {bandLo != null && bandHi != null && (
           <div
             className="mono tnum"
