@@ -96,8 +96,8 @@ PAST_TERMS = (
 
 def _clean_text(value: str) -> str:
     text = html.unescape(value or "")
-    text = re.sub(r"<script\b[^>]*>.*?</script\s*>", " ", text, flags=re.I | re.S)
-    text = re.sub(r"<style\b[^>]*>.*?</style\s*>", " ", text, flags=re.I | re.S)
+    text = re.sub(r"<script\b[^>]*>.*?</script\b[^>]*>", " ", text, flags=re.I | re.S)
+    text = re.sub(r"<style\b[^>]*>.*?</style\b[^>]*>", " ", text, flags=re.I | re.S)
     text = re.sub(r"<[^>]+>", " ", text)
     return re.sub(r"\s+", " ", text).strip()
 
