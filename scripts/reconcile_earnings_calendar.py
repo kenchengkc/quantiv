@@ -1501,7 +1501,7 @@ def _candidate_symbols(
             chosen and any(candidate != chosen for candidate in external_dates(decision))
         )
         if reason == "baseline_confirmed":
-            return conflicts
+            return conflicts or normalize_timing(decision.get("timing")) == "unknown"
         return reason not in {"no_candidate", "official_announcement", "direct_announcement"}
 
     def risk_rank(symbol: str) -> tuple[int, int, str]:
@@ -1518,7 +1518,7 @@ def _candidate_symbols(
             rank = 1
         elif conflicts:
             rank = 2
-        elif reason in {"baseline_sticky", "current_base"} and timing == "unknown":
+        elif timing == "unknown":
             rank = 3
         elif reason in {"baseline_sticky", "current_base"}:
             rank = 4
