@@ -293,6 +293,9 @@ def _session_from_text(text: str) -> str:
             "prior to the market open",
             "pre-market",
             "premarket",
+            "issued that morning",
+            "released that morning",
+            "release that morning",
         )
     ):
         return "bmo"
@@ -373,8 +376,14 @@ def extract_earnings_announcement(
             score += 2
         if any(term in context_lower for term in PAST_TERMS):
             score -= 6
-        if 0 <= (candidate - published_on).days <= 180:
+        distance_days = (candidate - published_on).days
+        if 0 < distance_days <= 180:
             score += 2
+        elif distance_days == 0:
+            # Company releases commonly begin with a publication dateline before
+            # naming the actual future earnings date. Keep same-day events valid,
+            # but do not let the dateline win a tie against a future event.
+            score -= 2
         candidates.append((score, candidate, context))
 
     if not candidates:
