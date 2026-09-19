@@ -235,19 +235,23 @@ def attach_frozen_event_forecasts(
     current_event_date: date | None = None,
     today: date | None = None,
 ) -> dict | None:
-    """Attach final pre-event ML snapshots to symbol history and reported hero.
+    """Attach point-in-time forecasts to reported symbol history and hero.
 
-    The archive is keyed by exact (ticker, earnings_date). Historical rows keep
-    their realized/EPS outcomes from the fresh build; only ML forecast fields are
-    added. For the currently published event, once it has reported, the same
-    frozen ML snapshot remains the ticker-page expected move instead of falling
-    through to a historical-median display fallback.
+    ML remains the preferred frozen forecast when the durable ML archive has an
+    exact (ticker, earnings_date) snapshot. If no archived ML exists, reuse the
+    strict historical option evidence already selected for that event instead of
+    dropping through to a historical-median presentation estimate.
     """
-    if detail is None or not archive:
+    if detail is None:
         return detail
 
     symbol = ticker.upper()
+    archive = archive or {}
     history = detail.get("earnings_history") or []
+
+    # Historical rows can carry both the strict option-implied range and the
+    # model forecast. That makes the event study a genuine forecast-vs-realized
+    # record instead of reconstructing a new estimate after the event.
     for row in history:
         event_iso = str(row.get("date") or "")[:10]
         fc = archive.get((symbol, event_iso))
@@ -267,31 +271,82 @@ def attach_frozen_event_forecasts(
 
     event_iso = current_event_date.isoformat()
     fc = archive.get((symbol, event_iso))
-    if not fc:
-        return detail
     fields = ml_fields(fc)
     forecast_pct = fields.get("em_ml_pct")
-    if forecast_pct is None:
+    if forecast_pct is not None:
+        current = detail.get("expected_move") or {}
+        current_date = str(current.get("earnings_date") or "")[:10]
+        if current_date and current_date != event_iso:
+            current = {}
+
+        frozen = {
+            **current,
+            "earnings_date": event_iso,
+            **fields,
+            "em_method": "ml_lightgbm",
+            "display_forecast_pct": forecast_pct,
+            "display_forecast_method": "ml",
+            "display_forecast_as_of": fields.get("ml_snapshot_date"),
+            "ml_status": "available",
+            "fallback_reason": None,
+            "forecast_frozen": True,
+        }
+        detail["expected_move"] = frozen
         return detail
 
-    current = detail.get("expected_move") or {}
-    current_date = str(current.get("earnings_date") or "")[:10]
-    if current_date and current_date != event_iso:
-        current = {}
+    # No archived ML snapshot: the history builder may still have exact,
+    # decision-eligible pre-event option evidence. That evidence is strictly
+    # point-in-time and therefore a better frozen fallback than a newly
+    # calculated historical median.
+    history_row = next(
+        (row for row in history if str(row.get("date") or "")[:10] == event_iso),
+        None,
+    )
+    if not history_row:
+        return detail
 
-    frozen = {
-        **current,
+    implied = history_row.get("implied")
+    quality = history_row.get("implied_quality_status")
+    try:
+        implied_pct = float(implied)
+    except (TypeError, ValueError):
+        implied_pct = 0.0
+    if not math.isfinite(implied_pct) or implied_pct <= 0:
+        return detail
+    if quality not in {None, "decision_eligible_eod"}:
+        return detail
+
+    atm_iv = history_row.get("implied_atm_iv")
+    dte = history_row.get("implied_dte")
+    try:
+        iv_pct = (
+            float(atm_iv) * math.sqrt(float(dte) / 365.0)
+            if atm_iv is not None and dte is not None and float(dte) > 0
+            else None
+        )
+    except (TypeError, ValueError):
+        iv_pct = None
+
+    detail["expected_move"] = {
         "earnings_date": event_iso,
-        **fields,
-        "em_method": "ml_lightgbm",
-        "display_forecast_pct": forecast_pct,
-        "display_forecast_method": "ml",
-        "display_forecast_as_of": fields.get("ml_snapshot_date"),
-        "ml_status": "available",
+        "timing": history_row.get("timing"),
+        "expiration": history_row.get("implied_expiration"),
+        "dte": history_row.get("implied_dte"),
+        "lead_time_days": history_row.get("implied_lead_days"),
+        "atm_strike": history_row.get("implied_atm_strike"),
+        "atm_iv": history_row.get("implied_atm_iv"),
+        "straddle_abs": history_row.get("implied_straddle_abs"),
+        "straddle_pct": implied_pct,
+        "iv_pct": jsonable(iv_pct),
+        "em_method": "options_math",
+        "display_forecast_pct": implied_pct,
+        "display_forecast_method": "options_math",
+        "display_forecast_as_of": history_row.get("implied_as_of"),
+        "ml_status": "unavailable_event",
+        "options_status": "decision_eligible",
         "fallback_reason": None,
         "forecast_frozen": True,
     }
-    detail["expected_move"] = frozen
     return detail
 
 
