@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from benchmark_earnings_announcements import extract_earnings_announcement
+from benchmark_earnings_announcements import _clean_text, extract_earnings_announcement
 
 
 def test_extracts_named_date_and_after_close_session() -> None:
@@ -40,3 +40,15 @@ def test_resolves_month_day_without_year_to_future_date() -> None:
         "date": "2026-09-29",
         "session": "amc",
     }
+
+
+def test_clean_text_removes_script_and_style_with_malformed_closing_tags() -> None:
+    raw = (
+        "Before"
+        "<script>window.secret = 'do not keep';</script\t\n data-junk>"
+        "Middle"
+        "<style>.hidden { display: none; }</style bogus>"
+        "After"
+    )
+
+    assert _clean_text(raw) == "Before Middle After"
