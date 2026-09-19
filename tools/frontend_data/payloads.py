@@ -154,6 +154,133 @@ def _historical_option_evidence(conn, ticker: str, cutoff: date) -> dict[date, d
     }
 
 
+
+def _positive_forecast_number(value):
+    if isinstance(value, bool):
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return number if math.isfinite(number) and number > 0 else None
+
+
+def _reported_forecast_fields(
+    ticker: str,
+    earnings_date: date,
+    timing: str | None,
+    evidence: dict | None,
+    archive: dict[tuple[str, str], dict] | None,
+) -> dict | None:
+    """Build the canonical frozen forecast for one reported earnings event.
+
+    This is shared by calendar rows and symbol heroes so they cannot select
+    different headline methods for the same event identity.
+    """
+    event_iso = earnings_date.isoformat()
+    symbol = ticker.upper()
+    archived = (archive or {}).get((symbol, event_iso))
+    ml = ml_fields(archived)
+    ml_pct = _positive_forecast_number(ml.get("em_ml_pct"))
+
+    row = evidence or {}
+    implied_as_of = str(row.get("implied_as_of") or "")[:10]
+    normalized_timing = str(timing or "").strip().lower()
+    after_close = (
+        normalized_timing in {"after_market_close", "amc", "after_close"}
+        or "after" in normalized_timing
+    )
+    option_point_in_time = bool(
+        implied_as_of
+        and (implied_as_of <= event_iso if after_close else implied_as_of < event_iso)
+        and row.get("implied_quality_status") in {None, "decision_eligible_eod"}
+    )
+
+    straddle_pct = _positive_forecast_number(row.get("implied"))
+    atm_iv = _positive_forecast_number(row.get("implied_atm_iv"))
+    dte = _positive_forecast_number(row.get("implied_dte"))
+    iv_pct = (
+        atm_iv * math.sqrt(dte / 365.0)
+        if atm_iv is not None and dte is not None
+        else None
+    )
+
+    if option_point_in_time and (iv_pct is not None or straddle_pct is not None):
+        return {
+            "as_of_date": implied_as_of,
+            "atm_strike": row.get("implied_atm_strike"),
+            "atm_iv": row.get("implied_atm_iv"),
+            "em_straddle_abs": row.get("implied_straddle_abs"),
+            "em_straddle_pct": straddle_pct,
+            "em_iv_pct": jsonable(iv_pct),
+            "expiry_date": row.get("implied_expiration"),
+            "days_to_expiry": row.get("implied_dte"),
+            "lead_time_days": row.get("implied_lead_days"),
+            **ml,
+            "em_method": "options_math",
+            "display_forecast_pct": jsonable(iv_pct or straddle_pct),
+            "display_forecast_method": "options_math",
+            "display_forecast_as_of": implied_as_of,
+            "ml_status": "available" if ml_pct is not None else "unavailable_event",
+            "options_status": "decision_eligible",
+            "fallback_reason": None,
+            "forecast_frozen": True,
+        }
+
+    if ml_pct is not None:
+        return {
+            **ml,
+            "em_method": "ml_lightgbm",
+            "display_forecast_pct": ml_pct,
+            "display_forecast_method": "ml",
+            "display_forecast_as_of": ml.get("ml_snapshot_date"),
+            "ml_status": "available",
+            "options_status": "unavailable",
+            "fallback_reason": None,
+            "forecast_frozen": True,
+        }
+    return None
+
+
+def enrich_reported_event_forecasts(
+    conn,
+    events: list[dict],
+    *,
+    today: date,
+    archive: dict[tuple[str, str], dict] | None = None,
+) -> int:
+    """Put the same frozen IV/ML forecast on reported calendar rows as symbol pages."""
+    evidence_cache: dict[str, dict[date, dict]] = {}
+    changed = 0
+    for event in events:
+        ticker = str(event.get("ticker") or "").upper()
+        earnings_iso = str(event.get("earnings_date") or "")[:10]
+        if not ticker or not earnings_iso:
+            continue
+        earnings_date = date.fromisoformat(earnings_iso)
+        if earnings_date > today:
+            continue
+
+        if ticker not in evidence_cache:
+            evidence_cache[ticker] = _historical_option_evidence(
+                conn, ticker, today + timedelta(days=1)
+            )
+        fields = _reported_forecast_fields(
+            ticker,
+            earnings_date,
+            event.get("timing"),
+            evidence_cache[ticker].get(earnings_date),
+            archive,
+        )
+        if fields is None:
+            continue
+        before = {key: event.get(key) for key in fields}
+        event.update(fields)
+        if any(before.get(key) != value for key, value in fields.items()):
+            changed += 1
+    return changed
+
+
 def _history_row(d, timing, fiscal_year, fiscal_q, eps_actual, eps_estimate,
                  rev_actual, rev_estimate, actual_move, symbol=None, source=None,
                  option_evidence=None):
@@ -235,14 +362,7 @@ def attach_frozen_event_forecasts(
     current_event_date: date | None = None,
     today: date | None = None,
 ) -> dict | None:
-    """Attach point-in-time forecasts to reported symbol history and hero.
-
-    Reported events use the same product hierarchy as upcoming events:
-    point-in-time IV/options evidence first, then the frozen ML snapshot, and
-    only then historical presentation fallbacks elsewhere in the pipeline.
-    ML is still preserved on the history row and expected-move object so model
-    comparisons remain available even when IV is the headline forecast.
-    """
+    """Attach the canonical frozen forecast to reported symbol history and hero."""
     if detail is None:
         return detail
 
@@ -250,8 +370,6 @@ def attach_frozen_event_forecasts(
     archive = archive or {}
     history = detail.get("earnings_history") or []
 
-    # Historical rows retain the final pre-event model snapshot for event-study
-    # comparison, independently of which signal is the headline display value.
     for row in history:
         event_iso = str(row.get("date") or "")[:10]
         fc = archive.get((symbol, event_iso))
@@ -274,96 +392,63 @@ def attach_frozen_event_forecasts(
         (row for row in history if str(row.get("date") or "")[:10] == event_iso),
         None,
     )
-    fc = archive.get((symbol, event_iso))
-    ml = ml_fields(fc)
-    ml_pct = ml.get("em_ml_pct")
-
-    # Prefer exact historical option evidence when it is genuinely pre-event.
-    # Same-day EOD evidence is safe for AMC events (the market closes before
-    # the report) but not for BMO/unknown events, where it would be post-event.
-    if history_row:
-        implied_as_of = str(history_row.get("implied_as_of") or "")[:10]
-        timing = str(history_row.get("timing") or "").lower()
-        after_close = timing in {"after_market_close", "amc", "after_close"} or "after" in timing
-        option_point_in_time = bool(
-            implied_as_of
-            and (
-                implied_as_of <= event_iso
-                if after_close
-                else implied_as_of < event_iso
-            )
-        )
-        quality = history_row.get("implied_quality_status")
-        if quality not in {None, "decision_eligible_eod"}:
-            option_point_in_time = False
-
-        implied = history_row.get("implied")
-        try:
-            straddle_pct = float(implied)
-        except (TypeError, ValueError):
-            straddle_pct = 0.0
-        if not math.isfinite(straddle_pct) or straddle_pct <= 0:
-            straddle_pct = 0.0
-
-        atm_iv = history_row.get("implied_atm_iv")
-        dte = history_row.get("implied_dte")
-        try:
-            iv_pct = (
-                float(atm_iv) * math.sqrt(float(dte) / 365.0)
-                if atm_iv is not None and dte is not None and float(dte) > 0
-                else None
-            )
-        except (TypeError, ValueError):
-            iv_pct = None
-        if iv_pct is not None and (not math.isfinite(iv_pct) or iv_pct <= 0):
-            iv_pct = None
-
-        option_pct = iv_pct or (straddle_pct if straddle_pct > 0 else None)
-        if option_point_in_time and option_pct is not None:
-            detail["expected_move"] = {
-                "earnings_date": event_iso,
-                "timing": history_row.get("timing"),
-                "expiration": history_row.get("implied_expiration"),
-                "dte": history_row.get("implied_dte"),
-                "lead_time_days": history_row.get("implied_lead_days"),
-                "atm_strike": history_row.get("implied_atm_strike"),
-                "atm_iv": history_row.get("implied_atm_iv"),
-                "straddle_abs": history_row.get("implied_straddle_abs"),
-                "straddle_pct": straddle_pct if straddle_pct > 0 else None,
-                "iv_pct": jsonable(iv_pct),
-                **ml,
-                "em_method": "options_math",
-                "display_forecast_pct": option_pct,
-                "display_forecast_method": "options_math",
-                "display_forecast_as_of": implied_as_of,
-                "ml_status": "available" if ml_pct is not None else "unavailable_event",
-                "options_status": "decision_eligible",
-                "fallback_reason": None,
-                "forecast_frozen": True,
-            }
-            return detail
-
-    # No usable point-in-time IV/options evidence: retain the final pre-event ML
-    # snapshot rather than dropping through to a historical median.
-    if ml_pct is not None:
-        current = detail.get("expected_move") or {}
-        current_date = str(current.get("earnings_date") or "")[:10]
-        if current_date and current_date != event_iso:
-            current = {}
-
-        detail["expected_move"] = {
-            **current,
-            "earnings_date": event_iso,
-            **ml,
-            "em_method": "ml_lightgbm",
-            "display_forecast_pct": ml_pct,
-            "display_forecast_method": "ml",
-            "display_forecast_as_of": ml.get("ml_snapshot_date"),
-            "ml_status": "available",
-            "options_status": "unavailable",
-            "fallback_reason": None,
-            "forecast_frozen": True,
+    evidence = None
+    if history_row is not None:
+        evidence = {
+            "implied": history_row.get("implied"),
+            "implied_as_of": history_row.get("implied_as_of"),
+            "implied_expiration": history_row.get("implied_expiration"),
+            "implied_dte": history_row.get("implied_dte"),
+            "implied_lead_days": history_row.get("implied_lead_days"),
+            "implied_atm_strike": history_row.get("implied_atm_strike"),
+            "implied_straddle_abs": history_row.get("implied_straddle_abs"),
+            "implied_atm_iv": history_row.get("implied_atm_iv"),
+            "implied_quality_status": history_row.get("implied_quality_status"),
         }
+
+    fields = _reported_forecast_fields(
+        symbol,
+        current_event_date,
+        (history_row or {}).get("timing"),
+        evidence,
+        archive,
+    )
+    if fields is None:
+        return detail
+
+    detail["expected_move"] = {
+        "earnings_date": event_iso,
+        "timing": (history_row or {}).get("timing"),
+        "expiration": fields.get("expiry_date"),
+        "dte": fields.get("days_to_expiry"),
+        "lead_time_days": fields.get("lead_time_days"),
+        "atm_strike": fields.get("atm_strike"),
+        "atm_iv": fields.get("atm_iv"),
+        "straddle_abs": fields.get("em_straddle_abs"),
+        "straddle_pct": fields.get("em_straddle_pct"),
+        "iv_pct": fields.get("em_iv_pct"),
+        "em_ml_pct": fields.get("em_ml_pct"),
+        "em_ml_abs": fields.get("em_ml_abs"),
+        "correction_factor": fields.get("correction_factor"),
+        "model_horizon": fields.get("model_horizon"),
+        "ml_snapshot_date": fields.get("ml_snapshot_date"),
+        "p10": fields.get("p10"),
+        "p25": fields.get("p25"),
+        "p50": fields.get("p50"),
+        "p75": fields.get("p75"),
+        "p90": fields.get("p90"),
+        "em_method": fields.get("em_method"),
+        "display_forecast_pct": fields.get("display_forecast_pct"),
+        "display_forecast_method": fields.get("display_forecast_method"),
+        "display_forecast_as_of": fields.get("display_forecast_as_of"),
+        "ml_status": fields.get("ml_status"),
+        "options_status": fields.get("options_status"),
+        "fallback_reason": fields.get("fallback_reason"),
+        "forecast_frozen": True,
+    }
+    detail["expected_move"] = {
+        key: value for key, value in detail["expected_move"].items() if value is not None
+    }
     return detail
 
 
