@@ -4,11 +4,14 @@ from __future__ import annotations
 
 from datetime import date
 
+import pandas as pd
+
 from reconcile_earnings_calendar import (
     alpha_article_mentions_symbol,
     choose_canonical_event,
     extract_earnings_announcement,
     is_direct_earnings_announcement_title,
+    _candidate_symbols,
 )
 
 
@@ -252,3 +255,30 @@ def test_alpha_news_requires_target_ticker_relevance() -> None:
         "ACN",
         min_relevance=0.1,
     )
+
+
+
+def test_announcement_candidates_are_frontend_bounded_and_nearest_first() -> None:
+    current = pd.DataFrame(
+        [
+            {"act_symbol": "AAA", "date": date(2026, 9, 20)},
+            {"act_symbol": "BBB", "date": date(2026, 9, 21)},
+            {"act_symbol": "CCC", "date": date(2026, 9, 25)},
+        ]
+    )
+    baseline = pd.DataFrame(columns=["act_symbol", "date"])
+    provider_votes = [
+        {"provider": "finnhub_calendar", "symbol": "DDD", "date": "2026-09-19", "timing": "unknown"}
+    ]
+
+    symbols = _candidate_symbols(
+        current,
+        baseline,
+        provider_votes,
+        start=date(2026, 9, 19),
+        end=date(2026, 10, 10),
+        allowed_symbols={"AAA", "CCC", "DDD"},
+        max_symbols=2,
+    )
+
+    assert symbols == ["DDD", "AAA"]
