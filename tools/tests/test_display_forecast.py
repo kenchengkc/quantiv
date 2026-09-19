@@ -130,18 +130,23 @@ def _resolve(conn: duckdb.DuckDBPyConnection, **kwargs):
     )
 
 
-def test_ml_wins_over_all_fallbacks():
+def test_strict_options_win_over_ml_for_headline_display():
     conn = _conn()
     _pair(conn)
     result = _resolve(
         conn,
         ml_forecast={"em_ml_pct": 0.041},
-        strict_options={"em_baseline_straddle": 0.081},
+        strict_options={
+            "em_baseline_iv": 0.096,
+            "em_baseline_straddle": 0.081,
+        },
     )
-    assert result.method == "ml"
-    assert result.pct == 0.041
+    assert result.method == "options_math"
+    assert result.pct == 0.096
     assert result.ml_status == "available"
     assert result.options_status == "decision_eligible"
+    assert result.selected_options_details is not None
+    assert result.selected_options_details["estimator"] == "atm_iv"
 
 
 def test_ml_display_as_of_uses_model_snapshot_date():
@@ -157,7 +162,7 @@ def test_ml_display_as_of_uses_model_snapshot_date():
     assert result.as_of == "2026-09-09"
 
 
-def test_strict_options_used_when_ml_missing():
+def test_strict_straddle_is_used_when_iv_and_ml_are_missing():
     conn = _conn()
     result = _resolve(
         conn,
