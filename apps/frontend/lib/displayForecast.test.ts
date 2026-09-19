@@ -52,6 +52,13 @@ describe('display forecast helpers', () => {
         em_iv_pct: 0.16,
       }),
     ).toEqual({ pct: 0.16, method: 'options_math' });
+    expect(
+      resolveDisplayForecastCompat({
+        display_forecast_pct: 0.11,
+        display_forecast_method: 'options_indicative',
+        em_ml_pct: 0.12,
+      }),
+    ).toEqual({ pct: 0.11, method: 'options_indicative' });
   });
 
   it('uses a historical compatibility estimate when legacy public data has no ML or options move', () => {
