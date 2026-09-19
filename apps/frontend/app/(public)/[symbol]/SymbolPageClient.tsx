@@ -37,7 +37,6 @@ import { buildHistorySeries, GreeksPanel, HistoryBlock, medianAbsoluteHistoryMov
 import ScenarioRiskPanel from './ScenarioRiskPanel';
 import ResearchSnapshotRibbon from './ResearchSnapshotRibbon';
 import MoveComparisonChart from './MoveComparisonChart';
-import ForecastProvenance from './ForecastProvenance';
 import { SymbolPageLoading, SymbolPageUnavailable } from './SymbolPageStates';
 import type {
   IntradaySeries,
@@ -707,22 +706,6 @@ export default function SymbolPage({
           onToast={showToast}
         />
       </Reveal>
-
-      {displayForecastPct != null && (
-        <Reveal>
-          <ForecastProvenance
-            method={displayForecastMethod}
-            displayPct={displayForecastPct}
-            mlPct={activePredictionPct ?? finiteDisplayForecast(em?.em_ml_pct)}
-            optionsPct={finiteDisplayForecast(em?.straddle_pct ?? em?.iv_pct)}
-            historicalEventCount={
-              em?.historical_event_count ??
-              (displayForecastMethod === 'historical' ? compatibilityHistory.length : null)
-            }
-            asOf={em?.display_forecast_as_of ?? em?.ml_snapshot_date ?? data.as_of_date}
-          />
-        </Reveal>
-      )}
 
       {em && spot > 0 && (
         <Reveal>
