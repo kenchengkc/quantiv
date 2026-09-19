@@ -355,3 +355,49 @@ def test_reconcile_does_not_create_event_outside_allowed_frontend_universe() -> 
 
     assert "ZZZ" not in set(reconciled["act_symbol"])
     assert "ZZZ" not in report["decisions"]
+
+
+
+def test_large_direct_announcement_move_replaces_old_anchor_without_duplicate() -> None:
+    current = pd.DataFrame(
+        [
+            {
+                "act_symbol": "FERG",
+                "date": date(2026, 9, 22),
+                "timing": "unknown",
+                "fiscal_year": 2026,
+                "fiscal_q": "Q3",
+                "eps_actual": None,
+                "eps_estimate": 2.0,
+                "revenue_actual": None,
+                "revenue_estimate": None,
+                "source": "dolthub",
+            }
+        ]
+    )
+    baseline = current.copy()
+    announcements = {
+        "FERG": [
+            _announcement(
+                "finnhub_company_news",
+                "2026-11-09",
+                "bmo",
+                direct=True,
+                published_on="2026-09-18",
+            )
+        ]
+    }
+
+    reconciled, _ = reconcile_calendar(
+        current,
+        baseline,
+        start=date(2026, 9, 19),
+        end=date(2026, 11, 18),
+        structured_votes=[],
+        announcements_by_symbol=announcements,
+        allowed_symbols={"FERG"},
+    )
+
+    rows = reconciled[reconciled["act_symbol"].eq("FERG")]
+    assert rows["date"].tolist() == [date(2026, 11, 9)]
+    assert rows["timing"].tolist() == ["bmo"]
