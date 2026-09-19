@@ -90,28 +90,6 @@ jobs:
       - name: Sync earnings calendar
         run: python scripts/sync_dolthub.py --earnings
 
-      - name: Reconcile near-term earnings calendar
-        env:
-          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
-          FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
-          ALPHAVANTAGE_API_KEY: ${{ secrets.ALPHAVANTAGE_API_KEY }}
-          TWELVEDATA_API_KEY: ${{ secrets.TWELVEDATA_API_KEY }}
-        run: |
-          python scripts/reconcile_earnings_calendar.py \
-            --days-ahead 60 \
-            --announcement-days-ahead 35 \
-            --alpha-news-max 20 \
-            --report data/validation/earnings_calendar_reconciliation.json
-
-      - name: Upload earnings calendar reconciliation
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: earnings-calendar-reconciliation
-          path: data/validation/earnings_calendar_reconciliation.json
-          if-no-files-found: ignore
-          retention-days: 30
-
       - name: Overlay EPS and revenue from FMP
         env:
           FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
@@ -165,6 +143,28 @@ jobs:
             --max-calls 2000 \
             --allow-missing-key \
             $EXTRA_ARGS
+
+      - name: Reconcile near-term earnings calendar
+        env:
+          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+          FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
+          ALPHAVANTAGE_API_KEY: ${{ secrets.ALPHAVANTAGE_API_KEY }}
+          TWELVEDATA_API_KEY: ${{ secrets.TWELVEDATA_API_KEY }}
+        run: |
+          python scripts/reconcile_earnings_calendar.py \
+            --days-ahead 60 \
+            --announcement-days-ahead 35 \
+            --alpha-news-max 20 \
+            --report data/validation/earnings_calendar_reconciliation.json
+
+      - name: Upload earnings calendar reconciliation
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: earnings-calendar-reconciliation
+          path: data/validation/earnings_calendar_reconciliation.json
+          if-no-files-found: ignore
+          retention-days: 30
 
       - name: Apply manual earnings overrides
         run: python scripts/apply_earnings_overrides.py --allow-missing
