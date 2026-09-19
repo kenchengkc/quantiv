@@ -21,6 +21,21 @@ describe('buildHistorySeries', () => {
     expect(result[0].actual).toBe(0.01);
     expect(result.at(-1)?.actual).toBe(0.12);
   });
+
+  it('uses fiscal quarter metadata before falling back to the report-date quarter', () => {
+    const result = buildHistorySeries([
+      {
+        date: '2026-02-05',
+        timing: 'after_market_close',
+        fiscal_year: 2025,
+        fiscal_q: 'Q4',
+        actual: 0.03,
+      },
+    ]);
+
+    expect(result[0]?.q).toBe('Q4 25');
+  });
+
 });
 
 describe('historyRowsToCsv', () => {
