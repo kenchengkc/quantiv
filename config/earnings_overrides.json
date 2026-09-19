@@ -72,6 +72,49 @@
       },
       "action": "remove",
       "note": "No Q3 2026 earnings date announced on BXMT IR as of 2026-09-19; Sep 24 row is a phantom estimate. Re-add when direct announcement/provider consensus exists."
+    },
+    {
+      "symbol": "AIR",
+      "match": {
+        "date": "2026-09-22"
+      },
+      "set": {
+        "date": "2026-09-29",
+        "timing": "amc"
+      },
+      "note": "AAR IR says FY2027 Q1 results release after NYSE close on 2026-09-29; replaces stale Sep 22 estimate."
+    },
+    {
+      "symbol": "JEF",
+      "match": {
+        "date": "2026-09-30"
+      },
+      "set": {
+        "date": "2026-09-28",
+        "timing": "amc"
+      },
+      "note": "Jefferies Business Wire release says Q3 results on 2026-09-28 after market close; replaces stale Sep 30 estimate."
+    },
+    {
+      "symbol": "PRGS",
+      "match": {
+        "date": "2026-09-30"
+      },
+      "set": {
+        "timing": "amc"
+      },
+      "note": "Progress IR says fiscal Q3 2026 results will be released after market close on 2026-09-30."
+    },
+    {
+      "symbol": "CCL",
+      "match": {
+        "date": "2026-09-28"
+      },
+      "set": {
+        "date": "2026-09-29",
+        "timing": "unknown"
+      },
+      "note": "Carnival IR confirms the Q3 earnings event on 2026-09-29. Release session is left unknown until direct evidence confirms it."
     }
   ]
 }
