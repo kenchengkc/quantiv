@@ -171,6 +171,7 @@ def _reported_forecast_fields(
     timing: str | None,
     evidence: dict | None,
     archive: dict[tuple[str, str], dict] | None,
+    fallback_ml: dict | None = None,
 ) -> dict | None:
     """Build the canonical frozen forecast for one reported earnings event.
 
@@ -181,6 +182,21 @@ def _reported_forecast_fields(
     symbol = ticker.upper()
     archived = (archive or {}).get((symbol, event_iso))
     ml = ml_fields(archived)
+    fallback_ml = fallback_ml or {}
+    for key in (
+        "em_ml_pct",
+        "em_ml_abs",
+        "correction_factor",
+        "model_horizon",
+        "ml_snapshot_date",
+        "p10",
+        "p25",
+        "p50",
+        "p75",
+        "p90",
+    ):
+        if ml.get(key) is None and fallback_ml.get(key) is not None:
+            ml[key] = fallback_ml.get(key)
     ml_pct = _positive_forecast_number(ml.get("em_ml_pct"))
 
     row = evidence or {}
@@ -271,6 +287,7 @@ def enrich_reported_event_forecasts(
             event.get("timing"),
             evidence_cache[ticker].get(earnings_date),
             archive,
+            event,
         )
         if fields is None:
             continue
@@ -412,6 +429,7 @@ def attach_frozen_event_forecasts(
         (history_row or {}).get("timing"),
         evidence,
         archive,
+        history_row,
     )
     if fields is None:
         return detail
