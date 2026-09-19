@@ -101,6 +101,7 @@ def test_recover_week_repairs_present_row_instead_of_only_missing_rows(
     }
     monkeypatch.setattr(restore, "_history", lambda _path: ["abc"])
     monkeypatch.setattr(restore, "_bundle_at", lambda _commit, _path: historical)
+    monkeypatch.setattr(restore, "_symbol_history_candidate", lambda _key: None)
 
     repaired = restore.recover_week(
         path,
