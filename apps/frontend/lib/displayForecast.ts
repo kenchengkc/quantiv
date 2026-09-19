@@ -142,11 +142,28 @@ export function resolveDisplayForecastCompat(
     return { pct: canonical, method: 'ml' };
   }
 
+  const canonicalHistorical =
+    canonical != null &&
+    (fields.display_forecast_method === 'historical' ||
+      fields.display_forecast_method === 'historical_prior')
+      ? canonical
+      : null;
   const historical =
     explicitHistorical ??
+    canonicalHistorical ??
     finiteDisplayForecast(fields.hist_move_med_4q) ??
     finiteDisplayForecast(fields.hist_move_avg_4q);
-  if (historical != null) return { pct: historical, method: 'historical' };
+  if (historical != null) {
+    return {
+      pct: historical,
+      method:
+        explicitHistorical != null
+          ? 'historical'
+          : canonicalHistorical != null
+            ? fields.display_forecast_method ?? 'historical'
+            : 'historical',
+    };
+  }
 
   if (canonical != null) {
     return {
