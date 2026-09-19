@@ -11,6 +11,7 @@ from reconcile_earnings_calendar import (
     choose_canonical_event,
     extract_earnings_announcement,
     is_direct_earnings_announcement_title,
+    reconcile_calendar,
     _candidate_symbols,
 )
 
@@ -282,3 +283,75 @@ def test_announcement_candidates_are_frontend_bounded_and_nearest_first() -> Non
     )
 
     assert symbols == ["DDD", "AAA"]
+
+
+
+def test_confirmed_baseline_survives_later_structured_vendor_consensus() -> None:
+    baseline = {
+        "provider": "baseline",
+        "date": "2026-10-01",
+        "timing": "amc",
+        "confidence": "confirmed",
+    }
+    decision = choose_canonical_event(
+        current=_vote("dolthub", "2026-10-01", "amc"),
+        baseline=baseline,
+        structured_votes=[
+            _vote("finnhub_calendar", "2026-09-28", "amc"),
+            _vote("alphavantage_calendar", "2026-09-28"),
+        ],
+        announcements=[],
+        as_of=date(2026, 9, 19),
+    )
+
+    assert decision["date"] == "2026-10-01"
+    assert decision["timing"] == "amc"
+    assert decision["reason"] == "baseline_confirmed"
+    assert decision["confidence"] == "confirmed"
+
+
+def test_reconcile_does_not_create_event_outside_allowed_frontend_universe() -> None:
+    current = pd.DataFrame(
+        [
+            {
+                "act_symbol": "AAA",
+                "date": date(2026, 9, 25),
+                "timing": "unknown",
+                "fiscal_year": 2026,
+                "fiscal_q": "Q3",
+                "eps_actual": None,
+                "eps_estimate": None,
+                "revenue_actual": None,
+                "revenue_estimate": None,
+                "source": "dolthub",
+            }
+        ]
+    )
+    baseline = current.copy()
+    votes = [
+        {
+            "provider": "finnhub_calendar",
+            "symbol": "ZZZ",
+            "date": "2026-09-30",
+            "timing": "amc",
+        },
+        {
+            "provider": "alphavantage_calendar",
+            "symbol": "ZZZ",
+            "date": "2026-09-30",
+            "timing": "unknown",
+        },
+    ]
+
+    reconciled, report = reconcile_calendar(
+        current,
+        baseline,
+        start=date(2026, 9, 19),
+        end=date(2026, 11, 18),
+        structured_votes=votes,
+        announcements_by_symbol={},
+        allowed_symbols={"AAA"},
+    )
+
+    assert "ZZZ" not in set(reconciled["act_symbol"])
+    assert "ZZZ" not in report["decisions"]
