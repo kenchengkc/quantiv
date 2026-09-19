@@ -37,6 +37,7 @@ import {
 } from '@/lib/calendarReference';
 import {
   displayForecastLabel,
+  finiteDisplayForecast,
   resolveDisplayForecastCompat,
   type DisplayForecastFields,
   type DisplayForecastMethod,
