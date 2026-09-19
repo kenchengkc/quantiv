@@ -652,10 +652,11 @@ export default function SymbolPage({
       : null;
   const compatDisplayForecast = resolveDisplayForecastCompat(em, historicalCompatPct);
   const staticDisplayPct = compatDisplayForecast.pct;
-  const displayForecastPct =
-    showingLivePrediction && activePredictionPct != null ? activePredictionPct : staticDisplayPct;
-  const displayForecastMethod: DisplayForecastMethod | null =
-    showingLivePrediction && activePredictionPct != null ? 'ml' : compatDisplayForecast.method;
+  // The hero is the canonical product forecast, which is IV/options-first.
+  // Spot-updated ML remains available in the model comparison panel but must
+  // not silently replace the headline number with a different methodology.
+  const displayForecastPct = staticDisplayPct;
+  const displayForecastMethod: DisplayForecastMethod | null = compatDisplayForecast.method;
   const quantileMeta = showingLivePrediction
     ? livePrediction.response?.source === 'nightly_fallback'
       ? 'Nightly snapshot · spot update unavailable'
