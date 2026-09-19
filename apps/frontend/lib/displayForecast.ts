@@ -126,15 +126,20 @@ export function resolveDisplayForecastCompat(
     finiteDisplayForecast(fields.straddle_pct);
   if (straddle != null) return { pct: straddle, method: 'options_math' };
 
+  const canonical = finiteDisplayForecast(fields.display_forecast_pct);
+  if (
+    canonical != null &&
+    (fields.display_forecast_method === 'options_math' ||
+      fields.display_forecast_method === 'options_indicative')
+  ) {
+    return { pct: canonical, method: fields.display_forecast_method };
+  }
+
   const ml = finiteDisplayForecast(fields.em_ml_pct);
   if (ml != null) return { pct: ml, method: 'ml' };
 
-  const canonical = finiteDisplayForecast(fields.display_forecast_pct);
-  if (canonical != null) {
-    return {
-      pct: canonical,
-      method: fields.display_forecast_method ?? null,
-    };
+  if (canonical != null && fields.display_forecast_method === 'ml') {
+    return { pct: canonical, method: 'ml' };
   }
 
   const historical =
@@ -142,6 +147,13 @@ export function resolveDisplayForecastCompat(
     finiteDisplayForecast(fields.hist_move_med_4q) ??
     finiteDisplayForecast(fields.hist_move_avg_4q);
   if (historical != null) return { pct: historical, method: 'historical' };
+
+  if (canonical != null) {
+    return {
+      pct: canonical,
+      method: fields.display_forecast_method ?? null,
+    };
+  }
 
   return { pct: null, method: fields.display_forecast_method ?? null };
 }
