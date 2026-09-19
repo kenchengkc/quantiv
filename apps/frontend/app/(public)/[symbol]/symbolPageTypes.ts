@@ -43,6 +43,8 @@ export interface ExpectedMove extends DisplayForecastFields {
   p50?: number | null;
   p75?: number | null;
   p90?: number | null;
+  /** True once the event has reported and this pre-event forecast is immutable. */
+  forecast_frozen?: boolean;
 }
 
 export interface VolRegime {
@@ -114,6 +116,17 @@ export interface SymbolDetail {
     implied_straddle_abs?: number | null;
     implied_atm_iv?: number | null;
     implied_quality_status?: 'decision_eligible_eod' | null;
+    /** Final ML snapshot frozen immediately before this earnings event. */
+    em_ml_pct?: number | null;
+    em_ml_abs?: number | null;
+    model_horizon?: number | null;
+    ml_snapshot_date?: string | null;
+    p10?: number | null;
+    p25?: number | null;
+    p50?: number | null;
+    p75?: number | null;
+    p90?: number | null;
+    forecast_frozen?: boolean;
     /** Realized close-to-close move, as a signed decimal fraction. */
     actual?: number | null;
     eps_actual?: number | null;
