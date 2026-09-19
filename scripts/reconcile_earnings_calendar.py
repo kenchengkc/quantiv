@@ -498,7 +498,7 @@ def _announcement_decision(
     return None, None
 
 
-_INTERNAL_CALENDAR_PROVIDERS = {"dolthub_calendar", "baseline", "current"}
+_INTERNAL_CALENDAR_PROVIDERS = {"dolthub", "dolthub_calendar", "baseline", "current"}
 
 
 def _structured_date_consensus(votes: list[Vote]) -> tuple[str | None, list[str]]:
@@ -1585,15 +1585,10 @@ def _collect_announcements(
         if index + 1 < len(symbols) and twelvedata_key:
             time.sleep(twelvedata_delay)
 
-    alpha_symbols = symbols
-    if preliminary_decisions is not None:
-        alpha_symbols = _priority_symbols_for_alpha(
-            symbols,
-            preliminary_decisions,
-            alpha_news_max,
-        )
-    else:
-        alpha_symbols = symbols[:alpha_news_max]
+    # `symbols` is already risk-ranked by _candidate_symbols. Keep the
+    # expensive Alpha subset in that same order instead of re-ranking confirmed
+    # or merely sticky names back ahead of unresolved conflicts.
+    alpha_symbols = symbols[:alpha_news_max]
     for index, symbol in enumerate(alpha_symbols):
         rows, meta = fetch_alphavantage_announcements(
             symbol,
