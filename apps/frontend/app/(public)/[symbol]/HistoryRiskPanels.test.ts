@@ -36,6 +36,28 @@ describe('buildHistorySeries', () => {
     expect(result[0]?.q).toBe('Q4 25');
   });
 
+  it('carries the final frozen ML forecast into the event study', () => {
+    const result = buildHistorySeries([
+      {
+        date: '2026-09-16',
+        timing: 'after_market_close',
+        q: 'Q4 26',
+        actual: -0.071,
+        em_ml_pct: 0.083,
+        ml_snapshot_date: '2026-09-15',
+        model_horizon: 1,
+        p10: 0.03,
+        p50: 0.08,
+        p90: 0.14,
+      },
+    ]);
+
+    expect(result[0]?.model).toBe(0.083);
+    expect(result[0]?.modelAsOf).toBe('2026-09-15');
+    expect(result[0]?.modelHorizon).toBe(1);
+    expect(result[0]?.modelP50).toBe(0.08);
+  });
+
 });
 
 describe('historyRowsToCsv', () => {
@@ -52,6 +74,14 @@ describe('historyRowsToCsv', () => {
       impliedAtmStrike: 410,
       impliedStraddleAbs: 32.8,
       impliedAtmIv: 0.42,
+      model: 0.075,
+      modelAsOf: '2026-06-10',
+      modelHorizon: 1,
+      modelP10: 0.03,
+      modelP25: 0.05,
+      modelP50: 0.075,
+      modelP75: 0.10,
+      modelP90: 0.13,
       actual: -0.06755,
       epsActual: 5.96,
       epsEstimate: 5.9385,
@@ -66,6 +96,7 @@ describe('historyRowsToCsv', () => {
 
     expect(header).toContain('realized_move_pct');
     expect(header).toContain('exceeded_implied');
+    expect(header).toContain('ml_forecast_pct');
     expect(row).toContain('ADBE,"Q2, FY26",2026-06-11,after_market_close');
     expect(row).toContain(
       '-6.755000,6.755000,down,8.000000,2026-06-11,2026-06-19,8,0,410,32.8,42.000000,false',
@@ -88,6 +119,13 @@ describe('eventStudyEvidenceCounts', () => {
       impliedAtmStrike: null,
       impliedStraddleAbs: null,
       impliedAtmIv: null,
+      modelAsOf: null,
+      modelHorizon: null,
+      modelP10: null,
+      modelP25: null,
+      modelP50: null,
+      modelP75: null,
+      modelP90: null,
       epsActual: null,
       epsEstimate: null,
       revActual: null,
@@ -95,14 +133,16 @@ describe('eventStudyEvidenceCounts', () => {
       revSurprise: null,
     };
     const counts = eventStudyEvidenceCounts([
-      { ...base, implied: null, epsSurprise: null },
-      { ...base, q: 'Q2', implied: 0.04, epsSurprise: 0.02 },
-      { ...base, q: 'Q3', implied: 0.08, epsSurprise: -0.01 },
+      { ...base, implied: null, model: null, epsSurprise: null },
+      { ...base, q: 'Q2', implied: 0.04, model: 0.04, epsSurprise: 0.02 },
+      { ...base, q: 'Q3', implied: 0.08, model: 0.06, epsSurprise: -0.01 },
     ]);
 
     expect(counts).toEqual({
       impliedObservations: 2,
       impliedExceedances: 1,
+      modelObservations: 2,
+      modelExceedances: 1,
       epsObservations: 2,
       epsBeats: 1,
     });
