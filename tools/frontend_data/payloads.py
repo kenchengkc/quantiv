@@ -237,10 +237,11 @@ def attach_frozen_event_forecasts(
 ) -> dict | None:
     """Attach point-in-time forecasts to reported symbol history and hero.
 
-    ML remains the preferred frozen forecast when the durable ML archive has an
-    exact (ticker, earnings_date) snapshot. If no archived ML exists, reuse the
-    strict historical option evidence already selected for that event instead of
-    dropping through to a historical-median presentation estimate.
+    Reported events use the same product hierarchy as upcoming events:
+    point-in-time IV/options evidence first, then the frozen ML snapshot, and
+    only then historical presentation fallbacks elsewhere in the pipeline.
+    ML is still preserved on the history row and expected-move object so model
+    comparisons remain available even when IV is the headline forecast.
     """
     if detail is None:
         return detail
@@ -249,9 +250,8 @@ def attach_frozen_event_forecasts(
     archive = archive or {}
     history = detail.get("earnings_history") or []
 
-    # Historical rows can carry both the strict option-implied range and the
-    # model forecast. That makes the event study a genuine forecast-vs-realized
-    # record instead of reconstructing a new estimate after the event.
+    # Historical rows retain the final pre-event model snapshot for event-study
+    # comparison, independently of which signal is the headline display value.
     for row in history:
         event_iso = str(row.get("date") or "")[:10]
         fc = archive.get((symbol, event_iso))
@@ -270,83 +270,100 @@ def attach_frozen_event_forecasts(
         return detail
 
     event_iso = current_event_date.isoformat()
+    history_row = next(
+        (row for row in history if str(row.get("date") or "")[:10] == event_iso),
+        None,
+    )
     fc = archive.get((symbol, event_iso))
-    fields = ml_fields(fc)
-    forecast_pct = fields.get("em_ml_pct")
-    if forecast_pct is not None:
+    ml = ml_fields(fc)
+    ml_pct = ml.get("em_ml_pct")
+
+    # Prefer exact historical option evidence when it is genuinely pre-event.
+    # Same-day EOD evidence is safe for AMC events (the market closes before
+    # the report) but not for BMO/unknown events, where it would be post-event.
+    if history_row:
+        implied_as_of = str(history_row.get("implied_as_of") or "")[:10]
+        timing = str(history_row.get("timing") or "").lower()
+        after_close = timing in {"after_market_close", "amc", "after_close"} or "after" in timing
+        option_point_in_time = bool(
+            implied_as_of
+            and (
+                implied_as_of <= event_iso
+                if after_close
+                else implied_as_of < event_iso
+            )
+        )
+        quality = history_row.get("implied_quality_status")
+        if quality not in {None, "decision_eligible_eod"}:
+            option_point_in_time = False
+
+        implied = history_row.get("implied")
+        try:
+            straddle_pct = float(implied)
+        except (TypeError, ValueError):
+            straddle_pct = 0.0
+        if not math.isfinite(straddle_pct) or straddle_pct <= 0:
+            straddle_pct = 0.0
+
+        atm_iv = history_row.get("implied_atm_iv")
+        dte = history_row.get("implied_dte")
+        try:
+            iv_pct = (
+                float(atm_iv) * math.sqrt(float(dte) / 365.0)
+                if atm_iv is not None and dte is not None and float(dte) > 0
+                else None
+            )
+        except (TypeError, ValueError):
+            iv_pct = None
+        if iv_pct is not None and (not math.isfinite(iv_pct) or iv_pct <= 0):
+            iv_pct = None
+
+        option_pct = iv_pct or (straddle_pct if straddle_pct > 0 else None)
+        if option_point_in_time and option_pct is not None:
+            detail["expected_move"] = {
+                "earnings_date": event_iso,
+                "timing": history_row.get("timing"),
+                "expiration": history_row.get("implied_expiration"),
+                "dte": history_row.get("implied_dte"),
+                "lead_time_days": history_row.get("implied_lead_days"),
+                "atm_strike": history_row.get("implied_atm_strike"),
+                "atm_iv": history_row.get("implied_atm_iv"),
+                "straddle_abs": history_row.get("implied_straddle_abs"),
+                "straddle_pct": straddle_pct if straddle_pct > 0 else None,
+                "iv_pct": jsonable(iv_pct),
+                **ml,
+                "em_method": "options_math",
+                "display_forecast_pct": option_pct,
+                "display_forecast_method": "options_math",
+                "display_forecast_as_of": implied_as_of,
+                "ml_status": "available" if ml_pct is not None else "unavailable_event",
+                "options_status": "decision_eligible",
+                "fallback_reason": None,
+                "forecast_frozen": True,
+            }
+            return detail
+
+    # No usable point-in-time IV/options evidence: retain the final pre-event ML
+    # snapshot rather than dropping through to a historical median.
+    if ml_pct is not None:
         current = detail.get("expected_move") or {}
         current_date = str(current.get("earnings_date") or "")[:10]
         if current_date and current_date != event_iso:
             current = {}
 
-        frozen = {
+        detail["expected_move"] = {
             **current,
             "earnings_date": event_iso,
-            **fields,
+            **ml,
             "em_method": "ml_lightgbm",
-            "display_forecast_pct": forecast_pct,
+            "display_forecast_pct": ml_pct,
             "display_forecast_method": "ml",
-            "display_forecast_as_of": fields.get("ml_snapshot_date"),
+            "display_forecast_as_of": ml.get("ml_snapshot_date"),
             "ml_status": "available",
+            "options_status": "unavailable",
             "fallback_reason": None,
             "forecast_frozen": True,
         }
-        detail["expected_move"] = frozen
-        return detail
-
-    # No archived ML snapshot: the history builder may still have exact,
-    # decision-eligible pre-event option evidence. That evidence is strictly
-    # point-in-time and therefore a better frozen fallback than a newly
-    # calculated historical median.
-    history_row = next(
-        (row for row in history if str(row.get("date") or "")[:10] == event_iso),
-        None,
-    )
-    if not history_row:
-        return detail
-
-    implied = history_row.get("implied")
-    quality = history_row.get("implied_quality_status")
-    try:
-        implied_pct = float(implied)
-    except (TypeError, ValueError):
-        implied_pct = 0.0
-    if not math.isfinite(implied_pct) or implied_pct <= 0:
-        return detail
-    if quality not in {None, "decision_eligible_eod"}:
-        return detail
-
-    atm_iv = history_row.get("implied_atm_iv")
-    dte = history_row.get("implied_dte")
-    try:
-        iv_pct = (
-            float(atm_iv) * math.sqrt(float(dte) / 365.0)
-            if atm_iv is not None and dte is not None and float(dte) > 0
-            else None
-        )
-    except (TypeError, ValueError):
-        iv_pct = None
-
-    detail["expected_move"] = {
-        "earnings_date": event_iso,
-        "timing": history_row.get("timing"),
-        "expiration": history_row.get("implied_expiration"),
-        "dte": history_row.get("implied_dte"),
-        "lead_time_days": history_row.get("implied_lead_days"),
-        "atm_strike": history_row.get("implied_atm_strike"),
-        "atm_iv": history_row.get("implied_atm_iv"),
-        "straddle_abs": history_row.get("implied_straddle_abs"),
-        "straddle_pct": implied_pct,
-        "iv_pct": jsonable(iv_pct),
-        "em_method": "options_math",
-        "display_forecast_pct": implied_pct,
-        "display_forecast_method": "options_math",
-        "display_forecast_as_of": history_row.get("implied_as_of"),
-        "ml_status": "unavailable_event",
-        "options_status": "decision_eligible",
-        "fallback_reason": None,
-        "forecast_frozen": True,
-    }
     return detail
 
 
