@@ -1,0 +1,63 @@
+name: Earnings provider benchmark
+
+on:
+  push:
+    branches:
+      - benchmark/earnings-provider-bakeoff
+    paths:
+      - scripts/benchmark_earnings_providers.py
+      - scripts/tests/test_benchmark_earnings_providers.py
+      - .github/workflows/earnings-provider-benchmark.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install --require-hashes -r requirements.txt
+
+      - name: Verify benchmark unit tests
+        run: pytest scripts/tests/test_benchmark_earnings_providers.py -q
+
+      - name: Call configured earnings APIs
+        env:
+          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+          FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
+          FMP_API_KEY_2: ${{ secrets.FMP_API_KEY_2 }}
+          TWELVEDATA_API_KEY: ${{ secrets.TWELVEDATA_API_KEY }}
+          TWELVEDATA_API_KEY_2: ${{ secrets.TWELVEDATA_API_KEY_2 }}
+          ALPHAVANTAGE_API_KEY: ${{ secrets.ALPHAVANTAGE_API_KEY }}
+          ALPHAVANTAGE_API_KEY_2: ${{ secrets.ALPHAVANTAGE_API_KEY_2 }}
+          ALPHAVANTAGE_API_KEY_3: ${{ secrets.ALPHAVANTAGE_API_KEY_3 }}
+          POLYGON_API_KEY: ${{ secrets.POLYGON_API_KEY }}
+          POLYGON_API_KEY_2: ${{ secrets.POLYGON_API_KEY_2 }}
+          MASSIVE_API_KEY: ${{ secrets.MASSIVE_API_KEY }}
+        run: |
+          python scripts/benchmark_earnings_providers.py \
+            --start 2026-09-21 \
+            --end 2026-10-06 \
+            --output-dir /tmp/earnings-provider-benchmark
+          cat /tmp/earnings-provider-benchmark/summary.md
+
+      - name: Upload sanitized benchmark
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: earnings-provider-benchmark
+          path: /tmp/earnings-provider-benchmark
+          if-no-files-found: error
+          retention-days: 14
