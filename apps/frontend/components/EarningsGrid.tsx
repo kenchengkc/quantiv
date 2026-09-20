@@ -940,7 +940,10 @@ export default function EarningsGrid({
       ) as string[];
       let research: WeeklyData | null = null;
       for (const url of urls) {
-        const res = await fetch(url);
+        // Forecast methodology can change while the event identity stays the same.
+        // Do not let an hour-old stale-while-revalidate week payload overwrite a
+        // freshly deployed SSR snapshot with obsolete historical fallbacks.
+        const res = await fetch(url, { cache: 'no-store' });
         if (res.ok) {
           research = (await res.json()) as WeeklyData;
           break;
