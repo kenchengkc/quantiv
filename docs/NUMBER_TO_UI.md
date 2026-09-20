@@ -204,6 +204,28 @@ Forecast validation checks feature/schema integrity, quantile behavior, arithmet
 
 A failed validation exits before downstream publication.
 
+### Step 5.5 — immutable event prediction ledger
+
+Every scored candidate is appended to `data/forecasts/event_prediction_ledger.parquet` with:
+
+```text
+forecast_id
+feature_hash
+model_bundle_id
+scored_at
+feature_snapshot_at
+feature_cutoff_at
+prediction_deadline_at
+freeze_eligible
+freeze_ineligible_reason
+```
+
+The event cutoff comes from the canonical NYSE session contract. BMO/unknown rows use the previous session close as the feature boundary and must be scored before the earnings calendar day begins. AMC targets five minutes before the event-day close; date-only EOD rows cannot satisfy a same-day AMC cutoff and therefore fail closed to an earlier eligible snapshot.
+
+`event_forecast_archive.parquet` is no longer an independently mutable "latest" table. It is a materialized one-row-per-event view of the newest **eligible** ledger row. Post-deadline rescoring may remain in the ledger for audit but cannot become the frozen historical prediction.
+
+When frontend artifacts are generated, the first publication of each `forecast_id` is appended to `event_prediction_publications.parquet`. This separates model creation from publication time without rewriting the prediction ledger.
+
 ### Step 6 — frontend publication
 
 Validated forecast fields such as:
