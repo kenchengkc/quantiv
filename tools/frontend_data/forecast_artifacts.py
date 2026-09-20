@@ -121,6 +121,13 @@ def ml_fields(fc: dict | None) -> dict:
     out["ml_snapshot_date"] = (
         fc["snapshot_date"].isoformat() if fc.get("snapshot_date") else None
     )
+    out["forecast_id"] = pick("forecast_id")
+    out["forecast_scored_at"] = pick("scored_at")
+    out["forecast_feature_cutoff_at"] = pick("feature_cutoff_at")
+    out["forecast_prediction_deadline_at"] = pick("prediction_deadline_at")
+    out["forecast_feature_snapshot_at"] = pick("feature_snapshot_at")
+    out["forecast_feature_hash"] = pick("feature_hash")
+    out["forecast_frozen_eligible"] = pick("freeze_eligible")
     # Prefer true quantiles if the trainer emitted them, else use band endpoints.
     out["p10"] = jsonable(pick("p10", "band95_low_pct"))
     out["p25"] = jsonable(pick("p25", "band68_low_pct"))
