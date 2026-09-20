@@ -105,11 +105,11 @@ def _historical_option_evidence(conn, ticker: str, cutoff: date) -> dict[date, d
             FROM v_eligible_straddles s
             WHERE s.ticker = e.ticker
               AND s.as_of_date >= e.earnings_dt - INTERVAL '14' DAY
+              AND s.as_of_date < e.earnings_dt
               AND (
                   ((LOWER(COALESCE(e.timing, '')) IN (
                         'after_market_close', 'amc', 'after_close'
                     ) OR LOWER(COALESCE(e.timing, '')) LIKE '%after%')
-                   AND s.as_of_date <= e.earnings_dt
                    AND s.expiry_date > e.earnings_dt)
                   OR
                   (NOT (
@@ -117,7 +117,6 @@ def _historical_option_evidence(conn, ticker: str, cutoff: date) -> dict[date, d
                             'after_market_close', 'amc', 'after_close'
                         ) OR LOWER(COALESCE(e.timing, '')) LIKE '%after%'
                    )
-                   AND s.as_of_date < e.earnings_dt
                    AND s.expiry_date >= e.earnings_dt)
               )
             ORDER BY s.as_of_date DESC, s.expiry_date
@@ -215,14 +214,12 @@ def _reported_forecast_fields(
 
     row = evidence or {}
     implied_as_of = str(row.get("implied_as_of") or "")[:10]
-    normalized_timing = str(timing or "").strip().lower()
-    after_close = (
-        normalized_timing in {"after_market_close", "amc", "after_close"}
-        or "after" in normalized_timing
-    )
+    # Historical option evidence is date-granular. Until the stored evidence
+    # carries synchronized quote timestamps, same-day AMC observations cannot
+    # prove they precede the 15:55 event cutoff and therefore fail closed.
     option_point_in_time = bool(
         implied_as_of
-        and (implied_as_of <= event_iso if after_close else implied_as_of < event_iso)
+        and implied_as_of < event_iso
         and row.get("implied_quality_status") in {None, "decision_eligible_eod"}
     )
 
