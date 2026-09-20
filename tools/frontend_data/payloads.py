@@ -173,10 +173,10 @@ def _reported_forecast_fields(
     archive: dict[tuple[str, str], dict] | None,
     fallback_ml: dict | None = None,
 ) -> dict | None:
-    """Build the canonical frozen forecast for one reported earnings event.
+    """Build one frozen reported forecast using ML -> IV/options -> history.
 
-    This is shared by calendar rows and symbol heroes so they cannot select
-    different headline methods for the same event identity.
+    Calendar rows, symbol heroes, and history rows all call this selector so the
+    same event identity cannot show a different headline method on each surface.
     """
     event_iso = earnings_date.isoformat()
     symbol = ticker.upper()
@@ -220,9 +220,13 @@ def _reported_forecast_fields(
         if atm_iv is not None and dte is not None
         else None
     )
-
-    if option_point_in_time and (iv_pct is not None or straddle_pct is not None):
-        return {
+    option_pct = (
+        iv_pct or straddle_pct
+        if option_point_in_time
+        else None
+    )
+    option_fields = (
+        {
             "as_of_date": implied_as_of,
             "atm_strike": row.get("implied_atm_strike"),
             "atm_iv": row.get("implied_atm_iv"),
@@ -232,29 +236,41 @@ def _reported_forecast_fields(
             "expiry_date": row.get("implied_expiration"),
             "days_to_expiry": row.get("implied_dte"),
             "lead_time_days": row.get("implied_lead_days"),
-            **ml,
-            "em_method": "options_math",
-            "display_forecast_pct": jsonable(iv_pct or straddle_pct),
-            "display_forecast_method": "options_math",
-            "display_forecast_as_of": implied_as_of,
-            "ml_status": "available" if ml_pct is not None else "unavailable_event",
-            "options_status": "decision_eligible",
-            "fallback_reason": None,
-            "forecast_frozen": True,
         }
+        if option_pct is not None
+        else {}
+    )
 
     if ml_pct is not None:
         return {
+            **option_fields,
             **ml,
             "em_method": "ml_lightgbm",
             "display_forecast_pct": ml_pct,
             "display_forecast_method": "ml",
             "display_forecast_as_of": ml.get("ml_snapshot_date"),
             "ml_status": "available",
-            "options_status": "unavailable",
+            "options_status": (
+                "decision_eligible" if option_pct is not None else "unavailable"
+            ),
             "fallback_reason": None,
             "forecast_frozen": True,
         }
+
+    if option_pct is not None:
+        return {
+            **option_fields,
+            **ml,
+            "em_method": "options_math",
+            "display_forecast_pct": jsonable(option_pct),
+            "display_forecast_method": "options_math",
+            "display_forecast_as_of": implied_as_of,
+            "ml_status": "unavailable_event",
+            "options_status": "decision_eligible",
+            "fallback_reason": None,
+            "forecast_frozen": True,
+        }
+
     return None
 
 
@@ -389,14 +405,45 @@ def attach_frozen_event_forecasts(
 
     for row in history:
         event_iso = str(row.get("date") or "")[:10]
+        if not event_iso:
+            continue
+        event_date = date.fromisoformat(event_iso)
         fc = archive.get((symbol, event_iso))
-        if not fc:
-            continue
-        fields = ml_fields(fc)
-        if fields.get("em_ml_pct") is None:
-            continue
-        row.update(fields)
-        row["forecast_frozen"] = True
+        if fc:
+            fields = ml_fields(fc)
+            if fields.get("em_ml_pct") is not None:
+                row.update(fields)
+
+        frozen = _reported_forecast_fields(
+            symbol,
+            event_date,
+            row.get("timing"),
+            {
+                "implied": row.get("implied"),
+                "implied_as_of": row.get("implied_as_of"),
+                "implied_expiration": row.get("implied_expiration"),
+                "implied_dte": row.get("implied_dte"),
+                "implied_lead_days": row.get("implied_lead_days"),
+                "implied_atm_strike": row.get("implied_atm_strike"),
+                "implied_straddle_abs": row.get("implied_straddle_abs"),
+                "implied_atm_iv": row.get("implied_atm_iv"),
+                "implied_quality_status": row.get("implied_quality_status"),
+            },
+            archive,
+            row,
+        )
+        if frozen is not None:
+            for key in (
+                "display_forecast_pct",
+                "display_forecast_method",
+                "display_forecast_as_of",
+                "ml_status",
+                "options_status",
+                "fallback_reason",
+                "forecast_frozen",
+            ):
+                if key in frozen:
+                    row[key] = frozen[key]
 
     if current_event_date is None:
         return detail
