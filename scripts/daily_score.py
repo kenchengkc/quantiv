@@ -15,7 +15,7 @@ import math
 import os
 import re
 import sys
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict
 
@@ -45,6 +45,11 @@ from ml.pipeline_validation import (  # noqa: E402 - standalone script path setu
     FORECAST_REQUIRED_COLUMNS,
 )
 from ml.quantiles import rearrange_quantile_array  # noqa: E402 - standalone script path setup
+from event_forecast_ledger import (  # noqa: E402 - standalone script path setup
+    annotate_forecasts,
+    append_event_prediction_ledger,
+    latest_eligible_predictions,
+)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
@@ -513,7 +518,7 @@ def score(df: pd.DataFrame, models: Dict[int, dict]) -> pd.DataFrame:
             or (m.get("metadata") or {}).get("version")
             or "unversioned"
         )
-        hdf["scored_at"] = datetime.now().isoformat()
+        hdf["scored_at"] = datetime.now(timezone.utc).isoformat()
 
         results.append(hdf)
 
@@ -558,105 +563,69 @@ def update_event_forecast_archive(
     current: pd.DataFrame,
     forecast_dir: Path,
 ) -> Path | None:
-    """Persist the latest pre-event ML snapshot for every earnings event.
+    """Persist the latest *auditable* pre-event ML prediction per event.
 
-    Dated forecast snapshots are intentionally retained for only 14 days. The
-    event archive is the durable one-row-per-event record used after a company
-    reports and for historical event studies. While an event is upcoming, each
-    daily score can replace its archived row with a later pre-event snapshot.
-    Once the event date passes, no new row is produced, so the final pre-event
-    forecast stays frozen.
-
-    Existing dated snapshots are included on every refresh. That both seeds the
-    archive on first deployment and repairs recent gaps without changing older
-    frozen events.
+    Every scored row is first appended to the immutable event prediction ledger.
+    The one-row-per-event archive is then a materialized view of ledger rows that
+    pass the event-specific point-in-time controls.  This prevents a later daily
+    refresh from silently replacing a historical forecast with a post-deadline
+    score just because its market snapshot date was earlier.
     """
     if current.empty and not forecast_dir.exists():
         return None
 
     archive_path = forecast_dir / EVENT_FORECAST_ARCHIVE_NAME
-    frames: list[pd.DataFrame] = []
+    seed_frames: list[pd.DataFrame] = []
 
+    # Seed/migrate the ledger from retained dated snapshots.  Existing archive
+    # rows are included only as evidence candidates; unverified rows cannot win
+    # unless their timestamps independently satisfy the ledger policy.
     if archive_path.exists():
         try:
-            frames.append(pd.read_parquet(archive_path))
+            seed_frames.append(pd.read_parquet(archive_path))
         except Exception as exc:
             logger.warning("Could not read event forecast archive %s: %s", archive_path, exc)
 
     for snapshot_path in sorted(forecast_dir.glob("forecasts_*.parquet")):
         try:
-            frames.append(pd.read_parquet(snapshot_path))
+            seed_frames.append(pd.read_parquet(snapshot_path))
         except Exception as exc:
-            logger.warning("Could not seed archive from %s: %s", snapshot_path.name, exc)
+            logger.warning("Could not seed event ledger from %s: %s", snapshot_path.name, exc)
 
     if not current.empty:
-        frames.append(current.copy())
-
-    if not frames:
+        seed_frames.append(current.copy())
+    if not seed_frames:
         return None
 
-    combined = pd.concat(frames, ignore_index=True, sort=False)
+    candidates = pd.concat(seed_frames, ignore_index=True, sort=False)
     required = {"act_symbol", "earnings_date", "snapshot_date", "model_horizon"}
-    if not required <= set(combined.columns):
+    if not required <= set(candidates.columns):
         logger.warning(
-            "Skipping event forecast archive; missing columns: %s",
-            sorted(required - set(combined.columns)),
+            "Skipping event prediction ledger; missing columns: %s",
+            sorted(required - set(candidates.columns)),
         )
-        return None
-
-    combined["earnings_date"] = pd.to_datetime(
-        combined["earnings_date"], errors="coerce"
-    ).dt.date
-    combined["snapshot_date"] = pd.to_datetime(
-        combined["snapshot_date"], errors="coerce"
-    ).dt.date
-    combined["model_horizon"] = pd.to_numeric(
-        combined["model_horizon"], errors="coerce"
-    )
-    combined = combined.dropna(
-        subset=["act_symbol", "earnings_date", "snapshot_date", "model_horizon"]
-    ).copy()
-    combined["act_symbol"] = combined["act_symbol"].astype(str).str.upper().str.strip()
-    combined = combined[combined["act_symbol"].ne("")].copy()
-
-    # Forecasts must be based on information strictly before the earnings date.
-    # For AMC prints the model's snapshot spine already uses the prior close, so
-    # this strict inequality remains correct.
-    combined = combined[combined["snapshot_date"] < combined["earnings_date"]].copy()
-    if combined.empty:
         return archive_path if archive_path.exists() else None
 
-    combined["_lead_days"] = (
-        pd.to_datetime(combined["earnings_date"])
-        - pd.to_datetime(combined["snapshot_date"])
-    ).dt.days
-    combined["_horizon_gap"] = (
-        combined["model_horizon"] - combined["_lead_days"]
-    ).abs()
-    if "scored_at" not in combined.columns:
-        combined["scored_at"] = ""
+    ledger_path = append_event_prediction_ledger(candidates, forecast_dir)
+    if ledger_path is None:
+        return archive_path if archive_path.exists() else None
 
-    combined = combined.sort_values(
-        [
-            "act_symbol",
-            "earnings_date",
-            "snapshot_date",
-            "_horizon_gap",
-            "scored_at",
-        ],
-        ascending=[True, True, False, True, False],
-        kind="mergesort",
-    )
-    archive = combined.drop_duplicates(
-        subset=["act_symbol", "earnings_date"], keep="first"
-    ).drop(columns=["_lead_days", "_horizon_gap"])
+    ledger = pd.read_parquet(ledger_path)
+    archive = latest_eligible_predictions(ledger)
+    if archive.empty:
+        logger.warning("Event prediction ledger has no eligible frozen forecasts")
+        return archive_path if archive_path.exists() else None
 
     forecast_dir.mkdir(parents=True, exist_ok=True)
     temporary = archive_path.with_suffix(archive_path.suffix + ".tmp")
     archive.to_parquet(temporary, index=False)
     temporary.replace(archive_path)
+
+    eligible = int(ledger.get("freeze_eligible", pd.Series(dtype=bool)).fillna(False).sum())
     logger.info(
-        "Updated frozen event forecast archive: %d events → %s",
+        "Updated frozen event forecast archive from immutable ledger: "
+        "%d eligible rows, %d events → %s",
+        eligible,
         len(archive),
         archive_path,
     )
@@ -703,8 +672,12 @@ def save_forecasts(
         "hist_move_avg_4q", "hist_straddle_accuracy",
         "iv_rv_ratio_20d", "parkinson_rv_20d", "vol_of_vol_20d",
         "scored_at", "feature_vector",
+        "feature_cutoff_at", "prediction_deadline_at", "feature_snapshot_at",
+        "feature_hash", "forecast_id", "freeze_eligible",
+        "freeze_ineligible_reason",
     ]
     out = df[[c for c in out_cols if c in df.columns]].copy()
+    out = annotate_forecasts(out)
     serving_key_cols = [
         "act_symbol", "earnings_date", "snapshot_date", "model_horizon"
     ]
