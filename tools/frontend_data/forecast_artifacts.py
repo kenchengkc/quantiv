@@ -13,6 +13,7 @@ from ml.provider_signal_policy import (
 
 from .shared import (
     EVENT_FORECAST_ARCHIVE_PATH,
+    EVENT_PREDICTION_LEDGER_PATH,
     FORECAST_RECEIPT_PATH,
     FORECASTS_DIR,
     PROVIDER_ENRICHMENTS_DIR,
@@ -22,10 +23,62 @@ from .shared import (
 )
 
 def load_ml_forecasts() -> dict[tuple[str, str], dict]:
-    """Return {(ticker, earnings_date_iso): forecast_row} from the newest
-    daily_score.py output. Picks the row whose model_horizon is closest to the
-    actual lead time, and the most recent snapshot_date within that horizon.
-    Returns {} when no forecasts exist."""
+    """Return the latest *eligible* point-in-time forecast per event.
+
+    Once the immutable ledger exists it is authoritative. This prevents a
+    post-deadline rescore from becoming the homepage/ticker headline merely
+    because it lives in the newest dated forecast file. Legacy installations
+    without a ledger retain the prior newest-file behavior until the next score
+    seeds the ledger.
+    """
+    try:
+        import pandas as pd  # local import — only needed when forecasts exist
+    except Exception as exc:
+        print(f"⚠️  Could not import pandas for forecast loading: {exc}")
+        return {}
+
+    if EVENT_PREDICTION_LEDGER_PATH.exists():
+        try:
+            df = pd.read_parquet(EVENT_PREDICTION_LEDGER_PATH)
+        except Exception as exc:
+            print(f"⚠️  Could not read {EVENT_PREDICTION_LEDGER_PATH.name}: {exc}")
+            df = pd.DataFrame()
+        if not df.empty and "freeze_eligible" in df.columns:
+            df = df[df["freeze_eligible"].fillna(False).astype(bool)].copy()
+            if not df.empty:
+                df["earnings_date"] = pd.to_datetime(
+                    df["earnings_date"], errors="coerce"
+                ).dt.date
+                df["_snapshot"] = pd.to_datetime(
+                    df.get("feature_snapshot_at"), errors="coerce", utc=True
+                )
+                df["_scored"] = pd.to_datetime(
+                    df.get("scored_at"), errors="coerce", utc=True
+                )
+                df = df.dropna(subset=["earnings_date"])
+                df = df.sort_values(
+                    ["act_symbol", "earnings_date", "_snapshot", "_scored"],
+                    ascending=[True, True, False, False],
+                    kind="mergesort",
+                )
+                df = df.drop_duplicates(
+                    subset=["act_symbol", "earnings_date"], keep="first"
+                )
+                out: dict[tuple[str, str], dict] = {}
+                for row in df.drop(columns=["_snapshot", "_scored"]).to_dict(
+                    orient="records"
+                ):
+                    key = (
+                        str(row["act_symbol"]).upper(),
+                        row["earnings_date"].isoformat(),
+                    )
+                    out[key] = row
+                print(
+                    f"🤖 Loaded {len(out)} eligible ML forecasts from "
+                    f"{EVENT_PREDICTION_LEDGER_PATH.name}"
+                )
+                return out
+
     if not FORECASTS_DIR.exists():
         return {}
     files = sorted(FORECASTS_DIR.glob("forecasts_*.parquet"))
@@ -33,23 +86,28 @@ def load_ml_forecasts() -> dict[tuple[str, str], dict]:
         return {}
     latest = files[-1]
     try:
-        import pandas as pd  # local import — only needed when forecasts exist
         df = pd.read_parquet(latest)
-    except Exception as e:
-        print(f"⚠️  Could not read {latest.name}: {e}")
+    except Exception as exc:
+        print(f"⚠️  Could not read {latest.name}: {exc}")
         return {}
     if df.empty:
         return {}
 
     df = df.copy()
+    if "freeze_eligible" in df.columns:
+        df = df[df["freeze_eligible"].fillna(False).astype(bool)].copy()
+        if df.empty:
+            return {}
     df["earnings_date"] = pd.to_datetime(df["earnings_date"]).dt.date
     df["snapshot_date"] = pd.to_datetime(df["snapshot_date"]).dt.date
-    df["lead_days"] = (df["earnings_date"] - df["snapshot_date"]).apply(lambda d: d.days)
+    df["lead_days"] = (df["earnings_date"] - df["snapshot_date"]).apply(
+        lambda d: d.days
+    )
     df["horizon_gap"] = (df["model_horizon"] - df["lead_days"]).abs()
-
-    # Per (ticker, earnings_date): smallest horizon_gap, then most recent snapshot.
-    df = df.sort_values(["act_symbol", "earnings_date", "horizon_gap", "snapshot_date"],
-                        ascending=[True, True, True, False])
+    df = df.sort_values(
+        ["act_symbol", "earnings_date", "horizon_gap", "snapshot_date"],
+        ascending=[True, True, True, False],
+    )
     df = df.drop_duplicates(subset=["act_symbol", "earnings_date"], keep="first")
 
     out: dict[tuple[str, str], dict] = {}
