@@ -337,6 +337,12 @@ jobs:
         if: steps.options_gate.outputs.can_refresh == 'true'
         run: python scripts/restore_reported_forecasts.py --apply
 
+      - name: Persist forecast ledger publication receipts
+        if: steps.options_gate.outputs.can_refresh == 'true'
+        env:
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+        run: bash scripts/r2_push.sh --forecasts-only
+
       - name: Build production control snapshot
         env:
           CONTROL_DATA_R2_STATUS: passed
