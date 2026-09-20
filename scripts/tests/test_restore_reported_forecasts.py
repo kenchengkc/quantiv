@@ -131,19 +131,19 @@ def test_symbol_expected_move_maps_week_fields_to_symbol_contract():
             "COO",
             "2026-09-09",
             timing="after_market_close",
-            as_of_date="2026-09-09",
+            as_of_date="2026-09-08",
             em_straddle_pct=0.081714,
             em_iv_pct=0.097601,
             expiry_date="2026-09-18",
-            days_to_expiry=9,
-            lead_time_days=0,
+            days_to_expiry=10,
+            lead_time_days=1,
         )
     )
 
     assert event["display_forecast_method"] == "options_math"
     assert event["display_forecast_pct"] == pytest.approx(0.097601)
     assert event["expiration"] == "2026-09-18"
-    assert event["dte"] == 9
+    assert event["dte"] == 10
     assert event["forecast_frozen"] is True
 
 
