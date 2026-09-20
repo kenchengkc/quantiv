@@ -141,7 +141,7 @@ def test_forecast_surface_parity_rejects_fdx_style_split_release(
     )
     monkeypatch.setattr(contracts, "PUBLIC", public)
 
-    with pytest.raises(contracts.ContractError, match="calendar is missing canonical"):
+    with pytest.raises(contracts.ContractError, match="resolved headline mismatch"):
         contracts.validate_forecast_surface_parity()
 
 
