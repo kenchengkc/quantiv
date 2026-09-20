@@ -255,7 +255,7 @@ def test_reported_symbol_uses_iv_forecast_before_historical_median():
     assert expected["forecast_frozen"] is True
 
 
-def test_historical_iv_wins_over_archived_ml_but_ml_is_preserved():
+def test_archived_ml_wins_over_historical_iv_and_iv_is_preserved():
     detail = {
         "expected_move": None,
         "earnings_history": [
@@ -289,16 +289,14 @@ def test_historical_iv_wins_over_archived_ml_but_ml_is_preserved():
         today=date(2026, 9, 17),
     )
 
-    assert result["expected_move"]["display_forecast_method"] == "options_math"
-    assert result["expected_move"]["display_forecast_pct"] == pytest.approx(
-        round(0.29635 * (16 / 365.0) ** 0.5, 6)
-    )
+    assert result["expected_move"]["display_forecast_method"] == "ml"
+    assert result["expected_move"]["display_forecast_pct"] == pytest.approx(0.036898)
     assert result["expected_move"]["em_ml_pct"] == 0.036898
     assert result["expected_move"]["ml_status"] == "available"
 
 
 
-def test_reported_calendar_and_symbol_share_the_same_frozen_iv_forecast(
+def test_reported_calendar_and_symbol_share_the_same_frozen_ml_forecast(
     monkeypatch: pytest.MonkeyPatch,
 ):
     evidence = {
@@ -346,8 +344,8 @@ def test_reported_calendar_and_symbol_share_the_same_frozen_iv_forecast(
 
     expected_iv = 0.5927 * (16 / 365.0) ** 0.5
     assert changed == 1
-    assert calendar[0]["display_forecast_method"] == "options_math"
-    assert calendar[0]["display_forecast_pct"] == pytest.approx(round(expected_iv, 6))
+    assert calendar[0]["display_forecast_method"] == "ml"
+    assert calendar[0]["display_forecast_pct"] == pytest.approx(0.055115)
     assert calendar[0]["em_iv_pct"] == pytest.approx(round(expected_iv, 6))
     assert calendar[0]["em_straddle_pct"] == pytest.approx(0.10087)
     assert calendar[0]["em_ml_pct"] == pytest.approx(0.055115)
@@ -370,10 +368,8 @@ def test_reported_calendar_and_symbol_share_the_same_frozen_iv_forecast(
         today=date(2026, 9, 19),
     )
 
-    assert symbol["expected_move"]["display_forecast_method"] == "options_math"
-    assert symbol["expected_move"]["display_forecast_pct"] == pytest.approx(
-        round(expected_iv, 6)
-    )
+    assert symbol["expected_move"]["display_forecast_method"] == "ml"
+    assert symbol["expected_move"]["display_forecast_pct"] == pytest.approx(0.055115)
     assert symbol["expected_move"]["display_forecast_pct"] == pytest.approx(
         calendar[0]["display_forecast_pct"]
     )
