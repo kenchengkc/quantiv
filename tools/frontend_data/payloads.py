@@ -194,6 +194,13 @@ def _reported_forecast_fields(
         "p50",
         "p75",
         "p90",
+        "forecast_id",
+        "forecast_scored_at",
+        "forecast_feature_cutoff_at",
+        "forecast_prediction_deadline_at",
+        "forecast_feature_snapshot_at",
+        "forecast_feature_hash",
+        "forecast_frozen_eligible",
     ):
         if ml.get(key) is None and fallback_ml.get(key) is not None:
             ml[key] = fallback_ml.get(key)
@@ -441,6 +448,13 @@ def attach_frozen_event_forecasts(
                 "options_status",
                 "fallback_reason",
                 "forecast_frozen",
+                "forecast_id",
+                "forecast_scored_at",
+                "forecast_feature_cutoff_at",
+                "forecast_prediction_deadline_at",
+                "forecast_feature_snapshot_at",
+                "forecast_feature_hash",
+                "forecast_frozen_eligible",
             ):
                 if key in frozen:
                     row[key] = frozen[key]
@@ -510,6 +524,13 @@ def attach_frozen_event_forecasts(
         "options_status": fields.get("options_status"),
         "fallback_reason": fields.get("fallback_reason"),
         "forecast_frozen": True,
+        "forecast_id": fields.get("forecast_id"),
+        "forecast_scored_at": fields.get("forecast_scored_at"),
+        "forecast_feature_cutoff_at": fields.get("forecast_feature_cutoff_at"),
+        "forecast_prediction_deadline_at": fields.get("forecast_prediction_deadline_at"),
+        "forecast_feature_snapshot_at": fields.get("forecast_feature_snapshot_at"),
+        "forecast_feature_hash": fields.get("forecast_feature_hash"),
+        "forecast_frozen_eligible": fields.get("forecast_frozen_eligible"),
     }
     detail["expected_move"] = {
         key: value for key, value in detail["expected_move"].items() if value is not None
