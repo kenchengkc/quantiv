@@ -134,106 +134,309 @@ def validate_symbol_payloads() -> None:
 
 
 
-def _display_forecast_signature(
-    payload: dict[str, Any],
-    *,
-    label: str,
-) -> tuple[str, float] | None:
-    method = payload.get("display_forecast_method")
-    pct = payload.get("display_forecast_pct")
-    if method is None and pct is None:
+def _positive_optional(value: Any) -> float | None:
+    if isinstance(value, bool):
         return None
-    if method not in DISPLAY_FORECAST_METHODS:
-        raise ContractError(f"{label} has invalid display_forecast_method={method!r}")
-    value = _finite(pct, f"{label}.display_forecast_pct")
-    if value <= 0:
-        raise ContractError(f"{label}.display_forecast_pct must be positive")
-    return str(method), value
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return number if math.isfinite(number) and number > 0 else None
+
+
+def _resolved_forecast_signature(
+    payload: dict[str, Any] | None,
+    *,
+    historical_fallback: float | None = None,
+) -> tuple[str, float] | None:
+    """Python mirror of frontend resolveDisplayForecastCompat()."""
+
+    explicit_historical = _positive_optional(historical_fallback)
+    if not payload:
+        return ("historical", explicit_historical) if explicit_historical else None
+
+    ml = _positive_optional(payload.get("em_ml_pct"))
+    if ml is not None:
+        return ("ml", ml)
+
+    canonical = _positive_optional(payload.get("display_forecast_pct"))
+    canonical_method = payload.get("display_forecast_method")
+    if canonical is not None and canonical_method == "ml":
+        return ("ml", canonical)
+
+    iv = _positive_optional(payload.get("em_iv_pct"))
+    if iv is None:
+        iv = _positive_optional(payload.get("iv_pct"))
+    if iv is not None:
+        return ("options_math", iv)
+
+    straddle = _positive_optional(payload.get("em_straddle_pct"))
+    if straddle is None:
+        straddle = _positive_optional(payload.get("straddle_pct"))
+    if straddle is not None:
+        return ("options_math", straddle)
+
+    if canonical is not None and canonical_method in {
+        "options_math",
+        "options_indicative",
+    }:
+        return (str(canonical_method), canonical)
+
+    canonical_historical = (
+        canonical
+        if canonical is not None
+        and canonical_method in {"historical", "historical_prior"}
+        else None
+    )
+    historical = (
+        explicit_historical
+        or canonical_historical
+        or _positive_optional(payload.get("hist_move_med_4q"))
+        or _positive_optional(payload.get("hist_move_avg_4q"))
+    )
+    if historical is not None:
+        method = (
+            "historical"
+            if explicit_historical is not None
+            else str(canonical_method or "historical")
+            if canonical_historical is not None
+            else "historical"
+        )
+        return (method, historical)
+
+    if canonical is not None:
+        return (str(canonical_method), canonical) if canonical_method else None
+    return None
+
+
+def _symbol_historical_median(
+    payload: dict[str, Any],
+    event_date: str,
+) -> tuple[float | None, int]:
+    realized: list[tuple[str, float]] = []
+    for row in payload.get("earnings_history") or []:
+        if not isinstance(row, dict):
+            continue
+        row_date = str(row.get("date") or "")[:10]
+        actual = _positive_optional(abs(row.get("actual"))) if isinstance(row.get("actual"), (int, float)) and not isinstance(row.get("actual"), bool) else None
+        if row_date and actual is not None:
+            realized.append((row_date, actual))
+
+    realized.sort(key=lambda item: item[0])
+    prior = [value for row_date, value in realized[-12:] if row_date < event_date][-4:]
+    if len(prior) < 2:
+        return None, len(prior)
+    ordered = sorted(prior)
+    middle = len(ordered) // 2
+    median_value = (
+        ordered[middle]
+        if len(ordered) % 2
+        else (ordered[middle - 1] + ordered[middle]) / 2.0
+    )
+    return median_value, len(prior)
+
+
+def _symbol_page_components(
+    payload: dict[str, Any],
+    event_date: str,
+) -> dict[str, float | None]:
+    expected = payload.get("expected_move")
+    expected = expected if isinstance(expected, dict) else {}
+    expected_matches = str(expected.get("earnings_date") or "")[:10] == event_date
+    active_expected = expected if expected_matches else {}
+
+    history_row = next(
+        (
+            row
+            for row in payload.get("earnings_history") or []
+            if isinstance(row, dict)
+            and str(row.get("date") or "")[:10] == event_date
+        ),
+        None,
+    )
+
+    history_iv = None
+    history_straddle = None
+    history_ml = None
+    if isinstance(history_row, dict):
+        timing = str(history_row.get("timing") or "").lower()
+        after_close = (
+            timing in {"amc", "after_market_close", "after_close"}
+            or "after" in timing
+        )
+        implied_as_of = str(history_row.get("implied_as_of") or "")[:10]
+        quality = history_row.get("implied_quality_status")
+        option_point_in_time = bool(
+            implied_as_of
+            and (implied_as_of <= event_date if after_close else implied_as_of < event_date)
+            and quality in {None, "decision_eligible_eod"}
+        )
+        atm_iv = _positive_optional(history_row.get("implied_atm_iv"))
+        dte = _positive_optional(history_row.get("implied_dte"))
+        if option_point_in_time and atm_iv is not None and dte is not None:
+            history_iv = atm_iv * math.sqrt(dte / 365.0)
+        if option_point_in_time:
+            history_straddle = _positive_optional(history_row.get("implied"))
+
+        ml_snapshot = str(history_row.get("ml_snapshot_date") or "")[:10]
+        if ml_snapshot and ml_snapshot < event_date:
+            history_ml = _positive_optional(history_row.get("em_ml_pct"))
+
+    historical, _count = _symbol_historical_median(payload, event_date)
+    return {
+        "ml": _positive_optional(active_expected.get("em_ml_pct")) or history_ml,
+        "iv": _positive_optional(active_expected.get("iv_pct")) or history_iv,
+        "straddle": _positive_optional(active_expected.get("straddle_pct")) or history_straddle,
+        "historical": historical,
+    }
+
+
+def _symbol_page_signature(
+    payload: dict[str, Any],
+    event_date: str,
+) -> tuple[tuple[str, float] | None, dict[str, float | None]]:
+    expected = payload.get("expected_move")
+    expected = expected if isinstance(expected, dict) else {}
+    active_expected = (
+        expected
+        if str(expected.get("earnings_date") or "")[:10] == event_date
+        else {}
+    )
+    components = _symbol_page_components(payload, event_date)
+    headline_fields = {
+        **active_expected,
+        "em_ml_pct": components["ml"],
+        "iv_pct": components["iv"],
+        "straddle_pct": components["straddle"],
+    }
+    return (
+        _resolved_forecast_signature(
+            headline_fields,
+            historical_fallback=components["historical"],
+        ),
+        components,
+    )
 
 
 def validate_forecast_surface_parity() -> None:
-    """Require one event identity to publish one headline forecast everywhere."""
+    """Require the calendar to render the exact ticker-page forecast hierarchy."""
+
+    reference_start: str | None = None
+    reference_end: str | None = None
+    reference_path = PUBLIC / "calendar-reference.json"
+    if reference_path.is_file():
+        reference = _object(_read(reference_path), str(reference_path))
+        window = reference.get("window")
+        if isinstance(window, dict):
+            reference_start = str(window.get("start") or "")[:10] or None
+            reference_end = str(window.get("end") or "")[:10] or None
 
     week_events: dict[
         tuple[str, str],
-        tuple[tuple[str, float] | None, str],
+        tuple[tuple[str, float] | None, str, dict[str, Any]],
     ] = {}
     weeks_dir = PUBLIC / "weeks"
-    manifest_path = weeks_dir / "manifest.json"
-    visible_week_names: set[str] | None = None
-    if manifest_path.is_file():
-        manifest = _object(_read(manifest_path), str(manifest_path))
-        visible_week_names = {
-            f"{str(item.get('start'))[:10]}.json"
-            for item in _list(manifest.get("weeks"), "weeks manifest.weeks")
-            if isinstance(item, dict) and item.get("start")
-        }
-
     for path in sorted(weeks_dir.glob("*.json")):
         if re.fullmatch(r"\d{4}-\d{2}-\d{2}\.json", path.name) is None:
             continue
-        if visible_week_names is not None and path.name not in visible_week_names:
-            continue
         payload = _object(_read(path), str(path))
-        for index, event_raw in enumerate(_list(payload.get("events"), f"{path.name}.events")):
+        window = payload.get("window")
+        if (
+            reference_start
+            and reference_end
+            and isinstance(window, dict)
+            and (
+                str(window.get("end") or "")[:10] < reference_start
+                or str(window.get("start") or "")[:10] > reference_end
+            )
+        ):
+            continue
+
+        for index, event_raw in enumerate(
+            _list(payload.get("events"), f"{path.name}.events")
+        ):
             event = _object(event_raw, f"{path.name}.events[{index}]")
             ticker = event.get("ticker")
             earnings_date = event.get("earnings_date")
             if not isinstance(ticker, str) or not isinstance(earnings_date, str):
                 continue
             identity = (ticker.upper(), earnings_date[:10])
-            signature = _display_forecast_signature(
-                event,
-                label=f"{path.name}:{identity[0]}:{identity[1]}",
-            )
+            signature = _resolved_forecast_signature(event)
             existing = week_events.get(identity)
             if existing is not None and existing[0] != signature:
                 raise ContractError(
                     f"calendar forecast disagrees across week artifacts for "
                     f"{identity[0]} {identity[1]}"
                 )
-            week_events[identity] = (signature, path.name)
+            week_events[identity] = (signature, path.name, event)
 
-    for path in sorted((PUBLIC / "symbols").glob("*.json")):
-        payload = _object(_read(path), str(path))
-        symbol = payload.get("symbol")
-        expected = payload.get("expected_move")
-        if not isinstance(symbol, str) or not isinstance(expected, dict):
+    today = date.today().isoformat()
+    component_fields = {
+        "ml": "em_ml_pct",
+        "iv": "em_iv_pct",
+        "straddle": "em_straddle_pct",
+        "historical": "hist_move_med_4q",
+    }
+
+    for identity, (calendar_signature, calendar_path, calendar_event) in week_events.items():
+        ticker, event_date = identity
+        symbol_path = PUBLIC / "symbols" / f"{ticker}.json"
+        if not symbol_path.is_file():
             continue
-        earnings_date = expected.get("earnings_date")
-        if not isinstance(earnings_date, str) or not earnings_date:
-            continue
-        identity = (symbol.upper(), earnings_date[:10])
-        calendar = week_events.get(identity)
-        if calendar is None:
-            continue
-        calendar_signature, calendar_path = calendar
-        symbol_signature = _display_forecast_signature(
-            expected,
-            label=f"{path.name}.expected_move",
+        symbol_payload = _object(_read(symbol_path), str(symbol_path))
+        symbol_signature, components = _symbol_page_signature(
+            symbol_payload,
+            event_date,
         )
+
         if calendar_signature is None and symbol_signature is not None:
             raise ContractError(
-                f"calendar is missing canonical headline forecast for "
-                f"{identity[0]} {identity[1]} while {path.name} publishes one"
+                f"calendar is missing resolved headline forecast for "
+                f"{ticker} {event_date} while {symbol_path.name} renders one"
             )
         if calendar_signature is not None and symbol_signature is None:
             raise ContractError(
-                f"{path.name} is missing canonical headline forecast for "
-                f"{identity[0]} {identity[1]} while {calendar_path} publishes one"
+                f"{symbol_path.name} cannot resolve a headline forecast for "
+                f"{ticker} {event_date} while {calendar_path} renders one"
             )
-        if calendar_signature is None or symbol_signature is None:
+        if calendar_signature is not None and symbol_signature is not None:
+            if (
+                calendar_signature[0] != symbol_signature[0]
+                or not math.isclose(
+                    calendar_signature[1],
+                    symbol_signature[1],
+                    rel_tol=1e-9,
+                    abs_tol=1e-12,
+                )
+            ):
+                raise ContractError(
+                    f"calendar/symbol resolved headline mismatch for "
+                    f"{ticker} {event_date}: "
+                    f"{calendar_signature} != {symbol_signature}"
+                )
+
+        # Reported rows must also carry every ticker-page component needed by
+        # the homepage hover card. This guarantees ML, IV, historical median,
+        # and straddle evidence cannot silently disappear even when the
+        # headline itself happens to match.
+        if event_date > today:
             continue
-        if calendar_signature[0] != symbol_signature[0] or not math.isclose(
-            calendar_signature[1],
-            symbol_signature[1],
-            rel_tol=1e-12,
-            abs_tol=1e-12,
-        ):
-            raise ContractError(
-                f"calendar/symbol headline mismatch for {identity[0]} {identity[1]}: "
-                f"{calendar_signature} != {symbol_signature}"
-            )
+        for component, field in component_fields.items():
+            expected_value = components.get(component)
+            if expected_value is None:
+                continue
+            calendar_value = _positive_optional(calendar_event.get(field))
+            if calendar_value is None or not math.isclose(
+                calendar_value,
+                expected_value,
+                rel_tol=1e-9,
+                abs_tol=1e-12,
+            ):
+                raise ContractError(
+                    f"calendar hover component mismatch for {ticker} {event_date} "
+                    f"{component}: {calendar_value} != {expected_value}"
+                )
+
 
 
 def validate_dashboard_evidence() -> None:
