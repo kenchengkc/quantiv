@@ -209,8 +209,12 @@ def _normalize_forecast(event: dict) -> dict:
     iv = _positive(row.get("em_iv_pct"))
     options_are_pre_event = _option_evidence_is_pre_event(row)
     option_available = options_are_pre_event and (iv is not None or strict is not None)
+    ml_audited = (
+        row.get("forecast_frozen_eligible") is True
+        or _published_before_deadline(row)
+    )
 
-    if ml is not None:
+    if ml is not None and ml_audited:
         row.update(
             {
                 "em_method": "ml_lightgbm",
