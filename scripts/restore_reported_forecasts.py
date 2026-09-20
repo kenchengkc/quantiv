@@ -94,6 +94,20 @@ ML_HISTORY_FIELDS = {
     "p90",
 }
 
+FROZEN_HISTORY_FIELDS = ML_HISTORY_FIELDS | {
+    "display_forecast_pct",
+    "display_forecast_method",
+    "display_forecast_as_of",
+    "forecast_id",
+    "forecast_scored_at",
+    "forecast_published_at",
+    "forecast_feature_cutoff_at",
+    "forecast_prediction_deadline_at",
+    "forecast_feature_snapshot_at",
+    "forecast_feature_hash",
+    "forecast_frozen_eligible",
+}
+
 
 def _git(*args: str) -> bytes:
     return subprocess.run(
@@ -512,12 +526,12 @@ def _repair_symbol_payloads(recovered: dict[EventKey, dict], apply: bool) -> int
             if str(row.get("date") or "")[:10] != event_date:
                 continue
             normalized = _normalize_forecast(event)
-            if _positive(normalized.get("em_ml_pct")) is not None:
-                for field in ML_HISTORY_FIELDS:
-                    value = normalized.get(field)
-                    if value is not None and row.get(field) != value:
-                        row[field] = value
-                        changed = True
+            for field in FROZEN_HISTORY_FIELDS:
+                value = normalized.get(field)
+                if value is not None and row.get(field) != value:
+                    row[field] = value
+                    changed = True
+            if normalized.get("display_forecast_pct") is not None:
                 if row.get("forecast_frozen") is not True:
                     row["forecast_frozen"] = True
                     changed = True
