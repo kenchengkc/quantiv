@@ -2,7 +2,7 @@ import './globals.css';
 import './typography.css';
 import './typography-legacy.css';
 import './text-colors.css';
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { JetBrains_Mono, Mulish } from 'next/font/google';
 import { SPLASH_SESSION_KEY, SPLASH_SKIP_ATTRIBUTE } from '@/lib/splashSession';
 import { Analytics } from '@vercel/analytics/next';
@@ -60,10 +60,12 @@ export const metadata: Metadata = {
 
 // Explicit mobile viewport — Next.js 15 expects this in its own export so
 // the meta tag isn't mistakenly cached as static metadata across themes.
-export const viewport = {
+export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   maximumScale: 5,
+  themeColor: '#000000',
+  colorScheme: 'dark',
 };
 
 function SplashSessionGuard() {
@@ -107,17 +109,26 @@ export default function RootLayout({
       lang="en"
       suppressHydrationWarning
       className={`${mulish.variable} ${jetbrainsMono.variable}`}
-      style={{ backgroundColor: '#000000', colorScheme: 'dark' }}
+      style={{
+        backgroundColor: '#000000',
+        colorScheme: 'dark',
+        minHeight: '100%',
+      }}
     >
       <head>
         <style
+          id="quantiv-first-paint"
           dangerouslySetInnerHTML={{
-            __html: 'html,body{background:#000;color-scheme:dark}',
+            __html:
+              'html,body{background:#000!important;color-scheme:dark;min-height:100%;margin:0}',
           }}
         />
         <SplashSessionGuard />
       </head>
-      <body suppressHydrationWarning style={{ backgroundColor: '#000000' }}>
+      <body
+        suppressHydrationWarning
+        style={{ backgroundColor: '#000000', minHeight: '100%', margin: 0 }}
+      >
         {children}
         <Analytics />
         <SpeedInsights />
