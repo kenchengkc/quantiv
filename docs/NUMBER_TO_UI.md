@@ -231,13 +231,13 @@ The strict research fields above are intentionally allowed to be absent for an i
 `tools/frontend_data/display_forecast.py` resolves one canonical `display_forecast_pct` before publication:
 
 ```text
+validated ML expected move
+    ↓ unavailable
 strict point-in-time IV expected move
     ↓ unavailable
 strict decision-eligible straddle expected move
     ↓ unavailable
 indicative IV / options under display-only quote policy
-    ↓ unavailable
-validated ML expected move
     ↓ unavailable
 median absolute move from recent ticker earnings
     ↓ insufficient ticker history
@@ -274,11 +274,11 @@ Before screener/manifest publication, the frontend-data build fails closed unles
 
 Compact surfaces consume the same field rather than inventing their own hierarchy:
 
-- calendar expected-move cell: IV/options-first `display_forecast_pct` with no extra method label under the number; IV/straddle/ML provenance stays in the hover tooltip;
-- screener expected-move column and “Big movers” preset: the same IV/options-first display resolver;
-- watchlist expected move: IV/options first; spot-updated ML may replace only a historical/no-data fallback, never a usable IV/options estimate;
-- symbol page: the large headline expected move uses the same IV/options-first resolver; spot-updated ML remains a separate model-comparison signal rather than replacing the headline;
-- reported events freeze point-in-time IV/options evidence and ML separately, then continue to show IV/options first without recomputing from post-event data.
+- calendar expected-move cell: ML first, then IV/options, then history; there is no extra method label under the number, and provenance stays in the hover tooltip;
+- screener expected-move column and “Big movers” preset: the same ML → IV/options → history resolver;
+- watchlist expected move: the same static ML → IV/options → history resolver;
+- symbol page: the large headline expected move uses the same resolver as the calendar;
+- reported events freeze the selected headline plus the underlying ML and IV/options evidence, so historical pages can reuse the exact pre-event values without recomputation.
 
 This is a presentation continuity mechanism, not a relaxation of the model/research control plane.
 
