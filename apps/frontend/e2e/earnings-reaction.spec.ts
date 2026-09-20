@@ -161,8 +161,9 @@ test.describe('earnings calendar reaction labels', () => {
 
     const row = page.getByRole('link', { name: /CALB/i }).first();
     await expect(row).toContainText('7.0%');
+    await expect(row).toContainText('4.0–11.0%'); // ML p25–p75 band follows the ML headline
     await expect(row).not.toContainText('IV forecast');
-    await expect(row).not.toContainText('4.0–11.0%');
+    await expect(row).not.toContainText('ML forecast'); // method labels stay in hover only
 
     const move = row.locator('[data-calendar-move]');
     await move.hover();
