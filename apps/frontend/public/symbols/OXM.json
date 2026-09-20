@@ -1,22 +1,24 @@
 {
   "symbol": "OXM",
   "as_of_date": "2026-06-18",
-  "spot_price": 40.0,
+  "spot_price": 40,
   "expected_move": {
-    "expiration": "2026-07-17",
-    "dte": 29,
-    "atm_strike": 40.0,
-    "atm_iv": 0.75555,
-    "straddle_abs": 7.075,
-    "straddle_pct": 0.176875,
-    "iv_pct": 0.212969,
-    "timing": "after_market_close"
+    "earnings_date": "2026-09-08",
+    "timing": "after_market_close",
+    "display_forecast_pct": 0.128458,
+    "display_forecast_method": "historical",
+    "display_forecast_as_of": "2026-09-08",
+    "ml_status": "unavailable_event",
+    "options_status": "unavailable",
+    "fallback_reason": "no_event_expiry",
+    "historical_event_count": 4,
+    "forecast_frozen": true
   },
   "straddle_features": [
     {
       "expiration": "2026-07-17",
       "dte": 29,
-      "atm_strike": 40.0,
+      "atm_strike": 40,
       "atm_iv": 0.75555,
       "atm_call_iv": 0.7613,
       "atm_put_iv": 0.7498,
@@ -33,7 +35,7 @@
     {
       "expiration": "2026-08-21",
       "dte": 64,
-      "atm_strike": 35.0,
+      "atm_strike": 35,
       "atm_iv": 0.61475,
       "atm_call_iv": 0.6074,
       "atm_put_iv": 0.6221,
@@ -60,8 +62,8 @@
       "eps_actual": 1.39,
       "eps_estimate": 1.3002,
       "eps_surprise_pct": 0.069066,
-      "revenue_actual": 391402000.0,
-      "revenue_estimate": 395671711.0,
+      "revenue_actual": 391402000,
+      "revenue_estimate": 395671711,
       "rev_surprise_pct": -0.010791
     },
     {
@@ -76,7 +78,7 @@
       "eps_estimate": 1.3002,
       "eps_surprise_pct": null,
       "revenue_actual": null,
-      "revenue_estimate": 395671711.0,
+      "revenue_estimate": 395671711,
       "rev_surprise_pct": null
     },
     {
@@ -230,7 +232,7 @@
       "rev_surprise_pct": null
     }
   ],
-  "next_earnings": "2026-06-10",
+  "next_earnings": "2026-09-08",
   "vol_regime": {
     "iv_current": 0.707,
     "iv_rank": 0.534844,
