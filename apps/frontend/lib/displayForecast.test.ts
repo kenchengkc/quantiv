@@ -30,10 +30,10 @@ describe('display forecast helpers', () => {
     expect(finiteDisplayForecast(null)).toBeNull();
   });
 
-  it('bridges legacy fields using IV/options before ML and historical data', () => {
+  it('bridges legacy fields using ML before IV/options and historical data', () => {
     expect(resolveDisplayForecastCompat({ em_ml_pct: 0.12, em_straddle_pct: 0.14 })).toEqual({
-      pct: 0.14,
-      method: 'options_math',
+      pct: 0.12,
+      method: 'ml',
     });
     expect(resolveDisplayForecastCompat({ em_ml_pct: null, em_straddle_pct: 0.11 })).toEqual({
       pct: 0.11,
@@ -51,14 +51,14 @@ describe('display forecast helpers', () => {
         em_straddle_pct: 0.14,
         em_iv_pct: 0.16,
       }),
-    ).toEqual({ pct: 0.16, method: 'options_math' });
+    ).toEqual({ pct: 0.12, method: 'ml' });
     expect(
       resolveDisplayForecastCompat({
         display_forecast_pct: 0.11,
         display_forecast_method: 'options_indicative',
         em_ml_pct: 0.12,
       }),
-    ).toEqual({ pct: 0.11, method: 'options_indicative' });
+    ).toEqual({ pct: 0.12, method: 'ml' });
   });
 
   it('uses a historical compatibility estimate when legacy public data has no ML or options move', () => {
