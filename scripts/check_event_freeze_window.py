@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 import os
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 
 import duckdb
@@ -14,7 +14,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT / "scripts") not in sys.path:
     sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
-from market_sessions import EASTERN, is_us_market_session, us_market_close  # noqa: E402
+from market_sessions import EASTERN, is_us_market_session  # noqa: E402
 
 
 def _emit(name: str, value: str) -> None:
@@ -54,17 +54,17 @@ def main() -> int:
         _emit("reason", "not_market_session")
         return 0
 
-    close = datetime.combine(
-        session_day,
-        us_market_close(session_day),
-        tzinfo=EASTERN,
-    )
     if args.phase == "schedule":
-        # Two UTC cron entries cover EDT and EST. Exactly one should land in
-        # this 15-75 minute post-close settlement window.
-        should_run = close + timedelta(minutes=15) <= now <= close + timedelta(minutes=75)
+        # Two UTC cron entries cover EDT and EST. Exactly one lands around
+        # 21:30 ET, late enough for EOD provider settlement but still before
+        # the BMO prediction deadline at midnight ET.
+        local_minutes = now.hour * 60 + now.minute
+        should_run = 21 * 60 <= local_minutes <= 22 * 60
         _emit("run", "true" if should_run else "false")
-        _emit("reason", "post_close_window" if should_run else "outside_post_close_window")
+        _emit(
+            "reason",
+            "nightly_pre_bmo_window" if should_run else "outside_nightly_pre_bmo_window",
+        )
         _emit("session_date", session_day.isoformat())
         return 0
 
