@@ -96,7 +96,7 @@ describe('screener research query', () => {
     expect(result.map((row) => row.ticker)).toEqual(['MSFT', 'AAPL']);
   });
 
-  it('uses canonical display forecasts for big movers and expected-move sorting', () => {
+  it('uses the ML-first display resolver for big movers and expected-move sorting', () => {
     const displayDriven: ResearchScreenerEvent[] = [
       {
         ...rows[0],
@@ -119,8 +119,11 @@ describe('screener research query', () => {
       new URLSearchParams('preset=big_movers&sort=straddle&dir=desc'),
     );
 
+    // STRICT has a stale canonical 7% value plus a raw 9% ML value and a
+    // 14% straddle. ML is the headline, so it is below the 10% big-mover
+    // threshold. HIST remains because its 12% historical fallback is the best
+    // available signal for that row.
     expect(applyScreenerResearchQuery(displayDriven, query).map((row) => row.ticker)).toEqual([
-      'STRICT',
       'HIST',
     ]);
   });
