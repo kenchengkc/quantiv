@@ -29,6 +29,34 @@ def test_committed_public_contracts_validate() -> None:
         check()
 
 
+def test_validate_repo_skips_missing_materialized_research_history(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    public = tmp_path / "public"
+    public.mkdir()
+
+    monkeypatch.setattr(contracts, "PUBLIC", public)
+
+    called: list[str] = []
+    monkeypatch.setattr(contracts, "validate_schema_documents", lambda: called.append("schema"))
+    monkeypatch.setattr(contracts, "validate_screener", lambda: called.append("screener"))
+    monkeypatch.setattr(contracts, "validate_symbol_payloads", lambda: called.append("symbols"))
+    monkeypatch.setattr(contracts, "validate_forecast_surface_parity", lambda: called.append("parity"))
+    monkeypatch.setattr(contracts, "validate_dashboard_evidence", lambda: called.append("evidence"))
+    monkeypatch.setattr(contracts, "validate_control_plane", lambda: called.append("control"))
+    monkeypatch.setattr(contracts, "validate_model_validation", lambda: called.append("model"))
+    monkeypatch.setattr(
+        contracts,
+        "validate_research_history",
+        lambda: (_ for _ in ()).throw(AssertionError("research history should be skipped")),
+    )
+
+    passed = contracts.validate_repo()
+
+    assert "research history" not in passed
+    assert called == ["schema", "screener", "symbols", "parity", "evidence", "control", "model"]
+
+
 def test_screener_contract_fails_closed_on_count_mismatch(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     public = tmp_path / "public"
     public.mkdir()
