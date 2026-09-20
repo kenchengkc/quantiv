@@ -13,14 +13,16 @@ Uses the most recent parquet snapshot as the as-of date. Safe to re-run.
 import json
 import os
 import sys
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import duckdb
 
 sys.path.append(str(Path(__file__).parent))
 sys.path.append(str(Path(__file__).resolve().parent.parent / "apps" / "ml"))
+sys.path.append(str(Path(__file__).resolve().parent.parent / "scripts"))
 from build_earnings_events import build_earnings_events_table, create_duckdb_views
+from event_forecast_ledger import record_publications
 from frontend_data.display_payloads import (
     build_display_forecast_status,
     enrich_upcoming_events,
@@ -109,6 +111,7 @@ def main():
     ml_lookup = load_ml_forecasts()
     event_forecast_archive = load_event_forecast_archive()
     provider_lookup = load_provider_enrichments()
+    published_forecast_ids: set[str] = set()
 
     as_of_row = conn.execute("SELECT MAX(as_of_date) FROM v_options_chain").fetchone()
     as_of_date = as_of_row[0]
@@ -203,6 +206,11 @@ def main():
             )
             enrich_upcoming_events(conn, events, as_of_date=as_of_date, today=today)
             week_payloads[wk_start] = payload
+            published_forecast_ids.update(
+                str(event.get("forecast_id"))
+                for event in events
+                if event.get("forecast_id")
+            )
             print(f"📅 week {wk_start} (offset {offset:+d}) → {len(events)} events (cached)")
             for ev in events:
                 tickers_needing_detail.setdefault(ev["ticker"], date.fromisoformat(ev["earnings_date"]))
@@ -295,6 +303,11 @@ def main():
             },
         }
         week_payloads[wk_start] = payload
+        published_forecast_ids.update(
+            str(event.get("forecast_id"))
+            for event in events
+            if event.get("forecast_id")
+        )
         write_to_public(
             f"weeks/{wk_start.isoformat()}.json",
             json.dumps(payload, indent=2, default=str),
@@ -488,6 +501,13 @@ def main():
                 current_event_date=published[0] if published else earn_dt,
                 today=today,
             )
+            forecast_nodes = [detail.get("expected_move") or {}]
+            forecast_nodes.extend(detail.get("earnings_history") or [])
+            published_forecast_ids.update(
+                str(node.get("forecast_id"))
+                for node in forecast_nodes
+                if isinstance(node, dict) and node.get("forecast_id")
+            )
             write_to_public(
                 f"symbols/{ticker}.json",
                 json.dumps(detail, indent=2, default=str),
@@ -495,6 +515,19 @@ def main():
             generated += 1
         except Exception as e:
             print(f"  ⚠️  {ticker} detail: {e}")
+
+    publication_path = record_publications(
+        published_forecast_ids,
+        DATA_DIR / "forecasts",
+        published_at=datetime.now(timezone.utc),
+    )
+    if publication_path is not None:
+        print(
+            f"🧾 recorded publication receipts for "
+            f"{len(published_forecast_ids)} frozen forecast(s) → "
+            f"{publication_path.name}",
+            flush=True,
+        )
 
     print(
         f"✅ {len(week_payloads)} weeks written, {generated} symbol files"
