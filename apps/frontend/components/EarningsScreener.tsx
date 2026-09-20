@@ -80,7 +80,8 @@ export interface ScreenerEvent extends DisplayForecastFields {
   correction_factor?: number | null;
   // Screener-only extras emitted by tools/build_frontend_data.screener_extras
   iv_rank?: number | null;            // 0..1, percentile of current IV in trailing year
-  hist_move_avg_4q?: number | null;   // |close pre→post| avg over last 4 quarters
+  hist_move_avg_4q?: number | null;   // |close pre→post| mean over last 4 prior earnings
+  hist_move_med_4q?: number | null;   // canonical median over the same 4 prior earnings
   iv_crush_pct?: number | null;       // (front − back) / front
   provider_enrichment?: ProviderEnrichment | null;
   short_days_to_cover?: number | null;
