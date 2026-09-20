@@ -159,6 +159,8 @@ def validate_forecast_surface_parity() -> None:
         tuple[tuple[str, float] | None, str],
     ] = {}
     for path in sorted((PUBLIC / "weeks").glob("*.json")):
+        if re.fullmatch(r"\d{4}-\d{2}-\d{2}\.json", path.name) is None:
+            continue
         payload = _object(_read(path), str(path))
         for index, event_raw in enumerate(_list(payload.get("events"), f"{path.name}.events")):
             event = _object(event_raw, f"{path.name}.events[{index}]")
