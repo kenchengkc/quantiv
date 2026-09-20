@@ -729,9 +729,10 @@ export default function SymbolPage({
     historicalCompatPct,
   );
   const staticDisplayPct = compatDisplayForecast.pct;
-  // The hero is the canonical product forecast, which is IV/options-first.
-  // Spot-updated ML remains available in the model comparison panel but must
-  // not silently replace the headline number with a different methodology.
+  // The hero uses the same canonical hierarchy as every other surface:
+  // validated ML first, then point-in-time IV/options, then history.
+  // Spot-updated ML remains a separate interactive comparison and does not
+  // rewrite the frozen static research snapshot.
   const displayForecastPct = staticDisplayPct;
   const displayForecastMethod: DisplayForecastMethod | null = compatDisplayForecast.method;
   const quantileMeta = showingLivePrediction
