@@ -14,6 +14,7 @@ from ml.provider_signal_policy import (
 from .shared import (
     EVENT_FORECAST_ARCHIVE_PATH,
     EVENT_PREDICTION_LEDGER_PATH,
+    EVENT_PREDICTION_PUBLICATIONS_PATH,
     FORECAST_RECEIPT_PATH,
     FORECASTS_DIR,
     PROVIDER_ENRICHMENTS_DIR,
@@ -150,6 +151,24 @@ def load_event_forecast_archive() -> dict[tuple[str, str], dict]:
     frame = frame.dropna(subset=["act_symbol", "earnings_date", "snapshot_date"])
     frame["act_symbol"] = frame["act_symbol"].astype(str).str.upper().str.strip()
 
+    if EVENT_PREDICTION_PUBLICATIONS_PATH.exists() and "forecast_id" in frame.columns:
+        try:
+            publications = pd.read_parquet(EVENT_PREDICTION_PUBLICATIONS_PATH)
+        except Exception as exc:
+            print(
+                f"⚠️  Could not read {EVENT_PREDICTION_PUBLICATIONS_PATH.name}: {exc}"
+            )
+        else:
+            if {"forecast_id", "published_at"} <= set(publications.columns):
+                publications = publications.drop_duplicates(
+                    subset=["forecast_id"], keep="first"
+                )
+                frame = frame.merge(
+                    publications[["forecast_id", "published_at"]],
+                    on="forecast_id",
+                    how="left",
+                )
+
     out: dict[tuple[str, str], dict] = {}
     for row in frame.to_dict(orient="records"):
         key = (str(row["act_symbol"]), row["earnings_date"].isoformat())
@@ -181,6 +200,7 @@ def ml_fields(fc: dict | None) -> dict:
     )
     out["forecast_id"] = pick("forecast_id")
     out["forecast_scored_at"] = pick("scored_at")
+    out["forecast_published_at"] = pick("published_at", "forecast_published_at")
     out["forecast_feature_cutoff_at"] = pick("feature_cutoff_at")
     out["forecast_prediction_deadline_at"] = pick("prediction_deadline_at")
     out["forecast_feature_snapshot_at"] = pick("feature_snapshot_at")
