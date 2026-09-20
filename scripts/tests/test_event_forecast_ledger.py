@@ -36,13 +36,13 @@ def _row(**overrides):
     return row
 
 
-def test_bmo_uses_previous_session_close_and_prior_evening_deadline():
+def test_bmo_uses_previous_session_close_and_pre_event_midnight_deadline():
     feature_cutoff, prediction_deadline = event_cutoffs(
         date(2026, 9, 8), "before_market_open"
     )
     # Monday Sep 7 is Labor Day; previous NYSE session is Fri Sep 4.
     assert feature_cutoff == datetime(2026, 9, 4, 16, 0, tzinfo=ET)
-    assert prediction_deadline == datetime(2026, 9, 4, 18, 0, tzinfo=ET)
+    assert prediction_deadline == datetime(2026, 9, 8, 0, 0, tzinfo=ET)
 
 
 def test_amc_cutoff_is_five_minutes_before_canonical_close():
@@ -64,7 +64,7 @@ def test_morning_of_bmo_score_is_not_eligible_even_with_prior_close_features():
 
 
 def test_prior_evening_bmo_score_is_eligible():
-    audited = audit_forecast_row(_row())
+    audited = audit_forecast_row(_row(scored_at="2026-09-09T23:00:00+00:00"))
     assert audited["freeze_eligible"] is True
     assert audited["freeze_ineligible_reason"] is None
     assert audited["forecast_id"]
