@@ -1,28 +1,24 @@
 {
   "symbol": "HUBG",
   "as_of_date": "2026-08-28",
-  "spot_price": 40.0,
+  "spot_price": 40,
   "expected_move": {
-    "earnings_date": "2026-08-27",
-    "expiration": "2026-09-18",
-    "dte": 21,
-    "lead_time_days": -1,
-    "atm_strike": 40.0,
-    "atm_iv": 0.78285,
-    "straddle_abs": 5.945,
-    "straddle_pct": 0.148625,
-    "iv_pct": 0.187777,
-    "skew_atm": -0.0033,
-    "term_slope": null,
-    "total_vega": 0.0752,
-    "em_method": "options_math",
-    "timing": "after_market_close"
+    "earnings_date": "2026-09-17",
+    "timing": "after_market_close",
+    "display_forecast_pct": 0.013117,
+    "display_forecast_method": "historical",
+    "display_forecast_as_of": "2026-09-17",
+    "ml_status": "unavailable_event",
+    "options_status": "unavailable",
+    "fallback_reason": "no_event_expiry",
+    "historical_event_count": 4,
+    "forecast_frozen": true
   },
   "straddle_features": [
     {
       "expiration": "2026-09-18",
       "dte": 21,
-      "atm_strike": 40.0,
+      "atm_strike": 40,
       "atm_iv": 0.78285,
       "atm_call_iv": 0.7845,
       "atm_put_iv": 0.7812,
@@ -39,7 +35,7 @@
     {
       "expiration": "2026-10-16",
       "dte": 49,
-      "atm_strike": 40.0,
+      "atm_strike": 40,
       "atm_iv": 0.58685,
       "atm_call_iv": 0.5868,
       "atm_put_iv": 0.5869,
@@ -67,7 +63,7 @@
       "eps_estimate": 0.4821,
       "eps_surprise_pct": null,
       "revenue_actual": null,
-      "revenue_estimate": 1007181078.0,
+      "revenue_estimate": 1007181078,
       "rev_surprise_pct": null
     },
     {
@@ -127,7 +123,7 @@
       "eps_estimate": 0.3832,
       "eps_surprise_pct": null,
       "revenue_actual": null,
-      "revenue_estimate": 945258622.0,
+      "revenue_estimate": 945258622,
       "rev_surprise_pct": null
     },
     {
@@ -157,7 +153,7 @@
       "eps_estimate": 0.3832,
       "eps_surprise_pct": null,
       "revenue_actual": null,
-      "revenue_estimate": 945258622.0,
+      "revenue_estimate": 945258622,
       "rev_surprise_pct": null
     },
     {
@@ -232,11 +228,11 @@
       "eps_estimate": 0.3053,
       "eps_surprise_pct": null,
       "revenue_actual": null,
-      "revenue_estimate": 910361730.0,
+      "revenue_estimate": 910361730,
       "rev_surprise_pct": null
     }
   ],
-  "next_earnings": "2026-08-27",
+  "next_earnings": "2026-09-17",
   "vol_regime": {
     "iv_current": 0.6439,
     "iv_rank": 0.603,
