@@ -1,38 +1,24 @@
 {
   "symbol": "FIZZ",
   "as_of_date": "2026-08-21",
-  "spot_price": 30.0,
+  "spot_price": 30,
   "expected_move": {
-    "earnings_date": "2026-09-03",
-    "expiration": "2026-09-18",
-    "dte": 28,
-    "lead_time_days": 13,
-    "atm_strike": 30.0,
-    "atm_iv": 0.59165,
-    "straddle_abs": 3.8,
-    "straddle_pct": 0.126667,
-    "iv_pct": 0.163869,
-    "skew_atm": -0.0001,
-    "term_slope": null,
-    "total_vega": 0.0659,
-    "em_ml_pct": 0.045281,
-    "em_ml_abs": 1.458513,
-    "correction_factor": 0.333769,
-    "model_horizon": 14,
-    "ml_snapshot_date": "2026-08-20",
-    "p10": 0.008613,
-    "p25": 0.017411,
-    "p50": 0.04383,
-    "p75": 0.080299,
-    "p90": 0.132737,
-    "em_method": "ml_lightgbm",
-    "timing": "unknown"
+    "earnings_date": "2026-09-10",
+    "timing": "unknown",
+    "display_forecast_pct": 0.0479665,
+    "display_forecast_method": "historical",
+    "display_forecast_as_of": "2026-09-10",
+    "ml_status": "unavailable_event",
+    "options_status": "unavailable",
+    "fallback_reason": "no_event_expiry",
+    "historical_event_count": 4,
+    "forecast_frozen": true
   },
   "straddle_features": [
     {
       "expiration": "2026-09-18",
       "dte": 28,
-      "atm_strike": 30.0,
+      "atm_strike": 30,
       "atm_iv": 0.59165,
       "atm_call_iv": 0.5917,
       "atm_put_iv": 0.5916,
@@ -77,7 +63,7 @@
       "eps_estimate": 0.612,
       "eps_surprise_pct": null,
       "revenue_actual": null,
-      "revenue_estimate": 353980800.0,
+      "revenue_estimate": 353980800,
       "rev_surprise_pct": null
     },
     {
@@ -91,8 +77,8 @@
       "eps_actual": 0.43,
       "eps_estimate": 0.4794,
       "eps_surprise_pct": -0.103045,
-      "revenue_actual": 297120000.0,
-      "revenue_estimate": 300706200.0,
+      "revenue_actual": 297120000,
+      "revenue_estimate": 300706200,
       "rev_surprise_pct": -0.011926
     },
     {
@@ -246,7 +232,7 @@
       "rev_surprise_pct": null
     }
   ],
-  "next_earnings": "2026-09-03",
+  "next_earnings": "2026-09-10",
   "vol_regime": {
     "iv_current": 0.3498,
     "iv_rank": 0.293867,
