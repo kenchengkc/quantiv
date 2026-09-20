@@ -71,6 +71,7 @@ FORECAST_FIELDS = {
     "options_status",
     "fallback_reason",
     "historical_event_count",
+    "hist_move_med_4q",
     "forecast_frozen",
     "forecast_id",
     "forecast_scored_at",
@@ -215,6 +216,12 @@ def _forecast_rank(event: dict) -> tuple[int, str]:
     strict = _positive(event.get("em_straddle_pct"))
     if strict is not None and options_are_pre_event:
         return (2, as_of)
+
+    historical = _positive(event.get("hist_move_med_4q"))
+    if historical is None and event.get("display_forecast_method") == "historical":
+        historical = _positive(event.get("display_forecast_pct"))
+    if historical is not None:
+        return (1, str(event.get("display_forecast_as_of") or earnings_date))
     return (0, "")
 
 
@@ -274,6 +281,25 @@ def _normalize_forecast(event: dict) -> dict:
                 "forecast_frozen": True,
             }
         )
+    else:
+        historical = _positive(row.get("hist_move_med_4q"))
+        if historical is None and row.get("display_forecast_method") == "historical":
+            historical = _positive(row.get("display_forecast_pct"))
+        if historical is not None:
+            row.update(
+                {
+                    "display_forecast_pct": historical,
+                    "display_forecast_method": "historical",
+                    "display_forecast_as_of": row.get("display_forecast_as_of")
+                    or row.get("earnings_date"),
+                    "ml_status": "unavailable_event",
+                    "options_status": "unavailable",
+                    "fallback_reason": row.get("fallback_reason") or "no_event_expiry",
+                    "historical_event_count": int(row.get("historical_event_count") or 4),
+                    "hist_move_med_4q": historical,
+                    "forecast_frozen": True,
+                }
+            )
     return row
 
 
@@ -354,6 +380,116 @@ def _symbol_history_candidate(key: EventKey) -> dict | None:
     return candidate if _forecast_rank(candidate)[0] > 0 else None
 
 
+
+def _symbol_expected_move_candidate(key: EventKey) -> dict | None:
+    """Recover a matching event forecast retained by the ticker page.
+
+    Some thinly traded names keep valid pre-event option evidence in
+    symbols/<ticker>.json even after the current analytical snapshot can no
+    longer reconstruct that event. The ticker page already renders this
+    evidence through the compatibility resolver; calendar recovery must see the
+    same candidate.
+    """
+
+    ticker, event_date = key
+    path = SYMBOLS_DIR / f"{ticker}.json"
+    if not path.exists():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+
+    expected = payload.get("expected_move") or {}
+    if str(expected.get("earnings_date") or "")[:10] != event_date:
+        return None
+
+    candidate: dict[str, Any] = {
+        "ticker": ticker,
+        "earnings_date": event_date,
+        "timing": expected.get("timing"),
+        "as_of_date": payload.get("as_of_date"),
+        "expiry_date": expected.get("expiration"),
+        "days_to_expiry": expected.get("dte"),
+        "lead_time_days": expected.get("lead_time_days"),
+        "atm_strike": expected.get("atm_strike"),
+        "atm_iv": expected.get("atm_iv"),
+        "em_straddle_abs": expected.get("straddle_abs"),
+        "em_straddle_pct": expected.get("straddle_pct"),
+        "em_iv_pct": expected.get("iv_pct"),
+        "em_method": expected.get("em_method"),
+    }
+    for field in ML_HISTORY_FIELDS | {
+        "forecast_id",
+        "forecast_scored_at",
+        "forecast_published_at",
+        "forecast_feature_cutoff_at",
+        "forecast_prediction_deadline_at",
+        "forecast_feature_snapshot_at",
+        "forecast_feature_hash",
+        "forecast_frozen_eligible",
+    }:
+        value = expected.get(field)
+        if value is not None:
+            candidate[field] = value
+
+    return candidate if _forecast_rank(candidate)[0] > 0 else None
+
+
+def _symbol_historical_candidate(key: EventKey) -> dict | None:
+    """Mirror the ticker page's four-prior-event historical median."""
+
+    ticker, event_date = key
+    path = SYMBOLS_DIR / f"{ticker}.json"
+    if not path.exists():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+
+    realized: list[tuple[str, float]] = []
+    for row in payload.get("earnings_history") or []:
+        event_iso = str(row.get("date") or "")[:10]
+        actual = row.get("actual")
+        if not event_iso or isinstance(actual, bool):
+            continue
+        try:
+            number = float(actual)
+        except (TypeError, ValueError):
+            continue
+        if not math.isfinite(number):
+            continue
+        realized.append((event_iso, abs(number)))
+
+    # Match buildHistorySeries(...).slice(-12), then the symbol page's
+    # priorHistoricalForecastWindow(..., targetDate, 4).
+    realized.sort(key=lambda item: item[0])
+    prior = [value for iso, value in realized[-12:] if iso < event_date][-4:]
+    if len(prior) < 2:
+        return None
+    ordered = sorted(prior)
+    middle = len(ordered) // 2
+    historical = (
+        ordered[middle]
+        if len(ordered) % 2
+        else (ordered[middle - 1] + ordered[middle]) / 2.0
+    )
+    return {
+        "ticker": ticker,
+        "earnings_date": event_date,
+        "display_forecast_pct": historical,
+        "display_forecast_method": "historical",
+        "display_forecast_as_of": event_date,
+        "ml_status": "unavailable_event",
+        "options_status": "unavailable",
+        "fallback_reason": "no_event_expiry",
+        "historical_event_count": len(prior),
+        "hist_move_med_4q": historical,
+        "forecast_frozen": True,
+    }
+
+
 def _merge_forecast(current: dict, historical: dict) -> dict:
     source = _normalize_forecast(historical)
     merged = dict(current)
@@ -420,16 +556,26 @@ def recover_week(
             if previous is None or _forecast_rank(event) > _forecast_rank(previous):
                 best[key] = event
 
-    # The symbol history can retain a later, exact pre-event IV observation
-    # than the compact week bundle. Prefer it when it has stronger/newer
-    # point-in-time evidence.
+    # Symbol payloads can retain evidence that the rebuilt week row no longer
+    # has: a matching legacy expected_move, an exact historical option row, or
+    # the ticker page's four-prior-event historical median. Reconcile all three
+    # through the same ML -> IV -> history hierarchy used by the UI.
     for key in targets:
-        symbol_candidate = _symbol_history_candidate(key)
-        if symbol_candidate is None:
-            continue
-        previous = best.get(key)
-        if previous is None or _forecast_rank(symbol_candidate) > _forecast_rank(previous):
-            best[key] = symbol_candidate
+        for candidate in (
+            _symbol_expected_move_candidate(key),
+            _symbol_history_candidate(key),
+        ):
+            if candidate is None:
+                continue
+            previous = best.get(key)
+            if previous is None or _forecast_rank(candidate) > _forecast_rank(previous):
+                best[key] = candidate
+
+        historical_candidate = _symbol_historical_candidate(key)
+        if historical_candidate is not None:
+            previous = best.get(key)
+            if previous is None or _forecast_rank(previous)[0] <= 1:
+                best[key] = historical_candidate
 
     changed: dict[EventKey, dict] = {}
     for key in sorted(targets):
@@ -442,6 +588,16 @@ def recover_week(
         elif _forecast_rank(candidate) > _forecast_rank(current):
             repaired = _merge_forecast(current, candidate)
         elif _forecast_rank(current)[0] == 0:
+            repaired = _merge_forecast(current, candidate)
+        elif (
+            _forecast_rank(candidate)[0] == 1
+            and _forecast_rank(current)[0] == 1
+            and _positive(candidate.get("display_forecast_pct"))
+            != _positive(current.get("display_forecast_pct"))
+        ):
+            # Historical rows are deterministic from the ticker page's exact
+            # four-prior-event cohort. On an equal-rank tie, that cohort wins
+            # over legacy means or stale DB-derived historical values.
             repaired = _merge_forecast(current, candidate)
         else:
             # Even when the numerical forecast is already present, old bundles
