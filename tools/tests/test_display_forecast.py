@@ -130,7 +130,7 @@ def _resolve(conn: duckdb.DuckDBPyConnection, **kwargs):
     )
 
 
-def test_strict_options_win_over_ml_for_headline_display():
+def test_ml_wins_over_strict_options_for_headline_display():
     conn = _conn()
     _pair(conn)
     result = _resolve(
@@ -141,8 +141,8 @@ def test_strict_options_win_over_ml_for_headline_display():
             "em_baseline_straddle": 0.081,
         },
     )
-    assert result.method == "options_math"
-    assert result.pct == 0.096
+    assert result.method == "ml"
+    assert result.pct == 0.041
     assert result.ml_status == "available"
     assert result.options_status == "decision_eligible"
     assert result.selected_options_details is not None
