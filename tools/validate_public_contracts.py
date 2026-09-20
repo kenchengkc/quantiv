@@ -562,8 +562,17 @@ def validate_repo() -> list[str]:
         ("forecast evidence", validate_dashboard_evidence),
         ("control plane", validate_control_plane),
         ("model validation", validate_model_validation),
-        ("research history", validate_research_history),
     ]
+
+    # research-history.json is generated/materialized state rather than a
+    # guaranteed member of a clean source checkout. Validate it strictly when
+    # present, but do not make a source-only frontend publication impossible
+    # when the artifact is intentionally absent. Frontend prebuild preserves a
+    # source-level artifact when available or constructs the explicit
+    # display-limited preview fallback otherwise.
+    if (PUBLIC / "research-history.json").is_file():
+        checks.append(("research history", validate_research_history))
+
     passed: list[str] = []
     for name, check in checks:
         check()
