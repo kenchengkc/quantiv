@@ -133,6 +133,21 @@ export function medianAbsoluteHistoryMove(history: HistoryPoint[]): number | nul
     : moves[middle];
 }
 
+/** Canonical historical forecast cohort: up to four realized earnings strictly
+ * before the target event. This mirrors the backend display-forecast contract
+ * and prevents a reported event from leaking its own realized move into the
+ * historical fallback or comparison benchmark. */
+export function priorHistoricalForecastWindow(
+  history: HistoryPoint[],
+  targetDate: string | null | undefined,
+  limit = 4,
+): HistoryPoint[] {
+  const beforeTarget = targetDate
+    ? history.filter((point) => point.date < targetDate.slice(0, 10))
+    : history;
+  return beforeTarget.slice(-Math.max(0, limit));
+}
+
 export function eventStudyEvidenceCounts(history: HistoryPoint[]) {
   const impliedObservations = history.filter(
     (point) => point.implied != null,
