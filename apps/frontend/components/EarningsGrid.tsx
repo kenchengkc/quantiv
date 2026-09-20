@@ -56,6 +56,8 @@ interface EarningsEvent extends DisplayForecastFields {
   em_straddle_pct?: number | null;
   em_iv_pct?: number | null;
   em_ml_pct?: number | null;
+  hist_move_med_4q?: number | null;
+  hist_move_avg_4q?: number | null;
   p25?: number | null;
   p75?: number | null;
   realized_move_pct?: number | null;
@@ -147,6 +149,7 @@ function ExpectedMoveHover({
   ivPct,
   straddlePct,
   mlPct,
+  historicalPct,
   method,
   bandLo,
   bandHi,
@@ -156,6 +159,7 @@ function ExpectedMoveHover({
   ivPct: number | null;
   straddlePct: number | null;
   mlPct: number | null;
+  historicalPct: number | null;
   method: DisplayForecastMethod | null;
   bandLo: number | null | undefined;
   bandHi: number | null | undefined;
@@ -177,6 +181,7 @@ function ExpectedMoveHover({
   const ivLine = fmtMovePct(ivPct);
   const straddleLine = fmtMovePct(straddlePct);
   const mlLine = fmtMovePct(mlPct);
+  const historicalLine = fmtMovePct(historicalPct);
   const bandLine =
     method === 'ml' && bandLo != null && bandHi != null
       ? `${fmtMovePct(bandLo)}–${fmtMovePct(bandHi)}`
@@ -237,24 +242,24 @@ function ExpectedMoveHover({
             pointerEvents: 'none',
           }}
         >
-          {mlLine ? (
+          {mlLine && (
             <TooltipLine label="ML forecast" value={`±${mlLine}`} />
-          ) : ivLine ? (
-            <TooltipLine label="IV forecast" value={`±${ivLine}`} />
-          ) : straddleLine ? (
-            <TooltipLine label="Straddle implied" value={`±${straddleLine}`} />
-          ) : method === 'historical' && moveLine ? (
-            <TooltipLine label="Historical median" value={`±${moveLine}`} />
-          ) : method === 'historical_prior' && moveLine ? (
-            <TooltipLine label="Historical prior" value={`±${moveLine}`} />
-          ) : moveLine ? (
-            <TooltipLine label={displayForecastLabel(method)} value={`±${moveLine}`} />
-          ) : null}
-          {mlLine && ivLine && (
-            <TooltipLine label="IV forecast" value={`±${ivLine}`} marginTop={4} />
+          )}
+          {ivLine && (
+            <TooltipLine label="IV forecast" value={`±${ivLine}`} marginTop={mlLine ? 4 : 0} />
+          )}
+          {historicalLine && (
+            <TooltipLine
+              label={method === 'historical_prior' && historicalPct === movePct ? 'Historical prior' : 'Historical median'}
+              value={`±${historicalLine}`}
+              marginTop={mlLine || ivLine ? 4 : 0}
+            />
           )}
           {straddleLine && (
-            <TooltipLine label="Straddle implied" value={`±${straddleLine}`} marginTop={4} />
+            <TooltipLine label="Straddle implied" value={`±${straddleLine}`} marginTop={mlLine || ivLine || historicalLine ? 4 : 0} />
+          )}
+          {!mlLine && !ivLine && !historicalLine && !straddleLine && moveLine && (
+            <TooltipLine label={displayForecastLabel(method)} value={`±${moveLine}`} />
           )}
           {!ivLine && !straddleLine && (method === 'historical' || method === 'historical_prior') && (
             <TooltipLine label="IV forecast" value="Unavailable" muted marginTop={4} />
@@ -282,6 +287,11 @@ function TickerRow({
   const straddlePct = ev.em_straddle_pct ?? null;
   const mlPct = ev.em_ml_pct ?? null;
   const resolvedForecast = resolveDisplayForecastCompat(ev);
+  const historicalPct =
+    finiteDisplayForecast(ev.hist_move_med_4q) ??
+    ((resolvedForecast.method === 'historical' || resolvedForecast.method === 'historical_prior')
+      ? resolvedForecast.pct
+      : null);
   const method = resolvedForecast.method ?? legacyForecastMethod(ev);
   const movePct = resolvedForecast.pct;
   const bandLo = method === 'ml' ? ev.p25 : null;
@@ -391,6 +401,7 @@ function TickerRow({
         ivPct={ivPct}
         straddlePct={straddlePct}
         mlPct={mlPct}
+        historicalPct={historicalPct}
         method={method}
         bandLo={bandLo}
         bandHi={bandHi}
