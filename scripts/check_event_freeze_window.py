@@ -14,7 +14,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT / "scripts") not in sys.path:
     sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
-from market_sessions import EASTERN, is_us_market_session  # noqa: E402
+from market_sessions import EASTERN, is_us_market_session, us_market_close  # noqa: E402
 
 
 def _emit(name: str, value: str) -> None:
@@ -50,7 +50,7 @@ def main() -> int:
     session_day = now.date()
 
     if not is_us_market_session(session_day):
-        _emit("run", "false")
+        _emit("run" if args.phase == "schedule" else "ready", "false")
         _emit("reason", "not_market_session")
         return 0
 
@@ -66,6 +66,16 @@ def main() -> int:
             "nightly_pre_bmo_window" if should_run else "outside_nightly_pre_bmo_window",
         )
         _emit("session_date", session_day.isoformat())
+        return 0
+
+    close_at = datetime.combine(
+        session_day,
+        us_market_close(session_day),
+        tzinfo=EASTERN,
+    )
+    if now < close_at:
+        _emit("ready", "false")
+        _emit("reason", "market_session_not_closed")
         return 0
 
     if not args.db.exists():
