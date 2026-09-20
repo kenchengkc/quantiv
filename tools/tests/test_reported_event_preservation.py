@@ -227,10 +227,10 @@ def test_reported_symbol_uses_iv_forecast_before_historical_median():
                 "timing": "after_market_close",
                 "actual": -0.14666,
                 "implied": 0.081714,
-                "implied_as_of": "2026-09-09",
+                "implied_as_of": "2026-09-08",
                 "implied_expiration": "2026-09-18",
-                "implied_dte": 9,
-                "implied_lead_days": 0,
+                "implied_dte": 10,
+                "implied_lead_days": 1,
                 "implied_atm_strike": 70.0,
                 "implied_straddle_abs": 5.72,
                 "implied_atm_iv": 0.62145,
@@ -249,8 +249,8 @@ def test_reported_symbol_uses_iv_forecast_before_historical_median():
 
     expected = result["expected_move"]
     assert expected["display_forecast_method"] == "options_math"
-    assert expected["display_forecast_pct"] == pytest.approx(round(0.62145 * (9 / 365.0) ** 0.5, 6))
-    assert expected["display_forecast_as_of"] == "2026-09-09"
+    assert expected["display_forecast_pct"] == pytest.approx(round(0.62145 * (10 / 365.0) ** 0.5, 6))
+    assert expected["display_forecast_as_of"] == "2026-09-08"
     assert expected["options_status"] == "decision_eligible"
     assert expected["forecast_frozen"] is True
 
