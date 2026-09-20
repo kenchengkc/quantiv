@@ -86,17 +86,17 @@ jobs:
       - name: Score a candidate without mutating production forecasts
         if: steps.input_gate.outputs.ready == 'true'
         run: |
-          python scripts/daily_score.py             --days-ahead 3             --output-path data/forecasts/event-freeze-candidate.parquet
+          python scripts/daily_score.py             --days-ahead 3             --output-path data/validation/event-freeze-candidate.parquet
 
       - name: Validate candidate model and option evidence
         if: steps.input_gate.outputs.ready == 'true'
         run: |
-          python scripts/validate_ml_pipeline.py forecasts             --forecast-path data/forecasts/event-freeze-candidate.parquet             --report data/validation/event_freeze_forecasts.json
+          python scripts/validate_ml_pipeline.py forecasts             --forecast-path data/validation/event-freeze-candidate.parquet             --report data/validation/event_freeze_forecasts.json
 
       - name: Promote only event-cutoff-eligible rows
         if: steps.input_gate.outputs.ready == 'true'
         run: |
-          python scripts/promote_event_freeze.py             data/forecasts/event-freeze-candidate.parquet
+          python scripts/promote_event_freeze.py             data/validation/event-freeze-candidate.parquet
 
       - name: Persist immutable prediction ledger
         if: steps.input_gate.outputs.ready == 'true'
