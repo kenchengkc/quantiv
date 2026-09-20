@@ -162,9 +162,9 @@ def _validate_display_provenance(
     if method == "ml":
         if ml_status != "available":
             errors.append(f"{identity}: ML method without available ML status")
-        if options_status != "unavailable":
+        if options_status not in {"decision_eligible", "indicative", "unavailable"}:
             errors.append(
-                f"{identity}: ML method requires unavailable options status, got {options_status!r}"
+                f"{identity}: ML method has incoherent options status={options_status!r}"
             )
         if fallback_reason is not None:
             errors.append(f"{identity}: ML method must not carry a fallback reason")
