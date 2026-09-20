@@ -85,9 +85,11 @@ def enrich_upcoming_event(
     if not earnings_iso:
         return event
     earnings_date = date.fromisoformat(earnings_iso)
-    if earnings_date < today:
-        # Reported rows must preserve the pre-event display forecast carried
-        # from the prior bundle; never recompute them with post-event evidence.
+    if earnings_date <= today:
+        # Event-day rows are already inside their freeze window. Never recompute
+        # a BMO event after the announcement or an AMC event after the close
+        # using a date-only build. The reported-event selector above carries the
+        # audited pre-event forecast; future dates alone may be recomputed.
         return event
 
     result = resolve_display_forecast(
