@@ -61,7 +61,7 @@ def test_enrichment_preserves_ml_snapshot_date_as_display_provenance():
     assert event["display_forecast_as_of"] == "2026-09-09"
 
 
-def test_enrichment_prefers_strict_iv_even_when_ml_is_available():
+def test_enrichment_prefers_ml_even_when_strict_iv_is_available():
     conn = duckdb.connect()
     event = {
         "ticker": "GIS",
@@ -83,8 +83,8 @@ def test_enrichment_prefers_strict_iv_even_when_ml_is_available():
         today=date(2026, 9, 19),
     )
 
-    assert event["display_forecast_method"] == "options_math"
-    assert event["display_forecast_pct"] == pytest.approx(0.1052)
+    assert event["display_forecast_method"] == "ml"
+    assert event["display_forecast_pct"] == pytest.approx(0.043)
     assert event["ml_status"] == "available"
     assert event["options_status"] == "decision_eligible"
 
