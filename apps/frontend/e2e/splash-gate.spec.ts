@@ -11,7 +11,11 @@ test.describe("homepage splash", () => {
     );
 
     const response = await page.request.get("/");
-    expect(await response.text()).toContain("quantiv-splash-wordmark");
+    const serverHtml = await response.text();
+    expect(serverHtml).toContain("quantiv-splash-wordmark");
+    expect(serverHtml).toMatch(/<meta[^>]+name="theme-color"[^>]+content="#000000"/);
+    expect(serverHtml).toMatch(/<meta[^>]+name="color-scheme"[^>]+content="dark"/);
+    expect(serverHtml).toContain('id="quantiv-first-paint"');
 
     await page.goto("/", { waitUntil: "domcontentloaded" });
 
