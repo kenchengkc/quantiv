@@ -169,8 +169,9 @@ def _option_evidence_is_pre_event(event: dict) -> bool:
     as_of = str(event.get("as_of_date") or "")[:10]
     if not earnings_date or not as_of:
         return False
-    if _is_after_close(event.get("timing")):
-        return as_of <= earnings_date
+    # Legacy public rows only have date-granular option provenance. A same-day
+    # AMC row cannot prove it preceded the 15:55 cutoff, so require a prior
+    # session here. Timestamped same-day evidence belongs in the new ledger.
     return as_of < earnings_date
 
 
