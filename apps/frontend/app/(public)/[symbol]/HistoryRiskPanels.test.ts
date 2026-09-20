@@ -3,6 +3,8 @@ import {
   buildHistorySeries,
   eventStudyEvidenceCounts,
   historyRowsToCsv,
+  medianAbsoluteHistoryMove,
+  priorHistoricalForecastWindow,
   type HistoryPoint,
 } from './HistoryRiskPanels';
 
@@ -77,6 +79,29 @@ describe('buildHistorySeries', () => {
     expect(result[0]?.modelAsOf).toBe('2026-09-15');
   });
 
+});
+
+describe('priorHistoricalForecastWindow', () => {
+  it('uses only the four realized events before the target earnings date', () => {
+    const rows = buildHistorySeries([
+      { date: '2026-09-16', timing: 'after_market_close', actual: 0.013788 },
+      { date: '2026-06-23', timing: 'after_market_close', actual: -0.001292 },
+      { date: '2026-03-19', timing: 'after_market_close', actual: 0.007694 },
+      { date: '2025-12-18', timing: 'after_market_close', actual: 0.005782 },
+      { date: '2025-09-18', timing: 'after_market_close', actual: 0.023179 },
+      { date: '2025-06-24', timing: 'after_market_close', actual: -0.032722 },
+    ]);
+
+    const cohort = priorHistoricalForecastWindow(rows, '2026-09-16');
+
+    expect(cohort.map((row) => row.date)).toEqual([
+      '2025-09-18',
+      '2025-12-18',
+      '2026-03-19',
+      '2026-06-23',
+    ]);
+    expect(medianAbsoluteHistoryMove(cohort)).toBeCloseTo(0.006738, 6);
+  });
 });
 
 describe('historyRowsToCsv', () => {
