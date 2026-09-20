@@ -56,6 +56,7 @@ function toCsv(
     'p90',
     'iv_rank',
     'hist_move_avg_4q',
+    'hist_move_med_4q',
     'iv_crush_pct',
     'lead_time_days',
     'days_to_expiry',
