@@ -21,6 +21,11 @@ if [ -z "$SOURCE_REVISION" ]; then
   SOURCE_REVISION="local"
 fi
 
+# Do not seal an internally inconsistent frontend corpus. In particular, a
+# matching earnings event must not publish one headline forecast in weeks/*.json
+# and a different one in symbols/<ticker>.json.
+"$PYTHON_BIN" tools/validate_public_contracts.py
+
 "$PYTHON_BIN" scripts/frontend_release.py build \
   --public-dir "$PUBLIC_DIR" \
   --output-dir "$STAGE_DIR" \
