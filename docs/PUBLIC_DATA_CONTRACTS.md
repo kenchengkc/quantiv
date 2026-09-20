@@ -35,7 +35,9 @@ The display field is additive and must not be used to infer analytical eligibili
 
 A symbol payload is the complete static research state generated for one ticker. It includes the EOD spot reference, option/straddle research features, earnings history, and any other generated analysis present for that release. The interactive page may overlay a fresher quote, but that quote does not mutate the underlying symbol research contract.
 
-For the published event, `expected_move.display_forecast_*` carries the same canonical presentation estimate and provenance as the week/screener row. Historical fallback rows are allowed to have no strict options evidence: `straddle_features` remains empty and option-specific fields stay null or absent rather than being synthesized. A genuine spot-updated ML response remains a separate model-comparison signal and does not rewrite the static contract. After an event reports, the selected ML → IV/options → history headline and its underlying pre-event evidence are frozen so calendar, symbol, and historical-event surfaces reuse the same value without post-event recomputation.
+For the published event, `expected_move.display_forecast_*` carries the same canonical presentation estimate and provenance as the week/screener row. Historical fallback rows are allowed to have no strict options evidence: `straddle_features` remains empty and option-specific fields stay null or absent rather than being synthesized. A genuine spot-updated ML response remains a separate model-comparison signal and does not rewrite the static contract.
+
+After an event reports, the selected ML → IV/options → history headline comes only from the immutable event-prediction ledger or from explicitly audited legacy publication history. Generated symbol/history rows may additionally expose optional audit fields such as `forecast_id`, `forecast_scored_at`, `forecast_feature_cutoff_at`, `forecast_prediction_deadline_at`, `forecast_feature_snapshot_at`, `forecast_feature_hash`, and `forecast_frozen_eligible`. These fields are provenance; consumers must not manufacture them for legacy rows that cannot be verified.
 
 ### Display forecast status
 
