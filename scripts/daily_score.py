@@ -45,11 +45,18 @@ from ml.pipeline_validation import (  # noqa: E402 - standalone script path setu
     FORECAST_REQUIRED_COLUMNS,
 )
 from ml.quantiles import rearrange_quantile_array  # noqa: E402 - standalone script path setup
-from event_forecast_ledger import (  # noqa: E402 - standalone script path setup
-    annotate_forecasts,
-    append_event_prediction_ledger,
-    latest_eligible_predictions,
-)
+try:  # noqa: E402 - standalone script path setup
+    from event_forecast_ledger import (
+        annotate_forecasts,
+        append_event_prediction_ledger,
+        latest_eligible_predictions,
+    )
+except ModuleNotFoundError:  # imported as scripts.daily_score in pytest
+    from scripts.event_forecast_ledger import (
+        annotate_forecasts,
+        append_event_prediction_ledger,
+        latest_eligible_predictions,
+    )
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
