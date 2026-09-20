@@ -21,7 +21,7 @@ import json
 import math
 import subprocess
 import sys
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -34,6 +34,7 @@ CALENDAR_REFERENCE = PUBLIC_DIR / "calendar-reference.json"
 if str(REPO_ROOT / "tools") not in sys.path:
     sys.path.insert(0, str(REPO_ROOT / "tools"))
 from frontend_data.payloads import build_screener_payload  # noqa: E402
+from event_forecast_ledger import EASTERN, event_cutoffs  # noqa: E402
 
 EventKey = tuple[str, str]
 
@@ -70,6 +71,14 @@ FORECAST_FIELDS = {
     "fallback_reason",
     "historical_event_count",
     "forecast_frozen",
+    "forecast_id",
+    "forecast_scored_at",
+    "forecast_published_at",
+    "forecast_feature_cutoff_at",
+    "forecast_prediction_deadline_at",
+    "forecast_feature_snapshot_at",
+    "forecast_feature_hash",
+    "forecast_frozen_eligible",
 }
 
 ML_HISTORY_FIELDS = {
@@ -112,6 +121,34 @@ def _bundle_at(commit: str, path: Path) -> dict | None:
         return None
 
 
+def _commit_at(commit: str) -> datetime | None:
+    try:
+        raw = _git("show", "-s", "--format=%cI", commit).decode().strip()
+        parsed = datetime.fromisoformat(raw)
+    except (subprocess.CalledProcessError, UnicodeDecodeError, ValueError):
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed
+
+
+def _published_before_deadline(event: dict) -> bool:
+    published = event.get("forecast_published_at")
+    if not published:
+        return False
+    try:
+        published_at = datetime.fromisoformat(str(published).replace("Z", "+00:00"))
+        earnings_date = date.fromisoformat(str(event.get("earnings_date") or "")[:10])
+    except ValueError:
+        return False
+    if published_at.tzinfo is None:
+        published_at = published_at.replace(tzinfo=timezone.utc)
+    _feature_cutoff, prediction_deadline = event_cutoffs(
+        earnings_date, event.get("timing")
+    )
+    return published_at.astimezone(EASTERN) <= prediction_deadline
+
+
 def _positive(value: Any) -> float | None:
     if isinstance(value, bool):
         return None
@@ -141,8 +178,17 @@ def _forecast_rank(event: dict) -> tuple[int, str]:
     earnings_date = str(event.get("earnings_date") or "")[:10]
     ml = _positive(event.get("em_ml_pct"))
     ml_as_of = str(event.get("ml_snapshot_date") or "")[:10]
-    if ml is not None and ml_as_of and (not earnings_date or ml_as_of < earnings_date):
-        return (4, ml_as_of)
+    ml_audited = (
+        event.get("forecast_frozen_eligible") is True
+        or _published_before_deadline(event)
+    )
+    if (
+        ml is not None
+        and ml_as_of
+        and (not earnings_date or ml_as_of < earnings_date)
+        and ml_audited
+    ):
+        return (4, str(event.get("forecast_scored_at") or event.get("forecast_published_at") or ml_as_of))
 
     as_of = str(event.get("as_of_date") or "")[:10]
     options_are_pre_event = _option_evidence_is_pre_event(event)
@@ -266,6 +312,18 @@ def _symbol_history_candidate(key: EventKey) -> dict | None:
         value = row.get(field)
         if value is not None:
             candidate[field] = value
+    for field in (
+        "forecast_id",
+        "forecast_scored_at",
+        "forecast_feature_cutoff_at",
+        "forecast_prediction_deadline_at",
+        "forecast_feature_snapshot_at",
+        "forecast_feature_hash",
+        "forecast_frozen_eligible",
+    ):
+        value = row.get(field)
+        if value is not None:
+            candidate[field] = value
 
     quality = row.get("implied_quality_status")
     if quality not in {None, "decision_eligible_eod"}:
@@ -327,7 +385,13 @@ def recover_week(
         historical = _bundle_at(commit, path)
         if not historical:
             continue
-        for event in historical.get("events") or []:
+        published_at = _commit_at(commit)
+        for raw_event in historical.get("events") or []:
+            event = dict(raw_event)
+            if published_at is not None:
+                event["forecast_published_at"] = published_at.astimezone(
+                    timezone.utc
+                ).isoformat()
             key = (event.get("ticker"), event.get("earnings_date"))
             if key not in targets or _forecast_rank(event)[0] == 0:
                 continue
@@ -414,6 +478,14 @@ def _symbol_expected_move(event: dict) -> dict:
         "fallback_reason": event.get("fallback_reason"),
         "historical_event_count": event.get("historical_event_count"),
         "forecast_frozen": True,
+        "forecast_id": event.get("forecast_id"),
+        "forecast_scored_at": event.get("forecast_scored_at"),
+        "forecast_published_at": event.get("forecast_published_at"),
+        "forecast_feature_cutoff_at": event.get("forecast_feature_cutoff_at"),
+        "forecast_prediction_deadline_at": event.get("forecast_prediction_deadline_at"),
+        "forecast_feature_snapshot_at": event.get("forecast_feature_snapshot_at"),
+        "forecast_feature_hash": event.get("forecast_feature_hash"),
+        "forecast_frozen_eligible": event.get("forecast_frozen_eligible"),
     }
     return {key: value for key, value in mapped.items() if value is not None}
 
