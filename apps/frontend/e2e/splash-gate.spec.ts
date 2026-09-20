@@ -15,6 +15,31 @@ test.describe("homepage splash", () => {
 
     await page.goto("/", { waitUntil: "domcontentloaded" });
 
+    await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute(
+      "content",
+      "#000000",
+    );
+    await expect(page.locator('meta[name="color-scheme"]')).toHaveAttribute(
+      "content",
+      "dark",
+    );
+    await expect(page.locator("head > style#quantiv-first-paint")).toHaveCount(1);
+
+    const firstPaintSurface = await page.evaluate(() => {
+      const rootStyle = getComputedStyle(document.documentElement);
+      const bodyStyle = getComputedStyle(document.body);
+      return {
+        rootBackground: rootStyle.backgroundColor,
+        bodyBackground: bodyStyle.backgroundColor,
+        rootColorScheme: rootStyle.colorScheme,
+        bodyMargin: bodyStyle.margin,
+      };
+    });
+    expect(firstPaintSurface.rootBackground).toBe("rgb(0, 0, 0)");
+    expect(firstPaintSurface.bodyBackground).toBe("rgb(0, 0, 0)");
+    expect(firstPaintSurface.rootColorScheme).toBe("dark");
+    expect(firstPaintSurface.bodyMargin).toBe("0px");
+
     await expect(
       page.locator("head > script#quantiv-splash-session"),
     ).toHaveCount(1);
