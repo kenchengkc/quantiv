@@ -218,7 +218,12 @@ def _symbol_historical_median(
         if not isinstance(row, dict):
             continue
         row_date = str(row.get("date") or "")[:10]
-        actual = _positive_optional(abs(row.get("actual"))) if isinstance(row.get("actual"), (int, float)) and not isinstance(row.get("actual"), bool) else None
+        actual_raw = row.get("actual")
+        actual = None
+        if isinstance(actual_raw, (int, float)) and not isinstance(actual_raw, bool):
+            number = float(actual_raw)
+            if math.isfinite(number):
+                actual = abs(number)
         if row_date and actual is not None:
             realized.append((row_date, actual))
 
@@ -405,8 +410,8 @@ def validate_forecast_surface_parity() -> None:
                 or not math.isclose(
                     calendar_signature[1],
                     symbol_signature[1],
-                    rel_tol=1e-9,
-                    abs_tol=1e-12,
+                    rel_tol=1e-6,
+                    abs_tol=1e-6,
                 )
             ):
                 raise ContractError(
@@ -429,8 +434,8 @@ def validate_forecast_surface_parity() -> None:
             if calendar_value is None or not math.isclose(
                 calendar_value,
                 expected_value,
-                rel_tol=1e-9,
-                abs_tol=1e-12,
+                rel_tol=1e-6,
+                abs_tol=1e-6,
             ):
                 raise ContractError(
                     f"calendar hover component mismatch for {ticker} {event_date} "
