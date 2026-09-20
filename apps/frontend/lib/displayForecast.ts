@@ -91,14 +91,12 @@ export function finiteDisplayForecast(value: number | null | undefined): number 
 
 /**
  * Transitional read compatibility for public JSON generated before the
- * display-forecast contract landed. Point-in-time IV/options evidence is the
- * product headline whenever it exists, followed by ML and only then historical
- * fallbacks. This intentionally lets raw option fields supersede stale canonical
- * ML/historical fields during a publication transition. An explicitly supplied
- * history estimate has
- * priority over legacy summary fields because callers can calculate it from a
- * richer symbol history. This is display-only and never changes analytical
- * eligibility or ML-only filtering.
+ * display-forecast contract landed.
+ *
+ * Product headline priority is ML -> IV/options -> historical. This helper
+ * intentionally ignores a stale canonical historical/options field when a
+ * stronger raw ML signal is present so calendar, screener, watchlist and symbol
+ * pages cannot drift during a publication transition.
  */
 export function resolveDisplayForecastCompat(
   fields: LegacyDisplayForecastFields | null | undefined,
@@ -111,11 +109,14 @@ export function resolveDisplayForecastCompat(
       : { pct: null, method: null };
   }
 
-  // Product display policy is option/IV first. Raw point-in-time option
-  // evidence wins even when an older generated payload still carries an ML or
-  // historical canonical field. This keeps calendar and symbol surfaces
-  // consistent during publication transitions and avoids falling back to
-  // history when usable implied-volatility evidence exists.
+  const ml = finiteDisplayForecast(fields.em_ml_pct);
+  if (ml != null) return { pct: ml, method: 'ml' };
+
+  const canonical = finiteDisplayForecast(fields.display_forecast_pct);
+  if (canonical != null && fields.display_forecast_method === 'ml') {
+    return { pct: canonical, method: 'ml' };
+  }
+
   const iv =
     finiteDisplayForecast(fields.em_iv_pct) ??
     finiteDisplayForecast(fields.iv_pct);
@@ -126,20 +127,12 @@ export function resolveDisplayForecastCompat(
     finiteDisplayForecast(fields.straddle_pct);
   if (straddle != null) return { pct: straddle, method: 'options_math' };
 
-  const canonical = finiteDisplayForecast(fields.display_forecast_pct);
   if (
     canonical != null &&
     (fields.display_forecast_method === 'options_math' ||
       fields.display_forecast_method === 'options_indicative')
   ) {
     return { pct: canonical, method: fields.display_forecast_method };
-  }
-
-  const ml = finiteDisplayForecast(fields.em_ml_pct);
-  if (ml != null) return { pct: ml, method: 'ml' };
-
-  if (canonical != null && fields.display_forecast_method === 'ml') {
-    return { pct: canonical, method: 'ml' };
   }
 
   const canonicalHistorical =
