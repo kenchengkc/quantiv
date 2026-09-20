@@ -87,6 +87,14 @@ apps/frontend/public/
 
 Provider outputs are reconciled into `data/earnings_calendar.csv`. The integrity gate must pass before downstream generation proceeds.
 
+### Point-in-time earnings forecast freeze
+
+The daily forecast file is not the historical source of truth. Every model score is appended to an immutable event prediction ledger. Event-specific cutoff validation uses the repository-wide NYSE calendar, including holidays and early closes.
+
+BMO/unknown events use the previous session close as their feature boundary and reject any model score created on the earnings calendar day. AMC targets five minutes before the event-day close. Because the current options/OHLCV research path is EOD and date-granular, same-day AMC rows cannot claim that cutoff unless a future timestamped intraday source proves it; the system retains the latest earlier eligible forecast instead.
+
+A separate post-close workflow runs in one ET-aware settlement window after the NYSE close. It refreshes the finalized session, requires both OHLCV and options inputs to contain that session, scores a candidate without mutating the active dated forecast, validates it, then promotes only ledger-eligible rows. This gives next-session BMO events the previous close while remaining fail-closed when providers have not finalized the session.
+
 ## Spot-updated ML path
 
 When configured, symbol and watchlist pages can request a spot-updated re-score through a signed proxy:
@@ -188,7 +196,8 @@ See [RAILWAY_SETUP.md](RAILWAY_SETUP.md) for deployment instructions.
 | Workflow | Trigger | Purpose |
 |---|---|---|
 | `ci.yml` | Pull requests and pushes to `main` | Lint, build, pytest, and Playwright |
-| `daily-refresh.yml` | Nightly | Data refresh, scoring, frontend generation, and optional training |
+| `data-refresh.yml` | Daily | Data refresh, scoring, frontend generation, and publication |
+| `event-forecast-freeze.yml` | Weekday post-close, ET-gated | Refresh finalized session data, validate a candidate, and append eligible pre-event forecasts to the immutable ledger |
 | `refresh-broad.yml` | Weekday off-hours | Polygon quote-cache warming |
 | `refresh-ticker-names.yml` | Quarterly | SEC ticker-name and exchange refresh |
 | `av-enrichment.yml` | Manual only | Isolated provider-signal research artifact; never writes to `main` |
