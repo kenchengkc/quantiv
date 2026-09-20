@@ -592,12 +592,17 @@ def recover_week(
         elif (
             _forecast_rank(candidate)[0] == 1
             and _forecast_rank(current)[0] == 1
-            and _positive(candidate.get("display_forecast_pct"))
-            != _positive(current.get("display_forecast_pct"))
+            and (
+                _positive(candidate.get("display_forecast_pct"))
+                != _positive(current.get("display_forecast_pct"))
+                or _positive(candidate.get("hist_move_med_4q"))
+                != _positive(current.get("hist_move_med_4q"))
+            )
         ):
             # Historical rows are deterministic from the ticker page's exact
             # four-prior-event cohort. On an equal-rank tie, that cohort wins
-            # over legacy means or stale DB-derived historical values.
+            # over legacy means or stale DB-derived historical values, and the
+            # explicit median is retained for the calendar hover breakdown.
             repaired = _merge_forecast(current, candidate)
         else:
             # Even when the numerical forecast is already present, old bundles
