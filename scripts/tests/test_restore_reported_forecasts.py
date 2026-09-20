@@ -13,7 +13,7 @@ def _event(ticker: str, earnings_date: str, **extra) -> dict:
     return {"ticker": ticker, "earnings_date": earnings_date, **extra}
 
 
-def test_forecast_rank_prefers_iv_over_ml_when_both_are_pre_event():
+def test_forecast_rank_prefers_ml_over_iv_when_both_are_pre_event():
     ml = _event(
         "ADBE",
         "2026-09-10",
@@ -29,10 +29,10 @@ def test_forecast_rank_prefers_iv_over_ml_when_both_are_pre_event():
         as_of_date="2026-09-10",
     )
 
-    assert restore._forecast_rank(options) > restore._forecast_rank(ml)
+    assert restore._forecast_rank(ml) > restore._forecast_rank(options)
 
 
-def test_normalize_legacy_row_prefers_iv_but_preserves_ml_provenance():
+def test_normalize_legacy_row_prefers_ml_but_preserves_options_provenance():
     row = restore._normalize_forecast(
         _event(
             "FDX",
@@ -46,8 +46,8 @@ def test_normalize_legacy_row_prefers_iv_but_preserves_ml_provenance():
         )
     )
 
-    assert row["display_forecast_pct"] == pytest.approx(0.052634)
-    assert row["display_forecast_method"] == "options_math"
+    assert row["display_forecast_pct"] == pytest.approx(0.036898)
+    assert row["display_forecast_method"] == "ml"
     assert row["display_forecast_as_of"] == "2026-09-14"
     assert row["ml_status"] == "available"
     assert row["options_status"] == "decision_eligible"
@@ -113,8 +113,8 @@ def test_recover_week_repairs_present_row_instead_of_only_missing_rows(
     assert ("FDX", "2026-09-16") in repaired
     payload = json.loads(path.read_text(encoding="utf-8"))
     event = payload["events"][0]
-    assert event["display_forecast_method"] == "options_math"
-    assert event["display_forecast_pct"] == pytest.approx(0.052634)
+    assert event["display_forecast_method"] == "ml"
+    assert event["display_forecast_pct"] == pytest.approx(0.036898)
     assert event["realized_move_pct"] == pytest.approx(0.013788)
 
 
@@ -198,4 +198,4 @@ def test_symbol_history_candidate_computes_event_iv_forecast(
     assert candidate["em_iv_pct"] == pytest.approx(
         0.29635 * (16 / 365.0) ** 0.5
     )
-    assert restore._normalize_forecast(candidate)["display_forecast_method"] == "options_math"
+    assert restore._normalize_forecast(candidate)["display_forecast_method"] == "ml"
