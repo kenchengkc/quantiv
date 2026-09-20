@@ -170,7 +170,7 @@ def test_same_day_bmo_options_are_rejected_as_post_event_evidence():
     assert restore._forecast_rank(ml)[0] > 0
 
 
-def test_symbol_history_candidate_computes_event_iv_forecast(
+def test_symbol_history_candidate_computes_prior_session_event_iv_forecast(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ):
@@ -184,9 +184,9 @@ def test_symbol_history_candidate_computes_event_iv_forecast(
                         "date": "2026-09-16",
                         "timing": "after_market_close",
                         "implied": 0.049818,
-                        "implied_as_of": "2026-09-16",
+                        "implied_as_of": "2026-09-15",
                         "implied_expiration": "2026-10-02",
-                        "implied_dte": 16,
+                        "implied_dte": 17,
                         "implied_atm_iv": 0.29635,
                         "implied_quality_status": "decision_eligible_eod",
                         "em_ml_pct": 0.036898,
@@ -204,7 +204,7 @@ def test_symbol_history_candidate_computes_event_iv_forecast(
     assert candidate is not None
     assert candidate["em_straddle_pct"] == pytest.approx(0.049818)
     assert candidate["em_iv_pct"] == pytest.approx(
-        0.29635 * (16 / 365.0) ** 0.5
+        0.29635 * (17 / 365.0) ** 0.5
     )
     assert restore._normalize_forecast(candidate)["display_forecast_method"] == "options_math"
 
