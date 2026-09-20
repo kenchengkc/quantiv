@@ -735,12 +735,11 @@ def resolve_display_forecast(
     universe_prior: dict[str, Any] | None = None,
     policy: DisplayPolicy | None = None,
 ) -> DisplayForecast:
-    """Resolve the user-facing forecast with IV/options evidence first.
+    """Resolve the user-facing forecast using ML -> IV/options -> history.
 
-    The headline is intentionally market-implied whenever point-in-time option
-    evidence exists. ML remains preserved as a separate research/model signal
-    and becomes the headline only when no usable IV/options estimate is
-    available. Historical estimates remain the final presentation fallback.
+    A validated ML forecast is always the headline when available. Point-in-time
+    IV/options evidence is the first fallback, and historical estimates are used
+    only when neither model nor option evidence exists.
     """
 
     active_policy = policy or load_display_policy()
@@ -755,6 +754,34 @@ def resolve_display_forecast(
         or (strict_options or {}).get("straddle_pct")
     )
     strict_pct = strict_iv or strict_straddle
+
+    # ML is the canonical product forecast whenever a validated point estimate
+    # exists. Preserve option availability in provenance instead of pretending
+    # the option signal is absent.
+    if ml_pct is not None:
+        return DisplayForecast(
+            pct=ml_pct,
+            method="ml",
+            as_of=_forecast_as_of(ml_forecast, as_of_date),
+            ml_status="available",
+            options_status=(
+                "decision_eligible" if strict_pct is not None else "unavailable"
+            ),
+            fallback_reason=None,
+            selected_options_details=(
+                {
+                    "estimator": "atm_iv" if strict_iv is not None else "straddle_mid",
+                    "expiry_date": (strict_options or {}).get("expiry_date"),
+                    "dte": (strict_options or {}).get("dte"),
+                    "atm_iv": (strict_options or {}).get("atm_iv"),
+                    "atm_strike": (strict_options or {}).get("atm_strike"),
+                    "straddle_price": (strict_options or {}).get("straddle_price"),
+                }
+                if strict_pct is not None
+                else None
+            ),
+        )
+
     if strict_pct is not None:
         return DisplayForecast(
             pct=strict_pct,
@@ -773,9 +800,6 @@ def resolve_display_forecast(
             },
         )
 
-    # Evaluate both display-only option paths before considering ML. Prefer the
-    # IV-based estimate; the paired-straddle estimate remains the next option
-    # fallback when IV itself is not usable.
     indicative_pair, pair_failure_reason = _select_indicative_pair(
         conn,
         ticker=ticker,
@@ -827,16 +851,6 @@ def resolve_display_forecast(
                 fallback_reason="quote_quality",
                 selected_options_details=details,
             )
-
-    if ml_pct is not None:
-        return DisplayForecast(
-            pct=ml_pct,
-            method="ml",
-            as_of=_forecast_as_of(ml_forecast, as_of_date),
-            ml_status="available",
-            options_status="unavailable",
-            fallback_reason=None,
-        )
 
     historical = _ticker_historical_moves(
         conn,
