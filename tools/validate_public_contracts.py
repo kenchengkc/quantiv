@@ -18,6 +18,13 @@ SHA256_RE = re.compile(r"^(?:sha256:)?[0-9a-f]{64}$")
 SYMBOL_RE = re.compile(r"^[A-Z][A-Z0-9.\-]{0,9}$")
 SOURCE_UNIVERSE_SCHEMA = "quantiv.historical-event-universe.v1"
 PREVIEW_UNIVERSE_SCHEMA = "quantiv.historical-event-universe.preview.v1"
+DISPLAY_FORECAST_METHODS = {
+    "ml",
+    "options_math",
+    "options_indicative",
+    "historical",
+    "historical_prior",
+}
 
 
 class ContractError(ValueError):
@@ -124,6 +131,94 @@ def validate_symbol_payloads() -> None:
             raise ContractError(f"symbol payload/path mismatch: {path.name} -> {symbol}")
         _list(payload["straddle_features"], f"{path.name}.straddle_features")
         _list(payload["earnings_history"], f"{path.name}.earnings_history")
+
+
+
+def _display_forecast_signature(
+    payload: dict[str, Any],
+    *,
+    label: str,
+) -> tuple[str, float] | None:
+    method = payload.get("display_forecast_method")
+    pct = payload.get("display_forecast_pct")
+    if method is None and pct is None:
+        return None
+    if method not in DISPLAY_FORECAST_METHODS:
+        raise ContractError(f"{label} has invalid display_forecast_method={method!r}")
+    value = _finite(pct, f"{label}.display_forecast_pct")
+    if value <= 0:
+        raise ContractError(f"{label}.display_forecast_pct must be positive")
+    return str(method), value
+
+
+def validate_forecast_surface_parity() -> None:
+    """Require one event identity to publish one headline forecast everywhere."""
+
+    week_events: dict[
+        tuple[str, str],
+        tuple[tuple[str, float] | None, str],
+    ] = {}
+    for path in sorted((PUBLIC / "weeks").glob("*.json")):
+        payload = _object(_read(path), str(path))
+        for index, event_raw in enumerate(_list(payload.get("events"), f"{path.name}.events")):
+            event = _object(event_raw, f"{path.name}.events[{index}]")
+            ticker = event.get("ticker")
+            earnings_date = event.get("earnings_date")
+            if not isinstance(ticker, str) or not isinstance(earnings_date, str):
+                continue
+            identity = (ticker.upper(), earnings_date[:10])
+            signature = _display_forecast_signature(
+                event,
+                label=f"{path.name}:{identity[0]}:{identity[1]}",
+            )
+            existing = week_events.get(identity)
+            if existing is not None and existing[0] != signature:
+                raise ContractError(
+                    f"calendar forecast disagrees across week artifacts for "
+                    f"{identity[0]} {identity[1]}"
+                )
+            week_events[identity] = (signature, path.name)
+
+    for path in sorted((PUBLIC / "symbols").glob("*.json")):
+        payload = _object(_read(path), str(path))
+        symbol = payload.get("symbol")
+        expected = payload.get("expected_move")
+        if not isinstance(symbol, str) or not isinstance(expected, dict):
+            continue
+        earnings_date = expected.get("earnings_date")
+        if not isinstance(earnings_date, str) or not earnings_date:
+            continue
+        identity = (symbol.upper(), earnings_date[:10])
+        calendar = week_events.get(identity)
+        if calendar is None:
+            continue
+        calendar_signature, calendar_path = calendar
+        symbol_signature = _display_forecast_signature(
+            expected,
+            label=f"{path.name}.expected_move",
+        )
+        if calendar_signature is None and symbol_signature is not None:
+            raise ContractError(
+                f"calendar is missing canonical headline forecast for "
+                f"{identity[0]} {identity[1]} while {path.name} publishes one"
+            )
+        if calendar_signature is not None and symbol_signature is None:
+            raise ContractError(
+                f"{path.name} is missing canonical headline forecast for "
+                f"{identity[0]} {identity[1]} while {calendar_path} publishes one"
+            )
+        if calendar_signature is None or symbol_signature is None:
+            continue
+        if calendar_signature[0] != symbol_signature[0] or not math.isclose(
+            calendar_signature[1],
+            symbol_signature[1],
+            rel_tol=1e-12,
+            abs_tol=1e-12,
+        ):
+            raise ContractError(
+                f"calendar/symbol headline mismatch for {identity[0]} {identity[1]}: "
+                f"{calendar_signature} != {symbol_signature}"
+            )
 
 
 def validate_dashboard_evidence() -> None:
@@ -448,6 +543,7 @@ def validate_repo() -> list[str]:
         ("schema documents", validate_schema_documents),
         ("screener", validate_screener),
         ("symbol payloads", validate_symbol_payloads),
+        ("forecast surface parity", validate_forecast_surface_parity),
         ("forecast evidence", validate_dashboard_evidence),
         ("control plane", validate_control_plane),
         ("model validation", validate_model_validation),
