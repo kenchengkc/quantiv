@@ -16,7 +16,7 @@ def test_eod_observation_must_precede_the_event_session() -> None:
 
     assert _is_pre_event_observation(date(2026, 2, 9), event, "before_market_open")
     assert not _is_pre_event_observation(event, event, "before_market_open")
-    assert _is_pre_event_observation(event, event, "after_market_close")
+    assert not _is_pre_event_observation(event, event, "after_market_close")
     assert not _is_pre_event_observation(date(2026, 2, 11), event, "after_market_close")
     assert not _is_pre_event_observation(event, event, "unknown")
 
@@ -69,7 +69,8 @@ def test_historical_evidence_respects_bmo_and_amc_observation_cutoffs() -> None:
 
     assert evidence[date(2026, 2, 10)]["implied_as_of"] == "2026-02-09"
     assert evidence[date(2026, 2, 10)]["implied_lead_days"] == 1
-    assert evidence[date(2026, 5, 10)]["implied_as_of"] == "2026-05-10"
+    assert evidence[date(2026, 5, 10)]["implied_as_of"] == "2026-05-09"
+    assert evidence[date(2026, 5, 10)]["implied_lead_days"] == 1
     assert evidence[date(2026, 5, 10)]["implied_expiration"] == "2026-05-15"
 
 
