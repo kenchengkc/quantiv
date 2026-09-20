@@ -33,7 +33,7 @@ import {
   usePrevAppLocation,
 } from './SymbolPageHeader';
 import { buildTermRows, TermFan } from './ForecastPanels';
-import { buildHistorySeries, GreeksPanel, HistoryBlock, medianAbsoluteHistoryMove } from './HistoryRiskPanels';
+import { buildHistorySeries, GreeksPanel, HistoryBlock, medianAbsoluteHistoryMove, priorHistoricalForecastWindow } from './HistoryRiskPanels';
 import ScenarioRiskPanel from './ScenarioRiskPanel';
 import ResearchSnapshotRibbon from './ResearchSnapshotRibbon';
 import MoveComparisonChart from './MoveComparisonChart';
@@ -630,14 +630,19 @@ export default function SymbolPage({
   }
 
   const em = researchMatchesPublished ? data.expected_move : undefined;
+  const earningsDate = displayEarningsDate({
+    todayIso,
+    publishedDate: publishedEvent?.earnings_date,
+    nextEarnings: data.next_earnings,
+    researchDate: data.expected_move?.earnings_date,
+  });
   const historySeries = buildHistorySeries(data.earnings_history);
-  const comparisonHistory = historySeries.slice(-8);
-  const compatibilityHistory = historySeries.slice(-4);
-  const historicalMedianMovePct = medianAbsoluteHistoryMove(comparisonHistory);
-  const historicalCompatPct =
-    compatibilityHistory.length >= 2
-      ? medianAbsoluteHistoryMove(compatibilityHistory)
+  const comparisonHistory = priorHistoricalForecastWindow(historySeries, earningsDate);
+  const historicalMedianMovePct =
+    comparisonHistory.length >= 2
+      ? medianAbsoluteHistoryMove(comparisonHistory)
       : null;
+  const historicalCompatPct = historicalMedianMovePct;
 
   const liveForSymbol = live?.symbol === symbol ? live : null;
   const intradayForSymbol = intraday?.symbol === symbol ? intraday : null;
@@ -660,12 +665,6 @@ export default function SymbolPage({
         : 0;
 
   const straddlePct = finiteDisplayForecast(em?.straddle_pct) ?? 0;
-  const earningsDate = displayEarningsDate({
-    todayIso,
-    publishedDate: publishedEvent?.earnings_date,
-    nextEarnings: data.next_earnings,
-    researchDate: data.expected_move?.earnings_date,
-  });
   const earningsTiming = timingText(
     publishedEvent?.timing ?? em?.timing ?? data.next_earnings_timing,
   );
