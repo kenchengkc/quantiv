@@ -109,6 +109,8 @@ def test_recover_week_repairs_present_row_instead_of_only_missing_rows(
         lambda _commit: restore.datetime.fromisoformat("2026-09-15T20:00:00+00:00"),
     )
     monkeypatch.setattr(restore, "_symbol_history_candidate", lambda _key: None)
+    monkeypatch.setattr(restore, "_symbol_expected_move_candidate", lambda _key: None)
+    monkeypatch.setattr(restore, "_symbol_historical_candidate", lambda _key: None)
 
     repaired = restore.recover_week(
         path,
@@ -208,6 +210,77 @@ def test_symbol_history_candidate_computes_prior_session_event_iv_forecast(
     )
     assert restore._normalize_forecast(candidate)["display_forecast_method"] == "options_math"
 
+
+
+
+def test_symbol_expected_move_candidate_recovers_legacy_pre_event_iv(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    symbols = tmp_path / "symbols"
+    symbols.mkdir()
+    (symbols / "ABM.json").write_text(
+        json.dumps(
+            {
+                "as_of_date": "2026-08-27",
+                "expected_move": {
+                    "earnings_date": "2026-09-08",
+                    "timing": "before_market_open",
+                    "expiration": "2026-09-18",
+                    "dte": 22,
+                    "lead_time_days": 12,
+                    "atm_strike": 50.0,
+                    "atm_iv": 0.545013,
+                    "straddle_abs": 3.775,
+                    "straddle_pct": 0.0755,
+                    "iv_pct": 0.133805,
+                    "em_method": "options_math",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(restore, "SYMBOLS_DIR", symbols)
+
+    candidate = restore._symbol_expected_move_candidate(("ABM", "2026-09-08"))
+
+    assert candidate is not None
+    assert candidate["em_iv_pct"] == pytest.approx(0.133805)
+    assert candidate["em_straddle_pct"] == pytest.approx(0.0755)
+    normalized = restore._normalize_forecast(candidate)
+    assert normalized["display_forecast_method"] == "options_math"
+    assert normalized["display_forecast_pct"] == pytest.approx(0.133805)
+
+
+def test_symbol_historical_candidate_matches_ticker_page_four_prior_event_median(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    symbols = tmp_path / "symbols"
+    symbols.mkdir()
+    (symbols / "OXM.json").write_text(
+        json.dumps(
+            {
+                "earnings_history": [
+                    {"date": "2026-06-10", "actual": -0.170055},
+                    {"date": "2026-06-09", "actual": 0.002780},
+                    {"date": "2026-03-26", "actual": 0.086861},
+                    {"date": "2025-12-10", "actual": -0.212361},
+                    {"date": "2025-09-10", "actual": 0.276417},
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(restore, "SYMBOLS_DIR", symbols)
+
+    candidate = restore._symbol_historical_candidate(("OXM", "2026-09-08"))
+
+    assert candidate is not None
+    assert candidate["hist_move_med_4q"] == pytest.approx(0.128458)
+    assert candidate["display_forecast_pct"] == pytest.approx(0.128458)
+    assert candidate["display_forecast_method"] == "historical"
+    assert restore._forecast_rank(candidate)[0] == 1
 
 
 def test_post_deadline_published_ml_does_not_outrank_pre_event_iv():
