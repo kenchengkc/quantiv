@@ -862,10 +862,11 @@ export default function WatchlistPage() {
             const spot = quotePending ? null : tick?.price ?? sum?.spot_price ?? null;
             const mlCandidate = mlCandidates.find((item) => item.symbol === t);
             const mlState = liveMl[t]?.key === mlCandidate?.key ? liveMl[t] : undefined;
-            // Keep the same product hierarchy as the calendar and ticker hero:
-            // IV/options first, then ML, then historical context. A spot-updated
-            // ML response may replace only a historical/no-data fallback; it must
-            // never displace an available point-in-time IV/options forecast.
+            // Keep the same static product hierarchy as the calendar and ticker
+            // hero: validated ML, then IV/options, then historical context.
+            // Spot-updated ML is an interactive overlay and only replaces a
+            // historical/no-data fallback; it does not rewrite the frozen static
+            // publication snapshot.
             const liveMlPct =
               emMatches &&
               mlState?.status === 'ready' &&
