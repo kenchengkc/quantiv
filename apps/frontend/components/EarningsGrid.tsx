@@ -116,8 +116,8 @@ function fmtMovePct(v: number | null | undefined, digits = 1) {
 }
 
 function legacyForecastMethod(ev: EarningsEvent): DisplayForecastMethod | null {
-  if (ev.em_iv_pct != null || ev.em_straddle_pct != null) return 'options_math';
   if (ev.em_ml_pct != null) return 'ml';
+  if (ev.em_iv_pct != null || ev.em_straddle_pct != null) return 'options_math';
   return null;
 }
 
@@ -1181,11 +1181,7 @@ export default function EarningsGrid({
     if (filter === 'popular') list = list.filter((e) => (POPULAR_WEIGHT[e.ticker] ?? 0) >= 76);
     if (filter === 'sp500') list = list.filter((e) => SP500_SET.has(e.ticker));
     if (filter === 'movers') {
-      list = list.filter((e) => {
-        const display = finiteDisplayForecast(e.display_forecast_pct);
-        const legacy = e.em_ml_pct ?? e.em_straddle_pct ?? e.em_iv_pct ?? 0;
-        return (display ?? legacy) >= 0.10;
-      });
+      list = list.filter((e) => (resolveDisplayForecastCompat(e).pct ?? 0) >= 0.10);
     }
     if (search) list = list.filter((e) => e.ticker.startsWith(search));
     return list;
