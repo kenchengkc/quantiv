@@ -45,6 +45,14 @@ export interface ExpectedMove extends DisplayForecastFields {
   p90?: number | null;
   /** True once the event has reported and this pre-event forecast is immutable. */
   forecast_frozen?: boolean;
+  forecast_id?: string | null;
+  forecast_scored_at?: string | null;
+  forecast_published_at?: string | null;
+  forecast_feature_cutoff_at?: string | null;
+  forecast_prediction_deadline_at?: string | null;
+  forecast_feature_snapshot_at?: string | null;
+  forecast_feature_hash?: string | null;
+  forecast_frozen_eligible?: boolean | null;
 }
 
 export interface VolRegime {
@@ -116,7 +124,7 @@ export interface SymbolDetail {
     implied_straddle_abs?: number | null;
     implied_atm_iv?: number | null;
     implied_quality_status?: 'decision_eligible_eod' | null;
-    /** Final ML snapshot frozen immediately before this earnings event. */
+    /** Final audited pre-event ML snapshot when one exists. */
     em_ml_pct?: number | null;
     em_ml_abs?: number | null;
     model_horizon?: number | null;
@@ -126,7 +134,18 @@ export interface SymbolDetail {
     p50?: number | null;
     p75?: number | null;
     p90?: number | null;
+    display_forecast_pct?: number | null;
+    display_forecast_method?: 'ml' | 'options_math' | 'options_indicative' | 'historical' | 'historical_prior' | null;
+    display_forecast_as_of?: string | null;
     forecast_frozen?: boolean;
+    forecast_id?: string | null;
+    forecast_scored_at?: string | null;
+    forecast_published_at?: string | null;
+    forecast_feature_cutoff_at?: string | null;
+    forecast_prediction_deadline_at?: string | null;
+    forecast_feature_snapshot_at?: string | null;
+    forecast_feature_hash?: string | null;
+    forecast_frozen_eligible?: boolean | null;
     /** Realized close-to-close move, as a signed decimal fraction. */
     actual?: number | null;
     eps_actual?: number | null;
