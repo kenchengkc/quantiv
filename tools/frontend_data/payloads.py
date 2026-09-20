@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import math
 from datetime import date, datetime, timedelta
+from statistics import median
 from pathlib import Path
 
 from fiscal_calendar import (
@@ -798,15 +799,16 @@ def build_symbol_detail(conn, ticker: str, as_of_date: date, earnings_dt: date |
 
 
 def screener_extras(conn, ticker: str, earnings_dt: date, as_of_date: date) -> dict:
-    """Extra per-event fields the screener needs but the standard event payload
-    doesn't carry: IV rank, last-4-quarter realized average, IV crush proxy.
+    """Extra per-event fields used by calendar/screener compatibility surfaces.
 
-    All three are best-effort — return None for any field that can't be
-    computed. The screener degrades gracefully on missing fields.
+    Historical fallback provenance carries both the legacy four-event mean and
+    the canonical four-prior-event median. The median is the only value eligible
+    for the user-facing "Historical median" forecast fallback.
     """
     extras: dict = {
         "iv_rank": None,
         "hist_move_avg_4q": None,
+        "hist_move_med_4q": None,
         "iv_crush_pct": None,
     }
 
@@ -828,7 +830,9 @@ def screener_extras(conn, ticker: str, earnings_dt: date, as_of_date: date) -> d
     except Exception:
         pass
 
-    # Hist average realized move — last 4 earnings × OHLCV close-to-close.
+    # Historical realized moves — last 4 earnings strictly before the target.
+    # Keep the mean for research/screener compatibility, but publish the median
+    # separately because it is the canonical user-facing historical fallback.
     # Uses the canonical `earnings_events` table (built by build_earnings_events_table)
     # joined to v_ohlcv. Both must exist for this to produce a value; the
     # try/except suppresses errors when either is missing.
@@ -869,8 +873,9 @@ def screener_extras(conn, ticker: str, earnings_dt: date, as_of_date: date) -> d
             vals = [r[0] for r in rows if r[0] is not None]
             if vals:
                 extras["hist_move_avg_4q"] = jsonable(sum(vals) / len(vals))
+                extras["hist_move_med_4q"] = jsonable(median(vals))
     except Exception as e:
-        print(f"  ⚠ hist_move_avg_4q failed for {ticker}: {e}", flush=True)
+        print(f"  ⚠ historical move summary failed for {ticker}: {e}", flush=True)
 
     # IV crush proxy — front ATM IV vs the next-out expiry's ATM IV.
     # Already computed in v_straddle_features as iv_crush_pct upstream;
