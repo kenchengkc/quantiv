@@ -99,7 +99,9 @@ export function buildHistorySeries(
         impliedStraddleAbs: pickNum(h.implied_straddle_abs),
         impliedAtmIv: pickNum(h.implied_atm_iv),
         model:
-          h.em_ml_pct != null && Number.isFinite(h.em_ml_pct)
+          h.forecast_frozen_eligible === true &&
+          h.em_ml_pct != null &&
+          Number.isFinite(h.em_ml_pct)
             ? Math.abs(h.em_ml_pct)
             : null,
         modelAsOf: h.ml_snapshot_date ?? null,
