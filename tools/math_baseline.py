@@ -34,9 +34,12 @@ def _is_pre_event_observation(
     earnings_dt: date,
     timing: str | None,
 ) -> bool:
-    """Whether an EOD quote can have been observed before the event."""
-    if _is_after_close(timing):
-        return as_of_date <= earnings_dt
+    """Whether date-granular EOD evidence is provably pre-event.
+
+    Same-day AMC data is not accepted here because a DATE alone cannot prove
+    the observation preceded the event-day cutoff. Timestamped same-day inputs
+    are audited separately by the event prediction ledger.
+    """
     return as_of_date < earnings_dt
 
 
