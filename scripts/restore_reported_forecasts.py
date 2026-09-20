@@ -226,6 +226,7 @@ def _normalize_forecast(event: dict) -> dict:
                 "options_status": "decision_eligible" if option_available else "unavailable",
                 "fallback_reason": None,
                 "forecast_frozen": True,
+                "forecast_frozen_eligible": True,
             }
         )
     elif iv is not None and options_are_pre_event:
