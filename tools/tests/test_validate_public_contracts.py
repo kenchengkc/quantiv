@@ -163,6 +163,76 @@ def test_forecast_surface_parity_accepts_same_ml_headline(
     contracts.validate_forecast_surface_parity()
 
 
+
+
+def test_forecast_surface_parity_resolves_legacy_symbol_iv(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    public = tmp_path / "public"
+    _write_forecast_surface_fixture(
+        public,
+        calendar_forecast={
+            "display_forecast_pct": 0.042778,
+            "display_forecast_method": "historical",
+            "hist_move_med_4q": 0.050543,
+        },
+        symbol_forecast={
+            "earnings_date": "2026-09-16",
+            "iv_pct": 0.133805,
+            "straddle_pct": 0.0755,
+        },
+    )
+    # Fixture helper writes FDX; rename it to ABM and align identities.
+    week_path = public / "weeks" / "2026-09-14.json"
+    week = json.loads(week_path.read_text())
+    week["events"][0]["ticker"] = "ABM"
+    week_path.write_text(json.dumps(week))
+    symbol_path = public / "symbols" / "FDX.json"
+    symbol = json.loads(symbol_path.read_text())
+    symbol["symbol"] = "ABM"
+    symbol["expected_move"]["earnings_date"] = "2026-09-16"
+    (public / "symbols" / "ABM.json").write_text(json.dumps(symbol))
+    symbol_path.unlink()
+    monkeypatch.setattr(contracts, "PUBLIC", public)
+
+    with pytest.raises(contracts.ContractError, match="resolved headline mismatch"):
+        contracts.validate_forecast_surface_parity()
+
+
+def test_forecast_surface_parity_requires_reported_hover_components(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    public = tmp_path / "public"
+    forecast = {
+        "display_forecast_pct": 0.07,
+        "display_forecast_method": "ml",
+        "em_ml_pct": 0.07,
+    }
+    _write_forecast_surface_fixture(
+        public,
+        calendar_forecast=forecast,
+        symbol_forecast={
+            **forecast,
+            "iv_pct": 0.15,
+            "straddle_pct": 0.13,
+        },
+    )
+    # Give the ticker page enough prior realized history to expose a median.
+    symbol_path = public / "symbols" / "FDX.json"
+    symbol = json.loads(symbol_path.read_text())
+    symbol["earnings_history"] = [
+        {"date": "2026-06-01", "actual": 0.04},
+        {"date": "2026-03-01", "actual": -0.06},
+        {"date": "2025-12-01", "actual": 0.05},
+        {"date": "2025-09-01", "actual": -0.07},
+    ]
+    symbol_path.write_text(json.dumps(symbol))
+    monkeypatch.setattr(contracts, "PUBLIC", public)
+
+    with pytest.raises(contracts.ContractError, match="hover component mismatch"):
+        contracts.validate_forecast_surface_parity()
+
+
 def test_model_validation_preserves_decision_scope(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     evidence = tmp_path / "public" / "evidence"
     evidence.mkdir(parents=True)
