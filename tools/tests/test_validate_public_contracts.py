@@ -20,6 +20,7 @@ def test_committed_public_contracts_validate() -> None:
         contracts.validate_schema_documents,
         contracts.validate_screener,
         contracts.validate_symbol_payloads,
+        contracts.validate_forecast_surface_parity,
         contracts.validate_dashboard_evidence,
         contracts.validate_control_plane,
         contracts.validate_model_validation,
@@ -55,6 +56,83 @@ def test_screener_contract_fails_closed_on_count_mismatch(tmp_path: Path, monkey
 
     with pytest.raises(contracts.ContractError, match="event_count"):
         contracts.validate_screener()
+
+
+
+def _write_forecast_surface_fixture(
+    public: Path,
+    *,
+    calendar_forecast: dict,
+    symbol_forecast: dict,
+) -> None:
+    weeks = public / "weeks"
+    symbols = public / "symbols"
+    weeks.mkdir(parents=True)
+    symbols.mkdir(parents=True)
+    (weeks / "2026-09-14.json").write_text(
+        json.dumps(
+            {
+                "events": [
+                    {
+                        "ticker": "FDX",
+                        "earnings_date": "2026-09-16",
+                        "timing": "after_market_close",
+                        **calendar_forecast,
+                    }
+                ]
+            }
+        )
+    )
+    (symbols / "FDX.json").write_text(
+        json.dumps(
+            {
+                "symbol": "FDX",
+                "as_of_date": "2026-09-18",
+                "straddle_features": [],
+                "earnings_history": [],
+                "expected_move": {
+                    "earnings_date": "2026-09-16",
+                    **symbol_forecast,
+                },
+            }
+        )
+    )
+
+
+def test_forecast_surface_parity_rejects_fdx_style_split_release(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    public = tmp_path / "public"
+    _write_forecast_surface_fixture(
+        public,
+        calendar_forecast={"hist_move_avg_4q": 0.009487},
+        symbol_forecast={
+            "display_forecast_pct": 0.036898,
+            "display_forecast_method": "ml",
+        },
+    )
+    monkeypatch.setattr(contracts, "PUBLIC", public)
+
+    with pytest.raises(contracts.ContractError, match="calendar is missing canonical"):
+        contracts.validate_forecast_surface_parity()
+
+
+def test_forecast_surface_parity_accepts_same_ml_headline(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    public = tmp_path / "public"
+    forecast = {
+        "display_forecast_pct": 0.036898,
+        "display_forecast_method": "ml",
+    }
+    _write_forecast_surface_fixture(
+        public,
+        calendar_forecast=forecast,
+        symbol_forecast=forecast,
+    )
+    monkeypatch.setattr(contracts, "PUBLIC", public)
+
+    contracts.validate_forecast_surface_parity()
 
 
 def test_model_validation_preserves_decision_scope(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
