@@ -7,8 +7,9 @@ the model scoring timestamp.
 
 Policy:
 - BMO/unknown: features may use the previous NYSE session through its close.
-  The prediction itself must be created during the post-close processing window
-  on that prior session (two hours, to allow provider settlement/reconciliation).
+  The prediction itself must be created before the earnings calendar day begins
+  in New York. This supports normal nightly batch processing while excluding
+  any event-morning computation.
 - AMC: the research cutoff is five minutes before the event-day close.  A
   same-day row is eligible only when it carries timestamped intraday inputs that
   are demonstrably no later than that cutoff.  Current date-only EOD snapshots
@@ -33,7 +34,6 @@ except ModuleNotFoundError:  # imported as scripts.event_forecast_ledger in test
 LEDGER_NAME = "event_prediction_ledger.parquet"
 PUBLICATION_LEDGER_NAME = "event_prediction_publications.parquet"
 AMC_FREEZE_LEAD_MINUTES = 5
-BMO_PROCESSING_GRACE_MINUTES = 120
 
 
 def _normalized_timing(value: Any) -> str:
@@ -63,8 +63,8 @@ def event_cutoffs(
     """Return (feature_cutoff_at, prediction_deadline_at), both Eastern.
 
     The prediction deadline is deliberately stricter than "before the report"
-    when no issuer timestamp is available.  BMO rows must be created on the
-    prior session after its close; AMC rows must already exist before the
+    when no issuer timestamp is available. BMO rows must exist before midnight
+    starting the earnings calendar day; AMC rows must already exist before the
     event-day close buffer.
     """
     normalized = _normalized_timing(timing)
@@ -75,7 +75,8 @@ def event_cutoffs(
 
     prior = previous_us_market_session(earnings_date)
     close_at = _session_close_at(prior)
-    return close_at, close_at + timedelta(minutes=BMO_PROCESSING_GRACE_MINUTES)
+    deadline = datetime.combine(earnings_date, time(0, 0), tzinfo=EASTERN)
+    return close_at, deadline
 
 
 def _as_aware_datetime(value: Any) -> datetime | None:
