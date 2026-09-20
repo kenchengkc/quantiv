@@ -1,13 +1,13 @@
 {
   "symbol": "ABM",
   "as_of_date": "2026-08-27",
-  "spot_price": 50.0,
+  "spot_price": 50,
   "expected_move": {
     "earnings_date": "2026-09-08",
     "expiration": "2026-09-18",
     "dte": 22,
     "lead_time_days": 12,
-    "atm_strike": 50.0,
+    "atm_strike": 50,
     "atm_iv": 0.545013,
     "straddle_abs": 3.775,
     "straddle_pct": 0.0755,
@@ -16,13 +16,20 @@
     "term_slope": null,
     "total_vega": 0.0868,
     "em_method": "options_math",
-    "timing": "before_market_open"
+    "timing": "before_market_open",
+    "display_forecast_pct": 0.133805,
+    "display_forecast_method": "options_math",
+    "display_forecast_as_of": "2026-08-27",
+    "ml_status": "unavailable_event",
+    "options_status": "decision_eligible",
+    "fallback_reason": null,
+    "forecast_frozen": true
   },
   "straddle_features": [
     {
       "expiration": "2026-09-18",
       "dte": 22,
-      "atm_strike": 50.0,
+      "atm_strike": 50,
       "atm_iv": 0.54545,
       "atm_call_iv": 0.5265,
       "atm_put_iv": 0.5644,
@@ -39,7 +46,7 @@
     {
       "expiration": "2026-10-16",
       "dte": 50,
-      "atm_strike": 50.0,
+      "atm_strike": 50,
       "atm_iv": 0.35835,
       "atm_call_iv": 0.3832,
       "atm_put_iv": 0.3335,
@@ -67,7 +74,7 @@
       "eps_estimate": 1.0244,
       "eps_surprise_pct": null,
       "revenue_actual": null,
-      "revenue_estimate": 2332753711.0,
+      "revenue_estimate": 2332753711,
       "rev_surprise_pct": null
     },
     {
@@ -81,8 +88,8 @@
       "eps_actual": 0.9,
       "eps_estimate": 0.883,
       "eps_surprise_pct": 0.019253,
-      "revenue_actual": 2290000000.0,
-      "revenue_estimate": 2235990085.0,
+      "revenue_actual": 2290000000,
+      "revenue_estimate": 2235990085,
       "rev_surprise_pct": 0.024155
     },
     {
