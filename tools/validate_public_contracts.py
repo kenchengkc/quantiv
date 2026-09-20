@@ -158,8 +158,21 @@ def validate_forecast_surface_parity() -> None:
         tuple[str, str],
         tuple[tuple[str, float] | None, str],
     ] = {}
-    for path in sorted((PUBLIC / "weeks").glob("*.json")):
+    weeks_dir = PUBLIC / "weeks"
+    manifest_path = weeks_dir / "manifest.json"
+    visible_week_names: set[str] | None = None
+    if manifest_path.is_file():
+        manifest = _object(_read(manifest_path), str(manifest_path))
+        visible_week_names = {
+            f"{str(item.get('start'))[:10]}.json"
+            for item in _list(manifest.get("weeks"), "weeks manifest.weeks")
+            if isinstance(item, dict) and item.get("start")
+        }
+
+    for path in sorted(weeks_dir.glob("*.json")):
         if re.fullmatch(r"\d{4}-\d{2}-\d{2}\.json", path.name) is None:
+            continue
+        if visible_week_names is not None and path.name not in visible_week_names:
             continue
         payload = _object(_read(path), str(path))
         for index, event_raw in enumerate(_list(payload.get("events"), f"{path.name}.events")):
