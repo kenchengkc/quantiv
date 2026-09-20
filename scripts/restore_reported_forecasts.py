@@ -5,7 +5,7 @@ The frontend rebuild cannot recompute an earnings forecast after the event. This
 tool walks prior committed week bundles and restores the strongest pre-event
 forecast that Quantiv actually published for each reported event:
 
-    IV-based options forecast > strict straddle > frozen ML forecast.
+    frozen ML forecast > IV-based options forecast > strict straddle.
 
 Fresh post-event facts (realized move, EPS/revenue actuals, corrected timing)
 remain authoritative. Only forecast/pricing fields are frozen from history.
@@ -138,22 +138,21 @@ def _option_evidence_is_pre_event(event: dict) -> bool:
 
 
 def _forecast_rank(event: dict) -> tuple[int, str]:
-    as_of = str(event.get("as_of_date") or "")[:10]
-    options_are_pre_event = _option_evidence_is_pre_event(event)
-
-    iv = _positive(event.get("em_iv_pct"))
-    if iv is not None and options_are_pre_event:
-        return (4, as_of)
-
-    strict = _positive(event.get("em_straddle_pct"))
-    if strict is not None and options_are_pre_event:
-        return (3, as_of)
-
     earnings_date = str(event.get("earnings_date") or "")[:10]
     ml = _positive(event.get("em_ml_pct"))
     ml_as_of = str(event.get("ml_snapshot_date") or "")[:10]
     if ml is not None and ml_as_of and (not earnings_date or ml_as_of < earnings_date):
-        return (2, ml_as_of)
+        return (4, ml_as_of)
+
+    as_of = str(event.get("as_of_date") or "")[:10]
+    options_are_pre_event = _option_evidence_is_pre_event(event)
+    iv = _positive(event.get("em_iv_pct"))
+    if iv is not None and options_are_pre_event:
+        return (3, as_of)
+
+    strict = _positive(event.get("em_straddle_pct"))
+    if strict is not None and options_are_pre_event:
+        return (2, as_of)
     return (0, "")
 
 
@@ -163,8 +162,23 @@ def _normalize_forecast(event: dict) -> dict:
     strict = _positive(row.get("em_straddle_pct"))
     iv = _positive(row.get("em_iv_pct"))
     options_are_pre_event = _option_evidence_is_pre_event(row)
+    option_available = options_are_pre_event and (iv is not None or strict is not None)
 
-    if iv is not None and options_are_pre_event:
+    if ml is not None:
+        row.update(
+            {
+                "em_method": "ml_lightgbm",
+                "display_forecast_pct": ml,
+                "display_forecast_method": "ml",
+                "display_forecast_as_of": row.get("ml_snapshot_date")
+                or row.get("as_of_date"),
+                "ml_status": "available",
+                "options_status": "decision_eligible" if option_available else "unavailable",
+                "fallback_reason": None,
+                "forecast_frozen": True,
+            }
+        )
+    elif iv is not None and options_are_pre_event:
         decision_eligible = strict is not None
         row.update(
             {
@@ -174,7 +188,7 @@ def _normalize_forecast(event: dict) -> dict:
                     "options_math" if decision_eligible else "options_indicative"
                 ),
                 "display_forecast_as_of": row.get("as_of_date"),
-                "ml_status": "available" if ml is not None else "unavailable_event",
+                "ml_status": "unavailable_event",
                 "options_status": "decision_eligible" if decision_eligible else "indicative",
                 "fallback_reason": None if decision_eligible else "no_same_strike_pair",
                 "forecast_frozen": True,
@@ -187,22 +201,8 @@ def _normalize_forecast(event: dict) -> dict:
                 "display_forecast_pct": strict,
                 "display_forecast_method": "options_math",
                 "display_forecast_as_of": row.get("as_of_date"),
-                "ml_status": "available" if ml is not None else "unavailable_event",
+                "ml_status": "unavailable_event",
                 "options_status": "decision_eligible",
-                "fallback_reason": None,
-                "forecast_frozen": True,
-            }
-        )
-    elif ml is not None:
-        row.update(
-            {
-                "em_method": "ml_lightgbm",
-                "display_forecast_pct": ml,
-                "display_forecast_method": "ml",
-                "display_forecast_as_of": row.get("ml_snapshot_date")
-                or row.get("as_of_date"),
-                "ml_status": "available",
-                "options_status": "unavailable",
                 "fallback_reason": None,
                 "forecast_frozen": True,
             }
