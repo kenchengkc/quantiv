@@ -14,6 +14,7 @@ async function installCalendar(page: Page) {
       em_ml_pct: 0.07,
       em_straddle_pct: 0.13,
       em_iv_pct: 0.15,
+      hist_move_med_4q: 0.05,
       p25: 0.04,
       p75: 0.11,
       display_forecast_pct: 0.07,
@@ -57,7 +58,8 @@ for (const width of [1440, 768, 390]) {
     await expect(movePopup).toContainText('IV forecast');
     await expect(movePopup).toContainText('Straddle implied');
     await expect(movePopup).toContainText('ML forecast');
-    await expect(movePopup).not.toContainText('Historical median');
+    await expect(movePopup).toContainText('Historical median');
+    await expect(movePopup).toContainText('5.0%');
     await testInfo.attach(`move-hover-${width}`, { body: await page.screenshot(), contentType: 'image/png' });
 
     // An already-visible name card must disappear when crossing to the move.
