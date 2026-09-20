@@ -134,13 +134,13 @@ test.describe('earnings calendar reaction labels', () => {
     await expect(page.getByRole('link', { name: /ZZZ/i }).first()).toBeVisible();
   });
 
-  test('headline prefers the options-implied forecast over ML when both exist', async ({
+  test('headline prefers the ML forecast over options when both exist', async ({
     page,
   }) => {
     // CALB has both a strict options-implied move (±13%) and an ML move (±7%).
-    // Product display policy is options/IV first, so the calendar headline must
-    // show the options-implied number and label it as the IV forecast. The ML
-    // estimate remains available as secondary evidence in the hover breakdown.
+    // Product display policy is ML first, so the calendar headline must
+    // show the ML number. The options-implied estimate remains available as secondary
+    // evidence in the hover breakdown.
     await installWeekFixture(page, [
       {
         ticker: 'CALB',
@@ -160,7 +160,7 @@ test.describe('earnings calendar reaction labels', () => {
     await page.waitForTimeout(1_000);
 
     const row = page.getByRole('link', { name: /CALB/i }).first();
-    await expect(row).toContainText('13.0%');
+    await expect(row).toContainText('7.0%');
     await expect(row).not.toContainText('IV forecast');
     await expect(row).not.toContainText('4.0–11.0%');
 
