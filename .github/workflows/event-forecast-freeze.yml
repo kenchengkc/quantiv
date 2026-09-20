@@ -2,10 +2,10 @@ name: Event forecast freeze
 
 on:
   schedule:
-    # GitHub cron is UTC. Running both slots lets the ET guard select exactly
-    # one 16:15-17:15 local post-close window across EDT and EST.
-    - cron: '30 20 * * 1-5'
-    - cron: '30 21 * * 1-5'
+    # GitHub cron is UTC. Monday 21:30 ET is Tuesday UTC; the paired slots
+    # cover EDT/EST and the ET guard selects exactly one 21:00-22:00 run.
+    - cron: '30 1 * * 2-6'
+    - cron: '30 2 * * 2-6'
   workflow_dispatch:
 
 concurrency:
@@ -35,7 +35,7 @@ jobs:
       - name: Install Python dependencies
         run: pip install --require-hashes -r requirements.txt
 
-      - name: Select the canonical post-close window
+      - name: Select the nightly pre-BMO freeze window
         id: freeze_window
         run: python scripts/check_event_freeze_window.py --phase schedule
 
