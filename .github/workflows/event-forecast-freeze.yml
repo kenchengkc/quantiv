@@ -1,0 +1,140 @@
+name: Event forecast freeze
+
+on:
+  schedule:
+    # GitHub cron is UTC. Running both slots lets the ET guard select exactly
+    # one 16:15-17:15 local post-close window across EDT and EST.
+    - cron: '30 20 * * 1-5'
+    - cron: '30 21 * * 1-5'
+  workflow_dispatch:
+
+concurrency:
+  group: event-forecast-freeze
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  freeze:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install Python dependencies
+        run: pip install --require-hashes -r requirements.txt
+
+      - name: Select the canonical post-close window
+        id: freeze_window
+        run: python scripts/check_event_freeze_window.py --phase schedule
+
+      - name: Install verified rclone
+        if: steps.freeze_window.outputs.run == 'true' || github.event_name == 'workflow_dispatch'
+        run: bash scripts/install_rclone.sh
+
+      - name: Configure R2
+        if: steps.freeze_window.outputs.run == 'true' || github.event_name == 'workflow_dispatch'
+        env:
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.config/rclone
+          cat > ~/.config/rclone/rclone.conf <<EOF
+          [r2]
+          type = s3
+          provider = Cloudflare
+          access_key_id = $R2_ACCESS_KEY_ID
+          secret_access_key = $R2_SECRET_ACCESS_KEY
+          endpoint = https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com
+          region = auto
+          EOF
+
+      - name: Materialize current production state
+        if: steps.freeze_window.outputs.run == 'true' || github.event_name == 'workflow_dispatch'
+        env:
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          R2_REQUIRE_RUNTIME_STATE: '1'
+        run: bash scripts/r2_pull.sh
+
+      - name: Refresh event-day market inputs
+        if: steps.freeze_window.outputs.run == 'true' || github.event_name == 'workflow_dispatch'
+        run: |
+          set -euo pipefail
+          python scripts/sync_dolthub.py
+          python scripts/sync_dolthub.py --ohlcv
+          python scripts/sync_dolthub.py --earnings
+          python scripts/setup_duckdb_from_parquet.py
+
+      - name: Require finalized current-session inputs
+        if: steps.freeze_window.outputs.run == 'true' || github.event_name == 'workflow_dispatch'
+        id: input_gate
+        run: python scripts/check_event_freeze_window.py --phase data
+
+      - name: Score a candidate without mutating production forecasts
+        if: steps.input_gate.outputs.ready == 'true'
+        run: |
+          python scripts/daily_score.py             --days-ahead 3             --output-path data/forecasts/event-freeze-candidate.parquet
+
+      - name: Validate candidate model and option evidence
+        if: steps.input_gate.outputs.ready == 'true'
+        run: |
+          python scripts/validate_ml_pipeline.py forecasts             --forecast-path data/forecasts/event-freeze-candidate.parquet             --report data/validation/event_freeze_forecasts.json
+
+      - name: Promote only event-cutoff-eligible rows
+        if: steps.input_gate.outputs.ready == 'true'
+        run: |
+          python scripts/promote_event_freeze.py             data/forecasts/event-freeze-candidate.parquet
+
+      - name: Persist immutable prediction ledger
+        if: steps.input_gate.outputs.ready == 'true'
+        env:
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+        run: bash scripts/r2_push.sh --forecasts-only
+
+      - name: Rebuild public research from the eligible ledger
+        if: steps.input_gate.outputs.ready == 'true'
+        env:
+          TWELVEDATA_REALIZED_FALLBACK: '0'
+        run: |
+          python -u tools/build_frontend_data.py
+          python scripts/restore_reported_forecasts.py --apply
+
+      - name: Persist publication receipts
+        if: steps.input_gate.outputs.ready == 'true'
+        env:
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+        run: bash scripts/r2_push.sh --forecasts-only
+
+      - name: Commit refreshed public forecast artifacts
+        if: steps.input_gate.outputs.ready == 'true'
+        run: |
+          set -euo pipefail
+          git config --local user.email "action@github.com"
+          git config --local user.name "Quantiv bot"
+          git add apps/frontend/public
+          if git diff --staged --quiet; then
+            echo "No public forecast changes"
+          else
+            git commit -m "event forecast freeze $(date -u +%Y-%m-%d)"
+            bash scripts/git_push_with_retry.sh origin main
+          fi
+
+      - name: Explain fail-closed no-op
+        if: (steps.freeze_window.outputs.run != 'true' && github.event_name != 'workflow_dispatch') || steps.input_gate.outputs.ready == 'false'
+        run: |
+          echo "Event freeze intentionally made no publication."
+          echo "schedule_gate=${{ steps.freeze_window.outputs.reason }}"
+          echo "input_gate=${{ steps.input_gate.outputs.reason }}"
