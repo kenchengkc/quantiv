@@ -19,6 +19,7 @@ def test_forecast_rank_prefers_ml_over_iv_when_both_are_pre_event():
         "2026-09-10",
         em_ml_pct=0.054358,
         ml_snapshot_date="2026-09-09",
+        forecast_frozen_eligible=True,
     )
     options = _event(
         "ADBE",
@@ -41,6 +42,7 @@ def test_normalize_legacy_row_prefers_ml_but_preserves_options_provenance():
             as_of_date="2026-09-14",
             em_ml_pct=0.036898,
             ml_snapshot_date="2026-09-14",
+            forecast_frozen_eligible=True,
             em_straddle_pct=0.042,
             em_iv_pct=0.052634,
         )
@@ -101,6 +103,11 @@ def test_recover_week_repairs_present_row_instead_of_only_missing_rows(
     }
     monkeypatch.setattr(restore, "_history", lambda _path: ["abc"])
     monkeypatch.setattr(restore, "_bundle_at", lambda _commit, _path: historical)
+    monkeypatch.setattr(
+        restore,
+        "_commit_at",
+        lambda _commit: restore.datetime.fromisoformat("2026-09-15T20:00:00+00:00"),
+    )
     monkeypatch.setattr(restore, "_symbol_history_candidate", lambda _key: None)
 
     repaired = restore.recover_week(
@@ -156,6 +163,7 @@ def test_same_day_bmo_options_are_rejected_as_post_event_evidence():
         timing="bmo",
         em_ml_pct=0.046961,
         ml_snapshot_date="2026-09-10",
+        forecast_frozen_eligible=True,
     )
 
     assert restore._forecast_rank(options)[0] == 0
@@ -198,4 +206,40 @@ def test_symbol_history_candidate_computes_event_iv_forecast(
     assert candidate["em_iv_pct"] == pytest.approx(
         0.29635 * (16 / 365.0) ** 0.5
     )
-    assert restore._normalize_forecast(candidate)["display_forecast_method"] == "ml"
+    assert restore._normalize_forecast(candidate)["display_forecast_method"] == "options_math"
+
+
+
+def test_post_deadline_published_ml_does_not_outrank_pre_event_iv():
+    candidate = _event(
+        "M",
+        "2026-09-10",
+        timing="before_market_open",
+        em_ml_pct=0.055115,
+        ml_snapshot_date="2026-09-09",
+        forecast_published_at="2026-09-10T15:42:00+00:00",
+        as_of_date="2026-09-09",
+        em_iv_pct=0.124093,
+        em_straddle_pct=0.10087,
+    )
+
+    assert restore._forecast_rank(candidate)[0] == 3
+    normalized = restore._normalize_forecast(candidate)
+    # Normalization is presentation-only; ranking is the safety gate. The
+    # recovery path therefore selects IV when the ML publication missed cutoff.
+    candidate["em_ml_pct"] = None
+    normalized = restore._normalize_forecast(candidate)
+    assert normalized["display_forecast_method"] == "options_math"
+
+
+def test_pre_deadline_published_ml_is_recoverable():
+    candidate = _event(
+        "M",
+        "2026-09-10",
+        timing="before_market_open",
+        em_ml_pct=0.061359,
+        ml_snapshot_date="2026-09-08",
+        forecast_published_at="2026-09-09T15:35:05+00:00",
+    )
+
+    assert restore._forecast_rank(candidate)[0] == 4
