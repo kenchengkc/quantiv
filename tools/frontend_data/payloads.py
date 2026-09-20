@@ -183,7 +183,8 @@ def _reported_forecast_fields(
     archived = (archive or {}).get((symbol, event_iso))
     ml = ml_fields(archived)
     fallback_ml = fallback_ml or {}
-    for key in (
+    fallback_ml_is_audited = fallback_ml.get("forecast_frozen_eligible") is True
+    fallback_keys = (
         "em_ml_pct",
         "em_ml_abs",
         "correction_factor",
@@ -194,6 +195,12 @@ def _reported_forecast_fields(
         "p50",
         "p75",
         "p90",
+    )
+    if fallback_ml_is_audited:
+        for key in fallback_keys:
+            if ml.get(key) is None and fallback_ml.get(key) is not None:
+                ml[key] = fallback_ml.get(key)
+    for key in (
         "forecast_id",
         "forecast_scored_at",
         "forecast_feature_cutoff_at",
