@@ -31,8 +31,9 @@ WEEKS_DIR = PUBLIC_DIR / "weeks"
 SYMBOLS_DIR = PUBLIC_DIR / "symbols"
 CALENDAR_REFERENCE = PUBLIC_DIR / "calendar-reference.json"
 
-if str(REPO_ROOT / "tools") not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT / "tools"))
+for package_root in (REPO_ROOT / "tools", REPO_ROOT / "apps" / "ml"):
+    if str(package_root) not in sys.path:
+        sys.path.insert(0, str(package_root))
 from frontend_data.payloads import build_screener_payload  # noqa: E402
 from event_forecast_ledger import EASTERN, event_cutoffs  # noqa: E402
 

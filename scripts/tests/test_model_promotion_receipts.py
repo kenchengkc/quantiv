@@ -83,6 +83,26 @@ def test_build_and_verify_metric_based_promotion_receipts(tmp_path: Path) -> Non
     assert len(evidence["statistical_selection"]["sha256"]) == 64
 
 
+def test_build_accepts_repo_relative_candidate_manifest(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    training = tmp_path / "training"
+    _write_training(training, 1, snapshot_offset=1)
+    candidate = tmp_path / "candidate.json"
+    _candidate(candidate)
+    monkeypatch.chdir(tmp_path)
+
+    temporal, _ = build_promotion_receipts(
+        Path("candidate.json"),
+        training_dir=training,
+        temporal_path=tmp_path / "temporal.json",
+        statistical_path=tmp_path / "statistical.json",
+    )
+
+    assert temporal["candidate_record"]["path"] == "candidate.json"
+
+
 def test_rejects_future_or_horizon_inconsistent_snapshot(tmp_path: Path) -> None:
     training = tmp_path / "training"
     _write_training(training, 7, snapshot_offset=1)

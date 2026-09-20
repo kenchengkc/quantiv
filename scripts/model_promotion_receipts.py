@@ -80,6 +80,15 @@ def _read_object(path: Path) -> dict[str, Any]:
     return payload
 
 
+def _repo_relative(path: Path) -> str:
+    """Return a stable repository-relative path for absolute or CLI-relative input."""
+    resolved = path.resolve()
+    try:
+        return resolved.relative_to(REPO_ROOT.resolve()).as_posix()
+    except ValueError as exc:
+        raise ValueError(f"{resolved} is outside repository root {REPO_ROOT.resolve()}") from exc
+
+
 def _verify_receipt_identity(payload: dict[str, Any], *, label: str) -> None:
     receipt_id = payload.get("receipt_id")
     if not isinstance(receipt_id, str) or not re.fullmatch(r"[0-9a-f]{64}", receipt_id):
@@ -230,7 +239,7 @@ def build_promotion_receipts(
             "source_revision": source_revision,
             "candidate_bundle_id": bundle_id,
             "candidate_record": {
-                "path": candidate_record_path.relative_to(REPO_ROOT).as_posix(),
+                "path": _repo_relative(candidate_record_path),
                 "sha256": _sha256(candidate_record_path),
             },
             "feature_contract": contract,
