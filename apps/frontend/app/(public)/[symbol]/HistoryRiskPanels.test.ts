@@ -45,6 +45,7 @@ describe('buildHistorySeries', () => {
         actual: -0.071,
         em_ml_pct: 0.083,
         ml_snapshot_date: '2026-09-15',
+        forecast_frozen_eligible: true,
         model_horizon: 1,
         p10: 0.03,
         p50: 0.08,
@@ -56,6 +57,24 @@ describe('buildHistorySeries', () => {
     expect(result[0]?.modelAsOf).toBe('2026-09-15');
     expect(result[0]?.modelHorizon).toBe(1);
     expect(result[0]?.modelP50).toBe(0.08);
+  });
+
+
+  it('suppresses unaudited historical ML from the event study', () => {
+    const result = buildHistorySeries([
+      {
+        date: '2026-09-16',
+        timing: 'after_market_close',
+        q: 'Q4 26',
+        actual: -0.071,
+        em_ml_pct: 0.083,
+        ml_snapshot_date: '2026-09-15',
+        model_horizon: 1,
+      },
+    ]);
+
+    expect(result[0]?.model).toBeNull();
+    expect(result[0]?.modelAsOf).toBe('2026-09-15');
   });
 
 });
