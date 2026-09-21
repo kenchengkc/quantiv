@@ -2,10 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import styles from './page.module.css';
 import { ValidationPublication } from '@/components/ValidationPublication';
-import {
-  controlExceptionExplanation,
-  publishedForecastStatus,
-} from '@/lib/publicationPresentation';
+import { controlExceptionExplanation } from '@/lib/publicationPresentation';
 import { requirePublicJson } from '@/lib/researchSnapshot.server';
 
 export const metadata: Metadata = {
