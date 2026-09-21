@@ -338,13 +338,19 @@ def validate_forecast_surface_parity() -> None:
 
     week_events: dict[
         tuple[str, str],
-        tuple[tuple[str, float] | None, str, dict[str, Any]],
+        tuple[tuple[str, float] | None, str, dict[str, Any], str],
     ] = {}
     weeks_dir = PUBLIC / "weeks"
     for path in sorted(weeks_dir.glob("*.json")):
         if re.fullmatch(r"\d{4}-\d{2}-\d{2}\.json", path.name) is None:
             continue
         payload = _object(_read(path), str(path))
+        metadata = payload.get("metadata")
+        artifact_as_of = (
+            str(metadata.get("as_of_date") or "")[:10]
+            if isinstance(metadata, dict)
+            else ""
+        )
         window = payload.get("window")
         if (
             reference_start
@@ -367,15 +373,19 @@ def validate_forecast_surface_parity() -> None:
                 continue
             identity = (ticker.upper(), earnings_date[:10])
             signature = _resolved_forecast_signature(event)
+            event_as_of = artifact_as_of or str(event.get("as_of_date") or "")[:10]
+            if not event_as_of:
+                raise ContractError(
+                    f"{path.name} is missing a deterministic as-of date for "
+                    f"{identity[0]} {identity[1]}"
+                )
             existing = week_events.get(identity)
             if existing is not None and existing[0] != signature:
                 raise ContractError(
                     f"calendar forecast disagrees across week artifacts for "
                     f"{identity[0]} {identity[1]}"
                 )
-            week_events[identity] = (signature, path.name, event)
-
-    today = date.today().isoformat()
+            week_events[identity] = (signature, path.name, event, event_as_of)
     component_fields = {
         "ml": "em_ml_pct",
         "iv": "em_iv_pct",
@@ -383,7 +393,12 @@ def validate_forecast_surface_parity() -> None:
         "historical": "hist_move_med_4q",
     }
 
-    for identity, (calendar_signature, calendar_path, calendar_event) in week_events.items():
+    for identity, (
+        calendar_signature,
+        calendar_path,
+        calendar_event,
+        artifact_as_of,
+    ) in week_events.items():
         ticker, event_date = identity
         symbol_path = PUBLIC / "symbols" / f"{ticker}.json"
         if not symbol_path.is_file():
@@ -420,11 +435,12 @@ def validate_forecast_surface_parity() -> None:
                     f"{calendar_signature} != {symbol_signature}"
                 )
 
-        # Reported rows must also carry every ticker-page component needed by
-        # the homepage hover card. This guarantees ML, IV, historical median,
-        # and straddle evidence cannot silently disappear even when the
-        # headline itself happens to match.
-        if event_date > today:
+        # Rows that were already reported at the artifact's own snapshot must
+        # also carry every ticker-page component needed by the homepage hover
+        # card. Use the committed artifact as-of date, never the CI runner's
+        # wall clock: otherwise an unchanged pre-event snapshot begins failing
+        # simply because midnight passes and the event date arrives.
+        if event_date > artifact_as_of:
             continue
         for component, field in component_fields.items():
             expected_value = components.get(component)
