@@ -10,6 +10,20 @@ function percentile(samples: number[], value: number): number {
 test('homepage cold-load FCP stays inside the production budget', async ({
   browser,
 }) => {
+  // Prime one-time Chromium / local production-server startup before sampling.
+  // Measured runs below still use brand-new browser contexts with HTTP cache
+  // disabled, so they remain cold page loads without charging the page for
+  // harness/process initialization that occurs only on the first navigation.
+  const warmupContext = await browser.newContext();
+  const warmupPage = await warmupContext.newPage();
+  await warmupPage.goto('/', { waitUntil: 'domcontentloaded' });
+  await warmupPage.waitForFunction(() =>
+    performance
+      .getEntriesByType('paint')
+      .some((entry) => entry.name === 'first-contentful-paint'),
+  );
+  await warmupContext.close();
+
   const samples: number[] = [];
 
   for (let run = 0; run < budget.firstContentfulPaint.sampleCount; run += 1) {
