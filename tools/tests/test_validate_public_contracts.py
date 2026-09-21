@@ -92,6 +92,7 @@ def _write_forecast_surface_fixture(
     *,
     calendar_forecast: dict,
     symbol_forecast: dict,
+    artifact_as_of: str = "2026-09-18",
 ) -> None:
     weeks = public / "weeks"
     symbols = public / "symbols"
@@ -100,6 +101,7 @@ def _write_forecast_surface_fixture(
     (weeks / "2026-09-14.json").write_text(
         json.dumps(
             {
+                "metadata": {"as_of_date": artifact_as_of},
                 "events": [
                     {
                         "ticker": "FDX",
@@ -197,6 +199,42 @@ def test_forecast_surface_parity_resolves_legacy_symbol_iv(
 
     with pytest.raises(contracts.ContractError, match="resolved headline mismatch"):
         contracts.validate_forecast_surface_parity()
+
+
+def test_forecast_surface_parity_does_not_age_pre_event_snapshot_into_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    public = tmp_path / "public"
+    forecast = {
+        "display_forecast_pct": 0.07,
+        "display_forecast_method": "ml",
+        "em_ml_pct": 0.07,
+    }
+    _write_forecast_surface_fixture(
+        public,
+        calendar_forecast=forecast,
+        symbol_forecast={
+            **forecast,
+            "iv_pct": 0.15,
+            "straddle_pct": 0.13,
+        },
+        artifact_as_of="2026-09-15",
+    )
+    symbol_path = public / "symbols" / "FDX.json"
+    symbol = json.loads(symbol_path.read_text())
+    symbol["earnings_history"] = [
+        {"date": "2026-06-01", "actual": 0.04},
+        {"date": "2026-03-01", "actual": -0.06},
+        {"date": "2025-12-01", "actual": 0.05},
+        {"date": "2025-09-01", "actual": -0.07},
+    ]
+    symbol_path.write_text(json.dumps(symbol))
+    monkeypatch.setattr(contracts, "PUBLIC", public)
+
+    # The event is 2026-09-16, but this committed artifact was captured on
+    # 2026-09-15. Missing reported-only hover components must not become a
+    # failure later just because the CI runner's wall clock advances.
+    contracts.validate_forecast_surface_parity()
 
 
 def test_forecast_surface_parity_requires_reported_hover_components(
