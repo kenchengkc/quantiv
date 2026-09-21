@@ -19,6 +19,13 @@
     "em_ml_abs": 7.365425,
     "model_horizon": 7,
     "ml_snapshot_date": "2026-09-16",
+    "forecast_id": "f298b20503f96693871241ef121188a796eee25b56d89979f57eebf147b1e906",
+    "forecast_scored_at": "2026-09-19T14:29:37.355624",
+    "forecast_feature_cutoff_at": "2026-09-22T20:00:00+00:00",
+    "forecast_prediction_deadline_at": "2026-09-23T04:00:00+00:00",
+    "forecast_feature_snapshot_at": "2026-09-16T20:00:00+00:00",
+    "forecast_feature_hash": "94142f65574cdab7dbdce97d001fc48f299baef17a018a87e568ed63c579f27c",
+    "forecast_frozen_eligible": true,
     "p10": 0.008704,
     "p25": 0.022817,
     "p50": 0.037629,
@@ -32,7 +39,7 @@
     "options_status": "decision_eligible",
     "fallback_reason": null,
     "historical_event_count": null,
-    "timing": "bmo"
+    "timing": "unknown"
   },
   "straddle_features": [
     {
@@ -114,11 +121,24 @@
       "em_ml_abs": 7.365425,
       "model_horizon": 7,
       "ml_snapshot_date": "2026-09-16",
+      "forecast_id": "f298b20503f96693871241ef121188a796eee25b56d89979f57eebf147b1e906",
+      "forecast_scored_at": "2026-09-19T14:29:37.355624",
+      "forecast_feature_cutoff_at": "2026-09-22T20:00:00+00:00",
+      "forecast_prediction_deadline_at": "2026-09-23T04:00:00+00:00",
+      "forecast_feature_snapshot_at": "2026-09-16T20:00:00+00:00",
+      "forecast_feature_hash": "94142f65574cdab7dbdce97d001fc48f299baef17a018a87e568ed63c579f27c",
+      "forecast_frozen_eligible": true,
       "p10": 0.008704,
       "p25": 0.022817,
       "p50": 0.037629,
       "p75": 0.067335,
       "p90": 0.083914,
+      "display_forecast_pct": 0.036927,
+      "display_forecast_method": "ml",
+      "display_forecast_as_of": "2026-09-16",
+      "ml_status": "available",
+      "options_status": "unavailable",
+      "fallback_reason": null,
       "forecast_frozen": true
     },
     {
@@ -142,7 +162,14 @@
       "eps_surprise_pct": null,
       "revenue_actual": null,
       "revenue_estimate": null,
-      "rev_surprise_pct": null
+      "rev_surprise_pct": null,
+      "display_forecast_pct": 0.080488,
+      "display_forecast_method": "options_math",
+      "display_forecast_as_of": "2026-03-24",
+      "ml_status": "unavailable_event",
+      "options_status": "decision_eligible",
+      "fallback_reason": null,
+      "forecast_frozen": true
     },
     {
       "date": "2025-12-18",
@@ -165,7 +192,14 @@
       "eps_surprise_pct": null,
       "revenue_actual": null,
       "revenue_estimate": null,
-      "rev_surprise_pct": null
+      "rev_surprise_pct": null,
+      "display_forecast_pct": 0.073122,
+      "display_forecast_method": "options_math",
+      "display_forecast_as_of": "2025-12-17",
+      "ml_status": "unavailable_event",
+      "options_status": "decision_eligible",
+      "fallback_reason": null,
+      "forecast_frozen": true
     },
     {
       "date": "2025-09-24",
@@ -188,7 +222,14 @@
       "eps_surprise_pct": null,
       "revenue_actual": null,
       "revenue_estimate": null,
-      "rev_surprise_pct": null
+      "rev_surprise_pct": null,
+      "display_forecast_pct": 0.080358,
+      "display_forecast_method": "options_math",
+      "display_forecast_as_of": "2025-09-23",
+      "ml_status": "unavailable_event",
+      "options_status": "decision_eligible",
+      "fallback_reason": null,
+      "forecast_frozen": true
     },
     {
       "date": "2025-03-26",
@@ -211,7 +252,14 @@
       "eps_surprise_pct": null,
       "revenue_actual": null,
       "revenue_estimate": null,
-      "rev_surprise_pct": null
+      "rev_surprise_pct": null,
+      "display_forecast_pct": 0.075168,
+      "display_forecast_method": "options_math",
+      "display_forecast_as_of": "2025-03-25",
+      "ml_status": "unavailable_event",
+      "options_status": "decision_eligible",
+      "fallback_reason": null,
+      "forecast_frozen": true
     },
     {
       "date": "2024-12-19",
@@ -234,7 +282,14 @@
       "eps_surprise_pct": null,
       "revenue_actual": null,
       "revenue_estimate": null,
-      "rev_surprise_pct": null
+      "rev_surprise_pct": null,
+      "display_forecast_pct": 0.079793,
+      "display_forecast_method": "options_math",
+      "display_forecast_as_of": "2024-12-18",
+      "ml_status": "unavailable_event",
+      "options_status": "decision_eligible",
+      "fallback_reason": null,
+      "forecast_frozen": true
     },
     {
       "date": "2024-09-25",
@@ -257,7 +312,14 @@
       "eps_surprise_pct": null,
       "revenue_actual": null,
       "revenue_estimate": null,
-      "rev_surprise_pct": null
+      "rev_surprise_pct": null,
+      "display_forecast_pct": 0.07844,
+      "display_forecast_method": "options_math",
+      "display_forecast_as_of": "2024-09-24",
+      "ml_status": "unavailable_event",
+      "options_status": "decision_eligible",
+      "fallback_reason": null,
+      "forecast_frozen": true
     },
     {
       "date": "2024-03-27",
@@ -280,7 +342,14 @@
       "eps_surprise_pct": null,
       "revenue_actual": null,
       "revenue_estimate": null,
-      "rev_surprise_pct": null
+      "rev_surprise_pct": null,
+      "display_forecast_pct": 0.067757,
+      "display_forecast_method": "options_math",
+      "display_forecast_as_of": "2024-03-25",
+      "ml_status": "unavailable_event",
+      "options_status": "decision_eligible",
+      "fallback_reason": null,
+      "forecast_frozen": true
     },
     {
       "date": "2023-12-21",
@@ -303,7 +372,14 @@
       "eps_surprise_pct": null,
       "revenue_actual": null,
       "revenue_estimate": null,
-      "rev_surprise_pct": null
+      "rev_surprise_pct": null,
+      "display_forecast_pct": 0.064133,
+      "display_forecast_method": "options_math",
+      "display_forecast_as_of": "2023-12-20",
+      "ml_status": "unavailable_event",
+      "options_status": "decision_eligible",
+      "fallback_reason": null,
+      "forecast_frozen": true
     },
     {
       "date": "2023-09-26",
@@ -386,5 +462,5 @@
     "iv_mom_week": 0.0083,
     "iv_mom_month": null
   },
-  "next_earnings_timing": "bmo"
+  "next_earnings_timing": "unknown"
 }

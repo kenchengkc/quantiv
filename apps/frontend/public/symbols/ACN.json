@@ -20,6 +20,13 @@
     "correction_factor": 0.57378,
     "model_horizon": 14,
     "ml_snapshot_date": "2026-09-17",
+    "forecast_id": "fbe804f1829e719056deaa26a0b2b3a85c952c784bcf0b024bc92575d69ffe1b",
+    "forecast_scored_at": "2026-09-19T14:29:37.279123",
+    "forecast_feature_cutoff_at": "2026-10-01T19:55:00+00:00",
+    "forecast_prediction_deadline_at": "2026-10-01T19:55:00+00:00",
+    "forecast_feature_snapshot_at": "2026-09-17T20:00:00+00:00",
+    "forecast_feature_hash": "088c32d3430c70f3c91feb4b459a72b337c3cc1c116148dbaf60b036b0fb48b0",
+    "forecast_frozen_eligible": true,
     "p10": 0.009377,
     "p25": 0.022356,
     "p50": 0.047705,
@@ -33,7 +40,7 @@
     "options_status": "decision_eligible",
     "fallback_reason": null,
     "historical_event_count": null,
-    "timing": "amc"
+    "timing": "bmo"
   },
   "straddle_features": [
     {
@@ -91,7 +98,7 @@
   "earnings_history": [
     {
       "date": "2026-10-01",
-      "timing": "after_market_close",
+      "timing": "before_market_open",
       "q": "Q3 26",
       "fiscal_year": 2026,
       "fiscal_q": "Q3",
@@ -116,11 +123,24 @@
       "correction_factor": 0.57378,
       "model_horizon": 14,
       "ml_snapshot_date": "2026-09-17",
+      "forecast_id": "fbe804f1829e719056deaa26a0b2b3a85c952c784bcf0b024bc92575d69ffe1b",
+      "forecast_scored_at": "2026-09-19T14:29:37.279123",
+      "forecast_feature_cutoff_at": "2026-10-01T19:55:00+00:00",
+      "forecast_prediction_deadline_at": "2026-10-01T19:55:00+00:00",
+      "forecast_feature_snapshot_at": "2026-09-17T20:00:00+00:00",
+      "forecast_feature_hash": "088c32d3430c70f3c91feb4b459a72b337c3cc1c116148dbaf60b036b0fb48b0",
+      "forecast_frozen_eligible": true,
       "p10": 0.009377,
       "p25": 0.022356,
       "p50": 0.047705,
       "p75": 0.113454,
       "p90": 0.15059,
+      "display_forecast_pct": 0.05708,
+      "display_forecast_method": "ml",
+      "display_forecast_as_of": "2026-09-17",
+      "ml_status": "available",
+      "options_status": "unavailable",
+      "fallback_reason": null,
       "forecast_frozen": true
     },
     {
@@ -144,7 +164,14 @@
       "eps_surprise_pct": 0.014253,
       "revenue_actual": 18718144000.0,
       "revenue_estimate": 18932574078.0,
-      "rev_surprise_pct": -0.011326
+      "rev_surprise_pct": -0.011326,
+      "display_forecast_pct": 0.125626,
+      "display_forecast_method": "options_math",
+      "display_forecast_as_of": "2026-06-17",
+      "ml_status": "unavailable_event",
+      "options_status": "decision_eligible",
+      "fallback_reason": null,
+      "forecast_frozen": true
     },
     {
       "date": "2026-03-19",
@@ -167,7 +194,14 @@
       "eps_surprise_pct": null,
       "revenue_actual": null,
       "revenue_estimate": null,
-      "rev_surprise_pct": null
+      "rev_surprise_pct": null,
+      "display_forecast_pct": 0.116696,
+      "display_forecast_method": "options_math",
+      "display_forecast_as_of": "2026-03-18",
+      "ml_status": "unavailable_event",
+      "options_status": "decision_eligible",
+      "fallback_reason": null,
+      "forecast_frozen": true
     },
     {
       "date": "2025-12-18",
@@ -190,7 +224,14 @@
       "eps_surprise_pct": null,
       "revenue_actual": null,
       "revenue_estimate": null,
-      "rev_surprise_pct": null
+      "rev_surprise_pct": null,
+      "display_forecast_pct": 0.085674,
+      "display_forecast_method": "options_math",
+      "display_forecast_as_of": "2025-12-17",
+      "ml_status": "unavailable_event",
+      "options_status": "decision_eligible",
+      "fallback_reason": null,
+      "forecast_frozen": true
     },
     {
       "date": "2025-09-25",
@@ -213,7 +254,14 @@
       "eps_surprise_pct": null,
       "revenue_actual": null,
       "revenue_estimate": null,
-      "rev_surprise_pct": null
+      "rev_surprise_pct": null,
+      "display_forecast_pct": 0.114881,
+      "display_forecast_method": "options_math",
+      "display_forecast_as_of": "2025-09-24",
+      "ml_status": "unavailable_event",
+      "options_status": "decision_eligible",
+      "fallback_reason": null,
+      "forecast_frozen": true
     },
     {
       "date": "2025-06-20",
@@ -236,7 +284,14 @@
       "eps_surprise_pct": null,
       "revenue_actual": null,
       "revenue_estimate": null,
-      "rev_surprise_pct": null
+      "rev_surprise_pct": null,
+      "display_forecast_pct": 0.082315,
+      "display_forecast_method": "options_math",
+      "display_forecast_as_of": "2025-06-19",
+      "ml_status": "unavailable_event",
+      "options_status": "decision_eligible",
+      "fallback_reason": null,
+      "forecast_frozen": true
     },
     {
       "date": "2025-03-20",
@@ -259,7 +314,14 @@
       "eps_surprise_pct": null,
       "revenue_actual": null,
       "revenue_estimate": null,
-      "rev_surprise_pct": null
+      "rev_surprise_pct": null,
+      "display_forecast_pct": 0.094593,
+      "display_forecast_method": "options_math",
+      "display_forecast_as_of": "2025-03-19",
+      "ml_status": "unavailable_event",
+      "options_status": "decision_eligible",
+      "fallback_reason": null,
+      "forecast_frozen": true
     },
     {
       "date": "2024-12-19",
@@ -282,7 +344,14 @@
       "eps_surprise_pct": null,
       "revenue_actual": null,
       "revenue_estimate": null,
-      "rev_surprise_pct": null
+      "rev_surprise_pct": null,
+      "display_forecast_pct": 0.08334,
+      "display_forecast_method": "options_math",
+      "display_forecast_as_of": "2024-12-18",
+      "ml_status": "unavailable_event",
+      "options_status": "decision_eligible",
+      "fallback_reason": null,
+      "forecast_frozen": true
     },
     {
       "date": "2024-09-26",
@@ -305,7 +374,14 @@
       "eps_surprise_pct": null,
       "revenue_actual": null,
       "revenue_estimate": null,
-      "rev_surprise_pct": null
+      "rev_surprise_pct": null,
+      "display_forecast_pct": 0.08044,
+      "display_forecast_method": "options_math",
+      "display_forecast_as_of": "2024-09-25",
+      "ml_status": "unavailable_event",
+      "options_status": "decision_eligible",
+      "fallback_reason": null,
+      "forecast_frozen": true
     },
     {
       "date": "2024-06-20",
@@ -328,7 +404,14 @@
       "eps_surprise_pct": null,
       "revenue_actual": null,
       "revenue_estimate": null,
-      "rev_surprise_pct": null
+      "rev_surprise_pct": null,
+      "display_forecast_pct": 0.109134,
+      "display_forecast_method": "options_math",
+      "display_forecast_as_of": "2024-06-19",
+      "ml_status": "unavailable_event",
+      "options_status": "decision_eligible",
+      "fallback_reason": null,
+      "forecast_frozen": true
     },
     {
       "date": "2024-03-21",
@@ -351,7 +434,14 @@
       "eps_surprise_pct": null,
       "revenue_actual": null,
       "revenue_estimate": null,
-      "rev_surprise_pct": null
+      "rev_surprise_pct": null,
+      "display_forecast_pct": 0.065711,
+      "display_forecast_method": "options_math",
+      "display_forecast_as_of": "2024-03-20",
+      "ml_status": "unavailable_event",
+      "options_status": "decision_eligible",
+      "fallback_reason": null,
+      "forecast_frozen": true
     },
     {
       "date": "2023-12-19",
@@ -374,7 +464,14 @@
       "eps_surprise_pct": null,
       "revenue_actual": null,
       "revenue_estimate": null,
-      "rev_surprise_pct": null
+      "rev_surprise_pct": null,
+      "display_forecast_pct": 0.055578,
+      "display_forecast_method": "options_math",
+      "display_forecast_as_of": "2023-12-18",
+      "ml_status": "unavailable_event",
+      "options_status": "decision_eligible",
+      "fallback_reason": null,
+      "forecast_frozen": true
     }
   ],
   "next_earnings": "2026-10-01",
@@ -388,5 +485,5 @@
     "iv_mom_week": 0.0093,
     "iv_mom_month": null
   },
-  "next_earnings_timing": "amc"
+  "next_earnings_timing": "bmo"
 }

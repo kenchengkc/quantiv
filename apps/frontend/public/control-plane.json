@@ -2,30 +2,30 @@
   "data": {
     "contract_rejection_rate": 0.650558,
     "contracts": 116374,
-    "corporate_action_rows": 28764,
+    "corporate_action_rows": 28807,
     "corporate_action_status": "enforced",
     "covered_events": 30,
-    "decision_group_rejection_rate": 0.285714,
-    "decision_groups": 42,
+    "decision_group_rejection_rate": 0.302326,
+    "decision_groups": 43,
     "decision_scope": "end_of_day_research",
     "display_forecast_coverage_pct": 1.0,
-    "display_forecast_covered_events": 31,
-    "display_forecast_events": 31,
+    "display_forecast_covered_events": 40,
+    "display_forecast_events": 40,
     "display_forecast_method_mix": {
       "historical": 0,
       "historical_prior": 0,
-      "ml": 31,
+      "ml": 40,
       "options_indicative": 0,
       "options_math": 0
     },
     "duplicate_rows": 0,
     "eligible_contracts": 40666,
     "eligible_decision_groups": 30,
-    "event_coverage_pct": 0.714286,
-    "expected_events": 42,
+    "event_coverage_pct": 0.697674,
+    "expected_events": 43,
     "expected_source_date": "2026-09-18",
     "live_trading_eligible": false,
-    "missing_events": 12,
+    "missing_events": 13,
     "pair_rejection_rate": 0.922044,
     "quarantine_records": 129359,
     "quarantine_status": "enforced",
@@ -33,20 +33,26 @@
     "replay_status": "verified",
     "source_date": "2026-09-18",
     "source_session_lag": 0,
-    "status": "passed"
+    "status": "failed"
   },
   "exceptions": [
     {
       "code": "upcoming_events_outside_option_universe",
-      "count": 187,
+      "count": 196,
       "severity": "warning",
       "summary": "Calendar events fall outside the current options decision universe"
     },
     {
       "code": "upcoming_events_without_option_chain",
-      "count": 12,
+      "count": 13,
       "severity": "warning",
       "summary": "In-universe earnings events have no decision-eligible option chain"
+    },
+    {
+      "code": "event_quote_coverage_below_limit",
+      "count": 13,
+      "severity": "critical",
+      "summary": "Decision-eligible option coverage is below the publication limit"
     },
     {
       "code": "option_chain_diagnostics_above_limit",
@@ -55,7 +61,7 @@
       "summary": "Chain-wide option diagnostics exceed their limits outside the scoped earnings decision surface"
     }
   ],
-  "generated_at": "2026-09-19T15:00:57.030881+00:00",
+  "generated_at": "2026-09-21T17:55:26.505224+00:00",
   "model": {
     "challenger_present": true,
     "champion_active": true,
@@ -63,7 +69,7 @@
     "drift_status": "warning",
     "fallback_bundle_available": false,
     "hard_missing_features": 0,
-    "monitored_at": "2026-09-19T14:29:41.456755+00:00",
+    "monitored_at": "2026-09-21T17:20:31.686109+00:00",
     "outcome_common_rows": null,
     "outcome_evaluated_at": "2026-09-14T01:54:36.293833+00:00",
     "outcome_evaluations": 2,
@@ -77,7 +83,7 @@
     "status": "passed",
     "warning_features": 6
   },
-  "publication_eligible": true,
+  "publication_eligible": false,
   "release": {
     "artifact_promotion_status": "passed",
     "data_r2_status": "passed",
@@ -86,5 +92,5 @@
     "neon_import_status": "passed"
   },
   "schema": "quantiv.control-plane.v2",
-  "status": "passed"
+  "status": "failed"
 }

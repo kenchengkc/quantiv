@@ -27,7 +27,7 @@
     "p50": null,
     "p75": null,
     "p90": null,
-    "timing": "amc"
+    "timing": "unknown"
   },
   "straddle_features": [],
   "earnings_history": [
@@ -47,11 +47,24 @@
       "em_ml_abs": 1.876991,
       "model_horizon": 7,
       "ml_snapshot_date": "2026-09-16",
+      "forecast_id": "4523cfcfe3b46d02e177f6cf4573475f6ae7a1dc5dcf90fc30606afe823aba61",
+      "forecast_scored_at": "2026-09-19T14:29:37.355624",
+      "forecast_feature_cutoff_at": "2026-09-23T19:55:00+00:00",
+      "forecast_prediction_deadline_at": "2026-09-23T19:55:00+00:00",
+      "forecast_feature_snapshot_at": "2026-09-16T20:00:00+00:00",
+      "forecast_feature_hash": "c9a5afafd41183d042230b4e70a15b1b222a3d8a56aa621a7d901658dea9775d",
+      "forecast_frozen_eligible": true,
       "p10": 0.007132,
       "p25": 0.021182,
       "p50": 0.033721,
       "p75": 0.055432,
       "p90": 0.088823,
+      "display_forecast_pct": 0.036927,
+      "display_forecast_method": "ml",
+      "display_forecast_as_of": "2026-09-16",
+      "ml_status": "available",
+      "options_status": "unavailable",
+      "fallback_reason": null,
       "forecast_frozen": true
     },
     {
@@ -200,5 +213,5 @@
   ],
   "next_earnings": "2026-09-23",
   "vol_regime": null,
-  "next_earnings_timing": "amc"
+  "next_earnings_timing": "unknown"
 }

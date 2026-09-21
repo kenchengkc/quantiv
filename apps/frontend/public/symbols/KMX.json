@@ -20,6 +20,13 @@
     "correction_factor": 0.60542,
     "model_horizon": 14,
     "ml_snapshot_date": "2026-09-15",
+    "forecast_id": "e9c3b4d2ec7d9f58958666146790d8215e48174ca6d5d80cd011c2ef01535ffb",
+    "forecast_scored_at": "2026-09-19T14:29:37.279123",
+    "forecast_feature_cutoff_at": "2026-09-28T20:00:00+00:00",
+    "forecast_prediction_deadline_at": "2026-09-29T04:00:00+00:00",
+    "forecast_feature_snapshot_at": "2026-09-15T20:00:00+00:00",
+    "forecast_feature_hash": "8b16b93a0e07f474c239f0611404134694cf421786e9fddf325df7fa6cdd1984",
+    "forecast_frozen_eligible": true,
     "p10": 0.011581,
     "p25": 0.036745,
     "p50": 0.082622,
@@ -33,7 +40,7 @@
     "options_status": "decision_eligible",
     "fallback_reason": null,
     "historical_event_count": null,
-    "timing": "bmo"
+    "timing": "unknown"
   },
   "straddle_features": [
     {
@@ -82,11 +89,24 @@
       "correction_factor": 0.60542,
       "model_horizon": 14,
       "ml_snapshot_date": "2026-09-15",
+      "forecast_id": "e9c3b4d2ec7d9f58958666146790d8215e48174ca6d5d80cd011c2ef01535ffb",
+      "forecast_scored_at": "2026-09-19T14:29:37.279123",
+      "forecast_feature_cutoff_at": "2026-09-28T20:00:00+00:00",
+      "forecast_prediction_deadline_at": "2026-09-29T04:00:00+00:00",
+      "forecast_feature_snapshot_at": "2026-09-15T20:00:00+00:00",
+      "forecast_feature_hash": "8b16b93a0e07f474c239f0611404134694cf421786e9fddf325df7fa6cdd1984",
+      "forecast_frozen_eligible": true,
       "p10": 0.011581,
       "p25": 0.036745,
       "p50": 0.082622,
       "p75": 0.13995,
       "p90": 0.235171,
+      "display_forecast_pct": 0.083245,
+      "display_forecast_method": "ml",
+      "display_forecast_as_of": "2026-09-15",
+      "ml_status": "available",
+      "options_status": "unavailable",
+      "fallback_reason": null,
       "forecast_frozen": true
     },
     {
@@ -110,7 +130,14 @@
       "eps_surprise_pct": 0.3235,
       "revenue_actual": 8013519000.0,
       "revenue_estimate": 7498286611.0,
-      "rev_surprise_pct": 0.068713
+      "rev_surprise_pct": 0.068713,
+      "display_forecast_pct": 0.142399,
+      "display_forecast_method": "options_math",
+      "display_forecast_as_of": "2026-06-16",
+      "ml_status": "unavailable_event",
+      "options_status": "decision_eligible",
+      "fallback_reason": null,
+      "forecast_frozen": true
     },
     {
       "date": "2025-12-18",
@@ -133,7 +160,14 @@
       "eps_surprise_pct": null,
       "revenue_actual": null,
       "revenue_estimate": null,
-      "rev_surprise_pct": null
+      "rev_surprise_pct": null,
+      "display_forecast_pct": 0.121024,
+      "display_forecast_method": "options_math",
+      "display_forecast_as_of": "2025-12-17",
+      "ml_status": "unavailable_event",
+      "options_status": "decision_eligible",
+      "fallback_reason": null,
+      "forecast_frozen": true
     },
     {
       "date": "2025-09-25",
@@ -156,7 +190,14 @@
       "eps_surprise_pct": null,
       "revenue_actual": null,
       "revenue_estimate": null,
-      "rev_surprise_pct": null
+      "rev_surprise_pct": null,
+      "display_forecast_pct": 0.158522,
+      "display_forecast_method": "options_math",
+      "display_forecast_as_of": "2025-09-24",
+      "ml_status": "unavailable_event",
+      "options_status": "decision_eligible",
+      "fallback_reason": null,
+      "forecast_frozen": true
     },
     {
       "date": "2025-06-20",
@@ -179,7 +220,14 @@
       "eps_surprise_pct": null,
       "revenue_actual": null,
       "revenue_estimate": null,
-      "rev_surprise_pct": null
+      "rev_surprise_pct": null,
+      "display_forecast_pct": 0.083983,
+      "display_forecast_method": "options_math",
+      "display_forecast_as_of": "2025-06-19",
+      "ml_status": "unavailable_event",
+      "options_status": "decision_eligible",
+      "fallback_reason": null,
+      "forecast_frozen": true
     },
     {
       "date": "2024-12-19",
@@ -202,7 +250,14 @@
       "eps_surprise_pct": null,
       "revenue_actual": null,
       "revenue_estimate": null,
-      "rev_surprise_pct": null
+      "rev_surprise_pct": null,
+      "display_forecast_pct": 0.131233,
+      "display_forecast_method": "options_math",
+      "display_forecast_as_of": "2024-12-18",
+      "ml_status": "unavailable_event",
+      "options_status": "decision_eligible",
+      "fallback_reason": null,
+      "forecast_frozen": true
     },
     {
       "date": "2024-09-26",
@@ -225,7 +280,14 @@
       "eps_surprise_pct": null,
       "revenue_actual": null,
       "revenue_estimate": null,
-      "rev_surprise_pct": null
+      "rev_surprise_pct": null,
+      "display_forecast_pct": 0.151004,
+      "display_forecast_method": "options_math",
+      "display_forecast_as_of": "2024-09-25",
+      "ml_status": "unavailable_event",
+      "options_status": "decision_eligible",
+      "fallback_reason": null,
+      "forecast_frozen": true
     },
     {
       "date": "2024-06-21",
@@ -248,7 +310,14 @@
       "eps_surprise_pct": null,
       "revenue_actual": null,
       "revenue_estimate": null,
-      "rev_surprise_pct": null
+      "rev_surprise_pct": null,
+      "display_forecast_pct": 0.105328,
+      "display_forecast_method": "options_math",
+      "display_forecast_as_of": "2024-06-19",
+      "ml_status": "unavailable_event",
+      "options_status": "decision_eligible",
+      "fallback_reason": null,
+      "forecast_frozen": true
     },
     {
       "date": "2023-12-21",
@@ -271,7 +340,14 @@
       "eps_surprise_pct": null,
       "revenue_actual": null,
       "revenue_estimate": null,
-      "rev_surprise_pct": null
+      "rev_surprise_pct": null,
+      "display_forecast_pct": 0.134824,
+      "display_forecast_method": "options_math",
+      "display_forecast_as_of": "2023-12-20",
+      "ml_status": "unavailable_event",
+      "options_status": "decision_eligible",
+      "fallback_reason": null,
+      "forecast_frozen": true
     },
     {
       "date": "2023-09-28",
@@ -294,7 +370,14 @@
       "eps_surprise_pct": null,
       "revenue_actual": null,
       "revenue_estimate": null,
-      "rev_surprise_pct": null
+      "rev_surprise_pct": null,
+      "display_forecast_pct": 0.134216,
+      "display_forecast_method": "options_math",
+      "display_forecast_as_of": "2023-09-27",
+      "ml_status": "unavailable_event",
+      "options_status": "decision_eligible",
+      "fallback_reason": null,
+      "forecast_frozen": true
     },
     {
       "date": "2023-06-23",
@@ -354,5 +437,5 @@
     "iv_mom_week": 0.0267,
     "iv_mom_month": null
   },
-  "next_earnings_timing": "bmo"
+  "next_earnings_timing": "unknown"
 }
