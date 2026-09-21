@@ -2,7 +2,10 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import styles from './page.module.css';
 import { ValidationPublication } from '@/components/ValidationPublication';
-import { controlExceptionExplanation, publishedForecastStatus } from '@/lib/publicationPresentation';
+import {
+  controlExceptionExplanation,
+  publishedForecastStatus,
+} from '@/lib/publicationPresentation';
 import { requirePublicJson } from '@/lib/researchSnapshot.server';
 
 export const metadata: Metadata = {
@@ -11,7 +14,14 @@ export const metadata: Metadata = {
     'Audit Quantiv model performance, calibration, production controls, data quality, and evidence lineage.',
 };
 
-type Status = 'passed' | 'advisory' | 'degraded' | 'failed' | 'warning' | 'unavailable' | string;
+type Status =
+  | 'passed'
+  | 'advisory'
+  | 'degraded'
+  | 'failed'
+  | 'warning'
+  | 'unavailable'
+  | string;
 
 type HorizonValidation = {
   horizon_days: number;
@@ -148,7 +158,10 @@ type ForecastEvidence = {
   }>;
 };
 
-const validation = requirePublicJson<ValidationArtifact>('evidence', 'model-validation.json');
+const validation = requirePublicJson<ValidationArtifact>(
+  'evidence',
+  'model-validation.json',
+);
 const control = requirePublicJson<ControlPlane>('control-plane.json');
 const forecast = requirePublicJson<ForecastEvidence>('evidence', 'forecast.json');
 
@@ -180,385 +193,554 @@ function dateLabel(value: string | null | undefined): string {
 function shortHash(value: string | null | undefined): string {
   if (!value) return 'Unavailable';
   const clean = value.replace(/^sha256:/, '');
-  return clean.length > 18 ? `${clean.slice(0, 10)}…${clean.slice(-8)}` : clean;
+  return clean.length > 18
+    ? `${clean.slice(0, 10)}…${clean.slice(-8)}`
+    : clean;
 }
 
 function tone(status: Status | boolean): { label: string; color: string } {
-  if (status === true || status === 'passed' || status === 'verified' || status === 'enforced') {
-    return { label: status === true ? 'Eligible' : String(status), color: 'var(--up)' };
+  if (
+    status === true ||
+    status === 'passed' ||
+    status === 'verified' ||
+    status === 'enforced'
+  ) {
+    return {
+      label: status === true ? 'Eligible' : String(status),
+      color: 'var(--up)',
+    };
   }
   if (status === false || status === 'failed' || status === 'critical') {
-    return { label: status === false ? 'Blocked' : String(status), color: 'var(--down)' };
+    return {
+      label: status === false ? 'Blocked' : String(status),
+      color: 'var(--down)',
+    };
   }
-  if (status === 'advisory' || status === 'degraded' || status === 'warning') {
-    return { label: status === 'warning' ? 'warning' : 'advisory', color: 'var(--flag)' };
+  if (
+    status === 'advisory' ||
+    status === 'degraded' ||
+    status === 'warning'
+  ) {
+    return {
+      label: status === 'warning' ? 'warning' : 'advisory',
+      color: 'var(--flag)',
+    };
   }
-  return { label: String(status || 'unavailable'), color: 'var(--ink-3)' };
+  return {
+    label: String(status || 'unavailable'),
+    color: 'var(--ink-3)',
+  };
 }
 
 function StatusPill({ status }: { status: Status | boolean }) {
   const value = tone(status);
   return (
-    <span
-      className="mono"
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 6,
-        padding: '4px 8px',
-        borderRadius: 999,
-        border: '1px solid var(--line)',
-        fontSize: 10,
-        letterSpacing: '0.08em',
-        textTransform: 'uppercase',
-        color: value.color,
-        whiteSpace: 'nowrap',
-      }}
-    >
+    <span className={styles.statusPill} style={{ color: value.color }}>
       <span
         aria-hidden
-        style={{ width: 6, height: 6, borderRadius: 999, background: value.color }}
+        className={styles.statusDot}
+        style={{ background: value.color }}
       />
       {value.label}
     </span>
   );
 }
 
-function SectionTitle({ kicker, children }: { kicker: string; children: React.ReactNode }) {
+function SectionTitle({
+  kicker,
+  children,
+  description,
+}: {
+  kicker: string;
+  children: React.ReactNode;
+  description?: string;
+}) {
   return (
-    <div style={{ marginBottom: 18 }}>
-      <div
-        className="mono"
-        style={{
-          fontSize: 10,
-          color: 'var(--ink-3)',
-          letterSpacing: '0.16em',
-          textTransform: 'uppercase',
-          marginBottom: 8,
-        }}
-      >
-        {kicker}
-      </div>
-      <h2 style={{ margin: 0, fontSize: 32, fontWeight: 600, letterSpacing: '-0.025em' }}>
-        {children}
-      </h2>
+    <div className={styles.sectionHeading}>
+      <div className={styles.kicker}>{kicker}</div>
+      <h2>{children}</h2>
+      {description ? <p>{description}</p> : null}
     </div>
   );
 }
 
-function MetricCard({ label, value, detail }: { label: string; value: string; detail: string }) {
+function CalibrationMeter({
+  label,
+  nominal,
+  observed,
+}: {
+  label: string;
+  nominal: number;
+  observed: number | null | undefined;
+}) {
+  const observedPct =
+    observed == null || !Number.isFinite(observed)
+      ? null
+      : Math.min(1, Math.max(0, observed));
+
   return (
-    <div
-      style={{
-        minHeight: 148,
-        border: '1px solid var(--line)',
-        borderRadius: 14,
-        background: 'var(--bg-2)',
-        padding: 18,
-      }}
-    >
-      <div
-        className="mono"
-        style={{ fontSize: 10, color: 'var(--ink-3)', letterSpacing: '0.12em', textTransform: 'uppercase' }}
+    <div className={styles.calibrationMeter}>
+      <div className={styles.calibrationTopline}>
+        <span>{label}</span>
+        <strong className="mono tnum">{pct(observed)}</strong>
+      </div>
+      <div className={styles.meterTrack} aria-hidden>
+        <span
+          className={styles.targetMark}
+          style={{ left: `${nominal * 100}%` }}
+        />
+        {observedPct != null ? (
+          <span
+            className={styles.observedMark}
+            style={{ left: `${observedPct * 100}%` }}
+          />
+        ) : null}
+      </div>
+      <div className={styles.meterCaption}>
+        Target <span className="mono tnum">{pct(nominal)}</span>
+      </div>
+    </div>
+  );
+}
+
+function MiniFact({
+  label,
+  value,
+  toneColor,
+}: {
+  label: string;
+  value: React.ReactNode;
+  toneColor?: string;
+}) {
+  return (
+    <div className={styles.miniFact}>
+      <span>{label}</span>
+      <strong
+        className="mono tnum"
+        style={toneColor ? { color: toneColor } : undefined}
       >
-        {label}
-      </div>
-      <div className="tnum" style={{ marginTop: 18, fontSize: 32, fontWeight: 600, letterSpacing: '-0.025em' }}>
         {value}
-      </div>
-      <div style={{ marginTop: 10, fontSize: 12, color: 'var(--ink-3)', lineHeight: 1.5 }}>{detail}</div>
+      </strong>
     </div>
   );
 }
 
 export default function ValidationPage() {
   const sourceIsFallback = validation.model_source.kind !== 'signed_champion';
-  const modelBundle = forecast.artifact_bundles.find((item) => item.name === 'model_bundle');
-  const forecastBundle = forecast.artifact_bundles.find((item) => item.name === 'forecast_snapshot');
+  const modelBundle = forecast.artifact_bundles.find(
+    (item) => item.name === 'model_bundle',
+  );
+  const forecastBundle = forecast.artifact_bundles.find(
+    (item) => item.name === 'forecast_snapshot',
+  );
   const weighted = validation.summary.weighted_coverage;
+  const improvement = validation.summary.weighted_relative_mae_improvement;
+  const modelMae = validation.summary.weighted_model_mae;
+  const baselineMae = validation.summary.weighted_straddle_mae;
 
   return (
-    <main className="qv-m-pad" style={{ maxWidth: 1180, margin: '0 auto', padding: '0 28px 84px' }}>
-      <header style={{ padding: '32px 0 24px', borderBottom: '1px solid var(--line)' }}>
-        <div
-          className="mono"
-          style={{ fontSize: 10, color: 'var(--ink-3)', letterSpacing: '0.18em', textTransform: 'uppercase' }}
-        >
-          Model · data · evidence
+    <main className={styles.page}>
+      <header className={styles.hero}>
+        <div className={styles.kicker}>Model · data · evidence</div>
+        <h1 className="qv-m-h1">Research validation</h1>
+        <p className={styles.heroCopy}>
+          See whether Quantiv forecasts beat the market baseline, how well the
+          uncertainty estimates are calibrated, and whether the latest research
+          state is publishable.
+        </p>
+        <div className={styles.heroMeta}>
+          <span>Assessment</span>
+          <strong className="mono">{dateLabel(control.generated_at)} ET</strong>
         </div>
-        <h1
-          className="qv-m-h1"
-          style={{ margin: '18px 0 0', fontSize: 64, lineHeight: 0.96, fontWeight: 800, letterSpacing: '-0.035em' }}
-        >
-          Research validation
-        </h1>
-        <p style={{ margin: '22px 0 0', maxWidth: 760, color: 'var(--ink-2)', fontSize: 16, lineHeight: 1.65 }}>
-          Out-of-sample model performance, calibration and reproducible evidence.
-          Publication controls below distinguish the last validated forecast release from eligibility for new research.
-        </p>
-        <p style={{ margin: '12px 0 0', color: 'var(--ink-3)', fontSize: 12 }}>
-          Latest assessment: {dateLabel(control.generated_at)} ET
-        </p>
       </header>
 
-      {sourceIsFallback && (
-        <div
-          role="note"
-          style={{
-            marginTop: 18,
-            border: '1px solid var(--line)',
-            borderRadius: 12,
-            padding: '12px 14px',
-            color: 'var(--ink-2)',
-            background: 'var(--bg-2)',
-            fontSize: 12,
-            lineHeight: 1.55,
-          }}
-        >
-          <strong style={{ color: 'var(--ink)' }}>Preview model source.</strong> This committed artifact was generated from the checked-in fallback model metadata.
-          The nightly publication job prefers the signed active champion bundle after R2 synchronization and rewrites this artifact automatically.
-        </div>
-      )}
-
-      <section style={{ paddingTop: 42 }}>
-        <SectionTitle kicker="Primary question">Does the model add information?</SectionTitle>
-        <div
-          className="qv-m-2col"
-          style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 14 }}
-        >
-          <MetricCard
-            label="Model MAE"
-            value={pct(validation.summary.weighted_model_mae, 2)}
-            detail="Validation-weighted absolute error across the six horizon-specific models."
-          />
-          <MetricCard
-            label="Straddle baseline MAE"
-            value={pct(validation.summary.weighted_straddle_mae, 2)}
-            detail="The same validation observations scored against market-implied straddle move."
-          />
-          <MetricCard
-            label="Relative MAE improvement"
-            value={pct(validation.summary.weighted_relative_mae_improvement, 1)}
-            detail={`Every horizon improves on the baseline; range ${pct(validation.summary.min_relative_mae_improvement)}–${pct(validation.summary.max_relative_mae_improvement)}.`}
-          />
-          <MetricCard
-            label="Validation row-observations"
-            value={count(validation.summary.validation_row_observations)}
-            detail="Sum of holdout rows across horizon models; not a unique-event count."
-          />
-        </div>
-      </section>
-
-      <section style={{ paddingTop: 52 }}>
-        <SectionTitle kicker="Out of sample">Performance by research horizon</SectionTitle>
-        <div style={{ overflowX: 'auto', border: '1px solid var(--line)', borderRadius: 14 }}>
-          <table style={{ width: '100%', minWidth: 820, borderCollapse: 'collapse', fontSize: 13 }}>
-            <thead>
-              <tr style={{ background: 'var(--bg-2)' }}>
-                {['Horizon', 'Validation rows', 'Model MAE', 'Straddle MAE', 'Improvement', '50% coverage', '80% coverage'].map((label) => (
-                  <th
-                    key={label}
-                    className="mono"
-                    style={{
-                      textAlign: label === 'Horizon' ? 'left' : 'right',
-                      padding: '13px 14px',
-                      borderBottom: '1px solid var(--line)',
-                      color: 'var(--ink-3)',
-                      fontSize: 10,
-                      letterSpacing: '0.1em',
-                      textTransform: 'uppercase',
-                    }}
-                  >
-                    {label}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {validation.horizons.map((row) => (
-                <tr key={row.horizon_days}>
-                  <td style={{ padding: '14px', borderBottom: '1px solid var(--line)', fontWeight: 600 }}>T-{row.horizon_days}</td>
-                  <td className="mono tnum" style={{ padding: '14px', textAlign: 'right', borderBottom: '1px solid var(--line)' }}>{count(row.n_validation)}</td>
-                  <td className="mono tnum" style={{ padding: '14px', textAlign: 'right', borderBottom: '1px solid var(--line)' }}>{pct(row.model_mae, 2)}</td>
-                  <td className="mono tnum" style={{ padding: '14px', textAlign: 'right', borderBottom: '1px solid var(--line)' }}>{pct(row.straddle_baseline_mae, 2)}</td>
-                  <td className="mono tnum" style={{ padding: '14px', textAlign: 'right', borderBottom: '1px solid var(--line)', color: 'var(--up)' }}>{pct(row.relative_mae_improvement, 1)}</td>
-                  <td className="mono tnum" style={{ padding: '14px', textAlign: 'right', borderBottom: '1px solid var(--line)' }}>{pct(row.coverage.interval_50, 1)}</td>
-                  <td className="mono tnum" style={{ padding: '14px', textAlign: 'right', borderBottom: '1px solid var(--line)' }}>{pct(row.coverage.interval_80, 1)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <p style={{ margin: '12px 2px 0', color: 'var(--ink-3)', fontSize: 11.5, lineHeight: 1.55 }}>
-          MAE is expressed as absolute stock-move fraction. The comparison is paired on each horizon&apos;s validation rows; this table is predictive evidence, not a trading-P&amp;L claim.
-        </p>
-      </section>
-
-      <section style={{ paddingTop: 52 }}>
-        <SectionTitle kicker="Distribution quality">Calibration</SectionTitle>
-        <div className="qv-m-2col" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 14 }}>
-          <MetricCard label="P10 observed" value={pct(weighted.p10)} detail="Nominal target: 10%." />
-          <MetricCard label="P50 observed" value={pct(weighted.p50)} detail="Nominal target: 50%." />
-          <MetricCard label="P90 observed" value={pct(weighted.p90)} detail="Nominal target: 90%." />
-          <MetricCard label="80% interval coverage" value={pct(weighted.interval_80)} detail="Nominal target: 80%." />
-        </div>
-        <div style={{ marginTop: 14, border: '1px solid var(--line)', borderRadius: 14, padding: 18, background: 'var(--bg-2)' }}>
-          <div className="mono" style={{ fontSize: 10, color: 'var(--ink-3)', letterSpacing: '0.12em', textTransform: 'uppercase' }}>
-            Weighted quantile calibration
+      {sourceIsFallback ? (
+        <div role="note" className={styles.previewNote}>
+          <div>
+            <strong>Preview model source</strong>
+            <span>
+              This checkout is using fallback metadata rather than the signed
+              production champion.
+            </span>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: 10, marginTop: 16 }}>
+          <StatusPill status="advisory" />
+        </div>
+      ) : null}
+
+      <section className={styles.section} aria-labelledby="model-performance">
+        <SectionTitle
+          kicker="Performance"
+          description="The same holdout observations are scored by both Quantiv and the market-implied straddle baseline."
+        >
+          <span id="model-performance">Does the model add information?</span>
+        </SectionTitle>
+
+        <div className={styles.performanceHero}>
+          <div className={styles.performanceLead}>
+            <span className={styles.eyebrow}>Weighted error reduction</span>
+            <div className={styles.heroNumber}>{pct(improvement, 1)}</div>
+            <p>
+              Lower mean absolute error than the straddle baseline across the
+              supported research horizons.
+            </p>
+            <div className={styles.rangeLine}>
+              Every horizon improves · {pct(validation.summary.min_relative_mae_improvement)}
+              –{pct(validation.summary.max_relative_mae_improvement)}
+            </div>
+          </div>
+
+          <div className={styles.errorCompare} aria-label="Model versus straddle error">
+            <div className={styles.errorRow}>
+              <div>
+                <span>Quantiv model</span>
+                <strong className="mono tnum">{pct(modelMae, 2)}</strong>
+              </div>
+              <div className={styles.errorTrack}>
+                <span
+                  className={styles.errorFillModel}
+                  style={{
+                    width: `${Math.min(
+                      100,
+                      Math.max(
+                        8,
+                        baselineMae && modelMae
+                          ? (modelMae / baselineMae) * 100
+                          : 0,
+                      ),
+                    )}%`,
+                  }}
+                />
+              </div>
+            </div>
+            <div className={styles.errorRow}>
+              <div>
+                <span>Market straddle</span>
+                <strong className="mono tnum">{pct(baselineMae, 2)}</strong>
+              </div>
+              <div className={styles.errorTrack}>
+                <span className={styles.errorFillBaseline} />
+              </div>
+            </div>
+            <div className={styles.observationCount}>
+              <strong className="mono tnum">
+                {count(validation.summary.validation_row_observations)}
+              </strong>
+              <span>holdout row-observations across {validation.horizons.length} horizon models</span>
+            </div>
+          </div>
+        </div>
+
+        <details className={styles.detailPanel}>
+          <summary>Performance by horizon</summary>
+          <div className={styles.tableWrap}>
+            <table>
+              <thead>
+                <tr>
+                  {[
+                    'Horizon',
+                    'Rows',
+                    'Model MAE',
+                    'Straddle MAE',
+                    'Improvement',
+                    '50% interval',
+                    '80% interval',
+                  ].map((label) => (
+                    <th key={label}>{label}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {validation.horizons.map((row) => (
+                  <tr key={row.horizon_days}>
+                    <td>T-{row.horizon_days}</td>
+                    <td className="mono tnum">{count(row.n_validation)}</td>
+                    <td className="mono tnum">{pct(row.model_mae, 2)}</td>
+                    <td className="mono tnum">
+                      {pct(row.straddle_baseline_mae, 2)}
+                    </td>
+                    <td className="mono tnum" style={{ color: 'var(--up)' }}>
+                      {pct(row.relative_mae_improvement, 1)}
+                    </td>
+                    <td className="mono tnum">{pct(row.coverage.interval_50, 1)}</td>
+                    <td className="mono tnum">{pct(row.coverage.interval_80, 1)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className={styles.detailNote}>
+            MAE is absolute stock-move error. This is predictive validation,
+            not a trading-P&amp;L claim.
+          </p>
+        </details>
+      </section>
+
+      <section className={styles.section} aria-labelledby="calibration">
+        <SectionTitle
+          kicker="Uncertainty"
+          description="Observed quantiles should land close to their nominal targets. The marker shows observed frequency; the thin line is the target."
+        >
+          <span id="calibration">Calibration</span>
+        </SectionTitle>
+
+        <div className={styles.calibrationGrid}>
+          <CalibrationMeter label="P10" nominal={0.1} observed={weighted.p10} />
+          <CalibrationMeter label="P50" nominal={0.5} observed={weighted.p50} />
+          <CalibrationMeter label="P90" nominal={0.9} observed={weighted.p90} />
+          <CalibrationMeter
+            label="80% interval"
+            nominal={0.8}
+            observed={weighted.interval_80}
+          />
+        </div>
+
+        <div className={styles.secondaryCalibration}>
+          <span>Additional checks</span>
+          <div>
+            <MiniFact label="P25 observed" value={pct(weighted.p25)} />
+            <MiniFact label="P75 observed" value={pct(weighted.p75)} />
+            <MiniFact label="50% interval" value={pct(weighted.interval_50)} />
+          </div>
+        </div>
+      </section>
+
+      <section className={styles.section} aria-labelledby="publication-status">
+        <SectionTitle
+          kicker="Publication"
+          description="The last validated release and the ability to publish the next one are different states. This is the only place both are summarized."
+        >
+          <span id="publication-status">Can new research publish?</span>
+        </SectionTitle>
+
+        <ValidationPublication control={control} forecast={forecast} />
+
+        <div className={styles.evidenceStrip} aria-label="Published forecast evidence counts">
+          <MiniFact
+            label="Controls checked"
+            value={count(forecast.controls.evaluated)}
+          />
+          <MiniFact
+            label="Exceptions"
+            value={count(forecast.controls.exceptions)}
+            toneColor={
+              forecast.controls.exceptions > 0 ? 'var(--down)' : 'var(--up)'
+            }
+          />
+          <MiniFact label="Forecast rows" value={count(forecast.coverage.rows)} />
+          <MiniFact label="Events" value={count(forecast.coverage.events)} />
+        </div>
+
+        <div className={styles.operationsGrid}>
+          <article className={styles.operationCard}>
+            <div className={styles.cardHeader}>
+              <div>
+                <span className={styles.eyebrow}>Model safeguards</span>
+                <h3>Serving model</h3>
+              </div>
+              <StatusPill status={control.model.status} />
+            </div>
+            <div className={styles.factGrid}>
+              <MiniFact
+                label="Champion"
+                value={control.model.champion_active ? 'active' : 'inactive'}
+                toneColor={
+                  control.model.champion_active ? 'var(--up)' : 'var(--down)'
+                }
+              />
+              <MiniFact
+                label="Drift"
+                value={tone(control.model.drift_status).label}
+                toneColor={tone(control.model.drift_status).color}
+              />
+              <MiniFact
+                label="Fallback"
+                value={
+                  control.model.fallback_bundle_available
+                    ? 'available'
+                    : 'unavailable'
+                }
+              />
+              <MiniFact
+                label="Shadow roles"
+                value={
+                  control.model.shadow_roles.length
+                    ? control.model.shadow_roles.join(', ')
+                    : 'none'
+                }
+              />
+            </div>
+          </article>
+
+          <article className={styles.operationCard}>
+            <div className={styles.cardHeader}>
+              <div>
+                <span className={styles.eyebrow}>Data safeguards</span>
+                <h3>Decision universe</h3>
+              </div>
+              <StatusPill status={control.data.status} />
+            </div>
+            <div className={styles.factGrid}>
+              <MiniFact
+                label="Event coverage"
+                value={pct(control.data.event_coverage_pct)}
+              />
+              <MiniFact
+                label="Eligible contracts"
+                value={`${count(control.data.eligible_contracts)} / ${count(
+                  control.data.contracts,
+                )}`}
+              />
+              <MiniFact
+                label="Quarantine"
+                value={count(control.data.quarantine_records)}
+              />
+              <MiniFact
+                label="Duplicates"
+                value={count(control.data.duplicate_rows)}
+              />
+            </div>
+          </article>
+        </div>
+
+        {control.exceptions.length > 0 ? (
+          <div className={styles.exceptionPanel}>
+            <div className={styles.exceptionHeader}>
+              <div>
+                <span className={styles.eyebrow}>Needs attention</span>
+                <h3>Why publication is constrained</h3>
+              </div>
+              <span className="mono tnum">{control.exceptions.length}</span>
+            </div>
+            <div className={styles.exceptionList}>
+              {control.exceptions.map((item) => (
+                <div key={item.code} className={styles.exception}>
+                  <StatusPill status={item.severity} />
+                  <span>
+                    {controlExceptionExplanation(item, control.data)}
+                  </span>
+                  {item.code !== 'option_quote_quality_below_limit' &&
+                  item.count != null ? (
+                    <span className="mono tnum">{count(item.count)}</span>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+            <p>
+              These gates affect the next research release. They do not rewrite a
+              previously validated forecast receipt.
+            </p>
+          </div>
+        ) : null}
+      </section>
+
+      <section className={styles.section} aria-labelledby="method">
+        <SectionTitle
+          kicker="Method"
+          description="The validation process can be reduced to three checks. Technical controls remain available in the audit trail below."
+        >
+          <span id="method">How the result is earned</span>
+        </SectionTitle>
+
+        <div className={styles.methodGrid}>
+          <article>
+            <span className={styles.stepNumber}>01</span>
+            <h3>Separate past from future</h3>
+            <p>
+              {validation.validation_protocol.walk_forward.expanding_windows}{' '}
+              expanding walk-forward windows with a{' '}
+              {validation.validation_protocol.walk_forward.validation_window_days}
+              d validation window and{' '}
+              {validation.validation_protocol.walk_forward.purge_days}d purge.
+            </p>
+          </article>
+          <article>
+            <span className={styles.stepNumber}>02</span>
+            <h3>Beat the same market baseline</h3>
+            <p>
+              Every candidate is compared on the same observations against the
+              straddle baseline, while point error and interval calibration are
+              checked together.
+            </p>
+          </article>
+          <article>
+            <span className={styles.stepNumber}>03</span>
+            <h3>Verify before publication</h3>
+            <p>
+              Bundle identity, feature schema, shadow scoring, drift controls
+              and rollback evidence all stay tied to the model that produced
+              the stored forecasts.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <details className={styles.auditPanel}>
+        <summary>
+          <span>
+            <span className={styles.kicker}>Technical audit trail</span>
+            <strong>Evidence behind this page</strong>
+          </span>
+          <span aria-hidden>+</span>
+        </summary>
+
+        <div className={styles.auditBody}>
+          <div className={styles.lineageList}>
             {[
-              ['P10', 0.1, weighted.p10],
-              ['P25', 0.25, weighted.p25],
-              ['P50', 0.5, weighted.p50],
-              ['P75', 0.75, weighted.p75],
-              ['P90', 0.9, weighted.p90],
-            ].map(([label, nominal, observed]) => (
-              <div key={String(label)} style={{ minWidth: 0 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 11, color: 'var(--ink-3)' }}>
-                  <span>{label}</span>
-                  <span className="mono tnum">{pct(observed as number | null)}</span>
-                </div>
-                <div style={{ marginTop: 8, height: 5, borderRadius: 999, background: 'var(--bg-3)', overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: `${Math.min(100, Math.max(0, Number(observed) * 100))}%`, background: 'var(--accent)' }} />
-                </div>
-                <div className="mono" style={{ marginTop: 6, fontSize: 9.5, color: 'var(--ink-4)' }}>nominal {pct(nominal as number)}</div>
+              [
+                'Forecast receipt',
+                shortHash(forecast.receipt_id),
+                forecast.receipt_file,
+              ],
+              [
+                'Model artifact',
+                shortHash(
+                  validation.model_source.artifact_sha256 ?? modelBundle?.sha256,
+                ),
+                modelBundle?.producer ?? 'model trainer',
+              ],
+              [
+                'Forecast artifact',
+                shortHash(forecastBundle?.sha256),
+                forecastBundle?.producer ?? 'daily scoring',
+              ],
+              [
+                'Active bundle',
+                shortHash(validation.model_source.bundle_id),
+                validation.model_source.kind === 'signed_champion'
+                  ? 'signed champion'
+                  : 'preview fallback',
+              ],
+              [
+                'Control snapshot',
+                dateLabel(control.generated_at),
+                `${control.data.decision_scope ?? 'end_of_day_research'} · publication ${
+                  control.publication_eligible ? 'eligible' : 'blocked'
+                }`,
+              ],
+            ].map(([label, value, detail]) => (
+              <div key={label} className={styles.lineage}>
+                <span>{label}</span>
+                <strong className="mono">{value}</strong>
+                <span>{detail}</span>
               </div>
             ))}
           </div>
-        </div>
-      </section>
 
-      <section style={{ paddingTop: 52 }}>
-        <SectionTitle kicker="Production evidence">Latest assessed research controls</SectionTitle>
-        <ValidationPublication control={control} forecast={forecast} />
-        <div className={styles.controlCards}>
-          <div style={{ border: '1px solid var(--line)', borderRadius: 14, padding: 18, background: 'var(--bg-2)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-              <h3 style={{ margin: 0, fontSize: 20, fontWeight: 400 }}>Published forecast evidence</h3>
-              <StatusPill status={publishedForecastStatus(forecast)} />
-            </div>
-            <dl style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '10px 18px', margin: '20px 0 0', fontSize: 12 }}>
-              <dt style={{ color: 'var(--ink-3)' }}>Controls evaluated</dt><dd className="mono tnum" style={{ margin: 0 }}>{count(forecast.controls.evaluated)}</dd>
-              <dt style={{ color: 'var(--ink-3)' }}>Control exceptions</dt><dd className="mono tnum" style={{ margin: 0 }}>{count(forecast.controls.exceptions)}</dd>
-              <dt style={{ color: 'var(--ink-3)' }}>Forecast rows</dt><dd className="mono tnum" style={{ margin: 0 }}>{count(forecast.coverage.rows)}</dd>
-              <dt style={{ color: 'var(--ink-3)' }}>Events in this release</dt><dd className="mono tnum" style={{ margin: 0 }}>{count(forecast.coverage.events)}</dd>
-            </dl>
-          </div>
-
-          <div style={{ border: '1px solid var(--line)', borderRadius: 14, padding: 18, background: 'var(--bg-2)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-              <h3 style={{ margin: 0, fontSize: 20, fontWeight: 400 }}>Model control plane</h3>
-              <StatusPill status={control.model.status} />
-            </div>
-            <dl style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '10px 18px', margin: '20px 0 0', fontSize: 12 }}>
-              <dt style={{ color: 'var(--ink-3)' }}>Champion active</dt><dd style={{ margin: 0 }}><StatusPill status={control.model.champion_active} /></dd>
-              <dt style={{ color: 'var(--ink-3)' }}>Drift status</dt><dd style={{ margin: 0 }}><StatusPill status={control.model.drift_status} /></dd>
-              <dt style={{ color: 'var(--ink-3)' }}>Fallback bundle</dt><dd className="mono" style={{ margin: 0 }}>{control.model.fallback_bundle_available ? 'available' : 'unavailable'}</dd>
-              <dt style={{ color: 'var(--ink-3)' }}>Shadow roles</dt><dd className="mono" style={{ margin: 0 }}>{control.model.shadow_roles.length ? control.model.shadow_roles.join(', ') : 'none'}</dd>
-            </dl>
-          </div>
-        </div>
-
-        <div style={{ marginTop: 14, border: '1px solid var(--line)', borderRadius: 14, padding: 18 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-            <h3 style={{ margin: 0, fontSize: 20, fontWeight: 400 }}>Data decision universe</h3>
-            <StatusPill status={control.data.status} />
-          </div>
-          <div className="qv-m-2col" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 14, marginTop: 18 }}>
-            <MetricCard label="Eligible contracts" value={`${count(control.data.eligible_contracts)} / ${count(control.data.contracts)}`} detail="Contracts surviving commercial quote-quality controls." />
-            <MetricCard label="Event coverage" value={pct(control.data.event_coverage_pct)} detail={`${count(control.data.covered_events)} of ${count(control.data.expected_events)} in-universe upcoming events currently covered.`} />
-            <MetricCard label="Quarantine records" value={count(control.data.quarantine_records)} detail={`Rejected evidence retained; quarantine ${control.data.quarantine_status}.`} />
-            <MetricCard label="Duplicate rows" value={count(control.data.duplicate_rows)} detail={`Replay ${control.data.replay_status}; corporate actions ${control.data.corporate_action_status}.`} />
-          </div>
-
-          {control.exceptions.length > 0 && (
-            <div style={{ marginTop: 18, borderTop: '1px solid var(--line)', paddingTop: 16 }}>
-              <div className="mono" style={{ fontSize: 10, color: 'var(--ink-3)', letterSpacing: '0.12em', textTransform: 'uppercase' }}>Latest assessed control exceptions</div>
-              <div style={{ display: 'grid', gap: 8, marginTop: 10 }}>
-                {control.exceptions.map((item) => (
-                  <div key={item.code} className={styles.exception}>
-                    <StatusPill status={item.severity} />
-                    <span style={{ color: 'var(--ink-2)' }}>{controlExceptionExplanation(item, control.data)}</span>
-                    <span className="mono tnum" style={{ color: 'var(--ink-3)' }}>{item.code !== 'option_quote_quality_below_limit' && item.count != null ? count(item.count) : ''}</span>
-                  </div>
-                ))}
-              </div>
-              <p style={{ margin: '12px 0 0', color: 'var(--ink-3)', fontSize: 11.5, lineHeight: 1.55 }}>
-                These exceptions describe the assessment captured above, not live market state. They gate eligibility for new research; a retained forecast receipt can remain passed while stale or ineligible options evidence blocks the next release. No publication threshold is relaxed.
+          <div className={styles.scopeCallout}>
+            <div>
+              <span className={styles.eyebrow}>Decision scope</span>
+              <p>
+                Quantiv outputs are end-of-day research evidence. Live stock
+                prices may update spot-derived inputs, but options, IV, Greeks
+                and other snapshot features remain frozen. The validation page
+                does not present executable option quotes or live-trading
+                signals.
               </p>
             </div>
-          )}
+            <Link href="/about">Read methodology →</Link>
+          </div>
         </div>
-      </section>
-
-      <section style={{ paddingTop: 52 }}>
-        <SectionTitle kicker="Validation protocol">What has to pass</SectionTitle>
-        <div className="qv-m-2col" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 14 }}>
-          {[
-            ['Chronology', `${validation.validation_protocol.walk_forward.expanding_windows} expanding walk-forward windows · ${validation.validation_protocol.walk_forward.validation_window_days}d validation · ${validation.validation_protocol.walk_forward.purge_days}d purge`],
-            ['Baseline', 'Candidate models must beat the same-observation market straddle baseline; promotion also compares candidate and champion on a common purged holdout.'],
-            ['Distribution', 'Point error, quantile ordering, P10/P25/P50/P75/P90 behavior, 50%/80% coverage and interval quality are gated together.'],
-            ['Shadow scoring', 'Upcoming events are scored by the candidate before control changes, surfacing material divergence ahead of promotion.'],
-            ['Artifact integrity', 'Immutable model bundles carry exact feature schemas and content digests; serving activation is tied to the same bundle identity used for stored forecasts.'],
-            ['Rollback', 'Realized monitoring retains champion/comparison evidence and can record a signed rollback when minimum common-outcome and deterioration thresholds are met.'],
-          ].map(([title, body]) => (
-            <article key={title} style={{ border: '1px solid var(--line)', borderRadius: 14, padding: 18, background: 'var(--bg-2)' }}>
-              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>{title}</h3>
-              <p style={{ margin: '10px 0 0', fontSize: 12, color: 'var(--ink-3)', lineHeight: 1.6 }}>{body}</p>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section style={{ paddingTop: 52 }}>
-        <SectionTitle kicker="Lineage">Evidence behind this page</SectionTitle>
-        <div style={{ border: '1px solid var(--line)', borderRadius: 14, overflow: 'hidden' }}>
-          {[
-            ['Forecast receipt', shortHash(forecast.receipt_id), forecast.receipt_file],
-            ['Model artifact', shortHash(validation.model_source.artifact_sha256 ?? modelBundle?.sha256), modelBundle?.producer ?? 'model trainer'],
-            ['Forecast artifact', shortHash(forecastBundle?.sha256), forecastBundle?.producer ?? 'daily scoring'],
-            ['Active bundle', shortHash(validation.model_source.bundle_id), validation.model_source.kind === 'signed_champion' ? 'signed champion' : 'preview fallback'],
-            ['Control snapshot', dateLabel(control.generated_at), `${control.data.decision_scope ?? 'end_of_day_research'} · publication ${control.publication_eligible ? 'eligible' : 'blocked'}`],
-          ].map(([label, value, detail], index, rows) => (
-            <div
-              key={label}
-              className={styles.lineage}
-              style={{
-                borderBottom: index < rows.length - 1 ? '1px solid var(--line)' : 'none',
-              }}
-            >
-              <span style={{ color: 'var(--ink-3)' }}>{label}</span>
-              <span className="mono" style={{ color: 'var(--ink)' }}>{value}</span>
-              <span style={{ color: 'var(--ink-3)' }}>{detail}</span>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section
-        style={{
-          marginTop: 52,
-          borderTop: '1px solid var(--line)',
-          borderBottom: '1px solid var(--line)',
-          padding: '20px 0',
-          display: 'flex',
-          gap: 24,
-          alignItems: 'flex-start',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-        }}
-      >
-        <div style={{ maxWidth: 760 }}>
-          <div className="mono" style={{ fontSize: 10, color: 'var(--flag)', letterSpacing: '0.12em', textTransform: 'uppercase' }}>Decision scope</div>
-          <p style={{ margin: '8px 0 0', color: 'var(--ink-2)', fontSize: 12.5, lineHeight: 1.65 }}>
-            Quantiv model outputs are end-of-day research evidence. A latest stock quote may update spot-derived inputs, but options, IV, Greeks and other snapshot features remain frozen. These results are not presented as executable option quotes or live-trading signals.
-          </p>
-        </div>
-        <Link href="/about" style={{ fontSize: 12, color: 'var(--accent)', whiteSpace: 'nowrap', marginTop: 18 }}>
-          Read methodology →
-        </Link>
-      </section>
+      </details>
     </main>
   );
 }
