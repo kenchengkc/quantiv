@@ -63,6 +63,7 @@ test('validation separates latest assessment from retained forecast evidence', a
   expect(controls).not.toBeNull();
   expect(performance!.y).toBeLessThan(calibration!.y);
   expect(calibration!.y).toBeLessThan(controls!.y);
+  await expect(page.getByRole('heading', { name: 'Published forecast evidence' })).toHaveCount(0);
 });
 
 for (const width of [1440, 768, 390]) {
@@ -75,9 +76,13 @@ for (const width of [1440, 768, 390]) {
     }));
     expect(overflow.root).toBeLessThanOrEqual(overflow.viewport + 1);
     expect(overflow.body).toBeLessThanOrEqual(overflow.viewport + 1);
-    // Check individual evidence text too: overflow:hidden must not mask clipping.
-    const lineage = page.getByRole('heading', { name: 'Evidence behind this page' }).locator('..').locator('..');
-    const clipped = await lineage.locator('span').evaluateAll((nodes) => nodes.filter((node) => {
+    // Expand the technical audit and check its longest identifiers too:
+    // overflow:hidden must not mask clipping.
+    const audit = page.locator('details').filter({
+      has: page.getByText('Evidence behind this page', { exact: true }),
+    });
+    await audit.locator('summary').click();
+    const clipped = await audit.locator('span, strong').evaluateAll((nodes) => nodes.filter((node) => {
       const rect = node.getBoundingClientRect();
       return rect.left < -1 || rect.right > innerWidth + 1 || node.scrollWidth > node.clientWidth + 1;
     }).map((node) => node.textContent));
