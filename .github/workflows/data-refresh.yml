@@ -2,7 +2,9 @@ name: Daily data refresh
 
 on:
   schedule:
-    - cron: '0 11 * * *'
+    # 01:17 EDT / 00:17 EST, away from the busy top of the hour.
+    # Delayed and manual starts must still pass the premarket admission gate.
+    - cron: '17 5 * * *'
   workflow_dispatch:
     inputs:
       finnhub_profile_refresh:
@@ -40,6 +42,9 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
+
+      - name: Gate — reserve market-hours API capacity
+        run: python3 scripts/provider_market_hours.py --max-runtime-minutes 180
 
       - name: Setup Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -110,12 +115,7 @@ jobs:
         continue-on-error: true
         env:
           FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
-        run: |
-          EXTRA_ARGS="--skip-during-market-hours"
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            EXTRA_ARGS="--allow-market-hours"
-          fi
-          python scripts/sync_finnhub_market_holidays.py --allow-missing-key $EXTRA_ARGS
+        run: python scripts/sync_finnhub_market_holidays.py --allow-missing-key --skip-during-market-hours
 
       - name: Sunday full-universe Finnhub sweep
         env:
@@ -131,18 +131,13 @@ jobs:
             echo "Not Sunday (UTC weekday=$DOW); skipping full-universe Finnhub sweep."
             exit 0
           fi
-          EXTRA_ARGS=""
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            EXTRA_ARGS="--allow-market-hours"
-          fi
           python scripts/sync_finnhub_earnings.py \
             --frontend-universe \
             --past-days 30 \
             --future-days 0 \
             --delay 1.05 \
             --max-calls 2000 \
-            --allow-missing-key \
-            $EXTRA_ARGS
+            --allow-missing-key
 
       - name: Reconcile near-term earnings calendar
         env:
@@ -310,12 +305,7 @@ jobs:
       - name: Pull market caps
         env:
           FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
-        run: |
-          EXTRA_ARGS=""
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            EXTRA_ARGS="--allow-market-hours"
-          fi
-          python -u tools/pull_market_caps.py --allow-missing-key $EXTRA_ARGS
+        run: python -u tools/pull_market_caps.py --allow-missing-key
 
       - name: Build popular-ticker weights
         run: python -u tools/build_popular_weights.py
@@ -440,9 +430,9 @@ jobs:
             skip) echo "Profile sweep skipped."; exit 0 ;;
             *) echo "Unknown profile refresh mode: $MODE" >&2; exit 2 ;;
           esac
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            ARGS+=(--allow-market-hours)
-          fi
+          # Skip/no-op modes exit above. An actual sweep must fit its full
+          # job timeout before 08:30 ET, even when queued behind the refresh.
+          python3 scripts/provider_market_hours.py --max-runtime-minutes 240
           python -u scripts/sync_finnhub_profiles.py \
             --allow-missing-key \
             --universe frontend \
