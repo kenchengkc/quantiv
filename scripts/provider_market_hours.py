@@ -1,13 +1,40 @@
 from __future__ import annotations
 
 import os
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from market_sessions import is_us_market_session
 
 QUOTE_REFRESH_OPEN_MIN = 9 * 60 + 25
 QUOTE_REFRESH_CLOSE_MIN = 16 * 60 + 45
+
+
+def require_premarket_refresh_window(
+    max_runtime_minutes: int, *, now: datetime | None = None
+) -> datetime:
+    """Admit a daily job only if its entire timeout fits before 08:30 ET.
+
+    The workflow's job timeout enforces the runtime budget after admission.
+    This applies to scheduled and manual jobs, including weekends, and protects
+    every provider used by the pipeline rather than only individual Finnhub calls.
+    """
+    if max_runtime_minutes <= 0:
+        raise ValueError("The refresh runtime budget must be positive")
+    instant = now if now is not None else datetime.now(timezone.utc)
+    if instant.tzinfo is None or instant.utcoffset() is None:
+        raise ValueError("The refresh clock must be timezone-aware")
+    eastern_now = instant.astimezone(ZoneInfo("America/New_York"))
+    deadline = eastern_now.replace(hour=8, minute=30, second=0, microsecond=0)
+    # Measure elapsed time in UTC so DST jumps cannot extend the allowed window.
+    latest_finish = instant.astimezone(timezone.utc) + timedelta(minutes=max_runtime_minutes)
+    if latest_finish > deadline.astimezone(timezone.utc):
+        raise SystemExit(
+            f"Refusing daily refresh at {eastern_now.isoformat()}: the full "
+            f"{max_runtime_minutes}-minute job timeout must fit before 08:30 ET. "
+            "Run overnight; market-hours capacity is reserved for live quotes."
+        )
+    return deadline
 
 
 def is_finnhub_reserved_window(now: datetime | None = None) -> bool:
@@ -43,3 +70,13 @@ def block_finnhub_reserved_window(allow_market_hours: bool = False) -> None:
         "(09:25-16:45 ET). Re-run outside market hours, or pass "
         "--allow-market-hours for a deliberate override."
     )
+
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Enforce the daily refresh premarket window.")
+    parser.add_argument("--max-runtime-minutes", type=int, required=True)
+    args = parser.parse_args()
+    cutoff = require_premarket_refresh_window(args.max_runtime_minutes)
+    print(f"Daily refresh admitted: full job timeout fits before {cutoff.isoformat()}")

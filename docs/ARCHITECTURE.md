@@ -196,11 +196,20 @@ See [RAILWAY_SETUP.md](RAILWAY_SETUP.md) for deployment instructions.
 | Workflow | Trigger | Purpose |
 |---|---|---|
 | `ci.yml` | Pull requests and pushes to `main` | Lint, build, pytest, and Playwright |
-| `data-refresh.yml` | Daily | Data refresh, scoring, frontend generation, and publication |
+| `data-refresh.yml` | Daily at 05:17 UTC (01:17 EDT / 00:17 EST) | Premarket data refresh, scoring, frontend generation, and publication |
 | `event-forecast-freeze.yml` | Weekday post-close, ET-gated | Refresh finalized session data, validate a candidate, and append eligible pre-event forecasts to the immutable ledger |
 | `refresh-broad.yml` | Weekday off-hours | Polygon quote-cache warming |
 | `refresh-ticker-names.yml` | Quarterly | SEC ticker-name and exchange refresh |
 | `av-enrichment.yml` | Manual only | Isolated provider-signal research artifact; never writes to `main` |
+
+Daily refresh jobs must reserve their entire GitHub job timeout before 08:30 Eastern.
+The 180-minute refresh therefore rejects starts after 05:30 Eastern; the 240-minute
+profile sweep rejects actual sweeps after 04:30 Eastern. This gate applies to both
+scheduled and manual runs and protects all provider calls, including calendar
+reconciliation and frontend generation. Manual dispatch does not enable market-hours
+overrides. A delayed run fails before provider access and must be retried overnight.
+GitHub schedules are best-effort, so the early trigger and off-hour minute reduce
+delay risk while the admission gate and job timeout enforce the morning boundary.
 
 The nightly workflow broadly performs:
 

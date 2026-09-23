@@ -28,6 +28,14 @@ Do not delete a quarantined candidate before identifying why it was rejected.
 
 ## Failed provider synchronization
 
+Recovery runs must stay within the daily premarket window. The workflow is scheduled
+at 05:17 UTC (01:17 EDT / 00:17 EST). Scheduled and manual refreshes are rejected
+unless the full 180-minute job timeout fits before 08:30 Eastern; actual profile
+sweeps use their full 240-minute timeout. A late dispatch must wait for the next
+overnight window. Do not bypass this gate or add `--allow-market-hours` to recovery
+commands: Finnhub, Twelve Data, and other shared API capacity is reserved for daytime
+stock-price refreshes. Skip profile maintenance on incident retries unless needed.
+
 1. Determine whether the provider failure is optional/degradable or required for the downstream contract.
 2. Confirm the workflow used the intended fallback/hold path rather than continuing with a partial candidate as if it were fresh.
 3. If a retry is safe and provider quotas permit it, prefer `workflow_dispatch` of the owning workflow rather than manually copying files.
