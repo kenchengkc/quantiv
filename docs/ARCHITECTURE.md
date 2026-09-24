@@ -196,20 +196,22 @@ See [RAILWAY_SETUP.md](RAILWAY_SETUP.md) for deployment instructions.
 | Workflow | Trigger | Purpose |
 |---|---|---|
 | `ci.yml` | Pull requests and pushes to `main` | Lint, build, pytest, and Playwright |
-| `data-refresh.yml` | Daily at 05:17 UTC (01:17 EDT / 00:17 EST) | Premarket data refresh, scoring, frontend generation, and publication |
+| `data-refresh.yml` | Daily at 03:00 America/New_York (DST-aware) | Premarket data refresh, scoring, frontend generation, and publication |
 | `event-forecast-freeze.yml` | Weekday post-close, ET-gated | Refresh finalized session data, validate a candidate, and append eligible pre-event forecasts to the immutable ledger |
 | `refresh-broad.yml` | Weekday off-hours | Polygon quote-cache warming |
 | `refresh-ticker-names.yml` | Quarterly | SEC ticker-name and exchange refresh |
 | `av-enrichment.yml` | Manual only | Isolated provider-signal research artifact; never writes to `main` |
 
-Daily refresh jobs must reserve their entire GitHub job timeout before 08:30 Eastern.
-The 180-minute refresh therefore rejects starts after 05:30 Eastern; the 240-minute
-profile sweep rejects actual sweeps after 04:30 Eastern. This gate applies to both
-scheduled and manual runs and protects all provider calls, including calendar
-reconciliation and frontend generation. Manual dispatch does not enable market-hours
-overrides. A delayed run fails before provider access and must be retried overnight.
-GitHub schedules are best-effort, so the early trigger and off-hour minute reduce
-delay risk while the admission gate and job timeout enforce the morning boundary.
+Daily refresh jobs reject starts at or after 09:00 Eastern, including manual runs
+and profile sweeps queued behind the main refresh. Admission records that day's
+09:25 Eastern deadline. A shared shell wrapper refuses steps after the deadline
+and terminates the process group of a running step when it arrives, protecting all
+provider calls, including reconciliation and frontend generation. The existing
+180-minute refresh and 240-minute profile job timeouts remain additional limits.
+Manual dispatch does not enable market-hours overrides. GitHub schedules are
+best-effort; a delayed start is permitted only before 09:00, and a late or interrupted
+refresh must be retried in the next overnight window. The IANA schedule timezone and
+absolute UTC execution deadline preserve these boundaries through DST transitions.
 
 The nightly workflow broadly performs:
 
