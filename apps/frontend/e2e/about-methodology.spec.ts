@@ -29,7 +29,7 @@ test('publication walkthrough explains both a released and a blocked candidate',
   await expect(flow.getByRole('button', { name: 'Pause walkthrough' })).toHaveCount(0);
   await expect(flow.getByText('Illustrative example · not live status')).toBeVisible();
   await flow.getByRole('button', { name: '03 Verify' }).click();
-  await expect(flow.getByRole('heading', { name: 'Make the numbers agree.' })).toBeVisible();
+  await expect(flow.getByRole('heading', { name: 'Forecast consistency' })).toBeVisible();
   await expect(flow.getByText('Calendar 4.8% = ticker 4.8%')).toBeVisible();
   await flow.getByRole('button', { name: '04 Publish' }).click();
   await expect(flow.getByText('New snapshot published')).toBeVisible();

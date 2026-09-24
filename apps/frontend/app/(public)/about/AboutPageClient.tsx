@@ -368,7 +368,7 @@ function ModelVisual({ animated }: { animated: boolean }) {
         straddle
       </text>
       <text x="180" y="170" textAnchor="middle" fill="var(--ink-4)" fontSize="10">
-        range first · probability second
+        conditional range · probability estimates
       </text>
     </svg>
   );
@@ -607,7 +607,7 @@ export default function AboutPageClient() {
                 lineHeight: 1.5,
               }}
             >
-              Market pricing, realized earnings moves, and model ranges—shown together so the comparison is visible before it is explained.
+              Quantiv combines options-implied expectations, historical earnings reactions, and model forecasts to support earnings-risk analysis.
             </p>
           </div>
           <div style={{ justifySelf: "end" }}>
@@ -683,13 +683,13 @@ export default function AboutPageClient() {
               textTransform: "uppercase",
             }}
           >
-            One loop · three questions
+            Market · history · model
           </div>
           <h2
             className="qv-type-section-title"
             style={{ margin: "10px 0 0", color: "var(--ink)" }}
           >
-            See the research move.
+            Three perspectives on earnings risk
           </h2>
         </section>
         <div
@@ -734,10 +734,10 @@ export default function AboutPageClient() {
               className="qv-type-section-title"
               style={{ margin: 0, color: "var(--ink)" }}
             >
-              Validated before published.
+              Validation before publication
             </h2>
             <span style={{ color: "var(--ink-3)", fontSize: 12 }}>
-              Inspect a checkpoint or try the stale-quote scenario.
+              Explore validation checks and publication outcomes.
             </span>
           </div>
         </section>
@@ -776,10 +776,10 @@ export default function AboutPageClient() {
               className="qv-type-section-title"
               style={{ margin: 0, color: "var(--ink)" }}
             >
-              Math when you want it.
+              Quantitative methodology
             </h2>
             <span style={{ color: "var(--ink-3)", fontSize: 12 }}>
-              Tap a row to collapse the formula and caveat.
+              Formulas, assumptions, and limitations for each measure.
             </span>
           </div>
         </section>
@@ -814,10 +814,10 @@ export default function AboutPageClient() {
           </div>
           <div>
             <strong className="serif" style={{ color: "var(--ink)", fontSize: 20 }}>
-              Research, not a recommendation.
+              Research scope and limitations.
             </strong>
             <div style={{ marginTop: 5, color: "var(--ink-3)", fontSize: 12.5, lineHeight: 1.5 }}>
-              Quantiv shows priced movement and model evidence. Direction, position sizing, liquidity, fees, and risk tolerance remain yours.
+              Quantiv provides analytical context for earnings risk. Trading decisions require independent assessment of direction, position size, liquidity, transaction costs, and risk tolerance.
             </div>
           </div>
         </section>
