@@ -51,13 +51,13 @@ export const ABOUT_STORIES: ReadonlyArray<{
     kind: "history",
     kicker: "History",
     title: "Historical earnings reactions",
-    caption: "Historical earnings reactions are compared with the option-implied ranges available before each event.",
+    caption: "Compare historical earnings reactions with the option-implied ranges available before each event.",
   },
   {
     kind: "model",
     kicker: "Model",
     title: "Model-estimated ranges",
-    caption: "The P10–P90 interval describes a conditional range of absolute moves, with the straddle as a market benchmark.",
+    caption: "P10–P90 describes a conditional range of absolute moves, using the straddle as a market benchmark.",
   },
 ];
 
@@ -109,6 +109,6 @@ export const METHODOLOGY_SECTIONS = [
     kicker: "Market-relative probability",
     title: "Straddle exceedance",
     tex: String.raw`\widehat{P}(|r|>s)=1-\operatorname{lerp}\!\left((q_i,\tau_i),(q_{i+1},\tau_{i+1});s\right)`,
-    note: "The straddle threshold is mapped into the served P10/P25/P50/P75/P90 quantiles by interpolation. Outside that range, Quantiv reports probability bounds because the available quantiles do not support precise tail estimates.",
+    note: "The straddle threshold is interpolated across the served quantiles. Outside the P10–P90 range, probability bounds reflect the limited precision available for tail estimates.",
   },
 ] as const;
