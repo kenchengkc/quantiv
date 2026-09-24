@@ -183,4 +183,48 @@ describe('earningsReaction', () => {
       }),
     ).toEqual({ changePct: 0.0512, tag: 'REALIZED' });
   });
+
+  it.each([
+    ['2026-09-23', 'bmo', -0.0340543],
+    ['2026-09-22', 'amc', 0.0512],
+  ])('retains the dated closing quote after midnight for %s %s', (earningsDate, timing, pct) => {
+    expect(resolveEarningsReactionDisplay({
+      earningsDate,
+      timing,
+      liveChangePct: pct,
+      quoteCloseDate: '2026-09-23',
+      now: new Date('2026-09-24T04:47:00Z'),
+    })).toEqual({ changePct: pct, tag: 'CLOSE' });
+  });
+
+  it('never applies the next session quote to an earlier earnings reaction', () => {
+    expect(resolveEarningsReactionDisplay({
+      earningsDate: '2026-09-23', timing: 'bmo', liveChangePct: 0.02,
+      quoteCloseDate: '2026-09-24', now: new Date('2026-09-25T04:47:00Z'),
+    })).toEqual({ changePct: null, tag: null });
+  });
+
+  it('prefers finalized realized data over a dated cached closing quote', () => {
+    expect(resolveEarningsReactionDisplay({
+      earningsDate: '2026-09-23', timing: 'bmo', liveChangePct: -0.034,
+      quoteCloseDate: '2026-09-23', realizedMovePct: -0.035,
+      now: new Date('2026-09-24T04:47:00Z'),
+    })).toEqual({ changePct: -0.035, tag: 'REALIZED' });
+  });
+
+  it('retains an AMC closing quote across a holiday weekend without labeling it LIVE', () => {
+    expect(resolveEarningsReactionDisplay({
+      earningsDate: '2026-05-21', timing: 'amc', liveChangePct: 0,
+      quoteCloseDate: '2026-05-22', now: new Date('2026-05-26T14:00:00Z'),
+    })).toEqual({ changePct: 0, tag: 'CLOSE' });
+  });
+
+
+  it('keeps the existing LIVE label during the same-day quote settle window', () => {
+    expect(resolveEarningsReactionDisplay({
+      earningsDate: '2026-09-23', timing: 'bmo', liveChangePct: -0.034,
+      quoteCloseDate: '2026-09-23', now: new Date('2026-09-23T20:30:00Z'),
+    })).toEqual({ changePct: -0.034, tag: 'LIVE' });
+  });
+
 });

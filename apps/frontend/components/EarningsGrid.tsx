@@ -305,6 +305,7 @@ function TickerRow({
     timing: ev.timing,
     realizedMovePct: ev.realized_move_pct ?? realizedFromBackfill,
     liveChangePct: live?.changePct ?? null,
+    quoteCloseDate: live?.quoteCloseDate ?? null,
   });
   const changePct = reaction.changePct;
   const pctRounded = changePct !== null ? Math.round(changePct * 10000) / 10000 : null;
@@ -1075,6 +1076,7 @@ export default function EarningsGrid({
             price: number | null;
             change: number | null;
             changePct: number | null;
+            quoteCloseDate?: string | null;
             realizedMovePct?: number | null;
             realizedDate?: string | null;
           }[];
@@ -1090,6 +1092,8 @@ export default function EarningsGrid({
             next[t.symbol] = {
               change: t.price !== null ? t.change : prevEntry?.change ?? null,
               changePct: t.price !== null ? t.changePct : prevEntry?.changePct ?? null,
+              // Clear the closing-session marker when a new rolling quote lands.
+              quoteCloseDate: t.price !== null ? t.quoteCloseDate ?? null : prevEntry?.quoteCloseDate ?? null,
               realizedMovePct: t.realizedMovePct ?? prevEntry?.realizedMovePct ?? null,
               realizedDate: t.realizedDate ?? prevEntry?.realizedDate ?? null,
             };

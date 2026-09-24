@@ -134,6 +134,48 @@ test.describe('earnings calendar reaction labels', () => {
     await expect(page.getByRole('link', { name: /ZZZ/i }).first()).toBeVisible();
   });
 
+  test('keeps BMO and AMC closing moves after midnight until newer data arrives', async ({ page }) => {
+    await installWeekFixture(page, [
+      { ticker: 'CTAS', earnings_date: '2026-05-28', timing: 'before_market_open', em_ml_pct: 0.044 },
+      { ticker: 'KBH', earnings_date: '2026-05-27', timing: 'after_market_close', em_ml_pct: 0.045 },
+      { ticker: 'GIS', earnings_date: '2026-05-28', timing: 'before_market_open', em_ml_pct: 0.04 },
+    ]);
+    await page.clock.setFixedTime(new Date('2026-05-29T04:47:00Z'));
+    let nextSession = false;
+    await page.route('**/api/stocks/batch-price*', (route) => route.fulfill({
+      json: {
+        // A batch timestamp cannot establish which session each quote belongs to.
+        updated: '2026-05-29T04:40:00Z', marketOpen: false, quoteRefreshActive: false, pending: 0,
+        data: [
+          { symbol: 'CTAS', price: 192.03, change: -6.77, changePct: nextSession ? 0.02 : -0.0340543,
+            quoteCloseDate: nextSession ? null : '2026-05-28' },
+          { symbol: 'KBH', price: 110, change: 10, changePct: 0.1, quoteCloseDate: '2026-05-28',
+            realizedMovePct: nextSession ? 0.09 : null, realizedDate: nextSession ? '2026-05-27' : null },
+          { symbol: 'GIS', price: 35.82, change: 0.37, changePct: 0.0104 },
+        ],
+      },
+    }));
+    await page.goto('/');
+    await expect(page.locator('.qv-calendar-shell')).toBeVisible({ timeout: 60_000 });
+    await page.getByRole('button', { name: 'All', exact: true }).click();
+    const bmo = page.getByRole('link', { name: /CTAS/i }).first();
+    const amc = page.getByRole('link', { name: /KBH/i }).first();
+    await expect(bmo).toContainText('3.41%CLOSE');
+    await expect(amc).toContainText('10.00%CLOSE');
+    await expect(page.getByRole('link', { name: /GIS/i }).first()).not.toContainText('CLOSE');
+
+    // A subsequent refresh must replace provenance along with the percentage;
+    // otherwise a new daily move could inherit yesterday's closing-session tag.
+    nextSession = true;
+    await page.clock.setFixedTime(new Date('2026-05-29T14:00:00Z'));
+    const refreshed = page.waitForResponse('**/api/stocks/batch-price*');
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+    await refreshed;
+    await expect(bmo).not.toContainText('CLOSE');
+    await expect(bmo).not.toContainText('2.00%');
+    await expect(amc).toContainText('9.00%REALIZED');
+  });
+
   test('headline prefers the ML forecast over options when both exist', async ({
     page,
   }) => {

@@ -8,6 +8,7 @@ const MAX_WEEK_ENTRIES = 3;
 export type CachedLiveQuote = {
   change: number | null;
   changePct: number | null;
+  quoteCloseDate?: string | null;
   realizedMovePct?: number | null;
   realizedDate?: string | null;
 };
