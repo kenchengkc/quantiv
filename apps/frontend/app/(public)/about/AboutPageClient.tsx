@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import PublicationFlow from "./PublicationFlow";
 import Link from "next/link";
 import {
   useEffect,
@@ -46,6 +47,7 @@ function Reveal({
   delay?: number;
   style?: CSSProperties;
 }) {
+  const reducedMotion = useReducedMotion();
   const ref = useRef<HTMLDivElement | null>(null);
   const [shown, setShown] = useState(false);
 
@@ -73,7 +75,7 @@ function Reveal({
     <div
       ref={ref}
       className={`reveal${shown ? " in" : ""}`}
-      style={{ transitionDelay: `${delay}ms`, ...style }}
+      style={{ transitionDelay: `${delay}ms`, ...style, ...(reducedMotion ? { opacity: 1, transform: "none", transition: "none" } : {}) }}
     >
       {children}
     </div>
@@ -450,97 +452,6 @@ function StoryCard({
   );
 }
 
-function PublicationFlow({ animated }: { animated: boolean }) {
-  const stages = [
-    ["01", "Observe", "point-in-time"],
-    ["02", "Reconcile", "quality gate"],
-    ["03", "Verify", "model gate"],
-    ["04", "Publish", "or stop"],
-  ] as const;
-
-  return (
-    <div
-      style={{
-        borderRadius: 18,
-        border: "1px solid var(--line)",
-        background:
-          "radial-gradient(70% 100% at 50% 0%, color-mix(in oklab, var(--brand-blue-1) 10%, transparent), transparent 70%), var(--bg-2)",
-        padding: "20px 18px 18px",
-      }}
-    >
-      <svg
-        viewBox="0 0 760 120"
-        role="img"
-        aria-label="Animated validation flow from point-in-time data to publication"
-        style={{ width: "100%", height: "auto", display: "block" }}
-      >
-        <defs>
-          <linearGradient id="about-control-line" x1="0" x2="1">
-            <stop offset="0%" stopColor="var(--brand-blue-1)" />
-            <stop offset="55%" stopColor="var(--flag)" />
-            <stop offset="100%" stopColor="var(--up)" />
-          </linearGradient>
-        </defs>
-        <line x1="84" x2="676" y1="55" y2="55" stroke="var(--line-2)" strokeWidth="2" />
-        <line x1="84" x2="676" y1="55" y2="55" stroke="url(#about-control-line)" strokeWidth="3" strokeDasharray="592" />
-        {stages.map(([step, title, detail], index) => {
-          const x = 84 + index * 197.3;
-          return (
-            <g key={step}>
-              <circle cx={x} cy="55" r="24" fill="var(--bg-3)" stroke="var(--line-2)" />
-              <circle cx={x} cy="55" r="5" fill={index === 3 ? "var(--up)" : "var(--brand-blue-1)"} />
-              <text x={x} y="18" textAnchor="middle" fill="var(--ink-4)" fontSize="9">
-                {step}
-              </text>
-              <text x={x} y="96" textAnchor="middle" fill="var(--ink)" fontSize="11" fontWeight="700">
-                {title}
-              </text>
-              <text x={x} y="111" textAnchor="middle" fill="var(--ink-4)" fontSize="9">
-                {detail}
-              </text>
-            </g>
-          );
-        })}
-        {animated ? (
-          <circle r="6" fill="var(--ink)">
-            <animateMotion dur="4.2s" repeatCount="indefinite" path="M 84 55 L 676 55" />
-            <animate attributeName="opacity" values="0;1;1;0" dur="4.2s" repeatCount="indefinite" />
-          </circle>
-        ) : null}
-      </svg>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 12,
-          padding: "8px 8px 0",
-          flexWrap: "wrap",
-        }}
-      >
-        <span style={{ color: "var(--ink-3)", fontSize: 12 }}>
-          Critical control fails → publication stops.
-        </span>
-        <span
-          style={{
-            borderRadius: 999,
-            border: "1px solid color-mix(in oklab, var(--up) 35%, var(--line))",
-            background: "color-mix(in oklab, var(--up) 9%, transparent)",
-            color: "var(--up)",
-            padding: "4px 9px",
-            fontSize: 9.5,
-            letterSpacing: "0.09em",
-            textTransform: "uppercase",
-            whiteSpace: "nowrap",
-          }}
-        >
-          Fail closed
-        </span>
-      </div>
-    </div>
-  );
-}
-
 function FormulaDisclosure({
   id,
   kicker,
@@ -826,7 +737,7 @@ export default function AboutPageClient() {
               Validated before published.
             </h2>
             <span style={{ color: "var(--ink-3)", fontSize: 12 }}>
-              End-of-day research · not an execution feed
+              Inspect a checkpoint or try the stale-quote scenario.
             </span>
           </div>
         </section>

@@ -81,13 +81,13 @@ test("About documents the platform-wide publication controls", async ({
     page.getByRole("heading", { name: "Validated before published." }),
   ).toBeVisible({ timeout: 60_000 });
   await expect(
-    page.getByRole("img", {
-      name: "Animated validation flow from point-in-time data to publication",
+    page.getByRole("region", {
+      name: "Publication controls walkthrough",
     }),
   ).toBeVisible();
   await expect(page.getByText("Observe", { exact: true })).toBeVisible();
   await expect(page.getByText("Reconcile", { exact: true })).toBeVisible();
   await expect(page.getByText("Verify", { exact: true })).toBeVisible();
   await expect(page.getByText("Publish", { exact: true })).toBeVisible();
-  await expect(page.getByText("Fail closed", { exact: true })).toBeVisible();
+  await expect(page.getByText("Fail closed.", { exact: true })).toBeVisible();
 });
