@@ -44,7 +44,7 @@ describe("cached closing quote provenance", () => {
 
   it('keeps each symbol’s own closing session across ET midnight', () => {
     expect(cachedQuoteCloseDate(close, now)).toBe('2026-09-23');
-    expect(cachedQuoteCloseDate({ ...close, at: Date.parse('2026-09-23T19:59:00Z') }, now)).toBeNull();
+    expect(cachedQuoteCloseDate({ ...close, at: Date.parse('2026-09-23T19:59:13.115Z') }, now)).toBe('2026-09-23');
   });
 
   it('supports older explicitly regular Finnhub envelopes without sessionDate', () => {
@@ -67,6 +67,14 @@ describe("cached closing quote provenance", () => {
   it('uses the actual early close and Eastern date through winter DST', () => {
     const winterNow = Date.parse('2026-11-28T05:47:00Z');
     expect(cachedQuoteCloseDate({ ...close, at: Date.parse('2026-11-27T18:00:01Z'), sessionDate: '2026-11-27' }, winterNow)).toBe('2026-11-27');
-    expect(cachedQuoteCloseDate({ ...close, at: Date.parse('2026-11-27T17:59:59Z'), sessionDate: '2026-11-27' }, winterNow)).toBeNull();
+    expect(cachedQuoteCloseDate({ ...close, at: Date.parse('2026-11-27T17:59:59Z'), sessionDate: '2026-11-27' }, winterNow)).toBe('2026-11-27');
   });
+
+  it('marks the last observed regular trade only once its session has ended', () => {
+    const lastTrade = { ...close, at: Date.parse('2026-09-23T19:59:13.115Z') };
+    expect(cachedQuoteCloseDate(lastTrade, Date.parse('2026-09-23T19:59:30Z'))).toBeNull();
+    expect(cachedQuoteCloseDate(lastTrade, Date.parse('2026-09-23T20:00:00Z'))).toBe('2026-09-23');
+    expect(cachedQuoteCloseDate({ ...close, at: Date.parse('2026-09-23T13:25:00Z') }, now)).toBeNull();
+  });
+
 });
