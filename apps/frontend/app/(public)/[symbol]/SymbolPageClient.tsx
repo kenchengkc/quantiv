@@ -36,6 +36,8 @@ import { buildTermRows, TermFan } from './ForecastPanels';
 import { buildHistorySeries, GreeksPanel, HistoryBlock, medianAbsoluteHistoryMove, priorHistoricalForecastWindow } from './HistoryRiskPanels';
 import ScenarioRiskPanel from './ScenarioRiskPanel';
 import ResearchSnapshotRibbon from './ResearchSnapshotRibbon';
+import ResearchAvailability from './ResearchAvailability';
+import RESEARCH_NOTES from '../../../../../config/symbol_research_notes.json';
 import MoveComparisonChart from './MoveComparisonChart';
 import { SymbolPageLoading, SymbolPageUnavailable } from './SymbolPageStates';
 import type {
@@ -789,6 +791,15 @@ export default function SymbolPage({
           onToast={showToast}
         />
       </Reveal>
+
+      <ResearchAvailability
+        hasModel={activePredictionPct != null}
+        hasOptions={termRows.length > 0}
+        historyCount={historySeries.length}
+        history={data.earnings_history}
+        today={todayIso}
+        note={(RESEARCH_NOTES as Record<string, { title: string; detail: string; source_url: string }>)[symbol]}
+      />
 
       {em && spot > 0 && (
         <Reveal>

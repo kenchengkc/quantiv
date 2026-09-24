@@ -64,7 +64,7 @@ def test_load_published_calendar_keys_reads_identities(tmp_path: Path):
 
     assert load_published_calendar_keys(tmp_path) == {
         ("CNXC", "2026-09-29"),
-        ("HUBG", "2026-09-17"),
+        ("HUBG", "2026-09-14"),
     }
 
 
@@ -129,7 +129,7 @@ def test_load_published_calendar_events_skips_bad_rows(tmp_path: Path):
         encoding="utf-8",
     )
     assert load_published_calendar_events(tmp_path) == [
-        ("HUBG", date(2026, 9, 17), "unknown"),
+        ("HUBG", date(2026, 9, 14), "bmo"),
     ]
 
 
@@ -179,3 +179,11 @@ def test_resolve_event_timing_unknown_published_keeps_research_session():
     assert resolve_event_timing("bmo", "unknown") == "bmo"
     assert resolve_event_timing(None, None) == "unknown"
     assert resolve_event_timing("amc", "") == "amc"
+
+
+def test_issuer_correction_applies_to_retained_calendar_reference(tmp_path: Path):
+    (tmp_path / 'calendar-reference.json').write_text(json.dumps({'events': [
+        {'ticker': 'HUBG', 'earnings_date': '2026-09-17', 'timing': 'unknown'},
+        {'ticker': 'HUBG', 'earnings_date': '2026-09-10', 'timing': 'unknown'},
+    ]}))
+    assert load_published_calendar_events(tmp_path) == [('HUBG', date(2026, 9, 14), 'bmo')]

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import math
+
+import duckdb
 from datetime import date, datetime, timedelta
 from statistics import median
 from pathlib import Path
@@ -563,12 +565,19 @@ def build_symbol_detail(conn, ticker: str, as_of_date: date, earnings_dt: date |
         [ticker, as_of_date, as_of_date, as_of_date + timedelta(days=120)],
     ).fetchall()
 
-    if not eligible_pairs:
-        return None
-
-    # The source does not carry underlying spot, so the nearest eligible
-    # delta-balanced strike is the explicit EOD spot proxy.
-    spot = float(eligible_pairs[0][2])
+    # Missing current options must not erase independently available history,
+    # fundamentals, or an eligible event forecast.
+    spot = float(eligible_pairs[0][2]) if eligible_pairs else None
+    if spot is None:
+        try:
+            row = conn.execute(
+                "SELECT close FROM v_ohlcv WHERE act_symbol = ? AND date <= ? "
+                "AND close > 0 ORDER BY date DESC LIMIT 1",
+                [ticker, as_of_date],
+            ).fetchone()
+            spot = row[0] if row else None
+        except duckdb.Error:
+            pass
 
     straddles = []
     for (
@@ -608,9 +617,6 @@ def build_symbol_detail(conn, ticker: str, as_of_date: date, earnings_dt: date |
             "call_vega": jsonable(call_vega),
             "call_theta": jsonable(call_theta),
         })
-
-    if not straddles:
-        return None
 
     # Earnings history (last 12 events) with signed close-to-close realized
     # moves where OHLCV coverage permits. The LEFT JOIN ensures we still
@@ -726,13 +732,13 @@ def build_symbol_detail(conn, ticker: str, as_of_date: date, earnings_dt: date |
                 "term_slope": jsonable(em_math_data.get("term_slope")),
                 "total_vega": jsonable(em_math_data.get("total_vega")),
             }
-            fc = (ml_lookup or {}).get((ticker, earnings_dt.isoformat()))
-            ml = ml_fields(fc)
-            if ml:
-                em.update(ml)
-                em["em_method"] = "ml_lightgbm"
-            else:
-                em["em_method"] = "options_math"
+            em["em_method"] = "options_math"
+        fc = (ml_lookup or {}).get((ticker, earnings_dt.isoformat()))
+        ml = ml_fields(fc)
+        if ml:
+            em = em or {"earnings_date": earnings_dt.isoformat()}
+            em.update(ml)
+            em["em_method"] = "ml_lightgbm"
 
     # A generic near-term straddle is useful only when there is no known event.
     # It must never stand in for an earnings expected move if no eligible expiry
@@ -1024,8 +1030,34 @@ def load_published_calendar_events(public_dir: Path) -> list[tuple[str, date, st
         payload = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return []
+    # Mirror calendarReference.ts: date-only overrides can correct a retained
+    # reference without altering its immutable source receipt. Fiscal matches
+    # require canonical columns and are applied by ingestion instead.
+    overrides_path = Path(__file__).resolve().parents[2] / "config" / "earnings_overrides.json"
+    overrides = json.loads(overrides_path.read_text(encoding="utf-8"))["overrides"]
     events: list[tuple[str, date, str]] = []
-    for event in payload.get("events") or []:
+    for source_event in payload.get("events") or []:
+        if not isinstance(source_event, dict):
+            continue
+        event = dict(source_event)
+        removed = False
+        for rule in overrides:
+            match = rule.get("match") or {}
+            if set(match) != {"date"}:
+                continue
+            if (str(event.get("ticker") or "").upper() != rule["symbol"].upper()
+                    or event.get("earnings_date") != match["date"]):
+                continue
+            action = rule.get("action", "set")
+            if action == "remove":
+                removed = True
+                break
+            if action == "set":
+                fields = rule.get("set") or {}
+                event["earnings_date"] = fields.get("date", event.get("earnings_date"))
+                event["timing"] = fields.get("timing", event.get("timing"))
+        if removed:
+            continue
         if not isinstance(event, dict):
             continue
         ticker = str(event.get("ticker") or "").strip().upper()
@@ -1037,7 +1069,8 @@ def load_published_calendar_events(public_dir: Path) -> list[tuple[str, date, st
         except ValueError:
             continue
         timing = str(event.get("timing") or "unknown")
-        events.append((ticker, earn_dt, timing))
+        if (ticker, earn_dt, timing) not in events:
+            events.append((ticker, earn_dt, timing))
     return events
 
 

@@ -1,3 +1,4 @@
+import EARNINGS_OVERRIDES from '../../../config/earnings_overrides.json';
 import { resolveDisplayForecastCompat } from './displayForecast';
 
 export type CalendarReferenceEvent = {
@@ -78,6 +79,24 @@ export function normalizeCalendarTiming(value: string | null | undefined): 'bmo'
   return 'unknown';
 }
 
+/** Apply explicit date-only corrections without rewriting archived reference receipts.
+ * Fiscal-period rules require canonical source columns and stay in ingestion.
+ * Only reference identities change; research metrics must still match the new date.
+ */
+export function correctedReferenceEvents(events: readonly CalendarReferenceEvent[]): CalendarReferenceEvent[] {
+  type Rule = { symbol: string; match: Record<string, unknown>; action?: string; set?: { date?: string; timing?: string } };
+  let corrected = events.map((event) => ({ ...event }));
+  for (const rule of EARNINGS_OVERRIDES.overrides as Rule[]) {
+    if (Object.keys(rule.match).length !== 1 || typeof rule.match.date !== 'string') continue;
+    const matches = (event: CalendarReferenceEvent) => event.ticker.toUpperCase() === rule.symbol.toUpperCase() && event.earnings_date === rule.match.date;
+    if (rule.action === 'remove') corrected = corrected.filter((event) => !matches(event));
+    else if (!rule.action || rule.action === 'set') corrected = corrected.map((event) => matches(event) ? {
+      ...event, earnings_date: rule.set?.date ?? event.earnings_date, timing: rule.set?.timing ?? event.timing,
+    } : event);
+  }
+  return corrected.filter((event, index, rows) => rows.findIndex((row) => row.ticker === event.ticker && row.earnings_date === event.earnings_date && row.timing === event.timing) === index);
+}
+
 function addDays(iso: string, days: number): string {
   const [year, month, day] = iso.slice(0, 10).split('-').map(Number);
   const value = new Date(Date.UTC(year, (month ?? 1) - 1, day ?? 1));
@@ -131,7 +150,7 @@ export function mergeCalendarReference<
   }
   const legacyHistoricalPrior = median([...legacyHistoryByTicker.values()]);
 
-  const events: CalendarOverlayEvent<TEvent>[] = reference.events
+  const events: CalendarOverlayEvent<TEvent>[] = correctedReferenceEvents(reference.events)
     .filter((event) => event.earnings_date >= start && event.earnings_date <= end)
     .map((event): CalendarOverlayEvent<TEvent> => {
       const referenceTiming = normalizeCalendarTiming(event.timing);
@@ -253,7 +272,7 @@ export function publishedEventForTicker(
   ticker: string,
   todayIso: string,
 ): CalendarReferenceEvent | null {
-  const rows = (events ?? []).filter(
+  const rows = correctedReferenceEvents(events ?? []).filter(
     (event) => event.ticker.toUpperCase() === ticker.toUpperCase(),
   );
   if (rows.length === 0) return null;

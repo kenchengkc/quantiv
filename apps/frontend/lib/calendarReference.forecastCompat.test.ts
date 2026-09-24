@@ -35,10 +35,10 @@ function research(events: LegacyEvent[]): ResearchWeek<LegacyEvent> {
 describe('calendar legacy display forecast compatibility', () => {
   it('uses only same-ticker history after an earnings-date revision, never stale ML/options', () => {
     const merged = mergeCalendarReference(
-      reference([{ ticker: 'AIR', earnings_date: '2026-09-22', timing: 'unknown' }]),
+      reference([{ ticker: 'TEST', earnings_date: '2026-09-22', timing: 'unknown' }]),
       research([
         {
-          ticker: 'AIR',
+          ticker: 'TEST',
           earnings_date: '2026-09-21',
           timing: 'after_market_close',
           em_ml_pct: 0.0767,
@@ -50,7 +50,7 @@ describe('calendar legacy display forecast compatibility', () => {
     );
 
     expect(merged.events[0]).toEqual({
-      ticker: 'AIR',
+      ticker: 'TEST',
       earnings_date: '2026-09-22',
       timing: 'unknown',
       display_forecast_pct: 0.056849,
