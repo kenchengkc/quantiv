@@ -11,8 +11,8 @@ import provider_market_hours
 
 
 @pytest.mark.parametrize("instant", [
-    "2026-09-24T03:00:00-04:00",
-    "2026-12-24T03:00:00-05:00",
+    "2026-09-24T02:00:00-04:00",
+    "2026-12-24T02:00:00-05:00",
     "2026-09-24T08:59:59-04:00",
     "2026-12-24T08:59:59-05:00",
     "2026-03-08T03:00:00-04:00",
@@ -22,7 +22,7 @@ def test_starts_before_nine_are_admitted(instant):
     deadline = provider_market_hours.require_premarket_refresh_window(
         now=datetime.fromisoformat(instant)
     )
-    assert (deadline.hour, deadline.minute) == (9, 25)
+    assert (deadline.hour, deadline.minute) == (9, 35)
 
 
 @pytest.mark.parametrize("instant", [
@@ -62,6 +62,32 @@ def test_expired_deadline_blocks_provider_command(tmp_path):
         script, datetime.now(timezone.utc) - timedelta(seconds=1)
     ) == 124
     assert not marker.exists()
+
+
+@pytest.mark.parametrize("instant,expected_status", [
+    ("2026-09-24T09:25:00-04:00", 0),
+    ("2026-09-24T09:34:59-04:00", 0),
+    ("2026-09-24T09:35:00-04:00", 124),
+    ("2026-12-24T09:34:59-05:00", 0),
+    ("2026-12-24T09:35:00-05:00", 124),
+])
+def test_admitted_refresh_can_finish_until_935(monkeypatch, tmp_path, instant, expected_status):
+    clock = datetime.fromisoformat(instant)
+    deadline = provider_market_hours.require_premarket_refresh_window(
+        now=clock.replace(hour=2, minute=0, second=0)
+    )
+
+    class FrozenClock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return clock.astimezone(tz)
+
+    monkeypatch.setattr(provider_market_hours, "datetime", FrozenClock)
+    marker = tmp_path / "published"
+    script = tmp_path / "step.sh"
+    script.write_text(f"touch '{marker}'\n")
+    assert provider_market_hours.run_refresh_shell(script, deadline) == expected_status
+    assert marker.exists() == (expected_status == 0)
 
 
 def test_deadline_terminates_provider_process_group(tmp_path):

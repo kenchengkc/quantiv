@@ -29,12 +29,14 @@ Do not delete a quarantined candidate before identifying why it was rejected.
 ## Failed provider synchronization
 
 Recovery runs must stay within the daily premarket window. The workflow is scheduled
-at 03:00 America/New_York, automatically following daylight saving time. Scheduled
+at 02:00 America/New_York, automatically following daylight saving time. Scheduled
 and manual jobs are rejected if they start at or after 09:00 Eastern. Admitted jobs
-record a 09:25 Eastern deadline; every subsequent shell step is bounded by that
-deadline, and running provider processes are terminated at the cutoff. Existing
-job timeouts remain additional limits. A late dispatch or interrupted refresh must
-wait for the next overnight window. Do not bypass these gates or add
+record a 09:35 Eastern deadline; every subsequent shell step is bounded by that
+deadline, and running provider processes are terminated at the cutoff. Both jobs
+use the GitHub-hosted runner maximum of 360 minutes; this platform limit still
+applies if reached before 09:35. Optional non-price Finnhub enrichment continues
+to skip from 09:25 Eastern to reserve live-quote capacity. A late dispatch or
+interrupted refresh must wait for the next overnight window. Do not bypass these gates or add
 `--allow-market-hours` to recovery
 commands: Finnhub, Twelve Data, and other shared API capacity is reserved for daytime
 stock-price refreshes. Skip profile maintenance on incident retries unless needed.
