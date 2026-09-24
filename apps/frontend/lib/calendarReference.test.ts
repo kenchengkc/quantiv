@@ -245,18 +245,18 @@ describe('calendar reference overlay', () => {
   });
 
   it('uses the upcoming calendar date instead of a stale research print', () => {
-    const hubg = publishedEventForTicker(
+    const published = publishedEventForTicker(
       [
-        { ticker: 'HUBG', earnings_date: '2026-09-17', timing: 'unknown' },
+        { ticker: 'TEST', earnings_date: '2026-09-17', timing: 'unknown' },
         { ticker: 'PRGS', earnings_date: '2026-09-29', timing: 'unknown' },
       ],
-      'HUBG',
+      'TEST',
       '2026-09-15',
     );
-    expect(hubg?.earnings_date).toBe('2026-09-17');
+    expect(published?.earnings_date).toBe('2026-09-17');
     expect(displayEarningsDate({
       todayIso: '2026-09-15',
-      publishedDate: hubg?.earnings_date,
+      publishedDate: published?.earnings_date,
       nextEarnings: '2026-08-27',
       researchDate: '2026-08-27',
     })).toBe('2026-09-17');
@@ -286,4 +286,15 @@ describe('calendar reference overlay', () => {
       )?.earnings_date,
     ).toBe('2026-09-29');
   });
+});
+
+it('applies issuer corrections to retained references without reusing the superseded forecast', () => {
+  const stale = { ticker: 'HUBG', earnings_date: '2026-09-17', timing: 'unknown' };
+  const merged = mergeCalendarReference(reference([stale]), research([{ ...stale, em_ml_pct: .17 }]), '2026-09-14');
+  expect(merged.events).toHaveLength(1);
+  expect(merged.events[0].earnings_date).toBe('2026-09-14');
+  expect(merged.events[0].timing).toBe('bmo');
+  expect((merged.events[0] as Event).em_ml_pct).toBeUndefined();
+  expect(publishedEventForTicker([stale], 'HUBG', '2026-09-24')?.earnings_date).toBe('2026-09-14');
+  expect(publishedEventForTicker(merged.events, 'HUBG', '2026-09-24')?.earnings_date).toBe('2026-09-14');
 });
