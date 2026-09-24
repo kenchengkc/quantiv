@@ -198,7 +198,7 @@ See [RAILWAY_SETUP.md](RAILWAY_SETUP.md) for deployment instructions.
 | Workflow | Trigger | Purpose |
 |---|---|---|
 | `ci.yml` | Pull requests and pushes to `main` | Lint, build, pytest, and Playwright |
-| `data-refresh.yml` | Daily at 03:00 America/New_York (DST-aware) | Premarket data refresh, scoring, frontend generation, and publication |
+| `data-refresh.yml` | Daily at 02:00 America/New_York (DST-aware) | Premarket data refresh, scoring, frontend generation, and publication |
 | `event-forecast-freeze.yml` | Weekday post-close, ET-gated | Refresh finalized session data, validate a candidate, and append eligible pre-event forecasts to the immutable ledger |
 | `refresh-broad.yml` | Weekday off-hours | Polygon quote-cache warming |
 | `refresh-ticker-names.yml` | Quarterly | SEC ticker-name and exchange refresh |
@@ -206,10 +206,12 @@ See [RAILWAY_SETUP.md](RAILWAY_SETUP.md) for deployment instructions.
 
 Daily refresh jobs reject starts at or after 09:00 Eastern, including manual runs
 and profile sweeps queued behind the main refresh. Admission records that day's
-09:25 Eastern deadline. A shared shell wrapper refuses steps after the deadline
+09:35 Eastern deadline. A shared shell wrapper refuses steps after the deadline
 and terminates the process group of a running step when it arrives, protecting all
-provider calls, including reconciliation and frontend generation. The existing
-180-minute refresh and 240-minute profile job timeouts remain additional limits.
+provider calls, including reconciliation and frontend generation. Both jobs allow
+up to 360 minutes, the GitHub-hosted runner limit, rather than imposing shorter
+application timeouts. The independent non-price Finnhub guard still skips optional
+enrichment from 09:25 Eastern to reserve capacity for live quotes.
 Manual dispatch does not enable market-hours overrides. GitHub schedules are
 best-effort; a delayed start is permitted only before 09:00, and a late or interrupted
 refresh must be retried in the next overnight window. The IANA schedule timezone and
