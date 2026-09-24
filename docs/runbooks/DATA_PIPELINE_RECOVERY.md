@@ -29,10 +29,13 @@ Do not delete a quarantined candidate before identifying why it was rejected.
 ## Failed provider synchronization
 
 Recovery runs must stay within the daily premarket window. The workflow is scheduled
-at 05:17 UTC (01:17 EDT / 00:17 EST). Scheduled and manual refreshes are rejected
-unless the full 180-minute job timeout fits before 08:30 Eastern; actual profile
-sweeps use their full 240-minute timeout. A late dispatch must wait for the next
-overnight window. Do not bypass this gate or add `--allow-market-hours` to recovery
+at 03:00 America/New_York, automatically following daylight saving time. Scheduled
+and manual jobs are rejected if they start at or after 09:00 Eastern. Admitted jobs
+record a 09:25 Eastern deadline; every subsequent shell step is bounded by that
+deadline, and running provider processes are terminated at the cutoff. Existing
+job timeouts remain additional limits. A late dispatch or interrupted refresh must
+wait for the next overnight window. Do not bypass these gates or add
+`--allow-market-hours` to recovery
 commands: Finnhub, Twelve Data, and other shared API capacity is reserved for daytime
 stock-price refreshes. Skip profile maintenance on incident retries unless needed.
 

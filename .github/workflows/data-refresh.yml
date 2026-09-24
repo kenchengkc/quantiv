@@ -2,9 +2,8 @@ name: Daily data refresh
 
 on:
   schedule:
-    # 01:17 EDT / 00:17 EST, away from the busy top of the hour.
-    # Delayed and manual starts must still pass the premarket admission gate.
-    - cron: '17 5 * * *'
+    - cron: '0 3 * * *'
+      timezone: America/New_York
   workflow_dispatch:
     inputs:
       finnhub_profile_refresh:
@@ -28,6 +27,9 @@ jobs:
   refresh:
     runs-on: ubuntu-latest
     timeout-minutes: 180
+    defaults:
+      run:
+        shell: python3 scripts/provider_market_hours.py --run-shell {0}
     permissions:
       contents: write
       issues: write
@@ -35,6 +37,7 @@ jobs:
       FINNHUB_RESERVED_WINDOW_SOFT_SKIP: '1'
     steps:
       - name: Record refresh start time
+        shell: bash
         run: echo "REFRESH_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
 
       - name: Checkout
@@ -44,7 +47,8 @@ jobs:
           fetch-depth: 0
 
       - name: Gate — reserve market-hours API capacity
-        run: python3 scripts/provider_market_hours.py --max-runtime-minutes 180
+        shell: bash
+        run: python3 scripts/provider_market_hours.py --admit
 
       - name: Setup Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -385,6 +389,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: refresh
     timeout-minutes: 240
+    defaults:
+      run:
+        shell: python3 scripts/provider_market_hours.py --run-shell {0}
     permissions:
       contents: write
     steps:
@@ -393,22 +400,41 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Select and admit profile sweep
+        id: profile_window
+        shell: bash
+        env:
+          PROFILE_REFRESH: ${{ inputs.finnhub_profile_refresh || 'auto' }}
+        run: |
+          set -euo pipefail
+          if [ "$PROFILE_REFRESH" = "skip" ] || \
+             { [ "$PROFILE_REFRESH" = "auto" ] && [ "$(date -u +%u)" != "6" ]; }; then
+            echo "run_sweep=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          python3 scripts/provider_market_hours.py --admit
+          echo "run_sweep=true" >> "$GITHUB_OUTPUT"
+
       - name: Setup Python
+        if: steps.profile_window.outputs.run_sweep == 'true'
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: '3.11'
           cache: pip
 
       - name: Install Python dependencies
+        if: steps.profile_window.outputs.run_sweep == 'true'
         run: pip install --require-hashes -r requirements.txt
 
       - name: Pull latest main after refresh commit
+        if: steps.profile_window.outputs.run_sweep == 'true'
         run: |
           git fetch origin main
           git checkout main
           git pull --ff-only origin main
 
       - name: Finnhub profile/logo sweep
+        if: steps.profile_window.outputs.run_sweep == 'true'
         env:
           FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
           PROFILE_REFRESH: ${{ inputs.finnhub_profile_refresh || 'auto' }}
@@ -430,9 +456,6 @@ jobs:
             skip) echo "Profile sweep skipped."; exit 0 ;;
             *) echo "Unknown profile refresh mode: $MODE" >&2; exit 2 ;;
           esac
-          # Skip/no-op modes exit above. An actual sweep must fit its full
-          # job timeout before 08:30 ET, even when queued behind the refresh.
-          python3 scripts/provider_market_hours.py --max-runtime-minutes 240
           python -u scripts/sync_finnhub_profiles.py \
             --allow-missing-key \
             --universe frontend \
@@ -440,6 +463,7 @@ jobs:
           python scripts/check_ticker_identity.py --warn-only
 
       - name: Commit profile/logo cache
+        if: steps.profile_window.outputs.run_sweep == 'true'
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "Quantiv bot"
