@@ -9,6 +9,7 @@ import {
   etDateIso,
 } from '@/lib/marketHours';
 import {
+  cachedQuoteCloseDate,
   isFreshMemoryQuote,
   isUsableSharedQuote,
 } from '@/lib/quoteCachePolicy';
@@ -56,6 +57,7 @@ type Cached = {
   tick: Tick;
   source?: Source;
   session?: Session;
+  sessionDate?: string;
   transport?: 'rest' | 'websocket';
 };
 
@@ -346,6 +348,7 @@ export async function GET(req: NextRequest) {
       source: src,
       session: entry.session ?? 'regular',
       transport: entry.transport ?? null,
+      quoteCloseDate: cachedQuoteCloseDate(entry, now),
       ...realizedFields,
     };
   });

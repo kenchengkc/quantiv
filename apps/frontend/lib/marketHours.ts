@@ -55,7 +55,7 @@ function nowParts(d: Date = new Date()): NowParts {
   };
 }
 
-function isTradingDayET(now: Date): boolean {
+export function isTradingDayET(now: Date): boolean {
   const { weekday, isoDate } = nowParts(now);
   if (weekday === 'Sat' || weekday === 'Sun') return false;
   return !NYSE_HOLIDAYS.has(isoDate);

@@ -86,7 +86,8 @@ export function isRealizationWindowComplete(
  *  AMC reporter, the next session's quote anchors report-day close → next close.
  *  So we keep showing LIVE as a faithful stand-in until realized lands. Bounded
  *  to the realization day: after it, previousClose rolls forward and the live
- *  move would no longer match the earnings reaction. */
+ *  move would no longer match the earnings reaction. A separately dated cached
+ *  closing quote can still be shown by resolveEarningsReactionDisplay. */
 export function isRealizedPending(
   earningsDate: string,
   timing: string | undefined,
@@ -137,6 +138,7 @@ export function resolveEarningsReactionDisplay(args: {
   timing?: string;
   realizedMovePct?: number | null;
   liveChangePct?: number | null;
+  quoteCloseDate?: string | null;
   now?: Date;
 }): EarningsReactionDisplay {
   const {
@@ -144,6 +146,7 @@ export function resolveEarningsReactionDisplay(args: {
     timing,
     realizedMovePct = null,
     liveChangePct = null,
+    quoteCloseDate = null,
     now = new Date(),
   } = args;
 
@@ -152,6 +155,17 @@ export function resolveEarningsReactionDisplay(args: {
 
   if (complete && realizedMovePct != null) {
     return { changePct: realizedMovePct, tag: 'REALIZED' };
+  }
+
+  // A dated cached closing quote remains useful after midnight while the
+  // OHLCV backfill is pending. Match the event's resolving session so the next
+  // day's rolling daily change cannot be mistaken for its earnings reaction.
+  if (
+    complete && quoteCloseDate != null && today > quoteCloseDate &&
+    liveChangePct != null && Number.isFinite(liveChangePct) &&
+    quoteCloseDate === earningsReactionCloseDate(earningsDate, timing)
+  ) {
+    return { changePct: liveChangePct, tag: 'CLOSE' };
   }
 
   const showQuote =
