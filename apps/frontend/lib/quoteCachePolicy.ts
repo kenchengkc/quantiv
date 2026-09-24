@@ -1,4 +1,7 @@
-import { etDateIso, hasRegularClosePassedET, isTradingDayET } from './marketHours';
+import {
+  etDateIso, hasRegularClosePassedET, isNyseRegularSessionET,
+  isTradingDayET, lastCompletedTradingDayIso,
+} from './marketHours';
 
 export const MEMORY_QUOTE_CACHE_TTL_MS = 5_000;
 export const MAX_SHARED_QUOTE_AGE_MS = 7 * 24 * 60 * 60 * 1_000;
@@ -25,7 +28,7 @@ export function isUsableSharedQuote<T extends TimestampedQuote>(
   );
 }
 
-/** Session of a cached regular-hours quote captured at/after the close.
+/** Completed session of the last available cached regular-hours quote.
  * This is a provisional CLOSE, not finalized OHLCV. Never infer a session from
  * a batch timestamp or a grouped-daily cache write (which may occur days later).
  */
@@ -41,5 +44,9 @@ export function cachedQuoteCloseDate(
   if (!Number.isFinite(captured.getTime())) return null;
   const date = etDateIso(captured);
   if (entry.sessionDate != null && entry.sessionDate !== date) return null;
-  return isTradingDayET(captured) && hasRegularClosePassedET(captured) ? date : null;
+  if (!isTradingDayET(captured) || date > lastCompletedTradingDayIso(new Date(nowMs))) return null;
+  // A symbol's final trade may precede the closing bell. Preserve that cached
+  // daily move once its session is complete; it remains provisional CLOSE.
+  // Reject pre-open warmup quotes, which may still refer to the prior session.
+  return isNyseRegularSessionET(captured) || hasRegularClosePassedET(captured) ? date : null;
 }
