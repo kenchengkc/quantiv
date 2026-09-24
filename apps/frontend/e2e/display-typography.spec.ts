@@ -47,7 +47,7 @@ test('product hierarchy uses the restrained institutional Mulish system', async 
   expect(heroTitle.textTransform).toBe('uppercase');
 
   const cardTitle = await styleOf(
-    page.getByRole('heading', { name: 'What is priced?' }),
+    page.getByRole('heading', { name: 'Market-implied expectations' }),
   );
   expectMulishDisplay(cardTitle);
   expect(cardTitle.fontSize).toBe('20px');
@@ -56,7 +56,7 @@ test('product hierarchy uses the restrained institutional Mulish system', async 
   expect(cardTitle.textTransform).toBe('none');
 
   const sectionTitle = await styleOf(
-    page.getByRole('heading', { name: 'See the research move.' }),
+    page.getByRole('heading', { name: 'Three perspectives on earnings risk' }),
   );
   expectMulishDisplay(sectionTitle);
   expect(sectionTitle.fontSize).toBe('32px');
@@ -182,7 +182,7 @@ test('ordinary text uses three neutral roles while signal colors stay semantic',
     return { primary: probe('--qv-text-primary'), accent: probe('--qv-text-accent') };
   });
 
-  const cardTitle = page.getByRole('heading', { name: 'What is priced?' });
+  const cardTitle = page.getByRole('heading', { name: 'Market-implied expectations' });
   const heroAccent = page.getByText('options imply.', { exact: true });
   const heroStyle = await heroAccent.evaluate((element) => {
     const style = getComputedStyle(element);

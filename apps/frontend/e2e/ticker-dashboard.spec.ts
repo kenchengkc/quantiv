@@ -78,7 +78,7 @@ test("About documents the platform-wide publication controls", async ({
   await page.goto("/about", { waitUntil: "domcontentloaded" });
 
   await expect(
-    page.getByRole("heading", { name: "Validated before published." }),
+    page.getByRole("heading", { name: "Validation before publication" }),
   ).toBeVisible({ timeout: 60_000 });
   await expect(
     page.getByRole("region", {

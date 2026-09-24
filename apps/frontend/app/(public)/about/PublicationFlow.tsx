@@ -5,10 +5,10 @@ import { useEffect, useRef, useState } from 'react';
 import styles from './PublicationFlow.module.css';
 
 const CHECKPOINTS = [
-  { name: 'Observe', caption: 'Freeze the evidence', title: 'Start with a timestamp.', description: 'Prices, option quotes and the earnings event belong to a specific snapshot. The forecast can use only information available before its prediction deadline.', rule: 'No future information enters the forecast.', evidence: 'Snapshot manifest', checks: ['Market session recorded', 'Earnings date and session identified', 'Feature cutoff precedes the announcement'] },
-  { name: 'Reconcile', caption: 'Challenge the inputs', title: 'A quote must earn its place.', description: 'Eligible option quotes need usable bid/ask prices, matching contracts and consistent timestamps. Required evidence that contradicts the snapshot blocks this candidate release.', rule: 'A failed critical check stops publication.', evidence: 'Quote reconciliation', checks: ['Positive, uncrossed bid / ask', 'Call and put share strike and expiry', 'Quote evidence matches the snapshot session'] },
-  { name: 'Verify', caption: 'Cross-check the forecast', title: 'Make the numbers agree.', description: 'Recompute the option math, check model inputs and forecast ranges, then compare the values that will appear across the site. A plausible-looking number is not enough.', rule: 'Every published value must reconcile.', evidence: 'Forecast consistency', checks: ['Expected-move math reconciles', 'Forecast bands are ordered and finite', 'Calendar and ticker forecasts agree'] },
-  { name: 'Publish', caption: 'Release one verified snapshot', title: 'One release. Every surface.', description: 'Validated files are packaged together and verified before the site switches to the new snapshot. A failed candidate leaves the last validated release in place.', rule: 'The new release is available only after verification.', evidence: 'Published research', checks: ['Release contents verified', 'Calendar and ticker share a snapshot', 'Validation evidence accompanies the release'] },
+  { name: 'Observe', caption: 'Record the snapshot', title: 'Point-in-time inputs', description: 'Prices, option quotes and the earnings event belong to a specific snapshot. The forecast can use only information available before its prediction deadline.', rule: 'No future information enters the forecast.', evidence: 'Snapshot manifest', checks: ['Market session recorded', 'Earnings date and session identified', 'Feature cutoff precedes the announcement'] },
+  { name: 'Reconcile', caption: 'Validate source inputs', title: 'Option quote validation', description: 'Eligible option quotes need usable bid/ask prices, matching contracts and consistent timestamps. Required evidence that contradicts the snapshot blocks this candidate release.', rule: 'A failed critical check stops publication.', evidence: 'Quote reconciliation', checks: ['Positive, uncrossed bid / ask', 'Call and put share strike and expiry', 'Quote evidence matches the snapshot session'] },
+  { name: 'Verify', caption: 'Reconcile forecast values', title: 'Forecast consistency', description: 'Recompute option-derived estimates, validate model inputs and forecast ranges, and verify consistency across the site.', rule: 'Every published value must reconcile.', evidence: 'Forecast consistency', checks: ['Expected-move math reconciles', 'Forecast bands are ordered and finite', 'Calendar and ticker forecasts agree'] },
+  { name: 'Publish', caption: 'Publish verified data', title: 'Consistent publication', description: 'Validated files are packaged together and verified before the site switches to the new snapshot. A failed candidate leaves the last validated release in place.', rule: 'The new release is available only after verification.', evidence: 'Published research', checks: ['Release contents verified', 'Calendar and ticker share a snapshot', 'Validation evidence accompanies the release'] },
 ] as const;
 
 type Scenario = 'valid' | 'stale';
@@ -81,7 +81,7 @@ export default function PublicationFlow({ animated }: { animated: boolean }) {
 
   return <section ref={root} className={styles.flow} aria-label="Publication controls walkthrough" data-running={running} data-blocked={blocked}>
     <div className={styles.toolbar}>
-      <div><span className={styles.eyebrow}>Follow one release</span><p className={styles.disclaimer}>Illustrative example · not live status</p></div>
+      <div><span className={styles.eyebrow}>Publication workflow</span><p className={styles.disclaimer}>Illustrative example · not live status</p></div>
       <div className={styles.controls}>
         <div className={styles.scenarios} role="group" aria-label="Example scenario">
           <button type="button" aria-pressed={scenario === 'valid'} onClick={() => reset('valid')}>Valid snapshot</button>
@@ -107,8 +107,8 @@ export default function PublicationFlow({ animated }: { animated: boolean }) {
     <div className={styles.scene} key={`${scenario}-${step}`}>
       <div className={styles.explainer}>
         <span className={styles.stepLabel}>Checkpoint 0{step + 1} / 04</span>
-        <h3>{blocked ? 'The mismatch stops here.' : current.title}</h3>
-        <p>{blocked ? 'This candidate says its quote is from Tuesday, but the evidence points to Monday. The required session check fails, so this release cannot replace the published snapshot.' : current.description}</p>
+        <h3>{blocked ? 'Quote validation failed' : current.title}</h3>
+        <p>{blocked ? 'The candidate snapshot specifies Tuesday, but its quote evidence is from Monday. The session check fails, preventing the candidate from replacing the published release.' : current.description}</p>
         <div className={styles.rule}><span aria-hidden="true">↳</span>{current.rule}</div>
       </div>
       <div className={styles.lab}>
@@ -127,7 +127,7 @@ export default function PublicationFlow({ animated }: { animated: boolean }) {
           </div> : <div className={styles.gateResult}>
             <span className={styles.resultIcon} aria-hidden="true">{blocked ? '×' : '✓'}</span>
             <div><strong>{blocked ? 'Publication blocked' : step === 0 ? 'Evidence locked to this event' : step === 1 ? 'Inputs reconciled' : 'Ready for release verification'}</strong>
-            <span>{blocked ? 'Last validated release stays available' : step === 0 ? 'Event + session + prediction cutoff travel together' : step === 1 ? 'Required quote checks passed in this example' : 'A consistent forecast across every research surface'}</span></div>
+            <span>{blocked ? 'Last validated release stays available' : step === 0 ? 'Event, session, and prediction cutoff are recorded together' : step === 1 ? 'Required quote checks passed in this example' : 'A consistent forecast across every research surface'}</span></div>
           </div>}
         </div>
       </div>
