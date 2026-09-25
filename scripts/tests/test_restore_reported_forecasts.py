@@ -316,3 +316,36 @@ def test_pre_deadline_published_ml_is_recoverable():
     )
 
     assert restore._forecast_rank(candidate)[0] == 4
+
+
+@pytest.mark.parametrize("forecast", [
+    {"em_ml_pct": 0.084787, "ml_snapshot_date": "2026-09-21",
+     "forecast_frozen_eligible": True},
+    {"em_iv_pct": 0.178292, "as_of_date": "2026-09-22"},
+])
+def test_recover_week_reconciles_historical_hover_without_replacing_forecast(
+    tmp_path, monkeypatch, forecast,
+):
+    path = tmp_path / "2026-09-21.json"
+    current = restore._normalize_forecast(_event(
+        "CBRL", "2026-09-23", hist_move_med_4q=0.020598,
+        realized_move_pct=-0.03, **forecast,
+    ))
+    path.write_text(json.dumps({
+        "window": {"start": "2026-09-21", "end": "2026-09-25"},
+        "events": [current],
+    }))
+    monkeypatch.setattr(restore, "_history", lambda _path: [])
+    monkeypatch.setattr(restore, "_symbol_history_candidate", lambda _key: None)
+    monkeypatch.setattr(restore, "_symbol_expected_move_candidate", lambda _key: current)
+    monkeypatch.setattr(restore, "_symbol_historical_candidate", lambda _key: _event(
+        "CBRL", "2026-09-23", display_forecast_pct=0.028203,
+        display_forecast_method="historical", hist_move_med_4q=0.028203,
+        historical_event_count=4,
+    ))
+    membership = {("CBRL", "2026-09-23")}
+    assert restore.recover_week(path, membership, date(2026, 9, 22), apply=True) == {}
+    repaired = restore.recover_week(path, membership, date(2026, 9, 25), apply=True)
+    assert repaired[("CBRL", "2026-09-23")] == {**current, "hist_move_med_4q": 0.028203}
+    assert json.loads(path.read_text())["events"][0] == repaired[("CBRL", "2026-09-23")]
+    assert restore.recover_week(path, membership, date(2026, 9, 25), apply=True) == {}

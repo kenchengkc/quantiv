@@ -4,9 +4,18 @@
   "spot_price": 897.5,
   "expected_move": {
     "earnings_date": "2026-09-24",
-    "timing": "after_market_close",
+    "timing": "amc",
+    "expiration": "2026-10-09",
+    "dte": 16,
+    "lead_time_days": 1,
+    "atm_strike": 905.0,
+    "atm_iv": 0.26635,
+    "straddle_abs": 40.82,
+    "straddle_pct": 0.045105,
+    "iv_pct": 0.055766,
     "em_ml_pct": 0.025431,
     "em_ml_abs": 22.872672,
+    "correction_factor": 0.586162,
     "model_horizon": 2,
     "ml_snapshot_date": "2026-09-22",
     "p10": 0.004929,
@@ -19,7 +28,7 @@
     "display_forecast_method": "ml",
     "display_forecast_as_of": "2026-09-22",
     "ml_status": "available",
-    "options_status": "unavailable",
+    "options_status": "decision_eligible",
     "forecast_frozen": true,
     "forecast_id": "6ddd527bc1e3f99ee8e77c14a101dba00d5b0a3b700cb19dc30e9572011a6d21",
     "forecast_scored_at": "2026-09-23T18:53:08.202001+00:00",
@@ -144,7 +153,8 @@
       "ml_status": "available",
       "options_status": "unavailable",
       "fallback_reason": null,
-      "forecast_frozen": true
+      "forecast_frozen": true,
+      "correction_factor": 0.586162
     },
     {
       "date": "2026-05-28",
