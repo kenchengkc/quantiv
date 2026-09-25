@@ -1,17 +1,17 @@
 {
   "schema": "quantiv.dashboard-evidence.v1",
-  "receipt_id": "sha256:368ed97f090b89e8ede6d697bef287a7c74380df7b920806d8303b796779b704",
-  "receipt_file": "forecasts_2026-09-22.368ed97f090b.receipt.json",
-  "validated_at": "2026-09-22T15:51:05.916052+00:00",
+  "receipt_id": "sha256:9b7beb7f2a584a9ad6f9e7acb61702ea57f40e9f0bb690f9bdcb829be5fdaa5a",
+  "receipt_file": "forecasts_2026-09-25.9b7beb7f2a58.receipt.json",
+  "validated_at": "2026-09-25T11:50:04.281058+00:00",
   "quality": {
     "status": "passed",
     "issue_count": 0,
     "issue_codes": []
   },
   "coverage": {
-    "rows": 442,
-    "symbols": 164,
-    "events": 177,
+    "rows": 356,
+    "symbols": 196,
+    "events": 219,
     "horizons": [
       1,
       2,
@@ -22,12 +22,12 @@
     ]
   },
   "observation_window": {
-    "earnings_max": "2026-10-12",
-    "earnings_min": "2026-09-22",
-    "scored_at_max": "2026-09-22T15:51:02.299451+00:00",
-    "scored_at_min": "2026-09-22T15:51:02.129755+00:00",
-    "snapshot_max": "2026-09-21",
-    "snapshot_min": "2026-09-01"
+    "earnings_max": "2026-10-15",
+    "earnings_min": "2026-09-25",
+    "scored_at_max": "2026-09-25T11:49:47.460380+00:00",
+    "scored_at_min": "2026-09-25T11:49:47.238623+00:00",
+    "snapshot_max": "2026-09-24",
+    "snapshot_min": "2026-09-04"
   },
   "controls": {
     "evaluated": 13,
@@ -43,8 +43,8 @@
       "ml_only_point_outside_band": 0,
       "ml_only_quantile_crossings": 0,
       "non_finite_ml_rows": 0,
-      "optionless_ml_rows": 369,
-      "strict_option_rows": 73,
+      "optionless_ml_rows": 262,
+      "strict_option_rows": 94,
       "strict_reconciliation": {
         "absolute_move_mismatches": 0,
         "blank_symbols": 0,
@@ -61,7 +61,7 @@
         "invalid_quote_quality_labels": 0,
         "iv_formula_mismatches": 0,
         "leg_mid_mismatches": 0,
-        "max_point_median_gap": 0.009375185155869742,
+        "max_point_median_gap": 0.013279066924872615,
         "non_finite_values": 0,
         "out_of_range_move_rows": 0,
         "point_outside_band": 0,
@@ -85,8 +85,8 @@
       "name": "forecast_snapshot",
       "producer": "scripts/daily_score.py",
       "member_count": 1,
-      "bytes": 368361,
-      "sha256": "18b099904051b443f732055ab1ba2b678f43a6b95f84351ec426a59818beae10"
+      "bytes": 317703,
+      "sha256": "6c19bd499d42caf7333f983651c190ef39edaacfca6a1b99bd85fb86bc44616a"
     }
   ]
 }

@@ -1,8 +1,8 @@
 {
   "metadata": {
     "version": "v4_multi_week",
-    "generated_at": "2026-09-22T15:54:47.646230",
-    "as_of_date": "2026-09-21",
+    "generated_at": "2026-09-25T12:02:35.898899",
+    "as_of_date": "2026-09-24",
     "method": "ATM straddle + IV baseline",
     "offset": -1
   },
@@ -25,9 +25,9 @@
       "em_method": "ml_lightgbm",
       "em_straddle_pct": 0.042,
       "em_iv_pct": 0.052634,
-      "iv_rank": 0.293422,
+      "iv_rank": 0.385809,
       "hist_move_avg_4q": 0.009487,
-      "iv_crush_pct": 0.102699,
+      "iv_crush_pct": -0.030249,
       "atm_strike": 312.5,
       "atm_iv": 0.303191,
       "em_straddle_abs": 13.125,
@@ -79,9 +79,9 @@
       "em_method": "ml_lightgbm",
       "em_straddle_pct": 0.076563,
       "em_iv_pct": 0.097285,
-      "iv_rank": 0.215632,
+      "iv_rank": 0.305747,
       "hist_move_avg_4q": 0.040578,
-      "iv_crush_pct": 0.050241,
+      "iv_crush_pct": -0.057638,
       "atm_strike": 80.0,
       "atm_iv": 0.5604,
       "em_straddle_abs": 6.125,
@@ -118,36 +118,10 @@
       "skew_atm": -0.016035,
       "spot_price": 80.0,
       "term_slope": -0.054456
-    },
-    {
-      "ticker": "HUBG",
-      "earnings_date": "2026-09-14",
-      "timing": "bmo",
-      "fiscal_q": "Q2",
-      "eps_actual": null,
-      "eps_estimate": null,
-      "revenue_actual": null,
-      "revenue_estimate": null,
-      "realized_move_pct": -0.021643,
-      "as_of_date": "2026-09-11",
-      "em_method": "historical",
-      "em_straddle_pct": null,
-      "em_iv_pct": null,
-      "iv_rank": null,
-      "hist_move_avg_4q": 0.066187,
-      "hist_move_med_4q": 0.039592,
-      "iv_crush_pct": null,
-      "display_forecast_pct": 0.03959166996024832,
-      "display_forecast_method": "historical",
-      "display_forecast_as_of": "2026-09-11",
-      "ml_status": "unavailable_event",
-      "options_status": "unavailable",
-      "fallback_reason": "no_event_expiry",
-      "historical_event_count": 4
     }
   ],
   "summary": {
-    "total_events": 3,
+    "total_events": 2,
     "avg_em_straddle_pct": 0.0592815,
     "avg_em_iv_pct": 0.0749595
   }
