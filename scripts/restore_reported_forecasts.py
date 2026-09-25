@@ -560,6 +560,7 @@ def recover_week(
     # has: a matching legacy expected_move, an exact historical option row, or
     # the ticker page's four-prior-event historical median. Reconcile all three
     # through the same ML -> IV -> history hierarchy used by the UI.
+    historical_components: dict[EventKey, float] = {}
     for key in targets:
         for candidate in (
             _symbol_expected_move_candidate(key),
@@ -573,6 +574,7 @@ def recover_week(
 
         historical_candidate = _symbol_historical_candidate(key)
         if historical_candidate is not None:
+            historical_components[key] = historical_candidate["hist_move_med_4q"]
             previous = best.get(key)
             if previous is None or _forecast_rank(previous)[0] <= 1:
                 best[key] = historical_candidate
@@ -607,10 +609,20 @@ def recover_week(
         else:
             # Even when the numerical forecast is already present, old bundles
             # may predate canonical display provenance. Normalize those fields.
-            normalized = _normalize_forecast(current)
-            if normalized == current:
-                continue
-            repaired = normalized
+            repaired = _normalize_forecast(current)
+
+        # Historical context is a separate hover component even when ML or
+        # options supplies the frozen headline. Reconcile it from the same
+        # prior-event cohort as the ticker page without replacing the forecast.
+        if key in historical_components and not math.isclose(
+            _positive(repaired.get("hist_move_med_4q")) or 0.0,
+            historical_components[key],
+            rel_tol=1e-6,
+            abs_tol=1e-6,
+        ):
+            repaired["hist_move_med_4q"] = round(historical_components[key], 6)
+        if repaired == current:
+            continue
 
         by_key[key] = repaired
         changed[key] = repaired
