@@ -83,6 +83,14 @@ FORECAST_FIELDS = {
     "forecast_frozen_eligible",
 }
 
+# An option observation is one unit: never attach a new percentage to an old
+# expiry, strike, or observation date. ML identity and quantiles are separate.
+OPTION_FIELDS = {
+    "as_of_date", "spot_price", "atm_strike", "atm_iv", "em_straddle_pct",
+    "em_iv_pct", "em_straddle_abs", "expiry_date", "days_to_expiry",
+    "lead_time_days", "skew_atm", "term_slope",
+}
+
 ML_HISTORY_FIELDS = {
     "em_ml_pct",
     "em_ml_abs",
@@ -538,6 +546,20 @@ def recover_week(
         return {}
 
     best: dict[EventKey, dict] = {}
+    options: dict[EventKey, dict] = {}
+
+    def consider_options(key: EventKey, candidate: dict) -> None:
+        if not _option_evidence_is_pre_event(candidate):
+            return
+        if not any(_positive(candidate.get(f)) for f in ("em_iv_pct", "em_straddle_pct")):
+            return
+        previous = options.get(key)
+        if previous is None or candidate["as_of_date"] > previous["as_of_date"]:
+            options[key] = candidate
+
+    for key in targets:
+        if key in by_key:
+            consider_options(key, by_key[key])
     for commit in _history(path):
         historical = _bundle_at(commit, path)
         if not historical:
@@ -552,6 +574,7 @@ def recover_week(
             key = (event.get("ticker"), event.get("earnings_date"))
             if key not in targets or _forecast_rank(event)[0] == 0:
                 continue
+            consider_options(key, event)
             previous = best.get(key)
             if previous is None or _forecast_rank(event) > _forecast_rank(previous):
                 best[key] = event
@@ -568,6 +591,7 @@ def recover_week(
         ):
             if candidate is None:
                 continue
+            consider_options(key, candidate)
             previous = best.get(key)
             if previous is None or _forecast_rank(candidate) > _forecast_rank(previous):
                 best[key] = candidate
@@ -610,6 +634,18 @@ def recover_week(
             # Even when the numerical forecast is already present, old bundles
             # may predate canonical display provenance. Normalize those fields.
             repaired = _normalize_forecast(current)
+
+        # A tied ML forecast must not suppress newer eligible option evidence.
+        # Keep the chosen ML forecast/provenance and transfer the entire option
+        # snapshot independently. Option-led headlines keep their chosen snapshot.
+        option = options.get(key)
+        if (
+            _forecast_rank(repaired)[0] == 4
+            and option is not None
+            and any(repaired.get(field) != option.get(field) for field in OPTION_FIELDS)
+        ):
+            repaired.update({field: option.get(field) for field in OPTION_FIELDS})
+            repaired = _normalize_forecast(repaired)
 
         # Historical context is a separate hover component even when ML or
         # options supplies the frozen headline. Reconcile it from the same
@@ -770,10 +806,17 @@ def main() -> int:
     )
 
     recovered: dict[EventKey, dict] = {}
+    resolved: dict[EventKey, dict] = {}
     for path in sorted(WEEKS_DIR.glob("*.json")):
         if path.name == "manifest.json":
             continue
         repaired = recover_week(path, membership, today, args.apply)
+        # Symbols are rebuilt independently every day. Synchronize every active
+        # reported forecast, including calendar rows whose values did not change.
+        for event in json.loads(path.read_text(encoding="utf-8")).get("events") or []:
+            key = (event.get("ticker"), event.get("earnings_date"))
+            if key in membership and key[1] <= today.isoformat() and _forecast_rank(event)[0] > 0:
+                resolved[key] = event
         if repaired:
             recovered.update(repaired)
             print(f"  {path.name}: repaired {len(repaired)} reported forecast(s)")
@@ -783,9 +826,6 @@ def main() -> int:
                 )
                 print(f"    {earnings_date}  {ticker}  {method}")
 
-    if not recovered:
-        print("nothing to restore")
-        return 0
     if not args.apply:
         print(
             f"\ndry run — {len(recovered)} reported forecasts would be repaired; "
@@ -793,8 +833,15 @@ def main() -> int:
         )
         return 0
 
-    symbol_count = _repair_symbol_payloads(recovered, apply=True)
-    _republish_manifest_and_screener()
+    symbol_count = _repair_symbol_payloads(resolved, apply=True)
+    if recovered:
+        _republish_manifest_and_screener()
+    # Fail in the producer, before committing/publishing an inconsistent corpus.
+    from validate_public_contracts import validate_forecast_surface_parity
+    validate_forecast_surface_parity()
+    if not recovered and not symbol_count:
+        print("nothing to restore; forecast surface parity passed")
+        return 0
     print(
         f"\nrepaired {len(recovered)} reported forecasts "
         f"and {symbol_count} symbol payload(s)"

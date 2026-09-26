@@ -349,3 +349,121 @@ def test_recover_week_reconciles_historical_hover_without_replacing_forecast(
     assert repaired[("CBRL", "2026-09-23")] == {**current, "hist_move_med_4q": 0.028203}
     assert json.loads(path.read_text())["events"][0] == repaired[("CBRL", "2026-09-23")]
     assert restore.recover_week(path, membership, date(2026, 9, 25), apply=True) == {}
+
+
+@pytest.mark.parametrize("quality,snapshot,expected_iv", [
+    ("decision_eligible_eod", "2026-09-15", 0.2917 * (17 / 365) ** 0.5),
+    ("rejected", "2026-09-15", 0.052634),
+    ("decision_eligible_eod", "2026-09-17", 0.052634),
+    ("decision_eligible_eod", "2026-09-16", 0.052634),
+])
+def test_restoration_reconciles_option_snapshot_independently_of_ml_rank(
+    tmp_path, monkeypatch, quality, snapshot, expected_iv,
+):
+    import validate_public_contracts as contracts
+
+    symbols = tmp_path / "symbols"
+    weeks = tmp_path / "weeks"
+    symbols.mkdir()
+    weeks.mkdir()
+    event = restore._normalize_forecast(_event(
+        "FDX", "2026-09-16", timing="amc", as_of_date="2026-09-14",
+        em_ml_pct=0.036898, ml_snapshot_date="2026-09-14",
+        forecast_id="frozen-id", forecast_scored_at="2026-09-15T17:31:28+00:00",
+        forecast_frozen_eligible=True, em_iv_pct=0.052634, em_straddle_pct=0.042,
+        expiry_date="2026-09-25", days_to_expiry=11,
+    ))
+    path = weeks / "2026-09-14.json"
+    path.write_text(json.dumps({
+        "metadata": {"as_of_date": "2026-09-25"},
+        "window": {"start": "2026-09-14", "end": "2026-09-18"},
+        "events": [event],
+    }))
+    # Model rank and score timestamp tie, but the option observation is newer.
+    symbol = {"as_of_date": "2026-09-25", "next_earnings": "2026-09-16",
+              "expected_move": restore._symbol_expected_move(event),
+              "earnings_history": [{
+                  "date": "2026-09-16", "timing": "amc", "implied_as_of": snapshot,
+                  "implied_quality_status": quality, "implied": 0.050407,
+                  "implied_atm_iv": 0.2917, "implied_dte": 17,
+                  "implied_expiration": "2026-10-02",
+                  "em_ml_pct": event["em_ml_pct"], "ml_snapshot_date": "2026-09-14",
+                  "forecast_frozen_eligible": True,
+                  "forecast_scored_at": event["forecast_scored_at"],
+              }]}
+    (symbols / "FDX.json").write_text(json.dumps(symbol))
+    monkeypatch.setattr(restore, "SYMBOLS_DIR", symbols)
+    monkeypatch.setattr(restore, "_history", lambda _path: [])
+    monkeypatch.setattr(contracts, "PUBLIC", tmp_path)
+    key = ("FDX", "2026-09-16")
+    restore.recover_week(path, {key}, date(2026, 9, 26), apply=True)
+    repaired = json.loads(path.read_text())["events"][0]
+    assert repaired["em_iv_pct"] == pytest.approx(expected_iv)
+    for field in ("forecast_id", "forecast_scored_at", "em_ml_pct", "display_forecast_pct"):
+        assert repaired[field] == event[field]
+    if quality == "decision_eligible_eod" and snapshot == "2026-09-15":
+        assert repaired["expiry_date"] == "2026-10-02"
+        assert repaired["days_to_expiry"] == 17
+        assert repaired["as_of_date"] == snapshot
+        assert repaired["em_straddle_pct"] == 0.050407
+    restore._repair_symbol_payloads({key: repaired}, apply=True)
+    contracts.validate_forecast_surface_parity()
+    assert restore.recover_week(path, {key}, date(2026, 9, 26), apply=True) == {}
+
+
+def test_daily_rebuild_resynchronizes_symbols_when_calendar_is_unchanged(tmp_path, monkeypatch):
+    import sys
+    import validate_public_contracts as contracts
+
+    symbols, weeks = tmp_path / "symbols", tmp_path / "weeks"
+    symbols.mkdir()
+    weeks.mkdir()
+    key = ("FDX", "2026-09-16")
+    event = restore._normalize_forecast(_event(
+        *key, as_of_date="2026-09-15", em_iv_pct=0.06, em_straddle_pct=0.05,
+        em_ml_pct=0.036898, ml_snapshot_date="2026-09-14", forecast_frozen_eligible=True,
+    ))
+    week = weeks / "2026-09-14.json"
+    week.write_text(json.dumps({
+        "metadata": {"as_of_date": "2026-09-25"},
+        "window": {"start": "2026-09-14", "end": "2026-09-18"}, "events": [event],
+    }))
+    original_week = week.read_bytes()
+    monkeypatch.setattr(restore, "SYMBOLS_DIR", symbols)
+    monkeypatch.setattr(restore, "WEEKS_DIR", weeks)
+    monkeypatch.setattr(restore, "_history", lambda _path: [])
+    monkeypatch.setattr(restore, "_load_reference_membership", lambda: (
+        {key}, {"start": "2026-09-14", "end": "2026-09-18"},
+    ))
+    monkeypatch.setattr(contracts, "PUBLIC", tmp_path)
+    monkeypatch.setattr(restore, "_republish_manifest_and_screener", lambda: pytest.fail("calendar unchanged"))
+    for day in ("2026-09-25", "2026-09-26"):
+        monkeypatch.setattr(sys, "argv", ["restore", "--apply", "--today", day])
+        # Simulate the daily generator resetting just the symbol projection.
+        (symbols / "FDX.json").write_text(json.dumps({
+            "as_of_date": day, "next_earnings": key[1], "earnings_history": [],
+            "expected_move": {**restore._symbol_expected_move(event), "iv_pct": 0.09},
+        }))
+        with pytest.raises(contracts.ContractError, match="hover component mismatch"):
+            contracts.validate_forecast_surface_parity()
+        assert restore.main() == 0
+        contracts.validate_forecast_surface_parity()
+        assert week.read_bytes() == original_week
+        assert restore.main() == 0
+
+
+def test_refresh_and_ci_validate_real_publication_before_commit():
+    import yaml
+
+    root = Path(__file__).resolve().parents[2]
+    refresh = yaml.safe_load((root / ".github/workflows/data-refresh.yml").read_text())
+    steps = refresh["jobs"]["refresh"]["steps"]
+    commands = [step.get("run", "") for step in steps]
+    gate = next(i for i, cmd in enumerate(commands) if "tools/validate_public_contracts.py" in cmd)
+    restore_step = next(i for i, cmd in enumerate(commands) if "restore_reported_forecasts.py --apply" in cmd)
+    commit = next(i for i, cmd in enumerate(commands) if "git commit" in cmd)
+    assert restore_step < gate < commit
+    assert not steps[gate].get("continue-on-error", False)
+    ci = yaml.safe_load((root / ".github/workflows/ci.yml").read_text())
+    assert any("tools/validate_public_contracts.py" in step.get("run", "")
+               for job in ci["jobs"].values() for step in job["steps"])

@@ -104,3 +104,26 @@ After recovery:
 ## Evidence to retain
 
 Keep the failed reconciliation/options/forecast reports, relevant workflow logs/artifacts, release/pointer identities, provider evidence, and the successful recovery run. Open a regression issue if a bad candidate advanced farther than the intended control boundary.
+
+## Frontend forecast-component mismatch
+
+The daily generator and forecast restoration must complete before publication.
+Restoration selects the frozen headline forecast separately from its option
+comparison snapshot and historical context. Eligible option percentages move
+with their observation date, expiry, strike, and other snapshot fields; they
+must not inherit unrelated ML ranking timestamps. Same-day or post-event legacy
+option observations are not eligible for restoration.
+
+Every active reported event is synchronized back to its symbol payload, even
+when its calendar row was already correct. This is necessary because a later
+daily rebuild can replace the symbol projection independently. The restoration
+command validates forecast parity after writing. The daily workflow then runs
+all public-contract checks before committing generated files, and CI checks the
+actual committed corpus. The publisher retains its independent validation gate.
+
+For recovery, use `scripts/restore_reported_forecasts.py --apply --today YYYY-MM-DD`
+with the affected release's date, then run `tools/validate_public_contracts.py`.
+Review the generated diff and preserve frozen forecast identities and realized
+results. After merging a verified repair, dispatch `frontend-publication.yml`;
+this publishes the existing corpus without rerunning market-data provider calls.
+Verify the live release manifest and the affected calendar and symbol files.
