@@ -1,10 +1,10 @@
 {
   "metadata": {
     "version": "v4_multi_week",
-    "generated_at": "2026-09-25T12:08:14.646414",
+    "generated_at": "2026-09-26T11:35:41.335913",
     "as_of_date": "2026-09-24",
     "method": "ATM straddle + IV baseline",
-    "offset": 0
+    "offset": -1
   },
   "window": {
     "start": "2026-09-21",
@@ -560,11 +560,11 @@
       "earnings_date": "2026-09-24",
       "timing": "amc",
       "fiscal_q": "Q4",
-      "eps_actual": null,
+      "eps_actual": 6.75,
       "eps_estimate": 6.6729,
-      "revenue_actual": null,
+      "revenue_actual": 93873000000.0,
       "revenue_estimate": 96745402720.0,
-      "realized_move_pct": null,
+      "realized_move_pct": 0.02932,
       "as_of_date": "2026-09-23",
       "spot_price": 900.0,
       "atm_strike": 905.0,
@@ -607,7 +607,8 @@
       "options_status": "decision_eligible",
       "fallback_reason": null,
       "historical_event_count": null,
-      "forecast_frozen": true
+      "forecast_frozen": true,
+      "forecast_published_at": "2026-09-25T12:36:27.386457+00:00"
     },
     {
       "ticker": "DRI",
@@ -661,7 +662,8 @@
       "options_status": "decision_eligible",
       "fallback_reason": null,
       "historical_event_count": null,
-      "forecast_frozen": true
+      "forecast_frozen": true,
+      "forecast_published_at": "2026-09-25T12:36:27.386457+00:00"
     },
     {
       "ticker": "HUBG",
@@ -672,7 +674,7 @@
       "eps_estimate": null,
       "revenue_actual": null,
       "revenue_estimate": null,
-      "realized_move_pct": null,
+      "realized_move_pct": 0.010323,
       "as_of_date": "2026-09-11",
       "em_method": "options_math",
       "em_straddle_pct": 0.147143,
@@ -704,7 +706,7 @@
       "eps_estimate": -3.468,
       "revenue_actual": null,
       "revenue_estimate": 229182780.0,
-      "realized_move_pct": null,
+      "realized_move_pct": -0.071203,
       "as_of_date": "2026-09-21",
       "em_method": "ml_lightgbm",
       "em_straddle_pct": null,
@@ -736,7 +738,8 @@
       "options_status": "unavailable",
       "fallback_reason": null,
       "historical_event_count": null,
-      "forecast_frozen": true
+      "forecast_frozen": true,
+      "forecast_published_at": "2026-09-25T12:36:27.386457+00:00"
     },
     {
       "ticker": "SNX",
@@ -790,7 +793,8 @@
       "options_status": "decision_eligible",
       "fallback_reason": null,
       "historical_event_count": null,
-      "forecast_frozen": true
+      "forecast_frozen": true,
+      "forecast_published_at": "2026-09-25T12:36:27.386457+00:00"
     }
   ],
   "summary": {

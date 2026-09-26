@@ -5,59 +5,67 @@
     "corporate_action_rows": 28834,
     "corporate_action_status": "enforced",
     "covered_events": 68,
-    "decision_group_rejection_rate": 0.284211,
-    "decision_groups": 95,
+    "decision_group_rejection_rate": 0.291667,
+    "decision_groups": 96,
     "decision_scope": "end_of_day_research",
     "display_forecast_coverage_pct": 1.0,
-    "display_forecast_covered_events": 27,
-    "display_forecast_events": 27,
+    "display_forecast_covered_events": 28,
+    "display_forecast_events": 28,
     "display_forecast_method_mix": {
       "historical": 0,
       "historical_prior": 0,
-      "ml": 27,
+      "ml": 28,
       "options_indicative": 0,
       "options_math": 0
     },
     "duplicate_rows": 0,
     "eligible_contracts": 66767,
     "eligible_decision_groups": 68,
-    "event_coverage_pct": 0.715789,
-    "expected_events": 95,
-    "expected_source_date": "2026-09-24",
+    "event_coverage_pct": 0.708333,
+    "expected_events": 96,
+    "expected_source_date": "2026-09-25",
     "live_trading_eligible": false,
-    "missing_events": 27,
+    "missing_events": 28,
     "pair_rejection_rate": 0.844789,
     "quarantine_records": 91995,
     "quarantine_status": "enforced",
-    "quote_quality_errors": [],
+    "quote_quality_errors": [
+      "latest source date 2026-09-24 is 1 market session(s) behind expected 2026-09-25"
+    ],
     "replay_status": "verified",
     "source_date": "2026-09-24",
-    "source_session_lag": 0,
-    "status": "passed"
+    "source_session_lag": 1,
+    "status": "failed"
   },
   "exceptions": [
     {
       "code": "upcoming_events_outside_option_universe",
-      "count": 159,
+      "count": 154,
       "severity": "warning",
       "summary": "Calendar events fall outside the current options decision universe"
     },
     {
       "code": "upcoming_events_without_option_chain",
-      "count": 27,
+      "count": 28,
       "severity": "warning",
       "summary": "In-universe earnings events have no decision-eligible option chain"
+    },
+    {
+      "code": "option_quote_quality_below_limit",
+      "count": 28,
+      "severity": "critical",
+      "summary": "Option evidence on the scoped earnings decision surface exceeds the publication limit"
     }
   ],
-  "generated_at": "2026-09-25T12:36:35.533631+00:00",
+  "generated_at": "2026-09-26T12:18:52.680732+00:00",
   "model": {
     "challenger_present": true,
     "champion_active": true,
-    "critical_features": 3,
+    "critical_features": 1,
     "drift_status": "warning",
     "fallback_bundle_available": false,
     "hard_missing_features": 0,
-    "monitored_at": "2026-09-25T11:50:09.849027+00:00",
+    "monitored_at": "2026-09-26T11:28:17.771953+00:00",
     "outcome_common_rows": null,
     "outcome_evaluated_at": "2026-09-14T01:54:36.293833+00:00",
     "outcome_evaluations": 2,
@@ -67,11 +75,11 @@
     "shadow_roles": [
       "challenger"
     ],
-    "snapshot_date": "2026-09-24",
+    "snapshot_date": "2026-09-25",
     "status": "passed",
     "warning_features": 5
   },
-  "publication_eligible": true,
+  "publication_eligible": false,
   "release": {
     "artifact_promotion_status": "passed",
     "data_r2_status": "passed",
@@ -80,5 +88,5 @@
     "neon_import_status": "passed"
   },
   "schema": "quantiv.control-plane.v2",
-  "status": "passed"
+  "status": "failed"
 }
