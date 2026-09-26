@@ -132,6 +132,7 @@ jobs:
       # lifecycle, generated public JSON, model activation receipts, and the
       # frontend-data transformations consumed by deployment jobs.
       - run: ruff check scripts tools
+      - run: python tools/validate_public_contracts.py
       - run: pytest scripts tools -q
         env:
           PYTHONPATH: apps/ml:scripts:tools

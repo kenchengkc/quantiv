@@ -371,6 +371,9 @@ jobs:
           R2_BUCKET: ${{ secrets.R2_BUCKET }}
         run: bash scripts/r2_push.sh --runtime-state-only
 
+      - name: Gate — validate frontend publication contracts
+        run: python tools/validate_public_contracts.py
+
       - name: Commit generated publication and controlled metadata
         run: |
           set -euo pipefail
