@@ -31,7 +31,7 @@ def test_starts_before_nine_are_admitted(instant):
     "2026-09-23T15:13:49+00:00",
     "2026-09-23T18:09:20+00:00",
     "2026-09-24T17:00:00-04:00",
-    "2026-09-26T10:00:00-04:00",
+    "2026-11-27T10:00:00-05:00",
 ])
 def test_late_jobs_are_rejected_even_with_soft_skip(monkeypatch, instant):
     monkeypatch.setenv("FINNHUB_RESERVED_WINDOW_SOFT_SKIP", "1")
@@ -146,3 +146,45 @@ def test_workflow_deadline_covers_every_provider_step():
                 assert admission is not None and admission < index
                 assert "shell" not in step, "Provider steps must use the deadline wrapper"
             assert "--allow-market-hours" not in command
+
+
+@pytest.mark.parametrize("instant,expected_deadline", [
+    ("2026-09-26T10:00:00-04:00", "2026-09-28T09:35:00-04:00"),
+    ("2026-09-27T07:20:00-04:00", "2026-09-28T09:35:00-04:00"),
+    ("2026-09-27T14:00:00-04:00", "2026-09-28T09:35:00-04:00"),
+    ("2026-09-28T00:30:00+00:00", "2026-09-28T09:35:00-04:00"),
+    ("2026-09-06T15:00:00-04:00", "2026-09-08T09:35:00-04:00"),
+    ("2026-12-25T12:00:00-05:00", "2026-12-28T09:35:00-05:00"),
+    ("2026-03-07T23:00:00-05:00", "2026-03-09T09:35:00-04:00"),
+    ("2026-10-31T23:00:00-04:00", "2026-11-02T09:35:00-05:00"),
+])
+def test_closed_market_days_admit_until_next_session(instant, expected_deadline):
+    deadline = provider_market_hours.require_premarket_refresh_window(
+        now=datetime.fromisoformat(instant)
+    )
+    assert deadline.isoformat() == expected_deadline
+
+
+@pytest.mark.parametrize("instant,expected_status", [
+    ("2026-09-27T09:35:00-04:00", 0),
+    ("2026-09-27T15:00:00-04:00", 0),
+    ("2026-09-28T09:34:59-04:00", 0),
+    ("2026-09-28T09:35:00-04:00", 124),
+])
+def test_weekend_admission_protects_next_market_session(monkeypatch, tmp_path, instant, expected_status):
+    deadline = provider_market_hours.require_premarket_refresh_window(
+        now=datetime.fromisoformat("2026-09-27T07:20:00-04:00")
+    )
+    clock = datetime.fromisoformat(instant)
+
+    class FrozenClock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return clock.astimezone(tz)
+
+    monkeypatch.setattr(provider_market_hours, "datetime", FrozenClock)
+    marker = tmp_path / "called"
+    script = tmp_path / "step.sh"
+    script.write_text(f"touch '{marker}'\n")
+    assert provider_market_hours.run_refresh_shell(script, deadline) == expected_status
+    assert marker.exists() == (expected_status == 0)

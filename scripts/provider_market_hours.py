@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import signal
 import subprocess
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -14,27 +14,32 @@ QUOTE_REFRESH_CLOSE_MIN = 16 * 60 + 45
 
 
 def require_premarket_refresh_window(*, now: datetime | None = None) -> datetime:
-    """Admit starts before 09:00 ET and return the same day's 09:35 deadline."""
+    """Reserve trading-day capacity; closed days run until the next session cutoff."""
     instant = now if now is not None else datetime.now(timezone.utc)
     if instant.tzinfo is None or instant.utcoffset() is None:
         raise ValueError("The refresh clock must be timezone-aware")
     eastern_now = instant.astimezone(ZoneInfo("America/New_York"))
-    if eastern_now.hour >= 9:
+    market_day = is_us_market_session(eastern_now.date())
+    if market_day and eastern_now.hour >= 9:
         raise SystemExit(
             f"Refusing daily refresh at {eastern_now.isoformat()}: starts at or "
             "after 09:00 ET are rejected. "
             "Run overnight; market-hours capacity is reserved for live quotes."
         )
-    return eastern_now.replace(hour=9, minute=35, second=0, microsecond=0)
+    cutoff = eastern_now.replace(hour=9, minute=35, second=0, microsecond=0)
+    while not is_us_market_session(cutoff.date()):
+        cutoff += timedelta(days=1)
+    return cutoff
 
 
 def run_refresh_shell(script: Path, deadline: datetime) -> int:
     """Run an Actions step, killing its process group at the admitted deadline."""
     if deadline.tzinfo is None or deadline.utcoffset() is None:
         raise ValueError("The refresh deadline must be timezone-aware")
+    cutoff_label = deadline.astimezone(ZoneInfo("America/New_York")).isoformat()
     remaining = (deadline.astimezone(timezone.utc) - datetime.now(timezone.utc)).total_seconds()
     if remaining <= 0:
-        print("Refusing refresh step: the 09:35 ET provider cutoff has passed.", flush=True)
+        print(f"Refusing refresh step: provider cutoff {cutoff_label} has passed.", flush=True)
         return 124
     process = subprocess.Popen(
         ["bash", "--noprofile", "--norc", "-e", "-o", "pipefail", str(script)],
@@ -43,7 +48,7 @@ def run_refresh_shell(script: Path, deadline: datetime) -> int:
     try:
         return process.wait(timeout=remaining)
     except subprocess.TimeoutExpired:
-        print("Stopping refresh: the 09:35 ET provider cutoff has arrived.", flush=True)
+        print(f"Stopping refresh: provider cutoff {cutoff_label} has arrived.", flush=True)
         return 124
     finally:
         # Kill descendants as well as the shell, including any background work.

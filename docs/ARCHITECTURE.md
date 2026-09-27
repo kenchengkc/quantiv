@@ -204,17 +204,19 @@ See [RAILWAY_SETUP.md](RAILWAY_SETUP.md) for deployment instructions.
 | `refresh-ticker-names.yml` | Quarterly | SEC ticker-name and exchange refresh |
 | `av-enrichment.yml` | Manual only | Isolated provider-signal research artifact; never writes to `main` |
 
-Daily refresh jobs reject starts at or after 09:00 Eastern, including manual runs
-and profile sweeps queued behind the main refresh. Admission records that day's
-09:35 Eastern deadline. A shared shell wrapper refuses steps after the deadline
+On US market-session days, daily refresh jobs reject starts at or after 09:00
+Eastern, including manual runs and profile sweeps queued behind the main refresh.
+Admission records that day's 09:35 Eastern deadline. Weekends and exchange
+holidays admit starts at any time and set the cutoff to 09:35 Eastern on the next
+market session, using the canonical market calendar. A shared shell wrapper refuses steps after the deadline
 and terminates the process group of a running step when it arrives, protecting all
 provider calls, including reconciliation and frontend generation. Both jobs allow
 up to 360 minutes, the GitHub-hosted runner limit, rather than imposing shorter
 application timeouts. The independent non-price Finnhub guard still skips optional
 enrichment from 09:25 Eastern to reserve capacity for live quotes.
 Manual dispatch does not enable market-hours overrides. GitHub schedules are
-best-effort; a delayed start is permitted only before 09:00, and a late or interrupted
-refresh must be retried in the next overnight window. The IANA schedule timezone and
+best-effort; on trading days, a delayed start is permitted only before 09:00, and
+a late or interrupted refresh must be retried in the next overnight or closed-market window. The IANA schedule timezone and
 absolute UTC execution deadline preserve these boundaries through DST transitions.
 
 The nightly workflow broadly performs:
