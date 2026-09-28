@@ -5,6 +5,7 @@ import {
   easternDate,
   isNormalRefreshRun,
   scheduledMode,
+  watchdogRunState,
 } from "./index.js";
 
 test("dispatches at 02:00 Eastern in EDT", () => {
@@ -51,4 +52,18 @@ test("run matching uses Eastern calendar date and ignores recovery runs", () => 
     ),
     false,
   );
+});
+
+
+test("watchdog distinguishes missing start from failed completion", () => {
+  assert.equal(watchdogRunState({ status: "queued", conclusion: null }), "queued");
+  assert.equal(
+    watchdogRunState({ status: "completed", conclusion: "failure" }),
+    "failed",
+  );
+  assert.equal(
+    watchdogRunState({ status: "completed", conclusion: "success" }),
+    "started",
+  );
+  assert.equal(watchdogRunState({ status: "in_progress", conclusion: null }), "started");
 });
