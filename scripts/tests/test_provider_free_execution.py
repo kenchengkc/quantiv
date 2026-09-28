@@ -74,3 +74,11 @@ def test_daily_claim_is_serialized_before_refresh_execution() -> None:
     assert refresh["needs"] == "claim"
     assert refresh["concurrency"]["group"] == "daily-data-refresh-execution"
     assert recovery["concurrency"]["group"] == "daily-data-refresh-execution"
+
+
+def test_native_schedule_is_backup_off_the_top_of_hour() -> None:
+    workflow = yaml.safe_load((ROOT / ".github/workflows/data-refresh.yml").read_text())
+    schedules = workflow[True]["schedule"]
+    assert schedules == [
+        {"cron": "17 2 * * *", "timezone": "America/New_York"}
+    ]
