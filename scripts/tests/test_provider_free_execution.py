@@ -44,6 +44,7 @@ def test_recovery_job_has_no_market_data_provider_steps() -> None:
 
     assert "scripts/verify_refresh_recovery.py" in commands
     assert "--expected-release-id" in commands
+    assert "--expected-manifest-id" in commands
     assert "scripts/materialize_frontend_release.sh" in commands
     assert "FRONTEND_RELEASE_REQUIRED" in str(recovery["steps"])
     assert "scripts/run_provider_free.sh" in commands
