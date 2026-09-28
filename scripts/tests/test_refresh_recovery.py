@@ -53,7 +53,11 @@ def _write_recovery_evidence(data_dir: Path, *, state: str = "accepted") -> str:
 
 def test_recovery_accepts_exact_verified_release(tmp_path):
     release_id = _write_recovery_evidence(tmp_path)
-    result = verify_recovery(tmp_path, expected_release_id=release_id)
+    result = verify_recovery(
+        tmp_path,
+        expected_release_id=release_id,
+        expected_manifest_id="sha256:test-reconciliation",
+    )
     assert result["release_id"] == release_id
     assert result["options_state"] == "accepted"
     assert result["active_source_date"] == "2026-09-25"
@@ -62,16 +66,38 @@ def test_recovery_accepts_exact_verified_release(tmp_path):
 def test_recovery_refuses_different_release_id(tmp_path):
     _write_recovery_evidence(tmp_path)
     with pytest.raises(RecoveryVerificationError, match="release mismatch"):
-        verify_recovery(tmp_path, expected_release_id="sha256:not-the-release")
+        verify_recovery(
+            tmp_path,
+            expected_release_id="sha256:not-the-release",
+            expected_manifest_id="sha256:test-reconciliation",
+        )
 
 
 def test_recovery_refuses_blocked_options_state(tmp_path):
     release_id = _write_recovery_evidence(tmp_path, state="blocked")
     with pytest.raises(RecoveryVerificationError, match="not recoverable"):
-        verify_recovery(tmp_path, expected_release_id=release_id)
+        verify_recovery(
+            tmp_path,
+            expected_release_id=release_id,
+            expected_manifest_id="sha256:test-reconciliation",
+        )
 
 
 def test_recovery_requires_release_pin(tmp_path):
     _write_recovery_evidence(tmp_path)
     with pytest.raises(RecoveryVerificationError, match="exact promoted data release id"):
-        verify_recovery(tmp_path, expected_release_id="")
+        verify_recovery(
+            tmp_path,
+            expected_release_id="",
+            expected_manifest_id="sha256:test-reconciliation",
+        )
+
+
+def test_recovery_refuses_different_reconciliation_manifest(tmp_path):
+    release_id = _write_recovery_evidence(tmp_path)
+    with pytest.raises(RecoveryVerificationError, match="reconciliation mismatch"):
+        verify_recovery(
+            tmp_path,
+            expected_release_id=release_id,
+            expected_manifest_id="sha256:wrong-manifest",
+        )
