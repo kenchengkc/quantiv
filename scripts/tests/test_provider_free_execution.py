@@ -1,4 +1,7 @@
+import json
+import os
 from pathlib import Path
+import subprocess
 
 import yaml
 
@@ -86,3 +89,47 @@ def test_native_schedule_is_backup_off_the_top_of_hour() -> None:
     assert schedules == [
         {"cron": "17 2 * * *", "timezone": "America/New_York"}
     ]
+
+
+def test_provider_free_wrapper_strips_market_data_credentials(tmp_path) -> None:
+    script = ROOT / "scripts/run_provider_free.sh"
+    probe = (
+        "import json, os; "
+        "print(json.dumps({"
+        "'mode': os.getenv('PROVIDER_FREE_RECOVERY'), "
+        "'finnhub': os.getenv('FINNHUB_API_KEY'), "
+        "'fmp': os.getenv('FMP_API_KEY'), "
+        "'twelve': os.getenv('TWELVEDATA_API_KEY'), "
+        "'polygon': os.getenv('POLYGON_API_KEY'), "
+        "'alpaca': os.getenv('ALPACA_API_KEY'), "
+        "'database': os.getenv('DATABASE_URL')"
+        "}))"
+    )
+    env = {
+        **os.environ,
+        "FINNHUB_API_KEY": "secret",
+        "FMP_API_KEY": "secret",
+        "TWELVEDATA_API_KEY": "secret",
+        "POLYGON_API_KEY": "secret",
+        "ALPACA_API_KEY": "secret",
+        "DATABASE_URL": "postgres://allowed-non-market-service",
+    }
+    result = subprocess.run(
+        ["bash", str(script), "python", "-c", probe],
+        cwd=ROOT,
+        env=env,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    payload = json.loads(result.stdout)
+
+    assert payload == {
+        "mode": "1",
+        "finnhub": None,
+        "fmp": None,
+        "twelve": None,
+        "polygon": None,
+        "alpaca": None,
+        "database": "postgres://allowed-non-market-service",
+    }
