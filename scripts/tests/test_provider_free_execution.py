@@ -61,3 +61,16 @@ def test_normal_refresh_keeps_hard_provider_deadline() -> None:
         if step["name"] == "Gate — reserve market-hours API capacity"
     )
     assert "provider_market_hours.py --admit" in admit["run"]
+
+
+def test_daily_claim_is_serialized_before_refresh_execution() -> None:
+    workflow = yaml.safe_load((ROOT / ".github/workflows/data-refresh.yml").read_text())
+    claim = workflow["jobs"]["claim"]
+    refresh = workflow["jobs"]["refresh"]
+    recovery = workflow["jobs"]["recovery"]
+
+    assert claim["concurrency"]["group"] == "daily-data-refresh-claim"
+    assert claim["concurrency"]["cancel-in-progress"] is False
+    assert refresh["needs"] == "claim"
+    assert refresh["concurrency"]["group"] == "daily-data-refresh-execution"
+    assert recovery["concurrency"]["group"] == "daily-data-refresh-execution"
