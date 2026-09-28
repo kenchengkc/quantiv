@@ -564,10 +564,24 @@ jobs:
       - name: Preserve or reconstruct research history without providers
         run: |
           set -euo pipefail
-          if [ -f apps/frontend/public/research-history.json ]; then
-            bash scripts/run_provider_free.sh               python tools/build_research_history.py --preserve-existing
+          HISTORY=apps/frontend/public/research-history.json
+          ACTIVE_OPTIONS_DATE=$(jq -er .active_source_date data/validation/options_snapshot_status.json)
+          PRESERVE=false
+          if [ -f "$HISTORY" ]; then
+            HISTORY_SCHEMA=$(jq -er .schema "$HISTORY")
+            if [ "$HISTORY_SCHEMA" = "quantiv.historical-event-universe.v1" ]; then
+              HISTORY_AS_OF=$(jq -er .source.as_of_date "$HISTORY")
+              if [ "$HISTORY_AS_OF" = "$ACTIVE_OPTIONS_DATE" ]; then
+                PRESERVE=true
+              fi
+            fi
+          fi
+
+          if [ "$PRESERVE" = "true" ]; then
+            bash scripts/run_provider_free.sh python tools/build_research_history.py --preserve-existing
           else
-            bash scripts/run_provider_free.sh               node apps/frontend/scripts/build-research-history.mjs
+            rm -f "$HISTORY"
+            bash scripts/run_provider_free.sh node apps/frontend/scripts/build-research-history.mjs
             bash scripts/run_provider_free.sh python - <<'PY'
           import sys
           sys.path.insert(0, "tools")
