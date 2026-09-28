@@ -68,8 +68,9 @@ The recovery mode:
   a previously verified fallback whose `refresh_scoring_allowed` flag is true;
 - removes all market-data provider credentials from child commands;
 - disables TwelveData fallback even if a key exists in the runner environment;
-- validates and preserves the existing source-level `research-history.json`
-  instead of re-querying retired-symbol providers;
+- preserves the existing source-level `research-history.json` when it is
+  present; otherwise reconstructs the existing display-limited preview from the
+  recovered symbol payloads, never by re-querying retired-symbol providers;
 - reruns scoring, forecast validation, Neon import, frontend generation,
   forecast publication receipts, runtime-state publication, and public-contract
   validation from the saved data.
