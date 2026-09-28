@@ -57,6 +57,9 @@ The recovery mode:
 
 - requires the exact promoted `data-release` ID as an input;
 - materializes that release from R2 and verifies every file digest;
+- materializes the last Git-pinned, verified frontend release so generated
+  artifacts that are intentionally absent from a clean checkout (including
+  `research-history.json`) have a trusted baseline;
 - restores the saved reconciliation/options decision and the independently
   published calendar-reference release;
 - accepts only an `accepted` options snapshot with zero critical exceptions or
