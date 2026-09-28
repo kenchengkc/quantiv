@@ -2,9 +2,9 @@
 
 This Cloudflare Worker is the primary clock for the Quantiv daily refresh. It
 dispatches the existing GitHub Actions workflow at 02:00 America/New_York and
-checks again at 02:10. The native GitHub `schedule` remains enabled as a
-backup; the workflow's daily-claim job prevents a delayed native schedule from
-repeating provider work.
+checks again at 02:10. The native GitHub `schedule` remains enabled at 02:17 Eastern as a backup,
+away from the top-of-hour load window; the workflow's daily-claim job prevents a
+delayed native schedule from repeating provider work.
 
 Cloudflare Cron Triggers are UTC-only, so the Worker registers both 06:00/07:00
 UTC and admits only the trigger that maps to 02:00 Eastern. The same pattern is
