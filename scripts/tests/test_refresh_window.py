@@ -134,7 +134,8 @@ def test_admitted_shell_cli_preserves_actions_output_environment(tmp_path):
 def test_workflow_deadline_covers_every_provider_step():
     root = Path(__file__).resolve().parents[2]
     workflow = yaml.safe_load((root / ".github/workflows/data-refresh.yml").read_text())
-    for job in workflow["jobs"].values():
+    for job_name in ("refresh", "finnhub-profile-sweep"):
+        job = workflow["jobs"][job_name]
         assert "--run-shell {0}" in job["defaults"]["run"]["shell"]
         admission = None
         for index, step in enumerate(job["steps"]):
@@ -146,6 +147,10 @@ def test_workflow_deadline_covers_every_provider_step():
                 assert admission is not None and admission < index
                 assert "shell" not in step, "Provider steps must use the deadline wrapper"
             assert "--allow-market-hours" not in command
+
+    recovery = workflow["jobs"]["recovery"]
+    assert "defaults" not in recovery
+    assert recovery["env"]["PROVIDER_FREE_RECOVERY"] == "1"
 
 
 @pytest.mark.parametrize("instant,expected_deadline", [

@@ -1,0 +1,26 @@
+name = "quantiv-daily-refresh-scheduler"
+main = "src/index.js"
+compatibility_date = "2026-09-28"
+
+[vars]
+GITHUB_OWNER = "kenchengkc"
+GITHUB_REPO = "quantiv"
+GITHUB_WORKFLOW = "data-refresh.yml"
+GITHUB_REF = "main"
+
+[triggers]
+# Cloudflare cron is UTC. Both UTC hours are registered and the Worker admits
+# only the invocation that maps to 02:00/02:10 America/New_York. This preserves
+# the local schedule across DST without editing cron twice a year.
+crons = [
+  "0 6 * * *",
+  "0 7 * * *",
+  "10 6 * * *",
+  "10 7 * * *"
+]
+
+[observability]
+enabled = true
+
+[secrets]
+required = ["GITHUB_TOKEN"]

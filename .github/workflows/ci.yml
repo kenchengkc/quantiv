@@ -20,6 +20,7 @@ jobs:
 
       - run: npm ci
       - run: node --test scripts/tests/verify_frontend_publication.test.mjs
+      - run: node --test workers/daily-refresh-scheduler/src/index.test.mjs
       - run: npm run lint --workspace=apps/frontend
       - run: npm run type-check --workspace=apps/frontend
       - run: npm run build --workspace=apps/frontend

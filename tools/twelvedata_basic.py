@@ -67,6 +67,8 @@ def _env_float(name: str, default: float, *, minimum: float = 0.0) -> float:
 
 
 def twelvedata_api_key() -> str | None:
+    if os.getenv("PROVIDER_FREE_RECOVERY") == "1":
+        return None
     return (
         os.getenv("TWELVEDATA_API_KEY")
         or os.getenv("TWELVE_DATA_API_KEY")
@@ -83,7 +85,10 @@ def load_twelvedata_config(data_dir: Path) -> TwelveDataConfig:
         batch_size=_env_int("TWELVEDATA_BATCH_SIZE", 8, minimum=1),
         batch_delay_sec=_env_float("TWELVEDATA_BATCH_DELAY_SEC", 61.0, minimum=0.0),
         ledger_path=ledger_path,
-        realized_fallback_enabled=_env_bool("TWELVEDATA_REALIZED_FALLBACK", True),
+        realized_fallback_enabled=(
+            os.getenv("PROVIDER_FREE_RECOVERY") != "1"
+            and _env_bool("TWELVEDATA_REALIZED_FALLBACK", True)
+        ),
     )
 
 

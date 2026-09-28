@@ -644,8 +644,8 @@ def _validate_retired_membership(source: dict[str, Any]) -> None:
         raise ContractError("combined corporate-action counts cannot be smaller than retired source rows")
 
 
-def validate_research_history() -> None:
-    path = PUBLIC / "research-history.json"
+def validate_research_history(path: Path | None = None) -> None:
+    path = path if path is not None else PUBLIC / "research-history.json"
     payload = _object(_read(path), str(path))
     schema = payload.get("schema")
     source = _object(payload.get("source"), "research-history.source")

@@ -1,11 +1,27 @@
 name: Daily data refresh
+run-name: Daily data refresh [${{ inputs.refresh_mode || github.event_name }}]
 
 on:
   schedule:
-    - cron: '0 2 * * *'
+    - cron: '17 2 * * *'
       timezone: America/New_York
   workflow_dispatch:
     inputs:
+      refresh_mode:
+        description: "Normal provider refresh or provider-free recovery from an already promoted R2 data release."
+        type: choice
+        options: [normal, provider-free-recovery]
+        default: normal
+      recovery_release_id:
+        description: "Exact data-release id required for provider-free recovery (ignored in normal mode)."
+        type: string
+        required: false
+        default: ""
+      recovery_manifest_id:
+        description: "Exact reconciliation manifest id from the interrupted refresh."
+        type: string
+        required: false
+        default: ""
       finnhub_profile_refresh:
         description: "Profile/logo maintenance mode."
         type: choice
@@ -16,16 +32,40 @@ on:
         type: boolean
         default: false
 
-concurrency:
-  group: daily-data-refresh
-  cancel-in-progress: false
-
 permissions:
   contents: read
 
 jobs:
-  refresh:
+  claim:
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.refresh_mode != 'provider-free-recovery' }}
     runs-on: ubuntu-latest
+    concurrency:
+      group: daily-data-refresh-claim
+      cancel-in-progress: false
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      claimed: ${{ steps.claim.outputs.claimed }}
+      claim_date: ${{ steps.claim.outputs.claim_date }}
+      owner_run_id: ${{ steps.claim.outputs.owner_run_id }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Claim Eastern refresh date
+        id: claim
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 scripts/daily_refresh_claim.py --github-output "$GITHUB_OUTPUT"
+
+  refresh:
+    needs: claim
+    if: needs.claim.outputs.claimed == 'true'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: daily-data-refresh-execution
+      cancel-in-progress: false
     timeout-minutes: 360
     defaults:
       run:
@@ -385,6 +425,206 @@ jobs:
             echo "No generated source-controlled publication changes"
           else
             git commit -m "daily refresh $(date -u +%Y-%m-%d)"
+            bash scripts/git_push_with_retry.sh origin main
+          fi
+
+
+  recovery:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.refresh_mode == 'provider-free-recovery' }}
+    runs-on: ubuntu-latest
+    concurrency:
+      group: daily-data-refresh-execution
+      cancel-in-progress: false
+    timeout-minutes: 360
+    permissions:
+      contents: write
+    env:
+      PROVIDER_FREE_RECOVERY: '1'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 20
+
+      - name: Install Python dependencies
+        run: pip install --require-hashes -r requirements.txt
+
+      - name: Install verified rclone
+        run: bash scripts/install_rclone.sh
+
+      - name: Configure R2
+        env:
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.config/rclone
+          cat > ~/.config/rclone/rclone.conf <<EOF
+          [r2]
+          type = s3
+          provider = Cloudflare
+          access_key_id = $R2_ACCESS_KEY_ID
+          secret_access_key = $R2_SECRET_ACCESS_KEY
+          endpoint = https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com
+          region = auto
+          EOF
+
+      - name: Materialize already-promoted data release from R2
+        env:
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          R2_REQUIRE_RUNTIME_STATE: "1"
+        run: bash scripts/r2_pull.sh
+
+      - name: Materialize last verified frontend release from R2
+        env:
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          RCLONE_BIN: rclone
+          FRONTEND_RELEASE_REQUIRED: "1"
+        run: bash scripts/materialize_frontend_release.sh
+
+      - name: Restore saved reconciliation and calendar evidence
+        env:
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+        run: |
+          set -euo pipefail
+          mkdir -p data/validation data/calendar_reference
+          REMOTE="r2:$R2_BUCKET"
+          rclone copyto "$REMOTE/validation/data_reconciliation.json"             data/validation/data_reconciliation.json
+          rclone copyto "$REMOTE/validation/options_snapshot_status.json"             data/validation/options_snapshot_status.json
+          rclone copyto "$REMOTE/calendar-reference/current.json"             data/calendar_reference/current.json
+          RELEASE_REL=$(jq -er .release data/calendar_reference/current.json)
+          RECEIPT_REL=$(jq -er .receipt data/calendar_reference/current.json)
+          mkdir -p             "data/calendar_reference/$(dirname "$RELEASE_REL")"             "data/calendar_reference/$(dirname "$RECEIPT_REL")"
+          rclone copyto "$REMOTE/calendar-reference/$RELEASE_REL"             "data/calendar_reference/$RELEASE_REL"
+          rclone copyto "$REMOTE/calendar-reference/$RECEIPT_REL"             "data/calendar_reference/$RECEIPT_REL"
+          bash scripts/run_provider_free.sh             python scripts/calendar_reference.py verify               --output-dir data/calendar_reference
+          bash scripts/run_provider_free.sh             python scripts/calendar_reference.py project               --output-dir data/calendar_reference
+
+      - name: Gate — verify exact recovery release
+        run: |
+          bash scripts/run_provider_free.sh             python scripts/verify_refresh_recovery.py               --data-dir data               --expected-release-id "${{ inputs.recovery_release_id }}"               --expected-manifest-id "${{ inputs.recovery_manifest_id }}"
+
+      - name: Rebuild DuckDB views from saved data
+        run: bash scripts/run_provider_free.sh python scripts/setup_duckdb_from_parquet.py
+
+      - name: Score upcoming earnings from saved data
+        run: bash scripts/run_provider_free.sh python scripts/daily_score.py --days-ahead 21
+
+      - name: Gate — validate recovered ML and IV forecasts
+        run: |
+          bash scripts/run_provider_free.sh             python scripts/validate_ml_pipeline.py forecasts               --report data/validation/daily_forecasts.json               --publish-receipt-dir data/forecasts/receipts
+
+      - name: Upload recovered forecast validation report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: provider-free-recovery-forecast-validation
+          path: data/validation/daily_forecasts.json
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: Monitor champion and feature drift from saved inputs
+        env:
+          MODEL_BUNDLE_SIGNING_KEY: ${{ secrets.MODEL_BUNDLE_SIGNING_KEY }}
+        run: |
+          if [ -f data/models/control/champion.json ]; then
+            bash scripts/run_provider_free.sh python scripts/model_control_plane.py monitor
+          else
+            echo "No signed champion yet; skipping monitoring."
+          fi
+
+      - name: Import recovered forecasts to Neon
+        id: recovery_neon
+        continue-on-error: true
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: bash scripts/run_provider_free.sh python -u scripts/import_recent_to_postgres.py --full
+
+      - name: Push recovered forecasts to R2
+        env:
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+        run: bash scripts/r2_push.sh --forecasts-only
+
+      - name: Build frontend JSON without market-data providers
+        run: bash scripts/run_provider_free.sh python -u tools/build_frontend_data.py
+
+      - name: Restore frozen forecasts for reported events
+        run: bash scripts/run_provider_free.sh python scripts/restore_reported_forecasts.py --apply
+
+      - name: Preserve or reconstruct research history without providers
+        run: |
+          set -euo pipefail
+          HISTORY=apps/frontend/public/research-history.json
+          ACTIVE_OPTIONS_DATE=$(jq -er .active_source_date data/validation/options_snapshot_status.json)
+          PRESERVE=false
+          if [ -f "$HISTORY" ]; then
+            HISTORY_SCHEMA=$(jq -er .schema "$HISTORY")
+            if [ "$HISTORY_SCHEMA" = "quantiv.historical-event-universe.v1" ]; then
+              HISTORY_AS_OF=$(jq -er .source.as_of_date "$HISTORY")
+              if [ "$HISTORY_AS_OF" = "$ACTIVE_OPTIONS_DATE" ]; then
+                PRESERVE=true
+              fi
+            fi
+          fi
+
+          if [ "$PRESERVE" = "true" ]; then
+            bash scripts/run_provider_free.sh python tools/build_research_history.py --preserve-existing
+          else
+            rm -f "$HISTORY"
+            bash scripts/run_provider_free.sh node apps/frontend/scripts/build-research-history.mjs
+            bash scripts/run_provider_free.sh python - <<'PY'
+          import sys
+          sys.path.insert(0, "tools")
+          from validate_public_contracts import validate_research_history
+          validate_research_history()
+          print("Validated provider-free research-history preview")
+          PY
+          fi
+
+      - name: Persist recovered forecast publication receipts
+        env:
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+        run: bash scripts/r2_push.sh --forecasts-only
+
+      - name: Build production control snapshot
+        env:
+          CONTROL_DATA_R2_STATUS: passed
+          CONTROL_FORECAST_R2_STATUS: passed
+          CONTROL_FRONTEND_PAYLOAD_STATUS: passed
+          CONTROL_NEON_IMPORT_STATUS: ${{ steps.recovery_neon.outcome }}
+        run: bash scripts/run_provider_free.sh python -u tools/build_control_plane_snapshot.py
+
+      - name: Persist recovered cross-run runtime state to R2
+        env:
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+        run: bash scripts/r2_push.sh --runtime-state-only
+
+      - name: Gate — validate recovered frontend publication contracts
+        run: bash scripts/run_provider_free.sh python tools/validate_public_contracts.py
+
+      - name: Commit recovered publication
+        run: |
+          set -euo pipefail
+          git config --local user.email "action@github.com"
+          git config --local user.name "Quantiv recovery bot"
+          git add apps/frontend/public apps/frontend/lib/popular.ts
+          if git diff --staged --quiet; then
+            echo "No recovered source-controlled publication changes"
+          else
+            git commit -m "provider-free refresh recovery $(date -u +%Y-%m-%d)"
             bash scripts/git_push_with_retry.sh origin main
           fi
 
