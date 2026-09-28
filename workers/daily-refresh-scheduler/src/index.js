@@ -123,6 +123,12 @@ async function dispatchAtTwo(env, localDate) {
   await dispatchRefresh(env, `Cloudflare 02:00 ET trigger for ${localDate}`);
 }
 
+export function watchdogRunState(run) {
+  if (run.status === "queued") return "queued";
+  if (run.status === "completed" && run.conclusion !== "success") return "failed";
+  return "started";
+}
+
 async function watchdog(env, localDate) {
   const runs = await normalRunsForDate(env, localDate);
   if (runs.length === 0) {
@@ -138,9 +144,14 @@ async function watchdog(env, localDate) {
       new Date(a.created_at).getTime() - new Date(b.created_at).getTime() ||
       Number(a.id) - Number(b.id),
   )[0];
-  if (earliest.status === "queued") {
+  const state = watchdogRunState(earliest);
+  if (state === "queued") {
     console.warn(
-      `Daily refresh run ${earliest.id} exists for ${localDate} but is still queued at watchdog time; not duplicating it.`,
+      `Daily refresh run ${earliest.id} exists for ${localDate} but has not started by watchdog time; not duplicating it.`,
+    );
+  } else if (state === "failed") {
+    console.error(
+      `Daily refresh run ${earliest.id} already completed with ${earliest.conclusion}; automatic provider retry is intentionally disabled.`,
     );
   } else {
     console.log(
