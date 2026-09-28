@@ -37,8 +37,9 @@ Do not add `--allow-market-hours` to a normal refresh.
 The primary clock is the Cloudflare Worker under
 `workers/daily-refresh-scheduler/`. It dispatches the existing GitHub workflow
 at 02:00 America/New_York and checks again at 02:10. The native GitHub
-`schedule` remains enabled as a backup because GitHub scheduled workflows can
-be delayed or dropped. A workflow-level daily claim selects the earliest normal
+`schedule` remains enabled at 02:17 Eastern as a backup because GitHub scheduled
+workflows can be delayed or dropped; the off-minute backup also avoids the
+platform's documented top-of-hour congestion window. A workflow-level daily claim selects the earliest normal
 run created for each Eastern calendar date; later externally dispatched or native
 scheduled runs skip before provider work begins. Actual refresh/recovery jobs use
 a separate execution lock so publication writes cannot overlap.
