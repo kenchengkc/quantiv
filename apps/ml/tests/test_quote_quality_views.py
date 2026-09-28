@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 import sys
 
 import duckdb
 import pandas as pd
+import pytest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -13,6 +14,7 @@ if str(REPO_ROOT / "scripts") not in sys.path:
     sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 from setup_duckdb_from_parquet import setup_views  # noqa: E402
+from build_data_reconciliation import _event_coverage  # noqa: E402
 
 
 def _option(
@@ -159,3 +161,58 @@ def test_quote_views_pair_same_strike_and_fail_closed(tmp_path: Path) -> None:
         """
     ).fetchone()
     assert lineage == ("date", "end_of_day", None, None, "quote_spread_proxy")
+
+
+@pytest.mark.parametrize(
+    ("covered", "total", "status"),
+    [(13, 20, "passed"), (12, 20, "failed"),
+     (93, 143, "passed"), (92, 143, "failed")],
+)
+def test_event_coverage_admission_preserves_rejected_pairs(
+    tmp_path: Path, covered: int, total: int, status: str,
+) -> None:
+    snapshot = date.today()
+    earnings_date = snapshot + timedelta(days=3)
+    expiration = snapshot + timedelta(days=7)
+    options = []
+    for index in range(total):
+        for side, delta in [("Call", 0.5), ("Put", -0.5)]:
+            option = _option(
+                f"TEST{index:03d}", 100, side,
+                bid=1.0, ask=1.1 if index < covered else 4.0, delta=delta,
+            )
+            option.update(date=snapshot, expiration=expiration)
+            options.append(option)
+    partition = (
+        tmp_path / "parquet/options_chain" / f"year={snapshot.year}"
+        / f"month={snapshot.month:02d}" / f"{snapshot}.parquet"
+    )
+    partition.parent.mkdir(parents=True)
+    frame = pd.DataFrame(options)
+    frame["quote_timestamp"] = pd.to_datetime(frame["quote_timestamp"])
+    frame.to_parquet(partition, index=False)
+    pd.DataFrame([
+        {"act_symbol": f"TEST{index:03d}", "date": earnings_date, "timing": "bmo"}
+        for index in range(total)
+    ]).to_parquet(tmp_path / "earnings_calendar.parquet", index=False)
+
+    with duckdb.connect() as conn:
+        setup_views(conn, tmp_path)
+        coverage = _event_coverage(conn, days_ahead=21)
+        selected = conn.execute(
+            "SELECT act_symbol FROM v_straddle_features ORDER BY act_symbol"
+        ).fetchall()
+        rejected = conn.execute(
+            "SELECT COUNT(*) FROM v_straddle_quote_quarantine"
+        ).fetchone()[0]
+
+    assert coverage["status"] == status
+    assert coverage["expected_events"] == total
+    assert coverage["covered_events"] == covered
+    assert selected == [(f"TEST{index:03d}",) for index in range(covered)]
+    assert rejected == total - covered
+    assert coverage["missing_reason_counts"] == [
+        {"reason": "noncommercial_leg_quotes", "events": total - covered}
+    ]
+    # Aggregate admission must not silently lower the separate horizon warning.
+    assert coverage["horizon_coverage"]["status"] == "failed"

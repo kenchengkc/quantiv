@@ -59,6 +59,13 @@ A substitute provider must not be introduced during an incident unless field sem
 
 The options resilience path is intentionally allowed to reject a candidate and restore a previously validated baseline.
 
+Aggregate upcoming-event coverage requires 65% eligible option chains. The
+separate per-horizon coverage warning remains at 70%; individual quote eligibility,
+source freshness, and model-promotion controls are unchanged. See the
+[September 2026 policy evaluation](../research/OPTIONS_COVERAGE_POLICY_2026_09_28.md)
+for the historical comparison and its model-performance limitations. A policy
+change requires a new normal reconciliation run; never relabel an old held receipt.
+
 1. Inspect the reconciliation manifest and candidate quarantine.
 2. Confirm whether rejection was caused by sync failure, row/freshness controls, or candidate timestamp evidence.
 3. Verify the fallback baseline itself passes the fallback verification path and was created before the current run's candidate.
