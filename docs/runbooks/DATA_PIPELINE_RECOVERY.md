@@ -26,26 +26,62 @@ Before rerunning anything, preserve/record:
 
 Do not delete a quarantined candidate before identifying why it was rejected.
 
-## Failed provider synchronization
+## Refresh scheduling and provider cutoff
 
-Recovery runs must respect the market-session refresh window. The workflow is scheduled
-at 02:00 America/New_York, automatically following daylight saving time. Scheduled
-and manual jobs are rejected if they start at or after 09:00 Eastern on a trading
-day. Weekends and exchange holidays allow starts at any time. Admitted jobs record
-a 09:35 Eastern deadline on the current trading day or the next market session
-when admitted on a closed day; every subsequent shell step is bounded by that
-deadline, and running provider processes are terminated at the cutoff. Both jobs
-use the GitHub-hosted runner maximum of 360 minutes; this platform limit still
-applies if reached before 09:35. Optional non-price Finnhub enrichment continues
-to skip from 09:25 Eastern to reserve live-quote capacity. A late dispatch or
-interrupted refresh must wait for the next overnight or closed-market window. Do not bypass these gates or add
-`--allow-market-hours` to recovery
-commands: Finnhub, Twelve Data, and other shared API capacity is reserved for daytime
-stock-price refreshes. Skip profile maintenance on incident retries unless needed.
-Closed-market admission does not override reconciliation or retraining quality
-holds. A weekly retrain rejected by `verify_retrain_data_gate.py` requires a
-current, decision-safe options release; changing the provider cutoff does not
-make held source data eligible for training.
+The provider-backed daily refresh still has the same hard market-session boundary:
+normal runs are rejected if they start at or after 09:00 Eastern on a trading day,
+and every admitted shell step is terminated at 09:35 Eastern. Optional non-price
+Finnhub enrichment still skips from 09:25 Eastern to reserve live-quote capacity.
+Do not add `--allow-market-hours` to a normal refresh.
+
+The primary clock is the Cloudflare Worker under
+`workers/daily-refresh-scheduler/`. It dispatches the existing GitHub workflow
+at 02:00 America/New_York and checks again at 02:10. The native GitHub
+`schedule` remains enabled as a backup because GitHub scheduled workflows can
+be delayed or dropped. A workflow-level daily claim selects the earliest normal
+run created for each Eastern calendar date; later externally dispatched or native
+scheduled runs skip before provider work begins. Actual refresh/recovery jobs use
+a separate execution lock so publication writes cannot overlap.
+
+The 09:35 cutoff is intentionally not moved to compensate for dispatch jitter.
+The scheduler fixes the clock source; the market-data budget boundary remains the
+same.
+
+## Provider-free recovery after an interrupted refresh
+
+A provider-free recovery is the only deliberate exception to the whole-job 09:35
+deadline. Use it only when a normal run already completed provider ingestion,
+promoted an atomic R2 data release, and then failed during scoring/publication.
+
+The recovery mode:
+
+- requires the exact promoted `data-release` ID as an input;
+- materializes that release from R2 and verifies every file digest;
+- restores the saved reconciliation/options decision and the independently
+  published calendar-reference release;
+- accepts only an `accepted` options snapshot with zero critical exceptions or
+  a previously verified fallback whose `refresh_scoring_allowed` flag is true;
+- removes all market-data provider credentials from child commands;
+- disables TwelveData fallback even if a key exists in the runner environment;
+- validates and preserves the existing source-level `research-history.json`
+  instead of re-querying retired-symbol providers;
+- reruns scoring, forecast validation, Neon import, frontend generation,
+  forecast publication receipts, runtime-state publication, and public-contract
+  validation from the saved data.
+
+It does **not** rerun DoltHub/Finnhub/FMP/Alpha Vantage/TwelveData/Polygon/Alpaca
+market-data fetches, does not refresh market caps, and does not rebuild research
+history from upstream sources.
+
+Dispatch `Daily data refresh` manually with:
+
+- `refresh_mode = provider-free-recovery`
+- `recovery_release_id = <exact promoted release id>`
+
+If exact release identity or saved decision evidence cannot be verified, recovery
+fails closed. In that case wait for the next provider-safe window rather than
+loosening freshness or market-hours controls.
+
 
 1. Determine whether the provider failure is optional/degradable or required for the downstream contract.
 2. Confirm the workflow used the intended fallback/hold path rather than continuing with a partial candidate as if it were fresh.
