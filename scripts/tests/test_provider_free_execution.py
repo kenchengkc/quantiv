@@ -78,7 +78,8 @@ def test_daily_claim_is_serialized_before_refresh_execution() -> None:
 
 def test_native_schedule_is_backup_off_the_top_of_hour() -> None:
     workflow = yaml.safe_load((ROOT / ".github/workflows/data-refresh.yml").read_text())
-    schedules = workflow[True]["schedule"]
+    triggers = workflow.get("on") or workflow.get(True)
+    schedules = triggers["schedule"]
     assert schedules == [
         {"cron": "17 2 * * *", "timezone": "America/New_York"}
     ]
