@@ -47,7 +47,23 @@ def main() -> int:
     )
     parser.add_argument("--as-of-date", type=date.fromisoformat, default=None)
     parser.add_argument("--source-revision", default=os.getenv("GITHUB_SHA"))
+    parser.add_argument(
+        "--preserve-existing",
+        action="store_true",
+        help=(
+            "Validate and retain the existing artifact without querying providers "
+            "or changing its provenance."
+        ),
+    )
     args = parser.parse_args()
+
+    if args.preserve_existing:
+        validate_research_history(args.output)
+        print(
+            "Research history: validated existing artifact, retained unchanged -> "
+            f"{args.output}"
+        )
+        return 0
 
     conn = duckdb.connect()
     conn.execute("PRAGMA memory_limit='4GB'")
