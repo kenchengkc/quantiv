@@ -39,6 +39,9 @@ jobs:
   claim:
     if: ${{ github.event_name != 'workflow_dispatch' || inputs.refresh_mode != 'provider-free-recovery' }}
     runs-on: ubuntu-latest
+    concurrency:
+      group: daily-data-refresh-claim
+      cancel-in-progress: false
     permissions:
       actions: read
       contents: read
