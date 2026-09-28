@@ -49,6 +49,7 @@ def test_recovery_job_has_no_market_data_provider_steps() -> None:
     assert "FRONTEND_RELEASE_REQUIRED" in str(recovery["steps"])
     assert "scripts/run_provider_free.sh" in commands
     assert "tools/build_research_history.py --preserve-existing" in commands
+    assert "apps/frontend/scripts/build-research-history.mjs" in commands
 
 
 def test_normal_refresh_keeps_hard_provider_deadline() -> None:
