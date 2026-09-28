@@ -55,7 +55,8 @@ promoted an atomic R2 data release, and then failed during scoring/publication.
 
 The recovery mode:
 
-- requires the exact promoted `data-release` ID as an input;
+- requires the exact promoted `data-release` ID and reconciliation
+  `manifest_id` from the interrupted run as inputs;
 - materializes that release from R2 and verifies every file digest;
 - materializes the last Git-pinned, verified frontend release so generated
   artifacts that are intentionally absent from a clean checkout (including
@@ -80,6 +81,7 @@ Dispatch `Daily data refresh` manually with:
 
 - `refresh_mode = provider-free-recovery`
 - `recovery_release_id = <exact promoted release id>`
+- `recovery_manifest_id = <exact reconciliation manifest id>`
 
 If exact release identity or saved decision evidence cannot be verified, recovery
 fails closed. In that case wait for the next provider-safe window rather than
