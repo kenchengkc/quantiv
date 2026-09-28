@@ -7,6 +7,21 @@ import build_research_history as builder
 from validate_public_contracts import ContractError
 
 
+def _valid_preview_payload():
+    return {
+        "schema": "quantiv.historical-event-universe.preview.v1",
+        "generated_at": "2026-09-28T00:00:00Z",
+        "source": {
+            "kind": "display_payload_fallback",
+            "completeness": "display_limited",
+        },
+        "decision_scope": "end_of_day_research",
+        "live_trading_eligible": False,
+        "event_count": 0,
+        "events": [],
+    }
+
+
 def _run_preserved(monkeypatch, path):
     monkeypatch.setattr(
         sys,
@@ -36,7 +51,7 @@ def test_recovery_validates_and_preserves_existing_history_without_providers(
     tmp_path,
 ):
     path = tmp_path / "research-history.json"
-    original = (builder.PUBLIC_DIR / "research-history.json").read_bytes()
+    original = json.dumps(_valid_preview_payload(), sort_keys=True).encode()
     path.write_bytes(original)
 
     assert _run_preserved(monkeypatch, path) == 0
@@ -45,9 +60,7 @@ def test_recovery_validates_and_preserves_existing_history_without_providers(
 
 def test_recovery_rejects_invalid_existing_history(monkeypatch, tmp_path):
     path = tmp_path / "research-history.json"
-    payload = json.loads(
-        (builder.PUBLIC_DIR / "research-history.json").read_text()
-    )
+    payload = _valid_preview_payload()
     payload["event_count"] += 1
     path.write_text(json.dumps(payload))
 
