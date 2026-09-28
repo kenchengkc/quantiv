@@ -24,13 +24,16 @@ Store the token only as a Worker secret. The preferred deployment path is the
 manual GitHub Actions workflow `Deploy daily refresh scheduler`. Configure these
 repository Actions secrets first:
 
-- `CLOUDFLARE_API_TOKEN` — scoped to the Cloudflare account with Workers Scripts edit access.
+- `CLOUDFLARE_API_TOKEN` — scoped to the target Cloudflare account. The first deployment must be able to create the Worker; later deployments only need access sufficient to edit that Worker and its secret.
 - `CLOUDFLARE_ACCOUNT_ID` — the target Cloudflare account ID.
 - `DAILY_REFRESH_SCHEDULER_GITHUB_TOKEN` — the rotated fine-grained GitHub token described above.
 
-The deployment workflow tests the scheduler, uploads the GitHub token to
-Cloudflare as the Worker `GITHUB_TOKEN` secret, and deploys the Worker plus Cron
-Triggers. Local deployment remains available when needed:
+The deployment workflow tests the scheduler, performs a trigger-free bootstrap
+deploy (needed when the Worker does not exist yet), uploads the GitHub token to
+Cloudflare as the Worker `GITHUB_TOKEN` secret, and then deploys the real Cron
+Triggers. The bootstrap config deliberately omits `triggers`, so an initial
+Worker cannot fire before its GitHub credential exists. Local deployment remains
+available when needed:
 
 ```bash
 cd workers/daily-refresh-scheduler
