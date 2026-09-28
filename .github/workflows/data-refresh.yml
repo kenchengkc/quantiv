@@ -453,6 +453,11 @@ jobs:
           python-version: '3.11'
           cache: pip
 
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 20
+
       - name: Install Python dependencies
         run: pip install --require-hashes -r requirements.txt
 
@@ -515,9 +520,6 @@ jobs:
       - name: Rebuild DuckDB views from saved data
         run: bash scripts/run_provider_free.sh python scripts/setup_duckdb_from_parquet.py
 
-      - name: Validate and preserve existing research history
-        run: bash scripts/run_provider_free.sh python tools/build_research_history.py --preserve-existing
-
       - name: Score upcoming earnings from saved data
         run: bash scripts/run_provider_free.sh python scripts/daily_score.py --days-ahead 21
 
@@ -558,6 +560,22 @@ jobs:
 
       - name: Build frontend JSON without market-data providers
         run: bash scripts/run_provider_free.sh python -u tools/build_frontend_data.py
+
+      - name: Preserve or reconstruct research history without providers
+        run: |
+          set -euo pipefail
+          if [ -f apps/frontend/public/research-history.json ]; then
+            bash scripts/run_provider_free.sh               python tools/build_research_history.py --preserve-existing
+          else
+            bash scripts/run_provider_free.sh               node apps/frontend/scripts/build-research-history.mjs
+            bash scripts/run_provider_free.sh python - <<'PY'
+          import sys
+          sys.path.insert(0, "tools")
+          from validate_public_contracts import validate_research_history
+          validate_research_history()
+          print("Validated provider-free research-history preview")
+          PY
+          fi
 
       - name: Restore frozen forecasts for reported events
         run: bash scripts/run_provider_free.sh python scripts/restore_reported_forecasts.py --apply
