@@ -33,10 +33,15 @@ def verify_recovery(
     data_dir: Path,
     *,
     expected_release_id: str,
+    expected_manifest_id: str,
 ) -> dict[str, Any]:
     if not expected_release_id:
         raise RecoveryVerificationError(
             "provider-free recovery requires the exact promoted data release id"
+        )
+    if not expected_manifest_id:
+        raise RecoveryVerificationError(
+            "provider-free recovery requires the exact reconciliation manifest id"
         )
 
     verified = verify_release(data_dir)
@@ -57,6 +62,13 @@ def verify_recovery(
 
     reconciliation = _read_object(data_dir / "validation" / "data_reconciliation.json")
     options_status = _read_object(data_dir / "validation" / "options_snapshot_status.json")
+
+    actual_manifest_id = str(reconciliation.get("manifest_id") or "")
+    if actual_manifest_id != expected_manifest_id:
+        raise RecoveryVerificationError(
+            f"recovery reconciliation mismatch: expected {expected_manifest_id}, "
+            f"restored {actual_manifest_id or '<missing>'}"
+        )
 
     if options_status.get("schema") != "quantiv.options-snapshot-status.v1":
         raise RecoveryVerificationError("unsupported options snapshot status schema")
@@ -124,6 +136,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data-dir", type=Path, default=Path("data"))
     parser.add_argument("--expected-release-id", required=True)
+    parser.add_argument("--expected-manifest-id", required=True)
     args = parser.parse_args()
 
     if os.getenv("PROVIDER_FREE_RECOVERY") != "1":
@@ -135,6 +148,7 @@ def main() -> int:
         result = verify_recovery(
             args.data_dir,
             expected_release_id=args.expected_release_id,
+            expected_manifest_id=args.expected_manifest_id,
         )
     except (RecoveryVerificationError, RuntimeError) as exc:
         raise SystemExit(f"Provider-free recovery refused: {exc}") from exc
