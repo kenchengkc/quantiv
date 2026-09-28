@@ -17,6 +17,11 @@ on:
         type: string
         required: false
         default: ""
+      recovery_manifest_id:
+        description: "Exact reconciliation manifest id from the interrupted refresh."
+        type: string
+        required: false
+        default: ""
       finnhub_profile_refresh:
         description: "Profile/logo maintenance mode."
         type: choice
@@ -502,7 +507,7 @@ jobs:
 
       - name: Gate — verify exact recovery release
         run: |
-          bash scripts/run_provider_free.sh             python scripts/verify_refresh_recovery.py               --data-dir data               --expected-release-id "${{ inputs.recovery_release_id }}"
+          bash scripts/run_provider_free.sh             python scripts/verify_refresh_recovery.py               --data-dir data               --expected-release-id "${{ inputs.recovery_release_id }}"               --expected-manifest-id "${{ inputs.recovery_manifest_id }}"
 
       - name: Rebuild DuckDB views from saved data
         run: bash scripts/run_provider_free.sh python scripts/setup_duckdb_from_parquet.py
