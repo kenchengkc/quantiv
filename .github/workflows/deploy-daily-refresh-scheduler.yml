@@ -28,6 +28,25 @@ jobs:
       - name: Install pinned Wrangler
         run: npm install --no-save --ignore-scripts wrangler@4.40.2
 
+      - name: Bootstrap Worker without Cron Triggers
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          cat > wrangler.bootstrap.toml <<'EOF'
+          name = "quantiv-daily-refresh-scheduler"
+          main = "src/index.js"
+          compatibility_date = "2026-09-28"
+
+          [vars]
+          GITHUB_OWNER = "kenchengkc"
+          GITHUB_REPO = "quantiv"
+          GITHUB_WORKFLOW = "data-refresh.yml"
+          GITHUB_REF = "main"
+          EOF
+          npx wrangler deploy --config wrangler.bootstrap.toml
+
       - name: Upload GitHub dispatch token as Worker secret
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
