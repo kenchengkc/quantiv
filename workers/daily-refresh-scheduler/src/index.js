@@ -181,8 +181,4 @@ export default {
       `Ignoring UTC cron ${controller.cron}; it does not map to the active Eastern trigger hour.`,
     );
   },
-
-  async fetch() {
-    return new Response("Quantiv daily refresh scheduler", { status: 200 });
-  },
 };
