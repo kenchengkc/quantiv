@@ -561,6 +561,9 @@ jobs:
       - name: Build frontend JSON without market-data providers
         run: bash scripts/run_provider_free.sh python -u tools/build_frontend_data.py
 
+      - name: Restore frozen forecasts for reported events
+        run: bash scripts/run_provider_free.sh python scripts/restore_reported_forecasts.py --apply
+
       - name: Preserve or reconstruct research history without providers
         run: |
           set -euo pipefail
@@ -590,9 +593,6 @@ jobs:
           print("Validated provider-free research-history preview")
           PY
           fi
-
-      - name: Restore frozen forecasts for reported events
-        run: bash scripts/run_provider_free.sh python scripts/restore_reported_forecasts.py --apply
 
       - name: Persist recovered forecast publication receipts
         env:
