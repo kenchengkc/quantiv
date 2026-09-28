@@ -109,7 +109,7 @@ def _github_json(url: str, token: str) -> dict[str, Any]:
             "Accept": "application/vnd.github+json",
             "Authorization": f"Bearer {token}",
             "User-Agent": "quantiv-daily-refresh-claim",
-            "X-GitHub-Api-Version": "2026-03-10",
+            "X-GitHub-Api-Version": "2022-11-28",
         },
     )
     with urllib.request.urlopen(request, timeout=30) as response:
