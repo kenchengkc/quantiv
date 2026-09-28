@@ -20,7 +20,17 @@ Create a fine-grained token scoped only to `kenchengkc/quantiv` with:
 
 No repository contents permission is required for the scheduler.
 
-Store the token only as a Worker secret:
+Store the token only as a Worker secret. The preferred deployment path is the
+manual GitHub Actions workflow `Deploy daily refresh scheduler`. Configure these
+repository Actions secrets first:
+
+- `CLOUDFLARE_API_TOKEN` — scoped to the Cloudflare account with Workers Scripts edit access.
+- `CLOUDFLARE_ACCOUNT_ID` — the target Cloudflare account ID.
+- `DAILY_REFRESH_SCHEDULER_GITHUB_TOKEN` — the rotated fine-grained GitHub token described above.
+
+The deployment workflow tests the scheduler, uploads the GitHub token to
+Cloudflare as the Worker `GITHUB_TOKEN` secret, and deploys the Worker plus Cron
+Triggers. Local deployment remains available when needed:
 
 ```bash
 cd workers/daily-refresh-scheduler
