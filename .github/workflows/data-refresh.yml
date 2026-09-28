@@ -475,6 +475,13 @@ jobs:
           R2_REQUIRE_RUNTIME_STATE: "1"
         run: bash scripts/r2_pull.sh
 
+      - name: Materialize last verified frontend release from R2
+        env:
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          RCLONE_BIN: rclone
+          FRONTEND_RELEASE_REQUIRED: "1"
+        run: bash scripts/materialize_frontend_release.sh
+
       - name: Restore saved reconciliation and calendar evidence
         env:
           R2_BUCKET: ${{ secrets.R2_BUCKET }}
