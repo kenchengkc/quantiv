@@ -27,10 +27,6 @@ on:
         type: boolean
         default: false
 
-concurrency:
-  group: daily-data-refresh
-  cancel-in-progress: false
-
 permissions:
   contents: read
 
@@ -59,6 +55,9 @@ jobs:
     needs: claim
     if: needs.claim.outputs.claimed == 'true'
     runs-on: ubuntu-latest
+    concurrency:
+      group: daily-data-refresh-execution
+      cancel-in-progress: false
     timeout-minutes: 360
     defaults:
       run:
@@ -425,6 +424,9 @@ jobs:
   recovery:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.refresh_mode == 'provider-free-recovery' }}
     runs-on: ubuntu-latest
+    concurrency:
+      group: daily-data-refresh-execution
+      cancel-in-progress: false
     timeout-minutes: 360
     permissions:
       contents: write
@@ -473,15 +475,23 @@ jobs:
           R2_REQUIRE_RUNTIME_STATE: "1"
         run: bash scripts/r2_pull.sh
 
-      - name: Restore saved reconciliation evidence
+      - name: Restore saved reconciliation and calendar evidence
         env:
           R2_BUCKET: ${{ secrets.R2_BUCKET }}
         run: |
           set -euo pipefail
-          mkdir -p data/validation
+          mkdir -p data/validation data/calendar_reference
           REMOTE="r2:$R2_BUCKET"
           rclone copyto "$REMOTE/validation/data_reconciliation.json"             data/validation/data_reconciliation.json
           rclone copyto "$REMOTE/validation/options_snapshot_status.json"             data/validation/options_snapshot_status.json
+          rclone copyto "$REMOTE/calendar-reference/current.json"             data/calendar_reference/current.json
+          RELEASE_REL=$(jq -er .release data/calendar_reference/current.json)
+          RECEIPT_REL=$(jq -er .receipt data/calendar_reference/current.json)
+          mkdir -p             "data/calendar_reference/$(dirname "$RELEASE_REL")"             "data/calendar_reference/$(dirname "$RECEIPT_REL")"
+          rclone copyto "$REMOTE/calendar-reference/$RELEASE_REL"             "data/calendar_reference/$RELEASE_REL"
+          rclone copyto "$REMOTE/calendar-reference/$RECEIPT_REL"             "data/calendar_reference/$RECEIPT_REL"
+          bash scripts/run_provider_free.sh             python scripts/calendar_reference.py verify               --output-dir data/calendar_reference
+          bash scripts/run_provider_free.sh             python scripts/calendar_reference.py project               --output-dir data/calendar_reference
 
       - name: Gate — verify exact recovery release
         run: |
@@ -530,9 +540,6 @@ jobs:
         env:
           R2_BUCKET: ${{ secrets.R2_BUCKET }}
         run: bash scripts/r2_push.sh --forecasts-only
-
-      - name: Build popular-ticker weights from saved data
-        run: bash scripts/run_provider_free.sh python -u tools/build_popular_weights.py
 
       - name: Build frontend JSON without market-data providers
         run: bash scripts/run_provider_free.sh python -u tools/build_frontend_data.py
