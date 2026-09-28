@@ -3,7 +3,7 @@ run-name: Daily data refresh [${{ inputs.refresh_mode || github.event_name }}]
 
 on:
   schedule:
-    - cron: '0 2 * * *'
+    - cron: '17 2 * * *'
       timezone: America/New_York
   workflow_dispatch:
     inputs:
