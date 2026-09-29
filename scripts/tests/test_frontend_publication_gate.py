@@ -4,6 +4,7 @@ import pytest
 import yaml
 
 from scripts.frontend_publication_gate import evaluate_publication
+from scripts.production_smoke_gate import evaluate_smoke
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -140,3 +141,75 @@ def test_frontend_publication_workflow_uses_gate_job():
     assert publish["needs"] == "gate"
     assert publish["if"] == "needs.gate.outputs.should_publish == 'true'"
     assert publish["permissions"]["contents"] == "write"
+
+
+
+def test_smoke_runs_after_successful_frontend_publish_job():
+    result = evaluate_smoke(
+        event_name="workflow_run",
+        workflow_run={
+            "id": 456,
+            "name": "Frontend publication release",
+            "conclusion": "success",
+            "head_branch": "main",
+        },
+        jobs=[{"name": "publish", "conclusion": "success"}],
+    )
+    assert result["should_smoke"] is True
+
+
+def test_smoke_skips_after_frontend_publish_job_is_skipped():
+    result = evaluate_smoke(
+        event_name="workflow_run",
+        workflow_run={
+            "id": 456,
+            "name": "Frontend publication release",
+            "conclusion": "success",
+            "head_branch": "main",
+        },
+        jobs=[
+            {"name": "gate", "conclusion": "success"},
+            {"name": "publish", "conclusion": "skipped"},
+        ],
+    )
+    assert result["should_smoke"] is False
+    assert "skipped" in result["reason"]
+
+
+def test_direct_push_and_manual_smoke_still_run():
+    assert evaluate_smoke(
+        event_name="push",
+        workflow_run=None,
+    )["should_smoke"] is True
+    assert evaluate_smoke(
+        event_name="workflow_dispatch",
+        workflow_run=None,
+    )["should_smoke"] is True
+
+
+def test_failed_frontend_publication_does_not_smoke():
+    result = evaluate_smoke(
+        event_name="workflow_run",
+        workflow_run={
+            "id": 456,
+            "name": "Frontend publication release",
+            "conclusion": "failure",
+            "head_branch": "main",
+        },
+        jobs=[{"name": "publish", "conclusion": "success"}],
+    )
+    assert result["should_smoke"] is False
+
+
+def test_production_smoke_workflow_uses_publish_job_gate():
+    workflow = yaml.safe_load(
+        (ROOT / ".github/workflows/production-smoke.yml").read_text()
+    )
+    gate = workflow["jobs"]["gate"]
+    smoke = workflow["jobs"]["smoke"]
+
+    assert workflow["permissions"]["actions"] == "read"
+    assert workflow["permissions"]["contents"] == "read"
+    assert "production_smoke_gate.py" in gate["steps"][1]["run"]
+    assert smoke["needs"] == "gate"
+    assert smoke["if"] == "needs.gate.outputs.should_smoke == 'true'"
