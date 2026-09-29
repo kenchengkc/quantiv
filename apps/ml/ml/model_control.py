@@ -351,14 +351,38 @@ def append_prediction_ledger(
 def _outcome_metrics(frame: pd.DataFrame) -> dict[str, Any]:
     actual = frame["target"].to_numpy(dtype=float)
     prediction = frame["prediction"].to_numpy(dtype=float)
-    baseline = frame["em_math_pct"].to_numpy(dtype=float)
     quantiles = frame[[f"p{q:02d}" for q in DEFAULT_QUANTILES]].to_numpy(dtype=float)
+    if not (
+        np.isfinite(actual).all()
+        and np.isfinite(prediction).all()
+        and np.isfinite(quantiles).all()
+    ):
+        raise ValueError(
+            "realized outcome metrics require finite targets, predictions, and quantiles"
+        )
+
+    baseline = pd.to_numeric(frame["em_math_pct"], errors="coerce").to_numpy(dtype=float)
+    baseline_mask = np.isfinite(baseline)
+    baseline_rows = int(baseline_mask.sum())
+    baseline_straddle_mae: float | None = None
+    baseline_comparable_model_mae: float | None = None
+    if baseline_rows:
+        baseline_straddle_mae = float(
+            mean_absolute_error(actual[baseline_mask], baseline[baseline_mask])
+        )
+        baseline_comparable_model_mae = float(
+            mean_absolute_error(actual[baseline_mask], prediction[baseline_mask])
+        )
+
     residual = actual - prediction
     calibration_error, coverage = _coverage_error(actual, quantiles)
     return {
         "rows": len(frame),
         "mae": float(mean_absolute_error(actual, prediction)),
-        "baseline_straddle_mae": float(mean_absolute_error(actual, baseline)),
+        "baseline_rows": baseline_rows,
+        "optionless_rows": len(frame) - baseline_rows,
+        "baseline_comparable_model_mae": baseline_comparable_model_mae,
+        "baseline_straddle_mae": baseline_straddle_mae,
         "residual_mean": float(np.mean(residual)),
         "residual_std": float(np.std(residual)),
         "calibration_error": calibration_error,
@@ -495,7 +519,13 @@ def evaluate_realized_outcomes(
         ):
             residual_alerts.append({"horizon": horizon, "observed": observed, "reference": reference})
     report["residual_drift_alerts"] = residual_alerts
-    champion_worse_than_market = champion_metrics["mae"] > champion_metrics["baseline_straddle_mae"] * 1.05
+    baseline_model_mae = champion_metrics["baseline_comparable_model_mae"]
+    baseline_straddle_mae = champion_metrics["baseline_straddle_mae"]
+    champion_worse_than_market = bool(
+        baseline_model_mae is not None
+        and baseline_straddle_mae is not None
+        and baseline_model_mae > baseline_straddle_mae * 1.05
+    )
     comparison_materially_better = comparison_metrics["mae"] < champion_metrics["mae"] * 0.95
     severe_undercoverage = champion_metrics["coverage_80"] < 0.65
     report["rollback_recommended"] = bool(
