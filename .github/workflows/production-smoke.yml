@@ -23,6 +23,7 @@ on:
     types: [completed]
 
 permissions:
+  actions: read
   contents: read
 
 concurrency:
@@ -30,10 +31,25 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  gate:
+    runs-on: ubuntu-latest
+    outputs:
+      should_smoke: ${{ steps.gate.outputs.should_smoke }}
+    steps:
+      - name: Checkout smoke gate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+
+      - name: Determine smoke eligibility
+        id: gate
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 scripts/production_smoke_gate.py --github-output "$GITHUB_OUTPUT"
+
   smoke:
-    if: >-
-      github.event_name != 'workflow_run' ||
-      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main')
+    needs: gate
+    if: needs.gate.outputs.should_smoke == 'true'
     name: Public frontend and API
     runs-on: ubuntu-latest
     timeout-minutes: 15
