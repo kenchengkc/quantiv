@@ -199,6 +199,142 @@ def test_drift_and_realized_outcomes_drive_a_conservative_rollback(tmp_path: Pat
     assert result["rollback_reasons"]["comparison_materially_better"] is True
 
 
+
+def test_realized_outcomes_keep_optionless_ml_rows_out_of_straddle_comparison(
+    tmp_path: Path,
+) -> None:
+    events = pd.date_range("2026-02-01", periods=30, freq="D")
+    baselines = np.array([np.nan] * 10 + [0.05] * 20)
+    common = pd.DataFrame(
+        {
+            "act_symbol": [f"O{i}" for i in range(30)],
+            "earnings_date": events,
+            "snapshot_date": events - pd.Timedelta(days=7),
+            "model_horizon": 1,
+            "em_math_pct": baselines,
+            "p10": 0.02,
+            "p25": 0.03,
+            "p50": 0.05,
+            "p75": 0.07,
+            "p90": 0.09,
+        }
+    )
+    champion_prediction = np.array([0.30] * 10 + [0.06] * 20)
+    champion_rows = common.assign(
+        bundle_id="champion",
+        role="champion",
+        prediction=champion_prediction,
+    )
+    comparison_rows = common.assign(
+        bundle_id="previous",
+        role="previous",
+        prediction=0.055,
+    )
+    ledger_path = tmp_path / "ledger.parquet"
+    ledger = append_prediction_ledger(ledger_path, [champion_rows, comparison_rows])
+
+    training_dir = tmp_path / "training"
+    training_dir.mkdir()
+    pd.DataFrame(
+        {
+            "__symbol": [f"O{i}" for i in range(30)],
+            "__earnings_date": events,
+            "target": 0.05,
+            "__sector": "Technology",
+            "__dollar_volume": 200_000_000.0,
+            "dte": 7,
+            "vix_current": 20.0,
+        }
+    ).to_parquet(training_dir / "training_T1.parquet", index=False)
+
+    bundle = tmp_path / "bundle"
+    bundle.mkdir()
+    (bundle / "metadata_T1.json").write_text(
+        json.dumps({"residual_reference": {"mean": 0.0, "std": 1.0}})
+    )
+
+    result = evaluate_realized_outcomes(
+        ledger,
+        training_dir,
+        bundle,
+        bundle,
+        champion_id="champion",
+        comparison_id="previous",
+        min_common_rows=30,
+        horizons=[1],
+    )
+
+    champion = result["champion"]
+    assert result["status"] == "passed"
+    assert champion["rows"] == 30
+    assert champion["baseline_rows"] == 20
+    assert champion["optionless_rows"] == 10
+    assert np.isclose(champion["mae"], 0.09)
+    assert np.isclose(champion["baseline_comparable_model_mae"], 0.01)
+    assert np.isclose(champion["baseline_straddle_mae"], 0.0)
+
+
+def test_realized_outcomes_allow_fully_optionless_common_rows(tmp_path: Path) -> None:
+    events = pd.date_range("2026-03-01", periods=30, freq="D")
+    common = pd.DataFrame(
+        {
+            "act_symbol": [f"N{i}" for i in range(30)],
+            "earnings_date": events,
+            "snapshot_date": events - pd.Timedelta(days=7),
+            "model_horizon": 1,
+            "em_math_pct": np.nan,
+            "p10": 0.02,
+            "p25": 0.03,
+            "p50": 0.05,
+            "p75": 0.07,
+            "p90": 0.09,
+        }
+    )
+    champion_rows = common.assign(bundle_id="champion", role="champion", prediction=0.08)
+    comparison_rows = common.assign(bundle_id="previous", role="previous", prediction=0.051)
+    ledger_path = tmp_path / "ledger.parquet"
+    ledger = append_prediction_ledger(ledger_path, [champion_rows, comparison_rows])
+
+    training_dir = tmp_path / "training"
+    training_dir.mkdir()
+    pd.DataFrame(
+        {
+            "__symbol": [f"N{i}" for i in range(30)],
+            "__earnings_date": events,
+            "target": 0.05,
+            "__sector": "Technology",
+            "__dollar_volume": 200_000_000.0,
+            "dte": 7,
+            "vix_current": 20.0,
+        }
+    ).to_parquet(training_dir / "training_T1.parquet", index=False)
+
+    bundle = tmp_path / "bundle"
+    bundle.mkdir()
+    (bundle / "metadata_T1.json").write_text(
+        json.dumps({"residual_reference": {"mean": 0.0, "std": 1.0}})
+    )
+
+    result = evaluate_realized_outcomes(
+        ledger,
+        training_dir,
+        bundle,
+        bundle,
+        champion_id="champion",
+        comparison_id="previous",
+        min_common_rows=30,
+        horizons=[1],
+    )
+
+    champion = result["champion"]
+    assert result["status"] == "passed"
+    assert champion["baseline_rows"] == 0
+    assert champion["optionless_rows"] == 30
+    assert champion["baseline_comparable_model_mae"] is None
+    assert champion["baseline_straddle_mae"] is None
+    assert result["rollback_reasons"]["champion_worse_than_market"] is False
+    assert result["rollback_recommended"] is False
+
 def test_drift_blocks_large_missingness_shift_below_psi_sample_floor(tmp_path: Path) -> None:
     forecast = pd.DataFrame(
         {
