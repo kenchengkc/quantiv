@@ -1,69 +1,61 @@
 {
   "data": {
-    "contract_rejection_rate": 0.401815,
-    "contracts": 111616,
-    "corporate_action_rows": 28961,
+    "contract_rejection_rate": 0.402225,
+    "contracts": 111572,
+    "corporate_action_rows": 28992,
     "corporate_action_status": "enforced",
-    "covered_events": 98,
-    "decision_group_rejection_rate": 0.314685,
-    "decision_groups": 143,
+    "covered_events": 143,
+    "decision_group_rejection_rate": 0.331776,
+    "decision_groups": 214,
     "decision_scope": "end_of_day_research",
     "display_forecast_coverage_pct": 1.0,
-    "display_forecast_covered_events": 28,
-    "display_forecast_events": 28,
+    "display_forecast_covered_events": 93,
+    "display_forecast_events": 93,
     "display_forecast_method_mix": {
       "historical": 0,
       "historical_prior": 0,
-      "ml": 28,
+      "ml": 93,
       "options_indicative": 0,
       "options_math": 0
     },
     "duplicate_rows": 0,
-    "eligible_contracts": 66767,
-    "eligible_decision_groups": 98,
-    "event_coverage_pct": 0.685315,
-    "expected_events": 143,
-    "expected_source_date": "2026-09-25",
+    "eligible_contracts": 66695,
+    "eligible_decision_groups": 143,
+    "event_coverage_pct": 0.668224,
+    "expected_events": 214,
+    "expected_source_date": "2026-09-28",
     "live_trading_eligible": false,
-    "missing_events": 45,
-    "pair_rejection_rate": 0.844789,
-    "quarantine_records": 91995,
+    "missing_events": 71,
+    "pair_rejection_rate": 0.854211,
+    "quarantine_records": 92530,
     "quarantine_status": "enforced",
-    "quote_quality_errors": [
-      "latest source date 2026-09-24 is 1 market session(s) behind expected 2026-09-25"
-    ],
+    "quote_quality_errors": [],
     "replay_status": "verified",
-    "source_date": "2026-09-24",
-    "source_session_lag": 1,
-    "status": "failed"
+    "source_date": "2026-09-28",
+    "source_session_lag": 0,
+    "status": "passed"
   },
   "exceptions": [
     {
       "code": "upcoming_events_outside_option_universe",
-      "count": 239,
+      "count": 264,
       "severity": "warning",
       "summary": "Calendar events fall outside the current options decision universe"
     },
     {
       "code": "upcoming_events_without_option_chain",
-      "count": 45,
+      "count": 71,
       "severity": "warning",
       "summary": "In-universe earnings events have no decision-eligible option chain"
     },
     {
-      "code": "event_quote_coverage_below_limit",
-      "count": 45,
-      "severity": "critical",
-      "summary": "Decision-eligible option coverage is below the publication limit"
-    },
-    {
-      "code": "option_quote_quality_below_limit",
-      "count": 45,
-      "severity": "critical",
-      "summary": "Option evidence on the scoped earnings decision surface exceeds the publication limit"
+      "code": "forecast_horizon_coverage_below_limit",
+      "count": 21,
+      "severity": "warning",
+      "summary": "One or more model horizons lack sufficient eligible option coverage"
     }
   ],
-  "generated_at": "2026-09-28T01:48:24.996031+00:00",
+  "generated_at": "2026-09-29T11:11:37.340348+00:00",
   "model": {
     "challenger_present": true,
     "champion_active": true,
@@ -71,7 +63,7 @@
     "drift_status": "warning",
     "fallback_bundle_available": false,
     "hard_missing_features": 0,
-    "monitored_at": "2026-09-28T00:33:16.637508+00:00",
+    "monitored_at": "2026-09-29T09:42:17.082318+00:00",
     "outcome_common_rows": null,
     "outcome_evaluated_at": "2026-09-14T01:54:36.293833+00:00",
     "outcome_evaluations": 2,
@@ -81,11 +73,11 @@
     "shadow_roles": [
       "challenger"
     ],
-    "snapshot_date": "2026-09-25",
+    "snapshot_date": "2026-09-28",
     "status": "passed",
-    "warning_features": 5
+    "warning_features": 4
   },
-  "publication_eligible": false,
+  "publication_eligible": true,
   "release": {
     "artifact_promotion_status": "passed",
     "data_r2_status": "passed",
@@ -94,5 +86,5 @@
     "neon_import_status": "passed"
   },
   "schema": "quantiv.control-plane.v2",
-  "status": "failed"
+  "status": "passed"
 }
