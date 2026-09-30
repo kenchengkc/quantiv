@@ -1,17 +1,17 @@
 {
   "schema": "quantiv.dashboard-evidence.v1",
-  "receipt_id": "sha256:aac22c7b8ce4edf37963166c77140e0104ffffd0b4ab457fc247a260dd4e19c6",
-  "receipt_file": "forecasts_2026-09-29.aac22c7b8ce4.receipt.json",
-  "validated_at": "2026-09-29T09:42:13.698973+00:00",
+  "receipt_id": "sha256:a65f02323b336864d8fbbec58c499254c90d5fd0e320af3fb4c9bc70b0c38cb1",
+  "receipt_file": "forecasts_2026-09-30.a65f02323b33.receipt.json",
+  "validated_at": "2026-09-30T06:45:37.378029+00:00",
   "quality": {
     "status": "passed",
     "issue_count": 0,
     "issue_codes": []
   },
   "coverage": {
-    "rows": 527,
-    "symbols": 292,
-    "events": 316,
+    "rows": 642,
+    "symbols": 386,
+    "events": 425,
     "horizons": [
       1,
       2,
@@ -22,12 +22,12 @@
     ]
   },
   "observation_window": {
-    "earnings_max": "2026-10-19",
-    "earnings_min": "2026-09-29",
-    "scored_at_max": "2026-09-29T09:42:09.670760+00:00",
-    "scored_at_min": "2026-09-29T09:42:09.533654+00:00",
-    "snapshot_max": "2026-09-28",
-    "snapshot_min": "2026-09-08"
+    "earnings_max": "2026-10-20",
+    "earnings_min": "2026-09-30",
+    "scored_at_max": "2026-09-30T06:45:32.972634+00:00",
+    "scored_at_min": "2026-09-30T06:45:32.834844+00:00",
+    "snapshot_max": "2026-09-29",
+    "snapshot_min": "2026-09-09"
   },
   "controls": {
     "evaluated": 13,
@@ -43,8 +43,8 @@
       "ml_only_point_outside_band": 0,
       "ml_only_quantile_crossings": 0,
       "non_finite_ml_rows": 0,
-      "optionless_ml_rows": 385,
-      "strict_option_rows": 142,
+      "optionless_ml_rows": 520,
+      "strict_option_rows": 122,
       "strict_reconciliation": {
         "absolute_move_mismatches": 0,
         "blank_symbols": 0,
@@ -85,8 +85,8 @@
       "name": "forecast_snapshot",
       "producer": "scripts/daily_score.py",
       "member_count": 1,
-      "bytes": 452858,
-      "sha256": "dc70a751640ced47f5c7abb6a2c1f957d87e7fe9af30229216e68751aca1be2b"
+      "bytes": 519074,
+      "sha256": "d5c324bc521923a8b2811c13bc69a2dd56838ffa6bb4080dd116a119831b3675"
     }
   ]
 }
