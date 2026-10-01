@@ -116,6 +116,11 @@ promote_data_release() {
     exit 1
   fi
   "$PYTHON_BIN" scripts/data_release.py verify --data-dir "$DATA_DIR"
+  if [ "$MODE" = "--options-recovery" ]; then
+    # Upload/check latency may cross the market close. Revalidate the accepted
+    # source at the final promotion boundary, not just before uploads begin.
+    "$PYTHON_BIN" scripts/recover_options_snapshot.py --verify-only
+  fi
   # R2 object replacement is atomic. Consumers either see the prior complete
   # release or this complete release, never the upload in between.
   rclone copyto "$pointer" "$REMOTE/control/current_data_release.json"

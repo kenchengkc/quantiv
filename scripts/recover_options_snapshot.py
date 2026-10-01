@@ -72,7 +72,14 @@ def require_accepted_candidate(data_dir: Path, target: date, not_before: str,
 def restricted_query(sql: str, api_url: str = dolt.OPTIONS_API, retries: int = 3) -> list[dict]:
     allowed = {dolt.OPTIONS_API: {'option_chain'}, dolt.STOCKS_API: {'split', 'dividend'}}
     tables = re.findall(r'\bFROM\s+`?([a-z_]+)`?', sql, flags=re.IGNORECASE)
-    if api_url not in allowed or not tables or any(table.lower() not in allowed[api_url] for table in tables):
+    # These ingestion helpers emit one-table SELECTs. Reject unsupported SQL
+    # structures instead of trying to implement a general SQL parser here.
+    source_clause = re.split(r'\bFROM\b', sql, flags=re.IGNORECASE)[-1]
+    source_clause = re.split(r'\b(?:WHERE|ORDER|GROUP|LIMIT)\b', source_clause, flags=re.IGNORECASE)[0]
+    if (api_url not in allowed or len(tables) != 1
+        or re.search(r'\b(?:JOIN|UNION|INSERT|UPDATE|DELETE|DROP)\b', sql, flags=re.IGNORECASE)
+        or ',' in source_clause
+        or tables[0].lower() not in allowed.get(api_url, set())):
         raise RuntimeError('options recovery may query only option_chain, split, and dividend on DoltHub')
     return _source_query(sql, api_url, retries)
 
@@ -80,13 +87,31 @@ def restricted_query(sql: str, api_url: str = dolt.OPTIONS_API, retries: int = 3
 _source_query = dolt.query
 
 
+def verify_promotion(data_dir: Path) -> dict:
+    receipt = json.loads((data_dir / 'validation/options_recovery.json').read_text())
+    if receipt.get('schema') != 'quantiv.options-recovery.v1':
+        raise RuntimeError('options recovery acceptance receipt is unavailable')
+    report = require_accepted_candidate(data_dir, date.fromisoformat(receipt['target_date']),
+                                       receipt['started_at'])
+    if report.get('manifest_id') != receipt.get('manifest_id'):
+        raise RuntimeError('options recovery acceptance receipt references a different candidate')
+    return report
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--target-date', required=True, type=date.fromisoformat)
-    parser.add_argument('--expected-release-id', required=True)
-    parser.add_argument('--expected-manifest-id', required=True)
+    parser.add_argument('--verify-only', action='store_true')
+    parser.add_argument('--target-date', type=date.fromisoformat)
+    parser.add_argument('--expected-release-id', default='')
+    parser.add_argument('--expected-manifest-id', default='')
     args = parser.parse_args()
     data_dir = dolt.data_dir()
+    if args.verify_only:
+        verify_promotion(data_dir)
+        print('Options recovery acceptance reverified immediately before promotion')
+        return 0
+    if args.target_date is None:
+        parser.error('--target-date is required for options recovery')
     started = datetime.now(timezone.utc).isoformat()
     original = verify_recovery(data_dir, expected_release_id=args.expected_release_id,
                                expected_manifest_id=args.expected_manifest_id)
@@ -117,6 +142,9 @@ def main() -> int:
     meta.update(last_sync_date=args.target_date.isoformat(), last_sync_time=started,
                 last_options_candidate_status='accepted', mode='options-only-recovery')
     dolt.save_meta(meta)
+    receipt = {'schema': 'quantiv.options-recovery.v1', 'started_at': started,
+               'target_date': args.target_date.isoformat(), 'manifest_id': report['manifest_id']}
+    (data_dir / 'validation/options_recovery.json').write_text(json.dumps(receipt, indent=2) + '\n')
     print(f"Accepted options recovery: {args.target_date} · {report['manifest_id']}", flush=True)
     return 0
 

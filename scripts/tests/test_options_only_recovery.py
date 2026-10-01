@@ -1,7 +1,7 @@
 import importlib
 import json
 import os
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 import subprocess
 import sys
@@ -132,6 +132,18 @@ def test_options_promotion_never_writes_models_forecasts_calendar_or_runtime(tmp
     partition = data / 'parquet/options_chain/year=2026/month=09/2026-09-30.parquet'
     partition.parent.mkdir(parents=True)
     partition.write_bytes(b'content-addressed-test-partition')
+    report, status = _candidate(data)
+    from scripts.market_sessions import latest_completed_us_market_session
+    target = latest_completed_us_market_session().isoformat()
+    generated = datetime.now(timezone.utc)
+    report['generated_at'] = status['generated_at'] = generated.isoformat()
+    report['source_reconciliation']['source_date'] = report['quote_quality']['source_date'] = target
+    status['active_source_date'] = status['candidate_source_date'] = target
+    _write(data, report, status)
+    (data / 'validation/options_recovery.json').write_text(json.dumps({
+        'schema': 'quantiv.options-recovery.v1', 'target_date': target,
+        'started_at': (generated - timedelta(seconds=10)).isoformat(), 'manifest_id': 'sha256:fresh',
+    }))
     binaries = tmp_path / 'bin'
     binaries.mkdir()
     log = tmp_path / 'rclone.log'
@@ -176,3 +188,36 @@ def test_workflow_options_recovery_is_explicit_and_has_no_quote_provider_credent
 def test_recovery_rejects_non_options_source_queries_before_network(recovery, endpoint, sql):
     with pytest.raises(RuntimeError, match='may query only'):
         recovery.restricted_query(sql, endpoint)
+
+
+@pytest.mark.parametrize('sql', [
+    'SELECT split.act_symbol FROM split JOIN ohlcv ON split.act_symbol = ohlcv.act_symbol',
+    'SELECT act_symbol FROM split, ohlcv',
+])
+def test_recovery_refuses_joined_or_multiple_source_tables(recovery, monkeypatch, sql):
+    # External HTTP is forbidden in this test. A query forwarded to the source
+    # demonstrates the allowlist boundary was crossed.
+    def forbidden_network(*args, **kwargs):
+        raise AssertionError('disallowed table reached the HTTP boundary')
+    monkeypatch.setattr(recovery, '_source_query', forbidden_network)
+    with pytest.raises(RuntimeError, match='may query only'):
+        recovery.restricted_query(sql, recovery.dolt.STOCKS_API)
+
+
+def test_options_promotion_refuses_missing_acceptance_receipt(tmp_path):
+    data = tmp_path / 'data'
+    partition = data / 'parquet/options_chain/year=2026/month=09/2026-09-30.parquet'
+    partition.parent.mkdir(parents=True)
+    partition.write_bytes(b'content-addressed-test-partition')
+    binaries = tmp_path / 'bin'
+    binaries.mkdir()
+    log = tmp_path / 'rclone.log'
+    rclone = binaries / 'rclone'
+    rclone.write_text('#!/bin/sh\nprintf "%s\\n" "$*" >> "$CALL_LOG"\n')
+    rclone.chmod(0o755)
+    env = {**os.environ, 'PATH': f'{binaries}:{os.environ["PATH"]}',
+           'DATA_DIR': str(data), 'PYTHON_BIN': sys.executable, 'CALL_LOG': str(log)}
+    result = subprocess.run(['bash', 'scripts/r2_push.sh', '--options-recovery'],
+                            cwd=ROOT, env=env, capture_output=True, text=True)
+    assert result.returncode != 0
+    assert 'control/current_data_release.json' not in log.read_text()
