@@ -29,7 +29,16 @@ for attempt in $(seq 1 "$max_attempts"); do
   # outputs when a generated file overlaps with the fetched commit.
   if [[ -n "$remote_sha" ]] && ! git merge-base --is-ancestor "$remote_sha" HEAD; then
     echo "Remote ${remote}/${branch} advanced to ${remote_sha}; rebasing local commit."
-    if git rebase -X theirs "$remote/${branch}"; then
+    # Ingestion also changes tracked runtime inputs outside the publication
+    # commit. Preserve those changes locally; never add them just to enable a
+    # rebase. Git restores its temporary stash after replaying the commit.
+    if git rebase --autostash -X theirs "$remote/${branch}"; then
+      # Git can report a successful rebase even when restoring the autostash
+      # conflicts. Keep its recovery stash and stop before publishing.
+      if [[ -n "$(git ls-files --unmerged)" ]]; then
+        echo "Uncommitted files conflict after rebase; retained in Git's autostash. Resolve before publishing." >&2
+        exit 1
+      fi
       head_sha="$(git rev-parse HEAD)"
       echo "Rebased local refresh commit onto ${remote}/${branch} as ${head_sha}."
     else
