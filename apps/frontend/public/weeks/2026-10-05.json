@@ -1,7 +1,7 @@
 {
   "metadata": {
     "version": "v4_multi_week",
-    "generated_at": "2026-09-30T07:02:57.577677",
+    "generated_at": "2026-10-01T09:03:55.335118",
     "as_of_date": "2026-09-28",
     "method": "ATM straddle + IV baseline",
     "offset": 1
@@ -389,58 +389,6 @@
       "historical_event_count": null
     },
     {
-      "ticker": "BLK",
-      "earnings_date": "2026-10-09",
-      "timing": "before_market_open",
-      "fiscal_q": "Q3",
-      "eps_actual": null,
-      "eps_estimate": 14.4172,
-      "revenue_actual": null,
-      "revenue_estimate": 7629624436.0,
-      "realized_move_pct": null,
-      "as_of_date": "2026-09-28",
-      "spot_price": 1072.5,
-      "atm_strike": 1072.5,
-      "atm_iv": 0.301,
-      "em_straddle_pct": 0.041725,
-      "em_iv_pct": 0.052254,
-      "em_straddle_abs": 44.75,
-      "expiry_date": "2026-10-09",
-      "days_to_expiry": 11,
-      "lead_time_days": 11,
-      "skew_atm": -0.028933,
-      "term_slope": -0.059881,
-      "em_method": "ml_lightgbm",
-      "confidence": "high",
-      "iv_rank": 0.549383,
-      "hist_move_avg_4q": 0.047426,
-      "hist_move_med_4q": 0.046616,
-      "iv_crush_pct": -0.181397,
-      "em_ml_pct": 0.037259,
-      "em_ml_abs": 40.474399,
-      "model_horizon": 14,
-      "ml_snapshot_date": "2026-09-25",
-      "forecast_id": "d8938c2cfa1736c7c8a2eb1429745449d59efc3562f9752e8f539ddc28e19f20",
-      "forecast_scored_at": "2026-09-26T11:28:03.265129+00:00",
-      "forecast_feature_cutoff_at": "2026-10-08T20:00:00+00:00",
-      "forecast_prediction_deadline_at": "2026-10-09T04:00:00+00:00",
-      "forecast_feature_snapshot_at": "2026-09-25T20:00:00+00:00",
-      "forecast_feature_hash": "3c3ab19d914d85d71fe05a3cef24151dd0d7c65e9f13e3a463a1f523aad89a97",
-      "forecast_frozen_eligible": true,
-      "p10": 0.008108,
-      "p25": 0.017942,
-      "p50": 0.040078,
-      "p75": 0.062889,
-      "p90": 0.086741,
-      "display_forecast_pct": 0.037259,
-      "display_forecast_method": "ml",
-      "display_forecast_as_of": "2026-09-25",
-      "ml_status": "available",
-      "options_status": "decision_eligible",
-      "fallback_reason": null,
-      "historical_event_count": null
-    },
-    {
       "ticker": "DAL",
       "earnings_date": "2026-10-09",
       "timing": "before_market_open",
@@ -494,8 +442,8 @@
     }
   ],
   "summary": {
-    "total_events": 10,
-    "avg_em_straddle_pct": 0.09053,
-    "avg_em_iv_pct": 0.11303583333333335
+    "total_events": 9,
+    "avg_em_straddle_pct": 0.10029099999999999,
+    "avg_em_iv_pct": 0.12519220000000003
   }
 }

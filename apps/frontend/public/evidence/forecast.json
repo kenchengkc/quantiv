@@ -1,17 +1,17 @@
 {
   "schema": "quantiv.dashboard-evidence.v1",
-  "receipt_id": "sha256:a65f02323b336864d8fbbec58c499254c90d5fd0e320af3fb4c9bc70b0c38cb1",
-  "receipt_file": "forecasts_2026-09-30.a65f02323b33.receipt.json",
-  "validated_at": "2026-09-30T06:45:37.378029+00:00",
+  "receipt_id": "sha256:bd9012515a8c0b92f570382155ac946910af74849057bf961d065296fe464aa5",
+  "receipt_file": "forecasts_2026-10-01.bd9012515a8c.receipt.json",
+  "validated_at": "2026-10-01T08:44:30.766878+00:00",
   "quality": {
     "status": "passed",
     "issue_count": 0,
     "issue_codes": []
   },
   "coverage": {
-    "rows": 642,
-    "symbols": 386,
-    "events": 425,
+    "rows": 712,
+    "symbols": 499,
+    "events": 546,
     "horizons": [
       1,
       2,
@@ -22,12 +22,12 @@
     ]
   },
   "observation_window": {
-    "earnings_max": "2026-10-20",
-    "earnings_min": "2026-09-30",
-    "scored_at_max": "2026-09-30T06:45:32.972634+00:00",
-    "scored_at_min": "2026-09-30T06:45:32.834844+00:00",
-    "snapshot_max": "2026-09-29",
-    "snapshot_min": "2026-09-09"
+    "earnings_max": "2026-10-21",
+    "earnings_min": "2026-10-01",
+    "scored_at_max": "2026-10-01T08:44:25.480431+00:00",
+    "scored_at_min": "2026-10-01T08:44:25.306102+00:00",
+    "snapshot_max": "2026-09-30",
+    "snapshot_min": "2026-09-10"
   },
   "controls": {
     "evaluated": 13,
@@ -43,8 +43,8 @@
       "ml_only_point_outside_band": 0,
       "ml_only_quantile_crossings": 0,
       "non_finite_ml_rows": 0,
-      "optionless_ml_rows": 520,
-      "strict_option_rows": 122,
+      "optionless_ml_rows": 612,
+      "strict_option_rows": 100,
       "strict_reconciliation": {
         "absolute_move_mismatches": 0,
         "blank_symbols": 0,
@@ -85,8 +85,8 @@
       "name": "forecast_snapshot",
       "producer": "scripts/daily_score.py",
       "member_count": 1,
-      "bytes": 519074,
-      "sha256": "d5c324bc521923a8b2811c13bc69a2dd56838ffa6bb4080dd116a119831b3675"
+      "bytes": 559272,
+      "sha256": "cdf16fe81afffba7f29bc947f8ef882a5fad132276f47b9464730323687c53e1"
     }
   ]
 }

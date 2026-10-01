@@ -4,49 +4,49 @@
     "contracts": 111572,
     "corporate_action_rows": 28992,
     "corporate_action_status": "enforced",
-    "covered_events": 188,
-    "decision_group_rejection_rate": 0.342657,
-    "decision_groups": 286,
+    "covered_events": 197,
+    "decision_group_rejection_rate": 0.343333,
+    "decision_groups": 300,
     "decision_scope": "end_of_day_research",
     "display_forecast_coverage_pct": 1.0,
-    "display_forecast_covered_events": 88,
-    "display_forecast_events": 88,
+    "display_forecast_covered_events": 79,
+    "display_forecast_events": 79,
     "display_forecast_method_mix": {
       "historical": 0,
       "historical_prior": 0,
-      "ml": 88,
+      "ml": 79,
       "options_indicative": 0,
       "options_math": 0
     },
     "duplicate_rows": 0,
     "eligible_contracts": 66695,
-    "eligible_decision_groups": 188,
-    "event_coverage_pct": 0.657343,
-    "expected_events": 286,
-    "expected_source_date": "2026-09-29",
+    "eligible_decision_groups": 197,
+    "event_coverage_pct": 0.656667,
+    "expected_events": 300,
+    "expected_source_date": "2026-09-30",
     "live_trading_eligible": false,
-    "missing_events": 98,
+    "missing_events": 103,
     "pair_rejection_rate": 0.854211,
     "quarantine_records": 92530,
     "quarantine_status": "enforced",
     "quote_quality_errors": [
-      "latest source date 2026-09-28 is 1 market session(s) behind expected 2026-09-29"
+      "latest source date 2026-09-28 is 2 market session(s) behind expected 2026-09-30"
     ],
     "replay_status": "verified",
     "source_date": "2026-09-28",
-    "source_session_lag": 1,
+    "source_session_lag": 2,
     "status": "failed"
   },
   "exceptions": [
     {
       "code": "upcoming_events_outside_option_universe",
-      "count": 303,
+      "count": 372,
       "severity": "warning",
       "summary": "Calendar events fall outside the current options decision universe"
     },
     {
       "code": "upcoming_events_without_option_chain",
-      "count": 98,
+      "count": 103,
       "severity": "warning",
       "summary": "In-universe earnings events have no decision-eligible option chain"
     },
@@ -58,12 +58,12 @@
     },
     {
       "code": "option_quote_quality_below_limit",
-      "count": 98,
+      "count": 103,
       "severity": "critical",
       "summary": "Option evidence on the scoped earnings decision surface exceeds the publication limit"
     }
   ],
-  "generated_at": "2026-09-30T08:13:15.385490+00:00",
+  "generated_at": "2026-10-01T10:15:09.965360+00:00",
   "model": {
     "challenger_present": true,
     "champion_active": true,
@@ -71,7 +71,7 @@
     "drift_status": "warning",
     "fallback_bundle_available": false,
     "hard_missing_features": 0,
-    "monitored_at": "2026-09-30T06:45:40.407393+00:00",
+    "monitored_at": "2026-10-01T08:44:34.359984+00:00",
     "outcome_common_rows": null,
     "outcome_evaluated_at": "2026-09-14T01:54:36.293833+00:00",
     "outcome_evaluations": 2,
@@ -81,7 +81,7 @@
     "shadow_roles": [
       "challenger"
     ],
-    "snapshot_date": "2026-09-29",
+    "snapshot_date": "2026-09-30",
     "status": "passed",
     "warning_features": 3
   },
