@@ -221,3 +221,109 @@ def test_options_promotion_refuses_missing_acceptance_receipt(tmp_path):
                             cwd=ROOT, env=env, capture_output=True, text=True)
     assert result.returncode != 0
     assert 'control/current_data_release.json' not in log.read_text()
+
+
+def test_synced_sessions_accept_verified_empty_intermediate_session(recovery, tmp_path):
+    target = tmp_path / 'parquet/options_chain/year=2026/month=09/2026-09-30.parquet'
+    target.parent.mkdir(parents=True)
+    target.write_bytes(b'verified-target-partition')
+    controls = tmp_path / 'control/ingestion/options'
+    controls.mkdir(parents=True)
+    receipt = {
+        'schema': 'quantiv.options-ingestion.v1', 'status': 'passed',
+        'source': 'dolthub/post-no-preference/options/option_chain', 'source_date': '2026-09-29',
+        'expected_rows': 0, 'received_rows': 0, 'partition': None,
+        'replay_equivalence': 'verified', 'duplicate_primary_keys': 0,
+        'expected_method': 'exhaustive_keyset_pagination',
+        'pagination': [{'symbol_range': bounds, 'exhausted': True, 'rows': 0, 'pages': 1}
+                       for bounds in [[None, 'D'], ['D', 'G'], ['G', 'K'], ['K', 'N'],
+                                      ['N', 'R'], ['R', 'U'], ['U', None]]],
+    }
+    (controls / '2026-09-29.json').write_text(json.dumps(receipt))
+    verifier = getattr(recovery, 'verify_synced_sessions', None)
+    assert verifier is not None, 'empty source-session verification is missing'
+    assert verifier(tmp_path, [date(2026, 9, 29), date(2026, 9, 30)]) == ['2026-09-29']
+
+
+@pytest.mark.parametrize('problem', ['missing_receipt', 'nonzero_receipt', 'incomplete_pagination', 'empty_target'])
+def test_synced_sessions_reject_missing_data_without_verified_source_empty_receipt(recovery, tmp_path, problem):
+    target = tmp_path / 'parquet/options_chain/year=2026/month=09/2026-09-30.parquet'
+    target.parent.mkdir(parents=True)
+    target.write_bytes(b'verified-target-partition')
+    controls = tmp_path / 'control/ingestion/options'
+    controls.mkdir(parents=True)
+    if problem == 'empty_target':
+        target.unlink()
+        days = [date(2026, 9, 30)]
+    else:
+        days = [date(2026, 9, 29), date(2026, 9, 30)]
+    if problem != 'missing_receipt':
+        receipt = {
+            'schema': 'quantiv.options-ingestion.v1', 'status': 'passed',
+            'source': 'dolthub/post-no-preference/options/option_chain', 'source_date': '2026-09-29',
+            'expected_rows': 1 if problem == 'nonzero_receipt' else 0, 'received_rows': 0,
+            'partition': None, 'replay_equivalence': 'verified', 'duplicate_primary_keys': 0,
+            'expected_method': 'exhaustive_keyset_pagination', 'pagination': [],
+        }
+        (controls / '2026-09-29.json').write_text(json.dumps(receipt))
+    verifier = getattr(recovery, 'verify_synced_sessions', None)
+    assert verifier is not None, 'empty source-session verification is missing'
+    with pytest.raises(RuntimeError):
+        verifier(tmp_path, days)
+
+
+def test_verified_empty_ingestion_replay_preserves_immutable_receipt(recovery, monkeypatch, tmp_path):
+    import pandas as pd
+    monkeypatch.setenv('DATA_DIR', str(tmp_path / 'data'))
+    target = date(2026, 9, 29)
+    frame = pd.DataFrame(columns=recovery.dolt.ARROW_SCHEMA.names)
+    frame.attrs['ingestion_evidence'] = {
+        'expected_rows': 0, 'expected_method': 'exhaustive_keyset_pagination',
+        'buckets': [{'symbol_range': bounds, 'exhausted': True, 'rows': 0, 'pages': 1}
+                    for bounds in [[None, 'D'], ['D', 'G'], ['G', 'K'], ['K', 'N'],
+                                   ['N', 'R'], ['R', 'U'], ['U', None]]],
+    }
+    def source(day):
+        assert day == target
+        return frame.copy()
+    monkeypatch.setattr(recovery.dolt, 'fetch_date', source)
+    root = recovery.dolt.parquet_root()
+    assert recovery.dolt.sync_dates([target], root) == 0
+    receipt = recovery.dolt.ingestion_control_root() / '2026-09-29.json'
+    original = receipt.read_bytes()
+    assert recovery.dolt.sync_dates([target], root) == 0
+    assert receipt.read_bytes() == original
+    assert json.loads(original)['source_revision_status'] == 'baseline_recorded'
+
+    # Exercise the actual immutable upload contract when rclone is available.
+    import shutil
+    if shutil.which('rclone'):
+        destination = tmp_path / 'immutable-remote/2026-09-29.json'
+        destination.parent.mkdir()
+        destination.write_bytes(original)
+        uploaded = subprocess.run(['rclone', 'copyto', str(receipt), str(destination), '--immutable'],
+                                  capture_output=True, text=True)
+        assert uploaded.returncode == 0, uploaded.stderr
+        assert destination.read_bytes() == original
+
+
+def test_empty_ingestion_replay_still_holds_changed_source(recovery, monkeypatch, tmp_path):
+    import pandas as pd
+    monkeypatch.setenv('DATA_DIR', str(tmp_path / 'data'))
+    target = date(2026, 9, 29)
+    empty = pd.DataFrame(columns=recovery.dolt.ARROW_SCHEMA.names)
+    empty.attrs['ingestion_evidence'] = {'expected_rows': 0}
+    monkeypatch.setattr(recovery.dolt, 'fetch_date', lambda day: empty.copy())
+    recovery.dolt.sync_dates([target], recovery.dolt.parquet_root())
+    receipt = recovery.dolt.ingestion_control_root() / '2026-09-29.json'
+    original = receipt.read_bytes()
+    row = {name: None for name in recovery.dolt.ARROW_SCHEMA.names}
+    row.update(date=target, act_symbol='AAPL', expiration=date(2026, 10, 16), strike=200.0,
+               call_put='C', bid=1.0, ask=2.0, vol=0.25, delta=0.5, gamma=0.1,
+               theta=-0.02, vega=0.3, rho=0.1)
+    changed = pd.DataFrame([row])
+    changed.attrs['ingestion_evidence'] = {'expected_rows': 1}
+    monkeypatch.setattr(recovery.dolt, 'fetch_date', lambda day: changed.copy())
+    with pytest.raises(RuntimeError, match='replay digest changed'):
+        recovery.dolt.sync_dates([target], recovery.dolt.parquet_root())
+    assert receipt.read_bytes() == original

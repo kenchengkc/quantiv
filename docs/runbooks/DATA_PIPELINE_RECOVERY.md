@@ -196,7 +196,11 @@ publishes the missing sessions, dispatch `data-refresh.yml` on `main` with:
 - `options_target_date = <latest completed US market session, YYYY-MM-DD>`
 
 This manual mode accepts at most five missing market sessions and refuses an
-already published target. It downloads only the missing DoltHub option chains
+already published target. The latest session must have a nonempty partition.
+An intermediate source-empty session is retained only when its ingestion receipt
+proves all source pagination buckets were exhausted with zero rows; the job does
+not fabricate that day's quotes or reject a fresh target solely for this upstream
+historical gap. It downloads only the missing DoltHub option chains
 and the public split/dividend controls required for their active universe. It
 does not call stock-price, earnings, profile, or other enrichment APIs. Normal
 refresh admission, its daily claim, and the 09:35 Eastern cutoff are unchanged.

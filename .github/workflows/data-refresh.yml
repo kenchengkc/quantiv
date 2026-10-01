@@ -530,6 +530,7 @@ jobs:
             data/validation/data_reconciliation.json
             data/validation/options_snapshot_status.json
             data/validation/options_recovery.json
+            data/parquet/options_chain/year=*/month=*/${{ inputs.options_target_date }}.parquet
             data/control/ingestion/options
             data/control/ingestion/corporate_actions
             data/quarantine/options_candidates
