@@ -501,7 +501,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p data/validation data/calendar_reference
-          REMOTE="r2:$R2_BUCKET"
+          REMOTE="r2:${R2_BUCKET:-quantiv-data}"
           rclone copyto "$REMOTE/validation/data_reconciliation.json"             data/validation/data_reconciliation.json
           rclone copyto "$REMOTE/validation/options_snapshot_status.json"             data/validation/options_snapshot_status.json
           rclone copyto "$REMOTE/calendar-reference/current.json"             data/calendar_reference/current.json

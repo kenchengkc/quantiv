@@ -3,10 +3,36 @@ import os
 from pathlib import Path
 import subprocess
 
+import pytest
 import yaml
 
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+@pytest.mark.parametrize("bucket,expected", [
+    (None, "r2:quantiv-data/validation/data_reconciliation.json"),
+    ("", "r2:quantiv-data/validation/data_reconciliation.json"),
+    ("custom-bucket", "r2:custom-bucket/validation/data_reconciliation.json"),
+])
+def test_recovery_evidence_uses_the_configured_or_default_bucket(tmp_path, bucket, expected):
+    workflow = yaml.safe_load((ROOT / ".github/workflows/data-refresh.yml").read_text())
+    step = next(step for step in workflow["jobs"]["recovery"]["steps"]
+                if step["name"] == "Restore saved reconciliation and calendar evidence")
+    # Inspect the first real shell-to-rclone boundary, then stop before any
+    # downloads or verification commands can run.
+    probe = tmp_path / "rclone"
+    probe.write_text('#!/bin/sh\nprintf "%s" "$2" > "$CALL_LOG"\nexit 42\n')
+    probe.chmod(0o755)
+    log = tmp_path / "requested-source"
+    env = {**os.environ, "PATH": f"{tmp_path}:{os.environ['PATH']}", "CALL_LOG": str(log)}
+    env.pop("R2_BUCKET", None)
+    if bucket is not None:
+        env["R2_BUCKET"] = bucket
+    result = subprocess.run(["bash", "-c", step["run"]], cwd=tmp_path, env=env,
+                            capture_output=True, text=True)
+    assert result.returncode == 42, result.stderr
+    assert log.read_text() == expected
 
 
 def test_recovery_job_has_no_market_data_provider_steps() -> None:
