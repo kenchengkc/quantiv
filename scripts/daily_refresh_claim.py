@@ -31,7 +31,7 @@ def eastern_run_date(run: dict[str, Any]) -> str:
 
 def is_provider_free_recovery(run: dict[str, Any]) -> bool:
     title = str(run.get("display_title") or run.get("name") or "").lower()
-    return RECOVERY_MARKER in title
+    return RECOVERY_MARKER in title or "options-only-recovery" in title
 
 
 def normal_runs_for_date(runs: list[dict[str, Any]], claim_date: str) -> list[dict[str, Any]]:

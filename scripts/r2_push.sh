@@ -11,9 +11,9 @@ PYTHON_BIN="${PYTHON_BIN:-python}"
 
 MODE="${1:-all}"
 case "$MODE" in
-  all|--skip-forecasts|--forecasts-only|--model-recovery|--runtime-state-only) ;;
+  all|--skip-forecasts|--forecasts-only|--model-recovery|--runtime-state-only|--options-recovery) ;;
   *)
-    echo "Usage: r2_push.sh [all| --skip-forecasts | --forecasts-only | --model-recovery | --runtime-state-only]" >&2
+    echo "Usage: r2_push.sh [all| --skip-forecasts | --forecasts-only | --model-recovery | --runtime-state-only | --options-recovery]" >&2
     exit 2
     ;;
 esac
@@ -211,6 +211,13 @@ elif [ "$MODE" = "--forecasts-only" ]; then
   push_forecasts
 elif [ "$MODE" = "--runtime-state-only" ]; then
   push_runtime_state
+elif [ "$MODE" = "--options-recovery" ]; then
+  # Options catch-up owns only analytical partitions and reconciliation controls.
+  # It must never overwrite a concurrent weekly model, forecasts, or calendars.
+  "$PYTHON_BIN" scripts/data_release.py build --data-dir "$DATA_DIR"
+  push_parquet
+  push_controls
+  promote_data_release
 elif [ "$MODE" = "--skip-forecasts" ]; then
   "$PYTHON_BIN" scripts/data_release.py build --data-dir "$DATA_DIR"
   push_parquet

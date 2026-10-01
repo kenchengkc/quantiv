@@ -184,3 +184,36 @@ Review the generated diff and preserve frozen forecast identities and realized
 results. After merging a verified repair, dispatch `frontend-publication.yml`;
 this publishes the existing corpus without rerunning market-data provider calls.
 Verify the live release manifest and the affected calendar and symbol files.
+
+## Options-only catch-up after a delayed source update
+
+If the overnight run retained an older options snapshot and DoltHub later
+publishes the missing sessions, dispatch `data-refresh.yml` on `main` with:
+
+- `refresh_mode = options-only-recovery`
+- `recovery_release_id = <current promoted data release id>`
+- `recovery_manifest_id = <current saved reconciliation manifest id>`
+- `options_target_date = <latest completed US market session, YYYY-MM-DD>`
+
+This manual mode accepts at most five missing market sessions and refuses an
+already published target. It downloads only the missing DoltHub option chains
+and the public split/dividend controls required for their active universe. It
+does not call stock-price, earnings, profile, or other enrichment APIs. Normal
+refresh admission, its daily claim, and the 09:35 Eastern cutoff are unchanged.
+The data-only job shares the daily execution lock so it cannot race a normal
+refresh or saved-data publication recovery.
+
+The job verifies the pinned prior release, rebuilds the analytical views, and
+runs the existing reconciliation and options snapshot decision. Promotion
+requires an accepted candidate, `quality.decision_safe = true`, unchanged
+thresholds, no fallback, matching source dates, and fresh report evidence. A
+rejected candidate fails the job and preserves production; inspect the
+`options-only-recovery-evidence` artifact before taking another action.
+
+On success, `options-recovery-data-release` contains the new release pointer.
+Use that release ID and the accepted reconciliation manifest ID for a new
+`provider-free-recovery` publication. A data-only run does not publish the old
+frontend. Before starting `model-retrain.yml`, inspect the accepted evidence and
+check for an existing retrain after the promotion; dispatch only once while the
+source is still the latest completed session. The retrain and subsequent
+publication retain all normal validation and promotion gates.
