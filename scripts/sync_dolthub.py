@@ -430,6 +430,18 @@ def _write_ingestion_manifest(
                 f"{target}: replay digest changed ({prior_digest} -> {digest}); "
                 "quarantine the source revision before promotion"
             )
+        if (received == 0 and prior_manifest.get("schema") == "quantiv.options-ingestion.v1"
+                and prior_manifest.get("status") == "passed"
+                and prior_manifest.get("source_date") == target.isoformat()
+                and prior_manifest.get("expected_rows") == 0
+                and prior_manifest.get("received_rows") == 0
+                and prior_manifest.get("partition") is None
+                and prior_manifest.get("replay_equivalence") == "verified"
+                and prior_manifest.get("pagination") == evidence.get("buckets", [])):
+            # An empty date has no partition to skip on the next runner. Keep
+            # its identical verified receipt immutable after checking the live
+            # source digest, just as skip_existing does for nonempty partitions.
+            return prior_manifest
         source_revision_status = "unchanged"
     payload = {
         "schema": "quantiv.options-ingestion.v1",
