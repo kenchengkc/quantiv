@@ -221,3 +221,52 @@ def test_options_promotion_refuses_missing_acceptance_receipt(tmp_path):
                             cwd=ROOT, env=env, capture_output=True, text=True)
     assert result.returncode != 0
     assert 'control/current_data_release.json' not in log.read_text()
+
+
+def test_synced_sessions_accept_verified_empty_intermediate_session(recovery, tmp_path):
+    target = tmp_path / 'parquet/options_chain/year=2026/month=09/2026-09-30.parquet'
+    target.parent.mkdir(parents=True)
+    target.write_bytes(b'verified-target-partition')
+    controls = tmp_path / 'control/ingestion/options'
+    controls.mkdir(parents=True)
+    receipt = {
+        'schema': 'quantiv.options-ingestion.v1', 'status': 'passed',
+        'source': 'dolthub/post-no-preference/options/option_chain', 'source_date': '2026-09-29',
+        'expected_rows': 0, 'received_rows': 0, 'partition': None,
+        'replay_equivalence': 'verified', 'duplicate_primary_keys': 0,
+        'expected_method': 'exhaustive_keyset_pagination',
+        'pagination': [{'symbol_range': bounds, 'exhausted': True, 'rows': 0, 'pages': 1}
+                       for bounds in [[None, 'D'], ['D', 'G'], ['G', 'K'], ['K', 'N'],
+                                      ['N', 'R'], ['R', 'U'], ['U', None]]],
+    }
+    (controls / '2026-09-29.json').write_text(json.dumps(receipt))
+    verifier = getattr(recovery, 'verify_synced_sessions', None)
+    assert verifier is not None, 'empty source-session verification is missing'
+    assert verifier(tmp_path, [date(2026, 9, 29), date(2026, 9, 30)]) == ['2026-09-29']
+
+
+@pytest.mark.parametrize('problem', ['missing_receipt', 'nonzero_receipt', 'incomplete_pagination', 'empty_target'])
+def test_synced_sessions_reject_missing_data_without_verified_source_empty_receipt(recovery, tmp_path, problem):
+    target = tmp_path / 'parquet/options_chain/year=2026/month=09/2026-09-30.parquet'
+    target.parent.mkdir(parents=True)
+    target.write_bytes(b'verified-target-partition')
+    controls = tmp_path / 'control/ingestion/options'
+    controls.mkdir(parents=True)
+    if problem == 'empty_target':
+        target.unlink()
+        days = [date(2026, 9, 30)]
+    else:
+        days = [date(2026, 9, 29), date(2026, 9, 30)]
+    if problem != 'missing_receipt':
+        receipt = {
+            'schema': 'quantiv.options-ingestion.v1', 'status': 'passed',
+            'source': 'dolthub/post-no-preference/options/option_chain', 'source_date': '2026-09-29',
+            'expected_rows': 1 if problem == 'nonzero_receipt' else 0, 'received_rows': 0,
+            'partition': None, 'replay_equivalence': 'verified', 'duplicate_primary_keys': 0,
+            'expected_method': 'exhaustive_keyset_pagination', 'pagination': [],
+        }
+        (controls / '2026-09-29.json').write_text(json.dumps(receipt))
+    verifier = getattr(recovery, 'verify_synced_sessions', None)
+    assert verifier is not None, 'empty source-session verification is missing'
+    with pytest.raises(RuntimeError):
+        verifier(tmp_path, days)

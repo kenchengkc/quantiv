@@ -39,6 +39,42 @@ def recovery_dates(published: date, target: date, *, now: datetime | None = None
     return days
 
 
+def verify_synced_sessions(data_dir: Path, days: list[date]) -> list[str]:
+    """Keep the latest session mandatory; retain proved upstream historical gaps."""
+    empty_sessions = []
+    for day in days:
+        partition = data_dir / f'parquet/options_chain/year={day.year}/month={day.month:02d}/{day}.parquet'
+        if partition.is_file() and partition.stat().st_size > 0:
+            continue
+        if day == days[-1]:
+            raise RuntimeError(f'missing latest options partition after sync: {day}')
+        try:
+            receipt = json.loads((data_dir / f'control/ingestion/options/{day}.json').read_text())
+        except (OSError, json.JSONDecodeError) as exc:
+            raise RuntimeError(f'missing options partition without source-empty evidence: {day}') from exc
+        buckets = receipt.get('pagination') or []
+        if (
+            receipt.get('schema') != 'quantiv.options-ingestion.v1'
+            or receipt.get('status') != 'passed'
+            or receipt.get('source') != 'dolthub/post-no-preference/options/option_chain'
+            or receipt.get('source_date') != day.isoformat()
+            or receipt.get('expected_rows') != 0 or receipt.get('received_rows') != 0
+            or receipt.get('partition') is not None
+            or receipt.get('replay_equivalence') != 'verified'
+            or receipt.get('duplicate_primary_keys') != 0
+            or receipt.get('expected_method') != 'exhaustive_keyset_pagination'
+            or len(buckets) != len(dolt.SYMBOL_BUCKETS)
+            or {tuple(bucket.get('symbol_range') or []) for bucket in buckets} != set(dolt.SYMBOL_BUCKETS)
+            or any(bucket.get('exhausted') is not True or bucket.get('rows') != 0
+                   or not isinstance(bucket.get('pages'), int) or bucket['pages'] < 1
+                   for bucket in buckets)
+        ):
+            raise RuntimeError(f'missing options partition has unverified source-empty evidence: {day}')
+        print(f'Upstream source-empty intermediate session: {day}; preserving its zero-row receipt', flush=True)
+        empty_sessions.append(day.isoformat())
+    return empty_sessions
+
+
 def require_accepted_candidate(data_dir: Path, target: date, not_before: str,
                                *, now: datetime | None = None) -> dict:
     if target != latest_completed_us_market_session(now):
@@ -122,10 +158,7 @@ def main() -> int:
         raise RuntimeError('DoltHub has not published the requested options session')
     print(f'Options-only recovery: {days[0]} → {days[-1]} ({len(days)} sessions)', flush=True)
     dolt.sync_dates(days, dolt.parquet_root(), skip_existing=True)
-    for day in days:
-        partition = dolt.parquet_root() / f'year={day.year}/month={day.month:02d}/{day}.parquet'
-        if not partition.is_file():
-            raise RuntimeError(f'missing options partition after sync: {day}')
+    empty_sessions = verify_synced_sessions(data_dir, days)
     dolt.sync_corporate_actions(end_date_str=args.target_date.isoformat())
     env = {**os.environ, 'DATA_DIR': str(data_dir)}
     subprocess.run([sys.executable, 'scripts/setup_duckdb_from_parquet.py'], cwd=ROOT, env=env, check=True)
@@ -143,7 +176,8 @@ def main() -> int:
                 last_options_candidate_status='accepted', mode='options-only-recovery')
     dolt.save_meta(meta)
     receipt = {'schema': 'quantiv.options-recovery.v1', 'started_at': started,
-               'target_date': args.target_date.isoformat(), 'manifest_id': report['manifest_id']}
+               'target_date': args.target_date.isoformat(), 'manifest_id': report['manifest_id'],
+               'source_empty_sessions': empty_sessions}
     (data_dir / 'validation/options_recovery.json').write_text(json.dumps(receipt, indent=2) + '\n')
     print(f"Accepted options recovery: {args.target_date} · {report['manifest_id']}", flush=True)
     return 0
