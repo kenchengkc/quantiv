@@ -8,17 +8,22 @@ on:
   workflow_dispatch:
     inputs:
       refresh_mode:
-        description: "Normal provider refresh or provider-free recovery from an already promoted R2 data release."
+        description: "Normal refresh, saved-data publication recovery, or bounded DoltHub options catch-up."
         type: choice
-        options: [normal, provider-free-recovery]
+        options: [normal, provider-free-recovery, options-only-recovery]
         default: normal
       recovery_release_id:
-        description: "Exact data-release id required for provider-free recovery (ignored in normal mode)."
+        description: "Exact saved data-release id required for either recovery mode."
         type: string
         required: false
         default: ""
       recovery_manifest_id:
         description: "Exact reconciliation manifest id from the interrupted refresh."
+        type: string
+        required: false
+        default: ""
+      options_target_date:
+        description: "Latest completed US market session required for options-only recovery (YYYY-MM-DD)."
         type: string
         required: false
         default: ""
@@ -37,7 +42,7 @@ permissions:
 
 jobs:
   claim:
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.refresh_mode != 'provider-free-recovery' }}
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.refresh_mode != 'provider-free-recovery' && inputs.refresh_mode != 'options-only-recovery' }}
     runs-on: ubuntu-latest
     concurrency:
       group: daily-data-refresh-claim
@@ -428,6 +433,123 @@ jobs:
             bash scripts/git_push_with_retry.sh origin main
           fi
 
+
+
+  options_recovery:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.refresh_mode == 'options-only-recovery' }}
+    runs-on: ubuntu-latest
+    concurrency:
+      group: daily-data-refresh-execution
+      cancel-in-progress: false
+    timeout-minutes: 120
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 20
+
+      - name: Install Python dependencies
+        run: pip install --require-hashes -r requirements.txt
+
+      - name: Install verified rclone
+        run: bash scripts/install_rclone.sh
+
+      - name: Configure R2
+        env:
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.config/rclone
+          cat > ~/.config/rclone/rclone.conf <<EOF
+          [r2]
+          type = s3
+          provider = Cloudflare
+          access_key_id = $R2_ACCESS_KEY_ID
+          secret_access_key = $R2_SECRET_ACCESS_KEY
+          endpoint = https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com
+          region = auto
+          EOF
+
+      - name: Materialize already-promoted data release from R2
+        env:
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          R2_REQUIRE_RUNTIME_STATE: "1"
+        run: bash scripts/r2_pull.sh
+
+      - name: Restore saved reconciliation and calendar evidence
+        env:
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+        run: |
+          set -euo pipefail
+          mkdir -p data/validation data/calendar_reference
+          REMOTE="r2:${R2_BUCKET:-quantiv-data}"
+          rclone copyto "$REMOTE/validation/data_reconciliation.json"             data/validation/data_reconciliation.json
+          rclone copyto "$REMOTE/validation/options_snapshot_status.json"             data/validation/options_snapshot_status.json
+          rclone copyto "$REMOTE/calendar-reference/current.json"             data/calendar_reference/current.json
+          RELEASE_REL=$(jq -er .release data/calendar_reference/current.json)
+          RECEIPT_REL=$(jq -er .receipt data/calendar_reference/current.json)
+          mkdir -p             "data/calendar_reference/$(dirname "$RELEASE_REL")"             "data/calendar_reference/$(dirname "$RECEIPT_REL")"
+          rclone copyto "$REMOTE/calendar-reference/$RELEASE_REL"             "data/calendar_reference/$RELEASE_REL"
+          rclone copyto "$REMOTE/calendar-reference/$RECEIPT_REL"             "data/calendar_reference/$RECEIPT_REL"
+          bash scripts/run_provider_free.sh             python scripts/calendar_reference.py verify               --output-dir data/calendar_reference
+          bash scripts/run_provider_free.sh             python scripts/calendar_reference.py project               --output-dir data/calendar_reference
+
+      - name: Recover and validate missing options sessions
+        env:
+          OPTIONS_TARGET_DATE: ${{ inputs.options_target_date }}
+          EXPECTED_RELEASE_ID: ${{ inputs.recovery_release_id }}
+          EXPECTED_MANIFEST_ID: ${{ inputs.recovery_manifest_id }}
+        run: |
+          bash scripts/run_provider_free.sh python -u scripts/recover_options_snapshot.py \
+            --target-date "$OPTIONS_TARGET_DATE" \
+            --expected-release-id "$EXPECTED_RELEASE_ID" \
+            --expected-manifest-id "$EXPECTED_MANIFEST_ID"
+
+      - name: Preserve options recovery evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: options-only-recovery-evidence
+          path: |
+            data/validation/data_reconciliation.json
+            data/validation/options_snapshot_status.json
+            data/validation/options_recovery.json
+            data/control/ingestion/options
+            data/control/ingestion/corporate_actions
+            data/quarantine/options_candidates
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: Promote only accepted options recovery data
+        env:
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+        run: bash scripts/run_provider_free.sh bash scripts/r2_push.sh --options-recovery
+
+      - name: Preserve promoted data release
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: options-recovery-data-release
+          path: |
+            data/control/current_data_release.json
+            data/control/releases
+          if-no-files-found: error
+          retention-days: 30
 
   recovery:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.refresh_mode == 'provider-free-recovery' }}
