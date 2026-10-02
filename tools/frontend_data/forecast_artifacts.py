@@ -192,6 +192,7 @@ def withhold_upcoming_ml(public_dir: Path, *, today: date) -> None:
              *sorted((public_dir / 'symbols').glob('*.json'))]
     ml_keys = {'em_ml_pct', 'em_ml_abs', 'correction_factor', 'model_horizon',
                'ml_snapshot_date', 'p10', 'p25', 'p50', 'p75', 'p90'}
+    symbol_payloads = {}
     for path in paths:
         if not path.is_file() or path.name == 'manifest.json':
             continue
@@ -226,6 +227,36 @@ def withhold_upcoming_ml(public_dir: Path, *, today: date) -> None:
                                     display_forecast_as_of=node.get('as_of_date') or payload.get('as_of_date'),
                                     em_method='options_math' if method == 'options_math' else 'historical')
                         break
+        if changed:
+            path.write_text(json.dumps(payload, indent=2) + '\n')
+        if path.parent == public_dir / 'symbols':
+            symbol_payloads[path.stem] = payload
+
+    # Removing ML can expose an older historical estimate on one surface. Use
+    # the same resolved ticker-page signature that the publication contract
+    # validates; this preserves the existing IV -> historical display order.
+    try:
+        from tools.validate_public_contracts import _symbol_page_signature
+    except ModuleNotFoundError:
+        from validate_public_contracts import _symbol_page_signature
+    for path in paths:
+        if path.parent == public_dir / 'symbols' or not path.is_file() or path.name == 'manifest.json':
+            continue
+        payload = json.loads(path.read_text())
+        changed = False
+        for node in payload.get('events') or []:
+            event_date = str(node.get('earnings_date') or '')[:10]
+            symbol = symbol_payloads.get(str(node.get('ticker') or '').upper())
+            if not symbol or not event_date or date.fromisoformat(event_date) <= today:
+                continue
+            signature, components = _symbol_page_signature(symbol, event_date)
+            if signature is None:
+                continue
+            for key, component in (('em_iv_pct', 'iv'), ('em_straddle_pct', 'straddle'),
+                                   ('hist_move_med_4q', 'historical')):
+                node[key] = components[component]
+            node.update(display_forecast_method=signature[0], display_forecast_pct=signature[1])
+            changed = True
         if changed:
             path.write_text(json.dumps(payload, indent=2) + '\n')
 

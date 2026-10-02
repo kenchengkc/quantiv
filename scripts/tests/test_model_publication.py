@@ -174,3 +174,25 @@ def test_hold_removes_upcoming_ml_from_retained_symbol_files_but_preserves_histo
     assert result['earnings_history'][1].get('p90') is None
     assert result['earnings_history'][1].get('forecast_id') is None
     assert result['earnings_history'][1].get('display_forecast_method') != 'ml'
+
+
+def test_hold_calendar_and_symbol_use_same_historical_fallback(tmp_path):
+    from datetime import date
+    from tools.frontend_data import forecast_artifacts
+    symbols = tmp_path / 'symbols'
+    symbols.mkdir()
+    history = [{'date': f'2026-0{i}-01', 'actual': move} for i, move in enumerate([.04, .06, .08, .10], 1)]
+    symbol = {'symbol': 'TEST', 'as_of_date': '2026-09-30', 'earnings_history': history,
+              'expected_move': {'earnings_date': '2026-10-21', 'em_ml_pct': .09,
+                                'display_forecast_method': 'ml', 'display_forecast_pct': .09}}
+    (symbols / 'TEST.json').write_text(json.dumps(symbol))
+    event = {'ticker': 'TEST', 'earnings_date': '2026-10-21', 'as_of_date': '2026-09-30',
+             'em_ml_pct': .09, 'display_forecast_method': 'ml', 'display_forecast_pct': .09,
+             'hist_move_med_4q': .12}
+    path = tmp_path / 'weekly.json'
+    path.write_text(json.dumps({'events': [event]}))
+    forecast_artifacts.withhold_upcoming_ml(tmp_path, today=date(2026, 10, 2))
+    held = json.loads(path.read_text())['events'][0]
+    assert held['display_forecast_method'] == 'historical'
+    assert held['display_forecast_pct'] == pytest.approx(.07)
+    assert held['hist_move_med_4q'] == pytest.approx(.07)
