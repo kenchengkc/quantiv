@@ -2,7 +2,7 @@
   "current_evidence": {
     "control_plane_status": "failed",
     "data_status": "failed",
-    "drift_status": "warning",
+    "drift_status": "critical",
     "forecast_control_exceptions": 0,
     "forecast_events": 546,
     "forecast_model_matches_evaluation": true,
@@ -10,7 +10,7 @@
     "forecast_receipt_id": "sha256:bd9012515a8c0b92f570382155ac946910af74849057bf961d065296fe464aa5",
     "forecast_rows": 712,
     "forecast_validated_at": "2026-10-01T08:44:30.766878+00:00",
-    "model_status": "passed",
+    "model_status": "failed",
     "publication_eligible": false
   },
   "evaluation_evidence": {
@@ -399,7 +399,7 @@
     },
     "status": "verified"
   },
-  "generated_at": "2026-10-01T10:15:09.965360+00:00",
+  "generated_at": "2026-10-02T09:22:29.358216+00:00",
   "horizons": [
     {
       "coverage": {

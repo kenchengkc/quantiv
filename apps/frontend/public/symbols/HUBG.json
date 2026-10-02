@@ -1,7 +1,7 @@
 {
   "symbol": "HUBG",
-  "as_of_date": "2026-09-28",
-  "spot_price": 30.22,
+  "as_of_date": "2026-09-30",
+  "spot_price": 29.58,
   "expected_move": {
     "earnings_date": "2026-09-24",
     "timing": "after_market_close",
@@ -44,7 +44,10 @@
       "eps_surprise_pct": null,
       "revenue_actual": null,
       "revenue_estimate": 1007181078.0,
-      "rev_surprise_pct": null
+      "rev_surprise_pct": null,
+      "ml_status": "unavailable_model",
+      "ml_publication_status": "held",
+      "ml_publication_reason": "feature_drift"
     },
     {
       "date": "2026-09-24",
@@ -330,13 +333,13 @@
   ],
   "next_earnings": "2026-09-24",
   "vol_regime": {
-    "iv_current": 0.594,
-    "iv_rank": 0.523376,
+    "iv_current": 0.5097,
+    "iv_rank": 0.388862,
     "iv_year_high": 0.8927,
     "iv_year_low": 0.266,
-    "hv_current": 0.3423,
-    "hv_rank": 0.153085,
-    "iv_mom_week": -0.0786,
+    "hv_current": 0.3413,
+    "hv_rank": 0.151145,
+    "iv_mom_week": -0.3167,
     "iv_mom_month": null
   },
   "next_earnings_timing": "unknown"
