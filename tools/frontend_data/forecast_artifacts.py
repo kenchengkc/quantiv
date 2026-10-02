@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import math
+from datetime import date
+from pathlib import Path
 
 from ml.provider_signal_policy import (
     DEFAULT_POLICY_PATH,
@@ -23,7 +25,7 @@ from .shared import (
     write_to_public,
 )
 
-def load_ml_forecasts() -> dict[tuple[str, str], dict]:
+def load_ml_forecasts(*, publication_held: bool = False) -> dict[tuple[str, str], dict]:
     """Return the latest *eligible* point-in-time forecast per event.
 
     Once the immutable ledger exists it is authoritative. This prevents a
@@ -32,6 +34,9 @@ def load_ml_forecasts() -> dict[tuple[str, str], dict]:
     without a ledger retain the prior newest-file behavior until the next score
     seeds the ledger.
     """
+    if publication_held:
+        print('ML publication held: omitting upcoming model forecasts')
+        return {}
     try:
         import pandas as pd  # local import — only needed when forecasts exist
     except Exception as exc:
@@ -119,9 +124,12 @@ def load_ml_forecasts() -> dict[tuple[str, str], dict]:
     return out
 
 
-def load_event_forecast_archive() -> dict[tuple[str, str], dict]:
+def load_event_forecast_archive(*, forecasts_dir: Path | None = None) -> dict[tuple[str, str], dict]:
     """Return the durable final pre-event ML forecast for each earnings event."""
-    path = EVENT_FORECAST_ARCHIVE_PATH
+    path = (forecasts_dir / EVENT_FORECAST_ARCHIVE_PATH.name
+            if forecasts_dir is not None else EVENT_FORECAST_ARCHIVE_PATH)
+    publications_path = (forecasts_dir / EVENT_PREDICTION_PUBLICATIONS_PATH.name
+                         if forecasts_dir is not None else EVENT_PREDICTION_PUBLICATIONS_PATH)
     if not path.exists():
         return {}
     try:
@@ -151,9 +159,9 @@ def load_event_forecast_archive() -> dict[tuple[str, str], dict]:
     frame = frame.dropna(subset=["act_symbol", "earnings_date", "snapshot_date"])
     frame["act_symbol"] = frame["act_symbol"].astype(str).str.upper().str.strip()
 
-    if EVENT_PREDICTION_PUBLICATIONS_PATH.exists() and "forecast_id" in frame.columns:
+    if publications_path.exists() and "forecast_id" in frame.columns:
         try:
-            publications = pd.read_parquet(EVENT_PREDICTION_PUBLICATIONS_PATH)
+            publications = pd.read_parquet(publications_path)
         except Exception as exc:
             print(
                 f"⚠️  Could not read {EVENT_PREDICTION_PUBLICATIONS_PATH.name}: {exc}"
@@ -175,6 +183,51 @@ def load_event_forecast_archive() -> dict[tuple[str, str], dict]:
         out[key] = row
     print(f"🧊 Loaded {len(out)} frozen event ML forecasts from {path.name}")
     return out
+
+
+def withhold_upcoming_ml(public_dir: Path, *, today: date) -> None:
+    """Apply a drift hold to retained files too, preserving reported forecasts."""
+    paths = [public_dir / 'weekly.json', public_dir / 'screener.json',
+             *sorted((public_dir / 'weeks').glob('*.json')),
+             *sorted((public_dir / 'symbols').glob('*.json'))]
+    ml_keys = {'em_ml_pct', 'em_ml_abs', 'correction_factor', 'model_horizon',
+               'ml_snapshot_date', 'p10', 'p25', 'p50', 'p75', 'p90'}
+    for path in paths:
+        if not path.is_file() or path.name == 'manifest.json':
+            continue
+        payload = json.loads(path.read_text())
+        nodes = list(payload.get('events') or [])
+        if isinstance(payload.get('expected_move'), dict):
+            nodes.append(payload['expected_move'])
+        changed = False
+        for node in nodes:
+            event_date = node.get('earnings_date')
+            if not event_date or date.fromisoformat(str(event_date)[:10]) <= today:
+                continue
+            changed = True
+            for key in list(node):
+                if key in ml_keys or key.startswith('forecast_'):
+                    node.pop(key)
+            if node.get('display_forecast_method') == 'ml':
+                for key in ('display_forecast_pct', 'display_forecast_method', 'display_forecast_as_of'):
+                    node.pop(key, None)
+            if node.get('em_method') == 'ml_lightgbm':
+                node.pop('em_method', None)
+            node['ml_status'] = 'unavailable_model'
+            node['ml_publication_status'] = 'held'
+            node['ml_publication_reason'] = 'feature_drift'
+            if node.get('display_forecast_method') is None:
+                for key, method in (('em_iv_pct', 'options_math'), ('iv_pct', 'options_math'),
+                                    ('em_straddle_pct', 'options_math'), ('straddle_pct', 'options_math'),
+                                    ('hist_move_med_4q', 'historical'), ('hist_move_avg_4q', 'historical')):
+                    value = node.get(key)
+                    if isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value) and value > 0:
+                        node.update(display_forecast_pct=value, display_forecast_method=method,
+                                    display_forecast_as_of=node.get('as_of_date') or payload.get('as_of_date'),
+                                    em_method='options_math' if method == 'options_math' else 'historical')
+                        break
+        if changed:
+            path.write_text(json.dumps(payload, indent=2) + '\n')
 
 
 def ml_fields(fc: dict | None) -> dict:

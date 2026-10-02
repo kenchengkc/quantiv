@@ -36,6 +36,7 @@ from frontend_data.forecast_artifacts import (
     load_provider_enrichments,
     provider_event_fields as provider_event_fields,
     publish_forecast_evidence,
+    withhold_upcoming_ml,
 )
 from frontend_data.payloads import (
     align_symbol_detail_to_published,
@@ -73,6 +74,10 @@ def main():
 
     ap = argparse.ArgumentParser()
     ap.add_argument(
+        '--verify-model-publication', action='store_true',
+        help='Require signed monitoring evidence; omit upcoming ML during a verified drift hold.',
+    )
+    ap.add_argument(
         "--resume",
         action="store_true",
         help=(
@@ -96,10 +101,20 @@ def main():
         ),
     )
     args = ap.parse_args()
+    publication_held = False
+    retained_forecasts_dir = None
+    if args.verify_model_publication:
+        from model_publication import backup_dir, verify_publication
+        policy = verify_publication(DATA_DIR, not_before=os.getenv('REFRESH_STARTED_AT'))
+        publication_held = not policy['can_publish_ml']
+        retained_forecasts_dir = backup_dir(DATA_DIR) if publication_held else None
+        if publication_held and (args.resume or args.skip_weeks):
+            raise ValueError('a model hold requires rebuilding every publication surface')
 
     (PUBLIC_DIR / "symbols").mkdir(parents=True, exist_ok=True)
     (PUBLIC_DIR / "weeks").mkdir(parents=True, exist_ok=True)
-    publish_forecast_evidence()
+    if not publication_held:
+        publish_forecast_evidence()
 
     conn = duckdb.connect()
     # Cap DuckDB memory so long-running symbol-detail loops don't OOM-segfault.
@@ -108,8 +123,8 @@ def main():
     conn.execute("PRAGMA threads=4")
     build_earnings_events_table(conn, EARNINGS_CSV)
     create_duckdb_views(conn, DATA_DIR)
-    ml_lookup = load_ml_forecasts()
-    event_forecast_archive = load_event_forecast_archive()
+    ml_lookup = load_ml_forecasts(publication_held=publication_held)
+    event_forecast_archive = load_event_forecast_archive(forecasts_dir=retained_forecasts_dir)
     provider_lookup = load_provider_enrichments()
     published_forecast_ids: set[str] = set()
 
@@ -370,6 +385,8 @@ def main():
         today=today,
         generated_at=datetime.now().isoformat(),
     )
+    display_status['ml_publication_status'] = 'held' if publication_held else 'eligible'
+    display_status['ml_publication_reason'] = 'feature_drift' if publication_held else None
     mix = display_status["method_mix"]
     print(
         "  forecast methods: "
@@ -514,9 +531,14 @@ def main():
             )
             generated += 1
         except Exception as e:
+            if publication_held:
+                raise RuntimeError(f'cannot safely rebuild {ticker} during model publication hold') from e
             print(f"  ⚠️  {ticker} detail: {e}")
 
-    publication_path = record_publications(
+    if publication_held:
+        withhold_upcoming_ml(PUBLIC_DIR, today=today)
+
+    publication_path = None if publication_held else record_publications(
         published_forecast_ids,
         DATA_DIR / "forecasts",
         published_at=datetime.now(timezone.utc),

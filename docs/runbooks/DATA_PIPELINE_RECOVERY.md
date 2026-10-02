@@ -2,6 +2,30 @@
 
 Use this runbook for failed/stale daily refreshes, rejected options candidates, provider gaps, and forecast-to-Neon import failures.
 
+## Model drift publication holds
+
+Daily refresh and saved-data publication recovery verify the signed monitoring
+report against the exact scored forecast and active champion. Critical feature
+drift keeps the monitoring result failed and holds new ML publication. The
+workflow skips forecast uploads and Neon imports while rebuilding the calendar,
+IV and historical display estimates. Retained public payloads also withhold
+upcoming ML; reported forecasts keep their original values and dates. The
+control panel identifies the ML hold explicitly. Signature, digest, freshness,
+forecast-validation and other data-control failures still stop the workflow.
+
+The hold path snapshots the durable forecast archive before scoring and never
+uses newly scored rows as reported-event evidence. Monitoring reports, signed
+receipts and the ledger are uploaded as workflow evidence even on failure. A
+successful data publication with held ML is not evidence that a new model was
+promoted or that options became decision-safe. Retraining and model promotion
+retain their existing gates.
+
+Options-only catch-up also restores matching volatility history. Its latest
+partition must match the source count, schema and unique symbol/date keys. The
+acceptance receipt records its digest and is checked again immediately before
+R2 promotion. Previously completed recovery receipts without that evidence
+cannot be reused for another promotion.
+
 ## Trigger symptoms
 
 - `Daily data refresh` fails or exceeds its normal completion window.

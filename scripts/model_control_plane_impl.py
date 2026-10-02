@@ -38,6 +38,7 @@ from ml.model_control import (  # noqa: E402
     update_outcome_history,
 )
 from ml.pipeline_validation import latest_forecast_path  # noqa: E402
+from ml.model_artifact import sha256_file  # noqa: E402
 
 
 def _atomic_json(path: Path, payload: dict[str, Any]) -> None:
@@ -314,6 +315,11 @@ def monitor(args: argparse.Namespace) -> int:
         "snapshot_date": str(pd.to_datetime(forecasts["snapshot_date"]).max().date()),
         "champion_bundle_id": champion_id,
         "forecast_path": str(forecast_path),
+        "forecast_sha256": sha256_file(forecast_path),
+        "published_forecasts_sha256": (
+            sha256_file(args.forecast_dir.parent / '.published_forecasts/manifest.json')
+            if (args.forecast_dir.parent / '.published_forecasts/manifest.json').is_file() else None
+        ),
         "ledger_rows": len(ledger),
         "feature_drift": drift,
         "shadow_scoring": shadows,

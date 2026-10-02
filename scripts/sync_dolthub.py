@@ -1358,14 +1358,17 @@ def sync_volhist(start_date_str: Optional[str] = None, end_date_str: Optional[st
     volhist_root.mkdir(parents=True, exist_ok=True)
     meta = load_meta()
 
-    if full:
-        rows_min = query("SELECT date FROM volatility_history ORDER BY date ASC LIMIT 1", OPTIONS_API)
-        rows_max = query("SELECT date FROM volatility_history ORDER BY date DESC LIMIT 1", OPTIONS_API)
-        start = date.fromisoformat(start_date_str) if start_date_str else date.fromisoformat(rows_min[0]["date"])
-        end = date.fromisoformat(end_date_str) if end_date_str else date.fromisoformat(rows_max[0]["date"])
+    if end_date_str:
+        end = date.fromisoformat(end_date_str)
     else:
         rows_max = query("SELECT date FROM volatility_history ORDER BY date DESC LIMIT 1", OPTIONS_API)
         end = date.fromisoformat(rows_max[0]["date"])
+    if start_date_str:
+        start = date.fromisoformat(start_date_str)
+    elif full:
+        rows_min = query("SELECT date FROM volatility_history ORDER BY date ASC LIMIT 1", OPTIONS_API)
+        start = date.fromisoformat(rows_min[0]["date"])
+    else:
         last = meta.get("last_volhist_date")
         if last:
             start = date.fromisoformat(last) + timedelta(days=1)

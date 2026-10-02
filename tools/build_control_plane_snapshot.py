@@ -319,6 +319,8 @@ def build_snapshot(
         },
         "model": {
             "status": model_status,
+            "publication_status": display.get('ml_publication_status', 'unavailable'),
+            "publication_hold_reason": display.get('ml_publication_reason'),
             "monitored_at": monitoring.get("monitored_at"),
             "snapshot_date": monitoring.get("snapshot_date"),
             "champion_active": active_champion,

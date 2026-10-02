@@ -14,6 +14,9 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+import hashlib
+
+import pyarrow.parquet as pq
 
 from market_sessions import is_us_market_session, latest_completed_us_market_session
 from options_snapshot_resilience import _validated_manifest, finalize_snapshot
@@ -106,7 +109,7 @@ def require_accepted_candidate(data_dir: Path, target: date, not_before: str,
 
 
 def restricted_query(sql: str, api_url: str = dolt.OPTIONS_API, retries: int = 3) -> list[dict]:
-    allowed = {dolt.OPTIONS_API: {'option_chain'}, dolt.STOCKS_API: {'split', 'dividend'}}
+    allowed = {dolt.OPTIONS_API: {'option_chain', 'volatility_history'}, dolt.STOCKS_API: {'split', 'dividend'}}
     tables = re.findall(r'\bFROM\s+`?([a-z_]+)`?', sql, flags=re.IGNORECASE)
     # These ingestion helpers emit one-table SELECTs. Reject unsupported SQL
     # structures instead of trying to implement a general SQL parser here.
@@ -116,11 +119,41 @@ def restricted_query(sql: str, api_url: str = dolt.OPTIONS_API, retries: int = 3
         or re.search(r'\b(?:JOIN|UNION|INSERT|UPDATE|DELETE|DROP)\b', sql, flags=re.IGNORECASE)
         or ',' in source_clause
         or tables[0].lower() not in allowed.get(api_url, set())):
-        raise RuntimeError('options recovery may query only option_chain, split, and dividend on DoltHub')
+        raise RuntimeError('options recovery may query only option_chain, volatility_history, split, and dividend on DoltHub')
     return _source_query(sql, api_url, retries)
 
 
 _source_query = dolt.query
+
+
+def _volatility_partition(data_dir: Path, target: date):
+    partition = data_dir / f'parquet/volatility_history/year={target.year}/month={target.month:02d}/{target}.parquet'
+    if not partition.is_file():
+        raise RuntimeError(f'missing latest volatility-history partition after sync: {target}')
+    parquet = pq.ParquetFile(partition)
+    if not parquet.schema_arrow.remove_metadata().equals(dolt.VOLHIST_SCHEMA.remove_metadata()):
+        raise RuntimeError('latest volatility-history partition has invalid schema')
+    frame = parquet.read().to_pandas()
+    if (frame.empty
+        or frame['date'].isna().any() or set(frame['date']) != {target}
+        or frame['act_symbol'].isna().any() or frame['act_symbol'].astype(str).str.strip().eq('').any()
+        or frame.duplicated(['date', 'act_symbol']).any()):
+        raise RuntimeError('latest volatility-history partition has invalid schema or primary keys')
+    return partition, frame
+
+
+def recover_volatility_history(data_dir: Path, days: list[date]) -> dict:
+    """Recover matching public options-derived features, with a complete latest partition."""
+    dolt.sync_volhist(start_date_str=days[0].isoformat(), end_date_str=days[-1].isoformat())
+    target = days[-1]
+    partition, frame = _volatility_partition(data_dir, target)
+    rows = restricted_query(f"SELECT COUNT(*) AS rows_count FROM volatility_history WHERE date = '{target}'")
+    expected = int(rows[0]['rows_count'])
+    if len(frame) != expected:
+        raise RuntimeError(f'volatility-history source row count mismatch: expected {expected}, received {len(frame)}')
+    return {'status': 'passed', 'source_date': target.isoformat(), 'expected_rows': expected,
+            'received_rows': len(frame), 'partition': partition.relative_to(data_dir).as_posix(),
+            'sha256': hashlib.sha256(partition.read_bytes()).hexdigest()}
 
 
 def verify_promotion(data_dir: Path) -> dict:
@@ -131,6 +164,18 @@ def verify_promotion(data_dir: Path) -> dict:
                                        receipt['started_at'])
     if report.get('manifest_id') != receipt.get('manifest_id'):
         raise RuntimeError('options recovery acceptance receipt references a different candidate')
+    target = date.fromisoformat(receipt['target_date'])
+    vol = receipt.get('volatility_history') or {}
+    expected_path = f'parquet/volatility_history/year={target.year}/month={target.month:02d}/{target}.parquet'
+    if (vol.get('status') != 'passed' or vol.get('source_date') != target.isoformat()
+        or vol.get('partition') != expected_path
+        or type(vol.get('expected_rows')) is not int or vol['expected_rows'] <= 0
+        or vol.get('received_rows') != vol['expected_rows']):
+        raise RuntimeError('options recovery requires a complete latest volatility-history receipt')
+    partition, frame = _volatility_partition(data_dir, target)
+    if (len(frame) != vol['received_rows']
+        or hashlib.sha256(partition.read_bytes()).hexdigest() != vol.get('sha256')):
+        raise RuntimeError('latest volatility-history partition does not match its accepted receipt')
     return report
 
 
@@ -160,6 +205,7 @@ def main() -> int:
     dolt.sync_dates(days, dolt.parquet_root(), skip_existing=True)
     empty_sessions = verify_synced_sessions(data_dir, days)
     dolt.sync_corporate_actions(end_date_str=args.target_date.isoformat())
+    volatility_history = recover_volatility_history(data_dir, days)
     env = {**os.environ, 'DATA_DIR': str(data_dir)}
     subprocess.run([sys.executable, 'scripts/setup_duckdb_from_parquet.py'], cwd=ROOT, env=env, check=True)
     # Non-strict writes the full rejection evidence so finalize_snapshot can
@@ -177,7 +223,7 @@ def main() -> int:
     dolt.save_meta(meta)
     receipt = {'schema': 'quantiv.options-recovery.v1', 'started_at': started,
                'target_date': args.target_date.isoformat(), 'manifest_id': report['manifest_id'],
-               'source_empty_sessions': empty_sessions}
+               'source_empty_sessions': empty_sessions, 'volatility_history': volatility_history}
     (data_dir / 'validation/options_recovery.json').write_text(json.dumps(receipt, indent=2) + '\n')
     print(f"Accepted options recovery: {args.target_date} · {report['manifest_id']}", flush=True)
     return 0

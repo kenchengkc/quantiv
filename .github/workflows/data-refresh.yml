@@ -308,7 +308,9 @@ jobs:
 
       - name: Score upcoming earnings
         if: steps.options_gate.outputs.can_refresh == 'true'
-        run: python scripts/daily_score.py --days-ahead 21
+        run: |
+          python scripts/model_publication.py snapshot
+          python scripts/daily_score.py --days-ahead 21
 
       - name: Gate — validate scored ML and IV forecasts
         if: steps.options_gate.outputs.can_refresh == 'true'
@@ -328,17 +330,26 @@ jobs:
 
       - name: Monitor champion, shadows, and feature drift
         if: steps.options_gate.outputs.can_refresh == 'true'
+        id: model_publication
         env:
           MODEL_BUNDLE_SIGNING_KEY: ${{ secrets.MODEL_BUNDLE_SIGNING_KEY }}
         run: |
-          if [ -f data/models/control/champion.json ]; then
-            python scripts/model_control_plane.py monitor
-          else
-            echo "No signed champion yet; monitoring begins after the first gated retrain."
-          fi
+          python scripts/model_publication.py monitor --github-output "$GITHUB_OUTPUT"
+
+      - name: Preserve model monitoring and publication decision
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: refresh-model-monitoring
+          path: |
+            data/models/monitoring/latest_monitoring.json
+            data/models/monitoring/latest_monitoring.receipt.json
+            data/models/monitoring/prediction_ledger.parquet
+          if-no-files-found: ignore
+          retention-days: 30
 
       - name: Import recent forecasts to Neon
-        if: steps.options_gate.outputs.can_refresh == 'true'
+        if: steps.options_gate.outputs.can_refresh == 'true' && steps.model_publication.outputs.can_publish_ml == 'true'
         id: neon_import
         continue-on-error: true
         env:
@@ -346,7 +357,7 @@ jobs:
         run: python -u scripts/import_recent_to_postgres.py --full
 
       - name: Push forecasts to R2
-        if: steps.options_gate.outputs.can_refresh == 'true'
+        if: steps.options_gate.outputs.can_refresh == 'true' && steps.model_publication.outputs.can_publish_ml == 'true'
         env:
           R2_BUCKET: ${{ secrets.R2_BUCKET }}
         run: bash scripts/r2_push.sh --forecasts-only
@@ -370,14 +381,14 @@ jobs:
           TWELVEDATA_VALIDATION_SAMPLE_SIZE: "8"
           TWELVEDATA_VALIDATION_DELTA_PCT: "0.005"
           TWELVEDATA_SHARE_PROVIDER_LEDGER: "1"
-        run: python -u tools/build_frontend_data.py
+        run: python -u tools/build_frontend_data.py --verify-model-publication
 
       - name: Restore frozen forecasts for reported events
         if: steps.options_gate.outputs.can_refresh == 'true'
         run: python scripts/restore_reported_forecasts.py --apply
 
       - name: Persist forecast ledger publication receipts
-        if: steps.options_gate.outputs.can_refresh == 'true'
+        if: steps.options_gate.outputs.can_refresh == 'true' && steps.model_publication.outputs.can_publish_ml == 'true'
         env:
           R2_BUCKET: ${{ secrets.R2_BUCKET }}
         run: bash scripts/r2_push.sh --forecasts-only
@@ -385,7 +396,7 @@ jobs:
       - name: Build production control snapshot
         env:
           CONTROL_DATA_R2_STATUS: passed
-          CONTROL_FORECAST_R2_STATUS: ${{ steps.options_gate.outputs.can_refresh == 'true' && 'passed' || 'degraded' }}
+          CONTROL_FORECAST_R2_STATUS: ${{ steps.model_publication.outputs.can_publish_ml == 'true' && 'passed' || 'degraded' }}
           CONTROL_FRONTEND_PAYLOAD_STATUS: ${{ steps.options_gate.outputs.can_refresh == 'true' && 'passed' || 'degraded' }}
           CONTROL_NEON_IMPORT_STATUS: ${{ steps.options_gate.outputs.can_refresh == 'true' && steps.neon_import.outcome || 'degraded' }}
         run: python -u tools/build_control_plane_snapshot.py
@@ -531,6 +542,7 @@ jobs:
             data/validation/options_snapshot_status.json
             data/validation/options_recovery.json
             data/parquet/options_chain/year=*/month=*/${{ inputs.options_target_date }}.parquet
+            data/parquet/volatility_history/year=*/month=*/${{ inputs.options_target_date }}.parquet
             data/control/ingestion/options
             data/control/ingestion/corporate_actions
             data/quarantine/options_candidates
@@ -564,6 +576,9 @@ jobs:
     env:
       PROVIDER_FREE_RECOVERY: '1'
     steps:
+      - name: Record publication recovery start time
+        run: echo "REFRESH_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
+
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -644,7 +659,9 @@ jobs:
         run: bash scripts/run_provider_free.sh python scripts/setup_duckdb_from_parquet.py
 
       - name: Score upcoming earnings from saved data
-        run: bash scripts/run_provider_free.sh python scripts/daily_score.py --days-ahead 21
+        run: |
+          bash scripts/run_provider_free.sh python scripts/model_publication.py snapshot
+          bash scripts/run_provider_free.sh python scripts/daily_score.py --days-ahead 21
 
       - name: Gate — validate recovered ML and IV forecasts
         run: |
@@ -660,16 +677,26 @@ jobs:
           retention-days: 30
 
       - name: Monitor champion and feature drift from saved inputs
+        id: model_publication
         env:
           MODEL_BUNDLE_SIGNING_KEY: ${{ secrets.MODEL_BUNDLE_SIGNING_KEY }}
         run: |
-          if [ -f data/models/control/champion.json ]; then
-            bash scripts/run_provider_free.sh python scripts/model_control_plane.py monitor
-          else
-            echo "No signed champion yet; skipping monitoring."
-          fi
+          bash scripts/run_provider_free.sh python scripts/model_publication.py monitor --github-output "$GITHUB_OUTPUT"
+
+      - name: Preserve recovered model monitoring and publication decision
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: recovery-model-monitoring
+          path: |
+            data/models/monitoring/latest_monitoring.json
+            data/models/monitoring/latest_monitoring.receipt.json
+            data/models/monitoring/prediction_ledger.parquet
+          if-no-files-found: ignore
+          retention-days: 30
 
       - name: Import recovered forecasts to Neon
+        if: steps.model_publication.outputs.can_publish_ml == 'true'
         id: recovery_neon
         continue-on-error: true
         env:
@@ -677,12 +704,13 @@ jobs:
         run: bash scripts/run_provider_free.sh python -u scripts/import_recent_to_postgres.py --full
 
       - name: Push recovered forecasts to R2
+        if: steps.model_publication.outputs.can_publish_ml == 'true'
         env:
           R2_BUCKET: ${{ secrets.R2_BUCKET }}
         run: bash scripts/r2_push.sh --forecasts-only
 
       - name: Build frontend JSON without market-data providers
-        run: bash scripts/run_provider_free.sh python -u tools/build_frontend_data.py
+        run: bash scripts/run_provider_free.sh python -u tools/build_frontend_data.py --verify-model-publication
 
       - name: Restore frozen forecasts for reported events
         run: bash scripts/run_provider_free.sh python scripts/restore_reported_forecasts.py --apply
@@ -718,6 +746,7 @@ jobs:
           fi
 
       - name: Persist recovered forecast publication receipts
+        if: steps.model_publication.outputs.can_publish_ml == 'true'
         env:
           R2_BUCKET: ${{ secrets.R2_BUCKET }}
         run: bash scripts/r2_push.sh --forecasts-only
@@ -725,7 +754,7 @@ jobs:
       - name: Build production control snapshot
         env:
           CONTROL_DATA_R2_STATUS: passed
-          CONTROL_FORECAST_R2_STATUS: passed
+          CONTROL_FORECAST_R2_STATUS: ${{ steps.model_publication.outputs.can_publish_ml == 'true' && 'passed' || 'degraded' }}
           CONTROL_FRONTEND_PAYLOAD_STATUS: passed
           CONTROL_NEON_IMPORT_STATUS: ${{ steps.recovery_neon.outcome }}
         run: bash scripts/run_provider_free.sh python -u tools/build_control_plane_snapshot.py
