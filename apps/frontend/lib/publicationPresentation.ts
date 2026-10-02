@@ -9,7 +9,7 @@ export type PublicationControl = {
     source_session_lag?: number | null;
     quote_quality_errors?: string[];
   };
-  model: { status?: string };
+  model: { status?: string; publication_status?: string; publication_hold_reason?: string | null };
   exceptions: Array<{ code: string; severity: string; summary?: string; count?: number }>;
 };
 
@@ -48,6 +48,14 @@ export function researchUpdatePresentation(control: PublicationControl, forecast
   if (control.publication_eligible === true && critical.length === 0
     && ACCEPTABLE.has(control.data.status ?? '') && modelUsable) {
     return { label: 'Eligible', tone: 'up', detail: 'Current controls permit a new research release.' } as const;
+  }
+  if (control.publication_eligible === false && control.model.status === 'failed'
+    && control.model.publication_status === 'held' && control.model.publication_hold_reason === 'feature_drift'
+    && critical.every((item) => OPTIONS_ONLY.has(item.code))) {
+    return {
+      label: 'Held', tone: 'flag',
+      detail: 'New ML forecasts are withheld because feature drift exceeded limits. Calendar and display data continue to update; historical forecasts retain their original dates.',
+    } as const;
   }
   if (control.publication_eligible === false && publishedForecastStatus(forecast) === 'passed'
     && modelUsable && critical.length > 0 && critical.every((item) => OPTIONS_ONLY.has(item.code))) {

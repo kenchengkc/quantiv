@@ -140,9 +140,21 @@ def test_options_promotion_never_writes_models_forecasts_calendar_or_runtime(tmp
     report['source_reconciliation']['source_date'] = report['quote_quality']['source_date'] = target
     status['active_source_date'] = status['candidate_source_date'] = target
     _write(data, report, status)
+    import hashlib
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+    from scripts.sync_dolthub import VOLHIST_SCHEMA
+    vol_path = data / f'parquet/volatility_history/year={target[:4]}/month={target[5:7]}/{target}.parquet'
+    vol_path.parent.mkdir(parents=True)
+    vol_row = {field.name: None for field in VOLHIST_SCHEMA}
+    vol_row.update(date=date.fromisoformat(target), act_symbol='TEST')
+    pq.write_table(pa.Table.from_pylist([vol_row], schema=VOLHIST_SCHEMA), vol_path)
     (data / 'validation/options_recovery.json').write_text(json.dumps({
         'schema': 'quantiv.options-recovery.v1', 'target_date': target,
         'started_at': (generated - timedelta(seconds=10)).isoformat(), 'manifest_id': 'sha256:fresh',
+        'volatility_history': {'status': 'passed', 'source_date': target, 'expected_rows': 1,
+            'received_rows': 1, 'partition': vol_path.relative_to(data).as_posix(),
+            'sha256': hashlib.sha256(vol_path.read_bytes()).hexdigest()},
     }))
     binaries = tmp_path / 'bin'
     binaries.mkdir()

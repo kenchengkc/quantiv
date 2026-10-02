@@ -66,6 +66,17 @@ describe('publication presentation (never changes gate semantics)', () => {
     expect(researchUpdatePresentation({ ...control, publication_eligible: true }, forecast).label).toBe('Blocked');
   });
 
+  it('describes a verified model hold while preserving failed control status', () => {
+    const held = { ...control, model: { status: 'failed', publication_status: 'held', publication_hold_reason: 'feature_drift' } };
+    const presentation = researchUpdatePresentation(held, forecast);
+    expect(presentation.label).toBe('Held');
+    expect(presentation.detail).toContain('New ML forecasts are withheld');
+    expect(presentation.detail).toContain('Calendar and display data');
+    expect(held.model.status).toBe('failed');
+    expect(held.publication_eligible).toBe(false);
+    expect(researchUpdatePresentation({ ...held, exceptions: [{ code: 'corporate_actions_failed', severity: 'critical' }] }, forecast).label).toBe('Blocked');
+  });
+
   it('shows eligible only with a complete, permissive current assessment', () => {
     const eligible = { ...control, publication_eligible: true, data: { status: 'passed' }, exceptions: [] };
     expect(researchUpdatePresentation(eligible, forecast).label).toBe('Eligible');
