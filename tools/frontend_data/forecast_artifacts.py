@@ -196,12 +196,12 @@ def withhold_upcoming_ml(public_dir: Path, *, today: date) -> None:
         if not path.is_file() or path.name == 'manifest.json':
             continue
         payload = json.loads(path.read_text())
-        nodes = list(payload.get('events') or [])
+        nodes = [*(payload.get('events') or []), *(payload.get('earnings_history') or [])]
         if isinstance(payload.get('expected_move'), dict):
             nodes.append(payload['expected_move'])
         changed = False
         for node in nodes:
-            event_date = node.get('earnings_date')
+            event_date = node.get('earnings_date') or node.get('date')
             if not event_date or date.fromisoformat(str(event_date)[:10]) <= today:
                 continue
             changed = True

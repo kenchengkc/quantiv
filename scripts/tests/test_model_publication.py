@@ -74,7 +74,7 @@ def test_passed_monitor_allows_ml(signed_monitor):
     assert publication.verify_publication(root)['can_publish_ml'] is True
 
 
-@pytest.mark.parametrize('mutation', ['report', 'forecast', 'archive', 'champion', 'stale', 'other_failure'])
+@pytest.mark.parametrize('mutation', ['report', 'forecast', 'archive', 'champion', 'stale', 'other_failure', 'extra_archive'])
 def test_publication_refuses_unverified_or_mismatched_evidence(signed_monitor, mutation):
     publication, root, write = signed_monitor
     if mutation == 'report':
@@ -85,6 +85,11 @@ def test_publication_refuses_unverified_or_mismatched_evidence(signed_monitor, m
         (publication.backup_dir(root) / 'event_forecast_archive.parquet').write_bytes(b'changed')
     elif mutation == 'champion':
         write(bundle_id='b' * 64)
+    elif mutation == 'extra_archive':
+        (root / 'forecasts/event_forecast_archive.parquet').unlink()
+        publication.snapshot_published_forecasts(root)
+        write()
+        (publication.backup_dir(root) / 'event_forecast_archive.parquet').write_bytes(b'unsigned archive')
     elif mutation == 'other_failure':
         report = write('unavailable')
         report['status'] = 'failed'
@@ -94,7 +99,7 @@ def test_publication_refuses_unverified_or_mismatched_evidence(signed_monitor, m
             ledger_path=root / 'models/monitoring/prediction_ledger.parquet', report_path=path,
             snapshot_date=report['snapshot_date'])
         (root / 'models/monitoring/latest_monitoring.receipt.json').write_text(json.dumps(receipt))
-    with pytest.raises((ValueError, RuntimeError), match='digest|size|forecast|champion|predates|verified'):
+    with pytest.raises((ValueError, RuntimeError), match='digest|size|forecast|champion|predates|verified|inventory'):
         publication.verify_publication(root, not_before='2026-10-02T07:00:00Z' if mutation == 'stale' else None)
 
 
@@ -147,10 +152,13 @@ def test_hold_removes_upcoming_ml_from_retained_symbol_files_but_preserves_histo
     symbols.mkdir()
     path = symbols / 'RETAINED.json'
     historical = {'date': '2026-09-23', 'em_ml_pct': .04, 'display_forecast_method': 'ml'}
+    future_history = {'date': '2026-10-21', 'em_ml_pct': .99, 'p90': .99,
+                      'display_forecast_method': 'ml', 'display_forecast_pct': .99,
+                      'forecast_id': 'future-history-ml'}
     path.write_text(json.dumps({'symbol': 'RETAINED', 'as_of_date': '2026-09-28',
         'expected_move': {'earnings_date': '2026-10-21', 'em_ml_pct': .09, 'p10': .01,
             'display_forecast_pct': .09, 'display_forecast_method': 'ml',
-            'iv_pct': .07, 'forecast_id': 'retained-ml'}, 'earnings_history': [historical]}))
+            'iv_pct': .07, 'forecast_id': 'retained-ml'}, 'earnings_history': [historical, future_history]}))
     hold = getattr(forecast_artifacts, 'withhold_upcoming_ml', None)
     assert callable(hold), 'hold must cover retained public files as well as rebuilt events'
     hold(tmp_path, today=date(2026, 10, 2))
@@ -161,4 +169,8 @@ def test_hold_removes_upcoming_ml_from_retained_symbol_files_but_preserves_histo
     assert expected['display_forecast_method'] == 'options_math'
     assert expected['display_forecast_pct'] == .07
     assert expected['display_forecast_as_of'] == '2026-09-28'
-    assert result['earnings_history'] == [historical]
+    assert result['earnings_history'][0] == historical
+    assert result['earnings_history'][1].get('em_ml_pct') is None
+    assert result['earnings_history'][1].get('p90') is None
+    assert result['earnings_history'][1].get('forecast_id') is None
+    assert result['earnings_history'][1].get('display_forecast_method') != 'ml'

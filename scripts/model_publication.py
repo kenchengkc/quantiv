@@ -74,6 +74,8 @@ def verify_publication(data_dir: Path, *, not_before: str | None = None) -> dict
         names = [item['name'] for item in files]
         if len(set(names)) != len(names) or set(names) - set(ARCHIVE_FILES):
             raise RuntimeError('invalid published forecast archive backup')
+        if {path.name for path in backup_dir(data_dir).iterdir()} != {'manifest.json', *names}:
+            raise RuntimeError('published forecast archive backup inventory mismatch')
         for item in files:
             path = backup_dir(data_dir) / item['name']
             if not path.is_file() or sha256_file(path) != item['sha256']:
