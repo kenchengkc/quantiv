@@ -236,9 +236,10 @@ def withhold_upcoming_ml(public_dir: Path, *, today: date) -> None:
     # the same resolved ticker-page signature that the publication contract
     # validates; this preserves the existing IV -> historical display order.
     try:
-        from tools.validate_public_contracts import _symbol_page_signature
+        from tools.validate_public_contracts import _symbol_historical_median, _symbol_page_signature
     except ModuleNotFoundError:
-        from validate_public_contracts import _symbol_page_signature
+        from validate_public_contracts import _symbol_historical_median, _symbol_page_signature
+    from .display_payloads import _validate_display_provenance
     for path in paths:
         if path.parent == public_dir / 'symbols' or not path.is_file() or path.name == 'manifest.json':
             continue
@@ -252,10 +253,47 @@ def withhold_upcoming_ml(public_dir: Path, *, today: date) -> None:
             signature, components = _symbol_page_signature(symbol, event_date)
             if signature is None:
                 continue
+            calendar_date = (node.get('as_of_date') or payload.get('as_of_date')
+                             or (payload.get('metadata') or {}).get('as_of_date'))
+            symbol_date = symbol.get('as_of_date')
+            if not calendar_date or not symbol_date or calendar_date != symbol_date:
+                raise RuntimeError(f"{path.name}/{node.get('ticker')}: incompatible source dates "
+                                   f"{calendar_date!r} and {symbol_date!r}")
+            expected = symbol.get('expected_move') or {}
+            source = (expected if str(expected.get('earnings_date') or '')[:10] == event_date
+                      else next((row for row in symbol.get('earnings_history') or []
+                                 if str(row.get('date') or '')[:10] == event_date), {}))
+            method, pct = signature
+            if method == 'ml':
+                raise RuntimeError(f"{path.name}/{node.get('ticker')}: ML remains under publication hold")
+            _, historical_count = _symbol_historical_median(symbol, event_date)
+            options_status = {'options_math': 'decision_eligible', 'options_indicative': 'indicative',
+                              'historical': 'unavailable', 'historical_prior': 'unavailable'}[method]
+            if method == 'options_math' and source.get('options_status') not in {None, 'decision_eligible'}:
+                raise RuntimeError(f"{path.name}/{node.get('ticker')}: incompatible options provenance")
+            fallback_reason = None
+            if method == 'historical_prior':
+                fallback_reason = 'insufficient_ticker_history'
+            elif method in {'historical', 'options_indicative'}:
+                fallback_reason = source.get('fallback_reason') or 'no_same_strike_pair'
+            as_of = symbol_date
+            if method.startswith('options_'):
+                as_of = (source.get('display_forecast_as_of')
+                         if source.get('display_forecast_method') == method else None)
+                as_of = as_of or source.get('implied_as_of') or symbol_date
+            elif source.get('display_forecast_method') == method:
+                as_of = source.get('display_forecast_as_of') or symbol_date
             for key, component in (('em_iv_pct', 'iv'), ('em_straddle_pct', 'straddle'),
                                    ('hist_move_med_4q', 'historical')):
                 node[key] = components[component]
-            node.update(display_forecast_method=signature[0], display_forecast_pct=signature[1])
+            node.update(display_forecast_method=method, display_forecast_pct=pct,
+                        display_forecast_as_of=as_of, em_method=method,
+                        options_status=options_status, fallback_reason=fallback_reason,
+                        historical_event_count=historical_count if method.startswith('historical') else None)
+            errors = []
+            _validate_display_provenance(node, identity=f"{path.name}/{node.get('ticker')}", errors=errors)
+            if errors:
+                raise RuntimeError('Invalid held display provenance: ' + '; '.join(errors))
             changed = True
         if changed:
             path.write_text(json.dumps(payload, indent=2) + '\n')

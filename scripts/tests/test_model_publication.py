@@ -196,3 +196,21 @@ def test_hold_calendar_and_symbol_use_same_historical_fallback(tmp_path):
     assert held['display_forecast_method'] == 'historical'
     assert held['display_forecast_pct'] == pytest.approx(.07)
     assert held['hist_move_med_4q'] == pytest.approx(.07)
+    assert held['display_forecast_as_of'] == '2026-09-30'
+    assert held['options_status'] == 'unavailable'
+    assert held['historical_event_count'] == 4
+    assert held['em_method'] == 'historical'
+
+
+def test_hold_refuses_aligning_forecasts_from_different_source_dates(tmp_path):
+    from datetime import date
+    from tools.frontend_data import forecast_artifacts
+    symbols = tmp_path / 'symbols'
+    symbols.mkdir()
+    (symbols / 'TEST.json').write_text(json.dumps({'symbol': 'TEST', 'as_of_date': '2026-10-01',
+        'expected_move': {'earnings_date': '2026-10-21', 'iv_pct': .07}, 'earnings_history': []}))
+    (tmp_path / 'weekly.json').write_text(json.dumps({'events': [{'ticker': 'TEST',
+        'earnings_date': '2026-10-21', 'as_of_date': '2026-09-20', 'em_ml_pct': .09,
+        'display_forecast_method': 'ml', 'display_forecast_pct': .09}]}))
+    with pytest.raises(RuntimeError, match='source dates'):
+        forecast_artifacts.withhold_upcoming_ml(tmp_path, today=date(2026, 10, 2))
