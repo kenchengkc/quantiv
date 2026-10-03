@@ -1,10 +1,10 @@
 {
   "metadata": {
     "version": "v4_multi_week",
-    "generated_at": "2026-10-02T08:16:42.477984",
+    "generated_at": "2026-10-03T07:21:08.885044",
     "as_of_date": "2026-09-30",
     "method": "ATM straddle + IV baseline",
-    "offset": 2
+    "offset": 1
   },
   "window": {
     "start": "2026-10-12",
@@ -1306,34 +1306,6 @@
       "ml_publication_reason": "feature_drift"
     },
     {
-      "ticker": "HFWA",
-      "earnings_date": "2026-10-15",
-      "timing": "before_market_open",
-      "fiscal_q": "Q3",
-      "eps_actual": null,
-      "eps_estimate": 0.51,
-      "revenue_actual": null,
-      "revenue_estimate": 87846684.0,
-      "realized_move_pct": null,
-      "as_of_date": "2026-09-30",
-      "em_method": "historical",
-      "em_straddle_pct": null,
-      "em_iv_pct": null,
-      "iv_rank": null,
-      "hist_move_avg_4q": 0.022909,
-      "hist_move_med_4q": 0.008499,
-      "iv_crush_pct": null,
-      "display_forecast_pct": 0.008499,
-      "display_forecast_method": "historical",
-      "display_forecast_as_of": "2026-09-30",
-      "ml_status": "unavailable_model",
-      "options_status": "unavailable",
-      "fallback_reason": "quote_quality",
-      "historical_event_count": 4,
-      "ml_publication_status": "held",
-      "ml_publication_reason": "feature_drift"
-    },
-    {
       "ticker": "INDB",
       "earnings_date": "2026-10-15",
       "timing": "after_market_close",
@@ -2167,7 +2139,7 @@
     }
   ],
   "summary": {
-    "total_events": 63,
+    "total_events": 62,
     "avg_em_straddle_pct": 0.06523328205128202,
     "avg_em_iv_pct": 0.08106125641025641
   }
