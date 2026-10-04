@@ -9,13 +9,13 @@
     "decision_groups": 298,
     "decision_scope": "end_of_day_research",
     "display_forecast_coverage_pct": 1.0,
-    "display_forecast_covered_events": 71,
-    "display_forecast_events": 71,
+    "display_forecast_covered_events": 69,
+    "display_forecast_events": 69,
     "display_forecast_method_mix": {
-      "historical": 18,
+      "historical": 17,
       "historical_prior": 0,
       "ml": 0,
-      "options_indicative": 8,
+      "options_indicative": 7,
       "options_math": 45
     },
     "duplicate_rows": 0,
@@ -40,7 +40,7 @@
   "exceptions": [
     {
       "code": "upcoming_events_outside_option_universe",
-      "count": 382,
+      "count": 399,
       "severity": "warning",
       "summary": "Calendar events fall outside the current options decision universe"
     },
@@ -52,7 +52,7 @@
     },
     {
       "code": "forecast_horizon_coverage_below_limit",
-      "count": 34,
+      "count": 33,
       "severity": "warning",
       "summary": "One or more model horizons lack sufficient eligible option coverage"
     },
@@ -63,7 +63,7 @@
       "summary": "Option evidence on the scoped earnings decision surface exceeds the publication limit"
     }
   ],
-  "generated_at": "2026-10-03T09:16:31.705170+00:00",
+  "generated_at": "2026-10-04T09:32:37.483906+00:00",
   "model": {
     "challenger_present": true,
     "champion_active": true,
@@ -71,7 +71,7 @@
     "drift_status": "critical",
     "fallback_bundle_available": false,
     "hard_missing_features": 0,
-    "monitored_at": "2026-10-03T06:58:38.388135+00:00",
+    "monitored_at": "2026-10-04T07:26:16.141990+00:00",
     "outcome_common_rows": 83,
     "outcome_evaluated_at": "2026-10-01T18:05:12.797486+00:00",
     "outcome_evaluations": 3,
@@ -85,7 +85,7 @@
     ],
     "snapshot_date": "2026-10-02",
     "status": "failed",
-    "warning_features": 12
+    "warning_features": 13
   },
   "publication_eligible": false,
   "release": {
