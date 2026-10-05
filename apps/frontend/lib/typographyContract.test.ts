@@ -68,7 +68,10 @@ describe('Quantiv typography contract', () => {
     expect(globalsIndex).toBeGreaterThanOrEqual(0);
     expect(typographyIndex).toBeGreaterThan(globalsIndex);
     expect(colorsIndex).toBeGreaterThan(typographyIndex);
-    expect(layout).toContain('JetBrains_Mono, Mulish');
+    expect(layout).toContain("from 'next/font/local'");
+    expect(layout).toContain('./fonts/Mulish-Variable.woff2');
+    expect(layout).toContain('./fonts/JetBrainsMono-Variable.woff2');
+    expect(layout).not.toContain('next/font/google');
     expect(layout).not.toContain('Nunito_Sans');
     expect(layout).not.toContain('font-nunito-sans');
   });
