@@ -60,6 +60,42 @@ def test_exact_calendar_consumed_is_bound_to_admission(tmp_path):
     assert len(result["calendar_source"]["sha256"]) == 64
 
 
+@pytest.mark.parametrize("with_derivative", [False, True])
+def test_historical_calendar_preserves_literal_na_ticker(tmp_path, with_derivative):
+    _release(tmp_path)
+    frame = pd.DataFrame({"act_symbol": ["NA", "TEST"],
+                          "date": ["2026-09-01", "2026-09-01"],
+                          "timing": ["bmo", "amc"],
+                          "eps_estimate": [None, 1.5]})
+    frame.to_csv(tmp_path / "earnings_calendar.csv", index=False)
+    if with_derivative:
+        frame.to_parquet(tmp_path / "earnings_calendar.parquet", index=False)
+    result = verify_historical_training_gate(data_dir=tmp_path)
+    assert result["status"] == "passed"
+    assert result["calendar_source"]["events"] == 2
+
+
+def test_literal_na_ticker_still_requires_matching_derivative(tmp_path):
+    _release(tmp_path)
+    (tmp_path / "earnings_calendar.csv").write_text(
+        "act_symbol,date,timing\nNA,2026-09-01,bmo\n")
+    pd.DataFrame({"act_symbol": ["TEST"], "date": ["2026-09-01"],
+                  "timing": ["bmo"]}).to_parquet(tmp_path / "earnings_calendar.parquet")
+    with pytest.raises(RuntimeError, match="calendar.*canonical"):
+        verify_historical_training_gate(data_dir=tmp_path)
+
+
+@pytest.mark.parametrize("blank", ["", "   "])
+def test_historical_calendar_still_rejects_actual_blank_tickers(tmp_path, blank):
+    _release(tmp_path)
+    pd.DataFrame({"act_symbol": ["TEST", blank],
+                  "date": ["2026-09-01", "2026-09-01"],
+                  "timing": ["bmo", "amc"]}).to_csv(
+        tmp_path / "earnings_calendar.csv", index=False)
+    with pytest.raises(RuntimeError, match="blank symbols"):
+        verify_historical_training_gate(data_dir=tmp_path)
+
+
 def test_historical_admission_requires_verified_corporate_action_receipt(tmp_path):
     _release(tmp_path)
     (tmp_path / "control/ingestion/corporate_actions/latest.json").unlink()
