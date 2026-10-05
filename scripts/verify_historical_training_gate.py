@@ -146,7 +146,9 @@ def verify_historical_training_gate(*, data_dir: Path) -> dict[str, Any]:
             raise RuntimeError("historical calendar has blank symbols")
         return set(zip(symbols, dates, timing))
 
-    canonical_events = identities(pd.read_csv(calendar))
+    # NA is a literal ticker; preserve symbol text without changing null parsing
+    # for the calendar's date, timing or numeric columns.
+    canonical_events = identities(pd.read_csv(calendar, converters={"act_symbol": str}))
     selected = calendar
     if derivative.exists():
         if identities(pd.read_parquet(derivative)) != canonical_events:
