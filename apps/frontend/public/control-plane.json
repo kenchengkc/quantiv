@@ -2,30 +2,30 @@
   "data": {
     "contract_rejection_rate": 0.403109,
     "contracts": 96562,
-    "corporate_action_rows": 28992,
+    "corporate_action_rows": 29110,
     "corporate_action_status": "enforced",
-    "covered_events": 197,
-    "decision_group_rejection_rate": 0.338926,
-    "decision_groups": 298,
+    "covered_events": 279,
+    "decision_group_rejection_rate": 0.34965,
+    "decision_groups": 429,
     "decision_scope": "end_of_day_research",
     "display_forecast_coverage_pct": 1.0,
-    "display_forecast_covered_events": 69,
-    "display_forecast_events": 69,
+    "display_forecast_covered_events": 297,
+    "display_forecast_events": 297,
     "display_forecast_method_mix": {
-      "historical": 17,
-      "historical_prior": 0,
+      "historical": 135,
+      "historical_prior": 1,
       "ml": 0,
-      "options_indicative": 7,
-      "options_math": 45
+      "options_indicative": 21,
+      "options_math": 140
     },
     "duplicate_rows": 0,
     "eligible_contracts": 57637,
-    "eligible_decision_groups": 197,
-    "event_coverage_pct": 0.661074,
-    "expected_events": 298,
+    "eligible_decision_groups": 279,
+    "event_coverage_pct": 0.65035,
+    "expected_events": 429,
     "expected_source_date": "2026-10-02",
     "live_trading_eligible": false,
-    "missing_events": 101,
+    "missing_events": 150,
     "pair_rejection_rate": 0.855554,
     "quarantine_records": 80232,
     "quarantine_status": "enforced",
@@ -40,13 +40,13 @@
   "exceptions": [
     {
       "code": "upcoming_events_outside_option_universe",
-      "count": 399,
+      "count": 510,
       "severity": "warning",
       "summary": "Calendar events fall outside the current options decision universe"
     },
     {
       "code": "upcoming_events_without_option_chain",
-      "count": 101,
+      "count": 150,
       "severity": "warning",
       "summary": "In-universe earnings events have no decision-eligible option chain"
     },
@@ -58,12 +58,12 @@
     },
     {
       "code": "option_quote_quality_below_limit",
-      "count": 101,
+      "count": 150,
       "severity": "critical",
       "summary": "Option evidence on the scoped earnings decision surface exceeds the publication limit"
     }
   ],
-  "generated_at": "2026-10-04T09:32:37.483906+00:00",
+  "generated_at": "2026-10-05T10:01:27.188465+00:00",
   "model": {
     "challenger_present": true,
     "champion_active": true,
@@ -71,7 +71,7 @@
     "drift_status": "critical",
     "fallback_bundle_available": false,
     "hard_missing_features": 0,
-    "monitored_at": "2026-10-04T07:26:16.141990+00:00",
+    "monitored_at": "2026-10-05T06:54:56.394229+00:00",
     "outcome_common_rows": 83,
     "outcome_evaluated_at": "2026-10-01T18:05:12.797486+00:00",
     "outcome_evaluations": 3,

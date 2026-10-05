@@ -1,21 +1,24 @@
 {
   "symbol": "BANR",
-  "as_of_date": "2026-09-28",
-  "spot_price": 68.17,
+  "as_of_date": "2026-09-30",
+  "spot_price": 67.0,
   "expected_move": {
-    "earnings_date": "2026-10-13",
+    "earnings_date": "2026-10-21",
+    "display_forecast_pct": 0.0071269539961011374,
+    "display_forecast_method": "historical",
+    "display_forecast_as_of": "2026-09-30",
     "ml_status": "unavailable_model",
     "options_status": "unavailable",
-    "fallback_reason": null,
-    "historical_event_count": null,
-    "timing": "unknown",
+    "fallback_reason": "quote_quality",
+    "historical_event_count": 4,
+    "timing": "amc",
     "ml_publication_status": "held",
     "ml_publication_reason": "feature_drift"
   },
   "straddle_features": [],
   "earnings_history": [
     {
-      "date": "2026-10-13",
+      "date": "2026-10-21",
       "timing": "after_market_close",
       "q": "Q3 26",
       "fiscal_year": 2026,
@@ -296,16 +299,16 @@
       "rev_surprise_pct": null
     }
   ],
-  "next_earnings": "2026-10-13",
+  "next_earnings": "2026-10-21",
   "vol_regime": {
-    "iv_current": 0.3253,
-    "iv_rank": 0.232419,
+    "iv_current": 0.2889,
+    "iv_rank": 0.128359,
     "iv_year_high": 0.5938,
     "iv_year_low": 0.244,
-    "hv_current": 0.1716,
-    "hv_rank": 0.133454,
-    "iv_mom_week": 0.0267,
+    "hv_current": 0.171,
+    "hv_rank": 0.130748,
+    "iv_mom_week": -0.0313,
     "iv_mom_month": null
   },
-  "next_earnings_timing": "unknown"
+  "next_earnings_timing": "amc"
 }

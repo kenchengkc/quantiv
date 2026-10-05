@@ -3,15 +3,15 @@
   "as_of_date": "2026-09-30",
   "spot_price": 45.0,
   "expected_move": {
-    "earnings_date": "2026-10-15",
-    "display_forecast_pct": 0.04949956483899042,
-    "display_forecast_method": "options_indicative",
+    "earnings_date": "2026-10-20",
+    "display_forecast_pct": 0.012042222326248131,
+    "display_forecast_method": "historical",
     "display_forecast_as_of": "2026-09-30",
     "ml_status": "unavailable_model",
-    "options_status": "indicative",
-    "fallback_reason": "quote_quality",
-    "historical_event_count": null,
-    "timing": "unknown",
+    "options_status": "unavailable",
+    "fallback_reason": "no_event_expiry",
+    "historical_event_count": 4,
+    "timing": "amc",
     "ml_publication_status": "held",
     "ml_publication_reason": "feature_drift"
   },
@@ -36,7 +36,7 @@
   ],
   "earnings_history": [
     {
-      "date": "2026-10-15",
+      "date": "2026-10-20",
       "timing": "after_market_close",
       "q": "Q3 26",
       "fiscal_year": 2026,
@@ -58,8 +58,6 @@
       "revenue_estimate": 438833597.0,
       "rev_surprise_pct": null,
       "ml_status": "unavailable_model",
-      "options_status": "unavailable",
-      "fallback_reason": null,
       "ml_publication_status": "held",
       "ml_publication_reason": "feature_drift"
     },
@@ -394,7 +392,7 @@
       "forecast_frozen": true
     }
   ],
-  "next_earnings": "2026-10-15",
+  "next_earnings": "2026-10-20",
   "vol_regime": {
     "iv_current": 0.2577,
     "iv_rank": 0.184673,
@@ -405,5 +403,5 @@
     "iv_mom_week": -0.0308,
     "iv_mom_month": null
   },
-  "next_earnings_timing": "unknown"
+  "next_earnings_timing": "amc"
 }

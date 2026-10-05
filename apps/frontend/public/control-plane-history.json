@@ -1,6 +1,71 @@
 {
-  "generated_at": "2026-10-04T09:32:37.483906+00:00",
+  "generated_at": "2026-10-05T10:01:27.188465+00:00",
   "runs": [
+    {
+      "artifact_promotion_status": "advisory",
+      "challenger_present": true,
+      "contract_rejection_rate": 0.403109,
+      "corporate_action_status": "enforced",
+      "covered_events": 279,
+      "critical_exceptions": 1,
+      "critical_features": 15,
+      "data_r2_status": "passed",
+      "decision_group_rejection_rate": 0.34965,
+      "decision_groups": 429,
+      "display_forecast_coverage_pct": 1.0,
+      "display_forecast_covered_events": 297,
+      "display_forecast_events": 297,
+      "display_forecast_method_mix": {
+        "historical": 135,
+        "historical_prior": 1,
+        "ml": 0,
+        "options_indicative": 21,
+        "options_math": 140
+      },
+      "drift_status": "critical",
+      "duplicate_rows": 0,
+      "eligible_decision_groups": 279,
+      "event_coverage_pct": 0.65035,
+      "exception_codes": [
+        "forecast_horizon_coverage_below_limit",
+        "option_quote_quality_below_limit",
+        "upcoming_events_outside_option_universe",
+        "upcoming_events_without_option_chain"
+      ],
+      "expected_events": 429,
+      "forecast_r2_status": "advisory",
+      "frontend_payload_status": "passed",
+      "generated_at": "2026-10-05T10:01:27.188465+00:00",
+      "hard_missing_features": 0,
+      "missing_events": 150,
+      "model_snapshot_date": "2026-10-02",
+      "model_status": "failed",
+      "neon_import_status": "unavailable",
+      "outcome_common_rows": 83,
+      "outcome_evaluations": 3,
+      "outcome_minimum_rows": 30,
+      "outcome_status": "passed",
+      "pair_rejection_rate": 0.855554,
+      "publication_eligible": false,
+      "quarantine_records": 80232,
+      "quarantine_status": "enforced",
+      "replay_status": "verified",
+      "rollback_recorded": false,
+      "source_date": "2026-09-30",
+      "source_session_lag": 2,
+      "status": "failed",
+      "warning_exceptions": 3,
+      "warning_features": 13,
+      "workflow": {
+        "control_ready_seconds": 14420,
+        "event_name": "workflow_dispatch",
+        "run_attempt": "1",
+        "run_id": "37270331457",
+        "run_number": "50",
+        "started_at": "2026-10-05T06:01:07Z",
+        "url": "https://github.com/kenchengkc/quantiv/actions/runs/37270331457"
+      }
+    },
     {
       "artifact_promotion_status": "advisory",
       "challenger_present": true,
@@ -1713,34 +1778,6 @@
         "run_number": "193",
         "url": "https://github.com/kenchengkc/quantiv/actions/runs/33422160192"
       }
-    },
-    {
-      "challenger_present": false,
-      "contract_rejection_rate": 0.440461,
-      "covered_events": 38,
-      "critical_exceptions": 0,
-      "critical_features": 3,
-      "drift_status": "warning",
-      "duplicate_rows": 0,
-      "event_coverage_pct": 0.730769,
-      "exception_codes": [
-        "upcoming_events_outside_option_universe",
-        "upcoming_events_without_option_chain"
-      ],
-      "expected_events": 52,
-      "generated_at": "2026-08-30T17:38:18.241108+00:00",
-      "missing_events": 14,
-      "model_snapshot_date": "2026-08-28",
-      "model_status": "degraded",
-      "outcome_status": "unavailable",
-      "pair_rejection_rate": 0.877619,
-      "publication_eligible": true,
-      "source_date": "2026-08-28",
-      "source_session_lag": 0,
-      "status": "degraded",
-      "warning_exceptions": 2,
-      "warning_features": 8,
-      "workflow": null
     }
   ],
   "schema": "quantiv.control-plane-history.v1"

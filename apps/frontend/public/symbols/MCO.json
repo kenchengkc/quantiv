@@ -2,7 +2,19 @@
   "symbol": "MCO",
   "as_of_date": "2026-09-30",
   "spot_price": 450.0,
-  "expected_move": null,
+  "expected_move": {
+    "earnings_date": "2026-10-20",
+    "display_forecast_pct": 0.0202641314563613,
+    "display_forecast_method": "historical",
+    "display_forecast_as_of": "2026-09-30",
+    "ml_status": "unavailable_model",
+    "options_status": "unavailable",
+    "fallback_reason": "no_event_expiry",
+    "historical_event_count": 4,
+    "timing": "unknown",
+    "ml_publication_status": "held",
+    "ml_publication_reason": "feature_drift"
+  },
   "straddle_features": [
     {
       "expiration": "2026-10-16",
@@ -410,5 +422,5 @@
     "iv_mom_week": 0.0012,
     "iv_mom_month": null
   },
-  "next_earnings_timing": "before_market_open"
+  "next_earnings_timing": "unknown"
 }
