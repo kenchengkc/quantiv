@@ -12,6 +12,23 @@ import model_trainer
 import ml.training_split as splits
 
 
+def test_trainer_import_does_not_require_the_optional_tuning_dependency():
+    import subprocess
+    import sys
+
+    result = subprocess.run(
+        [sys.executable, "-c", "\n".join([
+            "import sys",
+            f"sys.path.insert(0, {str(Path(model_trainer.__file__).parent)!r})",
+            "sys.modules['optuna'] = None",
+            "import model_trainer",
+            "assert callable(model_trainer.run_training)",
+        ])],
+        capture_output=True, text=True,
+    )
+    assert result.returncode == 0, result.stderr
+
+
 def test_time_decay_uses_a_true_half_life():
     dates = pd.Series(pd.to_datetime(["2024-01-02", "2025-01-01"]))
     weights = splits.half_life_weights(dates, pd.Timestamp("2025-01-01"), 1.)

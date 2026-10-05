@@ -18,7 +18,6 @@ from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
 import numpy as np
-import optuna
 import pandas as pd
 from lightgbm import LGBMRegressor, early_stopping, log_evaluation
 from ml.model_artifact import save_native_model
@@ -29,9 +28,6 @@ from ml.training_split import (
     training_row_digest,
 )
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
-
-# Log one line per search instead of every trial.
-optuna.logging.set_verbosity(optuna.logging.WARNING)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
@@ -260,6 +256,10 @@ def tune_hyperparameters(X_train: pd.DataFrame, y_train: pd.Series,
 
     Score is average error on the validation rows, unweighted, so runs compare.
     """
+    import optuna
+
+    # Optimization is a training-only dependency, absent from serving images.
+    optuna.logging.set_verbosity(optuna.logging.WARNING)
 
     def objective(trial: optuna.Trial) -> float:
         params = {
