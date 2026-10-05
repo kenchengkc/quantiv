@@ -14,7 +14,9 @@ import argparse
 import json
 import logging
 import os
+import sys
 from dataclasses import dataclass, field
+from datetime import date
 from pathlib import Path
 from typing import Any, Dict
 
@@ -26,6 +28,18 @@ from ml.corporate_actions import (
     adjusted_post_price_sql,
     ensure_corporate_action_views,
 )
+
+from ml.causal_features import build_causal_features
+from ml.model_protocol import (
+    FEATURE_PROTOCOL_CAUSAL, FEATURE_PROTOCOL_LEGACY,
+    resolve_feature_protocol, target_protocol,
+)
+
+# This training script is also invoked directly without a repository PYTHONPATH.
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+from scripts.market_sessions import latest_completed_us_market_session  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
@@ -46,6 +60,7 @@ class FeatureSet:
     dollar_volume: pd.Series = field(default_factory=pd.Series)
     market_cap: pd.Series = field(default_factory=pd.Series)
     metadata: Dict[str, Any] = field(default_factory=dict)
+    observation_metadata: pd.DataFrame = field(default_factory=pd.DataFrame)
 
 
 def get_data_dir() -> Path:
@@ -164,7 +179,7 @@ def connect_duckdb() -> duckdb.DuckDBPyConnection:
     return conn
 
 
-def extract_training_data(conn: duckdb.DuckDBPyConnection,
+def _extract_legacy_training_data(conn: duckdb.DuckDBPyConnection,
                           start_date: str, end_date: str) -> Dict[int, FeatureSet]:
     """Build the training tables.
 
@@ -579,13 +594,38 @@ def extract_training_data(conn: duckdb.DuckDBPyConnection,
     """
 
     df = conn.execute(sql, [start_date, end_date]).fetchdf()
+    return _feature_sets_from_frame(df, feature_protocol=FEATURE_PROTOCOL_LEGACY)
+
+
+def extract_training_data(conn: duckdb.DuckDBPyConnection,
+                          start_date: str, end_date: str, *,
+                          feature_protocol: str = FEATURE_PROTOCOL_CAUSAL,
+                          as_of_date: date | None = None) -> Dict[int, FeatureSet]:
+    """New training uses auditable causal rows; legacy is an explicit opt-in."""
+    protocol = resolve_feature_protocol({"feature_protocol": feature_protocol})
+    if protocol == FEATURE_PROTOCOL_LEGACY:
+        return _extract_legacy_training_data(conn, start_date, end_date)
+    # Explicit dates describe an EOD replay. Runtime defaults must wait for the
+    # actual regular or early session close before admitting today's targets.
+    cutoff = as_of_date if as_of_date is not None else min(
+        date.fromisoformat(end_date), latest_completed_us_market_session()
+    )
+    frame = build_causal_features(
+        conn, start_date=date.fromisoformat(start_date), end_date=date.fromisoformat(end_date),
+        as_of_date=cutoff, require_labels=True,
+    )
+    return _feature_sets_from_frame(frame, feature_protocol=protocol)
+
+
+def _feature_sets_from_frame(df: pd.DataFrame, *, feature_protocol: str) -> Dict[int, FeatureSet]:
     logger.info(f"Raw snapshot rows: {len(df):,}")
 
     if df.empty:
         logger.warning("No data returned — check that options, daily prices, and earnings overlap")
         return {}
 
-    logger.info(f"Realized move sources: {df['realized_source'].value_counts().to_dict()}")
+    source_column = "label_source" if feature_protocol == FEATURE_PROTOCOL_CAUSAL else "realized_source"
+    logger.info("Realized move sources: %s", df[source_column].value_counts().to_dict())
 
     # Build a table for each days-until-earnings target
     profiles = _profile_metadata()
@@ -646,7 +686,7 @@ def extract_training_data(conn: duckdb.DuckDBPyConnection,
 
         # LightGBM can use missing values. Only drop infinities and extreme outliers.
         X = X.replace([np.inf, -np.inf], np.nan)
-        valid = y.notna() & (y > 0) & (y < 1.0)
+        valid = y.notna() & (y >= 0 if feature_protocol == FEATURE_PROTOCOL_CAUSAL else y > 0) & (y < 1.0)
         X = X[valid].reset_index(drop=True)
         y = y[valid].reset_index(drop=True)
         ed = ed[valid].reset_index(drop=True)
@@ -665,6 +705,19 @@ def extract_training_data(conn: duckdb.DuckDBPyConnection,
             logger.info(f"T-{horizon}: high-NaN columns (will be handled by LightGBM): "
                         f"{mostly_null.index.tolist()}")
 
+        sidecars = pd.DataFrame()
+        if feature_protocol == FEATURE_PROTOCOL_CAUSAL:
+            for source, destination in {
+                "snapshot_date": "__snapshot_date", "label_available_at": "__label_available_at",
+                "pre_price_date": "__pre_price_date", "post_price_date": "__post_price_date",
+                "label_source": "__label_source", "target_protocol": "__target_protocol",
+                "__cohort": "__cohort",
+            }.items():
+                values = hdf.loc[valid, source].reset_index(drop=True)
+                if source.endswith("date") or source == "label_available_at":
+                    values = pd.to_datetime(values).dt.date
+                sidecars[destination] = values
+
         feature_sets[horizon] = FeatureSet(
             horizon=horizon,
             features=X,
@@ -674,7 +727,11 @@ def extract_training_data(conn: duckdb.DuckDBPyConnection,
             sector=sector,
             dollar_volume=dollar_volume,
             market_cap=market_cap,
+            observation_metadata=sidecars,
             metadata={
+                "feature_protocol": feature_protocol,
+                "target_protocol": target_protocol({"feature_protocol": feature_protocol}),
+                "cohort_counts": sidecars["__cohort"].value_counts().to_dict() if not sidecars.empty else {"strict_options": len(X)},
                 "n_samples": len(X),
                 "target_mean": float(y.mean()),
                 "target_median": float(y.median()),
@@ -686,8 +743,7 @@ def extract_training_data(conn: duckdb.DuckDBPyConnection,
                 "hist_move_coverage": float(X["hist_move_avg_4q"].notna().mean()),
                 "hist_dist_coverage": float(X["hist_move_p75_8q"].notna().mean()),
                 "ohlcv_coverage": float(
-                    (hdf[valid]["realized_source"] == "ohlcv").mean()
-                    if "realized_source" in hdf.columns else 0
+                    hdf.loc[valid, source_column].isin(["ohlcv", "ohlcv_session_close"]).mean()
                 ),
                 "feature_cols": feature_cols,
             }
@@ -719,6 +775,10 @@ def save_training_data(feature_sets: Dict[int, FeatureSet], output_dir: Path):
             training_df["__dollar_volume"] = fs.dollar_volume.values
         if len(fs.market_cap) == len(fs.features):
             training_df["__market_cap"] = fs.market_cap.values
+        for column in fs.observation_metadata.columns:
+            if len(fs.observation_metadata) != len(training_df):
+                raise ValueError("observation sidecars do not align with training rows")
+            training_df[column] = fs.observation_metadata[column].values
         path = output_dir / f"training_T{horizon}.parquet"
         training_df.to_parquet(path, index=False)
 
@@ -733,15 +793,20 @@ def main():
     parser = argparse.ArgumentParser(description="Extract ML training features")
     parser.add_argument(
         "--start-date",
-        default="2019-06-01",
-        help="Start date (leave enough history for past-earnings features)",
+        default=None,
+        help="Start date (default: 2023-01-01 for causal, 2019-06-01 for legacy)",
     )
     parser.add_argument("--end-date", default="2026-03-31")
     parser.add_argument("--output-dir", default=None)
+    parser.add_argument("--feature-protocol", default=FEATURE_PROTOCOL_CAUSAL,
+                        choices=[FEATURE_PROTOCOL_CAUSAL, FEATURE_PROTOCOL_LEGACY])
     args = parser.parse_args()
+    start_date = args.start_date or (
+        "2019-06-01" if args.feature_protocol == FEATURE_PROTOCOL_LEGACY else "2023-01-01"
+    )
 
     conn = connect_duckdb()
-    feature_sets = extract_training_data(conn, args.start_date, args.end_date)
+    feature_sets = extract_training_data(conn, start_date, args.end_date, feature_protocol=args.feature_protocol)
     conn.close()
 
     if not feature_sets:

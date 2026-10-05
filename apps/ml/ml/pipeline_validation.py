@@ -13,13 +13,14 @@ import numpy as np
 import pandas as pd
 
 from ml.model_artifact import load_native_model, point_model_name, quantile_model_name
+from ml.model_protocol import CAUSAL_FEATURE_PROTOCOL, feature_protocol, target_protocol
 from ml.provider_signal_policy import (
     DEFAULT_POLICY_PATH,
     ProviderSignalPolicyError,
     blocked_model_features,
     load_provider_signal_policy,
 )
-from ml.training_split import chronological_train_val_split
+from ml.training_split import chronological_train_val_split, eligible_mature_rows, temporal_dates, training_row_digest
 
 DEFAULT_HORIZONS = (1, 2, 3, 7, 14, 21)
 QUANTILE_LEVELS = (10, 25, 50, 75, 90)
@@ -300,6 +301,7 @@ def validate_training_artifacts(
                 frame,
                 train_frac=train_frac,
                 purge_days=purge_days,
+                horizon_days=horizon,
             )
         except ValueError as exc:
             _issue(issues, "training", path, "invalid_validation_split", str(exc))
@@ -317,6 +319,26 @@ def validate_training_artifacts(
         else:
             try:
                 metadata = _load_json(metadata_path)
+                try:
+                    protocol = feature_protocol(metadata)
+                    target_version = target_protocol(metadata)
+                    if protocol == CAUSAL_FEATURE_PROTOCOL:
+                        required_dates = {"__snapshot_date", "__label_available_at", "__pre_price_date", "__post_price_date", "__target_protocol"}
+                        if not required_dates <= set(frame):
+                            raise ValueError("causal rows require snapshot, price and label-availability sidecars")
+                        snapshots, labels, _ = temporal_dates(frame, horizon_days=horizon)
+                        if not ((parsed_dates - snapshots).dt.days == horizon).all():
+                            raise ValueError("prediction snapshots disagree with horizon")
+                        if not frame["__target_protocol"].eq(target_version).all():
+                            raise ValueError("training targets use another protocol")
+                        pre = pd.to_datetime(frame["__pre_price_date"], errors="raise")
+                        post = pd.to_datetime(frame["__post_price_date"], errors="raise")
+                        if (pre >= post).any() or (labels < post).any():
+                            raise ValueError("reaction prices disagree with label availability")
+                        if (labels > pd.Timestamp.now(tz="UTC").tz_localize(None)).any():
+                            raise ValueError("training labels are not mature")
+                except (ValueError, KeyError, TypeError) as exc:
+                    _issue(issues, "training", metadata_path, "invalid_causal_training_contract", str(exc))
                 if int(metadata.get("n_samples", -1)) != len(frame):
                     _issue(
                         issues,
@@ -400,6 +422,61 @@ def validate_model_artifacts(
             _issue(issues, "models", metadata_path, "invalid_model_metadata", str(exc))
             continue
 
+        causal = False
+        try:
+            causal = feature_protocol(metadata) == CAUSAL_FEATURE_PROTOCOL
+            target_protocol(metadata)
+        except ValueError as exc:
+            _issue(issues, "models", metadata_path, "invalid_model_protocol", str(exc))
+        if causal:
+            try:
+                fit = metadata["final_fit"]
+                if metadata["metric_scope"] != "selection_only" or metadata["selection_metrics"]["metric_scope"] != "selection_only":
+                    raise ValueError("selection metrics must not claim independence for refitted trees")
+                if int(fit["rows"]) < int(metadata["n_train"]) + int(metadata["n_val"]):
+                    raise ValueError("final fitting omitted eligible development rows")
+                if pd.to_datetime(fit["label_available_end"], utc=True) > pd.to_datetime(fit["as_of"], utc=True):
+                    raise ValueError("final fitting consumed unavailable labels")
+                if metadata["selection_exposure"]["row_digest"] != fit["row_digest"]:
+                    raise ValueError("final fitting exposure digest mismatch")
+                if pd.Timestamp(metadata["selection_exposure"]["through_date"]) < pd.Timestamp(fit["label_available_end"]):
+                    raise ValueError("final fitting exposure cutoff omits labels")
+                expected_heads = {"point", *(f"q{q:02d}" for q in QUANTILE_LEVELS)}
+                if set(metadata["selected_iterations"]) != expected_heads:
+                    raise ValueError("selected tree counts do not cover all heads")
+                supported = metadata["supported_cohorts"]
+                if not supported or set(supported) - {"strict_options", "optionless"}:
+                    raise ValueError("no validated serving cohort")
+                for cohort in supported:
+                    evidence = metadata["selection_metrics"]["cohorts"][cohort]
+                    if evidence["status"] != "passed" or int(evidence["baseline_rows"]) < min_validation_rows:
+                        raise ValueError(f"unsupported serving cohort: {cohort}")
+                    if int(evidence["baseline_rows"]) > int(evidence["rows"]) or int(evidence["rows"]) > int(metadata["n_val"]):
+                        raise ValueError("cohort evidence exceeds actual selection rows")
+                    if not all(_finite_number(evidence.get(key)) for key in ("model_mae_on_baseline_rows", "baseline_mae")):
+                        raise ValueError("cohort baseline evidence must be finite")
+                    if evidence["model_mae_on_baseline_rows"] >= evidence["baseline_mae"]:
+                        raise ValueError(f"cohort does not beat matched baseline: {cohort}")
+                    for key, expected in (("coverage_80", .8), ("coverage_50", .5), *((f"q{q:02d}_coverage", q/100) for q in QUANTILE_LEVELS)):
+                        if not _finite_number(evidence.get(key)) or abs(float(evidence[key]) - expected) > coverage_tolerance:
+                            raise ValueError(f"cohort calibration failed: {cohort} {key}")
+                    for key, maximum in (("quantile_crossing_rate_raw", max_crossing_rate), ("quantile_negative_rate_raw", max_negative_rate)):
+                        if not _finite_number(evidence.get(key)) or not 0 <= float(evidence[key]) <= maximum:
+                            raise ValueError(f"cohort raw quantile quality failed: {cohort} {key}")
+                if training_dir:
+                    source = pd.read_parquet(training_dir / f"training_T{horizon}.parquet")
+                    mature, snapshots, labels = eligible_mature_rows(source, as_of=fit["as_of"], horizon_days=horizon)
+                    if len(mature) != int(fit["rows"]) or training_row_digest(mature) != fit["row_digest"]:
+                        raise ValueError("final fitting does not bind the exact mature source cohort")
+                    events = pd.to_datetime(mature["__earnings_date"])
+                    expected_dates = {"start": events.min(), "end": events.max(),
+                                      "label_available_end": labels.max(),
+                                      "snapshot_start": snapshots.min(), "snapshot_end": snapshots.max()}
+                    if any(pd.Timestamp(fit[key]).date() != value.date() for key, value in expected_dates.items()):
+                        raise ValueError("final fitting dates disagree with consumed rows")
+            except (ValueError, KeyError, TypeError) as exc:
+                _issue(issues, "models", metadata_path, "invalid_final_fit_evidence", str(exc))
+
         required_metrics = (
             "n_train",
             "n_val",
@@ -410,6 +487,10 @@ def validate_model_artifacts(
             "quantile_crossing_rate_raw",
             "quantile_negative_rate_raw",
         )
+        if causal:
+            # Pooled diagnostics include withheld cohorts. Activation support is
+            # earned by every declared serving cohort under the same limits.
+            required_metrics = ("n_train", "n_val", "val_mae")
         missing_metrics = [
             key for key in required_metrics if not _finite_number(metadata.get(key))
         ]
@@ -433,7 +514,7 @@ def validate_model_artifacts(
                     "insufficient_holdout_rows",
                     f"train/validation rows are {metadata['n_train']}/{metadata['n_val']}",
                 )
-            if float(metadata["val_mae"]) >= float(metadata["baseline_straddle_mae"]):
+            if not causal and float(metadata.get("val_mae_on_straddle_rows", metadata["val_mae"])) >= float(metadata["baseline_straddle_mae"]):
                 _issue(
                     issues,
                     "models",
@@ -441,7 +522,7 @@ def validate_model_artifacts(
                     "model_fails_baseline",
                     "validation MAE does not beat the straddle baseline",
                 )
-            for key, target in (("coverage_80", 0.80), ("coverage_50", 0.50)):
+            for key, target in (() if causal else (("coverage_80", 0.80), ("coverage_50", 0.50))):
                 if abs(float(metadata[key]) - target) > coverage_tolerance:
                     _issue(
                         issues,
@@ -450,7 +531,7 @@ def validate_model_artifacts(
                         "interval_miscalibration",
                         f"{key}={metadata[key]:.3f}; target={target:.2f} ± {coverage_tolerance:.2f}",
                     )
-            for quantile in QUANTILE_LEVELS:
+            for quantile in (() if causal else QUANTILE_LEVELS):
                 key = f"q{quantile:02d}_coverage"
                 value = metadata.get(key)
                 target = quantile / 100
@@ -465,7 +546,7 @@ def validate_model_artifacts(
                         "quantile_miscalibration",
                         f"{key}={value}; target={target:.2f} ± {coverage_tolerance:.2f}",
                     )
-            if float(metadata["quantile_crossing_rate_raw"]) > max_crossing_rate:
+            if not causal and float(metadata["quantile_crossing_rate_raw"]) > max_crossing_rate:
                 _issue(
                     issues,
                     "models",
@@ -473,7 +554,7 @@ def validate_model_artifacts(
                     "excessive_quantile_crossing",
                     f"raw crossing rate {metadata['quantile_crossing_rate_raw']:.1%} exceeds {max_crossing_rate:.1%}",
                 )
-            if float(metadata["quantile_negative_rate_raw"]) > max_negative_rate:
+            if not causal and float(metadata["quantile_negative_rate_raw"]) > max_negative_rate:
                 _issue(
                     issues,
                     "models",
@@ -496,7 +577,10 @@ def validate_model_artifacts(
                 train_end = pd.Timestamp(split["train_end"])
                 validation_start = pd.Timestamp(split["validation_start"])
                 split_purge_days = int(split["purge_days"])
-                if (validation_start - train_end).days <= split_purge_days:
+                if "validation_snapshot_start" in split:
+                    if pd.Timestamp(split["train_label_available_end"]) >= pd.Timestamp(split["validation_snapshot_start"]):
+                        raise ValueError("selection fitted labels unavailable at prediction time")
+                elif (validation_start - train_end).days <= split_purge_days:
                     raise ValueError(
                         "train/validation date ranges violate the purge window"
                     )
@@ -586,6 +670,11 @@ def validate_model_artifacts(
                     walk_forward["baseline_straddle_mae"]
                 ):
                     raise ValueError("walk-forward MAE does not beat the straddle baseline")
+                if causal:
+                    for cohort in metadata.get("supported_cohorts", []):
+                        evidence = walk_forward.get("cohort_assessments", {}).get(cohort, {})
+                        if evidence.get("status") != "passed":
+                            raise ValueError(f"walk-forward has no passing evidence for serving cohort {cohort}")
             except (KeyError, TypeError, ValueError) as exc:
                 _issue(
                     issues,
@@ -630,6 +719,11 @@ def validate_model_artifacts(
                 continue
             try:
                 estimator = load_native_model(artifact_path)
+                if causal:
+                    fitted = int(metadata.get("fitted_iterations", {}).get(label, -1))
+                    selected = int(metadata.get("selected_iterations", {}).get(label, -1))
+                    if estimator.num_trees() != fitted or not 0 < fitted <= selected:
+                        raise ValueError("saved refit tree count disagrees with frozen selection recipe")
                 artifact_features = _feature_names(estimator)
                 if artifact_features != feature_cols:
                     raise ValueError(
@@ -809,6 +903,25 @@ def validate_forecast_artifact(
             )
 
     key_cols = ["act_symbol", "earnings_date", "snapshot_date", "model_horizon"]
+    # Only a declared, validated causal cohort may omit option inputs. Legacy
+    # models and every quote-backed row retain the full existing quote gate.
+    optionless_rows = pd.Series(False, index=frame.index)
+    for horizon in frame["model_horizon"].dropna().unique():
+        try:
+            metadata = _load_json(models_dir / f"metadata_T{int(horizon)}.json")
+            protocol = feature_protocol(metadata)
+            expected_target = target_protocol(metadata)
+            if protocol == CAUSAL_FEATURE_PROTOCOL:
+                rows = frame.loc[frame["model_horizon"] == horizon]
+                if not {"feature_protocol", "target_protocol"} <= set(rows) or not rows["feature_protocol"].eq(protocol).all() or not rows["target_protocol"].eq(expected_target).all():
+                    raise ValueError("forecast vectors are not bound to the model protocol")
+                baseline = pd.to_numeric(rows["em_math_pct"], errors="coerce")
+                cohorts = np.where(np.isfinite(baseline) & (baseline > 0), "strict_options", "optionless")
+                if not set(cohorts) <= set(metadata.get("supported_cohorts", [])):
+                    raise ValueError("forecast contains unsupported serving cohorts")
+                optionless_rows.loc[rows.index] = baseline.isna()
+        except (ValueError, KeyError, OSError, TypeError) as exc:
+            _issue(issues, "forecasts", forecast_path, "forecast_protocol_mismatch", str(exc))
     duplicate_count = int(frame.duplicated(key_cols).sum())
     if duplicate_count:
         _issue(
@@ -867,7 +980,16 @@ def validate_forecast_artifact(
         "straddle_bid", "straddle_ask", "straddle_mid",
         "straddle_relative_spread",
     ]
-    quote_numeric = frame[quote_numeric_cols].apply(pd.to_numeric, errors="coerce")
+    option_fields = [*quote_numeric_cols, "atm_iv", "em_math_pct", "correction_factor",
+                     "call_quote_timestamp", "put_quote_timestamp", "quote_quality_status",
+                     "quote_timestamp_precision", "market_data_mode", "liquidity_tier",
+                     "liquidity_tier_method", "quote_rejection_reason"]
+    partial_optionless = int(frame.loc[optionless_rows, option_fields].notna().any(axis=1).sum())
+    if partial_optionless:
+        _issue(issues, "forecasts", forecast_path, "optionless_quote_evidence",
+               f"found {partial_optionless} optionless rows with quote-dependent evidence or claims")
+    quote_frame = frame.loc[~optionless_rows]
+    quote_numeric = quote_frame[quote_numeric_cols].apply(pd.to_numeric, errors="coerce").astype(float)
     invalid_quote_evidence = int((~np.isfinite(quote_numeric.to_numpy(dtype=float))).any(axis=1).sum())
     crossed_or_zero_quotes = int(
         (
@@ -932,22 +1054,22 @@ def validate_forecast_artifact(
     )
     invalid_quality_labels = int(
         (
-            frame["quote_quality_status"].fillna("").ne("passed")
-            | frame["quote_timestamp_precision"].fillna("").ne("date")
-            | frame["market_data_mode"].fillna("").ne("end_of_day")
-            | ~frame["liquidity_tier_method"].fillna("").isin(
+            quote_frame["quote_quality_status"].fillna("").ne("passed")
+            | quote_frame["quote_timestamp_precision"].fillna("").ne("date")
+            | quote_frame["market_data_mode"].fillna("").ne("end_of_day")
+            | ~quote_frame["liquidity_tier_method"].fillna("").isin(
                 {"quote_spread_proxy", "spread_volume_open_interest"}
             )
-            | frame["quote_rejection_reason"].notna()
+            | quote_frame["quote_rejection_reason"].notna()
         ).sum()
     )
     call_quote_times = pd.to_datetime(
-        frame["call_quote_timestamp"], errors="coerce", utc=True
+        quote_frame["call_quote_timestamp"], errors="coerce", utc=True
     )
     put_quote_times = pd.to_datetime(
-        frame["put_quote_timestamp"], errors="coerce", utc=True
+        quote_frame["put_quote_timestamp"], errors="coerce", utc=True
     )
-    timestamp_rows = frame["quote_timestamp_precision"].eq("timestamp")
+    timestamp_rows = quote_frame["quote_timestamp_precision"].eq("timestamp")
     timestamp_evidence_failures = int(
         (
             timestamp_rows
@@ -984,11 +1106,8 @@ def validate_forecast_artifact(
 
     numeric_cols = [
         "spot_price",
-        "atm_iv",
-        "em_math_pct",
         "em_ml_pct",
         "em_ml_abs",
-        "correction_factor",
         "p10",
         "p25",
         "p50",
@@ -998,7 +1117,8 @@ def validate_forecast_artifact(
     numeric = (
         frame[numeric_cols].apply(pd.to_numeric, errors="coerce").to_numpy(dtype=float)
     )
-    non_finite_values = int((~np.isfinite(numeric)).sum())
+    option_numeric = quote_frame[["atm_iv", "em_math_pct", "correction_factor"]].apply(pd.to_numeric, errors="coerce").to_numpy(dtype=float)
+    non_finite_values = int((~np.isfinite(numeric)).sum() + (~np.isfinite(option_numeric)).sum())
     invalid_market_input_rows = 0
     out_of_range_move_rows = 0
     crossing_count = 0
@@ -1016,7 +1136,7 @@ def validate_forecast_artifact(
         )
     else:
         invalid_market_input_rows = int(
-            ((frame["spot_price"] <= 0) | (frame["atm_iv"] <= 0)).sum()
+            ((frame["spot_price"] <= 0) | ((frame["atm_iv"] <= 0) & ~optionless_rows)).sum()
         )
         if invalid_market_input_rows:
             _issue(
@@ -1083,13 +1203,13 @@ def validate_forecast_artifact(
                 "absolute_forecast_mismatch",
                 f"found {absolute_mismatches} rows where ML $ move does not match pct × spot",
             )
-        expected_correction = frame["em_ml_pct"] / frame["em_math_pct"].clip(
+        expected_correction = pd.to_numeric(quote_frame["em_ml_pct"]) / pd.to_numeric(quote_frame["em_math_pct"]).clip(
             lower=0.001
         )
         correction_mismatches = int(
             (
                 ~np.isclose(
-                    frame["correction_factor"],
+                    pd.to_numeric(quote_frame["correction_factor"]).to_numpy(dtype=float),
                     expected_correction,
                     rtol=1e-6,
                     atol=1e-8,
@@ -1175,7 +1295,8 @@ def validate_forecast_artifact(
     invalid_feature_values = 0
     iv_formula_mismatches = 0
     straddle_mismatches = 0
-    for _, row in frame.iterrows():
+    timing_contract_failures = 0
+    for index, row in frame.iterrows():
         try:
             vector = _strict_json_object(row["feature_vector"])
         except (TypeError, ValueError, json.JSONDecodeError):
@@ -1197,6 +1318,16 @@ def validate_forecast_artifact(
             value is not None and not _finite_number(value) for value in vector.values()
         ):
             invalid_feature_values += 1
+        if metadata and feature_protocol(metadata) == CAUSAL_FEATURE_PROTOCOL:
+            timing = str(row.get("timing") or "").strip().lower()
+            expected_timing = {"bmo": (1., 0.), "amc": (0., 1.)}.get(timing)
+            if expected_timing is None or (vector.get("timing_bmo"), vector.get("timing_amc")) != expected_timing:
+                timing_contract_failures += 1
+        if optionless_rows.loc[index]:
+            if any(vector.get(key) is not None for key in ("atm_iv", "dte", "em_iv_pct", "straddle_pct")):
+                _issue(issues, "forecasts", forecast_path, "optionless_quote_evidence",
+                       "optionless vector contains quote-dependent model inputs")
+            continue
         try:
             atm_iv = float(vector["atm_iv"])
             dte = float(vector["dte"])
@@ -1219,6 +1350,9 @@ def validate_forecast_artifact(
         except (KeyError, TypeError, ValueError):
             straddle_mismatches += 1
 
+    if timing_contract_failures:
+        _issue(issues, "forecasts", forecast_path, "forecast_timing_contract",
+               f"found {timing_contract_failures} causal vectors without matching verified event timing")
     if invalid_vectors:
         _issue(
             issues,

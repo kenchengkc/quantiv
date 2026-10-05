@@ -7,6 +7,7 @@ import pandas as pd
 import pytest
 
 from research.independent_model_evaluation import prepare_independent_test
+import research.independent_model_evaluation as evaluation
 from research.research_manifest import sha256_file
 
 
@@ -199,3 +200,45 @@ def test_prepare_fails_when_test_period_is_too_small(tmp_path: Path) -> None:
             min_test_rows=10,
             source_revision="test-revision",
         )
+
+
+def test_legacy_reservation_purges_forecast_lead_and_label_latency(tmp_path: Path):
+    _write_training(tmp_path, horizon=21, days=100)
+    reservation = prepare_independent_test(
+        repo_root=tmp_path, training_dir=tmp_path / "data/ml_training",
+        staging_dir=tmp_path / "data/independent_evaluation/pending",
+        horizons=[21], test_days=10, min_development_rows=20, min_test_rows=10,
+    )
+    row = reservation["horizons"][0]
+    assert row["development_end"] == "2025-03-05"
+    assert row["first_test_snapshot"] == "2025-03-11"
+    assert row["max_development_label_available_at"] == "2025-03-10"
+
+
+def test_final_refit_consumed_labels_cannot_receive_independent_test_claim():
+    final_test = pd.DataFrame({
+        "__earnings_date": ["2025-06-20"], "__snapshot_date": ["2025-05-30"],
+        "__label_available_at": ["2025-06-21"],
+    })
+    metadata = {"final_fit": {"label_available_end": "2025-06-01"},
+                "selection_exposure": {"through_date": "2025-06-01"}}
+    with pytest.raises(evaluation.ModelBundleError, match="consumed|exposure"):
+        evaluation._assert_unseen_final_test(metadata, final_test, horizon=21)
+
+
+def test_learning_report_retains_recent_fit_without_independent_metric_claim(tmp_path: Path):
+    metadata = {1: {
+        "feature_protocol": "quantiv.earnings-causal.v2", "target_protocol": "quantiv.session-reaction.v2",
+        "final_fit": {"rows": 1000, "end": "2026-09-30", "row_digest": "sha256:fit"},
+        "selection_exposure": {"through_date": "2026-10-01", "row_digest": "sha256:exposed"},
+        "selection_metrics": {"val_mae": .04},
+    }}
+    decision = {"candidate_bundle_id": "candidate", "champion_bundle_id": "old", "promoted": False}
+    report = evaluation.learning_evidence_report(metadata, bundle_id="candidate", decision=decision)
+    assert report["status"] == "retained_candidate"
+    assert report["independent_evaluation"]["status"] == "not_established"
+    assert report["independent_evaluation"]["consumed_labels_are_independent"] is False
+    assert report["horizons"]["1"]["final_fit"]["end"] == "2026-09-30"
+    decision.update({"champion_bundle_id": "candidate", "promoted": True})
+    promoted = evaluation.learning_evidence_report(metadata, bundle_id="candidate", decision=decision)
+    assert promoted["status"] == "promoted"

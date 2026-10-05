@@ -111,6 +111,8 @@ def test_quote_views_pair_same_strike_and_fail_closed(tmp_path: Path) -> None:
     conn = duckdb.connect()
     setup_views(conn, tmp_path)
 
+    assert conn.execute("SELECT COUNT(*) FROM v_corporate_action_coverage").fetchone()[0] == 0
+
     selected = conn.execute(
         """
         SELECT act_symbol, atm_strike, call_bid, put_bid, quote_quality_status

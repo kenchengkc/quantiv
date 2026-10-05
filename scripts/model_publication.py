@@ -43,7 +43,7 @@ def snapshot_published_forecasts(data_dir: Path) -> None:
     backup_manifest(data_dir).write_text(json.dumps({'files': files}, sort_keys=True) + '\n')
 
 
-def verify_publication(data_dir: Path, *, not_before: str | None = None) -> dict:
+def verify_publication(data_dir: Path, *, not_before: str | None = None, forecast_path: Path | None = None) -> dict:
     monitoring = data_dir / 'models/monitoring'
     report_path = monitoring / 'latest_monitoring.json'
     report = json.loads(report_path.read_text())
@@ -53,7 +53,13 @@ def verify_publication(data_dir: Path, *, not_before: str | None = None) -> dict
     pointer = verify_control_pointer(json.loads((data_dir / 'models/control/champion.json').read_text()))
     if report.get('champion_bundle_id') != pointer['champion_bundle_id']:
         raise RuntimeError('monitoring champion does not match the active signed pointer')
-    forecast = latest_forecast_path(data_dir / 'forecasts')
+    configured = os.getenv('MODEL_PUBLICATION_FORECAST_PATH')
+    forecast = forecast_path or (Path(configured) if configured else latest_forecast_path(data_dir / 'forecasts'))
+    if forecast is not None:
+        try:
+            forecast.resolve().relative_to(data_dir.resolve())
+        except ValueError as exc:
+            raise RuntimeError('monitored forecast path escapes data directory') from exc
     if forecast is None or report.get('forecast_sha256') != sha256_file(forecast):
         raise RuntimeError('monitored forecast digest does not match the current scored snapshot')
     monitored_at = datetime.fromisoformat(report['monitored_at'].replace('Z', '+00:00'))
@@ -62,7 +68,7 @@ def verify_publication(data_dir: Path, *, not_before: str | None = None) -> dict
     if not_before and monitored_at < datetime.fromisoformat(not_before.replace('Z', '+00:00')):
         raise RuntimeError('monitoring report predates this refresh')
     drift = (report.get('feature_drift') or {}).get('status')
-    held = report.get('status') == 'failed' and drift == 'critical'
+    held = report.get('status') == 'failed' and drift in {'critical', 'insufficient_data', 'unsupported_cohort'}
     eligible = report.get('status') == 'passed' and drift in {'passed', 'warning'}
     if report.get('schema') != 'quantiv.model-monitoring.v1' or not (held or eligible):
         raise RuntimeError('monitoring failure is not a verified feature-drift publication hold')
@@ -91,6 +97,8 @@ def main() -> int:
     parser.add_argument('command', choices=['snapshot', 'monitor'])
     parser.add_argument('--data-dir', type=Path, default=Path('data'))
     parser.add_argument('--github-output', type=Path)
+    parser.add_argument('--forecast-path', type=Path)
+    parser.add_argument('--days-ahead', type=int, default=21)
     args = parser.parse_args()
     if args.command == 'snapshot':
         snapshot_published_forecasts(args.data_dir)
@@ -99,8 +107,9 @@ def main() -> int:
     # Exceptions, signature failures and malformed evidence remain fatal. Only
     # a completed, signed drift assessment can select the data-only path.
     result = monitor(argparse.Namespace(models_root=args.data_dir / 'models',
-                                       forecast_dir=args.data_dir / 'forecasts', forecast_path=None))
-    policy = verify_publication(args.data_dir, not_before=os.getenv('REFRESH_STARTED_AT'))
+                                       forecast_dir=args.data_dir / 'forecasts', forecast_path=args.forecast_path,
+                                       days_ahead=args.days_ahead))
+    policy = verify_publication(args.data_dir, not_before=os.getenv('REFRESH_STARTED_AT'), forecast_path=args.forecast_path)
     if result != (0 if policy['can_publish_ml'] else 1):
         raise RuntimeError('monitoring exit status contradicts publication evidence')
     if args.github_output:
@@ -108,7 +117,7 @@ def main() -> int:
             output.write(f"can_publish_ml={str(policy['can_publish_ml']).lower()}\n")
     print(json.dumps(policy, sort_keys=True))
     if not policy['can_publish_ml']:
-        print('::warning::ML publication held by critical feature drift; publishing independent data only.')
+        print('::warning::ML publication held by signed model evidence; publishing independent data only.')
     return 0
 
 

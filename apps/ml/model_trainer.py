@@ -13,7 +13,7 @@ import argparse
 import json
 import logging
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
@@ -22,8 +22,12 @@ import optuna
 import pandas as pd
 from lightgbm import LGBMRegressor, early_stopping, log_evaluation
 from ml.model_artifact import save_native_model
+from ml.model_protocol import CAUSAL_FEATURE_PROTOCOL, feature_protocol, target_protocol
 from ml.quantiles import rearrange_quantile_array
-from ml.training_split import chronological_train_val_split
+from ml.training_split import (
+    chronological_train_val_split, eligible_mature_rows, half_life_weights,
+    training_row_digest,
+)
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 # Log one line per search instead of every trial.
@@ -91,6 +95,64 @@ def _feature_reference(frame: pd.DataFrame) -> dict[str, Any]:
             "probabilities": probabilities.astype(float).tolist(),
         }
     return reference
+
+
+def _cohort_masks(frame: pd.DataFrame) -> dict[str, pd.Series]:
+    straddle = pd.to_numeric(frame.get("straddle_pct", pd.Series(np.nan, index=frame.index)), errors="coerce")
+    strict = np.isfinite(straddle) & (straddle > 0)
+    return {"strict_options": strict, "optionless": ~strict}
+
+
+def _cohort_validation_report(
+    frame: pd.DataFrame, actual: np.ndarray, point: np.ndarray, quantiles: np.ndarray,
+    *, min_rows: int = 200, coverage_tolerance: float = .08,
+    raw_quantiles: np.ndarray | None = None,
+    max_crossing_rate: float = .20, max_negative_rate: float = .05,
+) -> dict[str, Any]:
+    """Selection evidence; no baseline may use validation labels to fill gaps."""
+    report = {}
+    raw = quantiles if raw_quantiles is None else raw_quantiles
+    for cohort, mask in _cohort_masks(frame).items():
+        selected = mask.to_numpy(dtype=bool)
+        n = int(selected.sum())
+        baseline_col = "straddle_pct" if cohort == "strict_options" else "hist_move_med_4q"
+        baseline = pd.to_numeric(frame.get(baseline_col, pd.Series(np.nan, index=frame.index)), errors="coerce").to_numpy(dtype=float)
+        valid = selected & np.isfinite(baseline) & (baseline >= 0)
+        payload: dict[str, Any] = {
+            "rows": n, "baseline_rows": int(valid.sum()),
+            "baseline_name": "straddle" if cohort == "strict_options" else "historical_median",
+            "baseline_mae": float(mean_absolute_error(actual[valid], baseline[valid])) if valid.any() else None,
+            "mae": float(mean_absolute_error(actual[selected], point[selected])) if n else None,
+            "status": "withheld", "metric_scope": "selection_only",
+        }
+        issues = []
+        if n < min_rows or int(valid.sum()) < min_rows:
+            issues.append("insufficient cohort/baseline selection rows")
+        if n:
+            y, q = actual[selected], quantiles[selected]
+            raw_cohort = raw[selected]
+            payload["quantile_crossing_rate_raw"] = float(np.any(np.diff(raw_cohort, axis=1) < 0, axis=1).mean())
+            payload["quantile_negative_rate_raw"] = float((raw_cohort < 0).any(axis=1).mean())
+            if payload["quantile_crossing_rate_raw"] > max_crossing_rate:
+                issues.append("cohort raw quantile crossing exceeds limit")
+            if payload["quantile_negative_rate_raw"] > max_negative_rate:
+                issues.append("cohort raw negative quantiles exceed limit")
+            payload["coverage_80"] = float(((y >= q[:, 0]) & (y <= q[:, 4])).mean())
+            payload["coverage_50"] = float(((y >= q[:, 1]) & (y <= q[:, 3])).mean())
+            for index, alpha in enumerate(QUANTILES):
+                payload[f"q{int(alpha * 100):02d}_coverage"] = float((y <= q[:, index]).mean())
+            coverage_targets = {"coverage_80": .8, "coverage_50": .5, **{f"q{int(a*100):02d}_coverage": a for a in QUANTILES}}
+            if any(abs(payload[key] - expected) > coverage_tolerance for key, expected in coverage_targets.items()):
+                issues.append("cohort interval/quantile miscalibration")
+        if valid.any():
+            payload["model_mae_on_baseline_rows"] = float(mean_absolute_error(actual[valid], point[valid]))
+            if payload["model_mae_on_baseline_rows"] >= payload["baseline_mae"]:
+                issues.append("cohort selection model does not beat matched baseline")
+        payload["issues"] = issues
+        if not issues:
+            payload["status"] = "passed"
+        report[cohort] = payload
+    return report
 
 
 def _validation_slice_report(
@@ -282,16 +344,24 @@ def train_point_model(X_train: pd.DataFrame, y_train: pd.Series,
 
     # Baseline: using straddle_pct directly as prediction
     if "straddle_pct" in X_val.columns:
-        baseline_mae = float(mean_absolute_error(y_val, X_val["straddle_pct"].fillna(y_val.mean())))
-        metrics["baseline_straddle_mae"] = baseline_mae
-        if baseline_mae > 0:
-            metrics["improvement_vs_straddle"] = f"{(1 - metrics['val_mae'] / baseline_mae) * 100:.1f}%"
+        baseline_rows = np.isfinite(X_val["straddle_pct"]) & (X_val["straddle_pct"] > 0)
+        if baseline_rows.any():
+            baseline_mae = float(mean_absolute_error(y_val[baseline_rows], X_val.loc[baseline_rows, "straddle_pct"]))
+            metrics["baseline_straddle_mae"] = baseline_mae
+            model_mae = float(mean_absolute_error(y_val[baseline_rows], y_pred_val[baseline_rows]))
+            metrics["val_mae_on_straddle_rows"] = model_mae
+            metrics["baseline_straddle_rows"] = int(baseline_rows.sum())
+            if baseline_mae > 0:
+                metrics["improvement_vs_straddle"] = f"{(1 - model_mae / baseline_mae) * 100:.1f}%"
 
     # Baseline: using event_move_implied
     if "event_move_implied" in X_val.columns:
-        evi = X_val["event_move_implied"].fillna(X_val["straddle_pct"] if "straddle_pct" in X_val.columns else y_val.mean())
-        baseline_event_mae = float(mean_absolute_error(y_val, evi))
-        metrics["baseline_event_vol_mae"] = baseline_event_mae
+        evi = X_val["event_move_implied"].copy()
+        if "straddle_pct" in X_val:
+            evi = evi.fillna(X_val["straddle_pct"])
+        valid_baseline = np.isfinite(evi)
+        if valid_baseline.any():
+            metrics["baseline_event_vol_mae"] = float(mean_absolute_error(y_val[valid_baseline], evi[valid_baseline]))
 
     # Feature importance
     importance = dict(zip(X_train.columns, model.feature_importances_))
@@ -377,7 +447,8 @@ def train_quantile_models(X_train: pd.DataFrame, y_train: pd.Series,
 
 def run_training(horizons: List[int] = HORIZONS, tune: bool = False,
                  time_decay_years: float = 0.0, tune_trials: int = 30,
-                 train_frac: float = 0.75, purge_days: int = 5):
+                 train_frac: float = 0.75, purge_days: int = 5,
+                 as_of: str | None = None):
     data_dir = get_data_dir()
     ml_dir = data_dir / "ml_training"
     models_dir = data_dir / "models"
@@ -387,6 +458,7 @@ def run_training(horizons: List[int] = HORIZONS, tune: bool = False,
         logger.info(f"⚖️  Time-decay sample weighting enabled: half-life = {time_decay_years} years")
 
     results = {}
+    fit_as_of = as_of or datetime.now(timezone.utc).isoformat()
 
     for horizon in horizons:
         path = ml_dir / f"training_T{horizon}.parquet"
@@ -399,6 +471,14 @@ def run_training(horizons: List[int] = HORIZONS, tune: bool = False,
         logger.info(f"{'='*60}")
 
         df = pd.read_parquet(path)
+        feature_meta_path = ml_dir / f"metadata_T{horizon}.json"
+        feature_metadata = json.loads(feature_meta_path.read_text()) if feature_meta_path.exists() else {}
+        protocol = feature_protocol(feature_metadata)
+        target_version = target_protocol(feature_metadata)
+        if protocol == CAUSAL_FEATURE_PROTOCOL and not {"__snapshot_date", "__label_available_at"}.issubset(df.columns):
+            raise ValueError("causal training requires snapshot and label availability sidecars")
+        source_rows = len(df)
+        df, fit_snapshots, fit_labels = eligible_mature_rows(df, as_of=fit_as_of, horizon_days=horizon)
         target_col = "target"
         # Columns starting with __ are extra info, not model inputs.
         meta_cols = [c for c in df.columns if c.startswith("__")]
@@ -408,6 +488,7 @@ def run_training(horizons: List[int] = HORIZONS, tune: bool = False,
             df,
             train_frac=train_frac,
             purge_days=purge_days,
+            horizon_days=horizon,
         )
         X_train = train_df[feature_cols]
         X_val = val_df[feature_cols]
@@ -432,8 +513,7 @@ def run_training(horizons: List[int] = HORIZONS, tune: bool = False,
         if time_decay_years > 0:
             ed_train = earnings_date_train.reset_index(drop=True)
             max_date = ed_train.max()
-            days_old = (max_date - ed_train).dt.days.clip(lower=0).to_numpy()
-            sample_weight = np.exp(-days_old / (365.0 * time_decay_years))
+            sample_weight = half_life_weights(ed_train, max_date, time_decay_years)
             logger.info(
                 f"  decay weights: min={sample_weight.min():.4f} "
                 f"max={sample_weight.max():.4f} "
@@ -471,18 +551,11 @@ def run_training(horizons: List[int] = HORIZONS, tune: bool = False,
         logger.info(f"  80% interval width: {q_metrics['interval_width_80_mean']:.4f}  "
                      f"50% interval width: {q_metrics['interval_width_50_mean']:.4f}")
 
-        # ── Save best-guess model ──
         model_path = models_dir / f"lgbm_T{horizon}.txt"
-        save_native_model(model, model_path)
-
-        # ── Save band models ──
-        for alpha, qm in q_models.items():
-            q_path = models_dir / f"lgbm_T{horizon}_q{int(alpha*100):02d}.txt"
-            save_native_model(qm, q_path)
 
         # ── Save combined metadata ──
         all_metrics = {**metrics, **q_metrics}
-        all_metrics["trained_at"] = datetime.now().isoformat()
+        all_metrics["trained_at"] = datetime.now(timezone.utc).isoformat()
         all_metrics["model_path"] = str(model_path)
         all_metrics["feature_cols"] = feature_cols
         all_metrics["quantiles"] = QUANTILES
@@ -491,6 +564,10 @@ def run_training(horizons: List[int] = HORIZONS, tune: bool = False,
         all_metrics["tuned"] = bool(best_params)
         all_metrics["best_params"] = best_params
         all_metrics["validation_split"] = split_metadata
+        all_metrics["feature_protocol"] = protocol
+        all_metrics["target_protocol"] = target_version
+        all_metrics["metric_scope"] = "selection_only"
+        all_metrics["selection_metrics"] = {**metrics, **q_metrics, "metric_scope": "selection_only"}
 
         # Also compute the old-style residual_std for backward compat
         y_pred_val = model.predict(X_val)
@@ -505,10 +582,13 @@ def run_training(horizons: List[int] = HORIZONS, tune: bool = False,
             "median": float(residuals.quantile(0.50)),
             "p95": float(residuals.quantile(0.95)),
         }
-        all_metrics["feature_reference"] = _feature_reference(X_train)
-        q_val_matrix = rearrange_quantile_array(
-            np.column_stack([q_models[alpha].predict(X_val) for alpha in QUANTILES])
-        )
+        all_metrics["feature_reference"] = _feature_reference(df[feature_cols])
+        all_metrics["cohort_reference"] = {
+            cohort: {"rows": int(mask.sum()), "feature_reference": _feature_reference(df.loc[mask, feature_cols])}
+            for cohort, mask in _cohort_masks(df).items()
+        }
+        q_val_raw = np.column_stack([q_models[alpha].predict(X_val) for alpha in QUANTILES])
+        q_val_matrix = rearrange_quantile_array(q_val_raw)
         all_metrics["validation_slices"] = _validation_slice_report(
             val_df,
             X_val,
@@ -516,6 +596,40 @@ def run_training(horizons: List[int] = HORIZONS, tune: bool = False,
             np.asarray(y_pred_val, dtype=float),
             q_val_matrix,
         )
+        cohort_evidence = _cohort_validation_report(
+            val_df, y_val.to_numpy(dtype=float), np.asarray(y_pred_val, dtype=float), q_val_matrix,
+            raw_quantiles=q_val_raw,
+        )
+        all_metrics["selection_metrics"]["cohorts"] = cohort_evidence
+        all_metrics["supported_cohorts"] = [key for key, value in cohort_evidence.items() if value["status"] == "passed"]
+
+        # Validation chose these recipes. Final fitting uses every mature row;
+        # the consumed selection labels are never independent fit evidence.
+        selected_heads = {"point": model, **{f"q{int(alpha * 100):02d}": qm for alpha, qm in q_models.items()}}
+        all_metrics["selected_iterations"] = {}
+        all_metrics["fitted_iterations"] = {}
+        all_metrics["selection_recipe"] = {}
+        final_weights = half_life_weights(pd.to_datetime(df["__earnings_date"]), pd.to_datetime(df["__earnings_date"]).max(), time_decay_years)
+        for head, selected in selected_heads.items():
+            count = int(selected.booster_.num_trees())
+            params = selected.get_params()
+            params["n_estimators"] = count
+            all_metrics["selected_iterations"][head] = count
+            all_metrics["selection_recipe"][head] = params
+            final_model = LGBMRegressor(**params)
+            final_model.fit(df[feature_cols], df[target_col], sample_weight=final_weights)
+            all_metrics["fitted_iterations"][head] = int(final_model.booster_.num_trees())
+            suffix = "" if head == "point" else "_" + head
+            save_native_model(final_model, models_dir / f"lgbm_T{horizon}{suffix}.txt")
+        dates = pd.to_datetime(df["__earnings_date"])
+        digest = training_row_digest(df)
+        all_metrics["final_fit"] = {
+            "rows": len(df), "start": dates.min().date().isoformat(), "end": dates.max().date().isoformat(),
+            "label_available_end": fit_labels.max().date().isoformat(),
+            "snapshot_start": fit_snapshots.min().date().isoformat(), "snapshot_end": fit_snapshots.max().date().isoformat(),
+            "row_digest": digest, "as_of": fit_as_of, "immature_rows_excluded": source_rows - len(df),
+        }
+        all_metrics["selection_exposure"] = {"through_date": fit_labels.max().date().isoformat(), "row_digest": digest}
 
         meta_path = models_dir / f"metadata_T{horizon}.json"
         with open(meta_path, "w") as f:
@@ -578,6 +692,7 @@ def main():
         default=5,
         help="Days dropped between train and validation (default 5).",
     )
+    parser.add_argument("--as-of", help="Only fit labels available by this UTC timestamp (default now).")
     args = parser.parse_args()
     run_training(
         args.horizons,
@@ -586,6 +701,7 @@ def main():
         tune_trials=args.tune_trials,
         train_frac=args.train_frac,
         purge_days=args.purge_days,
+        as_of=args.as_of,
     )
 
 

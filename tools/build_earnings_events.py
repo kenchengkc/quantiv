@@ -294,7 +294,14 @@ def infer_unknown_timings(conn: duckdb.DuckDBPyConnection) -> None:
 def create_duckdb_views(conn: duckdb.DuckDBPyConnection, data_dir: Path):
     """Create DuckDB views for options_chain and volatility_history."""
 
+    # The standalone tools entrypoint also needs the repository's scripts package.
+    repo_root = str(Path(__file__).resolve().parent.parent)
+    if repo_root not in sys.path:
+        sys.path.insert(0, repo_root)
+    from scripts.setup_duckdb_from_parquet import setup_corporate_action_views
+
     print("🦆 Creating DuckDB views...")
+    setup_corporate_action_views(conn, data_dir)
 
     policy_path = Path(__file__).resolve().parent.parent / "config" / "option_quote_quality.json"
     policy = json.loads(policy_path.read_text())

@@ -11,9 +11,9 @@ PYTHON_BIN="${PYTHON_BIN:-python}"
 
 MODE="${1:-all}"
 case "$MODE" in
-  all|--skip-forecasts|--forecasts-only|--model-recovery|--runtime-state-only|--options-recovery) ;;
+  all|--skip-forecasts|--forecasts-only|--model-recovery|--runtime-state-only|--options-recovery|--candidate-control-only) ;;
   *)
-    echo "Usage: r2_push.sh [all| --skip-forecasts | --forecasts-only | --model-recovery | --runtime-state-only | --options-recovery]" >&2
+    echo "Usage: r2_push.sh [all| --skip-forecasts | --forecasts-only | --model-recovery | --runtime-state-only | --options-recovery | --candidate-control-only]" >&2
     exit 2
     ;;
 esac
@@ -34,14 +34,23 @@ push_parquet() {
 }
 
 push_models() {
-  # Upload immutable/versioned bundles and supporting state first. The signed
-  # champion pointer is promoted separately after every other upload succeeds.
-  rclone sync "$DATA_DIR/models" "$REMOTE/models" \
+  # Upload immutable/versioned bundles and supporting state first.
+  # Champion publication follows immutable payloads and forecasts; registry
+  # discovery follows that pointer.
+  if [ -d "$DATA_DIR/models/bundles" ]; then
+    rclone copy "$DATA_DIR/models/bundles" "$REMOTE/models/bundles" --immutable \
+      --fast-list --transfers=8 --progress
+  fi
+  rclone copy "$DATA_DIR/models" "$REMOTE/models" \
     --exclude "/control/**" \
+    --exclude "/bundles/**" \
+    --exclude "/candidates/**" \
+    --exclude "/evaluations/**" \
     --fast-list --transfers=8 --progress
   if [ -d "$DATA_DIR/models/control" ]; then
-    rclone sync "$DATA_DIR/models/control" "$REMOTE/models/control" \
+    rclone copy "$DATA_DIR/models/control" "$REMOTE/models/control" \
       --exclude "/champion.json" \
+      --exclude "/registry.json" \
       --fast-list --transfers=4 --progress
   fi
 }
@@ -49,11 +58,58 @@ push_models() {
 promote_model_champion() {
   local pointer="$DATA_DIR/models/control/champion.json"
   if [ -f "$pointer" ]; then
-    # This is deliberately the final R2 mutation in a full push. A model
-    # reader can never observe a new champion before its bundle, validation
-    # receipts, forecasts, and data-release pointer are durable.
+    # A model reader can never observe a new champion before its bundle,
+    # validation receipts, forecasts, and data-release pointer are durable.
+    # Registry discovery is published only after this pointer succeeds.
     rclone copyto "$pointer" "$REMOTE/models/control/champion.json"
     echo "✅ Promoted atomic model champion pointer"
+  fi
+}
+
+promote_model_registry() {
+  local registry="$DATA_DIR/models/control/registry.json"
+  if [ -f "$registry" ]; then
+    # Candidate discovery must follow the champion it names. A held activation
+    # cannot publish a registry that claims an unpublished champion.
+    rclone copyto "$registry" "$REMOTE/models/control/registry.json"
+  fi
+}
+
+publish_candidate_registry() {
+  local registry="$DATA_DIR/models/control/registry.json"
+  [ -f "$registry" ] || return 0
+  local readback
+  readback=$(mktemp -d "$DATA_DIR/.registry-check.XXXXXX")
+  if ! rclone copyto "$REMOTE/models/control/champion.json" "$readback/champion.json"; then
+    rm -f "$readback/champion.json"
+  fi
+  if ! "$PYTHON_BIN" - "$registry" "$DATA_DIR/models/control/champion.json" "$readback/champion.json" <<'PY'
+import json
+from pathlib import Path
+import sys
+
+sys.path.insert(0, str(Path.cwd() / "apps/ml"))
+from ml.model_bundle import verify_control_pointer, verify_registry
+
+registry_path, local_path, remote_path = map(Path, sys.argv[1:])
+registry = verify_registry(json.loads(registry_path.read_text()))
+local = verify_control_pointer(json.loads(local_path.read_text())) if local_path.is_file() else {}
+remote = verify_control_pointer(json.loads(remote_path.read_text())) if remote_path.is_file() else {}
+expected = registry.get("champion_bundle_id")
+if local.get("champion_bundle_id") != expected or remote.get("champion_bundle_id") != expected:
+    raise RuntimeError("candidate registry champion differs from the published signed pointer")
+PY
+  then
+    rm -rf "$readback"
+    return 1
+  fi
+  rm -rf "$readback"
+  promote_model_registry
+}
+
+push_model_evaluations() {
+  if [ -d "$DATA_DIR/models/evaluations" ]; then
+    rclone copy "$DATA_DIR/models/evaluations" "$REMOTE/models/evaluations" --immutable
   fi
 }
 
@@ -65,7 +121,8 @@ push_forecasts() {
     echo "⚠️  $DATA_DIR/forecasts missing — skipping forecast sync"
   fi
   if [ -d "$DATA_DIR/models/monitoring" ]; then
-    rclone sync "$DATA_DIR/models/monitoring" "$REMOTE/models/monitoring" \
+    rclone copy "$DATA_DIR/models/monitoring" "$REMOTE/models/monitoring" \
+      --exclude '*outcomes*' --exclude 'outcome_history.json' \
       --fast-list --transfers=4 --progress
   fi
 }
@@ -206,12 +263,23 @@ PY
   echo "✅ Promoted runtime-state release $release_id after R2 readback verification"
 }
 
-if [ "$MODE" = "--model-recovery" ]; then
+if [ "$MODE" = "--candidate-control-only" ]; then
+  # The retrainer owns the candidate registry. Retention never promotes a data
+  # release, production forecast, or champion pointer.
+  publish_candidate_registry
+  push_model_evaluations
+  if [ -d "$DATA_DIR/models/monitoring" ]; then
+    rclone copy "$DATA_DIR/models/monitoring" "$REMOTE/models/monitoring" \
+      --include '*outcomes*' --include 'outcome_history.json'
+  fi
+elif [ "$MODE" = "--model-recovery" ]; then
   # Controlled provenance recovery: never build/promote a data release or
   # rewrite reconciliation. The publication hold remains intact.
   push_models
+  push_model_evaluations
   push_forecasts
   promote_model_champion
+  promote_model_registry
 elif [ "$MODE" = "--forecasts-only" ]; then
   push_forecasts
 elif [ "$MODE" = "--runtime-state-only" ]; then
@@ -226,7 +294,6 @@ elif [ "$MODE" = "--options-recovery" ]; then
 elif [ "$MODE" = "--skip-forecasts" ]; then
   "$PYTHON_BIN" scripts/data_release.py build --data-dir "$DATA_DIR"
   push_parquet
-  push_models
   push_small_files
   push_controls
   promote_data_release
@@ -243,16 +310,17 @@ elif [ "$MODE" = "--skip-forecasts" ]; then
     echo "ℹ REFRESH_STARTED_AT unset; skipping research/calendar publication"
   fi
 
-  promote_model_champion
 else
   "$PYTHON_BIN" scripts/data_release.py build --data-dir "$DATA_DIR"
   push_parquet
   push_models
+  push_model_evaluations
   push_forecasts
   push_small_files
   push_controls
   promote_data_release
   promote_model_champion
+  promote_model_registry
 fi
 
 echo "✅ Push complete ($MODE)"

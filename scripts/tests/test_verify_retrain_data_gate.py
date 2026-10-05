@@ -8,6 +8,7 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from scripts.verify_retrain_data_gate import verify_retrain_data_gate
+from scripts import verify_retrain_data_gate as gate_script
 
 EASTERN = ZoneInfo("America/New_York")
 
@@ -178,3 +179,33 @@ def test_retrain_r2_pull_restores_and_checks_reconciliation() -> None:
 
     assert 'REMOTE/validation/data_reconciliation.json' in retrain_block
     assert 'verify_retrain_data_gate.py --data-dir "$DATA_DIR"' in retrain_block
+
+
+@pytest.mark.parametrize("section", ["source_reconciliation", "quote_quality"])
+def test_malformed_prospective_section_records_hold_without_blocking_learning(
+    tmp_path: Path, monkeypatch, section: str,
+) -> None:
+    data_dir = tmp_path / "data"
+    _write_options_partition(data_dir, "2026-09-30")
+    _write_manifest(
+        data_dir,
+        source_date="2026-09-30",
+        generated_at=datetime.now(EASTERN).isoformat(),
+    )
+    path = data_dir / "validation" / "data_reconciliation.json"
+    manifest = json.loads(path.read_text())
+    manifest[section] = [{}]
+    path.write_text(json.dumps(manifest))
+    report = tmp_path / "activation.json"
+    monkeypatch.setattr(
+        "sys.argv",
+        ["verify_retrain_data_gate.py", "--data-dir", str(data_dir),
+         "--report", str(report), "--allow-hold"],
+    )
+
+    assert gate_script.main() == 0
+    result = json.loads(report.read_text())
+    assert result["status"] == "held"
+    assert "invalid source contract" in result["reason"]
+    with pytest.raises(RuntimeError, match="invalid source contract"):
+        verify_retrain_data_gate(data_dir=data_dir)

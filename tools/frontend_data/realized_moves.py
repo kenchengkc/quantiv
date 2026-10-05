@@ -13,6 +13,9 @@ from twelvedata_basic import (
     plan_credit_use,
 )
 
+import pandas as pd
+
+from ml.causal_features import extract_reaction_labels, reaction_sessions
 from .shared import DATA_DIR, ET, MARKET_SESSIONS_JSON, jsonable
 
 
@@ -59,7 +62,7 @@ MARKET_HOLIDAYS, MARKET_EARLY_CLOSES = load_market_sessions()
 
 
 def timing_bucket(timing: str | None) -> str:
-    k = (timing or "").lower()
+    k = (timing or "").strip().lower()
     if k == "bmo" or "before" in k:
         return "bmo"
     if k == "amc" or "after" in k:
@@ -86,7 +89,10 @@ def realization_window_complete(
     now: datetime | None = None,
 ) -> bool:
     now_et = now or datetime.now(ET)
-    close_date = earnings_reaction_close_date(earnings_dt, timing)
+    boundaries = reaction_sessions(earnings_dt, timing_bucket(timing))
+    if boundaries is None:
+        return False
+    _, close_date = boundaries
     if now_et.date() > close_date:
         return True
     if now_et.date() < close_date:
@@ -101,134 +107,83 @@ def realized_move_from_ohlcv(
     earnings_dt: date,
     timing: str | None,
 ) -> float | None:
-    """Timing-aware regular-session close-to-close move from local OHLCV."""
+    """The signed value of the same adjusted session target used by training."""
+    label = reaction_label_lookup(conn, [(ticker, earnings_dt, timing)], as_of_date=date.today()).get(
+        (ticker, earnings_dt))
+    return None if label is None else float(label.signed_realized_move_pct)
+
+
+def reaction_label_lookup(conn, events: list[tuple[str, date, str | None]], *, as_of_date: date) -> dict:
+    """Shared exact labels for product queries whose calendar uses ticker aliases."""
+    if not events:
+        return {}
+    frame = pd.DataFrame([(symbol, day, timing_bucket(timing)) for symbol, day, timing in events],
+                         columns=["act_symbol", "earnings_date", "timing"])
     try:
-        row = conn.execute(
-            """
-            WITH event AS (
-                SELECT
-                    CAST(? AS VARCHAR) AS ticker,
-                    CAST(? AS DATE) AS earnings_dt,
-                    LOWER(COALESCE(CAST(? AS VARCHAR), 'unknown')) AS timing
-            )
-            SELECT (post.close / NULLIF(pre.close, 0) - 1.0) AS realized_move
-            FROM event e
-            LEFT JOIN v_ohlcv pre ON pre.act_symbol = e.ticker
-                AND pre.close > 0
-                AND pre.date >= e.earnings_dt - INTERVAL '5' DAY
-                AND (
-                    ((e.timing IN ('after_market_close', 'amc', 'after_close') OR e.timing LIKE '%after%')
-                        AND pre.date <= e.earnings_dt)
-                    OR (NOT (e.timing IN ('after_market_close', 'amc', 'after_close') OR e.timing LIKE '%after%')
-                        AND pre.date < e.earnings_dt)
-                )
-            LEFT JOIN v_ohlcv post ON post.act_symbol = e.ticker
-                AND post.close > 0
-                AND post.date <= e.earnings_dt + INTERVAL '5' DAY
-                AND (
-                    ((e.timing IN ('before_market_open', 'bmo', 'before_open') OR e.timing LIKE '%before%')
-                        AND post.date >= e.earnings_dt)
-                    OR (NOT (e.timing IN ('before_market_open', 'bmo', 'before_open') OR e.timing LIKE '%before%')
-                        AND post.date > e.earnings_dt)
-                )
-            QUALIFY ROW_NUMBER() OVER (
-                ORDER BY pre.date DESC NULLS LAST, post.date ASC NULLS LAST
-            ) = 1
-            """,
-            [ticker, earnings_dt, timing or "unknown"],
-        ).fetchone()
+        calendar_columns = {row[0] for row in conn.execute("""
+            SELECT column_name FROM information_schema.columns WHERE table_name='earnings_events'
+        """).fetchall()}
+        if "timing_source" in calendar_columns:
+            # Calendar inference can use later reports. Only original reported
+            # timings establish the exact historical reaction session.
+            conn.register("_product_reaction_events", frame)
+            try:
+                frame = conn.execute("""
+                    SELECT events.act_symbol,events.earnings_date,
+                           calendar.timing
+                    FROM _product_reaction_events events
+                    JOIN earnings_events calendar
+                      ON calendar.ticker=events.act_symbol
+                     AND calendar.earnings_dt=CAST(events.earnings_date AS DATE)
+                    WHERE calendar.timing_source='reported'
+                """).fetchdf()
+            finally:
+                conn.unregister("_product_reaction_events")
+            frame["timing"] = frame["timing"].map(timing_bucket)
+        labels = extract_reaction_labels(conn, as_of_date=as_of_date, events=frame)
     except Exception:
-        return None
-    if not row or row[0] is None:
-        return None
-    return float(row[0])
+        return {}
+    return {(row.act_symbol, pd.Timestamp(row.earnings_date).date()): row
+            for row in labels.itertuples(index=False)}
 
 
 def enrich_realized_moves_from_ohlcv(conn, events: list[dict]) -> int:
-    """Backfill/refresh realized_move_pct on both new and preserved week rows."""
-    candidates: list[tuple[dict, str, date, str]] = []
+    """Reconcile product outcomes with exact, normalized and mature ML targets."""
+    candidates = []
+    updated = 0
     for ev in events:
         try:
             ticker = str(ev.get("ticker") or "").upper()
             earnings_dt = date.fromisoformat(str(ev.get("earnings_date") or "")[:10])
         except ValueError:
             continue
-        if not ticker or not realization_window_complete(earnings_dt, ev.get("timing")):
+        timing = timing_bucket(ev.get("timing"))
+        if timing == "unknown" or not realization_window_complete(earnings_dt, timing):
+            if ev.get("realized_move_pct") is not None:
+                ev["realized_move_pct"] = None
+                ev["realized_label_source"] = None
+                ev["realized_target_protocol"] = None
+                updated += 1
             continue
-        candidates.append((ev, ticker, earnings_dt, str(ev.get("timing") or "unknown")))
+        if ticker:
+            candidates.append((ev, ticker, earnings_dt, timing))
     if not candidates:
-        return 0
-
-    try:
-        conn.execute(
-            """
-            CREATE OR REPLACE TEMP TABLE tmp_earnings_reaction_events (
-                ticker VARCHAR,
-                earnings_dt DATE,
-                timing VARCHAR
-            )
-            """
-        )
-        conn.executemany(
-            "INSERT INTO tmp_earnings_reaction_events VALUES (?, ?, ?)",
-            [(ticker, earnings_dt, timing) for _, ticker, earnings_dt, timing in candidates],
-        )
-        rows = conn.execute(
-            """
-            SELECT ticker, earnings_dt, realized_move
-            FROM (
-                SELECT
-                    e.ticker,
-                    e.earnings_dt,
-                    (post.close / NULLIF(pre.close, 0) - 1.0) AS realized_move,
-                    ROW_NUMBER() OVER (
-                        PARTITION BY e.ticker, e.earnings_dt
-                        ORDER BY pre.date DESC NULLS LAST, post.date ASC NULLS LAST
-                    ) AS rn
-                FROM tmp_earnings_reaction_events e
-                LEFT JOIN v_ohlcv pre ON pre.act_symbol = e.ticker
-                    AND pre.close > 0
-                    AND pre.date >= e.earnings_dt - INTERVAL '5' DAY
-                    AND (
-                        ((LOWER(COALESCE(e.timing, 'unknown')) IN ('after_market_close', 'amc', 'after_close')
-                            OR LOWER(COALESCE(e.timing, 'unknown')) LIKE '%after%')
-                            AND pre.date <= e.earnings_dt)
-                        OR (NOT (LOWER(COALESCE(e.timing, 'unknown')) IN ('after_market_close', 'amc', 'after_close')
-                            OR LOWER(COALESCE(e.timing, 'unknown')) LIKE '%after%')
-                            AND pre.date < e.earnings_dt)
-                    )
-                LEFT JOIN v_ohlcv post ON post.act_symbol = e.ticker
-                    AND post.close > 0
-                    AND post.date <= e.earnings_dt + INTERVAL '5' DAY
-                    AND (
-                        ((LOWER(COALESCE(e.timing, 'unknown')) IN ('before_market_open', 'bmo', 'before_open')
-                            OR LOWER(COALESCE(e.timing, 'unknown')) LIKE '%before%')
-                            AND post.date >= e.earnings_dt)
-                        OR (NOT (LOWER(COALESCE(e.timing, 'unknown')) IN ('before_market_open', 'bmo', 'before_open')
-                            OR LOWER(COALESCE(e.timing, 'unknown')) LIKE '%before%')
-                            AND post.date > e.earnings_dt)
-                    )
-            )
-            WHERE rn = 1 AND realized_move IS NOT NULL
-            """
-        ).fetchall()
-    except Exception:
-        rows = []
-
-    moves = {
-        (str(ticker).upper(), earnings_dt): float(move)
-        for ticker, earnings_dt, move in rows
-        if move is not None
-    }
-    updated = 0
-    for ev, ticker, earnings_dt, _ in candidates:
-        move = moves.get((ticker, earnings_dt))
-        if move is None:
-            continue
-        new_value = jsonable(move)
-        if ev.get("realized_move_pct") != new_value:
-            ev["realized_move_pct"] = new_value
+        return updated
+    moves = reaction_label_lookup(conn, [(ticker, earnings_dt, timing)
+                                        for _, ticker, earnings_dt, timing in candidates],
+                                  as_of_date=date.today())
+    for ev, ticker, earnings_dt, timing in candidates:
+        label = moves.get((ticker, earnings_dt))
+        move = None if label is None else jsonable(label.signed_realized_move_pct)
+        if ev.get("realized_move_pct") != move:
+            ev["realized_move_pct"] = move
             updated += 1
+        ev["realized_label_source"] = None if label is None else label.label_source
+        ev["realized_target_protocol"] = None if label is None else label.target_protocol
+        if label is not None:
+            ev["realized_pre_price_date"] = pd.Timestamp(label.pre_price_date).date().isoformat()
+            ev["realized_post_price_date"] = pd.Timestamp(label.post_price_date).date().isoformat()
+            ev["realized_label_available_at"] = pd.Timestamp(label.label_available_at).date().isoformat()
     return updated
 
 
@@ -237,23 +192,16 @@ def _compute_realized_from_closes(
     earnings_dt: date,
     timing: str | None,
 ) -> float | None:
-    if not closes:
+    """Exact-session fallback on externally comparable closes, without label proof."""
+    boundaries = reaction_sessions(earnings_dt, timing_bucket(timing))
+    if boundaries is None:
         return None
-    bucket = timing_bucket(timing)
-    if bucket == "amc":
-        pre = [row for row in closes if row[0] <= earnings_dt]
-        post = [row for row in closes if row[0] > earnings_dt]
-    elif bucket == "bmo":
-        pre = [row for row in closes if row[0] < earnings_dt]
-        post = [row for row in closes if row[0] >= earnings_dt]
-    else:
-        pre = [row for row in closes if row[0] < earnings_dt]
-        post = [row for row in closes if row[0] > earnings_dt]
-    if not pre or not post:
+    pre, post = boundaries
+    observations = dict(closes)
+    if len(observations) != len(closes):
         return None
-    pre_close = pre[-1][1]
-    post_close = post[0][1]
-    if pre_close <= 0 or post_close <= 0:
+    pre_close, post_close = observations.get(pre), observations.get(post)
+    if pre_close is None or post_close is None or pre_close <= 0 or post_close <= 0:
         return None
     return post_close / pre_close - 1.0
 
@@ -266,7 +214,7 @@ def twelvedata_realized_candidates(events: list[dict]) -> tuple[list[tuple[dict,
         "invalid": 0,
     }
     for ev in events:
-        if ev.get("realized_move_pct") is not None:
+        if ev.get("realized_move_pct") is not None or ev.get("realized_external_fallback_pct") is not None:
             stats["already_realized"] += 1
             continue
         try:
@@ -354,7 +302,12 @@ def enrich_realized_moves_from_twelvedata(events: list[dict], *, dry_run: bool =
         )
         if move is None:
             continue
-        ev["realized_move_pct"] = jsonable(move)
+        ev["realized_external_fallback_pct"] = jsonable(move)
+        ev["realized_external_fallback_source"] = "external_split_adjusted_close_unverified"
+        ev["realized_move_pct"] = None
+        ev["realized_move_abs"] = None
+        ev["realized_label_source"] = None
+        ev["realized_target_protocol"] = None
         updated += 1
     return updated
 

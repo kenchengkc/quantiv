@@ -22,6 +22,10 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
+from ml.candidate_evidence import verify_candidate_evidence
+from ml.evidence_receipt import verify_evidence_receipt
+from ml.model_bundle import verify_bundle_dir
+from ml.model_protocol import CAUSAL_FEATURE_PROTOCOL, feature_protocol
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 FEATURE_ENGINEERING_PATH = REPO_ROOT / "apps" / "ml" / "feature_engineering.py"
@@ -120,6 +124,14 @@ def _feature_engineering_contract() -> dict[str, str]:
         "snapshot_rule": "snapshot_date < earnings_date",
         "horizon_rule": "calendar lead_days == declared T-N horizon",
         "label_rule": "realized target is stored only in target and is not a model feature",
+        "source_members": {
+            path.name: _sha256(path)
+            for path in (REPO_ROOT / "apps/ml/ml/causal_features.py",
+                         REPO_ROOT / "apps/ml/ml/corporate_actions.py",
+                         REPO_ROOT / "apps/ml/ml/model_protocol.py",
+                         REPO_ROOT / "config/market_sessions.json")
+            if path.exists()
+        },
     }
 
 
@@ -164,6 +176,15 @@ def _inspect_training(horizon: int, path: Path, metadata: Path) -> dict[str, Any
     earnings = pd.to_datetime(frame["__earnings_date"], errors="coerce")
     if earnings.isna().any():
         raise ValueError(f"T-{horizon} has invalid __earnings_date values")
+    feature_metadata = _read_object(metadata)
+    if feature_protocol(feature_metadata) == CAUSAL_FEATURE_PROTOCOL:
+        for column in ("__label_available_at", "__pre_price_date", "__post_price_date", "__target_protocol"):
+            if column not in frame:
+                raise ValueError(f"T-{horizon} missing causal target sidecar: {column}")
+        labels = pd.to_datetime(frame["__label_available_at"], errors="raise")
+        posts = pd.to_datetime(frame["__post_price_date"], errors="raise")
+        if (labels < posts).any() or (labels < earnings).any():
+            raise ValueError(f"T-{horizon} has inconsistent target availability")
 
     snapshot_present = "__snapshot_date" in frame.columns
     if snapshot_present:
@@ -272,8 +293,9 @@ def build_promotion_receipts(
             "gates": [
                 "validated signed candidate bundle",
                 "mandatory purged walk-forward validation",
-                "feature drift must not be critical",
-                "common-holdout comparison must pass when a champion exists",
+                "matching serving cohorts must pass feature-contract and reference-evidence checks; covariate PSI remains diagnostic",
+                "mutually unseen paired holdout or signed prospective matched-snapshot comparison must pass when a champion exists",
+                "each served cohort requires at least 200 matched baseline observations per horizon and unchanged MAE/calibration limits",
                 "shadow scoring must pass when a champion exists",
             ],
             "research_policy": "Any separate experiment that selects from a family of p-values must preserve raw statistics and Holm/BH correction evidence; that is not the production champion-selection rule.",
@@ -290,6 +312,7 @@ def verify_promotion_receipts(
     training_dir: Path = DEFAULT_TRAINING_DIR,
     temporal_path: Path = DEFAULT_TEMPORAL_RECEIPT,
     statistical_path: Path = DEFAULT_STATISTICAL_RECEIPT,
+    archived_evidence_dir: Path | None = None,
 ) -> dict[str, Any]:
     temporal = _read_object(temporal_path)
     statistical = _read_object(statistical_path)
@@ -302,9 +325,25 @@ def verify_promotion_receipts(
         if payload.get("candidate_bundle_id") != candidate_bundle_id:
             raise ValueError(f"{label} promotion receipt is bound to another candidate")
 
-    contract = _feature_engineering_contract()
-    if (temporal.get("feature_contract") or {}).get("sha256") != contract["sha256"]:
-        raise ValueError("temporal receipt feature-engineering source digest is stale")
+    recorded_contract = temporal.get("feature_contract") or {}
+    if archived_evidence_dir:
+        verify_candidate_evidence(archived_evidence_dir, candidate_bundle_id)
+        receipt = verify_evidence_receipt(_read_object(archived_evidence_dir / "model_validation_receipt.json"), expected_scope="models")
+        bundle = verify_bundle_dir(archived_evidence_dir.parent.parent / "bundles" / candidate_bundle_id)
+        if receipt["receipt_id"] != bundle["receipt_id"] or receipt["quality"]["status"] != "passed":
+            raise ValueError("archived model validation receipt does not match signed bundle")
+        from ml.candidate_evidence import verify_candidate_bindings
+        verify_candidate_bindings(archived_evidence_dir, bundle)
+        source = archived_evidence_dir / "source"
+        if _sha256(source / "feature_engineering.py") != recorded_contract.get("sha256"):
+            raise ValueError("archived feature-engineering source digest mismatch")
+        for name, digest in recorded_contract.get("source_members", {}).items():
+            if Path(name).name != name or _sha256(source / name) != digest:
+                raise ValueError("archived causal feature source digest mismatch")
+    else:
+        contract = _feature_engineering_contract()
+        if recorded_contract.get("sha256") != contract["sha256"] or recorded_contract.get("source_members", {}) != contract.get("source_members", {}):
+            raise ValueError("temporal receipt feature-engineering source digest is stale")
 
     current = {
         horizon: (path, metadata)
