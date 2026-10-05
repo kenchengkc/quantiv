@@ -3,27 +3,28 @@ import './typography.css';
 import './typography-legacy.css';
 import './text-colors.css';
 import type { Metadata, Viewport } from 'next';
-import { JetBrains_Mono, Mulish } from 'next/font/google';
+import localFont from 'next/font/local';
 import { SPLASH_SESSION_KEY, SPLASH_SKIP_ATTRIBUTE } from '@/lib/splashSession';
 import { Analytics } from '@vercel/analytics/next';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 
-// Self-host the product UI font and technical data font through next/font/google.
+// Bundle the product UI and technical data fonts so builds work without a
+// Google Fonts request. The licensed variable files retain all source glyphs.
 // Mulish is the single application voice used by the About-page reference
 // heading and all ordinary interface copy; JetBrains Mono remains reserved for
-// genuinely technical/data-oriented content. next/font writes preload +
-// font-face rules into Next's <head> stream, so there is no runtime request to
-// fonts.googleapis.com.
-const mulish = Mulish({
-  subsets: ['latin'],
-  weight: ['300', '400', '500', '600', '700', '800', '900'],
+// technical/data-oriented content. Next emits and preloads both local files.
+const mulish = localFont({
+  src: './fonts/Mulish-Variable.woff2',
+  weight: '300 900',
+  style: 'normal',
   variable: '--font-mulish',
   display: 'swap',
 });
 
-const jetbrainsMono = JetBrains_Mono({
-  subsets: ['latin'],
-  weight: ['300', '400', '500', '600'],
+const jetbrainsMono = localFont({
+  src: './fonts/JetBrainsMono-Variable.woff2',
+  weight: '300 600',
+  style: 'normal',
   variable: '--font-jetbrains-mono',
   display: 'swap',
 });

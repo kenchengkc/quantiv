@@ -2,11 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Mulish, Nunito Sans, and JetBrains Mono are self-hosted via next/font/google
-   in app/layout.tsx, which exposes them as CSS variables on <html>
-   (--font-mulish, --font-nunito-sans, --font-jetbrains-mono). The rules
-   below reference those variables, so no third-party CDN request is made
-   at runtime. KaTeX has no fonts to fetch from a CDN, so its @import stays. */
+/* Mulish and JetBrains Mono are bundled via next/font/local in app/layout.tsx,
+   which exposes --font-mulish and --font-jetbrains-mono on <html>. Typography
+   references those variables without a third-party font request at build or
+   runtime. KaTeX also bundles its fonts, so its @import stays. */
 @import "katex/dist/katex.min.css";
 
 /* Palette tuned to the Quantiv logo: pure black page backgrounds, pure white
