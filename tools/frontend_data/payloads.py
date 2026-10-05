@@ -20,6 +20,7 @@ from math_baseline import compute_em_math
 
 from .forecast_artifacts import ml_fields, provider_event_fields
 from .shared import WEEK_OFFSETS, jsonable
+from .realized_moves import reaction_label_lookup, timing_bucket
 
 def build_screener_payload(
     as_of_date: date,
@@ -618,83 +619,23 @@ def build_symbol_detail(conn, ticker: str, as_of_date: date, earnings_dt: date |
             "call_theta": jsonable(call_theta),
         })
 
-    # Earnings history (last 12 events) with signed close-to-close realized
-    # moves where OHLCV coverage permits. The LEFT JOIN ensures we still
-    # return history rows when v_ohlcv can't bracket the event — those
-    # rows just have actual=NULL and the chart's dot won't render. The
-    # window is ±5 calendar days so weekends/holidays don't drop events.
-    #
-    # Bracket is timing-aware (Finnhub-grade timing once overlay has run):
-    #   BMO  → pre = last close BEFORE earnings_dt, post = close ON OR AFTER earnings_dt
-    #   AMC  → pre = close ON OR BEFORE earnings_dt, post = first close AFTER earnings_dt
-    #   DMH / unknown → symmetric (pre <, post >) — original behavior.
-    # ROW_NUMBER picks the latest pre and earliest post per earnings_dt
-    # (NULLS LAST keeps the bare row if no OHLCV exists).
-    #
-    # Also pulls EPS/revenue actual+estimate (populated by the Finnhub
-    # overlay) so the historical chart can color realized-move dots by
-    # surprise and surface fundamentals in the tooltip.
-    try:
-        history = conn.execute(
-            """
-            SELECT
-                e.earnings_dt,
-                e.timing,
-                e.fiscal_year,
-                e.fiscal_q,
-                e.eps_actual,
-                e.eps_estimate,
-                e.revenue_actual,
-                e.revenue_estimate,
-                (post.close / NULLIF(pre.close, 0) - 1.0) AS actual,
-                e.source
-            FROM earnings_events e
-            LEFT JOIN v_ohlcv pre  ON pre.act_symbol = e.ticker
-                AND pre.date >= e.earnings_dt - INTERVAL '5' DAY
-                AND (
-                    ((LOWER(COALESCE(e.timing, 'unknown')) IN ('after_market_close', 'amc', 'after_close')
-                        OR LOWER(COALESCE(e.timing, 'unknown')) LIKE '%after%')
-                        AND pre.date <= e.earnings_dt)
-                    OR (NOT (LOWER(COALESCE(e.timing, 'unknown')) IN ('after_market_close', 'amc', 'after_close')
-                        OR LOWER(COALESCE(e.timing, 'unknown')) LIKE '%after%')
-                        AND pre.date < e.earnings_dt)
-                )
-            LEFT JOIN v_ohlcv post ON post.act_symbol = e.ticker
-                AND post.date <= e.earnings_dt + INTERVAL '5' DAY
-                AND (
-                    ((LOWER(COALESCE(e.timing, 'unknown')) IN ('before_market_open', 'bmo', 'before_open')
-                        OR LOWER(COALESCE(e.timing, 'unknown')) LIKE '%before%')
-                        AND post.date >= e.earnings_dt)
-                    OR (NOT (LOWER(COALESCE(e.timing, 'unknown')) IN ('before_market_open', 'bmo', 'before_open')
-                        OR LOWER(COALESCE(e.timing, 'unknown')) LIKE '%before%')
-                        AND post.date > e.earnings_dt)
-                )
-            WHERE e.ticker = ?
-            QUALIFY ROW_NUMBER() OVER (
-                PARTITION BY e.earnings_dt
-                ORDER BY pre.date DESC NULLS LAST, post.date ASC NULLS LAST
-            ) = 1
-            ORDER BY e.earnings_dt DESC
-            LIMIT 20
-            """,
-            [ticker],
-        ).fetchall()
-    except Exception:
-        # v_ohlcv may not exist for this build; fall back to bare history.
-        history = [
-            (d, t, fy, fq, epa, epe, rva, rve, None, src)
-            for d, t, fy, fq, epa, epe, rva, rve, src in conn.execute(
-                """
-                SELECT earnings_dt, timing, fiscal_year, fiscal_q,
-                       eps_actual, eps_estimate, revenue_actual, revenue_estimate, source
-                FROM earnings_events
-                WHERE ticker = ?
-                ORDER BY earnings_dt DESC
-                LIMIT 20
-                """,
-                [ticker],
-            ).fetchall()
-        ]
+    # Preserve fundamentals even when an exact mature reaction cannot be verified.
+    history_rows = conn.execute(
+        """
+        SELECT earnings_dt, timing, fiscal_year, fiscal_q,
+               eps_actual, eps_estimate, revenue_actual, revenue_estimate, source
+        FROM earnings_events WHERE ticker = ?
+        ORDER BY earnings_dt DESC LIMIT 20
+        """, [ticker],
+    ).fetchall()
+    reaction_labels = reaction_label_lookup(
+        conn, [(ticker, row[0], row[1]) for row in history_rows], as_of_date=as_of_date,
+    )
+    history = []
+    for day, timing, fy, fq, epa, epe, rva, rve, event_source in history_rows:
+        label = reaction_labels.get((ticker, day))
+        history.append((day, label.timing if label else timing, fy, fq, epa, epe, rva, rve,
+                        label.signed_realized_move_pct if label else None, event_source))
 
     historical_options = _historical_option_evidence(conn, ticker, as_of_date)
 
@@ -790,6 +731,11 @@ def build_symbol_detail(conn, ticker: str, as_of_date: date, earnings_dt: date |
         # v_volhist may not exist if volatility_history parquet hasn't been synced yet
         pass
 
+    earnings_history = _history_rows(history, ticker, historical_options)
+    for row in earnings_history:
+        label = reaction_labels.get((ticker, date.fromisoformat(row["date"])))
+        row["realized_target_protocol"] = label.target_protocol if label else None
+        row["realized_label_source"] = label.label_source if label else None
     provider_fields = provider_event_fields((provider_lookup or {}).get(ticker))
     return {
         "symbol": ticker,
@@ -797,7 +743,7 @@ def build_symbol_detail(conn, ticker: str, as_of_date: date, earnings_dt: date |
         "spot_price": jsonable(spot),
         "expected_move": em,
         "straddle_features": straddles,
-        "earnings_history": _history_rows(history, ticker, historical_options),
+        "earnings_history": earnings_history,
         "next_earnings": earnings_dt.isoformat() if earnings_dt else None,
         "vol_regime": vol_regime,
         **provider_fields,
@@ -836,50 +782,19 @@ def screener_extras(conn, ticker: str, earnings_dt: date, as_of_date: date) -> d
     except Exception:
         pass
 
-    # Historical realized moves — last 4 earnings strictly before the target.
-    # Keep the mean for research/screener compatibility, but publish the median
-    # separately because it is the canonical user-facing historical fallback.
-    # Uses the canonical `earnings_events` table (built by build_earnings_events_table)
-    # joined to v_ohlcv. Both must exist for this to produce a value; the
-    # try/except suppresses errors when either is missing.
+    # Summarize only exact adjusted labels available by this feature snapshot.
     try:
-        rows = conn.execute(
-            """
-            SELECT ABS(post.close / NULLIF(pre.close, 0) - 1.0) AS realized
-            FROM earnings_events e
-            JOIN v_ohlcv pre  ON pre.act_symbol = e.ticker
-                AND pre.date >= e.earnings_dt - INTERVAL '5' DAY
-                AND (
-                    ((LOWER(COALESCE(e.timing, 'unknown')) IN ('after_market_close', 'amc', 'after_close')
-                        OR LOWER(COALESCE(e.timing, 'unknown')) LIKE '%after%')
-                        AND pre.date <= e.earnings_dt)
-                    OR (NOT (LOWER(COALESCE(e.timing, 'unknown')) IN ('after_market_close', 'amc', 'after_close')
-                        OR LOWER(COALESCE(e.timing, 'unknown')) LIKE '%after%')
-                        AND pre.date < e.earnings_dt)
-                )
-            JOIN v_ohlcv post ON post.act_symbol = e.ticker
-                AND post.date <= e.earnings_dt + INTERVAL '5' DAY
-                AND (
-                    ((LOWER(COALESCE(e.timing, 'unknown')) IN ('before_market_open', 'bmo', 'before_open')
-                        OR LOWER(COALESCE(e.timing, 'unknown')) LIKE '%before%')
-                        AND post.date >= e.earnings_dt)
-                    OR (NOT (LOWER(COALESCE(e.timing, 'unknown')) IN ('before_market_open', 'bmo', 'before_open')
-                        OR LOWER(COALESCE(e.timing, 'unknown')) LIKE '%before%')
-                        AND post.date > e.earnings_dt)
-                )
-            WHERE e.ticker = ? AND e.earnings_dt < ? AND pre.close > 0 AND post.close > 0
-            QUALIFY ROW_NUMBER() OVER (
-                PARTITION BY e.earnings_dt ORDER BY pre.date DESC, post.date ASC
-            ) = 1
-            ORDER BY e.earnings_dt DESC LIMIT 4
-            """,
+        prior_events = conn.execute(
+            "SELECT earnings_dt,timing FROM earnings_events WHERE ticker=? AND earnings_dt<? ORDER BY earnings_dt DESC",
             [ticker, earnings_dt],
         ).fetchall()
-        if rows:
-            vals = [r[0] for r in rows if r[0] is not None]
-            if vals:
-                extras["hist_move_avg_4q"] = jsonable(sum(vals) / len(vals))
-                extras["hist_move_med_4q"] = jsonable(median(vals))
+        labels = reaction_label_lookup(conn, [(ticker, day, timing) for day, timing in prior_events],
+                                       as_of_date=as_of_date)
+        recent = sorted(labels.values(), key=lambda row: row.earnings_date, reverse=True)[:4]
+        vals = [row.realized_move_pct for row in recent]
+        if vals:
+            extras["hist_move_avg_4q"] = jsonable(sum(vals) / len(vals))
+            extras["hist_move_med_4q"] = jsonable(median(vals))
     except Exception as e:
         print(f"  ⚠ historical move summary failed for {ticker}: {e}", flush=True)
 
@@ -1186,62 +1101,27 @@ def build_week_events(conn, as_of_date: date, week_start: date, week_end: date,
                       require_ml: bool = True,
                       canonical: set[tuple[str, str]] | None = None,
                       published: dict[tuple[str, str], str] | set[tuple[str, str]] | None = None) -> list[dict]:
-    # realized_move: signed regular-session close-to-close move ACROSS the
-    # print, for events already reported. Same timing-aware bracket as
-    # build_symbol_detail (BMO → prev close→report-day close; AMC → report-day
-    # close→next close). Regular-session OHLCV only, so it excludes the
-    # pre/after-hours IEX prints the live quote can include. NULL for upcoming
-    # events (no post close yet) — the calendar then shows the live tick.
-    try:
-        rows = conn.execute(
-            """
-            SELECT e.ticker, e.earnings_dt, e.timing, e.fiscal_q,
-                   e.eps_actual, e.eps_estimate, e.revenue_actual, e.revenue_estimate,
-                   (post.close / NULLIF(pre.close, 0) - 1.0) AS realized_move
-            FROM earnings_events e
-            LEFT JOIN v_ohlcv pre  ON pre.act_symbol = e.ticker
-                AND pre.date >= e.earnings_dt - INTERVAL '5' DAY
-                AND (
-                    ((LOWER(COALESCE(e.timing, 'unknown')) IN ('after_market_close', 'amc', 'after_close')
-                        OR LOWER(COALESCE(e.timing, 'unknown')) LIKE '%after%')
-                        AND pre.date <= e.earnings_dt)
-                    OR (NOT (LOWER(COALESCE(e.timing, 'unknown')) IN ('after_market_close', 'amc', 'after_close')
-                        OR LOWER(COALESCE(e.timing, 'unknown')) LIKE '%after%')
-                        AND pre.date < e.earnings_dt)
-                )
-            LEFT JOIN v_ohlcv post ON post.act_symbol = e.ticker
-                AND post.date <= e.earnings_dt + INTERVAL '5' DAY
-                AND (
-                    ((LOWER(COALESCE(e.timing, 'unknown')) IN ('before_market_open', 'bmo', 'before_open')
-                        OR LOWER(COALESCE(e.timing, 'unknown')) LIKE '%before%')
-                        AND post.date >= e.earnings_dt)
-                    OR (NOT (LOWER(COALESCE(e.timing, 'unknown')) IN ('before_market_open', 'bmo', 'before_open')
-                        OR LOWER(COALESCE(e.timing, 'unknown')) LIKE '%before%')
-                        AND post.date > e.earnings_dt)
-                )
-            WHERE e.earnings_dt BETWEEN ? AND ?
-            QUALIFY ROW_NUMBER() OVER (
-                PARTITION BY e.ticker, e.earnings_dt
-                ORDER BY pre.date DESC NULLS LAST, post.date ASC NULLS LAST
-            ) = 1
-            ORDER BY e.earnings_dt, e.ticker
-            """,
-            [week_start, week_end],
-        ).fetchall()
-    except Exception:
-        # v_ohlcv absent (e.g. options-only build) — fall back without moves.
-        rows = [
-            (*r, None) for r in conn.execute(
-                """
-                SELECT ticker, earnings_dt, timing, fiscal_q,
-                       eps_actual, eps_estimate, revenue_actual, revenue_estimate
-                FROM earnings_events
-                WHERE earnings_dt BETWEEN ? AND ?
-                ORDER BY earnings_dt, ticker
-                """,
-                [week_start, week_end],
-            ).fetchall()
-        ]
+    # Read event identities first; outcomes share the exact adjusted ML target.
+    event_rows = conn.execute(
+        """
+        SELECT ticker, earnings_dt, timing, fiscal_q,
+               eps_actual, eps_estimate, revenue_actual, revenue_estimate
+        FROM earnings_events WHERE earnings_dt BETWEEN ? AND ?
+        ORDER BY earnings_dt,ticker
+        """, [week_start, week_end],
+    ).fetchall()
+    reaction_labels = reaction_label_lookup(
+        conn, [(row[0], row[1], row[2]) for row in event_rows], as_of_date=as_of_date,
+    )
+    unique_events = {}
+    for row in event_rows:
+        key = (row[0], row[1])
+        rank = (timing_bucket(row[2]) != "unknown", row[4] is not None, row[6] is not None)
+        if key not in unique_events or rank > unique_events[key][0]:
+            unique_events[key] = (rank, row)
+    event_rows = [row for _, row in unique_events.values()]
+    rows = [(*row[:8], reaction_labels[(row[0], row[1])].signed_realized_move_pct
+             if (row[0], row[1]) in reaction_labels else None) for row in event_rows]
 
     events = []
     skipped_no_ml = 0
@@ -1272,6 +1152,9 @@ def build_week_events(conn, as_of_date: date, week_start: date, week_end: date,
         timing = resolve_event_timing(
             timing, _published_timing(published, ticker, earnings_iso)
         )
+        label = reaction_labels.get((ticker, earnings_dt))
+        if label is not None:
+            timing = label.timing
         fc = ml_lookup.get((ticker, earnings_iso))
         if ml_gate_drops_event(ticker, earnings_iso, today, ml_lookup, require_ml, published):
             skipped_no_ml += 1
@@ -1302,6 +1185,8 @@ def build_week_events(conn, as_of_date: date, week_start: date, week_end: date,
                     "revenue_actual": jsonable(revenue_actual),
                     "revenue_estimate": jsonable(revenue_estimate),
                     "realized_move_pct": jsonable(realized_move),
+                    "realized_target_protocol": label.target_protocol if label else None,
+                    "realized_label_source": label.label_source if label else None,
                     "as_of_date": as_of_date.isoformat(),
                     "em_method": "ml_lightgbm" if ml else None,
                     "em_straddle_pct": None,
@@ -1333,6 +1218,8 @@ def build_week_events(conn, as_of_date: date, week_start: date, week_end: date,
             # as the earnings-day reaction) instead of the live tick once a
             # reporter's date has passed. NULL for upcoming events.
             "realized_move_pct": jsonable(realized_move),
+            "realized_target_protocol": label.target_protocol if label else None,
+            "realized_label_source": label.label_source if label else None,
             "as_of_date": as_of_date.isoformat(),
             "spot_price": jsonable(em["estimated_spot"]),
             "atm_strike": jsonable(em["atm_strike"]),

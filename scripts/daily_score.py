@@ -45,6 +45,14 @@ from ml.pipeline_validation import (  # noqa: E402 - standalone script path setu
     FORECAST_REQUIRED_COLUMNS,
 )
 from ml.quantiles import rearrange_quantile_array  # noqa: E402 - standalone script path setup
+from ml.model_protocol import (  # noqa: E402
+    FEATURE_PROTOCOL_CAUSAL,
+    FEATURE_PROTOCOL_LEGACY,
+    bundle_feature_protocol,
+    resolve_feature_protocol,
+    target_protocol,
+)
+from ml.causal_features import build_causal_features  # noqa: E402
 try:  # noqa: E402 - standalone script path setup
     from event_forecast_ledger import (
         annotate_forecasts,
@@ -87,6 +95,8 @@ def load_models(models_dir: Path) -> Dict[int, dict]:
     for meta_path in sorted(models_dir.glob("metadata_T*.json")):
         with open(meta_path) as f:
             meta = json.load(f)
+        resolve_feature_protocol(meta)
+        target_protocol(meta)
         horizon = meta["horizon"]
         model_path = models_dir / point_model_name(horizon)
         if not model_path.exists():
@@ -140,6 +150,61 @@ def load_models(models_dir: Path) -> Dict[int, dict]:
 def get_upcoming_features(
     conn: duckdb.DuckDBPyConnection,
     days_ahead: int,
+    *,
+    feature_protocol: str = FEATURE_PROTOCOL_LEGACY,
+) -> pd.DataFrame:
+    """Route live feature construction by the signed model's explicit semantics."""
+    protocol = resolve_feature_protocol({"feature_protocol": feature_protocol})
+    if protocol == FEATURE_PROTOCOL_CAUSAL:
+        today = date.today()
+        return build_causal_features(
+            conn, start_date=today, end_date=today + timedelta(days=days_ahead),
+            as_of_date=today,
+        )
+    return _get_legacy_upcoming_features(conn, days_ahead)
+
+
+def get_bundle_upcoming_features(
+    conn: duckdb.DuckDBPyConnection, models_dir: Path, days_ahead: int,
+) -> pd.DataFrame:
+    """Build this bundle's features, rather than reuse another model's vectors."""
+    horizons = [int(path.stem.removeprefix("metadata_T"))
+                for path in models_dir.glob("metadata_T*.json")]
+    if not horizons:
+        raise ValueError("bundle has no feature protocol metadata")
+    return get_upcoming_features(
+        conn, days_ahead,
+        feature_protocol=bundle_feature_protocol(models_dir, horizons=horizons),
+    )
+
+
+def score_upcoming_models(
+    conn: duckdb.DuckDBPyConnection, models: Dict[int, dict], days_ahead: int,
+) -> pd.DataFrame:
+    """Construct each protocol once and score each head on its own inputs."""
+    results = []
+    protocols = {resolve_feature_protocol(entry.get("metadata") or {})
+                 for entry in models.values()}
+    for protocol in sorted(protocols):
+        entries = {horizon: entry for horizon, entry in models.items()
+                   if resolve_feature_protocol(entry.get("metadata") or {}) == protocol}
+        frame = get_upcoming_features(conn, days_ahead, feature_protocol=protocol)
+        if not frame.empty:
+            result = score(frame, entries)
+            if not result.empty:
+                results.append(result)
+    return pd.concat(results, ignore_index=True) if results else pd.DataFrame()
+
+
+def get_bundle_forecasts(
+    conn: duckdb.DuckDBPyConnection, models_dir: Path, days_ahead: int,
+) -> pd.DataFrame:
+    """Protocol-specific shadow predictions for model-control consumers."""
+    return score_upcoming_models(conn, load_models(models_dir), days_ahead)
+
+
+def _get_legacy_upcoming_features(
+    conn: duckdb.DuckDBPyConnection, days_ahead: int,
 ) -> pd.DataFrame:
     """Build point-in-time live features for upcoming earnings.
 
@@ -465,6 +530,16 @@ def score(df: pd.DataFrame, models: Dict[int, dict]) -> pd.DataFrame:
 
     for horizon, m in models.items():
         hdf = df[df["lead_days"] == horizon].copy()
+        metadata = m.get("metadata") or {}
+        protocol = resolve_feature_protocol(metadata)
+        if protocol == FEATURE_PROTOCOL_CAUSAL:
+            hdf["timing"] = hdf["timing"].fillna("").astype(str).str.strip().str.lower()
+            hdf = hdf.loc[hdf["timing"].isin(["bmo", "amc"])].copy()
+            baseline = pd.to_numeric(hdf["straddle_pct"], errors="coerce")
+            cohort = np.where(np.isfinite(baseline) & (baseline > 0), "strict_options", "optionless")
+            hdf["__cohort"] = cohort
+            supported = set(metadata.get("supported_cohorts") or [])
+            hdf = hdf.loc[hdf["__cohort"].isin(supported)].copy()
         if hdf.empty:
             continue
 
@@ -526,6 +601,8 @@ def score(df: pd.DataFrame, models: Dict[int, dict]) -> pd.DataFrame:
             or "unversioned"
         )
         hdf["scored_at"] = datetime.now(timezone.utc).isoformat()
+        hdf["feature_protocol"] = protocol
+        hdf["target_protocol"] = target_protocol(metadata)
 
         results.append(hdf)
 
@@ -650,7 +727,18 @@ def save_forecasts(
 
     if df.empty:
         logger.warning("No forecasts to save")
-        if output_path is None:
+        if output_path is not None:
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            temporary = output_path.with_suffix(output_path.suffix + ".tmp")
+            pd.DataFrame(columns=sorted(FORECAST_REQUIRED_COLUMNS)).to_parquet(temporary, index=False)
+            temporary.replace(output_path)
+            report = {"schema": "quantiv.candidate-scoring.v1", "status": "no_upcoming_events",
+                      "rows": 0, "generated_at": datetime.now(timezone.utc).isoformat()}
+            report_path = output_path.with_suffix(".research.json")
+            temporary_report = report_path.with_suffix(".json.tmp")
+            temporary_report.write_text(json.dumps(report, indent=2) + "\n")
+            temporary_report.replace(report_path)
+        else:
             prune_forecast_snapshots(forecast_dir)
         return
 
@@ -682,6 +770,7 @@ def save_forecasts(
         "feature_cutoff_at", "prediction_deadline_at", "feature_snapshot_at",
         "feature_hash", "forecast_id", "freeze_eligible",
         "freeze_ineligible_reason",
+        "feature_protocol", "target_protocol", "__cohort", "timing_confidence",
     ]
     out = df[[c for c in out_cols if c in df.columns]].copy()
     out = annotate_forecasts(out)
@@ -713,7 +802,33 @@ def save_forecasts(
 
     today = datetime.now().strftime("%Y-%m-%d")
     parquet_path = forecast_dir / f"forecasts_{today}.parquet"
-    out.to_parquet(parquet_path, index=False)
+    staged_path = parquet_path.with_suffix(".parquet.tmp")
+    out.to_parquet(staged_path, index=False)
+    # Add newly introduced protocol fields before publication. Named insertion
+    # preserves older rows and tolerates table columns from earlier schemas.
+    db_path = os.getenv("DUCKDB_PATH", str(data_dir / "quantiv.duckdb"))
+    conn = duckdb.connect(db_path)
+    conn.register("_scored_forecasts", out)
+    try:
+        conn.execute("BEGIN TRANSACTION")
+        conn.execute("CREATE TABLE IF NOT EXISTS ml_forecasts AS SELECT * FROM _scored_forecasts WHERE 1=0")
+        existing = {row[0] for row in conn.execute("DESCRIBE ml_forecasts").fetchall()}
+        for column, dtype, *_ in conn.execute("DESCRIBE _scored_forecasts").fetchall():
+            if column not in existing:
+                identifier = '"' + column.replace('"', '""') + '"'
+                conn.execute(f"ALTER TABLE ml_forecasts ADD COLUMN {identifier} {dtype}")
+        columns = ", ".join('"' + column.replace('"', '""') + '"' for column in out.columns)
+        conn.execute(f"INSERT INTO ml_forecasts ({columns}) SELECT {columns} FROM _scored_forecasts")
+        n = conn.execute("SELECT COUNT(*) FROM ml_forecasts").fetchone()[0]
+        conn.execute("COMMIT")
+    except Exception:
+        conn.execute("ROLLBACK")
+        staged_path.unlink(missing_ok=True)
+        raise
+    finally:
+        conn.unregister("_scored_forecasts")
+        conn.close()
+    staged_path.replace(parquet_path)
     logger.info(f"Saved {len(out)} forecasts → {parquet_path}")
     update_event_forecast_archive(out, forecast_dir)
     pruned = prune_forecast_snapshots(forecast_dir)
@@ -724,14 +839,6 @@ def save_forecasts(
             FORECAST_RETENTION_DAYS,
         )
 
-    db_path = os.getenv("DUCKDB_PATH", str(data_dir / "quantiv.duckdb"))
-    conn = duckdb.connect(db_path)
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS ml_forecasts AS SELECT * FROM out WHERE 1=0"
-    )
-    conn.execute("INSERT INTO ml_forecasts SELECT * FROM out")
-    n = conn.execute("SELECT COUNT(*) FROM ml_forecasts").fetchone()[0]
-    conn.close()
     logger.info(f"DuckDB ml_forecasts: {n:,} total rows")
 
 
@@ -796,6 +903,7 @@ def main():
                    NULL::DOUBLE AS parkinson_rv_60d,
                    NULL::DOUBLE AS cc_rv_10d, NULL::DOUBLE AS cc_rv_20d,
                    NULL::DOUBLE AS vol_of_vol_20d,
+                   NULL::DOUBLE AS volume,
                    NULL::DOUBLE AS volume_ratio_20d, NULL::DOUBLE AS drift_5d
             WHERE 1=0
         """)
@@ -865,15 +973,8 @@ def main():
                 WHERE 1=0
             """)
 
-    df = get_upcoming_features(conn, args.days_ahead)
+    forecasts = score_upcoming_models(conn, models, args.days_ahead)
     conn.close()
-    logger.info(f"Found {len(df)} feature rows for upcoming earnings")
-
-    if df.empty:
-        logger.warning("No upcoming earnings with features found")
-        return
-
-    forecasts = score(df, models)
     logger.info(f"Generated {len(forecasts)} forecasts")
 
     save_forecasts(forecasts, data_dir, output_path=args.output_path)

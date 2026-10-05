@@ -28,6 +28,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import (
 )
 
 from ml.model_artifact import point_model_name, quantile_model_name, sha256_file
+from ml.evidence_receipt import verify_evidence_receipt
 
 BUNDLE_SCHEMA = "quantiv.model-bundle.v1"
 CONTROL_SCHEMA = "quantiv.model-control.v1"
@@ -162,13 +163,35 @@ def create_signed_bundle(
     private_key: str | bytes | None = None,
 ) -> tuple[Path, dict[str, Any]]:
     """Copy a passed model set into an immutable, signed bundle directory."""
-    report = json.loads(validation_report_path.read_text())
-    receipt = json.loads(receipt_path.read_text())
-    if report.get("status") != "passed" or receipt.get("quality", {}).get("status") != "passed":
+    try:
+        report = json.loads(validation_report_path.read_text())
+        receipt = json.loads(receipt_path.read_text())
+    except (OSError, ValueError) as exc:
+        raise ModelBundleError(f"cannot read model validation evidence: {exc}") from exc
+    if not isinstance(report, Mapping) or report.get("status") != "passed":
         raise ModelBundleError("refusing to package a model set that did not pass validation")
-    receipt_id = str(receipt.get("receipt_id", ""))
-    if not receipt_id.startswith("sha256:"):
-        raise ModelBundleError("model validation receipt has no content-addressed receipt_id")
+    try:
+        if not isinstance(receipt, Mapping):
+            raise ValueError("model validation receipt must be an object")
+        receipt = verify_evidence_receipt(receipt, expected_scope="models")
+        if receipt["quality"].get("status") != "passed":
+            raise ValueError("model validation receipt did not pass validation")
+        if "evidence_receipt" in report:
+            reported_receipt = verify_evidence_receipt(report["evidence_receipt"], expected_scope="models")
+            if reported_receipt["receipt_id"] != receipt["receipt_id"]:
+                raise ValueError("validation report and model receipt identities differ")
+        expected_horizons = sorted(set(horizons))
+        receipt_horizons = receipt["horizons"]
+        if (
+            not expected_horizons
+            or any(type(horizon) is not int or horizon <= 0 for horizon in expected_horizons)
+            or any(type(horizon) is not int for horizon in receipt_horizons)
+            or sorted(receipt_horizons) != expected_horizons
+        ):
+            raise ValueError("validated model horizons differ from requested bundle horizons")
+    except (ValueError, TypeError, KeyError, AttributeError) as exc:
+        raise ModelBundleError(f"invalid model validation receipt: {exc}") from exc
+    receipt_id = receipt["receipt_id"]
 
     names = required_artifact_names(horizons)
     missing = [name for name in names if not (models_dir / name).is_file()]
@@ -182,6 +205,20 @@ def create_signed_bundle(
         }
         for name in names
     ]
+    try:
+        model_bundles = [item for item in receipt["artifacts"] if item.get("name") == "model_bundle"]
+        if len(model_bundles) != 1:
+            raise ValueError("model receipt has no unique validated model bundle")
+        members = model_bundles[0]["members"]
+        member_names = [Path(item["path"]).name for item in members]
+        if len(member_names) != len(set(member_names)) or set(member_names) != set(names):
+            raise ValueError("validated model member set differs from requested bundle")
+        validated = dict(zip(member_names, members))
+        for artifact in artifacts:
+            if any(validated[artifact["name"]][key] != artifact[key] for key in ("bytes", "sha256")):
+                raise ValueError(f"model changed after validation: {artifact['name']}")
+    except (ValueError, TypeError, KeyError, AttributeError) as exc:
+        raise ModelBundleError(f"invalid model validation receipt: {exc}") from exc
     core = _bundle_core(
         artifacts=artifacts,
         receipt_id=receipt_id,

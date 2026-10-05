@@ -1,8 +1,11 @@
 """Route-level tests for ML coverage and batch prediction endpoints."""
 
+import asyncio
+import json
 import sys
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from fastapi import HTTPException
@@ -18,6 +21,224 @@ from models import (  # noqa: E402
     MLStatusRequest,
 )
 from routers import ml_predict  # noqa: E402
+
+
+def test_prediction_cache_key_changes_when_active_bundle_changes(monkeypatch):
+    req = MLPredictRequest(symbol="A", horizon_days=7)
+    monkeypatch.setattr(ml_predict.predict_service, "get_bundle", lambda _: SimpleNamespace(bundle_id="a" * 64))
+    old_key = ml_predict._cache_key(req)
+    monkeypatch.setattr(ml_predict.predict_service, "get_bundle", lambda _: SimpleNamespace(bundle_id="b" * 64))
+    assert ml_predict._cache_key(req) != old_key
+
+
+class _PredictionCache:
+    """Pause a real cache boundary while a model activation occurs."""
+    def __init__(self, *, pause_at):
+        self.data = {}
+        self.pause_at = pause_at
+        self.started = asyncio.Event()
+        self.resume = asyncio.Event()
+        self.paused = False
+
+    async def _pause(self, operation):
+        if operation == self.pause_at and not self.paused:
+            self.paused = True
+            self.started.set()
+            await self.resume.wait()
+
+    async def get(self, key):
+        await self._pause("get")
+        return self.data.get(key)
+
+    async def setex(self, key, ttl, payload):
+        await self._pause("set")
+        self.data[key] = payload
+
+
+def _active_test_models(monkeypatch):
+    import pandas as pd
+    from lightgbm import LGBMRegressor
+
+    bundles = {}
+    features = pd.DataFrame({"log_spot": [4.6] * 20})
+    for name, value in (("a", .01), ("b", .09)):
+        model = LGBMRegressor(n_estimators=1, n_jobs=1, verbose=-1).fit(features, [value] * len(features)).booster_
+        bundles[name] = ml_predict.predict_service._ModelBundle(
+            estimator=model, feature_names=["log_spot"],
+            quantile_estimators={q: model for q in (10, 25, 50, 75, 90)},
+            loaded_at=datetime.now(timezone.utc), model_version=name,
+            model_trained_at=None, feature_schema_hash="fixture", val_mae=None,
+            bundle_id=name * 64,
+        )
+    active = {"bundle": bundles["a"]}
+    monkeypatch.setattr(ml_predict.predict_service, "get_bundle", lambda _: active["bundle"])
+    return active, bundles
+
+
+def _snapshot(bundle):
+    return {
+        "snapshot_date": date.today(), "earnings_date": date.today() + timedelta(days=7),
+        "feature_vector": {"log_spot": 4.6}, "model_bundle_id": bundle.bundle_id,
+        "spot_at_snapshot": 100., "snapshot_age_days": 0,
+        "forecast_scored_at": datetime.now(timezone.utc),
+    }
+
+
+def _cached_prediction(bundle, value):
+    response = MLPredictResponse(
+        symbol="A", horizon_days=7, em_ml_pct=value, em_ml_abs=value * 100.,
+        quantiles={q: value for q in (10, 25, 50, 75, 90)}, spot_used=100.,
+        feature_snapshot_date=date.today().isoformat(), source="computed",
+        inference_mode="snapshot_rescore",
+        served_at=datetime.now(timezone.utc), model_version=bundle.model_version,
+    ).model_dump(mode="json")
+    return json.dumps({**response, "model_bundle_id": bundle.bundle_id})
+
+
+@pytest.mark.asyncio
+async def test_activation_during_cache_hit_never_serves_previous_bundle(monkeypatch):
+    active, bundles = _active_test_models(monkeypatch)
+    req = MLPredictRequest(symbol="A", horizon_days=7)
+    cache = _PredictionCache(pause_at="get")
+    old_key = ml_predict._cache_key(req)
+    cache.data[old_key] = _cached_prediction(bundles["a"], .01)
+    active["bundle"] = bundles["b"]
+    new_key = ml_predict._cache_key(req)
+    cache.data[new_key] = _cached_prediction(bundles["b"], .09)
+    active["bundle"] = bundles["a"]
+    ml_predict.init_router({"db_pool": _Pool(_StatusConn()), "redis_client": cache})
+    task = asyncio.create_task(ml_predict._predict_response(req))
+    await asyncio.wait_for(cache.started.wait(), timeout=2)
+    active["bundle"] = bundles["b"]
+    cache.resume.set()
+    response = await asyncio.wait_for(task, timeout=2)
+    assert response.model_version == "b"
+    assert response.em_ml_pct == pytest.approx(.09)
+    assert response.source == "cached"
+
+
+@pytest.mark.asyncio
+async def test_activation_during_cache_miss_caches_inference_under_its_own_bundle(monkeypatch):
+    active, bundles = _active_test_models(monkeypatch)
+    req = MLPredictRequest(symbol="A", horizon_days=7)
+    cache = _PredictionCache(pause_at="get")
+    old_key = ml_predict._cache_key(req)
+
+    async def snapshot(*_args):
+        return _snapshot(active["bundle"])
+
+    monkeypatch.setattr(ml_predict.predict_service, "fetch_latest_feature_snapshot", snapshot)
+    ml_predict.init_router({"db_pool": _Pool(_StatusConn()), "redis_client": cache})
+    task = asyncio.create_task(ml_predict._predict_response(req))
+    await asyncio.wait_for(cache.started.wait(), timeout=2)
+    active["bundle"] = bundles["b"]
+    cache.resume.set()
+    response = await asyncio.wait_for(task, timeout=2)
+    assert response.model_version == "b"
+    assert response.em_ml_pct == pytest.approx(.09)
+    assert old_key not in cache.data
+    cached = json.loads(cache.data[ml_predict._cache_key(req)])
+    assert cached["model_bundle_id"] == "b" * 64
+    assert cached["model_version"] == "b"
+
+
+@pytest.mark.asyncio
+async def test_activation_during_snapshot_fetch_retries_with_the_new_bundle(monkeypatch):
+    active, bundles = _active_test_models(monkeypatch)
+    req = MLPredictRequest(symbol="A", horizon_days=7)
+    cache = _PredictionCache(pause_at=None)
+    started, resume = asyncio.Event(), asyncio.Event()
+
+    async def snapshot(*_args):
+        selected = active["bundle"]
+        if selected is bundles["a"]:
+            started.set()
+            await resume.wait()
+        return _snapshot(selected)
+
+    monkeypatch.setattr(ml_predict.predict_service, "fetch_latest_feature_snapshot", snapshot)
+    ml_predict.init_router({"db_pool": _Pool(_StatusConn()), "redis_client": cache})
+    task = asyncio.create_task(ml_predict._predict_response(req))
+    await asyncio.wait_for(started.wait(), timeout=2)
+    active["bundle"] = bundles["b"]
+    resume.set()
+    response = await asyncio.wait_for(task, timeout=2)
+    assert response.model_version == "b"
+    assert response.em_ml_pct == pytest.approx(.09)
+    cached = json.loads(cache.data[ml_predict._cache_key(req)])
+    assert cached["model_bundle_id"] == "b" * 64
+
+
+@pytest.mark.asyncio
+async def test_activation_during_cache_write_never_returns_superseded_inference(monkeypatch):
+    active, bundles = _active_test_models(monkeypatch)
+    req = MLPredictRequest(symbol="A", horizon_days=7)
+    cache = _PredictionCache(pause_at="set")
+    old_key = ml_predict._cache_key(req)
+
+    async def snapshot(*_args):
+        return _snapshot(active["bundle"])
+
+    monkeypatch.setattr(ml_predict.predict_service, "fetch_latest_feature_snapshot", snapshot)
+    ml_predict.init_router({"db_pool": _Pool(_StatusConn()), "redis_client": cache})
+    task = asyncio.create_task(ml_predict._predict_response(req))
+    await asyncio.wait_for(cache.started.wait(), timeout=2)
+    active["bundle"] = bundles["b"]
+    cache.resume.set()
+    response = await asyncio.wait_for(task, timeout=2)
+    assert response.model_version == "b"
+    assert response.em_ml_pct == pytest.approx(.09)
+    assert json.loads(cache.data[old_key])["model_bundle_id"] == "a" * 64
+    assert json.loads(cache.data[ml_predict._cache_key(req)])["model_bundle_id"] == "b" * 64
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("marker", [None, "b" * 64])
+async def test_previous_unbound_or_miskeyed_cache_entries_are_recomputed(monkeypatch, marker):
+    active, bundles = _active_test_models(monkeypatch)
+    req = MLPredictRequest(symbol="A", horizon_days=7)
+    cache = _PredictionCache(pause_at=None)
+    payload = json.loads(_cached_prediction(bundles["b"], .09))
+    if marker is None:
+        payload.pop("model_bundle_id")
+    else:
+        payload["model_bundle_id"] = marker
+    cache.data[ml_predict._cache_key(req)] = json.dumps(payload)
+
+    async def snapshot(*_args):
+        return _snapshot(active["bundle"])
+
+    monkeypatch.setattr(ml_predict.predict_service, "fetch_latest_feature_snapshot", snapshot)
+    ml_predict.init_router({"db_pool": _Pool(_StatusConn()), "redis_client": cache})
+    response = await ml_predict._predict_response(req)
+    assert response.source == "computed"
+    assert response.model_version == "a"
+    assert response.em_ml_pct == pytest.approx(.01)
+    assert json.loads(cache.data[ml_predict._cache_key(req)])["model_bundle_id"] == "a" * 64
+
+
+@pytest.mark.asyncio
+async def test_repeated_activation_fails_closed_without_caching_a_prediction(monkeypatch):
+    active, bundles = _active_test_models(monkeypatch)
+
+    class RotatingCache(_PredictionCache):
+        async def get(self, key):
+            active["bundle"] = bundles["b"] if active["bundle"] is bundles["a"] else bundles["a"]
+            await asyncio.sleep(0)
+            return None
+
+    cache = RotatingCache(pause_at=None)
+
+    async def snapshot(*_args):
+        return _snapshot(active["bundle"])
+
+    monkeypatch.setattr(ml_predict.predict_service, "fetch_latest_feature_snapshot", snapshot)
+    ml_predict.init_router({"db_pool": _Pool(_StatusConn()), "redis_client": cache})
+    with pytest.raises(HTTPException) as error:
+        await asyncio.wait_for(ml_predict._predict_response(MLPredictRequest(symbol="A", horizon_days=7)), timeout=2)
+    assert error.value.status_code == 503
+    assert "retry" in error.value.detail
+    assert cache.data == {}
 
 
 class _Acquire:
@@ -273,6 +494,7 @@ async def test_status_endpoint_returns_model_and_data_metadata(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_predict_response_includes_debug_metadata(monkeypatch):
+    monkeypatch.setattr(ml_predict.predict_service, "get_bundle", lambda _: SimpleNamespace(bundle_id="a" * 64))
     class _Result:
         em_ml_pct = 0.07
         em_ml_abs = 7.0
@@ -289,6 +511,7 @@ async def test_predict_response_includes_debug_metadata(monkeypatch):
             "snapshot_date": date(2026, 5, 20),
             "earnings_date": date(2026, 5, 27),
             "feature_vector": {"log_spot": 4.6},
+            "model_bundle_id": "a" * 64,
             "spot_at_snapshot": 99.0,
             "forecast_scored_at": datetime(2026, 5, 24, tzinfo=timezone.utc),
             "snapshot_age_days": 4,
@@ -315,6 +538,7 @@ async def test_predict_response_includes_debug_metadata(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_cached_prediction_is_upgraded_to_current_decision_contract(monkeypatch):
+    monkeypatch.setattr(ml_predict.predict_service, "get_bundle", lambda _: SimpleNamespace(bundle_id="a" * 64))
     async def fake_cached_get(_key):
         return {
             "symbol": "CRM",
@@ -327,6 +551,7 @@ async def test_cached_prediction_is_upgraded_to_current_decision_contract(monkey
             "earnings_date": "2026-05-27",
             "source": "live",
             "served_at": "2026-05-24T00:00:00Z",
+            "model_bundle_id": "a" * 64,
         }
 
     monkeypatch.setattr(ml_predict, "_cached_get", fake_cached_get)
@@ -355,6 +580,7 @@ def test_prediction_request_rejects_live_trading_intent() -> None:
 
 @pytest.mark.asyncio
 async def test_predict_response_labels_snapshot_rescore_without_spot_override(monkeypatch):
+    monkeypatch.setattr(ml_predict.predict_service, "get_bundle", lambda _: SimpleNamespace(bundle_id="a" * 64))
     class _SnapshotResult:
         em_ml_pct = 0.07
         em_ml_abs = 6.93
@@ -371,6 +597,7 @@ async def test_predict_response_labels_snapshot_rescore_without_spot_override(mo
             "snapshot_date": date(2026, 5, 20),
             "earnings_date": date(2026, 5, 27),
             "feature_vector": {"log_spot": 4.6},
+            "model_bundle_id": "a" * 64,
             "spot_at_snapshot": 99.0,
             "forecast_scored_at": datetime(2026, 5, 24, tzinfo=timezone.utc),
             "snapshot_age_days": 4,

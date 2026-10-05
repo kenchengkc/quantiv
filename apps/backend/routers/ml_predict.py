@@ -82,13 +82,20 @@ def _supported_horizons() -> list[int]:
     return sorted(VALID_HORIZONS)
 
 
-def _cache_key(req: MLPredictRequest) -> str:
+def _active_bundle_id(horizon: int) -> str | None:
+    bundle = predict_service.get_bundle(horizon)
+    return bundle.bundle_id if bundle is not None else None
+
+
+def _cache_key(req: MLPredictRequest, *, bundle_id: str | None = None) -> str:
     """Stable cache key. Spot is rounded to 1 decimal so trivial flicker
     in the latest stock tick doesn't blow the cache to bits; 0.1 = ~10bp on a $100
     name, well below the noise floor of an EM prediction."""
     spot_bucket = round(req.spot_override, 1) if req.spot_override is not None else "snap"
     earn = req.earnings_date.isoformat() if req.earnings_date else "auto"
-    return f"ml:pred:{req.symbol.upper()}:{req.horizon_days}:{spot_bucket}:{earn}"
+    if bundle_id is None:
+        bundle_id = _active_bundle_id(req.horizon_days)
+    return f"ml:pred:{bundle_id or 'unbound'}:{req.symbol.upper()}:{req.horizon_days}:{spot_bucket}:{earn}"
 
 
 async def _cached_get(key: str) -> Optional[Dict[str, Any]]:
@@ -135,76 +142,94 @@ async def _predict_response(req: MLPredictRequest) -> MLPredictResponse:
         # 503 so callers know to retry, not as a 500.
         raise HTTPException(status_code=503, detail="Postgres pool not available")
 
-    cache_key = _cache_key(req)
-    hit = await _cached_get(cache_key)
-    if hit is not None:
-        hit["source"] = "cached"
-        hit["inference_mode"] = (
-            "spot_updated_snapshot"
-            if req.spot_override is not None
-            else "snapshot_rescore"
-        )
-        hit["updated_inputs"] = ["spot"] if req.spot_override is not None else []
-        return MLPredictResponse(**hit)
+    # A cache/database await can overlap activation. Retry once against the new
+    # immutable identity, then fail closed if activation continues changing it.
+    for _attempt in range(2):
+        bundle_id = _active_bundle_id(req.horizon_days)
+        if bundle_id is None:
+            raise HTTPException(status_code=503, detail=f"No signed model loaded for horizon T-{req.horizon_days}")
+        cache_key = _cache_key(req, bundle_id=bundle_id)
+        hit = await _cached_get(cache_key)
+        if _active_bundle_id(req.horizon_days) != bundle_id:
+            continue
+        # Older entries may have been placed under the wrong key during an
+        # activation race. Only explicitly identity-bound entries are reusable.
+        if isinstance(hit, dict) and hit.get("model_bundle_id") == bundle_id:
+            hit["source"] = "cached"
+            hit["inference_mode"] = (
+                "spot_updated_snapshot"
+                if req.spot_override is not None
+                else "snapshot_rescore"
+            )
+            hit["updated_inputs"] = ["spot"] if req.spot_override is not None else []
+            return MLPredictResponse(**hit)
 
-    snapshot = await predict_service.fetch_latest_feature_snapshot(
-        pool,
-        req.symbol,
-        req.horizon_days,
-        req.earnings_date,
-    )
-    if snapshot is None:
-        raise HTTPException(
-            status_code=404,
-            detail=(
-                f"No fresh feature snapshot for {req.symbol.upper()} "
-                f"horizon={req.horizon_days}d "
-                f"(max age {predict_service.MAX_SNAPSHOT_AGE_DAYS}d). "
-                "The nightly batch may not have scored this symbol recently."
+        snapshot = await predict_service.fetch_latest_feature_snapshot(
+            pool, req.symbol, req.horizon_days, req.earnings_date,
+        )
+        if _active_bundle_id(req.horizon_days) != bundle_id:
+            continue
+        if snapshot is None:
+            raise HTTPException(
+                status_code=404,
+                detail=(
+                    f"No fresh feature snapshot for {req.symbol.upper()} "
+                    f"horizon={req.horizon_days}d "
+                    f"(max age {predict_service.MAX_SNAPSHOT_AGE_DAYS}d). "
+                    "The nightly batch may not have scored this symbol recently."
+                ),
+            )
+        inference_bundle_id = snapshot.get("model_bundle_id")
+        if inference_bundle_id != bundle_id:
+            raise HTTPException(status_code=503, detail="Feature snapshot does not match the active model")
+
+        result = predict_service.predict(
+            feature_vector=snapshot["feature_vector"],
+            snapshot_date=snapshot["snapshot_date"],
+            horizon=req.horizon_days,
+            spot_override=req.spot_override or snapshot.get("spot_at_snapshot"),
+            snapshot_bundle_id=inference_bundle_id,
+        )
+        if _active_bundle_id(req.horizon_days) != inference_bundle_id:
+            continue
+        if result is None:
+            raise HTTPException(
+                status_code=503, detail=f"No model loaded for horizon T-{req.horizon_days}",
+            )
+
+        response = MLPredictResponse(
+            symbol=req.symbol.upper(),
+            horizon_days=req.horizon_days,
+            em_ml_pct=result.em_ml_pct,
+            em_ml_abs=result.em_ml_abs,
+            quantiles=result.quantiles,
+            spot_used=result.spot_used,
+            feature_snapshot_date=result.feature_snapshot_date,
+            earnings_date=snapshot.get("earnings_date"),
+            source="computed",
+            inference_mode=(
+                "spot_updated_snapshot"
+                if req.spot_override is not None
+                else "snapshot_rescore"
             ),
+            updated_inputs=["spot"] if req.spot_override is not None else [],
+            served_at=datetime.now(timezone.utc),
+            snapshot_age_days=snapshot.get("snapshot_age_days"),
+            forecast_scored_at=snapshot.get("forecast_scored_at"),
+            model_version=result.model_version,
+            model_trained_at=result.model_trained_at,
+            model_loaded_at=result.model_loaded_at,
+            feature_schema_hash=result.feature_schema_hash,
         )
-
-    result = predict_service.predict(
-        feature_vector=snapshot["feature_vector"],
-        snapshot_date=snapshot["snapshot_date"],
-        horizon=req.horizon_days,
-        spot_override=req.spot_override or snapshot.get("spot_at_snapshot"),
-    )
-    if result is None:
-        raise HTTPException(
-            status_code=503,
-            detail=f"No model loaded for horizon T-{req.horizon_days}",
+        await _cached_set(
+            _cache_key(req, bundle_id=inference_bundle_id),
+            {**response.model_dump(mode="json"), "model_bundle_id": inference_bundle_id},
         )
+        if _active_bundle_id(req.horizon_days) != inference_bundle_id:
+            continue
+        return response
 
-    response = MLPredictResponse(
-        symbol=req.symbol.upper(),
-        horizon_days=req.horizon_days,
-        em_ml_pct=result.em_ml_pct,
-        em_ml_abs=result.em_ml_abs,
-        quantiles=result.quantiles,
-        spot_used=result.spot_used,
-        feature_snapshot_date=result.feature_snapshot_date,
-        earnings_date=snapshot.get("earnings_date"),
-        source="computed",
-        inference_mode=(
-            "spot_updated_snapshot"
-            if req.spot_override is not None
-            else "snapshot_rescore"
-        ),
-        updated_inputs=["spot"] if req.spot_override is not None else [],
-        served_at=datetime.now(timezone.utc),
-        snapshot_age_days=snapshot.get("snapshot_age_days"),
-        forecast_scored_at=snapshot.get("forecast_scored_at"),
-        model_version=result.model_version,
-        model_trained_at=result.model_trained_at,
-        model_loaded_at=result.model_loaded_at,
-        feature_schema_hash=result.feature_schema_hash,
-    )
-
-    # Mirror into Upstash so the next caller (and any backend instance)
-    # serves the cached response without re-running the model.
-    await _cached_set(cache_key, response.model_dump(mode="json"))
-    return response
+    raise HTTPException(status_code=503, detail="Active model changed during prediction; retry the request")
 
 
 @router.post("/api/ml/predict", response_model=MLPredictResponse)

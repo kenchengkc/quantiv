@@ -6,11 +6,20 @@ is covered separately by integration tests once the data pipeline is live.
 """
 
 import math
+import json
 import sys
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 import pytest
+import duckdb
+import pandas as pd
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from lightgbm import LGBMRegressor
+from ml.evidence_receipt import build_evidence_receipt
+from ml.model_artifact import save_native_model
+from ml.model_bundle import create_signed_bundle
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(REPO_ROOT / "apps" / "backend"))
@@ -49,6 +58,121 @@ def _import():
     from services import predict_service  # noqa: WPS433 — runtime import is intentional
     predict_service.reset_cache()
     return predict_service
+
+
+def test_unknown_feature_semantics_rejected_before_native_loading(tmp_path, monkeypatch):
+    import json
+
+    service = _import()
+    (tmp_path / "lgbm_T1.txt").write_text("unused model")
+    (tmp_path / "metadata_T1.json").write_text(json.dumps({"feature_protocol": "unknown"}))
+    monkeypatch.setattr(service, "load_native_model", lambda path: pytest.fail("native loading preceded protocol validation"))
+    with pytest.raises(ValueError, match="unsupported feature protocol"):
+        service._load_bundle_from_dir(tmp_path, 1)
+
+
+def _signed_serving_models(tmp_path, monkeypatch):
+    models = tmp_path / "source"
+    models.mkdir()
+    features = ["log_spot", "straddle_pct", "timing_bmo", "timing_amc"]
+    frame = pd.DataFrame([[4.6, .05, 1., 0.]] * 20, columns=features)
+    estimator = LGBMRegressor(n_estimators=1, min_child_samples=2, verbose=-1)
+    estimator.fit(frame, [.06] * len(frame))
+    for suffix in ["", "_q10", "_q25", "_q50", "_q75", "_q90"]:
+        save_native_model(estimator, models / f"lgbm_T7{suffix}.txt")
+    (models / "metadata_T7.json").write_text(json.dumps({
+        "feature_cols": features, "feature_protocol": "quantiv.earnings-causal.v2",
+        "target_protocol": "quantiv.session-reaction.v2", "supported_cohorts": ["strict_options"],
+    }))
+    private = Ed25519PrivateKey.generate()
+    private_pem = private.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption())
+    public = tmp_path / "public.pem"
+    public.write_bytes(private.public_key().public_bytes(serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo))
+    monkeypatch.setenv("MODEL_BUNDLE_PUBLIC_KEY", str(public))
+    report = tmp_path / "report.json"
+    validation = {"status": "passed", "issues": [], "stages": {"models": {"horizons": [7]}}}
+    report.write_text(json.dumps(validation))
+    receipt = tmp_path / "receipt.json"
+    receipt.write_text(json.dumps(build_evidence_receipt(
+        validation, scope="models", repo_root=tmp_path, data_dir=tmp_path / "data",
+        training_dir=tmp_path / "training", models_dir=models, forecast_path=None, horizons=[7],
+    )))
+    bundle_dir, manifest = create_signed_bundle(models, tmp_path / "bundles", receipt_path=receipt,
+                                              validation_report_path=report, source_revision="test", horizons=[7], private_key=private_pem)
+    monkeypatch.setenv("ML_MODELS_DIR", str(bundle_dir))
+    return manifest["bundle_id"]
+
+
+class _SnapshotPool:
+    """Run emitted SQL against real local rows instead of faking query selection."""
+    def __init__(self, rows):
+        self.conn = duckdb.connect()
+        self.conn.register("snapshot_rows", pd.DataFrame(rows))
+        self.conn.execute("CREATE TABLE em_forecasts AS SELECT * FROM snapshot_rows")
+
+    def acquire(self):
+        return self
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *args):
+        return False
+
+    async def fetchrow(self, query, *params):
+        cursor = self.conn.execute(query, params)
+        values = cursor.fetchone()
+        return dict(zip([column[0] for column in cursor.description], values)) if values else None
+
+
+def _snapshot_row(bundle_id, *, days_old=0, straddle=.05):
+    return {
+        "act_symbol": "A", "snapshot_date": date.today() - timedelta(days=days_old),
+        "earnings_date": date(2026, 12, 1), "model_horizon": 7, "model_bundle_id": bundle_id,
+        "feature_vector": json.dumps({"log_spot": 4.6, "straddle_pct": straddle, "timing_bmo": 1., "timing_amc": 0.}),
+        "spot_price": 100., "scored_at": "2026-10-05T12:00:00Z",
+    }
+
+
+@pytest.mark.asyncio
+async def test_snapshot_lookup_uses_active_bundle_instead_of_newer_legacy_vector(tmp_path, monkeypatch):
+    service = _import()
+    active_id = _signed_serving_models(tmp_path, monkeypatch)
+    pool = _SnapshotPool([_snapshot_row("b" * 64), _snapshot_row(active_id, days_old=1)])
+    snapshot = await service.fetch_latest_feature_snapshot(pool, "A", 7)
+    assert snapshot is not None
+    assert snapshot["snapshot_date"] == date.today() - timedelta(days=1)
+    assert snapshot["model_bundle_id"] == active_id
+
+
+@pytest.mark.asyncio
+async def test_snapshot_lookup_withholds_cohort_without_fresh_active_bundle_row(tmp_path, monkeypatch):
+    service = _import()
+    _signed_serving_models(tmp_path, monkeypatch)
+    pool = _SnapshotPool([_snapshot_row("b" * 64, straddle=None)])
+    assert await service.fetch_latest_feature_snapshot(pool, "A", 7) is None
+
+
+@pytest.mark.asyncio
+async def test_unsigned_local_model_cannot_claim_a_production_snapshot(tmp_path, monkeypatch):
+    service = _import()
+    monkeypatch.setenv("ML_MODELS_DIR", str(tmp_path))
+    pool = _SnapshotPool([_snapshot_row("v3")])
+    assert await service.fetch_latest_feature_snapshot(pool, "A", 7) is None
+
+
+def test_signed_prediction_rejects_cross_bundle_and_unsupported_cohort(tmp_path, monkeypatch):
+    service = _import()
+    active_id = _signed_serving_models(tmp_path, monkeypatch)
+    vector = {"log_spot": 4.6, "straddle_pct": .05, "timing_bmo": 1., "timing_amc": 0.}
+    kwargs = {"feature_vector": vector, "snapshot_date": date.today(), "horizon": 7, "spot_override": 100.}
+    assert service.predict(**kwargs) is None
+    assert service.predict(**kwargs, snapshot_bundle_id="b" * 64) is None
+    assert service.predict(**kwargs, snapshot_bundle_id=active_id) is not None
+    vector["straddle_pct"] = None
+    assert service.predict(**kwargs, snapshot_bundle_id=active_id) is None
+    vector.update({"straddle_pct": .05, "timing_bmo": 0.})
+    assert service.predict(**kwargs, snapshot_bundle_id=active_id) is None
 
 
 def _synthetic_feature_vector(feature_names):

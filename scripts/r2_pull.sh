@@ -207,12 +207,28 @@ rclone sync "$REMOTE/forecasts" "$DATA_DIR/forecasts" \
   --fast-list --transfers=8 --progress 2>/dev/null || true
 
 # Weekly/manual retraining additionally restores the latest reconciliation
-# decision and verifies that the materialized release is eligible for training.
+# decision. Historical training checks immutable sources separately; every
+# production activation still requires the current reconciliation contract.
 if [ "${R2_PULL_EARNINGS:-0}" = "1" ]; then
-  rclone copyto \
-    "$REMOTE/validation/data_reconciliation.json" \
-    "$DATA_DIR/validation/data_reconciliation.json"
-  "$PYTHON_BIN" scripts/verify_retrain_data_gate.py --data-dir "$DATA_DIR"
+  reconciliation="$DATA_DIR/validation/data_reconciliation.json"
+  reconciliation_tmp="$DATA_DIR/validation/.data_reconciliation.$$.tmp"
+  rm -f "$reconciliation_tmp" "$reconciliation"
+  if rclone copyto "$REMOTE/validation/data_reconciliation.json" "$reconciliation_tmp"; then
+    mv "$reconciliation_tmp" "$reconciliation"
+  elif [ "${R2_HISTORICAL_TRAINING:-0}" = "1" ]; then
+    rm -f "$reconciliation_tmp"
+    echo "⚠️  Current activation evidence unavailable; historical admission remains independent and activation will be held"
+  else
+    rm -f "$reconciliation_tmp"
+    echo "Missing current reconciliation evidence; refusing production eligibility" >&2
+    exit 1
+  fi
+  if [ "${R2_HISTORICAL_TRAINING:-0}" = "1" ]; then
+    "$PYTHON_BIN" scripts/verify_historical_training_gate.py --data-dir "$DATA_DIR" \
+      --report "$DATA_DIR/validation/historical_training_admission.json"
+  else
+    "$PYTHON_BIN" scripts/verify_retrain_data_gate.py --data-dir "$DATA_DIR"
+  fi
 fi
 rclone copy "$REMOTE/bias_curves.parquet" "$DATA_DIR/" 2>/dev/null || true
 

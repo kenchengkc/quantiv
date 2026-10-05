@@ -171,5 +171,12 @@ def test_retrain_workflow_imports_exact_promoted_forecast() -> None:
     )[1].split("- name: Upload exact-bundle forecast import receipt", maxsplit=1)[0]
 
     assert "FORECAST_PATH=$(jq -r '.production_forecast // empty'" in import_step
-    assert 'FORECAST_PATH="${{ steps.rollback-score.outputs.forecast_path }}"' in import_step
+    assert "steps.rollback-score" not in import_step
     assert '--file "$FORECAST_PATH"' in import_step
+    assert "--activation-receipt data/validation/serving_activation.json" in import_step
+    rollback_import = workflow.split(
+        "- name: Import exact automatic rollback forecast", maxsplit=1
+    )[1].split("- name: Upload independent rollback handoff evidence", maxsplit=1)[0]
+    assert "FORECAST_PATH=$(jq -er .production_forecast data/validation/rollback_applied.json)" in rollback_import
+    assert "--activation-receipt data/validation/rollback_serving_activation.json" in rollback_import
+    assert '--expected-model-bundle-id "$EXPECTED_BUNDLE_ID"' in rollback_import

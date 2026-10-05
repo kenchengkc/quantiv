@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
-"""Reserve and evaluate a current-run independent chronological final test.
+"""Report full-history learning, or explicitly reserve/evaluate a legacy test.
 
-The weekly retrain uses two explicit phases:
+``report-learning`` reports the retained/promoted candidate's fitting and
+selection exposure. It never reserves recent data or describes consumed labels
+as independent evaluation. Current full-history learning uses this protocol;
+the explicit legacy ``prepare`` / ``evaluate`` commands remain available.
+
+Legacy holdout experiments use two explicit phases:
 
 ``prepare``
     After the existing operational outcome/rollback check, seal a recent test
@@ -48,6 +53,8 @@ for candidate in (REPO_ROOT, ML_PACKAGE_ROOT):
         sys.path.insert(0, str(candidate))
 
 from ml.evidence_receipt import verify_evidence_receipt  # noqa: E402
+from ml.model_protocol import feature_protocol, target_protocol  # noqa: E402
+from ml.training_split import temporal_dates  # noqa: E402
 from ml.model_bundle import (  # noqa: E402
     DEFAULT_HORIZONS,
     ModelBundleError,
@@ -134,6 +141,61 @@ def _normalized_training_frame(path: Path) -> pd.DataFrame:
         if column in frame.columns
     ]
     return frame.sort_values(["__earnings_date", *tie_breakers], kind="mergesort")
+
+
+def learning_evidence_report(
+    metadata_by_horizon: Mapping[int, Mapping[str, Any]], *, bundle_id: str,
+    decision: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Describe fitting separately from activation and independent evidence."""
+    if decision.get("candidate_bundle_id") != bundle_id:
+        raise ModelBundleError("learning decision does not identify this candidate")
+    promoted = decision.get("promoted") is True
+    if promoted and decision.get("champion_bundle_id") != bundle_id:
+        raise ModelBundleError("promoted learning report disagrees with champion decision")
+    horizons = {}
+    for horizon, metadata in metadata_by_horizon.items():
+        protocol = feature_protocol(metadata)
+        target = target_protocol(metadata)
+        if not metadata.get("final_fit") or not metadata.get("selection_exposure"):
+            raise ModelBundleError(f"T-{horizon} lacks final fit/selection exposure evidence")
+        horizons[str(horizon)] = {
+            "feature_protocol": protocol, "target_protocol": target,
+            "final_fit": metadata["final_fit"],
+            "selection_exposure": metadata["selection_exposure"],
+            "metric_scope": "selection_only",
+            "selection_metrics": metadata.get("selection_metrics") or {},
+        }
+    return {
+        "schema": "quantiv.model-learning-evidence.v2", "bundle_id": bundle_id,
+        "status": "promoted" if promoted else "retained_candidate", "promoted": promoted,
+        "horizons": horizons,
+        "independent_evaluation": {
+            "status": "not_established", "consumed_labels_are_independent": False,
+            "reason": "Full-history refit consumes historical selection labels; independent evidence requires untouched prospective paired outcomes.",
+        },
+    }
+
+
+def _assert_unseen_final_test(
+    metadata: Mapping[str, Any], final_test: pd.DataFrame, *, horizon: int,
+    label_lag_days: int = DEFAULT_LABEL_AVAILABILITY_DAYS,
+) -> None:
+    snapshots, _, _ = temporal_dates(final_test, horizon_days=horizon, label_lag_days=label_lag_days)
+    cutoff = snapshots.min()
+    exposure = [
+        (metadata.get("final_fit") or {}).get("label_available_end"),
+        (metadata.get("selection_exposure") or {}).get("through_date"),
+    ]
+    if not any(exposure):
+        validation_end = (metadata.get("validation_split") or {}).get("validation_end")
+        if validation_end:
+            exposure.append(pd.Timestamp(validation_end) + pd.Timedelta(days=label_lag_days))
+    if not any(value is not None for value in exposure):
+        raise ModelBundleError("independent test has no verifiable consumed-label exposure cutoff")
+    for value in exposure:
+        if value is not None and pd.Timestamp(value) >= cutoff:
+            raise ModelBundleError("consumed-label exposure overlaps independent prediction snapshots")
 
 
 def _ledger_evidence(
@@ -240,7 +302,6 @@ def prepare_independent_test(
         source_sha = sha256_file(training_path)
         test_end = pd.Timestamp(frame["__earnings_date"].max()).normalize()
         test_start = test_end - pd.Timedelta(days=test_days - 1)
-        development_cutoff = test_start - pd.Timedelta(days=effective_embargo)
 
         recent = frame.loc[frame["__earnings_date"] >= test_start].copy()
         recent_keys = pd.Series(
@@ -258,13 +319,18 @@ def prepare_independent_test(
         operational_mask = recent_keys.isin(operational_keys)
         final_test = recent.loc[~operational_mask].copy()
         operational_excluded = recent.loc[operational_mask].copy()
+        snapshots, labels, availability_basis = temporal_dates(
+            frame, horizon_days=horizon, label_lag_days=label_availability_days,
+            purge_days=purge_days,
+        )
+        prediction_cutoff = snapshots.loc[recent.index].min()
         development = frame.loc[
-            frame["__earnings_date"] < development_cutoff
+            (frame["__earnings_date"] < test_start) & (labels < prediction_cutoff)
         ].copy()
         purged = frame.loc[
-            (frame["__earnings_date"] >= development_cutoff)
-            & (frame["__earnings_date"] < test_start)
+            (labels >= prediction_cutoff) & (frame["__earnings_date"] < test_start)
         ].copy()
+        development_cutoff = test_start - pd.Timedelta(days=horizon + effective_embargo)
 
         if len(development) < min_development_rows:
             raise ValueError(
@@ -276,7 +342,7 @@ def prepare_independent_test(
                 f"T-{horizon} has only {len(final_test)} final-test rows after "
                 f"operational-outcome exclusions; require {min_test_rows}"
             )
-        if development["__earnings_date"].max() >= development_cutoff:
+        if labels.loc[development.index].max() >= prediction_cutoff:
             raise AssertionError("development rows crossed the embargo boundary")
         final_keys = set(
             zip(
@@ -313,6 +379,9 @@ def prepare_independent_test(
                 "final_test_sha256": sha256_file(final_test_path),
                 "development_start": development["__earnings_date"].min().date().isoformat(),
                 "development_end": development["__earnings_date"].max().date().isoformat(),
+                "first_test_snapshot": prediction_cutoff.date().isoformat(),
+                "max_development_label_available_at": labels.loc[development.index].max().date().isoformat(),
+                "availability_basis": availability_basis,
                 "embargo_start": development_cutoff.date().isoformat(),
                 "reservation_window_start": test_start.date().isoformat(),
                 "reservation_window_end": test_end.date().isoformat(),
@@ -630,6 +699,7 @@ def evaluate_independent_test(
             raise ValueError(f"T-{horizon} final-test date range changed after reservation")
 
         metadata = _read_json(bundle_dir / f"metadata_T{horizon}.json")
+        _assert_unseen_final_test(metadata, final_test, horizon=horizon)
         validation_split = metadata.get("validation_split") or {}
         validation_end = pd.Timestamp(str(validation_split.get("validation_end")))
         reservation_start = pd.Timestamp(str(reserved["reservation_window_start"]))
@@ -821,6 +891,12 @@ def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
 
+    learning = subparsers.add_parser("report-learning", help="report full mature-history candidate fitting without reserving recent labels")
+    learning.add_argument("--bundle-dir", type=Path, required=True)
+    learning.add_argument("--decision", type=Path, required=True)
+    learning.add_argument("--report", type=Path, required=True)
+    learning.add_argument("--horizons", nargs="+", type=int, default=list(DEFAULT_HORIZONS))
+
     prepare = subparsers.add_parser(
         "prepare", help="seal the final test and rewrite training to development rows"
     )
@@ -883,6 +959,16 @@ def _parser() -> argparse.ArgumentParser:
 
 def main() -> int:
     args = _parser().parse_args()
+    if args.command == "report-learning":
+        bundle_dir = args.bundle_dir.resolve()
+        manifest = verify_bundle_dir(bundle_dir)
+        report = learning_evidence_report(
+            {horizon: _read_json(bundle_dir / f"metadata_T{horizon}.json") for horizon in args.horizons},
+            bundle_id=str(manifest["bundle_id"]), decision=_read_json(args.decision.resolve()),
+        )
+        _atomic_json(args.report.resolve(), report)
+        print(json.dumps(report, indent=2, sort_keys=True))
+        return 0
     if args.command == "prepare":
         reservation = prepare_independent_test(
             repo_root=args.repo_root.resolve(),

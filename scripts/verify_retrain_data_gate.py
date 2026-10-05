@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Require current decision-safe data evidence before a model retrain can mutate prod.
+"""Require current decision-safe data evidence before model activation.
 
 The weekly retrain restores the published R2 data release instead of ingesting a new
 options candidate itself. That means a plain age check is insufficient: a bounded
@@ -111,8 +111,10 @@ def verify_retrain_data_gate(
         )
 
     active_source_date = _active_options_date(data_dir)
-    source = manifest.get("source_reconciliation") or {}
-    quote = manifest.get("quote_quality") or {}
+    source = manifest.get("source_reconciliation")
+    quote = manifest.get("quote_quality")
+    if not isinstance(source, dict) or not isinstance(quote, dict):
+        raise RuntimeError("retrain reconciliation evidence has an invalid source contract")
     source_dates = {
         str(value)
         for value in (source.get("source_date"), quote.get("source_date"))
@@ -144,12 +146,26 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data-dir", type=Path, default=Path("data"))
     parser.add_argument("--max-report-age-hours", type=float, default=36.0)
+    parser.add_argument("--report", type=Path)
+    parser.add_argument("--allow-hold", action="store_true",
+                        help="Record an activation hold without blocking historical training")
     args = parser.parse_args()
 
-    result = verify_retrain_data_gate(
-        data_dir=args.data_dir,
-        max_report_age_hours=args.max_report_age_hours,
-    )
+    try:
+        result = verify_retrain_data_gate(
+            data_dir=args.data_dir,
+            max_report_age_hours=args.max_report_age_hours,
+        )
+    except RuntimeError as exc:
+        if not args.allow_hold:
+            raise
+        result = {"status": "held", "reason": str(exc), "reasons": [str(exc)]}
+    if args.report:
+        args.report.parent.mkdir(parents=True, exist_ok=True)
+        args.report.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n")
+    if result["status"] == "held":
+        print(f"Model activation held: {result['reason']}")
+        return 0
     print(
         "Retrain data gate passed: "
         f"source={result['source_date']} manifest={result['manifest_id']}"

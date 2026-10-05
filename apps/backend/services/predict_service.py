@@ -29,6 +29,11 @@ from typing import Any, Dict, List, Optional
 
 import pandas as pd
 from ml.model_artifact import load_native_model, point_model_name, quantile_model_name
+from ml.model_bundle import verify_bundle_dir
+from ml.model_protocol import (
+    CAUSAL_FEATURE_PROTOCOL, LEGACY_FEATURE_PROTOCOL,
+    bundle_feature_protocol, feature_protocol, target_protocol,
+)
 from ml.quantiles import rearrange_quantile_mapping
 
 logger = logging.getLogger(__name__)
@@ -68,6 +73,9 @@ class _ModelBundle:
     model_trained_at: Optional[datetime]
     feature_schema_hash: str
     val_mae: Optional[float]
+    bundle_id: Optional[str] = None
+    feature_protocol: str = LEGACY_FEATURE_PROTOCOL
+    supported_cohorts: tuple[str, ...] = ()
 
 
 _BUNDLE_CACHE: Dict[int, _ModelBundle] = {}
@@ -124,17 +132,23 @@ def _load_bundle_from_dir(models_dir: Path, horizon: int) -> Optional[_ModelBund
     if point_name is None:
         logger.warning("Unsupported model horizon requested")
         return None
+    models_dir = models_dir.resolve()
     point_path = models_dir / point_name
     if not point_path.exists():
         logger.warning("Allowlisted model file is missing")
         return None
 
+    metadata = _metadata_for_horizon(models_dir, horizon)
+    protocol = feature_protocol(metadata)
+    target_protocol(metadata)
+    bundle_id = None
+    if (models_dir / "manifest.json").exists():
+        bundle_id = verify_bundle_dir(models_dir)["bundle_id"]
     estimator = load_native_model(point_path)
     feature_names = list(estimator.feature_name())
     if not feature_names:
         logger.error("Loaded model is unusable (no feature_names)")
         return None
-    metadata = _metadata_for_horizon(models_dir, horizon)
 
     quantile_estimators: Dict[int, Any] = {}
     for q in _QUANTILES:
@@ -155,11 +169,15 @@ def _load_bundle_from_dir(models_dir: Path, horizon: int) -> Optional[_ModelBund
         model_trained_at=_parse_datetime(metadata.get("trained_at")),
         feature_schema_hash=_feature_schema_hash(feature_names),
         val_mae=float(metadata["val_mae"]) if metadata.get("val_mae") is not None else None,
+        bundle_id=bundle_id,
+        feature_protocol=protocol,
+        supported_cohorts=tuple(metadata.get("supported_cohorts") or []),
     )
 
 
 def validate_models_dir(models_dir: Path) -> List[Dict[str, Any]]:
     """Preflight every required native model before a directory is activated."""
+    bundle_feature_protocol(models_dir, horizons=_HORIZONS)
     verified: List[Dict[str, Any]] = []
     for horizon in _HORIZONS:
         bundle = _load_bundle_from_dir(models_dir, horizon)
@@ -346,6 +364,7 @@ def predict(
     snapshot_date: date,
     horizon: int,
     spot_override: Optional[float],
+    snapshot_bundle_id: Optional[str] = None,
 ) -> Optional[PredictionResult]:
     """Run the point + quantile heads against `feature_vector` with the
     caller's spot. Returns None if no model is available for `horizon`.
@@ -353,6 +372,18 @@ def predict(
     bundle = get_bundle(horizon)
     if bundle is None:
         return None
+    if bundle.bundle_id is not None and snapshot_bundle_id != bundle.bundle_id:
+        return None
+    if bundle.feature_protocol == CAUSAL_FEATURE_PROTOCOL:
+        try:
+            straddle = float(feature_vector.get("straddle_pct") or 0.)
+            timing_bmo = float(feature_vector.get("timing_bmo") or 0.)
+            timing_amc = float(feature_vector.get("timing_amc") or 0.)
+        except (TypeError, ValueError):
+            return None
+        cohort = "strict_options" if math.isfinite(straddle) and straddle > 0 else "optionless"
+        if cohort not in bundle.supported_cohorts or (timing_bmo, timing_amc) not in {(1., 0.), (0., 1.)}:
+            return None
 
     # Pick the spot we'll report and substitute. None → use whatever
     # snapshot value lives in the feature vector (no-op substitution).
@@ -406,8 +437,12 @@ async def fetch_latest_feature_snapshot(
     feature_vector for (symbol, horizon[, earnings_date]). None if there
     isn't one within MAX_SNAPSHOT_AGE_DAYS.
 
-    Shape: {snapshot_date, earnings_date, feature_vector: dict, spot_at_snapshot}.
+    Only signed active-bundle snapshots are eligible. Shape includes
+    model_bundle_id so inference can reject a concurrent bundle activation.
     """
+    bundle = get_bundle(horizon)
+    if bundle is None or bundle.bundle_id is None:
+        return None
     base = """
         SELECT
           snapshot_date,
@@ -415,16 +450,18 @@ async def fetch_latest_feature_snapshot(
           feature_vector,
           spot_price,
           scored_at,
+          model_bundle_id,
           (CURRENT_DATE - snapshot_date)::int AS snapshot_age_days
         FROM em_forecasts
         WHERE act_symbol = $1
           AND model_horizon = $2
           AND feature_vector IS NOT NULL
           AND snapshot_date >= CURRENT_DATE - ($3 || ' days')::interval
+          AND model_bundle_id = $4
     """
-    params: List[Any] = [symbol.upper(), horizon, str(MAX_SNAPSHOT_AGE_DAYS)]
+    params: List[Any] = [symbol.upper(), horizon, str(MAX_SNAPSHOT_AGE_DAYS), bundle.bundle_id]
     if earnings_date is not None:
-        base += " AND earnings_date = $4"
+        base += " AND earnings_date = $5"
         params.append(earnings_date)
     base += " ORDER BY snapshot_date DESC LIMIT 1"
 
@@ -447,6 +484,7 @@ async def fetch_latest_feature_snapshot(
         "snapshot_date": row["snapshot_date"],
         "earnings_date": row["earnings_date"],
         "feature_vector": feature_vector,
+        "model_bundle_id": row["model_bundle_id"],
         "spot_at_snapshot": float(row["spot_price"]) if row["spot_price"] is not None else None,
         "forecast_scored_at": row["scored_at"],
         "snapshot_age_days": row["snapshot_age_days"],

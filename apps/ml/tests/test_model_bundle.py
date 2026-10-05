@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -38,22 +39,108 @@ def _keys() -> tuple[bytes, bytes]:
 
 
 def _validated_inputs(root: Path) -> tuple[Path, Path, Path]:
+    from ml.evidence_receipt import build_evidence_receipt
     models = root / "models"
     models.mkdir()
     for name in required_artifact_names([1]):
         (models / name).write_bytes(f"artifact:{name}".encode())
     report = root / "report.json"
-    report.write_text(json.dumps({"status": "passed"}))
+    payload = {"status": "passed", "stages": {"models": {"horizons": [1]}}}
     receipt = root / "receipt.json"
-    receipt.write_text(
-        json.dumps(
-            {
-                "receipt_id": "sha256:" + "a" * 64,
-                "quality": {"status": "passed"},
-            }
-        )
-    )
+    payload["evidence_receipt"] = build_evidence_receipt(payload, scope="models", repo_root=root,
+        data_dir=root, training_dir=root / "training", models_dir=models, forecast_path=None, horizons=[1])
+    report.write_text(json.dumps(payload))
+    receipt.write_text(json.dumps(payload["evidence_receipt"]))
     return models, report, receipt
+
+
+@pytest.mark.parametrize("changed", ["model", "metadata", "receipt", "report_receipt"])
+def test_packaging_rejects_bytes_or_evidence_changed_after_validation(tmp_path, changed):
+    private, _ = _keys()
+    models, report, receipt = _validated_inputs(tmp_path)
+    if changed in {"model", "metadata"}:
+        name = "lgbm_T1.txt" if changed == "model" else "metadata_T1.json"
+        (models / name).write_bytes(b"changed after validation")
+    elif changed == "receipt":
+        payload = json.loads(receipt.read_text())
+        payload["receipt_id"] = "sha256:" + "a" * 64
+        receipt.write_text(json.dumps(payload))
+    else:
+        payload = json.loads(report.read_text())
+        payload["evidence_receipt"]["receipt_id"] = "sha256:" + "b" * 64
+        report.write_text(json.dumps(payload))
+    with pytest.raises(ModelBundleError, match="(receipt|validation|validated)"):
+        create_signed_bundle(models, tmp_path / "bundles", receipt_path=receipt,
+            validation_report_path=report, source_revision="changed", horizons=[1], private_key=private)
+    assert not (tmp_path / "bundles").exists()
+
+
+@pytest.mark.parametrize("changed", [
+    "scope", "horizons", "member_name", "member_bytes", "duplicate_member",
+    "missing_model_bundle", "failed_quality", "report_identity", "malformed_quality",
+])
+def test_packaging_requires_exact_validated_model_set(tmp_path, changed):
+    private, _ = _keys()
+    models, report_path, receipt_path = _validated_inputs(tmp_path)
+    report = json.loads(report_path.read_text())
+    receipt = json.loads(receipt_path.read_text())
+    members = receipt["artifacts"][0]["members"]
+    if changed == "scope":
+        receipt["scope"] = "training"
+    elif changed == "horizons":
+        receipt["horizons"] = [1, 1]
+    elif changed == "member_name":
+        members[0]["path"] = "models/undeclared_model.txt"
+    elif changed == "member_bytes":
+        members[0]["bytes"] += 1
+    elif changed == "duplicate_member":
+        members.append(dict(members[0]))
+    elif changed == "missing_model_bundle":
+        receipt["artifacts"] = []
+    elif changed == "failed_quality":
+        receipt["quality"]["status"] = "failed"
+    elif changed == "malformed_quality":
+        receipt["quality"] = "passed"
+    else:
+        receipt["reconciliation"]["changed"] = True
+    core = {key: value for key, value in receipt.items() if key != "receipt_id"}
+    receipt["receipt_id"] = "sha256:" + hashlib.sha256(
+        json.dumps(core, sort_keys=True, separators=(",", ":"), default=str).encode()
+    ).hexdigest()
+    if changed == "report_identity":
+        report["evidence_receipt"] = receipt
+    else:
+        receipt_path.write_text(json.dumps(receipt))
+        report["evidence_receipt"] = receipt
+    report_path.write_text(json.dumps(report))
+    with pytest.raises(ModelBundleError, match="(receipt|validation|validated)"):
+        create_signed_bundle(
+            models, tmp_path / "bundles", receipt_path=receipt_path,
+            validation_report_path=report_path, source_revision="invalid-evidence",
+            horizons=[1], private_key=private,
+        )
+    assert not (tmp_path / "bundles").exists()
+
+
+@pytest.mark.parametrize("changed", ["receipt_json", "receipt_object", "report_receipt_null"])
+def test_packaging_rejects_unreadable_or_malformed_receipts(tmp_path, changed):
+    private, _ = _keys()
+    models, report, receipt = _validated_inputs(tmp_path)
+    if changed == "receipt_json":
+        receipt.write_text("not JSON")
+    elif changed == "receipt_object":
+        receipt.write_text("[]")
+    else:
+        payload = json.loads(report.read_text())
+        payload["evidence_receipt"] = None
+        report.write_text(json.dumps(payload))
+    with pytest.raises(ModelBundleError, match="(receipt|validation)"):
+        create_signed_bundle(
+            models, tmp_path / "bundles", receipt_path=receipt,
+            validation_report_path=report, source_revision="malformed",
+            horizons=[1], private_key=private,
+        )
+    assert not (tmp_path / "bundles").exists()
 
 
 def test_signed_bundle_detects_any_artifact_change(tmp_path: Path) -> None:

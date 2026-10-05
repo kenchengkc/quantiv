@@ -16,6 +16,7 @@ from ml.model_bundle import (  # noqa: E402
     create_signed_control_pointer,
     required_artifact_names,
 )
+from ml.evidence_receipt import build_evidence_receipt  # noqa: E402
 from services import r2_models  # noqa: E402
 
 
@@ -63,16 +64,13 @@ def _remote_objects(
     for name in required_artifact_names([1]):
         (models / name).write_bytes(f"artifact:{marker}:{name}".encode())
     report = tmp_path / "report.json"
-    report.write_text(json.dumps({"status": "passed"}))
+    validation = {"status": "passed", "issues": [], "stages": {"models": {"horizons": [1]}}}
+    report.write_text(json.dumps(validation))
     receipt = tmp_path / "receipt.json"
-    receipt.write_text(
-        json.dumps(
-            {
-                "receipt_id": "sha256:" + "a" * 64,
-                "quality": {"status": "passed"},
-            }
-        )
-    )
+    receipt.write_text(json.dumps(build_evidence_receipt(
+        validation, scope="models", repo_root=tmp_path, data_dir=tmp_path / "data",
+        training_dir=tmp_path / "training", models_dir=models, forecast_path=None, horizons=[1],
+    )))
     bundle_dir, manifest = create_signed_bundle(
         models,
         tmp_path / "bundles",

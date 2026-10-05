@@ -54,13 +54,16 @@ jobs:
         env:
           R2_BUCKET: ${{ secrets.R2_BUCKET }}
           R2_PULL_EARNINGS: "1"
+          R2_HISTORICAL_TRAINING: "1"
         run: bash scripts/r2_pull.sh
 
       - name: Rebuild DuckDB views
         run: python scripts/setup_duckdb_from_parquet.py
 
-      - name: Gate — verify data freshness before ML
-        run: python scripts/check_duckdb_freshness.py --strict --max-lag-days 5
+      - name: Verify historical source integrity
+        run: |
+          python scripts/verify_historical_training_gate.py \
+            --report data/validation/historical_training_admission.json
 
       - name: Build ML training parquet
         run: |
@@ -69,6 +72,13 @@ jobs:
             --start-date 2023-01-01 \
             --end-date "$END"
 
+      - name: Evaluate current data eligibility for activation
+        id: activation-data
+        run: |
+          python scripts/verify_retrain_data_gate.py \
+            --report data/validation/retrain_activation.json --allow-hold
+          echo "status=$(jq -r .status data/validation/retrain_activation.json)" >> "$GITHUB_OUTPUT"
+
       - name: Evaluate realized champion outcomes and automatic rollback
         id: outcome-control
         env:
@@ -76,10 +86,13 @@ jobs:
         run: |
           if [ -f data/models/control/champion.json ]; then
             python scripts/model_control_plane.py evaluate-outcomes \
+              --activation-gate-report data/validation/retrain_activation.json \
+              --activation-report data/validation/rollback_decision.json \
+              --stage-rollback \
               --report data/validation/model_outcomes.json
-            echo "rolled_back=$(jq -r .rolled_back data/validation/model_outcomes.json)" >> "$GITHUB_OUTPUT"
+            echo "rollback_staged=$(jq -r '.rollback_staged // false' data/validation/model_outcomes.json)" >> "$GITHUB_OUTPUT"
           else
-            echo "rolled_back=false" >> "$GITHUB_OUTPUT"
+            echo "rollback_staged=false" >> "$GITHUB_OUTPUT"
             echo "No signed champion exists; skipping realized-outcome evaluation."
           fi
 
@@ -91,6 +104,85 @@ jobs:
           path: data/validation/model_outcomes.json
           if-no-files-found: ignore
           retention-days: 90
+
+      - name: Rescore automatic rollback independently of training
+        id: rollback-score
+        if: steps.outcome-control.outputs.rollback_staged == 'true'
+        run: |
+          ROLLBACK_BUNDLE_ID=$(jq -er .champion_bundle_id data/validation/rollback_decision.json)
+          python scripts/daily_score.py \
+            --days-ahead 21 \
+            --models-dir "data/models/bundles/$ROLLBACK_BUNDLE_ID" \
+            --output-path data/validation/rollback_forecasts.parquet
+
+      - name: Apply automatic rollback only after exact forecast validation
+        id: rollback-apply
+        if: steps.outcome-control.outputs.rollback_staged == 'true'
+        env:
+          MODEL_BUNDLE_SIGNING_KEY: ${{ secrets.MODEL_BUNDLE_SIGNING_KEY }}
+        run: |
+          python scripts/model_control_plane.py apply-rollback \
+            --rollback-decision data/validation/rollback_decision.json \
+            --candidate-forecast data/validation/rollback_forecasts.parquet \
+            --activation-gate-report data/validation/retrain_activation.json \
+            --report data/validation/rollback_applied.json
+          echo "rolled_back=$(jq -r .rolled_back data/validation/rollback_applied.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Publish validated automatic rollback before training
+        id: rollback-publication
+        if: steps.rollback-apply.outputs.rolled_back == 'true'
+        env:
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+        run: |
+          python scripts/verify_retrain_data_gate.py --report data/validation/rollback_activation.json
+          ROLLBACK_BUNDLE_ID=$(jq -er .champion_bundle_id data/validation/rollback_applied.json)
+          FORECAST_PATH=$(jq -er .production_forecast data/validation/rollback_applied.json)
+          python scripts/validate_ml_pipeline.py forecasts \
+            --forecast-path "$FORECAST_PATH" \
+            --models-dir "data/models/bundles/$ROLLBACK_BUNDLE_ID" \
+            --report data/validation/rollback_production_forecasts.json \
+            --publish-receipt-dir data/forecasts/receipts
+          python scripts/verify_retrain_data_gate.py --report data/validation/rollback_activation.json
+          bash scripts/r2_push.sh --model-recovery
+
+      - name: Activate exact automatic rollback bundle
+        id: rollback-serving
+        if: steps.rollback-apply.outputs.rolled_back == 'true'
+        env:
+          RAILWAY_BACKEND_URL: ${{ secrets.RAILWAY_BACKEND_URL }}
+          ADMIN_API_KEY: ${{ secrets.ADMIN_API_KEY }}
+        run: |
+          python scripts/activate_model_bundle.py \
+            --decision data/validation/rollback_applied.json \
+            --receipt data/validation/rollback_serving_activation.json
+
+      - name: Import exact automatic rollback forecast
+        id: rollback-import
+        if: steps.rollback-apply.outputs.rolled_back == 'true'
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          EXPECTED_BUNDLE_ID=$(jq -er .champion_bundle_id data/validation/rollback_applied.json)
+          FORECAST_PATH=$(jq -er .production_forecast data/validation/rollback_applied.json)
+          python -u scripts/import_recent_to_postgres.py \
+            --file "$FORECAST_PATH" --full --require-database \
+            --expected-model-bundle-id "$EXPECTED_BUNDLE_ID" \
+            --activation-receipt data/validation/rollback_serving_activation.json \
+            --receipt data/validation/rollback_forecast_import.json
+
+      - name: Upload independent rollback handoff evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: automatic-rollback-handoff
+          path: data/validation/rollback_*.json
+          if-no-files-found: ignore
+          retention-days: 90
+
+      - name: Persist realized outcome evidence before training
+        env:
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+        run: bash scripts/r2_push.sh --candidate-control-only
 
       - name: Gate — validate full training source
         run: |
@@ -106,29 +198,22 @@ jobs:
           if-no-files-found: ignore
           retention-days: 30
 
-      - name: Reserve untouched independent final test
-        run: |
-          python scripts/research/independent_model_evaluation.py prepare \
-            --source-revision "$GITHUB_SHA"
+      - name: Select recipes and refit LightGBM models on all mature history
+        id: fit-models
+        run: python apps/ml/model_trainer.py --tune --time-decay 0.5
 
-      - name: Gate — validate development-only training artifacts
-        run: |
-          python scripts/validate_ml_pipeline.py training \
-            --report data/validation/retrain_development_training.json
-
-      - name: Upload independent-test reservation evidence
-        if: always()
+      - name: Retain fitted research artifacts independently of promotion
+        if: always() && steps.fit-models.outcome == 'success'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: independent-test-reservation
+          name: fitted-research-models
           path: |
-            data/independent_evaluation/pending/reservation.json
-            data/validation/retrain_development_training.json
-          if-no-files-found: ignore
-          retention-days: 90
-
-      - name: Train LightGBM models on development data
-        run: python apps/ml/model_trainer.py --tune --time-decay 0.5
+            data/models/lgbm_T*.txt
+            data/models/metadata_T*.json
+            data/ml_training/**
+            data/validation/historical_training_admission.json
+          if-no-files-found: error
+          retention-days: 30
 
       - name: Gate — mandatory purged walk-forward validation
         run: |
@@ -170,18 +255,57 @@ jobs:
           BUNDLE_ID=$(jq -r .bundle_id data/validation/candidate_bundle.json)
           echo "bundle_dir=data/models/bundles/$BUNDLE_ID" >> "$GITHUB_OUTPUT"
 
+      - name: Archive signed candidate and exact fitting evidence
+        env:
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          MODEL_BUNDLE_SIGNING_KEY: ${{ secrets.MODEL_BUNDLE_SIGNING_KEY }}
+        run: |
+          python scripts/archive_model_candidate.py \
+            --bundle-dir "${{ steps.package-challenger.outputs.bundle_dir }}" \
+            --retain-evidence --report data/validation/candidate_archive.json
+
+      - name: Register candidate and preserve frozen challenger
+        id: register-candidate
+        env:
+          MODEL_BUNDLE_SIGNING_KEY: ${{ secrets.MODEL_BUNDLE_SIGNING_KEY }}
+        run: |
+          python scripts/model_control_plane.py register \
+            --candidate-manifest data/validation/candidate_bundle.json \
+            --report data/validation/candidate_registration.json
+          {
+            echo "bundle_dir=$(jq -r .evaluation_bundle_dir data/validation/candidate_registration.json)"
+            echo "manifest=$(jq -r .evaluation_manifest data/validation/candidate_registration.json)"
+            echo "evidence_dir=$(jq -r .evaluation_evidence_dir data/validation/candidate_registration.json)"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Persist candidate registry before live forecast gates
+        env:
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+        run: bash scripts/r2_push.sh --candidate-control-only
+
       - name: Shadow-score upcoming earnings with the challenger
+        id: shadow-score
         run: |
           python scripts/daily_score.py \
             --days-ahead 21 \
-            --models-dir "${{ steps.package-challenger.outputs.bundle_dir }}" \
+            --models-dir "${{ steps.register-candidate.outputs.bundle_dir }}" \
             --output-path data/validation/candidate_forecasts.parquet
+          ROWS=$(python -c "import pandas as pd; print(len(pd.read_parquet('data/validation/candidate_forecasts.parquet')))")
+          echo "rows=$ROWS" >> "$GITHUB_OUTPUT"
+          if [ -f data/models/control/champion.json ]; then
+            CHAMPION_ID=$(jq -r .champion_bundle_id data/models/control/champion.json)
+            python scripts/daily_score.py \
+              --days-ahead 21 \
+              --models-dir "data/models/bundles/$CHAMPION_ID" \
+              --output-path data/validation/champion_forecasts.parquet
+          fi
 
       - name: Gate — validate retrain forecasts
+        if: steps.activation-data.outputs.status == 'passed' && steps.shadow-score.outputs.rows != '0'
         run: |
           python scripts/validate_ml_pipeline.py forecasts \
             --forecast-path data/validation/candidate_forecasts.parquet \
-            --models-dir "${{ steps.package-challenger.outputs.bundle_dir }}" \
+            --models-dir "${{ steps.register-candidate.outputs.bundle_dir }}" \
             --report data/validation/retrain_forecasts.json \
             --publish-receipt-dir data/validation/candidate_receipts
 
@@ -200,10 +324,24 @@ jobs:
           MODEL_BUNDLE_SIGNING_KEY: ${{ secrets.MODEL_BUNDLE_SIGNING_KEY }}
         run: |
           python scripts/model_control_plane.py decide \
-            --candidate-manifest data/validation/candidate_bundle.json \
+            --candidate-manifest "${{ steps.register-candidate.outputs.manifest }}" \
+            --archived-evidence-dir "${{ steps.register-candidate.outputs.evidence_dir }}" \
             --candidate-forecast data/validation/candidate_forecasts.parquet \
+            --champion-forecast data/validation/champion_forecasts.parquet \
+            --activation-gate-report data/validation/retrain_activation.json \
             --report data/validation/model_decision.json
           echo "promoted=$(jq -r .promoted data/validation/model_decision.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Record fitting and independent-evidence disposition
+        run: |
+          LEARNING_DECISION=data/validation/candidate_registration.json
+          if [ "$(jq -r .bundle_id data/validation/candidate_bundle.json)" = "$(jq -r .candidate_bundle_id data/validation/model_decision.json)" ]; then
+            LEARNING_DECISION=data/validation/model_decision.json
+          fi
+          python scripts/research/independent_model_evaluation.py report-learning \
+            --bundle-dir "${{ steps.package-challenger.outputs.bundle_dir }}" \
+            --decision "$LEARNING_DECISION" \
+            --report data/models/evaluations/learning_${{ github.run_id }}.json
 
       - name: Gate — validate promoted production forecast
         if: steps.model-decision.outputs.promoted == 'true'
@@ -211,47 +349,24 @@ jobs:
           FORECAST_PATH=$(jq -r .production_forecast data/validation/model_decision.json)
           python scripts/validate_ml_pipeline.py forecasts \
             --forecast-path "$FORECAST_PATH" \
-            --models-dir "${{ steps.package-challenger.outputs.bundle_dir }}" \
+            --models-dir "${{ steps.register-candidate.outputs.bundle_dir }}" \
             --report data/validation/promoted_forecasts.json \
             --publish-receipt-dir data/forecasts/receipts
 
-      - name: Evaluate promoted bundle on untouched final test
-        if: steps.model-decision.outputs.promoted == 'true'
-        env:
-          MODEL_BUNDLE_SIGNING_KEY: ${{ secrets.MODEL_BUNDLE_SIGNING_KEY }}
-        run: |
-          python scripts/research/independent_model_evaluation.py evaluate \
-            --bundle-dir "${{ steps.package-challenger.outputs.bundle_dir }}" \
-            --source-revision "$GITHUB_SHA"
-
-      - name: Upload independent final-test evidence
+      - name: Upload retained candidate and prospective evaluation evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: independent-model-evaluation
-          path: data/models/evaluations/**
+          name: retained-model-evaluation
+          path: |
+            data/models/evaluations/**
+            data/models/candidates/**/evidence.json
+            data/validation/candidate_archive.json
+            data/validation/candidate_registration.json
+            data/validation/historical_training_admission.json
+            data/validation/retrain_activation.json
           if-no-files-found: ignore
           retention-days: 365
-
-      - name: Rescore production after automatic rollback
-        id: rollback-score
-        if: >-
-          steps.outcome-control.outputs.rolled_back == 'true' &&
-          steps.model-decision.outputs.promoted != 'true'
-        run: |
-          ROLLBACK_BUNDLE_ID=$(jq -r .champion_bundle_id data/validation/model_decision.json)
-          ROLLBACK_MODELS_DIR="data/models/bundles/$ROLLBACK_BUNDLE_ID"
-          ROLLBACK_FORECAST_PATH="data/forecasts/forecasts_$(date -u +%Y-%m-%d).parquet"
-          python scripts/daily_score.py \
-            --days-ahead 21 \
-            --models-dir "$ROLLBACK_MODELS_DIR"
-          test -f "$ROLLBACK_FORECAST_PATH"
-          python scripts/validate_ml_pipeline.py forecasts \
-            --forecast-path "$ROLLBACK_FORECAST_PATH" \
-            --models-dir "$ROLLBACK_MODELS_DIR" \
-            --report data/validation/rollback_forecasts.json \
-            --publish-receipt-dir data/forecasts/receipts
-          echo "forecast_path=$ROLLBACK_FORECAST_PATH" >> "$GITHUB_OUTPUT"
 
       - name: Upload model control decision
         if: always()
@@ -265,16 +380,17 @@ jobs:
           if-no-files-found: ignore
           retention-days: 90
 
-      - name: Push models to R2
+      - name: Push activated models to R2
+        if: steps.model-decision.outputs.promoted == 'true'
         env:
           R2_BUCKET: ${{ secrets.R2_BUCKET }}
-        run: bash scripts/r2_push.sh
+        run: |
+          python scripts/verify_retrain_data_gate.py --report data/validation/final_activation.json
+          bash scripts/r2_push.sh --model-recovery
 
       - name: Sync Railway serving models
         id: sync-railway-models
-        if: >-
-          steps.model-decision.outputs.promoted == 'true' ||
-          steps.outcome-control.outputs.rolled_back == 'true'
+        if: steps.model-decision.outputs.promoted == 'true'
         env:
           RAILWAY_BACKEND_URL: ${{ secrets.RAILWAY_BACKEND_URL }}
           ADMIN_API_KEY: ${{ secrets.ADMIN_API_KEY }}
@@ -305,10 +421,7 @@ jobs:
           EXPECTED_BUNDLE_ID=$(jq -er .champion_bundle_id data/validation/model_decision.json)
           FORECAST_PATH=$(jq -r '.production_forecast // empty' data/validation/model_decision.json)
           if [ -z "$FORECAST_PATH" ]; then
-            FORECAST_PATH="${{ steps.rollback-score.outputs.forecast_path }}"
-          fi
-          if [ -z "$FORECAST_PATH" ]; then
-            echo "::error::No exact promoted or rollback forecast path was recorded."
+            echo "::error::No exact promoted forecast path was recorded."
             exit 1
           fi
           python -u scripts/import_recent_to_postgres.py \
@@ -318,6 +431,11 @@ jobs:
             --expected-model-bundle-id "$EXPECTED_BUNDLE_ID" \
             --activation-receipt data/validation/serving_activation.json \
             --receipt data/validation/forecast_import.json
+
+      - name: Persist retained candidate control and outcome evidence
+        env:
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+        run: bash scripts/r2_push.sh --candidate-control-only
 
       - name: Upload exact-bundle forecast import receipt
         if: always()

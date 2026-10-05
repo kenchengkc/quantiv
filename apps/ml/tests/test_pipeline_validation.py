@@ -23,6 +23,152 @@ FEATURES = ["atm_iv", "dte", "em_iv_pct", "straddle_pct"] + [
 ]
 
 
+def test_causal_training_rejects_missing_prediction_and_label_dates(tmp_path):
+    from ml.model_protocol import CAUSAL_FEATURE_PROTOCOL
+
+    _write_training_artifacts(tmp_path)
+    metadata_path = tmp_path / "metadata_T1.json"
+    metadata = json.loads(metadata_path.read_text())
+    metadata["feature_protocol"] = CAUSAL_FEATURE_PROTOCOL
+    metadata_path.write_text(json.dumps(metadata))
+    with pytest.raises(PipelineValidationError) as exc:
+        validate_training_artifacts(tmp_path, horizons=[1], min_rows=10, min_symbols=5, min_history_days=10)
+    assert "invalid_causal_training_contract" in _issue_codes(exc.value)
+
+
+def test_causal_models_require_real_final_fitting_evidence(tmp_path):
+    from ml.model_protocol import CAUSAL_FEATURE_PROTOCOL
+
+    _write_model_artifacts(tmp_path)
+    metadata_path = tmp_path / "metadata_T1.json"
+    metadata = json.loads(metadata_path.read_text())
+    metadata["feature_protocol"] = CAUSAL_FEATURE_PROTOCOL
+    metadata_path.write_text(json.dumps(metadata))
+    with pytest.raises(PipelineValidationError) as exc:
+        validate_model_artifacts(tmp_path, horizons=[1], min_train_rows=10, min_validation_rows=4)
+    assert "invalid_final_fit_evidence" in _issue_codes(exc.value)
+
+
+def _write_optionless_model_contract(directory):
+    from ml.model_protocol import CAUSAL_FEATURE_PROTOCOL, SESSION_TARGET_PROTOCOL
+
+    _write_model_artifacts(directory)
+    path = directory / "metadata_T1.json"
+    metadata = json.loads(path.read_text())
+    evidence = {"status": "passed", "rows": 4, "baseline_rows": 4,
+                "model_mae_on_baseline_rows": .02, "baseline_mae": .03,
+                **{key: value for key, value in metadata.items() if "coverage" in key or key.startswith("quantile_")}}
+    metadata.update({
+        "feature_protocol": CAUSAL_FEATURE_PROTOCOL, "target_protocol": SESSION_TARGET_PROTOCOL,
+        "metric_scope": "selection_only", "supported_cohorts": ["optionless"],
+        "selection_metrics": {"metric_scope": "selection_only", "cohorts": {"optionless": evidence}},
+        "final_fit": {"rows": 18, "label_available_end": "2024-04-29", "as_of": "2026-08-22",
+                      "row_digest": "a" * 64},
+        "selection_exposure": {"through_date": "2024-04-29", "row_digest": "a" * 64},
+        "selected_iterations": {head: 2 for head in ("point", "q10", "q25", "q50", "q75", "q90")},
+        "fitted_iterations": {head: 2 for head in ("point", "q10", "q25", "q50", "q75", "q90")},
+    })
+    metadata["walk_forward_validation"]["cohort_assessments"] = {"optionless": {"status": "passed"}}
+    # These diagnostics describe withheld rows; a supported optionless model
+    # has no required option baseline, and may not certify other cohorts.
+    metadata["baseline_straddle_mae"] = None
+    metadata["coverage_80"] = .01
+    metadata["quantile_crossing_rate_raw"] = 1.
+    path.write_text(json.dumps(metadata))
+    return path, metadata
+
+
+def test_supported_optionless_model_is_gated_on_its_own_baseline_and_calibration(tmp_path):
+    _write_optionless_model_contract(tmp_path)
+    report = validate_model_artifacts(tmp_path, horizons=[1], min_train_rows=10, min_validation_rows=4)
+    assert report["status"] == "passed"
+
+
+@pytest.mark.parametrize("metric,value", [("baseline_mae", .01), ("coverage_80", .6),
+                                         ("quantile_crossing_rate_raw", .21), ("quantile_negative_rate_raw", .051)])
+def test_supported_cohort_must_preserve_all_existing_quality_limits(tmp_path, metric, value):
+    path, metadata = _write_optionless_model_contract(tmp_path)
+    metadata["selection_metrics"]["cohorts"]["optionless"][metric] = value
+    path.write_text(json.dumps(metadata))
+    with pytest.raises(PipelineValidationError) as exc:
+        validate_model_artifacts(tmp_path, horizons=[1], min_train_rows=10, min_validation_rows=4)
+    assert "invalid_final_fit_evidence" in _issue_codes(exc.value)
+
+
+def test_new_protocol_forecast_cannot_masquerade_as_legacy_vector(tmp_path):
+    from ml.model_protocol import CAUSAL_FEATURE_PROTOCOL
+
+    now = datetime(2026, 8, 22, 12, tzinfo=timezone.utc)
+    models = tmp_path / "models"
+    path = tmp_path / "forecast.parquet"
+    _write_forecast_artifact(path, models, now=now)
+    metadata_path = models / "metadata_T1.json"
+    metadata = json.loads(metadata_path.read_text())
+    metadata["feature_protocol"] = CAUSAL_FEATURE_PROTOCOL
+    metadata_path.write_text(json.dumps(metadata))
+    with pytest.raises(PipelineValidationError) as exc:
+        validate_forecast_artifact(path, models_dir=models, now=now)
+    assert "forecast_protocol_mismatch" in _issue_codes(exc.value)
+
+
+def _write_causal_optionless_forecast(tmp_path):
+    from ml.model_protocol import CAUSAL_FEATURE_PROTOCOL, SESSION_TARGET_PROTOCOL
+
+    now = datetime(2026, 8, 22, 12, tzinfo=timezone.utc)
+    models = tmp_path / "models"
+    path = tmp_path / "forecast.parquet"
+    frame = _write_forecast_artifact(path, models, now=now)
+    optional = [
+        "atm_iv", "atm_strike", "call_strike", "put_strike", "call_bid", "call_ask",
+        "call_mid", "call_relative_spread", "put_bid", "put_ask", "put_mid",
+        "put_relative_spread", "straddle_bid", "straddle_ask", "straddle_mid",
+        "straddle_relative_spread", "quote_timestamp_precision", "market_data_mode",
+        "quote_quality_status", "liquidity_tier", "liquidity_tier_method",
+        "em_math_pct", "correction_factor",
+    ]
+    frame[optional] = None
+    frame["timing"] = "bmo"
+    frame["feature_protocol"] = CAUSAL_FEATURE_PROTOCOL
+    frame["target_protocol"] = SESSION_TARGET_PROTOCOL
+    vector = json.loads(frame.loc[0, "feature_vector"])
+    vector.update(atm_iv=None, dte=None, em_iv_pct=None, straddle_pct=None,
+                  timing_bmo=1., timing_amc=0.)
+    frame["feature_vector"] = json.dumps(vector)
+    frame.to_parquet(path, index=False)
+    (models / "metadata_T1.json").write_text(json.dumps({
+        "feature_cols": [*FEATURES, "timing_bmo", "timing_amc"],
+        "feature_protocol": CAUSAL_FEATURE_PROTOCOL,
+        "target_protocol": SESSION_TARGET_PROTOCOL,
+        "supported_cohorts": ["strict_options", "optionless"],
+    }))
+    return frame, path, models, now
+
+
+def test_forecast_gate_accepts_supported_optionless_cohort_without_inventing_quotes(tmp_path):
+    _, path, models, now = _write_causal_optionless_forecast(tmp_path)
+    assert validate_forecast_artifact(path, models_dir=models, now=now)["status"] == "passed"
+
+
+@pytest.mark.parametrize("field,value", [("call_bid", 1.), ("atm_iv", .5), ("quote_quality_status", "passed")])
+def test_optionless_cohort_cannot_hide_partial_or_rejected_option_evidence(tmp_path, field, value):
+    frame, path, models, now = _write_causal_optionless_forecast(tmp_path)
+    frame[field] = value
+    frame.to_parquet(path, index=False)
+    with pytest.raises(PipelineValidationError) as exc:
+        validate_forecast_artifact(path, models_dir=models, now=now)
+    assert "optionless_quote_evidence" in _issue_codes(exc.value)
+
+
+@pytest.mark.parametrize("timing", ["unknown", "amc"])
+def test_causal_forecast_requires_known_timing_matching_its_model_vector(tmp_path, timing):
+    frame, path, models, now = _write_causal_optionless_forecast(tmp_path)
+    frame["timing"] = timing
+    frame.to_parquet(path, index=False)
+    with pytest.raises(PipelineValidationError) as exc:
+        validate_forecast_artifact(path, models_dir=models, now=now)
+    assert "forecast_timing_contract" in _issue_codes(exc.value)
+
+
 def _issue_codes(exc: PipelineValidationError) -> set[str]:
     return {issue.code for issue in exc.issues}
 

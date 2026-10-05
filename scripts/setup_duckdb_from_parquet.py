@@ -59,6 +59,111 @@ def quote_quality_policy() -> dict[str, object]:
     return policy
 
 
+def setup_corporate_action_coverage(conn: duckdb.DuckDBPyConnection, data_dir: Path) -> None:
+    """Expose only the universe and dates authenticated by the selected receipt."""
+    try:
+        from verify_historical_training_gate import verify_historical_corporate_actions
+        from data_release import MUTABLE_PARQUET_ALIASES
+    except ModuleNotFoundError:
+        from scripts.verify_historical_training_gate import verify_historical_corporate_actions
+        from scripts.data_release import MUTABLE_PARQUET_ALIASES
+
+    # Always replace coverage, including when a prior database had valid proof.
+    conn.execute("""
+        CREATE OR REPLACE VIEW v_corporate_action_coverage AS
+        SELECT NULL::VARCHAR act_symbol, NULL::DATE window_start,
+               NULL::DATE window_end, NULL::VARCHAR receipt_id WHERE FALSE
+    """)
+    declared = {path.relative_to(data_dir).as_posix()
+                for path in (data_dir / "parquet").rglob("*.parquet")} - MUTABLE_PARQUET_ALIASES
+    try:
+        evidence = verify_historical_corporate_actions(data_dir, declared)
+    except RuntimeError as exc:
+        print(f"[views] corporate-action coverage withheld: {exc}")
+        return
+
+    def literal(value: str) -> str:
+        return "'" + value.replace("'", "''") + "'"
+
+    rows = ",".join(
+        f"({literal(symbol)}, DATE {literal(evidence['query_start'])}, "
+        f"DATE {literal(evidence['query_end'])}, {literal(evidence['receipt_id'])})"
+        for symbol in evidence["covered_symbols"]
+    )
+    conn.execute(f"""
+        CREATE OR REPLACE VIEW v_corporate_action_coverage AS
+        SELECT * FROM (VALUES {rows}) AS coverage(act_symbol,window_start,window_end,receipt_id)
+    """)
+    print(f"[views] corporate-action coverage: {len(evidence['covered_symbols']):,} symbols · "
+          f"{evidence['query_start']} → {evidence['query_end']}")
+
+
+def setup_corporate_action_views(conn: duckdb.DuckDBPyConnection, data_dir: Path) -> None:
+    """Install action datasets and their independently verified historical coverage."""
+    # ── Corporate actions used to normalize realized earnings moves ──
+    action_receipt_root = data_dir / "control" / "ingestion" / "corporate_actions"
+    latest_action_receipt = action_receipt_root / "latest.json"
+    action_receipts = sorted(action_receipt_root.glob("*.json"))
+    action_receipt = None
+    split_path = None
+    dividend_path = None
+    if latest_action_receipt.exists() or action_receipts:
+        try:
+            selected_receipt = (
+                latest_action_receipt
+                if latest_action_receipt.exists()
+                else action_receipts[-1]
+            )
+            action_receipt = json.loads(selected_receipt.read_text())
+            split_value = action_receipt["datasets"]["splits"]["partition"]
+            dividend_value = action_receipt["datasets"]["dividends"]["partition"]
+            split_path = data_dir / str(split_value)
+            dividend_path = data_dir / str(dividend_value)
+        except (OSError, KeyError, TypeError, json.JSONDecodeError):
+            action_receipt = None
+    if split_path is not None and split_path.exists():
+        conn.execute(f"""
+            CREATE OR REPLACE VIEW v_splits AS
+            SELECT CAST(act_symbol AS VARCHAR) AS act_symbol,
+                   CAST(ex_date AS DATE) AS ex_date,
+                   CAST(to_factor AS DOUBLE) AS to_factor,
+                   CAST(for_factor AS DOUBLE) AS for_factor
+            FROM read_parquet('{split_path}')
+        """)
+    else:
+        conn.execute("""
+            CREATE OR REPLACE VIEW v_splits AS
+            SELECT NULL::VARCHAR AS act_symbol, NULL::DATE AS ex_date,
+                   NULL::DOUBLE AS to_factor, NULL::DOUBLE AS for_factor
+            WHERE FALSE
+        """)
+    if dividend_path is not None and dividend_path.exists():
+        conn.execute(f"""
+            CREATE OR REPLACE VIEW v_dividends AS
+            SELECT CAST(act_symbol AS VARCHAR) AS act_symbol,
+                   CAST(ex_date AS DATE) AS ex_date,
+                   CAST(amount AS DOUBLE) AS amount
+            FROM read_parquet('{dividend_path}')
+        """)
+    else:
+        conn.execute("""
+            CREATE OR REPLACE VIEW v_dividends AS
+            SELECT NULL::VARCHAR AS act_symbol, NULL::DATE AS ex_date,
+                   NULL::DOUBLE AS amount
+            WHERE FALSE
+        """)
+    action_counts = conn.execute("""
+        SELECT (SELECT COUNT(*) FROM v_splits),
+               (SELECT COUNT(*) FROM v_dividends)
+    """).fetchone()
+    print(
+        f"[views] corporate actions: {action_counts[0]:,} splits · "
+        f"{action_counts[1]:,} dividends · "
+        f"source options {action_receipt.get('source_options_date') if action_receipt else 'none'}"
+    )
+    setup_corporate_action_coverage(conn, data_dir)
+
+
 def setup_views(conn: duckdb.DuckDBPyConnection, data_dir: Path):
     policy = quote_quality_policy()
     min_bid = float(policy["min_bid"])
@@ -414,67 +519,7 @@ def setup_views(conn: duckdb.DuckDBPyConnection, data_dir: Path):
     else:
         print("[views] ⚠ No earnings data found (run: python scripts/sync_dolthub.py --earnings)")
 
-    # ── Corporate actions used to normalize realized earnings moves ──
-    action_receipt_root = data_dir / "control" / "ingestion" / "corporate_actions"
-    latest_action_receipt = action_receipt_root / "latest.json"
-    action_receipts = sorted(action_receipt_root.glob("*.json"))
-    action_receipt = None
-    split_path = None
-    dividend_path = None
-    if latest_action_receipt.exists() or action_receipts:
-        try:
-            selected_receipt = (
-                latest_action_receipt
-                if latest_action_receipt.exists()
-                else action_receipts[-1]
-            )
-            action_receipt = json.loads(selected_receipt.read_text())
-            split_value = action_receipt["datasets"]["splits"]["partition"]
-            dividend_value = action_receipt["datasets"]["dividends"]["partition"]
-            split_path = data_dir / str(split_value)
-            dividend_path = data_dir / str(dividend_value)
-        except (OSError, KeyError, TypeError, json.JSONDecodeError):
-            action_receipt = None
-    if split_path is not None and split_path.exists():
-        conn.execute(f"""
-            CREATE OR REPLACE VIEW v_splits AS
-            SELECT CAST(act_symbol AS VARCHAR) AS act_symbol,
-                   CAST(ex_date AS DATE) AS ex_date,
-                   CAST(to_factor AS DOUBLE) AS to_factor,
-                   CAST(for_factor AS DOUBLE) AS for_factor
-            FROM read_parquet('{split_path}')
-        """)
-    else:
-        conn.execute("""
-            CREATE OR REPLACE VIEW v_splits AS
-            SELECT NULL::VARCHAR AS act_symbol, NULL::DATE AS ex_date,
-                   NULL::DOUBLE AS to_factor, NULL::DOUBLE AS for_factor
-            WHERE FALSE
-        """)
-    if dividend_path is not None and dividend_path.exists():
-        conn.execute(f"""
-            CREATE OR REPLACE VIEW v_dividends AS
-            SELECT CAST(act_symbol AS VARCHAR) AS act_symbol,
-                   CAST(ex_date AS DATE) AS ex_date,
-                   CAST(amount AS DOUBLE) AS amount
-            FROM read_parquet('{dividend_path}')
-        """)
-    else:
-        conn.execute("""
-            CREATE OR REPLACE VIEW v_dividends AS
-            SELECT NULL::VARCHAR AS act_symbol, NULL::DATE AS ex_date,
-                   NULL::DOUBLE AS amount
-            WHERE FALSE
-        """)
-    action_counts = conn.execute("""
-        SELECT (SELECT COUNT(*) FROM v_splits),
-               (SELECT COUNT(*) FROM v_dividends)
-    """).fetchone()
-    print(
-        f"[views] corporate actions: {action_counts[0]:,} splits · "
-        f"{action_counts[1]:,} dividends · "
-        f"source options {action_receipt.get('source_options_date') if action_receipt else 'none'}"
-    )
+    setup_corporate_action_views(conn, data_dir)
 
     # ── Volatility history (prefer Parquet, fall back to CSV) ───────
     volhist_parquet_dir = data_dir / "parquet" / "volatility_history"

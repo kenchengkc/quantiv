@@ -74,6 +74,22 @@ def test_passed_monitor_allows_ml(signed_monitor):
     assert publication.verify_publication(root)['can_publish_ml'] is True
 
 
+@pytest.mark.parametrize('drift', ['insufficient_data', 'unsupported_cohort'])
+def test_signed_evidence_hold_keeps_independent_data_publishable(signed_monitor, drift):
+    publication, root, write = signed_monitor
+    report = write(drift)
+    report['status'] = 'failed'
+    path = root / 'models/monitoring/latest_monitoring.json'
+    path.write_text(json.dumps(report))
+    receipt = create_signed_monitor_receipt(
+        ledger_path=root / 'models/monitoring/prediction_ledger.parquet', report_path=path,
+        snapshot_date=report['snapshot_date'])
+    (root / 'models/monitoring/latest_monitoring.receipt.json').write_text(json.dumps(receipt))
+    policy = publication.verify_publication(root)
+    assert policy['can_publish_ml'] is False
+    assert policy['state'] == 'held'
+
+
 @pytest.mark.parametrize('mutation', ['report', 'forecast', 'archive', 'champion', 'stale', 'other_failure', 'extra_archive'])
 def test_publication_refuses_unverified_or_mismatched_evidence(signed_monitor, mutation):
     publication, root, write = signed_monitor
