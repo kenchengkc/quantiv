@@ -94,7 +94,9 @@ def _feature_reference(frame: pd.DataFrame) -> dict[str, Any]:
 
 
 def _cohort_masks(frame: pd.DataFrame) -> dict[str, pd.Series]:
-    straddle = pd.to_numeric(frame.get("straddle_pct", pd.Series(np.nan, index=frame.index)), errors="coerce")
+    straddle = pd.to_numeric(
+        frame.get("straddle_pct", pd.Series(np.nan, index=frame.index)), errors="coerce"
+    ).astype(float)
     strict = np.isfinite(straddle) & (straddle > 0)
     return {"strict_options": strict, "optionless": ~strict}
 
@@ -112,7 +114,9 @@ def _cohort_validation_report(
         selected = mask.to_numpy(dtype=bool)
         n = int(selected.sum())
         baseline_col = "straddle_pct" if cohort == "strict_options" else "hist_move_med_4q"
-        baseline = pd.to_numeric(frame.get(baseline_col, pd.Series(np.nan, index=frame.index)), errors="coerce").to_numpy(dtype=float)
+        baseline = pd.to_numeric(
+            frame.get(baseline_col, pd.Series(np.nan, index=frame.index)), errors="coerce"
+        ).to_numpy(dtype=float, na_value=np.nan)
         valid = selected & np.isfinite(baseline) & (baseline >= 0)
         payload: dict[str, Any] = {
             "rows": n, "baseline_rows": int(valid.sum()),
@@ -162,7 +166,10 @@ def _validation_slice_report(
 ) -> dict[str, Any]:
     def numeric_column(frame: pd.DataFrame, name: str) -> pd.Series:
         values = frame[name] if name in frame else pd.Series(np.nan, index=frame.index)
-        return pd.to_numeric(values, errors="coerce")
+        # Nullable Parquet integers produce nullable boolean comparisons, which
+        # NumPy cannot select on. Preserve missing observations as float NaNs so
+        # they reach the existing unavailable buckets and baseline exclusions.
+        return pd.to_numeric(values, errors="coerce").astype(float)
 
     sector = val_frame.get("__sector", pd.Series("Unknown", index=val_frame.index)).map(_broad_sector)
     vix = numeric_column(X_val, "vix_current")

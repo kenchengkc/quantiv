@@ -63,6 +63,44 @@ def test_optionless_selection_evidence_uses_available_historical_baseline():
     assert missing["optionless"]["baseline_mae"] is None
 
 
+def test_validation_slices_preserve_missing_nullable_numeric_observations():
+    frame = pd.DataFrame({"__dollar_volume": pd.Series(
+        [10_000_000, 50_000_000, 150_000_000, None], dtype="Int64")})
+    features = pd.DataFrame({
+        "vix_current": pd.Series([10., 20., 30., None], dtype="Float64"),
+        "dte": pd.Series([3, 7, 14, None], dtype="Int32"),
+        "straddle_pct": pd.Series([.05, .06, .07, None], dtype="Float64"),
+    })
+    actual = pd.Series([.04, .05, .06, .08])
+    quantiles = np.tile([.01, .03, .05, .08, .10], (4, 1))
+    report = model_trainer._validation_slice_report(
+        frame, features, actual, actual.to_numpy(), quantiles)
+    for dimension, unavailable in [("volatility_regime", "VIX unavailable"),
+                                   ("liquidity", "liquidity unavailable"),
+                                   ("dte", "DTE unavailable")]:
+        cohorts = report[dimension]["cohorts"]
+        assert sum(cohort["rows"] for cohort in cohorts.values()) == 4
+        assert cohorts[unavailable]["rows"] == 1
+        assert "baseline_straddle_mae" not in cohorts[unavailable]
+    assert report["dte"]["cohorts"]["0–3 DTE"]["rows"] == 1
+    assert report["liquidity"]["cohorts"]["lower (<$20m/day)"]["rows"] == 1
+
+
+def test_nullable_missing_straddles_remain_optionless_without_invented_baselines():
+    frame = pd.DataFrame({
+        "straddle_pct": pd.Series([.05, None, None, 0.], dtype="Float64"),
+        "hist_move_med_4q": pd.Series([.04, .06, None, .07], dtype="Float64"),
+    })
+    actual = np.array([.04, .06, .02, .07])
+    quantiles = np.tile([.01, .03, .05, .08, .10], (4, 1))
+    report = model_trainer._cohort_validation_report(
+        frame, actual, actual, quantiles)
+    assert report["strict_options"]["rows"] == 1
+    assert report["optionless"]["rows"] == 3
+    assert report["optionless"]["baseline_rows"] == 2
+    assert report["optionless"]["status"] == "withheld"
+
+
 @pytest.mark.parametrize("corruption,expected", [("crossing", .25), ("negative", .10)])
 def test_supported_cohort_cannot_hide_raw_quantile_failures_after_rearrangement(corruption, expected):
     actual = np.linspace(.02, .12, 200)
