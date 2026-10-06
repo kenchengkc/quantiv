@@ -18,6 +18,7 @@ from typing import Any, Literal
 
 import duckdb
 
+from .realized_moves import reaction_label_lookup
 from .shared import DATA_DIR
 
 
@@ -585,51 +586,23 @@ def _ticker_historical_moves(
 ) -> list[float]:
     if not _relation_exists(conn, "earnings_events") or not _relation_exists(conn, "v_ohlcv"):
         return []
-    rows = conn.execute(
+    events = conn.execute(
         """
-        SELECT ABS(post.close / NULLIF(pre.close, 0) - 1.0) AS realized
-        FROM earnings_events e
-        JOIN LATERAL (
-            SELECT close
-            FROM v_ohlcv
-            WHERE act_symbol = e.ticker
-              AND date >= e.earnings_dt - INTERVAL '5' DAY
-              AND (
-                ((LOWER(COALESCE(e.timing, 'unknown')) IN ('after_market_close','amc','after_close')
-                   OR LOWER(COALESCE(e.timing, 'unknown')) LIKE '%after%') AND date <= e.earnings_dt)
-                OR
-                (NOT (LOWER(COALESCE(e.timing, 'unknown')) IN ('after_market_close','amc','after_close')
-                   OR LOWER(COALESCE(e.timing, 'unknown')) LIKE '%after%') AND date < e.earnings_dt)
-              )
-              AND close > 0
-            ORDER BY date DESC
-            LIMIT 1
-        ) pre ON TRUE
-        JOIN LATERAL (
-            SELECT close
-            FROM v_ohlcv
-            WHERE act_symbol = e.ticker
-              AND date <= e.earnings_dt + INTERVAL '5' DAY
-              AND date <= ?
-              AND (
-                ((LOWER(COALESCE(e.timing, 'unknown')) IN ('before_market_open','bmo','before_open')
-                   OR LOWER(COALESCE(e.timing, 'unknown')) LIKE '%before%') AND date >= e.earnings_dt)
-                OR
-                (NOT (LOWER(COALESCE(e.timing, 'unknown')) IN ('before_market_open','bmo','before_open')
-                   OR LOWER(COALESCE(e.timing, 'unknown')) LIKE '%before%') AND date > e.earnings_dt)
-              )
-              AND close > 0
-            ORDER BY date ASC
-            LIMIT 1
-        ) post ON TRUE
-        WHERE e.ticker = ? AND e.earnings_dt < ?
-        ORDER BY e.earnings_dt DESC
-        LIMIT ?
+        SELECT ticker, earnings_dt, timing FROM earnings_events
+        WHERE ticker = ? AND earnings_dt < ? ORDER BY earnings_dt DESC
         """,
-        [cutoff, ticker.upper(), cutoff, limit],
+        [ticker.upper(), cutoff],
     ).fetchall()
-    values = [_finite_positive(row[0]) for row in rows]
-    return [value for value in values if value is not None]
+    labels = reaction_label_lookup(conn, events, as_of_date=cutoff)
+    # Limit verified events, so an unresolved or unverified recent report cannot
+    # displace an older usable reaction. A verified flat reaction still counts.
+    history = sorted(
+        (label for label in labels.values()
+         if math.isfinite(label.realized_move_pct) and label.realized_move_pct >= 0),
+        key=lambda label: label.earnings_date,
+        reverse=True,
+    )
+    return [float(label.realized_move_pct) for label in history[:limit]]
 
 
 def build_universe_historical_prior(
@@ -648,55 +621,18 @@ def build_universe_historical_prior(
             "event_count": 0,
             "symbol_count": 0,
         }
-    rows = conn.execute(
+    events = conn.execute(
         """
-        SELECT e.ticker, ABS(post.close / NULLIF(pre.close, 0) - 1.0) AS realized
-        FROM earnings_events e
-        JOIN LATERAL (
-            SELECT close
-            FROM v_ohlcv
-            WHERE act_symbol = e.ticker
-              AND date >= e.earnings_dt - INTERVAL '5' DAY
-              AND (
-                ((LOWER(COALESCE(e.timing, 'unknown')) IN ('after_market_close','amc','after_close')
-                   OR LOWER(COALESCE(e.timing, 'unknown')) LIKE '%after%') AND date <= e.earnings_dt)
-                OR
-                (NOT (LOWER(COALESCE(e.timing, 'unknown')) IN ('after_market_close','amc','after_close')
-                   OR LOWER(COALESCE(e.timing, 'unknown')) LIKE '%after%') AND date < e.earnings_dt)
-              )
-              AND close > 0
-            ORDER BY date DESC
-            LIMIT 1
-        ) pre ON TRUE
-        JOIN LATERAL (
-            SELECT close
-            FROM v_ohlcv
-            WHERE act_symbol = e.ticker
-              AND date <= e.earnings_dt + INTERVAL '5' DAY
-              AND date <= ?
-              AND (
-                ((LOWER(COALESCE(e.timing, 'unknown')) IN ('before_market_open','bmo','before_open')
-                   OR LOWER(COALESCE(e.timing, 'unknown')) LIKE '%before%') AND date >= e.earnings_dt)
-                OR
-                (NOT (LOWER(COALESCE(e.timing, 'unknown')) IN ('before_market_open','bmo','before_open')
-                   OR LOWER(COALESCE(e.timing, 'unknown')) LIKE '%before%') AND date > e.earnings_dt)
-              )
-              AND close > 0
-            ORDER BY date ASC
-            LIMIT 1
-        ) post ON TRUE
-        WHERE e.earnings_dt >= ? AND e.earnings_dt < ?
+        SELECT ticker, earnings_dt, timing FROM earnings_events
+        WHERE earnings_dt >= ? AND earnings_dt < ?
         """,
-        [cutoff, start, cutoff],
+        [start, cutoff],
     ).fetchall()
-    values: list[float] = []
-    symbols: set[str] = set()
-    for ticker, raw in rows:
-        value = _finite_positive(raw)
-        if value is None:
-            continue
-        values.append(value)
-        symbols.add(str(ticker))
+    labels = reaction_label_lookup(conn, events, as_of_date=cutoff)
+    verified = [label for label in labels.values()
+                if math.isfinite(label.realized_move_pct) and label.realized_move_pct >= 0]
+    values = [float(label.realized_move_pct) for label in verified]
+    symbols = {label.act_symbol for label in verified}
     return {
         "as_of_date": cutoff.isoformat(),
         "window_start": start.isoformat(),
@@ -858,9 +794,10 @@ def resolve_display_forecast(
         cutoff=as_of_date,
         limit=active_policy.ticker_history_window_events,
     )
-    if len(historical) >= active_policy.min_ticker_history_events:
+    historical_pct = _finite_positive(median(historical)) if historical else None
+    if len(historical) >= active_policy.min_ticker_history_events and historical_pct is not None:
         return DisplayForecast(
-            pct=float(median(historical)),
+            pct=historical_pct,
             method="historical",
             as_of=as_of_date.isoformat(),
             ml_status=ml_status,

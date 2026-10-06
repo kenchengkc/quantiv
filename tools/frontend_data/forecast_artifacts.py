@@ -267,6 +267,18 @@ def withhold_upcoming_ml(public_dir: Path, *, today: date) -> None:
             if method == 'ml':
                 raise RuntimeError(f"{path.name}/{node.get('ticker')}: ML remains under publication hold")
             _, historical_count = _symbol_historical_median(symbol, event_date)
+            canonical_pct = source.get('display_forecast_pct')
+            historical_pct = components['historical']
+            if (method.startswith('historical')
+                    and (historical_pct is None or not math.isfinite(historical_pct)
+                         or historical_pct <= 0)
+                    and source.get('display_forecast_method') == method
+                    and isinstance(canonical_pct, (int, float))
+                    and not isinstance(canonical_pct, bool) and canonical_pct == pct):
+                # The canonical estimator can use verified history outside the
+                # compact page window. Preserve provenance for that exact value;
+                # UI-derived medians retain the count derived from their rows.
+                historical_count = source.get('historical_event_count')
             options_status = {'options_math': 'decision_eligible', 'options_indicative': 'indicative',
                               'historical': 'unavailable', 'historical_prior': 'unavailable'}[method]
             if method == 'options_math' and source.get('options_status') not in {None, 'decision_eligible'}:

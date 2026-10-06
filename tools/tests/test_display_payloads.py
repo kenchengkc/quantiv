@@ -9,6 +9,7 @@ from frontend_data.display_forecast import DisplayForecastError
 from frontend_data.display_payloads import (
     build_display_forecast_status,
     enrich_upcoming_event,
+    ensure_symbol_display_detail,
     validate_upcoming_display_forecasts,
 )
 
@@ -165,3 +166,133 @@ def test_display_status_tracks_method_mix_separately_from_research_coverage():
     assert status["coverage_pct"] == 1.0
     assert status["method_mix"]["ml"] == 1
     assert status["method_mix"]["options_indicative"] == 1
+
+
+def _history_conn() -> duckdb.DuckDBPyConnection:
+    conn = duckdb.connect()
+    conn.execute("""
+        CREATE TABLE earnings_events (
+            ticker VARCHAR, earnings_dt DATE, timing VARCHAR,
+            fiscal_year INTEGER, fiscal_q VARCHAR, eps_actual DOUBLE,
+            eps_estimate DOUBLE, revenue_actual DOUBLE, revenue_estimate DOUBLE,
+            source VARCHAR, timing_source VARCHAR
+        )
+    """)
+    conn.execute("CREATE TABLE v_ohlcv (date DATE, act_symbol VARCHAR, close DOUBLE)")
+    conn.execute("""
+        CREATE VIEW v_corporate_action_coverage AS
+        SELECT DISTINCT ticker AS act_symbol, DATE '2023-01-01' AS window_start,
+               DATE '2028-12-31' AS window_end FROM earnings_events
+    """)
+    return conn
+
+
+def _history_detail(conn, *, as_of_date=date(2026, 9, 16)):
+    return ensure_symbol_display_detail(
+        conn,
+        None,
+        ticker="A",
+        as_of_date=as_of_date,
+        earnings_date=date(2026, 10, 15),
+        display_event={
+            "display_forecast_pct": 0.05,
+            "display_forecast_method": "historical",
+            "display_forecast_as_of": as_of_date.isoformat(),
+            "ml_status": "unavailable_inputs",
+            "options_status": "unavailable",
+            "fallback_reason": "no_event_expiry",
+            "historical_event_count": 2,
+        },
+    )
+
+
+def test_optionless_symbol_history_preserves_signed_exact_adjusted_actuals():
+    conn = _history_conn()
+    conn.executemany("""
+        INSERT INTO earnings_events VALUES ('A', ?, ?, 2026, ?, NULL, NULL,
+            NULL, NULL, 'finnhub', 'reported')
+    """, [(date(2026, 9, 15), "bmo", "Q3"), (date(2026, 6, 15), "amc", "Q2")])
+    conn.executemany(
+        "INSERT INTO v_ohlcv VALUES (?, 'A', ?)",
+        [(date(2026, 9, 14), 100.0), (date(2026, 9, 15), 52.0),
+         (date(2026, 6, 15), 100.0), (date(2026, 6, 16), 96.0)],
+    )
+    conn.execute("""
+        CREATE TABLE v_splits AS SELECT 'A' AS act_symbol,
+            DATE '2026-09-15' AS ex_date, 2.0 AS to_factor, 1.0 AS for_factor
+    """)
+    conn.execute("""
+        CREATE TABLE v_dividends AS SELECT 'A' AS act_symbol,
+            DATE '2026-09-15' AS ex_date, 1.0 AS amount
+    """)
+
+    detail = _history_detail(conn)
+
+    assert detail is not None
+    history = detail["earnings_history"]
+    assert [row["actual"] for row in history] == pytest.approx([0.06, -0.04])
+    assert all(row["realized_target_protocol"] == "quantiv.session-reaction.v2" for row in history)
+    assert all(row["realized_label_source"] == "ohlcv_session_close" for row in history)
+
+
+@pytest.mark.parametrize("timing,timing_source", [
+    ("unknown", "reported"), ("dmh", "reported"), ("bmo", "inferred"),
+])
+def test_optionless_symbol_history_withholds_unverified_timing(timing, timing_source):
+    conn = _history_conn()
+    conn.execute("""
+        INSERT INTO earnings_events VALUES ('A', DATE '2026-09-15', ?, 2026, 'Q3',
+            NULL, NULL, NULL, NULL, 'finnhub', ?)
+    """, [timing, timing_source])
+    conn.executemany("INSERT INTO v_ohlcv VALUES (?, 'A', ?)",
+                     [(date(2026, 9, 14), 100.0), (date(2026, 9, 15), 110.0),
+                      (date(2026, 9, 16), 120.0)])
+
+    assert _history_detail(conn)["earnings_history"][0]["actual"] is None
+
+
+def test_optionless_symbol_history_requires_mature_exact_session_prices():
+    conn = _history_conn()
+    conn.execute("""
+        INSERT INTO earnings_events VALUES ('A', DATE '2026-09-15', 'amc', 2026, 'Q3',
+            NULL, NULL, NULL, NULL, 'finnhub', 'reported')
+    """)
+    conn.executemany("INSERT INTO v_ohlcv VALUES (?, 'A', ?)",
+                     [(date(2026, 9, 15), 100.0), (date(2026, 9, 17), 120.0)])
+    assert _history_detail(conn)["earnings_history"][0]["actual"] is None
+
+    conn.execute("INSERT INTO v_ohlcv VALUES (DATE '2026-09-16', 'A', 110.0)")
+    assert _history_detail(conn, as_of_date=date(2026, 9, 15))["earnings_history"][0]["actual"] is None
+    assert _history_detail(conn)["earnings_history"][0]["actual"] == pytest.approx(0.10)
+
+
+def test_optionless_symbol_history_requires_action_coverage():
+    conn = _history_conn()
+    conn.execute("""
+        INSERT INTO earnings_events VALUES ('A', DATE '2026-09-15', 'bmo', 2026, 'Q3',
+            NULL, NULL, NULL, NULL, 'finnhub', 'reported')
+    """)
+    conn.executemany("INSERT INTO v_ohlcv VALUES (?, 'A', ?)",
+                     [(date(2026, 9, 14), 100.0), (date(2026, 9, 15), 110.0)])
+    conn.execute("""
+        CREATE OR REPLACE VIEW v_corporate_action_coverage AS
+        SELECT NULL::VARCHAR AS act_symbol, NULL::DATE AS window_start,
+               NULL::DATE AS window_end WHERE FALSE
+    """)
+    assert _history_detail(conn)["earnings_history"][0]["actual"] is None
+
+
+def test_optionless_symbol_history_does_not_publish_nonfinite_actuals():
+    conn = _history_conn()
+    conn.execute("""
+        INSERT INTO earnings_events VALUES ('A', DATE '2026-09-15', 'bmo', 2026, 'Q3',
+            NULL, NULL, NULL, NULL, 'finnhub', 'reported')
+    """)
+    conn.executemany("INSERT INTO v_ohlcv VALUES (?, 'A', ?)",
+                     [(date(2026, 9, 14), 100.0), (date(2026, 9, 15), float('inf'))])
+
+    row = _history_detail(conn)["earnings_history"][0]
+
+    assert row["actual"] is None
+    assert row["realized_target_protocol"] is None
+    assert row["realized_label_source"] is None

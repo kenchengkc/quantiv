@@ -7,6 +7,7 @@ import pytest
 
 from frontend_data.display_forecast import (
     DisplayPolicy,
+    build_universe_historical_prior,
     resolve_display_forecast,
 )
 
@@ -59,6 +60,11 @@ def _conn() -> duckdb.DuckDBPyConnection:
         )
         """
     )
+    conn.execute("""
+        CREATE VIEW v_corporate_action_coverage AS
+        SELECT DISTINCT ticker AS act_symbol, DATE '2023-01-01' AS window_start,
+               DATE '2028-12-31' AS window_end FROM earnings_events
+    """)
     return conn
 
 
@@ -87,15 +93,13 @@ def _history(
     conn: duckdb.DuckDBPyConnection,
     ticker: str,
     moves: list[float],
-    *,
-    before: date = EVENT,
 ) -> None:
-    for idx, move in enumerate(moves, start=1):
-        event = before - timedelta(days=90 * idx)
-        pre = event - timedelta(days=1)
+    sessions = [date(2026, 7, 16), date(2026, 4, 16), date(2026, 1, 15), date(2025, 10, 16)]
+    for event, move in zip(sessions, moves, strict=False):
+        pre = event
         post = event + timedelta(days=1)
         conn.execute(
-            "INSERT INTO earnings_events VALUES (?, ?, 'unknown')",
+            "INSERT INTO earnings_events VALUES (?, ?, 'amc')",
             [ticker, event],
         )
         conn.executemany(
@@ -299,16 +303,16 @@ def test_ticker_history_does_not_use_events_after_forecast_cutoff():
     known_event = date(2026, 9, 10)
     future_event = date(2026, 9, 18)
     conn.executemany(
-        "INSERT INTO earnings_events VALUES ('PAYX', ?, 'unknown')",
+        "INSERT INTO earnings_events VALUES ('PAYX', ?, 'amc')",
         [(known_event,), (future_event,)],
     )
     conn.executemany(
         "INSERT INTO v_ohlcv VALUES (?, 'PAYX', ?)",
         [
-            (known_event - timedelta(days=1), 100.0),
+            (known_event, 100.0),
             (known_event + timedelta(days=1), 104.0),
-            (future_event - timedelta(days=1), 100.0),
-            (future_event + timedelta(days=1), 120.0),
+            (future_event, 100.0),
+            (date(2026, 9, 21), 120.0),
         ],
     )
 
@@ -324,7 +328,7 @@ def test_generated_universe_prior_uses_forecast_cutoff_not_target_date():
     known_event = date(2026, 9, 10)
     future_event = date(2026, 9, 18)
     conn.executemany(
-        "INSERT INTO earnings_events VALUES (?, ?, 'unknown')",
+        "INSERT INTO earnings_events VALUES (?, ?, 'amc')",
         [
             ("KNOWN", known_event),
             ("FUTURE", future_event),
@@ -333,12 +337,12 @@ def test_generated_universe_prior_uses_forecast_cutoff_not_target_date():
     conn.executemany(
         "INSERT INTO v_ohlcv VALUES (?, ?, ?)",
         [
-            (known_event - timedelta(days=1), "KNOWN", 100.0),
+            (known_event, "KNOWN", 100.0),
             (known_event + timedelta(days=1), "KNOWN", 104.0),
             # These rows deliberately simulate information that exists before
             # the target earnings event but only after the forecast cutoff.
-            (future_event - timedelta(days=1), "FUTURE", 100.0),
-            (future_event + timedelta(days=1), "FUTURE", 120.0),
+            (future_event, "FUTURE", 100.0),
+            (date(2026, 9, 21), "FUTURE", 120.0),
         ],
     )
 
@@ -378,3 +382,161 @@ def test_missing_deltas_fall_back_to_strike_proximity():
     assert result.method == "options_indicative"
     assert result.selected_options_details is not None
     assert result.selected_options_details["atm_delta_distance"] is None
+
+
+@pytest.mark.parametrize("timing", ["unknown", "dmh", "during_market_hours"])
+def test_unverified_timing_does_not_supply_ticker_or_universe_history(timing):
+    conn = _conn()
+    conn.executemany(
+        "INSERT INTO earnings_events VALUES ('WABC', ?, ?)",
+        [(date(2026, 4, 16), timing), (date(2026, 7, 16), timing)],
+    )
+    conn.executemany(
+        "INSERT INTO v_ohlcv VALUES (?, 'WABC', ?)",
+        [(date(2026, 4, 15), 100.0), (date(2026, 4, 17), 104.0),
+         (date(2026, 7, 15), 100.0), (date(2026, 7, 17), 106.0)],
+    )
+
+    result = _resolve(conn, ticker="WABC")
+    prior = build_universe_historical_prior(conn, cutoff=AS_OF)
+
+    assert result.method == "historical_prior"
+    assert result.pct == pytest.approx(0.055)
+    assert result.historical_event_count == 0
+    assert prior["median_abs_move"] is None
+    assert prior["event_count"] == 0
+
+
+def test_ticker_and_universe_history_use_exact_adjusted_bmo_amc_targets():
+    conn = _conn()
+    conn.executemany(
+        "INSERT INTO earnings_events VALUES ('PAYX', ?, ?)",
+        [(date(2026, 4, 16), "bmo"), (date(2026, 7, 16), "amc")],
+    )
+    conn.executemany(
+        "INSERT INTO v_ohlcv VALUES (?, 'PAYX', ?)",
+        [(date(2026, 4, 15), 100.0), (date(2026, 4, 16), 104.0),
+         (date(2026, 7, 16), 100.0), (date(2026, 7, 17), 52.0)],
+    )
+    conn.execute("""
+        CREATE TABLE v_splits AS SELECT 'PAYX' AS act_symbol,
+            DATE '2026-07-17' AS ex_date, 2.0 AS to_factor, 1.0 AS for_factor
+    """)
+    conn.execute("""
+        CREATE TABLE v_dividends AS SELECT 'PAYX' AS act_symbol,
+            DATE '2026-07-17' AS ex_date, 1.0 AS amount
+    """)
+
+    result = _resolve(conn)
+    prior = build_universe_historical_prior(conn, cutoff=AS_OF)
+
+    assert result.method == "historical"
+    assert result.pct == pytest.approx(0.05)
+    assert result.historical_event_count == 2
+    assert prior["median_abs_move"] == pytest.approx(0.05)
+    assert prior["event_count"] == 2
+    assert prior["symbol_count"] == 1
+
+
+def test_missing_exact_reaction_close_cannot_be_replaced_by_nearest_price():
+    conn = _conn()
+    conn.executemany(
+        "INSERT INTO earnings_events VALUES ('PAYX', ?, ?)",
+        [(date(2026, 4, 16), "amc"), (date(2026, 7, 16), "bmo")],
+    )
+    conn.executemany(
+        "INSERT INTO v_ohlcv VALUES (?, 'PAYX', ?)",
+        [(date(2026, 4, 16), 100.0), (date(2026, 4, 20), 104.0),
+         (date(2026, 7, 15), 100.0), (date(2026, 7, 17), 106.0)],
+    )
+
+    result = _resolve(conn)
+    prior = build_universe_historical_prior(conn, cutoff=AS_OF)
+
+    assert result.method == "historical_prior"
+    assert result.historical_event_count == 0
+    assert prior["event_count"] == 0
+
+
+def test_uncovered_corporate_actions_do_not_supply_display_history():
+    conn = _conn()
+    _history(conn, "PAYX", [0.02, 0.04])
+    conn.execute("""
+        CREATE OR REPLACE VIEW v_corporate_action_coverage AS
+        SELECT NULL::VARCHAR AS act_symbol, NULL::DATE AS window_start,
+               NULL::DATE AS window_end WHERE FALSE
+    """)
+
+    result = _resolve(conn)
+
+    assert result.method == "historical_prior"
+    assert result.historical_event_count == 0
+    assert build_universe_historical_prior(conn, cutoff=AS_OF)["event_count"] == 0
+
+
+def test_later_inferred_timing_does_not_supply_display_history():
+    conn = _conn()
+    _history(conn, "PAYX", [0.02, 0.04])
+    conn.execute("ALTER TABLE earnings_events ADD COLUMN timing_source VARCHAR DEFAULT 'inferred'")
+
+    result = _resolve(conn)
+
+    assert result.method == "historical_prior"
+    assert result.historical_event_count == 0
+    assert build_universe_historical_prior(conn, cutoff=AS_OF)["event_count"] == 0
+
+
+def test_verified_zero_reaction_counts_in_historical_median_and_provenance():
+    conn = _conn()
+    _history(conn, "PAYX", [0.0, 0.04])
+
+    result = _resolve(conn)
+    prior = build_universe_historical_prior(conn, cutoff=AS_OF)
+
+    assert result.method == "historical"
+    assert result.pct == pytest.approx(0.02)
+    assert result.historical_event_count == 2
+    assert prior["median_abs_move"] == pytest.approx(0.02)
+    assert prior["event_count"] == 2
+
+
+def test_all_zero_ticker_history_keeps_count_but_uses_positive_universe_prior():
+    conn = _conn()
+    _history(conn, "PAYX", [0.0, 0.0])
+
+    result = _resolve(conn)
+    prior = build_universe_historical_prior(conn, cutoff=AS_OF)
+
+    assert result.method == "historical_prior"
+    assert result.pct == pytest.approx(0.055)
+    assert result.historical_event_count == 2
+    assert prior["median_abs_move"] == 0.0
+    assert prior["event_count"] == 2
+
+
+def test_history_window_selects_verified_events_before_limiting():
+    conn = _conn()
+    _history(conn, "PAYX", [0.03, 0.05, 0.07, 0.09])
+    conn.execute("INSERT INTO earnings_events VALUES ('PAYX', DATE '2026-08-13', 'unknown')")
+    conn.executemany("INSERT INTO v_ohlcv VALUES (?, 'PAYX', ?)",
+                     [(date(2026, 8, 12), 100.0), (date(2026, 8, 14), 101.0)])
+
+    result = _resolve(conn)
+
+    assert result.method == "historical"
+    assert result.pct == pytest.approx(0.06)
+    assert result.historical_event_count == 4
+
+
+def test_nonfinite_reaction_is_excluded_before_history_count_and_median():
+    conn = _conn()
+    _history(conn, "PAYX", [float("inf"), 0.06, 0.02])
+
+    result = _resolve(conn)
+    prior = build_universe_historical_prior(conn, cutoff=AS_OF)
+
+    assert result.method == "historical"
+    assert result.pct == pytest.approx(0.04)
+    assert result.historical_event_count == 2
+    assert prior["median_abs_move"] == pytest.approx(0.04)
+    assert prior["event_count"] == 2

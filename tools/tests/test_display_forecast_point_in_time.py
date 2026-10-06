@@ -43,6 +43,11 @@ def _conn() -> duckdb.DuckDBPyConnection:
     conn.execute(
         "CREATE TABLE v_ohlcv (date DATE, act_symbol VARCHAR, close DOUBLE)"
     )
+    conn.execute("""
+        CREATE VIEW v_corporate_action_coverage AS
+        SELECT DISTINCT ticker AS act_symbol, DATE '2023-01-01' AS window_start,
+               DATE '2028-12-31' AS window_end FROM earnings_events
+    """)
     return conn
 
 
@@ -68,17 +73,17 @@ def _resolve(
 def test_ticker_history_ignores_realization_not_observable_by_cutoff():
     conn = _conn()
     known_event = date(2026, 9, 10)
-    unresolved_event = date(2026, 9, 13)
+    unresolved_event = date(2026, 9, 14)
     conn.executemany(
-        "INSERT INTO earnings_events VALUES ('PAYX', ?, 'unknown')",
+        "INSERT INTO earnings_events VALUES ('PAYX', ?, 'amc')",
         [(known_event,), (unresolved_event,)],
     )
     conn.executemany(
         "INSERT INTO v_ohlcv VALUES (?, 'PAYX', ?)",
         [
-            (known_event - timedelta(days=1), 100.0),
+            (known_event, 100.0),
             (known_event + timedelta(days=1), 104.0),
-            (unresolved_event - timedelta(days=1), 100.0),
+            (unresolved_event, 100.0),
             # This realization is after the forecast cutoff and must not count.
             (AS_OF + timedelta(days=1), 120.0),
         ],
@@ -102,17 +107,17 @@ def test_ticker_history_ignores_realization_not_observable_by_cutoff():
 def test_universe_prior_ignores_realization_not_observable_by_cutoff():
     conn = _conn()
     known_event = date(2026, 9, 10)
-    unresolved_event = date(2026, 9, 13)
+    unresolved_event = date(2026, 9, 14)
     conn.executemany(
-        "INSERT INTO earnings_events VALUES (?, ?, 'unknown')",
+        "INSERT INTO earnings_events VALUES (?, ?, 'amc')",
         [("KNOWN", known_event), ("UNRESOLVED", unresolved_event)],
     )
     conn.executemany(
         "INSERT INTO v_ohlcv VALUES (?, ?, ?)",
         [
-            (known_event - timedelta(days=1), "KNOWN", 100.0),
+            (known_event, "KNOWN", 100.0),
             (known_event + timedelta(days=1), "KNOWN", 104.0),
-            (unresolved_event - timedelta(days=1), "UNRESOLVED", 100.0),
+            (unresolved_event, "UNRESOLVED", 100.0),
             # This realization is after the forecast cutoff and must not count.
             (AS_OF + timedelta(days=1), "UNRESOLVED", 120.0),
         ],
