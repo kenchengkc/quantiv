@@ -86,7 +86,7 @@ def main() -> int:
     conn = duckdb.connect(str(args.db), read_only=True)
     try:
         ohlcv = conn.execute("SELECT MAX(date) FROM v_ohlcv").fetchone()[0]
-        options = conn.execute("SELECT MAX(as_of_date) FROM v_options_chain").fetchone()[0]
+        options = conn.execute("SELECT MAX(date) FROM v_options").fetchone()[0]
     finally:
         conn.close()
 

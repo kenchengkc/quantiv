@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: event-forecast-freeze
+  group: daily-data-refresh-execution
   cancel-in-progress: false
 
 permissions:
@@ -104,13 +104,19 @@ jobs:
             --forecast-path data/validation/event-freeze-candidate.parquet \
             --days-ahead 3 --github-output "$GITHUB_OUTPUT"
 
+      - name: Persist authenticated event monitoring independently of ML publication
+        if: steps.model-publication.outcome == 'success'
+        env:
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+        run: bash scripts/r2_push.sh --monitoring-only
+
       - name: Promote only event-cutoff-eligible rows
         if: steps.input_gate.outputs.ready == 'true' && steps.model-publication.outputs.can_publish_ml == 'true'
         run: |
           python scripts/promote_event_freeze.py             data/validation/event-freeze-candidate.parquet
 
-      - name: Persist immutable prediction ledger
-        if: steps.input_gate.outputs.ready == 'true'
+      - name: Persist eligible event forecasts
+        if: steps.input_gate.outputs.ready == 'true' && steps.model-publication.outputs.can_publish_ml == 'true'
         env:
           R2_BUCKET: ${{ secrets.R2_BUCKET }}
         run: bash scripts/r2_push.sh --forecasts-only
@@ -125,7 +131,7 @@ jobs:
           python scripts/restore_reported_forecasts.py --apply
 
       - name: Persist publication receipts
-        if: steps.input_gate.outputs.ready == 'true'
+        if: steps.input_gate.outputs.ready == 'true' && steps.model-publication.outputs.can_publish_ml == 'true'
         env:
           R2_BUCKET: ${{ secrets.R2_BUCKET }}
         run: bash scripts/r2_push.sh --forecasts-only

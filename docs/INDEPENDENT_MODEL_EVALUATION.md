@@ -36,6 +36,47 @@ medians available at prediction time. MAE, calibration, forecast handoff and cur
 data activation gates remain mandatory. Insufficient evidence retains the challenger
 and champion without claiming independent success.
 
+The existing promotion limits are safety and non-regression checks: a candidate can
+pass with up to 2% higher MAE than the champion. Passing them does not establish
+that the candidate improved accuracy. A claim of improvement needs a separate,
+predefined paired analysis with uncertainty; the 200-row floor alone is not proof.
+
+Two experiments answer different questions:
+
+1. To isolate the benefit of additional data, compare earlier and later training
+   cutoffs using the same causal features, labels, recipe and tuning procedure.
+   Evaluate both on the same later unused earnings windows, repeating the exercise
+   chronologically. Changing targets, features or fitting rules in only one arm
+   would confound the effect of the new data.
+2. To assess the actual retained bundles, collect their paired predictions before
+   announcements, then wait for mature common labels. Choose the primary metric,
+   minimum meaningful improvement, supported cohorts and decision checkpoint before
+   inspecting outcomes. Report paired MAE differences and cluster uncertainty by
+   issuer or earnings event instead of treating related rows as independent.
+
+The research paired-benchmark CLI supports reproducible cluster bootstrap intervals
+via `--cluster-column`; it does not enforce an automatic superiority gate or adjust
+for repeated looks across cohorts and horizons. Those choices must be specified in
+the experiment design. Historical selection results and a positive pooled average
+cannot substitute for this evidence. Even strong evidence describes the tested
+population and period, not a guarantee for every future market regime.
+
+## Monitoring collection and publication holds
+
+Daily and nightly event-freeze monitoring persist the signed prediction ledger,
+report and receipt independently of public ML publication. The monitoring-only R2
+writer verifies a staged copy of all three files before any upload and writes the
+receipt last. Model and forecast upload modes do not own these prediction files;
+the retrainer's separate outcome evidence remains separately owned.
+
+Daily refresh and nightly freeze share the same execution concurrency group for
+the complete pull, append and upload sequence. This prevents two valid cumulative
+ledgers from replacing one another with missing observations. Readers still verify
+the receipt and its bound bytes and reject incomplete uploads. These persistence
+repairs do not make stale inputs eligible: prospective evidence must independently
+pass snapshot freshness, announcement timing and model exposure checks. Publication
+and model activation retain all existing quality gates.
+
 ## Retained provenance
 
 `data/models/candidates/<bundle_id>/` retains original training tables, temporal and
