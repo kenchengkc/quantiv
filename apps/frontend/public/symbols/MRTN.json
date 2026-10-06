@@ -4,7 +4,7 @@
   "spot_price": 12.92,
   "expected_move": {
     "earnings_date": "2026-10-21",
-    "display_forecast_pct": 0.03523484143786543,
+    "display_forecast_pct": 0.03096080179691557,
     "display_forecast_method": "historical",
     "display_forecast_as_of": "2026-09-30",
     "ml_status": "unavailable_model",
@@ -39,6 +39,8 @@
       "revenue_actual": null,
       "revenue_estimate": 234158003.0,
       "rev_surprise_pct": null,
+      "realized_target_protocol": null,
+      "realized_label_source": null,
       "ml_status": "unavailable_model",
       "options_status": "unavailable",
       "fallback_reason": null,
@@ -47,7 +49,7 @@
     },
     {
       "date": "2026-07-23",
-      "timing": "after_market_close",
+      "timing": "amc",
       "q": "Q2 26",
       "fiscal_year": 2026,
       "fiscal_q": "Q2",
@@ -66,7 +68,9 @@
       "eps_surprise_pct": -0.192618,
       "revenue_actual": 223543000.0,
       "revenue_estimate": 234753000.0,
-      "rev_surprise_pct": -0.047752
+      "rev_surprise_pct": -0.047752,
+      "realized_target_protocol": "quantiv.session-reaction.v2",
+      "realized_label_source": "ohlcv_session_close"
     },
     {
       "date": "2026-04-15",
@@ -74,7 +78,7 @@
       "q": "Q1 26",
       "fiscal_year": 2026,
       "fiscal_q": "Q1",
-      "actual": 0.04,
+      "actual": null,
       "implied": null,
       "implied_as_of": null,
       "implied_expiration": null,
@@ -89,7 +93,9 @@
       "eps_surprise_pct": null,
       "revenue_actual": null,
       "revenue_estimate": null,
-      "rev_surprise_pct": null
+      "rev_surprise_pct": null,
+      "realized_target_protocol": null,
+      "realized_label_source": null
     },
     {
       "date": "2026-01-26",
@@ -97,7 +103,7 @@
       "q": "Q4 25",
       "fiscal_year": 2025,
       "fiscal_q": "Q4",
-      "actual": -0.001603,
+      "actual": null,
       "implied": null,
       "implied_as_of": null,
       "implied_expiration": null,
@@ -112,7 +118,9 @@
       "eps_surprise_pct": null,
       "revenue_actual": null,
       "revenue_estimate": null,
-      "rev_surprise_pct": null
+      "rev_surprise_pct": null,
+      "realized_target_protocol": null,
+      "realized_label_source": null
     },
     {
       "date": "2025-10-16",
@@ -120,7 +128,7 @@
       "q": "Q3 25",
       "fiscal_year": 2025,
       "fiscal_q": "Q3",
-      "actual": -0.003687,
+      "actual": null,
       "implied": null,
       "implied_as_of": null,
       "implied_expiration": null,
@@ -135,11 +143,13 @@
       "eps_surprise_pct": null,
       "revenue_actual": null,
       "revenue_estimate": null,
-      "rev_surprise_pct": null
+      "rev_surprise_pct": null,
+      "realized_target_protocol": null,
+      "realized_label_source": null
     },
     {
       "date": "2025-07-17",
-      "timing": "before_market_open",
+      "timing": "bmo",
       "q": "Q2 25",
       "fiscal_year": 2025,
       "fiscal_q": "Q2",
@@ -158,7 +168,9 @@
       "eps_surprise_pct": null,
       "revenue_actual": null,
       "revenue_estimate": null,
-      "rev_surprise_pct": null
+      "rev_surprise_pct": null,
+      "realized_target_protocol": "quantiv.session-reaction.v2",
+      "realized_label_source": "ohlcv_session_close"
     },
     {
       "date": "2025-04-17",
@@ -166,7 +178,7 @@
       "q": "Q1 25",
       "fiscal_year": 2025,
       "fiscal_q": "Q1",
-      "actual": 0.002262,
+      "actual": null,
       "implied": null,
       "implied_as_of": null,
       "implied_expiration": null,
@@ -181,11 +193,13 @@
       "eps_surprise_pct": null,
       "revenue_actual": null,
       "revenue_estimate": null,
-      "rev_surprise_pct": null
+      "rev_surprise_pct": null,
+      "realized_target_protocol": null,
+      "realized_label_source": null
     },
     {
       "date": "2025-01-27",
-      "timing": "after_market_close",
+      "timing": "amc",
       "q": "Q4 24",
       "fiscal_year": 2024,
       "fiscal_q": "Q4",
@@ -204,11 +218,13 @@
       "eps_surprise_pct": null,
       "revenue_actual": null,
       "revenue_estimate": null,
-      "rev_surprise_pct": null
+      "rev_surprise_pct": null,
+      "realized_target_protocol": "quantiv.session-reaction.v2",
+      "realized_label_source": "ohlcv_session_close"
     },
     {
       "date": "2024-10-17",
-      "timing": "after_market_close",
+      "timing": "amc",
       "q": "Q3 24",
       "fiscal_year": 2024,
       "fiscal_q": "Q3",
@@ -227,11 +243,13 @@
       "eps_surprise_pct": null,
       "revenue_actual": null,
       "revenue_estimate": null,
-      "rev_surprise_pct": null
+      "rev_surprise_pct": null,
+      "realized_target_protocol": "quantiv.session-reaction.v2",
+      "realized_label_source": "ohlcv_session_close"
     },
     {
       "date": "2024-07-18",
-      "timing": "after_market_close",
+      "timing": "amc",
       "q": "Q2 24",
       "fiscal_year": 2024,
       "fiscal_q": "Q2",
@@ -250,11 +268,13 @@
       "eps_surprise_pct": null,
       "revenue_actual": null,
       "revenue_estimate": null,
-      "rev_surprise_pct": null
+      "rev_surprise_pct": null,
+      "realized_target_protocol": "quantiv.session-reaction.v2",
+      "realized_label_source": "ohlcv_session_close"
     },
     {
       "date": "2024-04-17",
-      "timing": "after_market_close",
+      "timing": "amc",
       "q": "Q1 24",
       "fiscal_year": 2024,
       "fiscal_q": "Q1",
@@ -273,11 +293,13 @@
       "eps_surprise_pct": null,
       "revenue_actual": null,
       "revenue_estimate": null,
-      "rev_surprise_pct": null
+      "rev_surprise_pct": null,
+      "realized_target_protocol": "quantiv.session-reaction.v2",
+      "realized_label_source": "ohlcv_session_close"
     },
     {
       "date": "2024-01-24",
-      "timing": "after_market_close",
+      "timing": "amc",
       "q": "Q4 23",
       "fiscal_year": 2023,
       "fiscal_q": "Q4",
@@ -296,7 +318,9 @@
       "eps_surprise_pct": null,
       "revenue_actual": null,
       "revenue_estimate": null,
-      "rev_surprise_pct": null
+      "rev_surprise_pct": null,
+      "realized_target_protocol": "quantiv.session-reaction.v2",
+      "realized_label_source": "ohlcv_session_close"
     }
   ],
   "next_earnings": "2026-10-21",

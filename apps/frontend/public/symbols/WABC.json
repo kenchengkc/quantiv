@@ -4,13 +4,13 @@
   "spot_price": 58.32,
   "expected_move": {
     "earnings_date": "2026-10-15",
-    "display_forecast_pct": 0.021032003204805916,
-    "display_forecast_method": "historical",
+    "display_forecast_pct": 0.04236069487009636,
+    "display_forecast_method": "historical_prior",
     "display_forecast_as_of": "2026-09-30",
     "ml_status": "unavailable_model",
     "options_status": "unavailable",
-    "fallback_reason": "quote_quality",
-    "historical_event_count": 4,
+    "fallback_reason": "insufficient_ticker_history",
+    "historical_event_count": 0,
     "timing": "unknown",
     "ml_publication_status": "held",
     "ml_publication_reason": "feature_drift"
@@ -39,6 +39,8 @@
       "revenue_actual": null,
       "revenue_estimate": 64362000.0,
       "rev_surprise_pct": null,
+      "realized_target_protocol": null,
+      "realized_label_source": null,
       "ml_status": "unavailable_model",
       "options_status": "unavailable",
       "fallback_reason": null,
@@ -51,7 +53,7 @@
       "q": "Q2 26",
       "fiscal_year": 2026,
       "fiscal_q": "Q2",
-      "actual": 0.039648,
+      "actual": null,
       "implied": null,
       "implied_as_of": null,
       "implied_expiration": null,
@@ -66,7 +68,9 @@
       "eps_surprise_pct": 0.04567,
       "revenue_actual": 62968000.0,
       "revenue_estimate": 62832000.0,
-      "rev_surprise_pct": 0.002165
+      "rev_surprise_pct": 0.002165,
+      "realized_target_protocol": null,
+      "realized_label_source": null
     },
     {
       "date": "2026-04-16",
@@ -74,7 +78,7 @@
       "q": "Q1 26",
       "fiscal_year": 2026,
       "fiscal_q": "Q1",
-      "actual": 0.014447,
+      "actual": null,
       "implied": null,
       "implied_as_of": null,
       "implied_expiration": null,
@@ -89,7 +93,9 @@
       "eps_surprise_pct": null,
       "revenue_actual": null,
       "revenue_estimate": null,
-      "rev_surprise_pct": null
+      "rev_surprise_pct": null,
+      "realized_target_protocol": null,
+      "realized_label_source": null
     },
     {
       "date": "2026-01-15",
@@ -97,7 +103,7 @@
       "q": "Q4 25",
       "fiscal_year": 2025,
       "fiscal_q": "Q4",
-      "actual": 0.027617,
+      "actual": null,
       "implied": null,
       "implied_as_of": null,
       "implied_expiration": null,
@@ -112,7 +118,9 @@
       "eps_surprise_pct": null,
       "revenue_actual": null,
       "revenue_estimate": null,
-      "rev_surprise_pct": null
+      "rev_surprise_pct": null,
+      "realized_target_protocol": null,
+      "realized_label_source": null
     },
     {
       "date": "2025-10-16",
@@ -120,7 +128,7 @@
       "q": "Q3 25",
       "fiscal_year": 2025,
       "fiscal_q": "Q3",
-      "actual": 0.003873,
+      "actual": null,
       "implied": null,
       "implied_as_of": null,
       "implied_expiration": null,
@@ -135,7 +143,9 @@
       "eps_surprise_pct": null,
       "revenue_actual": null,
       "revenue_estimate": null,
-      "rev_surprise_pct": null
+      "rev_surprise_pct": null,
+      "realized_target_protocol": null,
+      "realized_label_source": null
     },
     {
       "date": "2025-07-17",
@@ -143,7 +153,7 @@
       "q": "Q2 25",
       "fiscal_year": 2025,
       "fiscal_q": "Q2",
-      "actual": -0.012603,
+      "actual": null,
       "implied": null,
       "implied_as_of": null,
       "implied_expiration": null,
@@ -158,7 +168,9 @@
       "eps_surprise_pct": null,
       "revenue_actual": null,
       "revenue_estimate": null,
-      "rev_surprise_pct": null
+      "rev_surprise_pct": null,
+      "realized_target_protocol": null,
+      "realized_label_source": null
     },
     {
       "date": "2025-04-17",
@@ -166,7 +178,7 @@
       "q": "Q1 25",
       "fiscal_year": 2025,
       "fiscal_q": "Q1",
-      "actual": 0.0068,
+      "actual": null,
       "implied": null,
       "implied_as_of": null,
       "implied_expiration": null,
@@ -181,7 +193,9 @@
       "eps_surprise_pct": null,
       "revenue_actual": null,
       "revenue_estimate": null,
-      "rev_surprise_pct": null
+      "rev_surprise_pct": null,
+      "realized_target_protocol": null,
+      "realized_label_source": null
     },
     {
       "date": "2025-01-16",
@@ -189,7 +203,7 @@
       "q": "Q4 24",
       "fiscal_year": 2024,
       "fiscal_q": "Q4",
-      "actual": 0.009632,
+      "actual": null,
       "implied": null,
       "implied_as_of": null,
       "implied_expiration": null,
@@ -204,7 +218,9 @@
       "eps_surprise_pct": null,
       "revenue_actual": null,
       "revenue_estimate": null,
-      "rev_surprise_pct": null
+      "rev_surprise_pct": null,
+      "realized_target_protocol": null,
+      "realized_label_source": null
     },
     {
       "date": "2024-10-17",
@@ -212,7 +228,7 @@
       "q": "Q3 24",
       "fiscal_year": 2024,
       "fiscal_q": "Q3",
-      "actual": 0.013302,
+      "actual": null,
       "implied": null,
       "implied_as_of": null,
       "implied_expiration": null,
@@ -227,7 +243,9 @@
       "eps_surprise_pct": null,
       "revenue_actual": null,
       "revenue_estimate": null,
-      "rev_surprise_pct": null
+      "rev_surprise_pct": null,
+      "realized_target_protocol": null,
+      "realized_label_source": null
     },
     {
       "date": "2024-07-18",
@@ -235,7 +253,7 @@
       "q": "Q2 24",
       "fiscal_year": 2024,
       "fiscal_q": "Q2",
-      "actual": -0.046516,
+      "actual": null,
       "implied": null,
       "implied_as_of": null,
       "implied_expiration": null,
@@ -250,7 +268,9 @@
       "eps_surprise_pct": null,
       "revenue_actual": null,
       "revenue_estimate": null,
-      "rev_surprise_pct": null
+      "rev_surprise_pct": null,
+      "realized_target_protocol": null,
+      "realized_label_source": null
     },
     {
       "date": "2024-04-18",
@@ -258,7 +278,7 @@
       "q": "Q1 24",
       "fiscal_year": 2024,
       "fiscal_q": "Q1",
-      "actual": 0.028132,
+      "actual": null,
       "implied": null,
       "implied_as_of": null,
       "implied_expiration": null,
@@ -273,7 +293,9 @@
       "eps_surprise_pct": null,
       "revenue_actual": null,
       "revenue_estimate": null,
-      "rev_surprise_pct": null
+      "rev_surprise_pct": null,
+      "realized_target_protocol": null,
+      "realized_label_source": null
     },
     {
       "date": "2024-01-18",
@@ -281,7 +303,7 @@
       "q": "Q4 23",
       "fiscal_year": 2023,
       "fiscal_q": "Q4",
-      "actual": -0.058434,
+      "actual": null,
       "implied": null,
       "implied_as_of": null,
       "implied_expiration": null,
@@ -296,7 +318,9 @@
       "eps_surprise_pct": null,
       "revenue_actual": null,
       "revenue_estimate": null,
-      "rev_surprise_pct": null
+      "rev_surprise_pct": null,
+      "realized_target_protocol": null,
+      "realized_label_source": null
     }
   ],
   "next_earnings": "2026-10-15",
