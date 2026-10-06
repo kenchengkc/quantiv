@@ -11,9 +11,9 @@ PYTHON_BIN="${PYTHON_BIN:-python}"
 
 MODE="${1:-all}"
 case "$MODE" in
-  all|--skip-forecasts|--forecasts-only|--model-recovery|--runtime-state-only|--options-recovery|--candidate-control-only) ;;
+  all|--skip-forecasts|--forecasts-only|--monitoring-only|--model-recovery|--runtime-state-only|--options-recovery|--candidate-control-only) ;;
   *)
-    echo "Usage: r2_push.sh [all| --skip-forecasts | --forecasts-only | --model-recovery | --runtime-state-only | --options-recovery | --candidate-control-only]" >&2
+    echo "Usage: r2_push.sh [all| --skip-forecasts | --forecasts-only | --monitoring-only | --model-recovery | --runtime-state-only | --options-recovery | --candidate-control-only]" >&2
     exit 2
     ;;
 esac
@@ -46,6 +46,7 @@ push_models() {
     --exclude "/bundles/**" \
     --exclude "/candidates/**" \
     --exclude "/evaluations/**" \
+    --exclude "/monitoring/**" \
     --fast-list --transfers=8 --progress
   if [ -d "$DATA_DIR/models/control" ]; then
     rclone copy "$DATA_DIR/models/control" "$REMOTE/models/control" \
@@ -120,12 +121,42 @@ push_forecasts() {
   else
     echo "⚠️  $DATA_DIR/forecasts missing — skipping forecast sync"
   fi
-  if [ -d "$DATA_DIR/models/monitoring" ]; then
-    rclone copy "$DATA_DIR/models/monitoring" "$REMOTE/models/monitoring" \
-      --exclude '*outcomes*' --exclude 'outcome_history.json' \
-      --fast-list --transfers=4 --progress
-  fi
 }
+
+push_monitoring() (
+  # Monitoring observations remain useful when feature drift holds ML serving.
+  # Freeze and authenticate the exact trio before any remote operation; other
+  # producer modes must never replace it from a stale local pull.
+  local monitoring="$DATA_DIR/models/monitoring"
+  local snapshot
+  snapshot=$(mktemp -d)
+  trap 'rm -rf "$snapshot"' EXIT
+  "$PYTHON_BIN" - "$monitoring" "$snapshot" <<'PY'
+import json
+from pathlib import Path
+import shutil
+import sys
+
+sys.path.insert(0, str(Path.cwd() / "apps/ml"))
+from ml.model_bundle import verify_monitor_receipt
+
+source, snapshot = map(Path, sys.argv[1:])
+for name in ("prediction_ledger.parquet", "latest_monitoring.json", "latest_monitoring.receipt.json"):
+    shutil.copyfile(source / name, snapshot / name)
+verify_monitor_receipt(
+    json.loads((snapshot / "latest_monitoring.receipt.json").read_text()),
+    ledger_path=snapshot / "prediction_ledger.parquet",
+    report_path=snapshot / "latest_monitoring.json",
+)
+PY
+  rclone copyto "$snapshot/prediction_ledger.parquet" \
+    "$REMOTE/models/monitoring/prediction_ledger.parquet"
+  rclone copyto "$snapshot/latest_monitoring.json" \
+    "$REMOTE/models/monitoring/latest_monitoring.json"
+  # Readers verify this signed commit marker against both uploaded artifacts.
+  rclone copyto "$snapshot/latest_monitoring.receipt.json" \
+    "$REMOTE/models/monitoring/latest_monitoring.receipt.json"
+)
 
 push_small_files() {
   [ -f "$DATA_DIR/earnings_calendar.csv" ] && \
@@ -263,7 +294,9 @@ PY
   echo "✅ Promoted runtime-state release $release_id after R2 readback verification"
 }
 
-if [ "$MODE" = "--candidate-control-only" ]; then
+if [ "$MODE" = "--monitoring-only" ]; then
+  push_monitoring
+elif [ "$MODE" = "--candidate-control-only" ]; then
   # The retrainer owns the candidate registry. Retention never promotes a data
   # release, production forecast, or champion pointer.
   publish_candidate_registry

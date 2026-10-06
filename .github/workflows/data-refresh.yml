@@ -336,6 +336,13 @@ jobs:
         run: |
           python scripts/model_publication.py monitor --github-output "$GITHUB_OUTPUT"
 
+      - name: Persist authenticated model monitoring independently of ML publication
+        if: steps.model_publication.outcome == 'success'
+        shell: bash
+        env:
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+        run: bash scripts/r2_push.sh --monitoring-only
+
       - name: Preserve model monitoring and publication decision
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -682,6 +689,12 @@ jobs:
           MODEL_BUNDLE_SIGNING_KEY: ${{ secrets.MODEL_BUNDLE_SIGNING_KEY }}
         run: |
           bash scripts/run_provider_free.sh python scripts/model_publication.py monitor --github-output "$GITHUB_OUTPUT"
+
+      - name: Persist authenticated recovered model monitoring independently of ML publication
+        if: steps.model_publication.outcome == 'success'
+        env:
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+        run: bash scripts/run_provider_free.sh bash scripts/r2_push.sh --monitoring-only
 
       - name: Preserve recovered model monitoring and publication decision
         if: always()
