@@ -230,3 +230,83 @@ def test_hold_refuses_aligning_forecasts_from_different_source_dates(tmp_path):
         'display_forecast_method': 'ml', 'display_forecast_pct': .09}]}))
     with pytest.raises(RuntimeError, match='source dates'):
         forecast_artifacts.withhold_upcoming_ml(tmp_path, today=date(2026, 10, 2))
+
+
+@pytest.mark.parametrize('compact_actuals', [[None], [0, 0]])
+@pytest.mark.parametrize(('method', 'count', 'reason'), [
+    ('historical', 4, 'quote_quality'),
+    ('historical_prior', 1, 'insufficient_ticker_history'),
+])
+def test_hold_preserves_canonical_history_provenance_when_page_history_is_truncated(
+    tmp_path, method, count, reason, compact_actuals,
+):
+    from datetime import date
+    from tools.frontend_data import forecast_artifacts
+
+    symbols = tmp_path / 'symbols'
+    symbols.mkdir()
+    expected = {
+        'earnings_date': '2026-10-15', 'display_forecast_pct': .025,
+        'display_forecast_method': method, 'display_forecast_as_of': '2026-10-05',
+        'historical_event_count': count, 'options_status': 'unavailable',
+        'fallback_reason': reason, 'ml_status': 'unavailable_model',
+    }
+    (symbols / 'TEST.json').write_text(json.dumps({
+        'symbol': 'TEST', 'as_of_date': '2026-10-05', 'expected_move': expected,
+        # The canonical estimate can use verified events outside this compact
+        # ticker-page window. An absent display row is not absent source evidence.
+        'earnings_history': [
+            {'date': f'2026-07-{15 + index}', 'actual': actual}
+            for index, actual in enumerate(compact_actuals)
+        ],
+    }))
+    path = tmp_path / 'screener.json'
+    path.write_text(json.dumps({'as_of_date': '2026-10-05', 'events': [{
+        'ticker': 'TEST', 'earnings_date': '2026-10-15',
+        'em_ml_pct': .99, 'p90': .99, 'forecast_id': 'held-candidate',
+    }]}))
+
+    forecast_artifacts.withhold_upcoming_ml(tmp_path, today=date(2026, 10, 6))
+
+    held = json.loads(path.read_text())['events'][0]
+    for field in ('display_forecast_pct', 'display_forecast_method',
+                  'display_forecast_as_of', 'historical_event_count', 'fallback_reason'):
+        assert held[field] == expected[field]
+    assert held['ml_publication_status'] == 'held'
+    assert held.get('em_ml_pct') is None
+    assert held.get('p90') is None
+    assert held.get('forecast_id') is None
+
+
+@pytest.mark.parametrize('compact_actuals', [[], [0, 0]])
+@pytest.mark.parametrize(('method', 'count'), [
+    ('historical', 0), ('historical', True),
+    ('historical_prior', -1), ('historical_prior', None),
+])
+def test_hold_rejects_invalid_canonical_historical_provenance(
+    tmp_path, method, count, compact_actuals,
+):
+    from datetime import date
+    from tools.frontend_data import forecast_artifacts
+
+    symbols = tmp_path / 'symbols'
+    symbols.mkdir()
+    (symbols / 'TEST.json').write_text(json.dumps({
+        'symbol': 'TEST', 'as_of_date': '2026-10-05', 'earnings_history': [
+            {'date': f'2026-07-{15 + index}', 'actual': actual}
+            for index, actual in enumerate(compact_actuals)
+        ],
+        'expected_move': {
+            'earnings_date': '2026-10-15', 'display_forecast_pct': .025,
+            'display_forecast_method': method, 'historical_event_count': count,
+            'fallback_reason': 'insufficient_ticker_history' if method == 'historical_prior'
+                               else 'quote_quality',
+        },
+    }))
+    (tmp_path / 'screener.json').write_text(json.dumps({
+        'as_of_date': '2026-10-05',
+        'events': [{'ticker': 'TEST', 'earnings_date': '2026-10-15'}],
+    }))
+
+    with pytest.raises(RuntimeError, match='historical_event_count'):
+        forecast_artifacts.withhold_upcoming_ml(tmp_path, today=date(2026, 10, 6))

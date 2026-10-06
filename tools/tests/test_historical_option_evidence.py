@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+import json
 from pathlib import Path
 
 import duckdb
@@ -103,6 +104,52 @@ def _option(
         "option_volume": option_volume,
         "open_interest": open_interest,
     }
+
+
+def test_historical_evidence_filters_parquet_before_ranking_unrelated_symbols(
+    tmp_path: Path,
+) -> None:
+    rows = [
+        _option(symbol, side, bid=4.0, ask=4.2, delta=delta)
+        for symbol in ("ACME", "OTHER")
+        for side, delta in (("Call", 0.5), ("Put", -0.5))
+    ]
+    partition = tmp_path / "parquet/options_chain/year=2026/month=02/data.parquet"
+    partition.parent.mkdir(parents=True)
+    pd.DataFrame(rows).to_parquet(partition, index=False)
+    conn = duckdb.connect()
+
+    class PlannedConnection:
+        plan: list[dict]
+
+        def execute(self, query, parameters):
+            # Characterize the real bound query plan, rather than asserting SQL
+            # spelling or timing a small fixture on shared CI hardware.
+            self.plan = json.loads(
+                conn.execute("EXPLAIN (FORMAT JSON) " + query, parameters).fetchone()[1]
+            )
+            return conn.execute(query, parameters)
+
+    planned = PlannedConnection()
+    try:
+        create_duckdb_views(conn, tmp_path)
+        conn.execute("CREATE TABLE earnings_events (ticker VARCHAR, earnings_dt DATE, timing VARCHAR)")
+        conn.execute("INSERT INTO earnings_events VALUES ('ACME', '2026-02-11', 'before_market_open')")
+        evidence = _historical_option_evidence(planned, "ACME", date(2026, 2, 12))
+    finally:
+        conn.close()
+
+    def operators(nodes):
+        for node in nodes:
+            yield node
+            yield from operators(node.get("children", []))
+
+    scans = [node for node in operators(planned.plan) if node["name"] == "READ_PARQUET"]
+    assert scans
+    assert all("act_symbol='ACME'" in str(scan["extra_info"].get("Filters", "")) for scan in scans)
+    assert list(evidence) == [date(2026, 2, 11)]
+    assert evidence[date(2026, 2, 11)]["implied"] == 0.082
+    assert evidence[date(2026, 2, 11)]["implied_quality_status"] == "decision_eligible_eod"
 
 
 def test_frontend_straddles_use_the_same_leg_and_pair_quality_gates(

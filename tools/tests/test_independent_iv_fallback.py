@@ -45,7 +45,8 @@ def _conn() -> duckdb.DuckDBPyConnection:
         CREATE TABLE earnings_events (
             ticker VARCHAR,
             earnings_dt DATE,
-            timing VARCHAR
+            timing VARCHAR,
+            timing_source VARCHAR DEFAULT 'reported'
         )
         """
     )
@@ -59,6 +60,11 @@ def _conn() -> duckdb.DuckDBPyConnection:
         """
     )
     conn.execute("INSERT INTO v_ohlcv VALUES (?, 'PAYX', 122.0)", [AS_OF])
+    conn.execute("""
+        CREATE VIEW v_corporate_action_coverage AS
+        SELECT DISTINCT ticker AS act_symbol, DATE '2023-01-01' AS window_start,
+               DATE '2028-12-31' AS window_end FROM earnings_events
+    """)
     return conn
 
 
@@ -80,16 +86,16 @@ def _option(
 
 
 def _history(conn: duckdb.DuckDBPyConnection, moves: list[float]) -> None:
-    for idx, move in enumerate(moves, start=1):
-        event = EVENT - timedelta(days=90 * idx)
+    sessions = [date(2026, 7, 16), date(2026, 4, 16), date(2026, 1, 15), date(2025, 10, 16)]
+    for event, move in zip(sessions, moves, strict=False):
         conn.execute(
-            "INSERT INTO earnings_events VALUES ('PAYX', ?, 'unknown')",
+            "INSERT INTO earnings_events (ticker, earnings_dt, timing) VALUES ('PAYX', ?, 'amc')",
             [event],
         )
         conn.executemany(
             "INSERT INTO v_ohlcv VALUES (?, 'PAYX', ?)",
             [
-                (event - timedelta(days=1), 100.0),
+                (event, 100.0),
                 (event + timedelta(days=1), 100.0 * (1.0 + move)),
             ],
         )

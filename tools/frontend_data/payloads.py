@@ -108,6 +108,9 @@ def _historical_option_evidence(conn, ticker: str, cutoff: date) -> dict[date, d
             SELECT s.*
             FROM v_eligible_straddles s
             WHERE s.ticker = e.ticker
+              -- The fixed outer ticker also lets DuckDB filter both option
+              -- scans before ranking pairs inside this correlated query.
+              AND s.ticker = ?
               AND s.as_of_date >= e.earnings_dt - INTERVAL '14' DAY
               AND s.as_of_date < e.earnings_dt
               AND (
@@ -127,7 +130,7 @@ def _historical_option_evidence(conn, ticker: str, cutoff: date) -> dict[date, d
             LIMIT 1
         ) selected ON TRUE
         """,
-        [ticker, cutoff],
+        [ticker, cutoff, ticker],
     ).fetchall()
     return {
         earnings_date: {

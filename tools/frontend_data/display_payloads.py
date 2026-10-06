@@ -17,6 +17,7 @@ from fiscal_calendar import (
 )
 
 from .display_forecast import DisplayForecastError, resolve_display_forecast
+from .realized_moves import reaction_label_lookup
 from .shared import jsonable
 
 
@@ -332,6 +333,8 @@ def display_fields_from_event(event: dict[str, Any] | None) -> dict[str, Any]:
 def _symbol_history(
     conn: duckdb.DuckDBPyConnection,
     ticker: str,
+    *,
+    as_of_date: date,
 ) -> list[dict[str, Any]]:
     try:
         rows = conn.execute(
@@ -348,6 +351,11 @@ def _symbol_history(
     except duckdb.Error:
         return []
 
+    labels = reaction_label_lookup(
+        conn,
+        [(ticker, row[0], row[1]) for row in rows],
+        as_of_date=as_of_date,
+    )
     best: dict[tuple[int, str], tuple[tuple[int, date], dict[str, Any]]] = {}
     for (
         earnings_dt,
@@ -360,6 +368,9 @@ def _symbol_history(
         revenue_estimate,
         source,
     ) in rows:
+        label = labels.get((ticker, earnings_dt))
+        if label is not None and not math.isfinite(label.signed_realized_move_pct):
+            label = None
         fiscal_year, fiscal_q = reporting_fiscal_period(
             ticker,
             earnings_dt,
@@ -368,7 +379,7 @@ def _symbol_history(
         )
         item = {
             "date": earnings_dt.isoformat(),
-            "timing": timing or "unknown",
+            "timing": label.timing if label is not None else timing or "unknown",
             "q": reporting_quarter_label(
                 ticker,
                 earnings_dt,
@@ -377,7 +388,9 @@ def _symbol_history(
             ),
             "fiscal_year": fiscal_year,
             "fiscal_q": fiscal_q,
-            "actual": None,
+            "actual": jsonable(label.signed_realized_move_pct) if label is not None else None,
+            "realized_target_protocol": label.target_protocol if label is not None else None,
+            "realized_label_source": label.label_source if label is not None else None,
             "implied": None,
             "eps_actual": jsonable(eps_actual),
             "eps_estimate": jsonable(eps_estimate),
@@ -461,7 +474,7 @@ def ensure_symbol_display_detail(
         "spot_price": spot,
         "expected_move": expected_move,
         "straddle_features": [],
-        "earnings_history": _symbol_history(conn, ticker),
+        "earnings_history": _symbol_history(conn, ticker, as_of_date=as_of_date),
         "next_earnings": earnings_date.isoformat(),
         "vol_regime": None,
         **(provider_fields or {}),
