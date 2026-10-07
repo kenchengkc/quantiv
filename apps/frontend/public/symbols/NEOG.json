@@ -4,7 +4,7 @@
   "spot_price": 12.8,
   "expected_move": {
     "earnings_date": "2026-10-06",
-    "timing": "before_market_open",
+    "timing": "amc",
     "expiration": "2026-10-16",
     "dte": 24,
     "lead_time_days": 14,
@@ -42,7 +42,7 @@
   "earnings_history": [
     {
       "date": "2026-10-06",
-      "timing": "before_market_open",
+      "timing": "after_market_close",
       "q": "Q3 26",
       "fiscal_year": 2026,
       "fiscal_q": "Q3",
@@ -453,5 +453,5 @@
     "iv_mom_week": 0.016,
     "iv_mom_month": null
   },
-  "next_earnings_timing": "unknown"
+  "next_earnings_timing": "amc"
 }
