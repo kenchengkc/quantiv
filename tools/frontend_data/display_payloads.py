@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import json
 import math
 from collections import Counter
 from datetime import date
+from pathlib import Path
 from typing import Any
 
 import duckdb
@@ -16,7 +18,12 @@ from fiscal_calendar import (
     reporting_quarter_label,
 )
 
-from .display_forecast import DisplayForecastError, resolve_display_forecast
+from .display_forecast import (
+    DisplayForecastError,
+    build_universe_historical_prior,
+    load_display_policy,
+    resolve_display_forecast,
+)
 from .realized_moves import reaction_label_lookup
 from .shared import jsonable
 
@@ -41,6 +48,7 @@ FALLBACK_REASONS = {
     "no_same_strike_pair",
     "no_event_expiry",
     "insufficient_ticker_history",
+    "options_held",
 }
 
 _FY_NAMING = load_fiscal_year_naming()
@@ -73,12 +81,26 @@ def _strict_options_from_event(event: dict[str, Any]) -> dict[str, Any] | None:
     }
 
 
+def _clear_held_option_inputs(node: dict[str, Any]) -> None:
+    """Remove option inputs that legacy headline readers would otherwise reuse."""
+    option_fields = {
+        "em_iv_pct", "em_straddle_pct", "em_straddle_abs", "iv_pct",
+        "straddle_pct", "straddle_abs", "atm_iv", "atm_strike",
+        "expiry_date", "expiration", "days_to_expiry", "dte", "lead_time_days",
+        "selected_options_details",
+    }
+    for key in node:
+        if key in option_fields or key == "implied" or key.startswith("implied_"):
+            node[key] = None
+
+
 def enrich_upcoming_event(
     conn: duckdb.DuckDBPyConnection,
     event: dict[str, Any],
     *,
     as_of_date: date,
     today: date,
+    options_available: bool = True,
 ) -> dict[str, Any]:
     """Attach display provenance to one upcoming event in-place."""
 
@@ -93,6 +115,9 @@ def enrich_upcoming_event(
         # audited pre-event forecast; future dates alone may be recomputed.
         return event
 
+    if not options_available:
+        _clear_held_option_inputs(event)
+
     result = resolve_display_forecast(
         conn,
         ticker=str(event.get("ticker") or "").upper(),
@@ -105,8 +130,11 @@ def enrich_upcoming_event(
             "ml_status": event.get("ml_status"),
         },
         strict_options=_strict_options_from_event(event),
+        options_available=options_available,
     )
     event.update(result.public_fields())
+    if not options_available:
+        event["em_method"] = "ml_lightgbm" if result.method == "ml" else result.method
     return event
 
 
@@ -116,9 +144,13 @@ def enrich_upcoming_events(
     *,
     as_of_date: date,
     today: date,
+    options_available: bool = True,
 ) -> list[dict[str, Any]]:
     for event in events:
-        enrich_upcoming_event(conn, event, as_of_date=as_of_date, today=today)
+        enrich_upcoming_event(
+            conn, event, as_of_date=as_of_date, today=today,
+            options_available=options_available,
+        )
     return events
 
 
@@ -209,6 +241,7 @@ def _validate_display_provenance(
             "quote_quality",
             "no_same_strike_pair",
             "no_event_expiry",
+            "options_held",
         }:
             errors.append(
                 f"{identity}: historical method has incoherent "
@@ -228,6 +261,66 @@ def _validate_display_provenance(
             errors.append(
                 f"{identity}: historical prior must identify insufficient_ticker_history"
             )
+
+
+def suppress_held_options(
+    public_dir: Path,
+    *,
+    conn: duckdb.DuckDBPyConnection,
+    as_of_date: date,
+    today: date,
+    publication_held: bool = False,
+) -> None:
+    """Project the options hold into retained and newly built future payloads."""
+    paths = [
+        public_dir / "weekly.json", public_dir / "screener.json",
+        *sorted((public_dir / "weeks").glob("*.json")),
+        *sorted((public_dir / "symbols").glob("*.json")),
+    ]
+    policy = None
+    universe_prior = None
+    resolved = {}
+    for path in paths:
+        if not path.is_file() or path.name == "manifest.json":
+            continue
+        payload = json.loads(path.read_text())
+        nodes = [*(payload.get("events") or []), *(payload.get("earnings_history") or [])]
+        if isinstance(payload.get("expected_move"), dict):
+            nodes.append(payload["expected_move"])
+        changed = False
+        for node in nodes:
+            event_iso = str(node.get("earnings_date") or node.get("date") or "")[:10]
+            if not event_iso or date.fromisoformat(event_iso) <= today:
+                continue
+            ticker = str(node.get("ticker") or payload.get("symbol") or "").upper()
+            if not ticker:
+                raise DisplayForecastError(f"{path.name}: future forecast has no ticker")
+            _clear_held_option_inputs(node)
+            if policy is None:
+                policy = load_display_policy()
+                universe_prior = build_universe_historical_prior(
+                    conn, cutoff=as_of_date, window_days=policy.universe_prior_window_days,
+                )
+            ml_forecast = None if publication_held else {
+                key: node.get(key)
+                for key in ("em_ml_pct", "ml_snapshot_date", "snapshot_date", "ml_status")
+            }
+            key = (ticker, event_iso, json.dumps(ml_forecast, sort_keys=True))
+            if key not in resolved:
+                resolved[key] = resolve_display_forecast(
+                    conn, ticker=ticker, earnings_date=date.fromisoformat(event_iso),
+                    timing=node.get("timing"), as_of_date=as_of_date,
+                    ml_forecast=ml_forecast, options_available=False,
+                    universe_prior=universe_prior, policy=policy,
+                )
+            result = resolved[key]
+            node.update(result.public_fields())
+            node["em_method"] = "ml_lightgbm" if result.method == "ml" else result.method
+            node["options_publication_status"] = "held"
+            node["options_publication_source_date"] = as_of_date.isoformat()
+            changed = True
+        if changed:
+            path.write_text(json.dumps(payload, indent=2) + "\n")
 
 
 def validate_upcoming_display_forecasts(

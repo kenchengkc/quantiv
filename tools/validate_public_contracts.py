@@ -164,6 +164,18 @@ def _resolved_forecast_signature(
     if canonical is not None and canonical_method == "ml":
         return ("ml", canonical)
 
+    projection_cutoff = payload.get("options_publication_source_date")
+    if (
+        canonical is not None
+        and payload.get("options_publication_status") == "held"
+        and payload.get("options_status") == "unavailable"
+        and isinstance(projection_cutoff, str)
+        and projection_cutoff
+        and projection_cutoff == payload.get("display_forecast_as_of")
+        and canonical_method in {"historical", "historical_prior"}
+    ):
+        return (str(canonical_method), canonical)
+
     iv = _positive_optional(payload.get("em_iv_pct"))
     if iv is None:
         iv = _positive_optional(payload.get("iv_pct"))

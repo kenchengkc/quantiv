@@ -14,6 +14,7 @@ export type MLForecastStatus =
 export type OptionsForecastStatus = 'decision_eligible' | 'indicative' | 'unavailable';
 
 export type ForecastFallbackReason =
+  | 'options_held'
   | 'quote_quality'
   | 'no_same_strike_pair'
   | 'no_event_expiry'
@@ -28,6 +29,8 @@ export type DisplayForecastFields = {
   options_status?: OptionsForecastStatus | null;
   fallback_reason?: ForecastFallbackReason;
   historical_event_count?: number | null;
+  options_publication_status?: 'held' | null;
+  options_publication_source_date?: string | null;
 };
 
 type LegacyDisplayForecastFields = DisplayForecastFields & {
@@ -115,6 +118,20 @@ export function resolveDisplayForecastCompat(
   const canonical = finiteDisplayForecast(fields.display_forecast_pct);
   if (canonical != null && fields.display_forecast_method === 'ml') {
     return { pct: canonical, method: 'ml' };
+  }
+
+  // A held projection already selected history at its audited cutoff. A
+  // later compact median or retained option input cannot replace that value.
+  if (
+    canonical != null &&
+    fields.options_publication_status === 'held' &&
+    fields.options_status === 'unavailable' &&
+    fields.options_publication_source_date &&
+    fields.options_publication_source_date === fields.display_forecast_as_of &&
+    (fields.display_forecast_method === 'historical' ||
+      fields.display_forecast_method === 'historical_prior')
+  ) {
+    return { pct: canonical, method: fields.display_forecast_method };
   }
 
   const iv =

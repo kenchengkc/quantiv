@@ -95,4 +95,26 @@ describe('display forecast helpers', () => {
       }),
     ).toEqual({ pct: 0.102694, method: 'historical' });
   });
+
+  it.each(['historical', 'historical_prior'] as const)(
+    'preserves a held %s forecast cutoff ahead of legacy IV and later compact history',
+    (method) => {
+      const fields = {
+        display_forecast_pct: 0.09,
+        display_forecast_method: method,
+        display_forecast_as_of: '2026-09-16',
+        iv_pct: 0.20,
+        options_status: 'unavailable',
+        options_publication_status: 'held',
+        options_publication_source_date: '2026-09-16',
+      } as const;
+
+      expect(resolveDisplayForecastCompat(fields, 0.06)).toEqual({ pct: 0.09, method });
+      expect(resolveDisplayForecastCompat({ ...fields, em_ml_pct: 0.12 }, 0.06))
+        .toEqual({ pct: 0.12, method: 'ml' });
+      expect(resolveDisplayForecastCompat({
+        ...fields, options_publication_source_date: '2026-09-15',
+      }, 0.06)).toEqual({ pct: 0.20, method: 'options_math' });
+    },
+  );
 });

@@ -253,16 +253,30 @@ def withhold_upcoming_ml(public_dir: Path, *, today: date) -> None:
             signature, components = _symbol_page_signature(symbol, event_date)
             if signature is None:
                 continue
-            calendar_date = (node.get('as_of_date') or payload.get('as_of_date')
-                             or (payload.get('metadata') or {}).get('as_of_date'))
-            symbol_date = symbol.get('as_of_date')
-            if not calendar_date or not symbol_date or calendar_date != symbol_date:
-                raise RuntimeError(f"{path.name}/{node.get('ticker')}: incompatible source dates "
-                                   f"{calendar_date!r} and {symbol_date!r}")
             expected = symbol.get('expected_move') or {}
             source = (expected if str(expected.get('earnings_date') or '')[:10] == event_date
                       else next((row for row in symbol.get('earnings_history') or []
                                  if str(row.get('date') or '')[:10] == event_date), {}))
+            calendar_date = (node.get('as_of_date') or payload.get('as_of_date')
+                             or (payload.get('metadata') or {}).get('as_of_date'))
+            symbol_date = symbol.get('as_of_date')
+            projection_date = node.get('options_publication_source_date')
+            matching_options_projection = (
+                node.get('options_publication_status') == 'held'
+                and source.get('options_publication_status') == 'held'
+                and projection_date
+                and projection_date == source.get('options_publication_source_date')
+                and projection_date == node.get('display_forecast_as_of')
+                and projection_date == source.get('display_forecast_as_of')
+                and node.get('options_status') == source.get('options_status') == 'unavailable'
+                and node.get('display_forecast_method') in {'historical', 'historical_prior'}
+                and source.get('display_forecast_method') in {'historical', 'historical_prior'}
+                and signature[0] in {'historical', 'historical_prior'}
+            )
+            if (not calendar_date or not symbol_date
+                    or calendar_date != symbol_date and not matching_options_projection):
+                raise RuntimeError(f"{path.name}/{node.get('ticker')}: incompatible source dates "
+                                   f"{calendar_date!r} and {symbol_date!r}")
             method, pct = signature
             if method == 'ml':
                 raise RuntimeError(f"{path.name}/{node.get('ticker')}: ML remains under publication hold")
@@ -270,14 +284,14 @@ def withhold_upcoming_ml(public_dir: Path, *, today: date) -> None:
             canonical_pct = source.get('display_forecast_pct')
             historical_pct = components['historical']
             if (method.startswith('historical')
-                    and (historical_pct is None or not math.isfinite(historical_pct)
+                    and (matching_options_projection
+                         or historical_pct is None or not math.isfinite(historical_pct)
                          or historical_pct <= 0)
                     and source.get('display_forecast_method') == method
                     and isinstance(canonical_pct, (int, float))
                     and not isinstance(canonical_pct, bool) and canonical_pct == pct):
-                # The canonical estimator can use verified history outside the
-                # compact page window. Preserve provenance for that exact value;
-                # UI-derived medians retain the count derived from their rows.
+                # A held canonical projection retains its point-in-time count;
+                # compact page history can contain reactions after that cutoff.
                 historical_count = source.get('historical_event_count')
             options_status = {'options_math': 'decision_eligible', 'options_indicative': 'indicative',
                               'historical': 'unavailable', 'historical_prior': 'unavailable'}[method]
