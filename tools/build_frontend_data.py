@@ -27,6 +27,7 @@ from frontend_data.display_payloads import (
     build_display_forecast_status,
     enrich_upcoming_events,
     ensure_symbol_display_detail,
+    suppress_held_options,
     validate_upcoming_display_forecasts,
 )
 from frontend_data.forecast_artifacts import (
@@ -67,6 +68,7 @@ from frontend_data.shared import (
     WEEK_OFFSETS,
     write_to_public,
 )
+from frontend_data.options_policy import options_display_available
 
 
 def main():
@@ -134,26 +136,22 @@ def main():
         print("❌ No options data available")
         sys.exit(1)
 
-    # Staleness guardrail. CI's daily-refresh pulls fresh parquet from R2
-    # before building, so as_of_date should be within a few days of today.
-    # Running this script with weeks-old local parquet produces empty
-    # upcoming-week JSONs and silently regresses production data. Bail
-    # loudly instead. Set ALLOW_STALE_OPTIONS=1 to override (e.g. for
-    # offline development or testing historical snapshots).
+    # Verified fallback permits independent publication, with all upcoming
+    # options inputs withheld. Unverified stale local snapshots still abort.
     age_days = (date.today() - as_of_date).days
-    stale_threshold = int(os.getenv("STALE_OPTIONS_MAX_DAYS", "7"))
-    if age_days > stale_threshold and not os.getenv("ALLOW_STALE_OPTIONS"):
-        print(
-            f"❌ Options chain is {age_days} days stale "
-            f"(as_of={as_of_date}, today={date.today()}, "
-            f"threshold={stale_threshold}d).\n"
-            "   Run `bash scripts/r2_pull.sh` to refresh local parquet, "
-            "or set ALLOW_STALE_OPTIONS=1 to override.\n"
-            "   Building with stale data produces empty upcoming-week "
-            "JSONs and regresses production. Aborting.",
-            file=sys.stderr,
+    try:
+        options_available = options_display_available(
+            DATA_DIR, as_of_date=as_of_date,
+            verify_fallback=args.verify_model_publication,
+            not_before=(None if os.getenv('PROVIDER_FREE_RECOVERY')
+                        else os.getenv('REFRESH_STARTED_AT')),
+            partial_rebuild=args.resume or args.skip_weeks,
         )
+    except RuntimeError as exc:
+        print(f"❌ {exc}", file=sys.stderr)
         sys.exit(2)
+    if not options_available:
+        print('Options publication held: using independent historical display estimates')
     if age_days > 1:
         print(f"⚠ Options chain is {age_days} days old (as_of={as_of_date})")
 
@@ -219,7 +217,8 @@ def main():
                 today=today,
                 archive=event_forecast_archive,
             )
-            enrich_upcoming_events(conn, events, as_of_date=as_of_date, today=today)
+            enrich_upcoming_events(conn, events, as_of_date=as_of_date, today=today,
+                                   options_available=options_available)
             week_payloads[wk_start] = payload
             published_forecast_ids.update(
                 str(event.get("forecast_id"))
@@ -297,7 +296,8 @@ def main():
         # Presentation fallbacks resolve only after the strict research row is
         # built. This keeps ML/decision eligibility untouched while guaranteeing
         # a useful headline for every upcoming published event.
-        enrich_upcoming_events(conn, events, as_of_date=as_of_date, today=today)
+        enrich_upcoming_events(conn, events, as_of_date=as_of_date, today=today,
+                               options_available=options_available)
 
         print(f"📅 week {wk_start} (offset {offset:+d}) → {len(events)} events")
         avg_em_straddle_pct, avg_em_iv_pct = week_em_averages(events)
@@ -531,10 +531,15 @@ def main():
             )
             generated += 1
         except Exception as e:
-            if publication_held:
-                raise RuntimeError(f'cannot safely rebuild {ticker} during model publication hold') from e
+            if publication_held or not options_available:
+                raise RuntimeError(f'cannot safely rebuild {ticker} during publication hold') from e
             print(f"  ⚠️  {ticker} detail: {e}")
 
+    if not options_available:
+        # Include retained symbols/weeks outside the rebuilt calendar. Clear
+        # legacy option fields before the ML hold compatibility resolver runs.
+        suppress_held_options(PUBLIC_DIR, conn=conn, as_of_date=as_of_date,
+                              today=today, publication_held=publication_held)
     if publication_held:
         withhold_upcoming_ml(PUBLIC_DIR, today=today)
 

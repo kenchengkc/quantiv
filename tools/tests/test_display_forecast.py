@@ -183,6 +183,50 @@ def test_strict_straddle_is_used_when_iv_and_ml_are_missing():
     assert result.ml_status == "unavailable_inputs"
 
 
+@pytest.mark.parametrize("strict_options", [None, {"em_baseline_iv": 0.20}])
+def test_held_options_skip_strict_and_indicative_forecasts(strict_options):
+    conn = _conn()
+    _pair(conn)
+    _history(conn, "PAYX", [0.03, 0.05])
+
+    result = _resolve(conn, strict_options=strict_options, options_available=False)
+
+    assert result.method == "historical"
+    assert result.pct == pytest.approx(0.04)
+    assert result.options_status == "unavailable"
+    assert result.fallback_reason == "options_held"
+    assert result.historical_event_count == 2
+    assert result.selected_options_details is None
+
+
+def test_held_options_keep_validated_ml_without_option_provenance():
+    conn = _conn()
+    result = _resolve(
+        conn,
+        ml_forecast={"em_ml_pct": 0.041, "ml_snapshot_date": "2026-09-09"},
+        strict_options={"em_baseline_iv": 0.20},
+        options_available=False,
+    )
+
+    assert result.method == "ml"
+    assert result.pct == 0.041
+    assert result.as_of == "2026-09-09"
+    assert result.options_status == "unavailable"
+    assert result.selected_options_details is None
+
+
+def test_held_options_without_ticker_history_use_universe_prior():
+    conn = _conn()
+    _pair(conn)
+
+    result = _resolve(conn, options_available=False)
+
+    assert result.method == "historical_prior"
+    assert result.pct == 0.055
+    assert result.options_status == "unavailable"
+    assert result.fallback_reason == "insufficient_ticker_history"
+
+
 def test_payx_like_pair_becomes_indicative():
     conn = _conn()
     _pair(conn)

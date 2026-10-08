@@ -40,6 +40,7 @@ MLStatus = Literal[
 ]
 OptionsStatus = Literal["decision_eligible", "indicative", "unavailable"]
 FallbackReason = Literal[
+    "options_held",
     "quote_quality",
     "no_same_strike_pair",
     "no_event_expiry",
@@ -668,6 +669,7 @@ def resolve_display_forecast(
     as_of_date: date,
     ml_forecast: dict[str, Any] | None,
     strict_options: dict[str, Any] | None = None,
+    options_available: bool = True,
     universe_prior: dict[str, Any] | None = None,
     policy: DisplayPolicy | None = None,
 ) -> DisplayForecast:
@@ -684,6 +686,8 @@ def resolve_display_forecast(
         "available" if ml_pct is not None else _missing_ml_status(ml_forecast)
     )
 
+    if not options_available:
+        strict_options = None
     strict_iv = _finite_positive((strict_options or {}).get("em_baseline_iv"))
     strict_straddle = _finite_positive(
         (strict_options or {}).get("em_baseline_straddle")
@@ -736,23 +740,27 @@ def resolve_display_forecast(
             },
         )
 
-    indicative_pair, pair_failure_reason = _select_indicative_pair(
-        conn,
-        ticker=ticker,
-        as_of_date=as_of_date,
-        earnings_date=earnings_date,
-        timing=timing,
-        policy=active_policy,
-    )
-    iv_details, iv_failure_reason = _select_indicative_iv(
-        conn,
-        ticker=ticker,
-        as_of_date=as_of_date,
-        earnings_date=earnings_date,
-        timing=timing,
-        policy=active_policy,
-        pair_failure_reason=pair_failure_reason,
-    )
+    indicative_pair = None
+    iv_details = None
+    iv_failure_reason = "options_held"
+    if options_available:
+        indicative_pair, pair_failure_reason = _select_indicative_pair(
+            conn,
+            ticker=ticker,
+            as_of_date=as_of_date,
+            earnings_date=earnings_date,
+            timing=timing,
+            policy=active_policy,
+        )
+        iv_details, iv_failure_reason = _select_indicative_iv(
+            conn,
+            ticker=ticker,
+            as_of_date=as_of_date,
+            earnings_date=earnings_date,
+            timing=timing,
+            policy=active_policy,
+            pair_failure_reason=pair_failure_reason,
+        )
     if iv_details is not None:
         pct = _finite_positive(iv_details.get("iv_em_pct"))
         if pct is not None:
