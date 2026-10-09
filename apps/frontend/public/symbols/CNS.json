@@ -3,22 +3,25 @@
   "as_of_date": "2026-09-30",
   "spot_price": 73.11,
   "expected_move": {
-    "earnings_date": "2026-10-14",
+    "earnings_date": "2026-10-15",
     "display_forecast_pct": 0.042943307369774086,
     "display_forecast_method": "historical",
     "display_forecast_as_of": "2026-09-30",
     "ml_status": "unavailable_model",
     "options_status": "unavailable",
-    "fallback_reason": "quote_quality",
+    "fallback_reason": "options_held",
     "historical_event_count": 4,
-    "timing": "unknown",
+    "timing": "amc",
+    "em_method": "historical",
+    "options_publication_status": "held",
+    "options_publication_source_date": "2026-09-30",
     "ml_publication_status": "held",
     "ml_publication_reason": "feature_drift"
   },
   "straddle_features": [],
   "earnings_history": [
     {
-      "date": "2026-10-14",
+      "date": "2026-10-15",
       "timing": "after_market_close",
       "q": "Q3 26",
       "fiscal_year": 2026,
@@ -41,9 +44,16 @@
       "rev_surprise_pct": null,
       "realized_target_protocol": null,
       "realized_label_source": null,
+      "display_forecast_pct": 0.042943307369774086,
+      "display_forecast_method": "historical",
+      "display_forecast_as_of": "2026-09-30",
       "ml_status": "unavailable_model",
       "options_status": "unavailable",
-      "fallback_reason": null,
+      "fallback_reason": "options_held",
+      "historical_event_count": 4,
+      "em_method": "historical",
+      "options_publication_status": "held",
+      "options_publication_source_date": "2026-09-30",
       "ml_publication_status": "held",
       "ml_publication_reason": "feature_drift"
     },
@@ -323,7 +333,7 @@
       "realized_label_source": "ohlcv_session_close"
     }
   ],
-  "next_earnings": "2026-10-14",
+  "next_earnings": "2026-10-15",
   "vol_regime": {
     "iv_current": 0.396,
     "iv_rank": 0.459274,
@@ -334,5 +344,5 @@
     "iv_mom_week": 0.0102,
     "iv_mom_month": null
   },
-  "next_earnings_timing": "unknown"
+  "next_earnings_timing": "amc"
 }
