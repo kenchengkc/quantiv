@@ -1,6 +1,38 @@
 from pathlib import Path
 
+import pytest
+
 import yaml
+
+
+@pytest.mark.parametrize('job', ['refresh', 'recovery'])
+def test_daily_handoff_uses_exact_scored_artifact_and_holds_empty_batch(job):
+    workflow = yaml.safe_load((Path(__file__).resolve().parents[2] / '.github/workflows/data-refresh.yml').read_text())
+    steps = workflow['jobs'][job]['steps']
+    score = next(step for step in steps if step['name'].startswith('Score upcoming'))
+    validate = next(step for step in steps if 'validate' in step['name'].lower() and 'forecast' in step['name'].lower())
+    monitor = next(step for step in steps if step.get('id') == 'model_publication')
+    build = next(step for step in steps if step['name'].startswith('Build frontend JSON'))
+    assert score.get('id') == 'scoring'
+    assert '--github-output "$GITHUB_OUTPUT"' in score['run']
+    assert "steps.scoring.outputs.has_forecasts == 'true'" in validate['if']
+    path = '${{ steps.scoring.outputs.forecast_path }}'
+    assert f'--forecast-path "{path}"' in validate['run']
+    assert f'--forecast-path "{path}"' in monitor['run']
+    assert build['env']['MODEL_PUBLICATION_FORECAST_PATH'] == path
+    assert 'has_forecasts' not in monitor.get('if', '')
+
+
+def test_event_freeze_empty_batch_still_records_a_signed_hold():
+    workflow = yaml.safe_load((Path(__file__).resolve().parents[2] / '.github/workflows/event-forecast-freeze.yml').read_text())
+    steps = workflow['jobs']['freeze']['steps']
+    score = next(step for step in steps if step['name'].startswith('Score a candidate'))
+    validate = next(step for step in steps if step['name'].startswith('Validate candidate'))
+    monitor = next(step for step in steps if step.get('id') == 'model-publication')
+    assert score.get('id') == 'scoring'
+    assert '--github-output "$GITHUB_OUTPUT"' in score['run']
+    assert "steps.scoring.outputs.has_forecasts == 'true'" in validate['if']
+    assert 'has_forecasts' not in monitor.get('if', '')
 
 ROOT = Path(__file__).resolve().parents[2]
 

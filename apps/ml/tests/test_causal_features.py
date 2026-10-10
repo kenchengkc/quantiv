@@ -344,6 +344,11 @@ def test_causal_model_withholds_unrepresented_optionless_cohort():
     assert len(result) == 1
     assert result.iloc[0]["feature_protocol"] == FEATURE_PROTOCOL_CAUSAL
     model["metadata"] = {}
+    assert score(pd.DataFrame([row]), {1: model}).empty
+    model["metadata"] = {
+        "supported_cohorts": ["strict_options", "optionless"],
+        "cohort_reference": {"optionless": {"rows": 500}},
+    }
     assert (
         score(pd.DataFrame([row]), {1: model}).iloc[0]["feature_protocol"]
         == FEATURE_PROTOCOL_LEGACY
@@ -661,9 +666,10 @@ def test_live_unknown_timing_is_explicit_but_has_no_verified_reaction():
 def test_bundle_queries_reconstruct_each_protocols_own_vectors(tmp_path):
     from datetime import timedelta
     from scripts.daily_score import get_bundle_upcoming_features
+    from scripts.market_sessions import latest_completed_us_market_session
 
-    today = date.today()
-    event = today + timedelta(days=1)
+    today = latest_completed_us_market_session()
+    event = date.today() + timedelta(days=1)
     future = today + timedelta(days=400)
     conn = market_connection(
         [("A", event, "bmo")],
@@ -671,7 +677,7 @@ def test_bundle_queries_reconstruct_each_protocols_own_vectors(tmp_path):
     )
     add_optional_feature_views(conn)
     conn.execute(
-        "CREATE OR REPLACE VIEW v_vix AS SELECT date,CASE WHEN date=CURRENT_DATE THEN 10.0 ELSE 1.0 END AS vix_close FROM v_ohlcv WHERE act_symbol='SPY'"
+        f"CREATE OR REPLACE VIEW v_vix AS SELECT date,CASE WHEN date=DATE '{today.isoformat()}' THEN 10.0 ELSE 1.0 END AS vix_close FROM v_ohlcv WHERE act_symbol='SPY'"
     )
     for name, metadata in [
         ("old", {"horizon": 1}),

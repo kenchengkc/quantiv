@@ -41,6 +41,7 @@ from ml.model_control import (  # noqa: E402
     update_outcome_history,
 )
 from ml.pipeline_validation import (  # noqa: E402
+    FORECAST_REQUIRED_COLUMNS,
     latest_forecast_path,
     validate_forecast_artifact,
     PipelineValidationError,
@@ -583,21 +584,32 @@ def monitor(args: argparse.Namespace) -> int:
     if forecast_path is None:
         raise FileNotFoundError("no production forecast snapshot exists")
     forecasts = pd.read_parquet(forecast_path)
+    if forecasts.empty:
+        missing = sorted(FORECAST_REQUIRED_COLUMNS - set(forecasts.columns))
+        if missing:
+            raise ValueError(f"empty forecast artifact lacks required columns: {missing}")
     served_ids = set(forecasts["model_bundle_id"].dropna().astype(str))
-    if served_ids != {champion_id}:
+    if not forecasts.empty and served_ids != {champion_id}:
         raise ValueError(
             f"production forecast bundle {sorted(served_ids)} does not match champion {champion_id}"
         )
 
-    ledger_rows = [
-        monitoring_rows(
+    if forecasts.empty:
+        # A run with no eligible current rows is authenticated as a hold. Keep
+        # ledger keys typed even when there is no prior or shadow observation.
+        empty_observations = forecasts.copy()
+        empty_observations["bundle_id"] = pd.Series(dtype="str")
+        empty_observations["role"] = pd.Series(dtype="str")
+        empty_observations["recorded_at"] = pd.Series(dtype="str")
+        ledger_rows = [empty_observations]
+    else:
+        ledger_rows = [monitoring_rows(
             forecasts,
             champion_dir,
             bundle_id=champion_id,
             role="champion",
             use_served_predictions=True,
-        )
-    ]
+        )]
     shadows: dict[str, Any] = {}
     shadow_ids = {
         "challenger": registry.get("challenger_bundle_id"),
@@ -630,9 +642,15 @@ def monitor(args: argparse.Namespace) -> int:
                 "issues": ["no protocol-specific shadow forecasts"],
             }
             continue
-        shadows[role] = shadow_score_report(
-            shadow_forecasts, champion_dir, champion_forecasts=forecasts
-        )
+        if forecasts.empty:
+            shadows[role] = {
+                "status": "insufficient_data",
+                "issues": ["no current champion forecasts for paired shadow comparison"],
+            }
+        else:
+            shadows[role] = shadow_score_report(
+                shadow_forecasts, champion_dir, champion_forecasts=forecasts
+            )
         ledger_rows.append(
             monitoring_rows(
                 shadow_forecasts,
@@ -646,19 +664,38 @@ def monitor(args: argparse.Namespace) -> int:
     monitoring_dir = args.models_root / "monitoring"
     ledger_path = monitoring_dir / "prediction_ledger.parquet"
     migration = _verify_prior_prediction_ledger(monitoring_dir)
-    drift = _rolling_drift_assessment(
-        forecasts, champion_dir, bundle_id=champion_id,
-        models_root=args.models_root, horizons=champion_manifest["horizons"],
-    )
+    monitored_at = datetime.now(timezone.utc)
+    if forecasts.empty:
+        try:
+            from market_sessions import latest_completed_us_market_session
+        except ModuleNotFoundError:
+            from scripts.market_sessions import latest_completed_us_market_session
+        snapshot_date = latest_completed_us_market_session(monitored_at).isoformat()
+        drift = {
+            "status": "insufficient_data",
+            "reason": "no_eligible_current_forecasts",
+            "issues": ["no eligible current forecasts"],
+            "rolling_evidence": {
+                "current_rows": 0,
+                "current_snapshot_fresh": False,
+            },
+        }
+    else:
+        snapshot_date = str(pd.to_datetime(forecasts["snapshot_date"]).max().date())
+        drift = _rolling_drift_assessment(
+            forecasts, champion_dir, bundle_id=champion_id,
+            models_root=args.models_root, horizons=champion_manifest["horizons"],
+        )
     ledger = append_prediction_ledger(ledger_path, ledger_rows)
     report = {
         "schema": "quantiv.model-monitoring.v1",
         "status": "passed" if drift["status"] in {"passed", "warning"} else "failed",
-        "monitored_at": datetime.now(timezone.utc).isoformat(),
-        "snapshot_date": str(pd.to_datetime(forecasts["snapshot_date"]).max().date()),
+        "monitored_at": monitored_at.isoformat(),
+        "snapshot_date": snapshot_date,
         "champion_bundle_id": champion_id,
         "forecast_path": str(forecast_path),
         "forecast_sha256": sha256_file(forecast_path),
+        "forecast_rows": len(forecasts),
         "published_forecasts_sha256": (
             sha256_file(args.forecast_dir.parent / ".published_forecasts/manifest.json")
             if (

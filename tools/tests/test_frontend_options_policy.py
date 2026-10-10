@@ -143,7 +143,7 @@ def test_builder_rebuilds_all_surfaces_from_verified_stale_fallback(tmp_path, mo
     """Reproduce the failed build without ingestion, remote calls or a model run."""
     import sys
     import model_publication
-    from frontend_data import display_forecast
+    from frontend_data import display_forecast, options_policy
 
     data, _, _ = _fallback(tmp_path)
     public = tmp_path / 'public'
@@ -168,6 +168,11 @@ def test_builder_rebuilds_all_surfaces_from_verified_stale_fallback(tmp_path, mo
         def today(cls):
             return date(2026, 10, 8)
 
+    class PolicyDateTime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return NOW.astimezone(tz) if tz else NOW.replace(tzinfo=None)
+
     def earnings(conn, _path):
         conn.execute('CREATE TABLE earnings_events(ticker VARCHAR, earnings_dt DATE, timing VARCHAR)')
         conn.execute("INSERT INTO earnings_events VALUES ('TEST', '2026-10-09', 'bmo')")
@@ -185,6 +190,8 @@ def test_builder_rebuilds_all_surfaces_from_verified_stale_fallback(tmp_path, mo
                 'earnings_history': []}
 
     monkeypatch.setattr(builder, 'date', BuildDate)
+    # Both clocks must evaluate freshness at the fixture's run time.
+    monkeypatch.setattr(options_policy, 'datetime', PolicyDateTime)
     monkeypatch.setattr(builder, 'DATA_DIR', data)
     monkeypatch.setattr(builder, 'PUBLIC_DIR', public)
     monkeypatch.setattr(builder, 'write_to_public', lambda path, content:
