@@ -20,6 +20,29 @@ successful data publication with held ML is not evidence that a new model was
 promoted or that options became decision-safe. Retraining and model promotion
 retain their existing gates.
 
+When options are accepted, live scoring uses same-date prices and qualifying
+quotes from the latest completed market session with the existing signed
+champion. Check that the current forecast contains only that session, that its
+recorded feature vectors contain the accepted quote inputs, and that its cohort
+is supported by the bundle. Historical exact-horizon snapshots belong in the
+retained prediction ledger, not a newly scored current batch. Unsupported rows
+are withheld rather than changing the model's cohort support. Events whose lead
+does not match a trained horizon retain their eligible prior forecast; scoring
+does not select a nearest head or shift a quote's source date.
+
+Accepted options do not by themselves release an ML publication hold. The
+authenticated monitoring report must still pass current snapshot, feature,
+cohort and rolling evidence checks. The 100-row drift minimum and every model
+activation/promotion gate remain in force. A healthy daily forecast uses the
+current champion without requiring another retrain or promotion.
+
+The scoring step emits its exact forecast path and row count for downstream
+steps. An empty current batch skips nonempty forecast validation and receives
+a signed `no_eligible_current_forecasts` insufficient-data hold. Inspect that
+current artifact and monitoring receipt; do not validate an older file as the
+new score. Independent calendar, IV and historical publication can continue
+while new forecast imports and uploads remain withheld.
+
 Options-only catch-up also restores matching volatility history. Its latest
 partition must match the source count, schema and unique symbol/date keys. The
 acceptance receipt records its digest and is checked again immediately before

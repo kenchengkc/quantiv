@@ -93,6 +93,25 @@ new bundle deserves production traffic.
 
 ## Production monitoring and rollback
 
+Live champion and shadow scoring use only the latest completed US market
+session. Options join the price snapshot on the same symbol and source date;
+older quotes are never moved onto a newer price snapshot. An event is scored
+only when its calendar-day lead matches an exact trained horizon and its
+options or optionless cohort is supported by that bundle's signed metadata.
+Legacy bundles default to the strict-options cohort. Accepting a new options
+snapshot supplies new inputs to the existing champion; it does not activate
+a challenger or change the signed champion pointer.
+
+Historical snapshots are not rescored into the current daily batch. Previously
+observed predictions remain in the immutable event ledger and frozen archive,
+including forecasts for events without a new exact-horizon score today.
+
+Scoring hands its exact output path to forecast validation and monitoring. If
+no current rows qualify, it writes an empty current artifact and monitoring
+signs an insufficient-data hold bound to that file. Validation never substitutes
+an older file. The hold preserves previously published forecasts and permits
+independent data publication; it cannot activate or promote a model.
+
 Every daily forecast run records the champion plus available challenger and
 previous-champion shadow predictions in a compact two-year Parquet ledger.
 The ledger and current monitoring report have a signed digest receipt.

@@ -308,14 +308,16 @@ jobs:
 
       - name: Score upcoming earnings
         if: steps.options_gate.outputs.can_refresh == 'true'
+        id: scoring
         run: |
           python scripts/model_publication.py snapshot
-          python scripts/daily_score.py --days-ahead 21
+          python scripts/daily_score.py --days-ahead 21 --github-output "$GITHUB_OUTPUT"
 
       - name: Gate — validate scored ML and IV forecasts
-        if: steps.options_gate.outputs.can_refresh == 'true'
+        if: steps.options_gate.outputs.can_refresh == 'true' && steps.scoring.outputs.has_forecasts == 'true'
         run: |
           python scripts/validate_ml_pipeline.py forecasts \
+            --forecast-path "${{ steps.scoring.outputs.forecast_path }}" \
             --report data/validation/daily_forecasts.json \
             --publish-receipt-dir data/forecasts/receipts
 
@@ -334,7 +336,9 @@ jobs:
         env:
           MODEL_BUNDLE_SIGNING_KEY: ${{ secrets.MODEL_BUNDLE_SIGNING_KEY }}
         run: |
-          python scripts/model_publication.py monitor --github-output "$GITHUB_OUTPUT"
+          python scripts/model_publication.py monitor \
+            --forecast-path "${{ steps.scoring.outputs.forecast_path }}" \
+            --github-output "$GITHUB_OUTPUT"
 
       - name: Persist authenticated model monitoring independently of ML publication
         if: steps.model_publication.outcome == 'success'
@@ -380,6 +384,7 @@ jobs:
       - name: Build frontend JSON
         if: steps.options_gate.outputs.can_refresh == 'true'
         env:
+          MODEL_PUBLICATION_FORECAST_PATH: ${{ steps.scoring.outputs.forecast_path }}
           TWELVEDATA_API_KEY: ${{ secrets.TWELVEDATA_API_KEY }}
           TWELVEDATA_REALIZED_FALLBACK: "1"
           TWELVEDATA_DAILY_CREDIT_LIMIT: "792"
@@ -666,13 +671,18 @@ jobs:
         run: bash scripts/run_provider_free.sh python scripts/setup_duckdb_from_parquet.py
 
       - name: Score upcoming earnings from saved data
+        id: scoring
         run: |
           bash scripts/run_provider_free.sh python scripts/model_publication.py snapshot
-          bash scripts/run_provider_free.sh python scripts/daily_score.py --days-ahead 21
+          bash scripts/run_provider_free.sh python scripts/daily_score.py --days-ahead 21 --github-output "$GITHUB_OUTPUT"
 
       - name: Gate — validate recovered ML and IV forecasts
+        if: steps.scoring.outputs.has_forecasts == 'true'
         run: |
-          bash scripts/run_provider_free.sh             python scripts/validate_ml_pipeline.py forecasts               --report data/validation/daily_forecasts.json               --publish-receipt-dir data/forecasts/receipts
+          bash scripts/run_provider_free.sh python scripts/validate_ml_pipeline.py forecasts \
+            --forecast-path "${{ steps.scoring.outputs.forecast_path }}" \
+            --report data/validation/daily_forecasts.json \
+            --publish-receipt-dir data/forecasts/receipts
 
       - name: Upload recovered forecast validation report
         if: always()
@@ -688,7 +698,9 @@ jobs:
         env:
           MODEL_BUNDLE_SIGNING_KEY: ${{ secrets.MODEL_BUNDLE_SIGNING_KEY }}
         run: |
-          bash scripts/run_provider_free.sh python scripts/model_publication.py monitor --github-output "$GITHUB_OUTPUT"
+          bash scripts/run_provider_free.sh python scripts/model_publication.py monitor \
+            --forecast-path "${{ steps.scoring.outputs.forecast_path }}" \
+            --github-output "$GITHUB_OUTPUT"
 
       - name: Persist authenticated recovered model monitoring independently of ML publication
         if: steps.model_publication.outcome == 'success'
@@ -723,6 +735,8 @@ jobs:
         run: bash scripts/r2_push.sh --forecasts-only
 
       - name: Build frontend JSON without market-data providers
+        env:
+          MODEL_PUBLICATION_FORECAST_PATH: ${{ steps.scoring.outputs.forecast_path }}
         run: bash scripts/run_provider_free.sh python -u tools/build_frontend_data.py --verify-model-publication
 
       - name: Restore frozen forecasts for reported events

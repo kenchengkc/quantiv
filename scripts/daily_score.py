@@ -54,6 +54,10 @@ from ml.model_protocol import (  # noqa: E402
 )
 from ml.causal_features import build_causal_features  # noqa: E402
 try:  # noqa: E402 - standalone script path setup
+    from market_sessions import EASTERN, latest_completed_us_market_session
+except ModuleNotFoundError:
+    from scripts.market_sessions import EASTERN, latest_completed_us_market_session
+try:  # noqa: E402 - standalone script path setup
     from event_forecast_ledger import (
         annotate_forecasts,
         append_event_prediction_ledger,
@@ -152,16 +156,30 @@ def get_upcoming_features(
     days_ahead: int,
     *,
     feature_protocol: str = FEATURE_PROTOCOL_LEGACY,
+    now: datetime | None = None,
 ) -> pd.DataFrame:
-    """Route live feature construction by the signed model's explicit semantics."""
+    """Build this bundle's live features from the latest completed market session.
+
+    Historical feature rows belong to training or an already observed ledger;
+    rescoring them today cannot make them current publication evidence.
+    """
     protocol = resolve_feature_protocol({"feature_protocol": feature_protocol})
+    current = now or datetime.now(timezone.utc)
+    if current.tzinfo is None:
+        raise ValueError("live scoring requires a timezone-aware current time")
+    today = current.astimezone(EASTERN).date()
+    snapshot_date = latest_completed_us_market_session(current)
     if protocol == FEATURE_PROTOCOL_CAUSAL:
-        today = date.today()
-        return build_causal_features(
+        features = build_causal_features(
             conn, start_date=today, end_date=today + timedelta(days=days_ahead),
-            as_of_date=today,
+            as_of_date=snapshot_date,
         )
-    return _get_legacy_upcoming_features(conn, days_ahead)
+        return features.loc[
+            pd.to_datetime(features["snapshot_date"]).dt.date.eq(snapshot_date)
+        ].reset_index(drop=True)
+    return _get_legacy_upcoming_features(
+        conn, days_ahead, today=today, snapshot_date=snapshot_date,
+    )
 
 
 def get_bundle_upcoming_features(
@@ -180,15 +198,19 @@ def get_bundle_upcoming_features(
 
 def score_upcoming_models(
     conn: duckdb.DuckDBPyConnection, models: Dict[int, dict], days_ahead: int,
+    *, now: datetime | None = None,
 ) -> pd.DataFrame:
     """Construct each protocol once and score each head on its own inputs."""
     results = []
+    current = now or datetime.now(timezone.utc)
     protocols = {resolve_feature_protocol(entry.get("metadata") or {})
                  for entry in models.values()}
     for protocol in sorted(protocols):
         entries = {horizon: entry for horizon, entry in models.items()
                    if resolve_feature_protocol(entry.get("metadata") or {}) == protocol}
-        frame = get_upcoming_features(conn, days_ahead, feature_protocol=protocol)
+        frame = get_upcoming_features(
+            conn, days_ahead, feature_protocol=protocol, now=current,
+        )
         if not frame.empty:
             result = score(frame, entries)
             if not result.empty:
@@ -205,6 +227,7 @@ def get_bundle_forecasts(
 
 def _get_legacy_upcoming_features(
     conn: duckdb.DuckDBPyConnection, days_ahead: int,
+    *, today: date, snapshot_date: date,
 ) -> pd.DataFrame:
     """Build point-in-time live features for upcoming earnings.
 
@@ -224,7 +247,7 @@ def _get_legacy_upcoming_features(
     WITH upcoming AS (
         SELECT act_symbol, date AS earnings_date, timing
         FROM v_earnings
-        WHERE date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '{days_ahead}' DAY
+        WHERE date BETWEEN DATE '{today.isoformat()}' AND DATE '{today.isoformat()}' + INTERVAL '{days_ahead}' DAY
     ),
     snapshot_spine AS (
         SELECT
@@ -236,6 +259,7 @@ def _get_legacy_upcoming_features(
         FROM upcoming u
         JOIN v_ohlcv px
           ON px.act_symbol = u.act_symbol
+         AND px.date = DATE '{snapshot_date.isoformat()}'
          AND px.date < u.earnings_date
          AND (u.earnings_date - px.date) BETWEEN 1 AND 25
          AND px.close > 0
@@ -251,7 +275,7 @@ def _get_legacy_upcoming_features(
         FROM v_earnings e
         JOIN v_ohlcv pre ON pre.act_symbol = e.act_symbol
             AND pre.date < e.date AND pre.date >= e.date - INTERVAL '5' DAY
-        WHERE e.date < CURRENT_DATE AND pre.close > 0
+        WHERE e.date < DATE '{today.isoformat()}' AND pre.close > 0
     ),
     post_close_ohlcv AS (
         SELECT e.act_symbol, e.date AS earnings_date,
@@ -262,7 +286,7 @@ def _get_legacy_upcoming_features(
         FROM v_earnings e
         JOIN v_ohlcv post ON post.act_symbol = e.act_symbol
             AND post.date > e.date AND post.date <= e.date + INTERVAL '5' DAY
-        WHERE e.date < CURRENT_DATE AND post.close > 0
+        WHERE e.date < DATE '{today.isoformat()}' AND post.close > 0
     ),
     past_realized_ohlcv AS (
         SELECT pre.act_symbol, pre.earnings_date,
@@ -535,11 +559,15 @@ def score(df: pd.DataFrame, models: Dict[int, dict]) -> pd.DataFrame:
         if protocol == FEATURE_PROTOCOL_CAUSAL:
             hdf["timing"] = hdf["timing"].fillna("").astype(str).str.strip().str.lower()
             hdf = hdf.loc[hdf["timing"].isin(["bmo", "amc"])].copy()
-            baseline = pd.to_numeric(hdf["straddle_pct"], errors="coerce")
-            cohort = np.where(np.isfinite(baseline) & (baseline > 0), "strict_options", "optionless")
-            hdf["__cohort"] = cohort
-            supported = set(metadata.get("supported_cohorts") or [])
-            hdf = hdf.loc[hdf["__cohort"].isin(supported)].copy()
+        baseline = pd.to_numeric(hdf["straddle_pct"], errors="coerce")
+        hdf["__cohort"] = np.where(
+            np.isfinite(baseline) & (baseline > 0), "strict_options", "optionless",
+        )
+        # Legacy bundles without an explicit cohort declaration are strict-only,
+        # matching the signed monitoring contract rather than emitting rows that
+        # their champion has never represented.
+        supported = set(metadata.get("supported_cohorts", ["strict_options"]))
+        hdf = hdf.loc[hdf["__cohort"].isin(supported)].copy()
         if hdf.empty:
             continue
 
@@ -721,26 +749,28 @@ def save_forecasts(
     data_dir: Path,
     *,
     output_path: Path | None = None,
-):
+) -> Path:
     forecast_dir = data_dir / "forecasts"
     forecast_dir.mkdir(parents=True, exist_ok=True)
 
     if df.empty:
-        logger.warning("No forecasts to save")
-        if output_path is not None:
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-            temporary = output_path.with_suffix(output_path.suffix + ".tmp")
-            pd.DataFrame(columns=sorted(FORECAST_REQUIRED_COLUMNS)).to_parquet(temporary, index=False)
-            temporary.replace(output_path)
+        logger.warning("No live forecasts; saving an empty current scoring artifact")
+        candidate_output = output_path is not None
+        if output_path is None:
+            today = datetime.now().strftime("%Y-%m-%d")
+            output_path = forecast_dir / f"forecasts_{today}.parquet"
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = output_path.with_suffix(output_path.suffix + ".tmp")
+        pd.DataFrame(columns=sorted(FORECAST_REQUIRED_COLUMNS)).to_parquet(temporary, index=False)
+        temporary.replace(output_path)
+        if candidate_output:
             report = {"schema": "quantiv.candidate-scoring.v1", "status": "no_upcoming_events",
                       "rows": 0, "generated_at": datetime.now(timezone.utc).isoformat()}
             report_path = output_path.with_suffix(".research.json")
             temporary_report = report_path.with_suffix(".json.tmp")
             temporary_report.write_text(json.dumps(report, indent=2) + "\n")
             temporary_report.replace(report_path)
-        else:
-            prune_forecast_snapshots(forecast_dir)
-        return
+        return output_path
 
     missing_required = sorted(FORECAST_REQUIRED_COLUMNS - set(df.columns))
     if missing_required:
@@ -798,7 +828,7 @@ def save_forecasts(
         out.to_parquet(temporary, index=False)
         temporary.replace(output_path)
         logger.info("Saved %d candidate forecasts → %s", len(out), output_path)
-        return
+        return output_path
 
     today = datetime.now().strftime("%Y-%m-%d")
     parquet_path = forecast_dir / f"forecasts_{today}.parquet"
@@ -840,6 +870,7 @@ def save_forecasts(
         )
 
     logger.info(f"DuckDB ml_forecasts: {n:,} total rows")
+    return parquet_path
 
 
 def main():
@@ -848,6 +879,7 @@ def main():
     )
     parser.add_argument("--days-ahead", type=int, default=14)
     parser.add_argument("--models-dir", type=Path, default=None)
+    parser.add_argument("--github-output", type=Path)
     parser.add_argument(
         "--output-path",
         type=Path,
@@ -977,7 +1009,14 @@ def main():
     conn.close()
     logger.info(f"Generated {len(forecasts)} forecasts")
 
-    save_forecasts(forecasts, data_dir, output_path=args.output_path)
+    forecast_path = save_forecasts(forecasts, data_dir, output_path=args.output_path)
+    if args.github_output is not None:
+        forecast_rows = len(pd.read_parquet(forecast_path, columns=["act_symbol"]))
+        args.github_output.parent.mkdir(parents=True, exist_ok=True)
+        with args.github_output.open("a") as output:
+            output.write(f"forecast_path={forecast_path}\n")
+            output.write(f"has_forecasts={'true' if forecast_rows else 'false'}\n")
+            output.write(f"forecast_rows={forecast_rows}\n")
 
     if not forecasts.empty:
         has_quantiles = "p10" in forecasts.columns and "p90" in forecasts.columns
