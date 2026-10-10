@@ -12,7 +12,7 @@
       "source": "manual (user-confirmed acquisition)"
     },
     "AVB": {
-      "reason": "Merged into Vivmark Residential (NYSE: VMRK) in a merger of equals with Equity Residential; closed 2026-08-17. Former AvalonBay holders own ~51% of VMRK. Predecessor retired — do not rename AVB→VMRK (would mix two companies' earnings histories onto the successor).",
+      "reason": "Merged into Vivmark Residential (NYSE: VMRK) in a merger of equals with Equity Residential; closed 2026-08-17. Former AvalonBay holders own ~51% of VMRK. Predecessor retired \u2014 do not rename AVB\u2192VMRK (would mix two companies' earnings histories onto the successor).",
       "delisted_on": "2026-08-17",
       "source": "manual (user-confirmed merger of equals; successor VMRK is a new ticker)"
     },
@@ -47,7 +47,7 @@
       "source": "manual (user-confirmed take-private)"
     },
     "EQR": {
-      "reason": "Merged with AvalonBay into Vivmark Residential (NYSE: VMRK) in a merger of equals; closed 2026-08-17, VMRK first trade 2026-08-18. Former Equity Residential holders own ~49% of VMRK. Predecessor retired — do not rename EQR→VMRK (would drop only EQR history onto a ~51/49 combined company).",
+      "reason": "Merged with AvalonBay into Vivmark Residential (NYSE: VMRK) in a merger of equals; closed 2026-08-17, VMRK first trade 2026-08-18. Former Equity Residential holders own ~49% of VMRK. Predecessor retired \u2014 do not rename EQR\u2192VMRK (would drop only EQR history onto a ~51/49 combined company).",
       "delisted_on": "2026-08-17",
       "source": "manual (user-confirmed merger of equals; successor VMRK is a new ticker)"
     },
@@ -76,6 +76,16 @@
       "delisted_on": "2026-06-29",
       "source": "manual (user-confirmed acquisition)"
     },
+    "PSKY": {
+      "reason": "Auto-detected: absent from NASDAQ/NYSE exchange directories for \u22653 consecutive days (likely M&A, bankruptcy, or going-private).",
+      "delisted_on": "2026-10-10",
+      "source": "auto: scripts/detect_delistings.py"
+    },
+    "QRVO": {
+      "reason": "Auto-detected: absent from NASDAQ/NYSE exchange directories for \u22653 consecutive days (likely M&A, bankruptcy, or going-private).",
+      "delisted_on": "2026-10-10",
+      "source": "auto: scripts/detect_delistings.py"
+    },
     "SNCY": {
       "reason": "Acquired by Allegiant Travel Company (NASDAQ: ALGT); Sun Country Airlines delisted from Nasdaq.",
       "delisted_on": "2026-05-29",
@@ -92,7 +102,7 @@
       "source": "manual (user-confirmed acquisition)"
     },
     "TWO": {
-      "reason": "Two Harbors common is being taken private by CrossCountry Mortgage at $12.00/share (expected close 2026-08-25). Common already absent from NYSE directories. TWO$A is Series A preferred (NYSE: TWO PRA), not a successor common ticker — do not rename TWO→TWO$A.",
+      "reason": "Two Harbors common is being taken private by CrossCountry Mortgage at $12.00/share (expected close 2026-08-25). Common already absent from NYSE directories. TWO$A is Series A preferred (NYSE: TWO PRA), not a successor common ticker \u2014 do not rename TWO\u2192TWO$A.",
       "delisted_on": "2026-08-03",
       "source": "manual (user-confirmed go-private; TWO$A is NYSE preferred, not a rename)"
     },
