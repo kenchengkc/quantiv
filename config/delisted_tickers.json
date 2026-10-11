@@ -26,6 +26,11 @@
       "delisted_on": "2026-07-03",
       "source": "manual (user-confirmed acquisition)"
     },
+    "BLFS": {
+      "reason": "Auto-detected: absent from NASDAQ/NYSE exchange directories for \u22653 consecutive days (likely M&A, bankruptcy, or going-private).",
+      "delisted_on": "2026-10-11",
+      "source": "auto: scripts/detect_delistings.py"
+    },
     "CPRX": {
       "reason": "Acquired by Angelini Pharma at $31.50/share cash; Catalyst Pharmaceuticals delisted from Nasdaq.",
       "delisted_on": "2026-07-15",
@@ -105,6 +110,11 @@
       "reason": "Two Harbors common is being taken private by CrossCountry Mortgage at $12.00/share (expected close 2026-08-25). Common already absent from NYSE directories. TWO$A is Series A preferred (NYSE: TWO PRA), not a successor common ticker \u2014 do not rename TWO\u2192TWO$A.",
       "delisted_on": "2026-08-03",
       "source": "manual (user-confirmed go-private; TWO$A is NYSE preferred, not a rename)"
+    },
+    "WBD": {
+      "reason": "Auto-detected: absent from NASDAQ/NYSE exchange directories for \u22653 consecutive days (likely M&A, bankruptcy, or going-private).",
+      "delisted_on": "2026-10-11",
+      "source": "auto: scripts/detect_delistings.py"
     },
     "WBS": {
       "reason": "Acquired by Banco Santander; each Webster common share converted into $48.75 cash plus 2.0548 SAN ADSs. WBS delisted from NYSE.",

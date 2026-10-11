@@ -4,15 +4,15 @@
     "contracts": 96562,
     "corporate_action_rows": 29105,
     "corporate_action_status": "enforced",
-    "covered_events": 501,
-    "decision_group_rejection_rate": 0.347656,
-    "decision_groups": 768,
+    "covered_events": 502,
+    "decision_group_rejection_rate": 0.347204,
+    "decision_groups": 769,
     "decision_scope": "end_of_day_research",
     "display_forecast_coverage_pct": 1.0,
-    "display_forecast_covered_events": 284,
-    "display_forecast_events": 284,
+    "display_forecast_covered_events": 283,
+    "display_forecast_events": 283,
     "display_forecast_method_mix": {
-      "historical": 272,
+      "historical": 271,
       "historical_prior": 12,
       "ml": 0,
       "options_indicative": 0,
@@ -20,9 +20,9 @@
     },
     "duplicate_rows": 0,
     "eligible_contracts": 57637,
-    "eligible_decision_groups": 501,
-    "event_coverage_pct": 0.652344,
-    "expected_events": 768,
+    "eligible_decision_groups": 502,
+    "event_coverage_pct": 0.652796,
+    "expected_events": 769,
     "expected_source_date": "2026-10-09",
     "live_trading_eligible": false,
     "missing_events": 267,
@@ -40,13 +40,13 @@
   "exceptions": [
     {
       "code": "options_stale",
-      "count": 10,
+      "count": 11,
       "severity": "critical",
       "summary": "options exceeds its freshness limit"
     },
     {
       "code": "upcoming_events_outside_option_universe",
-      "count": 1021,
+      "count": 1081,
       "severity": "warning",
       "summary": "Calendar events fall outside the current options decision universe"
     },
@@ -58,7 +58,7 @@
     },
     {
       "code": "forecast_horizon_coverage_below_limit",
-      "count": 34,
+      "count": 35,
       "severity": "warning",
       "summary": "One or more model horizons lack sufficient eligible option coverage"
     },
@@ -70,20 +70,20 @@
     },
     {
       "code": "retired_source_symbols_quarantined",
-      "count": 2,
+      "count": 4,
       "severity": "warning",
       "summary": "Latest source quotes for retired symbols are excluded from the decision universe"
     }
   ],
-  "generated_at": "2026-10-10T08:26:23.208404+00:00",
+  "generated_at": "2026-10-11T09:21:23.799026+00:00",
   "model": {
     "challenger_present": true,
     "champion_active": true,
     "critical_features": null,
-    "drift_status": "critical",
+    "drift_status": "insufficient_data",
     "fallback_bundle_available": false,
     "hard_missing_features": null,
-    "monitored_at": "2026-10-10T07:00:59.881120+00:00",
+    "monitored_at": "2026-10-11T07:46:44.437042+00:00",
     "outcome_common_rows": 0,
     "outcome_evaluated_at": "2026-10-05T21:12:16.684067+00:00",
     "outcome_evaluations": 4,
