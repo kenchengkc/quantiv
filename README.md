@@ -19,7 +19,7 @@ Under the hood, a Python pipeline reconciles provider data, validates every publ
 
 - 120,000+ historical earnings records
 - 10,000+ searchable ticker identities
-- Approximately 100 monthly active users
+- 150+ monthly active users
 - Market pricing, model estimates, and event history in one research view
 - Validated nightly snapshots with cached live stock quotes
 - Bad data and weak models blocked before publication—without another always-on service
