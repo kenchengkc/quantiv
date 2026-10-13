@@ -126,6 +126,39 @@ def test_held_reconciliation_blocks_retraining(tmp_path: Path) -> None:
         )
 
 
+@pytest.mark.parametrize("activation_flag", [None, True, False])
+@pytest.mark.parametrize("hold", ["coverage", "rejection_rate", "count_coverage"])
+def test_serving_safe_sparse_release_cannot_activate_models(
+    tmp_path: Path, activation_flag: bool | None, hold: str,
+) -> None:
+    _write_options_partition(tmp_path, "2026-09-04")
+    _write_manifest(tmp_path, source_date="2026-09-04",
+                    generated_at="2026-09-06T15:00:00+00:00")
+    path = tmp_path / "validation/data_reconciliation.json"
+    manifest = json.loads(path.read_text())
+    if activation_flag is not None:
+        manifest["quality"]["model_activation_eligible"] = activation_flag
+        manifest["quality"]["model_activation_blocking_codes"] = (
+            [] if activation_flag else ["event_quote_coverage_below_limit"]
+        )
+    if hold == "coverage":
+        manifest["event_coverage"] = {"status": "failed"}
+    elif hold == "rejection_rate":
+        manifest["quote_quality"].update({
+            "decision_group_rejection_rate": 0.6,
+            "max_decision_group_rejection_rate": 0.5,
+        })
+    else:
+        manifest["event_coverage"] = {
+            "status": "passed", "expected_events": 10, "covered_events": 6,
+            "minimum_coverage_pct": 0.65,
+        }
+    path.write_text(json.dumps(manifest))
+    with pytest.raises(RuntimeError, match="model activation.*blocked"):
+        verify_retrain_data_gate(data_dir=tmp_path,
+                                now=datetime(2026, 9, 6, 12, 0, tzinfo=EASTERN))
+
+
 def test_calendar_recent_but_market_session_stale_release_is_rejected(
     tmp_path: Path,
 ) -> None:

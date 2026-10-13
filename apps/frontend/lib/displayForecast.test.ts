@@ -7,6 +7,19 @@ import {
 } from './displayForecast';
 
 describe('display forecast helpers', () => {
+  it('ignores held raw and canonical ML values while retaining independent fallback', () => {
+    expect(resolveDisplayForecastCompat({
+      ml_publication_status: 'held', em_ml_pct: .4, display_forecast_pct: .4,
+      display_forecast_method: 'ml', em_iv_pct: .08,
+    })).toEqual({ pct: .08, method: 'options_math' });
+    expect(resolveDisplayForecastCompat({
+      ml_publication_status: 'held', display_forecast_pct: .4,
+      display_forecast_method: 'ml',
+    }, .06)).toEqual({ pct: .06, method: 'historical' });
+    expect(resolveDisplayForecastCompat({
+      ml_publication_status: 'held', display_forecast_pct: .4, display_forecast_method: 'ml',
+    }).pct).toBeNull();
+  });
   it('uses compact provenance labels', () => {
     expect(displayForecastLabel('ml')).toBe('ML forecast');
     expect(displayForecastLabel('options_math')).toBe('IV forecast');

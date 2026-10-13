@@ -40,7 +40,10 @@ def test_activation_and_rollback_remain_bound_to_current_data():
 def test_nightly_freeze_collects_bmo_shadow_evidence_under_publication_gate():
     steps = yaml.safe_load((ROOT / ".github/workflows/event-forecast-freeze.yml").read_text())["jobs"]["freeze"]["steps"]
     monitor = next(step for step in steps if step.get("id") == "model-publication")
-    assert "--forecast-path data/validation/event-freeze-candidate.parquet" in monitor["run"]
+    assert '--forecast-path "${{ steps.scoring.outputs.forecast_path }}"' in monitor["run"]
+    validation = next(step for step in steps if step["name"] == "Validate candidate model and option evidence")
+    assert '--forecast-path "${{ steps.model-publication.outputs.eligible_forecast_path }}"' in validation["run"]
+    assert steps.index(monitor) < steps.index(validation)
     assert "MODEL_BUNDLE_SIGNING_KEY" in monitor["env"]
     promotion = next(step for step in steps if step["name"] == "Promote only event-cutoff-eligible rows")
     assert "can_publish_ml == 'true'" in promotion["if"]

@@ -118,7 +118,7 @@ function fmtMovePct(v: number | null | undefined, digits = 1) {
 }
 
 function legacyForecastMethod(ev: EarningsEvent): DisplayForecastMethod | null {
-  if (ev.em_ml_pct != null) return 'ml';
+  if (ev.ml_publication_status !== 'held' && ev.em_ml_pct != null) return 'ml';
   if (ev.em_iv_pct != null || ev.em_straddle_pct != null) return 'options_math';
   return null;
 }
@@ -149,6 +149,7 @@ function ExpectedMoveHover({
   ivPct,
   straddlePct,
   mlPct,
+  mlHeld,
   historicalPct,
   method,
   bandLo,
@@ -159,6 +160,7 @@ function ExpectedMoveHover({
   ivPct: number | null;
   straddlePct: number | null;
   mlPct: number | null;
+  mlHeld: boolean;
   historicalPct: number | null;
   method: DisplayForecastMethod | null;
   bandLo: number | null | undefined;
@@ -265,7 +267,7 @@ function ExpectedMoveHover({
             <TooltipLine label="IV forecast" value="Unavailable" muted marginTop={4} />
           )}
           {!mlLine && method !== 'ml' && (
-            <TooltipLine label="ML forecast" value="Unavailable" muted marginTop={4} />
+            <TooltipLine label="ML forecast" value={mlHeld ? 'Held for this event' : 'Unavailable'} muted marginTop={4} />
           )}
           {bandLine != null && (
             <TooltipLine label="Typical" value={bandLine} marginTop={4} />
@@ -285,7 +287,8 @@ function TickerRow({
 }) {
   const ivPct = ev.em_iv_pct ?? null;
   const straddlePct = ev.em_straddle_pct ?? null;
-  const mlPct = ev.em_ml_pct ?? null;
+  const mlHeld = ev.ml_publication_status === 'held';
+  const mlPct = mlHeld ? null : ev.em_ml_pct ?? null;
   const resolvedForecast = resolveDisplayForecastCompat(ev);
   const historicalPct =
     finiteDisplayForecast(ev.hist_move_med_4q) ??
@@ -402,6 +405,7 @@ function TickerRow({
         ivPct={ivPct}
         straddlePct={straddlePct}
         mlPct={mlPct}
+        mlHeld={mlHeld}
         historicalPct={historicalPct}
         method={method}
         bandLo={bandLo}

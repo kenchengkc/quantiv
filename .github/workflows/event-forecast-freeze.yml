@@ -92,11 +92,6 @@ jobs:
             --output-path data/validation/event-freeze-candidate.parquet \
             --github-output "$GITHUB_OUTPUT"
 
-      - name: Validate candidate model and option evidence
-        if: steps.input_gate.outputs.ready == 'true' && steps.scoring.outputs.has_forecasts == 'true'
-        run: |
-          python scripts/validate_ml_pipeline.py forecasts             --forecast-path data/validation/event-freeze-candidate.parquet             --report data/validation/event_freeze_forecasts.json
-
       - name: Record signed champion and challenger observations before BMO cutoff
         if: steps.input_gate.outputs.ready == 'true'
         id: model-publication
@@ -104,7 +99,7 @@ jobs:
           MODEL_BUNDLE_SIGNING_KEY: ${{ secrets.MODEL_BUNDLE_SIGNING_KEY }}
         run: |
           python scripts/model_publication.py monitor \
-            --forecast-path data/validation/event-freeze-candidate.parquet \
+            --forecast-path "${{ steps.scoring.outputs.forecast_path }}" \
             --days-ahead 3 --github-output "$GITHUB_OUTPUT"
 
       - name: Persist authenticated event monitoring independently of ML publication
@@ -113,10 +108,18 @@ jobs:
           R2_BUCKET: ${{ secrets.R2_BUCKET }}
         run: bash scripts/r2_push.sh --monitoring-only
 
+      - name: Validate candidate model and option evidence
+        if: steps.input_gate.outputs.ready == 'true' && steps.model-publication.outputs.has_forecasts == 'true'
+        run: |
+          python scripts/validate_ml_pipeline.py forecasts \
+            --forecast-path "${{ steps.model-publication.outputs.eligible_forecast_path }}" \
+            --report data/validation/event_freeze_forecasts.json \
+            --publish-receipt-dir data/forecasts/receipts
+
       - name: Promote only event-cutoff-eligible rows
         if: steps.input_gate.outputs.ready == 'true' && steps.model-publication.outputs.can_publish_ml == 'true'
         run: |
-          python scripts/promote_event_freeze.py             data/validation/event-freeze-candidate.parquet
+          python scripts/promote_event_freeze.py "${{ steps.model-publication.outputs.eligible_forecast_path }}"
 
       - name: Persist eligible event forecasts
         if: steps.input_gate.outputs.ready == 'true' && steps.model-publication.outputs.can_publish_ml == 'true'
@@ -128,7 +131,7 @@ jobs:
         if: steps.input_gate.outputs.ready == 'true'
         env:
           TWELVEDATA_REALIZED_FALLBACK: '0'
-          MODEL_PUBLICATION_FORECAST_PATH: data/validation/event-freeze-candidate.parquet
+          MODEL_PUBLICATION_FORECAST_PATH: ${{ steps.scoring.outputs.forecast_path }}
         run: |
           python -u tools/build_frontend_data.py --verify-model-publication
           python scripts/restore_reported_forecasts.py --apply

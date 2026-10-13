@@ -31,6 +31,10 @@ Weekly training uses a verified immutable historical release and a mature,
 validated cohort. Current options holds do not prevent historical fitting or
 candidate retention. Current reconciliation and latest-session freshness remain
 mandatory for activation and rollback. Training calls no market-data providers.
+Aggregate options coverage and event quote rejection can be serving warnings,
+but the original aggregate limits still block model activation. Reconciliation
+records this distinction in `quality.model_activation_eligible`; the activation
+gate also recomputes the original limits from the underlying evidence.
 
 The causal protocol uses BMO/AMC session-specific targets and explicit prediction
 and label-availability dates. Unknown timing has no verified training label.
@@ -104,13 +108,35 @@ a challenger or change the signed champion pointer.
 
 Historical snapshots are not rescored into the current daily batch. Previously
 observed predictions remain in the immutable event ledger and frozen archive,
-including forecasts for events without a new exact-horizon score today.
+including reported-event forecasts. Upcoming events require an eligible current
+forecast to show ML; a retained older prediction cannot release that hold.
 
-Scoring hands its exact output path to forecast validation and monitoring. If
-no current rows qualify, it writes an empty current artifact and monitoring
-signs an insufficient-data hold bound to that file. Validation never substitutes
-an older file. The hold preserves previously published forecasts and permits
-independent data publication; it cannot activate or promote a model.
+Scoring hands its exact output path to monitoring. Monitoring validates each
+event's actual feature vector, quote evidence, arithmetic, quantiles, source
+session, model identity and prediction deadline, then assesses each surviving
+horizon/cohort independently with the unchanged authenticated rolling drift gate.
+It signs `quantiv.event-forecast-eligibility.v1` in the monitoring report, binding
+the original candidate and exact selected artifact by digest, forecast IDs and
+event keys. A partially eligible batch reports `partial`; the original aggregate
+drift assessment remains visible as a diagnostic.
+
+Full forecast validation, Neon import and public publication consume only that
+selected artifact. Retained calendar, ticker and static API payloads apply the
+same allowlist. Public prediction proxies reject held or unlisted events before
+reading database or cache results. Eligible responses must match the approved
+event, horizon, source session, scoring timestamp and bundle; a mismatch falls
+back to the approved nightly forecast. Other upcoming events use independent
+options or historical estimates and show their ML hold; reported forecasts keep
+their frozen values. Coverage counts refer to scored candidates, not every event
+on the calendar. Same-day events require the same eligibility until reported
+EPS or revenue actuals establish that their frozen historical values can be
+preserved. Forecast restoration cannot replace an unreported event's selection.
+
+If no current rows qualify, scoring writes an empty current artifact and
+monitoring signs an insufficient-data hold bound to that file. Nonempty forecast
+validation and forecast imports are skipped; validation never substitutes an
+older file. Independent data publication can continue. Neither partial
+publication nor a complete hold can activate or promote a model.
 
 Every daily forecast run records the champion plus available challenger and
 previous-champion shadow predictions in a compact two-year Parquet ledger.
@@ -131,8 +157,9 @@ Monitoring reports:
 
 Drift uses matching cohort references in both selection and monitoring. Seasonal
 and macro PSI is diagnostic; missing feature contracts, unsupported cohorts and
-insufficient samples are explicit holds, never proof of model health. Signed
-holds allow calendar, IV and historical publication while withholding upcoming ML.
+insufficient samples are explicit holds for the affected horizon/cohort, never
+proof of model health. Signed holds allow calendar, IV and historical publication
+while withholding the affected upcoming ML forecasts.
 The drift sample includes exact feature vectors observed within the last 30
 calendar days from verified ledger receipts, matched by bundle, horizon, cohort
 and feature/target protocol. This keeps the unchanged 100-row minimum meaningful

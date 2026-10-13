@@ -679,8 +679,9 @@ export default function SymbolPage({
     todayIso,
   );
   const modelSnapshot = em ?? frozenHistoryForecast?.row ?? null;
+  const mlPublicationHeld = em?.ml_publication_status === 'held';
   const snapshotQuantiles = normalizeForecastQuantiles(
-    modelSnapshot
+    modelSnapshot && !mlPublicationHeld
       ? {
           '10': modelSnapshot.p10,
           '25': modelSnapshot.p25,
@@ -693,6 +694,7 @@ export default function SymbolPage({
   const liveQuantiles =
     livePrediction.status === 'ready' ? normalizeForecastQuantiles(livePrediction.response?.quantiles) : null;
   const showingLivePrediction =
+    !mlPublicationHeld &&
     livePredictionRequest != null &&
     predictionMode === 'spot_updated' &&
     livePrediction.status === 'ready' &&
@@ -705,7 +707,7 @@ export default function SymbolPage({
   const quantiles = showingLivePrediction && liveQuantiles ? liveQuantiles : snapshotQuantiles;
   const rawActivePredictionPct = showingLivePrediction
     ? (livePrediction.response?.em_ml_pct ?? null)
-    : (em?.em_ml_pct ?? frozenHistoryForecast?.mlPct ?? null);
+    : mlPublicationHeld ? null : (em?.em_ml_pct ?? frozenHistoryForecast?.mlPct ?? null);
   const activePredictionPct =
     rawActivePredictionPct != null && Number.isFinite(rawActivePredictionPct)
       ? Math.max(0, rawActivePredictionPct)
@@ -794,6 +796,7 @@ export default function SymbolPage({
 
       <ResearchAvailability
         hasModel={activePredictionPct != null}
+        mlPublicationStatus={em?.ml_publication_status}
         hasOptions={termRows.length > 0}
         historyCount={historySeries.length}
         history={data.earnings_history}

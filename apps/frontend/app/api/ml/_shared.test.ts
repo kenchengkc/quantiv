@@ -2,6 +2,18 @@ import { describe, expect, it } from 'vitest';
 import { PredictRequestSchema, buildNightlyFallbackPayload } from './_shared';
 
 describe('ML nightly fallback payload', () => {
+  it('does not recover held nightly ML from raw or dollar fields', () => {
+    const req = { symbol: 'HELD', horizon_days: 7 as const, intended_use: 'end_of_day_research' as const };
+    const nightly = { spot_price: 100, expected_move: {
+      ml_publication_status: 'held' as const, em_ml_pct: .4, em_ml_abs: 40, p90: .6,
+      straddle_pct: .08,
+    } };
+    expect(buildNightlyFallbackPayload(req, nightly, 'backend_unavailable'))
+      .toMatchObject({ fallback_kind: 'straddle', em_ml_pct: .08, quantiles: {} });
+    expect(buildNightlyFallbackPayload(req, {
+      ...nightly, expected_move: { ...nightly.expected_move, straddle_pct: undefined },
+    }, 'backend_unavailable')).toBeNull();
+  });
   it('prefers static nightly ML fields over straddle fields', () => {
     const payload = buildNightlyFallbackPayload(
       {

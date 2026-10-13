@@ -82,13 +82,13 @@ def _scope_quote_quality(
     quote_quality: dict[str, Any] | None,
     event_coverage: dict[str, Any],
 ) -> dict[str, Any]:
-    """Separate chain diagnostics from the earnings decisions we publish.
+    """Separate chain diagnostics and aggregate coverage from event eligibility.
 
     Contract, same-strike-pair, and all-symbol/expiration rejection rates remain
     visible diagnostics over the immutable source chain. Publication-facing
-    decision groups, however, are upcoming in-universe earnings events because
-    that is the unit consumed by daily_score.py. This changes no numerical
-    threshold and never hides a source/freshness failure.
+    decision groups are upcoming in-universe earnings events. Aggregate shortfalls
+    remain activation holds, while serving consumes only individually eligible
+    event quotes. Source and freshness failures stay fail-closed.
     """
     quote = dict(quote_quality or {"status": "not_enforced"})
     raw_status = str(quote.get("status") or "not_enforced")
@@ -194,6 +194,25 @@ def _scope_quote_quality(
     else:
         quote["status"] = raw_status
 
+    # Preserve the original aggregate gate for model activation before applying
+    # the per-event serving policy. An unknown failure cannot be attributed to
+    # sparse coverage merely because the aggregate rejection rate is also high.
+    quote["model_activation_status"] = quote["status"]
+    quote["aggregate_decision_group_status"] = (
+        "failed" if scoped_decision_failure else "passed"
+    )
+    classified_raw_status = raw_status in {"passed", "degraded"} or (
+        raw_status == "failed" and diagnostics_exceeded
+    )
+    if (
+        quote["status"] == "failed"
+        and scoped_decision_failure
+        and not errors
+        and not empty_required_source
+        and classified_raw_status
+    ):
+        quote["status"] = "degraded"
+
     return quote
 
 
@@ -273,8 +292,8 @@ def build_reconciliation_manifest(
         exceptions.append(
             _exception(
                 "event_quote_coverage_below_limit",
-                "critical",
-                "Decision-eligible option coverage is below the publication limit",
+                "warning",
+                "Aggregate option coverage is below the model activation limit; individually eligible events may publish",
                 count=missing_events,
                 sample=event_coverage.get("missing_sample") or [],
             )
@@ -312,7 +331,17 @@ def build_reconciliation_manifest(
                 ),
             )
         )
-    elif quote_status == "degraded":
+    elif quote_quality.get("aggregate_decision_group_status") == "failed":
+        exceptions.append(
+            _exception(
+                "option_quote_quality_below_limit",
+                "warning",
+                "Aggregate event quote rejection exceeds the model activation limit; individually eligible events may publish",
+                count=int(quote_quality.get("rejected_decision_groups", 0)),
+                sample=quote_quality.get("top_decision_group_rejection_reasons") or [],
+            )
+        )
+    if quote_status == "degraded" and quote_quality.get("diagnostic_status") == "degraded":
         exceptions.append(
             _exception(
                 "option_chain_diagnostics_above_limit",
@@ -397,6 +426,13 @@ def build_reconciliation_manifest(
         )
 
     critical_count = sum(item["severity"] == "critical" for item in exceptions)
+    activation_blocking_codes = {
+        item["code"] for item in exceptions if item["severity"] == "critical"
+    }
+    if event_coverage.get("status") == "failed":
+        activation_blocking_codes.add("event_quote_coverage_below_limit")
+    if quote_quality.get("model_activation_status") not in {"passed", "degraded"}:
+        activation_blocking_codes.add("option_quote_quality_below_limit")
     warning_count = sum(item["severity"] == "warning" for item in exceptions)
     actionable_warnings = sum(
         1
@@ -415,6 +451,9 @@ def build_reconciliation_manifest(
                 else "passed"
             ),
             "decision_safe": critical_count == 0,
+            "serving_policy": "per_event_forecast",
+            "model_activation_eligible": not activation_blocking_codes,
+            "model_activation_blocking_codes": sorted(activation_blocking_codes),
             "critical_exceptions": critical_count,
             "warnings": warning_count,
         },

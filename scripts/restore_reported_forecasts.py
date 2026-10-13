@@ -35,6 +35,7 @@ for package_root in (REPO_ROOT / "tools", REPO_ROOT / "apps" / "ml"):
     if str(package_root) not in sys.path:
         sys.path.insert(0, str(package_root))
 from frontend_data.payloads import build_screener_payload  # noqa: E402
+from frontend_data.forecast_artifacts import has_reported_actuals, load_reported_event_keys  # noqa: E402
 from event_forecast_ledger import EASTERN, event_cutoffs  # noqa: E402
 
 EventKey = tuple[str, str]
@@ -74,6 +75,9 @@ FORECAST_FIELDS = {
     "hist_move_med_4q",
     "forecast_frozen",
     "forecast_id",
+    "forecast_model_bundle_id",
+    "ml_publication_status",
+    "ml_publication_reason",
     "forecast_scored_at",
     "forecast_published_at",
     "forecast_feature_cutoff_at",
@@ -109,6 +113,9 @@ FROZEN_HISTORY_FIELDS = ML_HISTORY_FIELDS | {
     "display_forecast_method",
     "display_forecast_as_of",
     "forecast_id",
+    "forecast_model_bundle_id",
+    "ml_publication_status",
+    "ml_publication_reason",
     "forecast_scored_at",
     "forecast_published_at",
     "forecast_feature_cutoff_at",
@@ -117,6 +124,28 @@ FROZEN_HISTORY_FIELDS = ML_HISTORY_FIELDS | {
     "forecast_feature_hash",
     "forecast_frozen_eligible",
 }
+
+
+def _restoration_context(today: date) -> tuple[bool, set[str]]:
+    policy_path = PUBLIC_DIR / 'control-plane.json'
+    if policy_path.is_file():
+        policy = json.loads(policy_path.read_text())
+        active = (policy.get('model') or {}).get('publication_policy') == 'quantiv.event-forecast-eligibility.v1'
+    else:
+        active = False
+    return active, load_reported_event_keys(PUBLIC_DIR, today=today)
+
+
+def _can_restore_event(key: EventKey, event: dict, today: date,
+                       context: tuple[bool, set[str]]) -> bool:
+    if key[1] < today.isoformat():
+        return True
+    if key[1] > today.isoformat():
+        return False
+    policy_active, reported_keys = context
+    if has_reported_actuals(event) or f'{key[0]}|{key[1]}' in reported_keys:
+        return True
+    return not policy_active and event.get('ml_publication_status') is None
 
 
 def _git(*args: str) -> bytes:
@@ -369,6 +398,9 @@ def _symbol_history_candidate(key: EventKey) -> dict | None:
             candidate[field] = value
     for field in (
         "forecast_id",
+        "forecast_model_bundle_id",
+        "ml_publication_status",
+        "ml_publication_reason",
         "forecast_scored_at",
         "forecast_feature_cutoff_at",
         "forecast_prediction_deadline_at",
@@ -429,6 +461,9 @@ def _symbol_expected_move_candidate(key: EventKey) -> dict | None:
     }
     for field in ML_HISTORY_FIELDS | {
         "forecast_id",
+        "forecast_model_bundle_id",
+        "ml_publication_status",
+        "ml_publication_reason",
         "forecast_scored_at",
         "forecast_published_at",
         "forecast_feature_cutoff_at",
@@ -503,6 +538,8 @@ def _merge_forecast(current: dict, historical: dict) -> dict:
     merged = dict(current)
     for field in FORECAST_FIELDS:
         value = source.get(field)
+        if field in {'ml_publication_status', 'ml_publication_reason'} and current.get('ml_publication_status') is not None:
+            continue
         if value is not None:
             merged[field] = value
     return merged
@@ -535,11 +572,12 @@ def recover_week(
     bundle = json.loads(path.read_text(encoding="utf-8"))
     events = bundle.get("events") or []
     by_key = {(e["ticker"], e["earnings_date"]): e for e in events}
+    context = _restoration_context(today)
 
     targets = {
         key
         for key in membership
-        if key[1] <= today.isoformat()
+        if _can_restore_event(key, by_key.get(key) or {}, today, context)
         and bundle["window"]["start"] <= key[1] <= bundle["window"]["end"]
     }
     if not targets:
@@ -709,6 +747,9 @@ def _symbol_expected_move(event: dict) -> dict:
         "historical_event_count": event.get("historical_event_count"),
         "forecast_frozen": True,
         "forecast_id": event.get("forecast_id"),
+        "forecast_model_bundle_id": event.get("forecast_model_bundle_id"),
+        "ml_publication_status": event.get("ml_publication_status"),
+        "ml_publication_reason": event.get("ml_publication_reason"),
         "forecast_scored_at": event.get("forecast_scored_at"),
         "forecast_published_at": event.get("forecast_published_at"),
         "forecast_feature_cutoff_at": event.get("forecast_feature_cutoff_at"),
@@ -807,6 +848,7 @@ def main() -> int:
 
     recovered: dict[EventKey, dict] = {}
     resolved: dict[EventKey, dict] = {}
+    context = _restoration_context(today)
     for path in sorted(WEEKS_DIR.glob("*.json")):
         if path.name == "manifest.json":
             continue
@@ -815,7 +857,7 @@ def main() -> int:
         # reported forecast, including calendar rows whose values did not change.
         for event in json.loads(path.read_text(encoding="utf-8")).get("events") or []:
             key = (event.get("ticker"), event.get("earnings_date"))
-            if key in membership and key[1] <= today.isoformat() and _forecast_rank(event)[0] > 0:
+            if key in membership and _can_restore_event(key, event, today, context) and _forecast_rank(event)[0] > 0:
                 resolved[key] = event
         if repaired:
             recovered.update(repaired)

@@ -153,6 +153,11 @@ def _model_status(monitoring: dict[str, Any]) -> str:
     if not monitoring:
         return "unavailable"
     drift = monitoring.get("feature_drift") or {}
+    event_policy_present = (monitoring.get('publication_eligibility') or {}).get('schema') == 'quantiv.event-forecast-eligibility.v1'
+    if event_policy_present and monitoring.get('status') == 'partial':
+        return 'advisory'
+    if event_policy_present and monitoring.get('status') == 'passed' and drift.get('status') in {'critical', 'insufficient_data', 'unsupported_cohort'}:
+        return 'advisory'
     monitor = _status(monitoring.get("status"))
     if monitor == "failed" or str(drift.get("status") or "") == "critical":
         return "failed"
@@ -241,6 +246,16 @@ def build_snapshot(
     shadow_scoring = monitoring.get("shadow_scoring") or {}
     model_status = _model_status(monitoring)
     data_status = _data_status(reconciliation)
+    event_policy = monitoring.get('publication_eligibility') or {}
+    event_policy_present = event_policy.get('schema') == 'quantiv.event-forecast-eligibility.v1'
+    publication_coverage = event_policy.get('coverage') or {}
+    serving_permitted = (
+        event_policy_present
+        and display.get('ml_publication_status') in {'eligible', 'partial'}
+        and display.get('ml_publication_coverage') == publication_coverage
+        and (_number(publication_coverage.get('eligible_rows')) or 0) > 0
+        and (_number(publication_coverage.get('eligible_events')) or 0) > 0
+    )
     if data_status == "unavailable" and model_status == "unavailable":
         overall_status = "unavailable"
     elif "failed" in {data_status, model_status}:
@@ -249,6 +264,23 @@ def build_snapshot(
         overall_status = "advisory"
     else:
         overall_status = _status(data_status, model_status)
+    if serving_permitted:
+        overall_status = _status(data_status, 'advisory' if model_status == 'failed'
+                                 or publication_coverage.get('held_events', 0) > 0 else model_status)
+    if event_policy_present and publication_coverage.get('held_events', 0) > 0:
+        eligible_count = publication_coverage.get('eligible_events', 0)
+        held_count = publication_coverage['held_events']
+        exceptions.append({'code': 'ml_event_coverage_partial', 'severity': 'warning',
+                           'summary': f'{eligible_count} of {publication_coverage.get("candidate_events", 0)} scored earnings events have eligible ML forecasts; {held_count} of those events are held. Other upcoming calendar events remain held for ML and use independent estimates until a current eligible forecast is available.',
+                           'count': held_count})
+    elif event_policy_present and publication_coverage.get('held_rows', 0) > 0:
+        held_count = publication_coverage['held_rows']
+        exceptions.append({'code': 'ml_forecast_coverage_partial', 'severity': 'warning',
+                           'summary': f'{held_count} model forecasts are held among scored earnings events; each scored event has an eligible forecast. Other upcoming calendar events remain held for ML and use independent estimates until a current eligible forecast is available.',
+                           'count': held_count})
+    if serving_permitted and drift.get('status') in {'critical', 'insufficient_data', 'unsupported_cohort'}:
+        exceptions.append({'code': 'ml_aggregate_drift_advisory', 'severity': 'warning',
+                           'summary': 'The aggregate model assessment requires attention. Only eligible event forecasts are published.'})
 
     total_duplicates = sum(
         int((value or {}).get("duplicate_rows") or 0)
@@ -263,10 +295,9 @@ def build_snapshot(
         if isinstance(item, dict)
     ]
 
-    publication_eligible = bool(quality.get("decision_safe")) and model_status in {
-        "passed",
-        "advisory",
-    }
+    publication_eligible = bool(quality.get("decision_safe")) and (
+        serving_permitted if event_policy_present else model_status in {'passed', 'advisory'}
+    )
 
     return {
         "schema": "quantiv.control-plane.v2",
@@ -320,7 +351,9 @@ def build_snapshot(
         "model": {
             "status": model_status,
             "publication_status": display.get('ml_publication_status', 'unavailable'),
+            "publication_policy": event_policy.get('schema') if event_policy_present else None,
             "publication_hold_reason": display.get('ml_publication_reason'),
+            "publication_coverage": publication_coverage if event_policy_present else {},
             "monitored_at": monitoring.get("monitored_at"),
             "snapshot_date": monitoring.get("snapshot_date"),
             "champion_active": active_champion,
@@ -458,6 +491,10 @@ def build_history_entry(
         "duplicate_rows": _number(data.get("duplicate_rows")),
         "model_snapshot_date": model.get("snapshot_date"),
         "model_status": model.get("status", "unavailable"),
+        "ml_publication_status": model.get('publication_status', 'unavailable'),
+        "ml_eligible_events": _number((model.get('publication_coverage') or {}).get('eligible_events')),
+        "ml_held_events": _number((model.get('publication_coverage') or {}).get('held_events')),
+        "ml_candidate_events": _number((model.get('publication_coverage') or {}).get('candidate_events')),
         "drift_status": model.get("drift_status", "unavailable"),
         "critical_features": _number(model.get("critical_features")),
         "warning_features": _number(model.get("warning_features")),

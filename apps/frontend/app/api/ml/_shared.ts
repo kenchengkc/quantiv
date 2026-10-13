@@ -45,6 +45,7 @@ export type BackendPredictResponse = {
   served_at: string;
   snapshot_age_days?: number | null;
   forecast_scored_at?: string | null;
+  model_bundle_id?: string | null;
   model_version?: string | null;
   model_trained_at?: string | null;
   model_loaded_at?: string | null;
@@ -62,6 +63,11 @@ export type SymbolJson = {
     em_ml_pct?: number | null;
     em_ml_abs?: number | null;
     ml_snapshot_date?: string | null;
+    model_horizon?: number | null;
+    forecast_model_bundle_id?: string | null;
+    forecast_scored_at?: string | null;
+    ml_publication_status?: 'held' | 'eligible' | null;
+    ml_publication_reason?: string | null;
     p10?: number | null;
     p25?: number | null;
     p50?: number | null;
@@ -115,6 +121,15 @@ export function loadSymbolJson(symbol: string): SymbolJson | null {
   }
 }
 
+export function loadPredictionPublicationPolicy(): boolean {
+  try {
+    const control = JSON.parse(readFileSync(join(publicDir(), 'control-plane.json'), 'utf8'));
+    return control?.model?.publication_policy === 'quantiv.event-forecast-eligibility.v1';
+  } catch {
+    return false;
+  }
+}
+
 function quantilesFromExpectedMove(
   expectedMove: SymbolJson['expected_move'],
 ): Record<string, number> {
@@ -140,9 +155,10 @@ export function buildNightlyFallbackPayload(
   const sym = req.symbol;
   const expectedMove = nightly?.expected_move;
   const spot = req.spot_override ?? nightly?.spot_price ?? 0;
-  const staticMlAbs = finite(expectedMove?.em_ml_abs) ? expectedMove.em_ml_abs : null;
+  const mlHeld = expectedMove?.ml_publication_status === 'held';
+  const staticMlAbs = !mlHeld && finite(expectedMove?.em_ml_abs) ? expectedMove.em_ml_abs : null;
   const straddleAbs = finite(expectedMove?.straddle_abs) ? expectedMove.straddle_abs : null;
-  const staticMlPct = finite(expectedMove?.em_ml_pct)
+  const staticMlPct = !mlHeld && finite(expectedMove?.em_ml_pct)
     ? expectedMove.em_ml_pct
     : staticMlAbs !== null && spot > 0
       ? staticMlAbs / spot

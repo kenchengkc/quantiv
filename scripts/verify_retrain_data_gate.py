@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import re
 from datetime import datetime, timezone
 from pathlib import Path
@@ -48,6 +49,49 @@ def _active_options_date(data_dir: Path) -> str:
     if not dates:
         raise RuntimeError("published data release has no options snapshot")
     return max(dates)
+
+
+def _aggregate_activation_holds(
+    manifest: dict[str, Any], quote: dict[str, Any],
+) -> set[str]:
+    """Reconstruct the original aggregate gates independently of serving flags."""
+    holds = {
+        str(item.get("code"))
+        for item in manifest["exceptions"]
+        if item.get("code") in {
+            "event_quote_coverage_below_limit", "option_quote_quality_below_limit",
+        }
+    }
+    coverage = manifest.get("event_coverage", {})
+    if not isinstance(coverage, dict):
+        raise RuntimeError("model activation coverage contract is invalid")
+    if coverage.get("status") == "failed":
+        holds.add("event_quote_coverage_below_limit")
+    if all(key in coverage for key in (
+        "expected_events", "covered_events", "minimum_coverage_pct",
+    )):
+        try:
+            expected = int(coverage["expected_events"])
+            covered = int(coverage["covered_events"])
+            floor = float(coverage["minimum_coverage_pct"])
+        except (TypeError, ValueError) as exc:
+            raise RuntimeError("model activation coverage contract is invalid") from exc
+        if expected < 0 or not 0 <= covered <= expected or not math.isfinite(floor):
+            raise RuntimeError("model activation coverage contract is invalid")
+        if expected and covered / expected < floor:
+            holds.add("event_quote_coverage_below_limit")
+    rate = quote.get("decision_group_rejection_rate")
+    limit = quote.get("max_decision_group_rejection_rate")
+    if rate is not None and limit is not None:
+        try:
+            rate, limit = float(rate), float(limit)
+        except (TypeError, ValueError) as exc:
+            raise RuntimeError("model activation quote-rate contract is invalid") from exc
+        if not math.isfinite(rate) or not math.isfinite(limit):
+            raise RuntimeError("model activation quote-rate contract is invalid")
+        if rate > limit:
+            holds.add("option_quote_quality_below_limit")
+    return holds
 
 
 def verify_retrain_data_gate(
@@ -115,6 +159,24 @@ def verify_retrain_data_gate(
     quote = manifest.get("quote_quality")
     if not isinstance(source, dict) or not isinstance(quote, dict):
         raise RuntimeError("retrain reconciliation evidence has an invalid source contract")
+    activation_holds = _aggregate_activation_holds(manifest, quote)
+    activation_eligible = quality.get("model_activation_eligible")
+    activation_codes = quality.get("model_activation_blocking_codes")
+    if "model_activation_eligible" in quality or "model_activation_blocking_codes" in quality:
+        if (
+            type(activation_eligible) is not bool
+            or not isinstance(activation_codes, list)
+            or any(not isinstance(code, str) or not code for code in activation_codes)
+        ):
+            raise RuntimeError("retrain reconciliation model activation contract is invalid")
+        activation_holds.update(activation_codes)
+        if not activation_eligible and not activation_holds:
+            activation_holds.add("model_activation_ineligible")
+    if activation_holds:
+        raise RuntimeError(
+            "published data release is serving-safe but model activation is blocked: "
+            + ", ".join(sorted(activation_holds))
+        )
     source_dates = {
         str(value)
         for value in (source.get("source_date"), quote.get("source_date"))

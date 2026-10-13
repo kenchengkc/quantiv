@@ -3,7 +3,7 @@ from __future__ import annotations
 from ml.data_reconciliation import build_reconciliation_manifest
 
 
-def test_september_4_candidate_keeps_real_coverage_hold_after_scope_correction() -> None:
+def test_september_4_candidate_keeps_activation_hold_with_per_event_serving() -> None:
     manifest = build_reconciliation_manifest(
         generated_at="2026-09-06T14:43:21+00:00",
         datasets={
@@ -95,10 +95,14 @@ def test_september_4_candidate_keeps_real_coverage_hold_after_scope_correction()
     assert quote["decision_group_rejection_rate"] == 0.342105
     assert quote["status"] == "degraded"
 
-    assert manifest["quality"]["status"] == "failed"
-    assert manifest["quality"]["decision_safe"] is False
-    assert manifest["quality"]["critical_exceptions"] == 1
+    assert manifest["quality"]["status"] == "advisory"
+    assert manifest["quality"]["decision_safe"] is True
+    assert manifest["quality"]["critical_exceptions"] == 0
+    assert manifest["quality"]["model_activation_eligible"] is False
+    assert manifest["quality"]["model_activation_blocking_codes"] == [
+        "event_quote_coverage_below_limit",
+    ]
     severities = {issue["code"]: issue["severity"] for issue in manifest["exceptions"]}
-    assert severities["event_quote_coverage_below_limit"] == "critical"
+    assert severities["event_quote_coverage_below_limit"] == "warning"
     assert severities["option_chain_diagnostics_above_limit"] == "warning"
     assert "option_quote_quality_below_limit" not in severities

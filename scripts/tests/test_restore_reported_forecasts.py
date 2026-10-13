@@ -467,3 +467,97 @@ def test_refresh_and_ci_validate_real_publication_before_commit():
     ci = yaml.safe_load((root / ".github/workflows/ci.yml").read_text())
     assert any("tools/validate_public_contracts.py" in step.get("run", "")
                for job in ci["jobs"].values() for step in job["steps"])
+
+
+@pytest.mark.parametrize('status', ['held', 'eligible', None])
+def test_new_policy_same_day_unreported_forecasts_are_not_replaced(tmp_path, monkeypatch, status):
+    path = tmp_path / 'week.json'
+    current = _event('GOOD', '2026-10-13', ml_publication_status=status,
+        display_forecast_pct=.05, display_forecast_method='historical', hist_move_med_4q=.05,
+        ml_status='unavailable_model', options_status='unavailable', historical_event_count=4)
+    if status == 'eligible':
+        current.update(em_ml_pct=.08, ml_snapshot_date='2026-10-12', forecast_id='approved',
+            forecast_model_bundle_id='current-bundle', forecast_scored_at='2026-10-13T10:00:00Z',
+            forecast_frozen_eligible=True, display_forecast_pct=.08, display_forecast_method='ml',
+            ml_status='available')
+    path.write_text(json.dumps({'window': {'start': '2026-10-12', 'end': '2026-10-16'}, 'events': [current]}))
+    original = path.read_bytes()
+    (tmp_path / 'control-plane.json').write_text(json.dumps({'model': {
+        'publication_policy': 'quantiv.event-forecast-eligibility.v1'}}))
+    monkeypatch.setattr(restore, 'PUBLIC_DIR', tmp_path)
+    monkeypatch.setattr(restore, '_history', lambda _path: ['old'])
+    old = _event('GOOD', '2026-10-13', em_ml_pct=.99, ml_snapshot_date='2026-10-12',
+                 forecast_frozen_eligible=True, forecast_id='old', forecast_scored_at='2026-10-13T12:00:00Z')
+    monkeypatch.setattr(restore, '_bundle_at', lambda *_args: {'events': [old]})
+    monkeypatch.setattr(restore, '_commit_at', lambda *_args: None)
+    assert restore.recover_week(path, {('GOOD', '2026-10-13')}, date(2026, 10, 13), apply=True) == {}
+    assert path.read_bytes() == original
+
+
+def test_main_does_not_reserialize_same_day_approved_symbol_identity(tmp_path, monkeypatch):
+    import sys
+    import validate_public_contracts as contracts
+    symbols, weeks = tmp_path / 'symbols', tmp_path / 'weeks'
+    symbols.mkdir()
+    weeks.mkdir()
+    key = ('GOOD', '2026-10-13')
+    event = restore._normalize_forecast(_event(*key, em_ml_pct=.08, ml_snapshot_date='2026-10-12',
+        forecast_id='approved', forecast_model_bundle_id='current-bundle',
+        forecast_scored_at='2026-10-13T10:00:00Z', forecast_frozen_eligible=True,
+        ml_publication_status='eligible', as_of_date='2026-10-12'))
+    week = weeks / '2026-10-12.json'
+    week.write_text(json.dumps({'window': {'start': '2026-10-12', 'end': '2026-10-16'}, 'events': [event]}))
+    expected = {**restore._symbol_expected_move(event), 'forecast_model_bundle_id': 'current-bundle',
+                'ml_publication_status': 'eligible'}
+    symbol = symbols / 'GOOD.json'
+    symbol.write_text(json.dumps({'symbol': 'GOOD', 'as_of_date': '2026-10-12',
+                                  'next_earnings': key[1], 'expected_move': expected, 'earnings_history': []}))
+    before = symbol.read_bytes()
+    monkeypatch.setattr(restore, 'PUBLIC_DIR', tmp_path)
+    monkeypatch.setattr(restore, 'SYMBOLS_DIR', symbols)
+    monkeypatch.setattr(restore, 'WEEKS_DIR', weeks)
+    monkeypatch.setattr(restore, '_history', lambda _path: [])
+    monkeypatch.setattr(restore, '_load_reference_membership', lambda: ({key}, {'start': '2026-10-12', 'end': '2026-10-16'}))
+    monkeypatch.setattr(contracts, 'PUBLIC', tmp_path)
+    monkeypatch.setattr(sys, 'argv', ['restore', '--apply', '--today', '2026-10-13'])
+    assert restore.main() == 0
+    assert symbol.read_bytes() == before
+
+
+@pytest.mark.parametrize('actual_origin', ['calendar', 'symbol_history'])
+def test_reported_same_day_actuals_remain_recoverable_under_new_policy(tmp_path, monkeypatch, actual_origin):
+    path = tmp_path / 'week.json'
+    current = _event('REPORTED', '2026-10-13', eps_actual=0 if actual_origin == 'calendar' else None,
+                     ml_publication_status='held')
+    path.write_text(json.dumps({'window': {'start': '2026-10-12', 'end': '2026-10-16'}, 'events': [current]}))
+    monkeypatch.setattr(restore, 'PUBLIC_DIR', tmp_path)
+    if actual_origin == 'symbol_history':
+        symbols = tmp_path / 'symbols'
+        symbols.mkdir()
+        (symbols / 'REPORTED.json').write_text(json.dumps({'symbol': 'REPORTED',
+            'earnings_history': [{'date': '2026-10-13', 'revenue_actual': 0}]}))
+        monkeypatch.setattr(restore, 'SYMBOLS_DIR', symbols)
+    monkeypatch.setattr(restore, '_history', lambda _path: ['old'])
+    old = _event('REPORTED', '2026-10-13', em_ml_pct=.04, ml_snapshot_date='2026-10-12',
+                 forecast_frozen_eligible=True, forecast_id='reported', forecast_model_bundle_id='historical-bundle')
+    monkeypatch.setattr(restore, '_bundle_at', lambda *_args: {'events': [old]})
+    monkeypatch.setattr(restore, '_commit_at', lambda *_args: None)
+    repaired = restore.recover_week(path, {('REPORTED', '2026-10-13')}, date(2026, 10, 13), apply=True)
+    result = repaired[('REPORTED', '2026-10-13')]
+    assert result['eps_actual'] == current['eps_actual'] and result['em_ml_pct'] == .04
+    assert result['forecast_model_bundle_id'] == 'historical-bundle'
+    assert restore._symbol_expected_move(result)['ml_publication_status'] == 'held'
+
+
+def test_legacy_markerless_same_day_recovery_keeps_prior_behavior(tmp_path, monkeypatch):
+    path = tmp_path / 'week.json'
+    path.write_text(json.dumps({'window': {'start': '2026-10-12', 'end': '2026-10-16'},
+                               'events': [_event('LEGACY', '2026-10-13')]}))
+    monkeypatch.setattr(restore, 'PUBLIC_DIR', tmp_path)
+    monkeypatch.setattr(restore, '_history', lambda _path: ['old'])
+    old = _event('LEGACY', '2026-10-13', em_ml_pct=.04, ml_snapshot_date='2026-10-12',
+                 forecast_frozen_eligible=True)
+    monkeypatch.setattr(restore, '_bundle_at', lambda *_args: {'events': [old]})
+    monkeypatch.setattr(restore, '_commit_at', lambda *_args: None)
+    result = restore.recover_week(path, {('LEGACY', '2026-10-13')}, date(2026, 10, 13), apply=True)
+    assert result[('LEGACY', '2026-10-13')]['em_ml_pct'] == .04

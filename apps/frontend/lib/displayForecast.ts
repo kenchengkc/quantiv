@@ -26,6 +26,8 @@ export type DisplayForecastFields = {
   display_forecast_method?: DisplayForecastMethod | null;
   display_forecast_as_of?: string | null;
   ml_status?: MLForecastStatus | null;
+  ml_publication_status?: 'held' | 'eligible' | null;
+  ml_publication_reason?: string | null;
   options_status?: OptionsForecastStatus | null;
   fallback_reason?: ForecastFallbackReason;
   historical_event_count?: number | null;
@@ -112,10 +114,12 @@ export function resolveDisplayForecastCompat(
       : { pct: null, method: null };
   }
 
-  const ml = finiteDisplayForecast(fields.em_ml_pct);
+  const mlHeld = fields.ml_publication_status === 'held';
+  const ml = mlHeld ? null : finiteDisplayForecast(fields.em_ml_pct);
   if (ml != null) return { pct: ml, method: 'ml' };
 
-  const canonical = finiteDisplayForecast(fields.display_forecast_pct);
+  const canonical = mlHeld && fields.display_forecast_method === 'ml'
+    ? null : finiteDisplayForecast(fields.display_forecast_pct);
   if (canonical != null && fields.display_forecast_method === 'ml') {
     return { pct: canonical, method: 'ml' };
   }
@@ -182,5 +186,6 @@ export function resolveDisplayForecastCompat(
     };
   }
 
-  return { pct: null, method: fields.display_forecast_method ?? null };
+  return { pct: null, method: mlHeld && fields.display_forecast_method === 'ml'
+    ? null : fields.display_forecast_method ?? null };
 }

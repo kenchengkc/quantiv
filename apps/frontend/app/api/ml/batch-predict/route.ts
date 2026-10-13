@@ -6,9 +6,12 @@ import {
   NO_STORE,
   PredictRequestSchema,
   type PredictRequestBody,
+  type SymbolJson,
   buildNightlyFallbackPayload,
+  loadPredictionPublicationPolicy,
   loadSymbolJson,
 } from '../_shared';
+import { guardPublishedPrediction, heldPrediction, matchesPublishedPrediction } from '../_publicationGuard';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -21,10 +24,11 @@ const BatchPredictRequestSchema = z.object({
 function buildFallbackItem(
   item: PredictRequestBody,
   fallbackReason: string,
+  nightly: SymbolJson | null = loadSymbolJson(item.symbol),
 ) {
   const response = buildNightlyFallbackPayload(
     item,
-    loadSymbolJson(item.symbol),
+    nightly,
     fallbackReason,
   );
   if (!response) {
@@ -65,12 +69,24 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  if (!backendProxyConfigured()) {
+  const policyActive = loadPredictionPublicationPolicy();
+  const publication = parsed.data.items.map((item) => {
+    const nightly = loadSymbolJson(item.symbol);
+    return { ...guardPublishedPrediction(item, nightly, policyActive), nightly };
+  });
+  const allowed = publication.filter((item) => item.holdReason == null);
+  const mergeItems = (responses: unknown[]) => {
+    let nextResponse = 0;
+    return publication.map((item) => item.holdReason
+      ? heldPrediction(item.request, item.holdReason)
+      : responses[nextResponse++]);
+  };
+
+  if (allowed.length === 0 || !backendProxyConfigured()) {
     return NextResponse.json(
       {
-        items: parsed.data.items.map((item) =>
-          buildFallbackItem(item, 'backend_proxy_not_configured'),
-        ),
+        items: mergeItems(allowed.map((item) =>
+          buildFallbackItem(item.request, 'backend_proxy_not_configured', item.nightly))),
         served_at: new Date().toISOString(),
       },
       { headers: NO_STORE },
@@ -78,12 +94,45 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const upstream = await proxyJsonPost('/api/ml/batch-predict', parsed.data, {
-      timeoutMs: 10_000,
+    const upstream = await proxyJsonPost<{ items: unknown[]; served_at: string }>(
+      '/api/ml/batch-predict', {
+        ...parsed.data, items: allowed.map((item) => item.request),
+      }, {
+        timeoutMs: 10_000,
+      },
+    );
+    if (!Array.isArray(upstream?.items) || upstream.items.length !== allowed.length) {
+      return NextResponse.json({
+        items: mergeItems(allowed.map((item) =>
+          buildFallbackItem(item.request, 'backend_batch_response_invalid', item.nightly))),
+        served_at: new Date().toISOString(),
+      }, { headers: NO_STORE });
+    }
+    const responses = allowed.map((item, index) => {
+      const result = upstream.items[index];
+      if (!item.publicationBound) return result;
+      const entry = result && typeof result === 'object' ? result as Record<string, unknown> : null;
+      if (entry?.ok !== true || entry.symbol !== item.request.symbol
+        || entry.horizon_days !== item.request.horizon_days
+        || entry.earnings_date !== item.request.earnings_date
+        || !matchesPublishedPrediction(item.request, item.nightly, entry.response)) {
+        return buildFallbackItem(item.request, 'backend_prediction_not_current', item.nightly);
+      }
+      return result;
     });
-    return NextResponse.json(upstream, { headers: NO_STORE });
+    return NextResponse.json({ ...upstream, items: mergeItems(responses) }, { headers: NO_STORE });
   } catch (err) {
     if (err instanceof BackendProxyError && err.status >= 400 && err.status < 500) {
+      if (allowed.some((item) => item.publicationBound)) {
+        return NextResponse.json({
+          items: mergeItems(allowed.map((item) => item.publicationBound
+            ? buildFallbackItem(item.request, 'backend_prediction_unavailable', item.nightly)
+            : { ok: false, symbol: item.request.symbol, horizon_days: item.request.horizon_days,
+              earnings_date: item.request.earnings_date ?? null,
+              error_status: err.status, error: err.message })),
+          served_at: new Date().toISOString(),
+        }, { headers: NO_STORE });
+      }
       return NextResponse.json(
         { error: err.message },
         { status: err.status, headers: NO_STORE },
@@ -91,9 +140,8 @@ export async function POST(req: NextRequest) {
     }
     return NextResponse.json(
       {
-        items: parsed.data.items.map((item) =>
-          buildFallbackItem(item, 'backend_unavailable'),
-        ),
+        items: mergeItems(allowed.map((item) =>
+          buildFallbackItem(item.request, 'backend_unavailable', item.nightly))),
         served_at: new Date().toISOString(),
       },
       { headers: NO_STORE },
