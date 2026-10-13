@@ -27,9 +27,9 @@
       "source": "manual (user-confirmed acquisition)"
     },
     "BLFS": {
-      "reason": "Auto-detected: absent from NASDAQ/NYSE exchange directories for \u22653 consecutive days (likely M&A, bankruptcy, or going-private).",
-      "delisted_on": "2026-10-11",
-      "source": "auto: scripts/detect_delistings.py"
+      "reason": "Repligen completed its acquisition of BioLife Solutions on 2026-10-06; common shares converted into $11.25 cash plus 0.1442 RGEN shares and Nasdaq trading was halted. Retire BLFS; do not merge BioLife earnings history into RGEN.",
+      "delisted_on": "2026-10-06",
+      "source": "https://www.sec.gov/Archives/edgar/data/730272/000119312526415015/d240327d8k.htm"
     },
     "CPRX": {
       "reason": "Acquired by Angelini Pharma at $31.50/share cash; Catalyst Pharmaceuticals delisted from Nasdaq.",
@@ -81,15 +81,10 @@
       "delisted_on": "2026-06-29",
       "source": "manual (user-confirmed acquisition)"
     },
-    "PSKY": {
-      "reason": "Auto-detected: absent from NASDAQ/NYSE exchange directories for \u22653 consecutive days (likely M&A, bankruptcy, or going-private).",
-      "delisted_on": "2026-10-10",
-      "source": "auto: scripts/detect_delistings.py"
-    },
     "QRVO": {
-      "reason": "Auto-detected: absent from NASDAQ/NYSE exchange directories for \u22653 consecutive days (likely M&A, bankruptcy, or going-private).",
-      "delisted_on": "2026-10-10",
-      "source": "auto: scripts/detect_delistings.py"
+      "reason": "Qorvo completed its merger with Skyworks Solutions on 2026-10-05; common shares converted into $32.50 cash plus 0.960 SWKS shares and Nasdaq trading halted. Retire QRVO; do not merge Qorvo earnings history into SWKS.",
+      "delisted_on": "2026-10-05",
+      "source": "https://www.sec.gov/Archives/edgar/data/1604778/000095010326015180/dp254466_8k.htm"
     },
     "SNCY": {
       "reason": "Acquired by Allegiant Travel Company (NASDAQ: ALGT); Sun Country Airlines delisted from Nasdaq.",
@@ -112,9 +107,9 @@
       "source": "manual (user-confirmed go-private; TWO$A is NYSE preferred, not a rename)"
     },
     "WBD": {
-      "reason": "Auto-detected: absent from NASDAQ/NYSE exchange directories for \u22653 consecutive days (likely M&A, bankruptcy, or going-private).",
-      "delisted_on": "2026-10-11",
-      "source": "auto: scripts/detect_delistings.py"
+      "reason": "Skydance Corporation (formerly Paramount Skydance) completed its acquisition of Warner Bros. Discovery on 2026-10-06; WBD common shares converted into cash consideration and ceased Nasdaq trading. Retire WBD; PSKY -> SKYD is the acquirer rename, not WBD -> SKYD.",
+      "delisted_on": "2026-10-06",
+      "source": "https://www.sec.gov/Archives/edgar/data/1437107/000119312526415055/d200872d8k.htm"
     },
     "WBS": {
       "reason": "Acquired by Banco Santander; each Webster common share converted into $48.75 cash plus 2.0548 SAN ADSs. WBS delisted from NYSE.",

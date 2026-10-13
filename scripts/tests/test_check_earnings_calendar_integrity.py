@@ -93,3 +93,20 @@ def test_required_baseline_fails_closed(tmp_path):
 
     assert result.returncode == 1
     assert "Required prior-release baseline missing" in result.stdout
+
+
+def test_verified_rename_does_not_exempt_an_unrelated_ticker_drop(tmp_path):
+    event_date = date.today() + timedelta(days=20)
+    _write_baseline(tmp_path, [_row("PSKY", event_date, "dolthub"),
+                               _row("KEEP", event_date, "dolthub")])
+    _write_calendar(tmp_path, [_row("SKYD", event_date, "dolthub"),
+                               _row("KEEP", event_date, "dolthub")])
+    args = ("--require-baseline", "--max-ticker-drop", "0", "--max-row-drop-pct", "100")
+    result = _run_gate(tmp_path, *args)
+    assert result.returncode == 0, result.stdout + result.stderr
+
+    _write_calendar(tmp_path, [_row("SKYD", event_date, "dolthub")])
+    result = _run_gate(tmp_path, *args)
+    assert result.returncode == 1
+    assert "1 US tickers vanished" in result.stdout
+    assert "KEEP" in result.stdout
