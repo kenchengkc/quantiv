@@ -44,6 +44,17 @@ export type ControlSnapshot = {
   };
   model: {
     status: ControlStatus;
+    publication_status?: 'eligible' | 'partial' | 'held' | 'unavailable';
+    publication_policy?: 'quantiv.event-forecast-eligibility.v1' | null;
+    publication_hold_reason?: string | null;
+    publication_coverage?: {
+      candidate_rows?: number;
+      eligible_rows?: number;
+      held_rows?: number;
+      candidate_events?: number;
+      eligible_events?: number;
+      held_events?: number;
+    };
     monitored_at: string | null;
     snapshot_date: string | null;
     champion_active: boolean;
@@ -103,6 +114,10 @@ export type ControlHistoryRun = {
   duplicate_rows: number | null;
   model_snapshot_date: string | null;
   model_status: ControlStatus;
+  ml_publication_status?: 'eligible' | 'partial' | 'held' | 'unavailable';
+  ml_eligible_events?: number | null;
+  ml_held_events?: number | null;
+  ml_candidate_events?: number | null;
   drift_status: string;
   critical_features: number | null;
   warning_features: number | null;

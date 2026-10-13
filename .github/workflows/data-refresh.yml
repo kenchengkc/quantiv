@@ -313,23 +313,6 @@ jobs:
           python scripts/model_publication.py snapshot
           python scripts/daily_score.py --days-ahead 21 --github-output "$GITHUB_OUTPUT"
 
-      - name: Gate — validate scored ML and IV forecasts
-        if: steps.options_gate.outputs.can_refresh == 'true' && steps.scoring.outputs.has_forecasts == 'true'
-        run: |
-          python scripts/validate_ml_pipeline.py forecasts \
-            --forecast-path "${{ steps.scoring.outputs.forecast_path }}" \
-            --report data/validation/daily_forecasts.json \
-            --publish-receipt-dir data/forecasts/receipts
-
-      - name: Upload daily forecast validation report
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: daily-forecast-validation
-          path: data/validation/daily_forecasts.json
-          if-no-files-found: ignore
-          retention-days: 14
-
       - name: Monitor champion, shadows, and feature drift
         if: steps.options_gate.outputs.can_refresh == 'true'
         id: model_publication
@@ -347,6 +330,23 @@ jobs:
           R2_BUCKET: ${{ secrets.R2_BUCKET }}
         run: bash scripts/r2_push.sh --monitoring-only
 
+      - name: Gate — validate scored ML and IV forecasts
+        if: steps.options_gate.outputs.can_refresh == 'true' && steps.model_publication.outputs.has_forecasts == 'true'
+        run: |
+          python scripts/validate_ml_pipeline.py forecasts \
+            --forecast-path "${{ steps.model_publication.outputs.eligible_forecast_path }}" \
+            --report data/validation/daily_forecasts.json \
+            --publish-receipt-dir data/forecasts/receipts
+
+      - name: Upload daily forecast validation report
+        if: always() && steps.model_publication.outputs.has_forecasts == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: daily-forecast-validation
+          path: data/validation/daily_forecasts.json
+          if-no-files-found: ignore
+          retention-days: 14
+
       - name: Preserve model monitoring and publication decision
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -356,6 +356,8 @@ jobs:
             data/models/monitoring/latest_monitoring.json
             data/models/monitoring/latest_monitoring.receipt.json
             data/models/monitoring/prediction_ledger.parquet
+            ${{ steps.scoring.outputs.forecast_path }}
+            ${{ steps.model_publication.outputs.eligible_forecast_path }}
           if-no-files-found: ignore
           retention-days: 30
 
@@ -365,7 +367,9 @@ jobs:
         continue-on-error: true
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        run: python -u scripts/import_recent_to_postgres.py --full
+        run: |
+          python -u scripts/import_recent_to_postgres.py --full \
+            --file "${{ steps.model_publication.outputs.eligible_forecast_path }}"
 
       - name: Push forecasts to R2
         if: steps.options_gate.outputs.can_refresh == 'true' && steps.model_publication.outputs.can_publish_ml == 'true'
@@ -676,23 +680,6 @@ jobs:
           bash scripts/run_provider_free.sh python scripts/model_publication.py snapshot
           bash scripts/run_provider_free.sh python scripts/daily_score.py --days-ahead 21 --github-output "$GITHUB_OUTPUT"
 
-      - name: Gate — validate recovered ML and IV forecasts
-        if: steps.scoring.outputs.has_forecasts == 'true'
-        run: |
-          bash scripts/run_provider_free.sh python scripts/validate_ml_pipeline.py forecasts \
-            --forecast-path "${{ steps.scoring.outputs.forecast_path }}" \
-            --report data/validation/daily_forecasts.json \
-            --publish-receipt-dir data/forecasts/receipts
-
-      - name: Upload recovered forecast validation report
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: provider-free-recovery-forecast-validation
-          path: data/validation/daily_forecasts.json
-          if-no-files-found: ignore
-          retention-days: 30
-
       - name: Monitor champion and feature drift from saved inputs
         id: model_publication
         env:
@@ -708,6 +695,23 @@ jobs:
           R2_BUCKET: ${{ secrets.R2_BUCKET }}
         run: bash scripts/run_provider_free.sh bash scripts/r2_push.sh --monitoring-only
 
+      - name: Gate — validate recovered ML and IV forecasts
+        if: steps.model_publication.outputs.has_forecasts == 'true'
+        run: |
+          bash scripts/run_provider_free.sh python scripts/validate_ml_pipeline.py forecasts \
+            --forecast-path "${{ steps.model_publication.outputs.eligible_forecast_path }}" \
+            --report data/validation/daily_forecasts.json \
+            --publish-receipt-dir data/forecasts/receipts
+
+      - name: Upload recovered forecast validation report
+        if: always() && steps.model_publication.outputs.has_forecasts == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: provider-free-recovery-forecast-validation
+          path: data/validation/daily_forecasts.json
+          if-no-files-found: ignore
+          retention-days: 30
+
       - name: Preserve recovered model monitoring and publication decision
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -717,6 +721,8 @@ jobs:
             data/models/monitoring/latest_monitoring.json
             data/models/monitoring/latest_monitoring.receipt.json
             data/models/monitoring/prediction_ledger.parquet
+            ${{ steps.scoring.outputs.forecast_path }}
+            ${{ steps.model_publication.outputs.eligible_forecast_path }}
           if-no-files-found: ignore
           retention-days: 30
 
@@ -726,7 +732,9 @@ jobs:
         continue-on-error: true
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        run: bash scripts/run_provider_free.sh python -u scripts/import_recent_to_postgres.py --full
+        run: |
+          bash scripts/run_provider_free.sh python -u scripts/import_recent_to_postgres.py --full \
+            --file "${{ steps.model_publication.outputs.eligible_forecast_path }}"
 
       - name: Push recovered forecasts to R2
         if: steps.model_publication.outputs.can_publish_ml == 'true'

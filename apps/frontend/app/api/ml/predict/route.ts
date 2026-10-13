@@ -3,10 +3,11 @@
  *
  * Flow (in order):
  *   1. Validate the request body with Zod.
- *   2. HMAC-proxy to Railway `/api/ml/predict` with a 5 s timeout.
- *   3. On Railway 4xx (model says no): return it as-is so the client can
- *      show a precise error (e.g. "no recent snapshot for this symbol").
- *   4. On Railway timeout / 5xx / network error: fall back to the nightly
+ *   2. Enforce the verified nightly event publication policy.
+ *   3. HMAC-proxy to Railway `/api/ml/predict` with a 5 s timeout.
+ *   4. Use the approved nightly value when backend publication has not caught
+ *      up; preserve precise Railway 4xx errors for legacy requests.
+ *   5. On Railway timeout / 5xx / network error: fall back to the nightly
  *      number from /public/symbols/{SYM}.json. Prefer static ML fields
  *      (`em_ml_pct`, quantiles) and only fall back to straddle when ML is
  *      absent.
@@ -24,8 +25,12 @@ import {
   BackendPredictResponse,
   NO_STORE,
   PredictRequestSchema,
+  buildNightlyFallbackPayload,
+  loadPredictionPublicationPolicy,
+  loadSymbolJson,
   nightlyFallbackResponse,
 } from '../_shared';
+import { guardPublishedPrediction, heldPrediction, matchesPublishedPrediction } from '../_publicationGuard';
 import { enforceRateLimit, PUBLIC_RATE_LIMITS } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
@@ -48,21 +53,41 @@ export async function POST(req: NextRequest) {
       { status: 400, headers: NO_STORE },
     );
   }
-  const requestBody = parsed.data;
+  const nightly = loadSymbolJson(parsed.data.symbol);
+  const publication = guardPublishedPrediction(parsed.data, nightly, loadPredictionPublicationPolicy());
+  if (publication.holdReason) {
+    return NextResponse.json(heldPrediction(publication.request, publication.holdReason), {
+      status: 404, headers: NO_STORE,
+    });
+  }
+  const requestBody = publication.request;
+  const fallback = (reason: string) => {
+    if (!publication.publicationBound) return nightlyFallbackResponse(requestBody, reason);
+    const payload = buildNightlyFallbackPayload(requestBody, nightly, reason);
+    return NextResponse.json(payload ?? {
+      error: 'nightly fallback unavailable', fallback_reason: reason,
+    }, { status: payload ? 200 : 503, headers: NO_STORE });
+  };
 
   // No backend wired up → fall back to nightly immediately so the route
   // works in local dev without Railway env set.
   if (!backendProxyConfigured()) {
-    return nightlyFallbackResponse(requestBody, 'backend_proxy_not_configured');
+    return fallback('backend_proxy_not_configured');
   }
 
   try {
     const upstream = await proxyJsonPost<BackendPredictResponse>('/api/ml/predict', requestBody, {
       timeoutMs: 5_000,
     });
+    if (publication.publicationBound && !matchesPublishedPrediction(requestBody, nightly, upstream)) {
+      return fallback('backend_prediction_not_current');
+    }
     return NextResponse.json(upstream, { headers: NO_STORE });
   } catch (err) {
     if (err instanceof BackendProxyError) {
+      if (err.status >= 400 && err.status < 500 && publication.publicationBound) {
+        return fallback('backend_prediction_unavailable');
+      }
       // 4xx from Railway is a real user-visible error ("no fresh snapshot
       // for this symbol", "horizon must be one of ...") — surface it as-is
       // rather than masking with the fallback.
@@ -73,6 +98,6 @@ export async function POST(req: NextRequest) {
       // UI shows a number with a clear "spot update unavailable" label instead
       // of an error.
     }
-    return nightlyFallbackResponse(requestBody, 'backend_unavailable');
+    return fallback('backend_unavailable');
   }
 }

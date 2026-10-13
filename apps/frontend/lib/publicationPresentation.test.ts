@@ -17,6 +17,43 @@ const control: PublicationControl = {
 };
 
 describe('publication presentation (never changes gate semantics)', () => {
+  it('explains partial event publication without changing aggregate drift status', () => {
+    const partial = { ...control, publication_eligible: true, data: { status: 'passed' },
+      model: { status: 'failed', publication_status: 'partial',
+        publication_coverage: { candidate_events: 3, eligible_events: 1, held_events: 2 } },
+      exceptions: [{ code: 'ml_event_coverage_partial', severity: 'warning' }] };
+    const result = researchUpdatePresentation(partial, forecast);
+    expect(result.label).toBe('Partially eligible');
+    expect(result.tone).toBe('flag');
+    expect(result.detail).toContain('1 of 3');
+    expect(result.detail).toContain('scored earnings events');
+    expect(result.detail).toContain('Other upcoming calendar events remain held for ML');
+    expect(result.detail).toContain('2');
+    expect(partial.model.status).toBe('failed');
+    expect(researchUpdatePresentation({ ...partial, exceptions: [
+      { code: 'corporate_actions_failed', severity: 'critical' },
+    ] }, forecast).label).toBe('Blocked');
+  });
+  it('reports held forecasts when every event still has an eligible horizon', () => {
+    const partial = { ...control, publication_eligible: true, data: { status: 'passed' },
+      model: { status: 'advisory', publication_status: 'partial',
+        publication_coverage: { candidate_events: 2, eligible_events: 2, held_events: 0,
+          candidate_rows: 4, eligible_rows: 3, held_rows: 1 } }, exceptions: [] };
+    const result = researchUpdatePresentation(partial, forecast);
+    expect(result.label).toBe('Partially eligible');
+    expect(result.detail).toContain('1 model forecast');
+    expect(result.detail).toContain('scored earnings events');
+  });
+  it('keeps unlisted calendar events held even when every scored event is eligible', () => {
+    const eligible = { ...control, publication_eligible: true, data: { status: 'passed' },
+      model: { status: 'passed', publication_status: 'eligible',
+        publication_coverage: { candidate_events: 10, eligible_events: 10, held_events: 0,
+          candidate_rows: 10, eligible_rows: 10, held_rows: 0 } }, exceptions: [] };
+    const result = researchUpdatePresentation(eligible, forecast);
+    expect(result.label).toBe('Eligible');
+    expect(result.detail).toContain('10 of 10 scored earnings events');
+    expect(result.detail).toContain('Other upcoming calendar events remain held for ML');
+  });
   it('maps advisory forecast quality without treating it as failed', () => {
     expect(publishedForecastStatus({
       ...forecast,

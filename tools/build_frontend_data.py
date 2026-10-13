@@ -32,9 +32,12 @@ from frontend_data.display_payloads import (
 )
 from frontend_data.forecast_artifacts import (
     build_dashboard_evidence as build_dashboard_evidence,
+    filter_event_forecast_archive_for_publication,
+    has_reported_actuals,
     load_event_forecast_archive,
     load_ml_forecasts,
     load_provider_enrichments,
+    load_reported_event_keys,
     provider_event_fields as provider_event_fields,
     publish_forecast_evidence,
     withhold_upcoming_ml,
@@ -104,19 +107,35 @@ def main():
     )
     args = ap.parse_args()
     publication_held = False
+    publication_policy = None
+    publication_state = 'eligible'
+    eligible_ids = None
+    eligible_event_keys = None
+    eligible_forecast_path = None
+    held_event_reasons = {}
     retained_forecasts_dir = None
     if args.verify_model_publication:
         from model_publication import backup_dir, verify_publication
         policy = verify_publication(DATA_DIR, not_before=os.getenv('REFRESH_STARTED_AT'))
+        publication_policy = policy
         publication_held = not policy['can_publish_ml']
-        retained_forecasts_dir = backup_dir(DATA_DIR) if publication_held else None
-        if publication_held and (args.resume or args.skip_weeks):
+        publication_state = policy.get('state', 'held' if publication_held else 'eligible')
+        if 'eligible_forecast_ids' in policy:
+            eligible_ids = set(policy['eligible_forecast_ids'])
+            eligible_event_keys = set(policy['eligible_event_keys'])
+            eligible_forecast_path = Path(policy['eligible_forecast_path']) if policy.get('eligible_forecast_path') else None
+            held_event_reasons = {item['event_key']: ', '.join(item.get('reasons') or ['no_eligible_current_forecast'])
+                                  for item in policy.get('held_events', [])}
+            if policy['can_publish_ml'] and eligible_forecast_path is None:
+                raise ValueError('eligible forecast publication requires an exact forecast path')
+        retained_forecasts_dir = backup_dir(DATA_DIR) if publication_state in {'held', 'partial'} else None
+        if publication_state in {'held', 'partial'} and (args.resume or args.skip_weeks):
             raise ValueError('a model hold requires rebuilding every publication surface')
 
     (PUBLIC_DIR / "symbols").mkdir(parents=True, exist_ok=True)
     (PUBLIC_DIR / "weeks").mkdir(parents=True, exist_ok=True)
     if not publication_held:
-        publish_forecast_evidence()
+        publish_forecast_evidence(expected_forecast_path=eligible_forecast_path)
 
     conn = duckdb.connect()
     # Cap DuckDB memory so long-running symbol-detail loops don't OOM-segfault.
@@ -125,8 +144,28 @@ def main():
     conn.execute("PRAGMA threads=4")
     build_earnings_events_table(conn, EARNINGS_CSV)
     create_duckdb_views(conn, DATA_DIR)
-    ml_lookup = load_ml_forecasts(publication_held=publication_held)
+    today = date.today()
+    reported_event_keys = load_reported_event_keys(PUBLIC_DIR, today=today)
+    # A same-day date alone does not establish that earnings were reported.
+    actual_columns = [field for field in ('eps_actual', 'revenue_actual')
+                      if field in {row[1] for row in conn.execute("PRAGMA table_info('earnings_events')").fetchall()}]
+    if actual_columns:
+        reported_rows = conn.execute(
+            f"SELECT ticker, earnings_dt, {', '.join(actual_columns)} FROM earnings_events WHERE earnings_dt = ?",
+            [today],
+        ).fetchall()
+        reported_event_keys.update(f'{str(row[0]).upper().strip()}|{row[1].isoformat()}'
+                                   for row in reported_rows
+                                   if has_reported_actuals(dict(zip(actual_columns, row[2:]))))
+    ml_lookup = load_ml_forecasts(publication_held=publication_held,
+                                 eligible_forecast_ids=eligible_ids,
+                                 eligible_event_keys=eligible_event_keys,
+                                 forecast_path=eligible_forecast_path)
     event_forecast_archive = load_event_forecast_archive(forecasts_dir=retained_forecasts_dir)
+    if eligible_ids is not None:
+        event_forecast_archive = filter_event_forecast_archive_for_publication(
+            event_forecast_archive, today=today, eligible_forecast_ids=eligible_ids,
+            eligible_event_keys=eligible_event_keys, reported_event_keys=reported_event_keys)
     provider_lookup = load_provider_enrichments()
     published_forecast_ids: set[str] = set()
 
@@ -155,7 +194,6 @@ def main():
     if age_days > 1:
         print(f"⚠ Options chain is {age_days} days old (as_of={as_of_date})")
 
-    today = date.today()
     this_monday = monday_of_week(today) if today.weekday() < 5 else today + timedelta(days=(7 - today.weekday()))
 
     # Build each week (last, this, next, +2) and collect unique tickers for detail pages.
@@ -379,25 +417,6 @@ def main():
         week_payloads,
         today=today,
     )
-    display_status = build_display_forecast_status(
-        published_events,
-        week_payloads,
-        today=today,
-        generated_at=datetime.now().isoformat(),
-    )
-    display_status['ml_publication_status'] = 'held' if publication_held else 'eligible'
-    display_status['ml_publication_reason'] = 'feature_drift' if publication_held else None
-    mix = display_status["method_mix"]
-    print(
-        "  forecast methods: "
-        + " ".join(f"{method}={mix.get(method, 0)}" for method in sorted(mix)),
-        flush=True,
-    )
-    validation_dir = DATA_DIR / "validation"
-    validation_dir.mkdir(parents=True, exist_ok=True)
-    (validation_dir / "display_forecast_status.json").write_text(
-        json.dumps(display_status, indent=2), encoding="utf-8"
-    )
 
     # Primary weekly.json points at the current week (back-compat for any old consumers).
     if not skip_weeks:
@@ -531,17 +550,47 @@ def main():
             )
             generated += 1
         except Exception as e:
-            if publication_held or not options_available:
+            if publication_state in {'held', 'partial'} or not options_available:
                 raise RuntimeError(f'cannot safely rebuild {ticker} during publication hold') from e
             print(f"  ⚠️  {ticker} detail: {e}")
 
     if not options_available:
+        if eligible_ids is not None:
+            # Clear unauthenticated ML before the independent history resolver
+            # runs; align components after option projections share a cutoff.
+            withhold_upcoming_ml(PUBLIC_DIR, today=today, eligible_forecast_ids=eligible_ids,
+                                 eligible_event_keys=eligible_event_keys,
+                                 held_event_reasons=held_event_reasons, align_components=False,
+                                 reported_event_keys=reported_event_keys)
         # Include retained symbols/weeks outside the rebuilt calendar. Clear
         # legacy option fields before the ML hold compatibility resolver runs.
         suppress_held_options(PUBLIC_DIR, conn=conn, as_of_date=as_of_date,
                               today=today, publication_held=publication_held)
-    if publication_held:
-        withhold_upcoming_ml(PUBLIC_DIR, today=today)
+    if publication_held or eligible_ids is not None:
+        withhold_upcoming_ml(PUBLIC_DIR, today=today, eligible_forecast_ids=eligible_ids,
+                             eligible_event_keys=eligible_event_keys,
+                             held_event_reasons=held_event_reasons,
+                             reported_event_keys=reported_event_keys)
+
+    # Report the final cleaned publication, including retained-file holds.
+    if publication_held or eligible_ids is not None or not options_available:
+        week_payloads = {start: json.loads((PUBLIC_DIR / 'weeks' / f'{start.isoformat()}.json').read_text())
+                         for start in week_payloads}
+    validate_upcoming_display_forecasts(published_events, week_payloads, today=today)
+    display_status = build_display_forecast_status(published_events, week_payloads, today=today,
+                                                 generated_at=datetime.now().isoformat())
+    display_status['ml_publication_status'] = publication_state
+    display_status['ml_publication_reason'] = (publication_policy or {}).get('reason')
+    if publication_policy and eligible_ids is not None:
+        display_status['ml_publication_coverage'] = publication_policy['coverage']
+    validation_dir = DATA_DIR / 'validation'
+    validation_dir.mkdir(parents=True, exist_ok=True)
+    (validation_dir / 'display_forecast_status.json').write_text(json.dumps(display_status, indent=2), encoding='utf-8')
+    mix = display_status['method_mix']
+    print('  forecast methods: ' + ' '.join(f'{method}={mix.get(method, 0)}' for method in sorted(mix)), flush=True)
+
+    if eligible_ids is not None:
+        published_forecast_ids &= eligible_ids
 
     publication_path = None if publication_held else record_publications(
         published_forecast_ids,

@@ -101,6 +101,9 @@ def test_manifest_is_reproducible_and_surfaces_coverage_gaps() -> None:
     assert first["quality"] == {
         "status": "passed",
         "decision_safe": True,
+        "model_activation_eligible": True,
+        "model_activation_blocking_codes": [],
+        "serving_policy": "per_event_forecast",
         "critical_exceptions": 0,
         "warnings": 1,
     }
@@ -215,7 +218,7 @@ def test_source_quote_error_remains_fail_closed_despite_supported_events() -> No
     }
 
 
-def test_scoped_decision_group_failure_remains_fail_closed() -> None:
+def test_sparse_event_quotes_allow_serving_but_keep_original_activation_hold() -> None:
     base = _manifest("2026-08-22T12:00:00+00:00")
     event_coverage = {
         **base["event_coverage"],
@@ -242,11 +245,45 @@ def test_scoped_decision_group_failure_remains_fail_closed() -> None:
     )
 
     assert manifest["quote_quality"]["decision_group_rejection_rate"] == 0.6
-    assert manifest["quote_quality"]["status"] == "failed"
+    assert manifest["quote_quality"]["status"] == "degraded"
+    assert manifest["quality"]["status"] == "advisory"
+    assert manifest["quality"]["decision_safe"] is True
+    assert manifest["quality"]["critical_exceptions"] == 0
+    assert manifest["quality"]["model_activation_eligible"] is False
+    assert manifest["quality"]["model_activation_blocking_codes"] == [
+        "event_quote_coverage_below_limit", "option_quote_quality_below_limit",
+    ]
+    severities = {issue["code"]: issue["severity"] for issue in manifest["exceptions"]}
+    assert severities["event_quote_coverage_below_limit"] == "warning"
+    assert severities["option_quote_quality_below_limit"] == "warning"
+
+
+def test_sparse_coverage_alone_preserves_original_activation_hold() -> None:
+    base = _manifest("2026-08-22T12:00:00+00:00")
+    manifest = _rebuild(base, event_coverage={
+        **base["event_coverage"], "status": "failed",
+        "covered_events": 6, "missing_events": 4,
+        "coverage_pct": 0.6, "minimum_coverage_pct": 0.65,
+    })
+    assert manifest["quality"]["decision_safe"] is True
+    assert manifest["quality"]["model_activation_eligible"] is False
+    assert manifest["quality"]["model_activation_blocking_codes"] == [
+        "event_quote_coverage_below_limit",
+    ]
+
+
+def test_sparse_coverage_cannot_hide_hard_quote_failure() -> None:
+    base = _manifest("2026-08-22T12:00:00+00:00")
+    manifest = _rebuild(base, event_coverage={
+        **base["event_coverage"], "status": "failed",
+        "covered_events": 4, "missing_events": 6,
+    }, quote_quality=_chain_quote_quality(errors=["source freshness failed"]))
     assert manifest["quality"]["decision_safe"] is False
-    codes = {issue["code"] for issue in manifest["exceptions"]}
-    assert "event_quote_coverage_below_limit" in codes
-    assert "option_quote_quality_below_limit" in codes
+    assert manifest["quality"]["model_activation_eligible"] is False
+    assert manifest["quote_quality"]["status"] == "failed"
+    quote_issue = next(issue for issue in manifest["exceptions"]
+                       if issue["code"] == "option_quote_quality_below_limit")
+    assert quote_issue["severity"] == "critical"
 
 
 def test_duplicate_serving_keys_make_manifest_fail_closed() -> None:

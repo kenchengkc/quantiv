@@ -139,7 +139,8 @@ def test_fallback_does_not_allow_partial_surface_rebuild(tmp_path):
         _available(data, partial_rebuild=True)
 
 
-def test_builder_rebuilds_all_surfaces_from_verified_stale_fallback(tmp_path, monkeypatch):
+@pytest.mark.parametrize('publication_state', ['held', 'partial'])
+def test_builder_rebuilds_all_surfaces_from_verified_stale_fallback(tmp_path, monkeypatch, publication_state):
     """Reproduce the failed build without ingestion, remote calls or a model run."""
     import sys
     import model_publication
@@ -198,8 +199,16 @@ def test_builder_rebuilds_all_surfaces_from_verified_stale_fallback(tmp_path, mo
                         _write_content(public / path, content))
     monkeypatch.setattr(builder, 'build_earnings_events_table', earnings)
     monkeypatch.setattr(builder, 'create_duckdb_views', views)
-    monkeypatch.setattr(model_publication, 'verify_publication', lambda *_args, **_kwargs:
-                        {'can_publish_ml': False})
+    publication_policy = {'can_publish_ml': False, 'state': 'held'}
+    if publication_state == 'partial':
+        publication_policy = {'can_publish_ml': True, 'state': 'partial',
+            'eligible_forecast_ids': ['approved-unseen'],
+            'eligible_event_keys': ['UNSEEN|2026-10-15'],
+            'eligible_forecast_path': str(data / 'eligible.parquet'),
+            'held_events': [{'event_key': 'TEST|2026-10-09', 'reasons': ['unsupported_cohort']}],
+            'coverage': {'candidate_events': 2, 'eligible_events': 1, 'held_events': 1}}
+    monkeypatch.setattr(model_publication, 'verify_publication', lambda *_args, **_kwargs: publication_policy)
+    monkeypatch.setattr(builder, 'publish_forecast_evidence', lambda **_kwargs: True)
     monkeypatch.setattr(builder, 'load_ml_forecasts', lambda **_kwargs: {})
     monkeypatch.setattr(builder, 'load_event_forecast_archive', lambda **_kwargs: {})
     monkeypatch.setattr(builder, 'load_provider_enrichments', lambda: {})
@@ -236,6 +245,10 @@ def test_builder_rebuilds_all_surfaces_from_verified_stale_fallback(tmp_path, mo
     assert json.loads((public / 'weekly.json').read_text())['events']
     assert json.loads((public / 'symbols/TEST.json').read_text())['expected_move']
     assert json.loads((public / 'symbols/RETAINED.json').read_text())['expected_move']
+    if publication_state == 'partial':
+        status = json.loads((data / 'validation/display_forecast_status.json').read_text())
+        assert status['ml_publication_status'] == 'partial'
+        assert status['ml_publication_coverage']['held_events'] == 1
 
 
 def _write_content(path, content):

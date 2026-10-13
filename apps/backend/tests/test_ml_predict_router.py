@@ -529,6 +529,7 @@ async def test_predict_response_includes_debug_metadata(monkeypatch):
     assert response.forecast_scored_at == datetime(2026, 5, 24, tzinfo=timezone.utc)
     assert response.model_version == "v3"
     assert response.feature_schema_hash == "abc123"
+    assert response.model_dump(mode="json")["model_bundle_id"] == "a" * 64
     assert response.inference_mode == "spot_updated_snapshot"
     assert response.market_data_mode == "end_of_day"
     assert response.decision_scope == "end_of_day_research"
@@ -562,6 +563,7 @@ async def test_cached_prediction_is_upgraded_to_current_decision_contract(monkey
     )
 
     assert response.source == "cached"
+    assert response.model_dump(mode="json")["model_bundle_id"] == "a" * 64
     assert response.inference_mode == "spot_updated_snapshot"
     assert response.decision_scope == "end_of_day_research"
     assert response.live_trading_eligible is False

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import math
+from copy import deepcopy
 from datetime import date
 from pathlib import Path
 
@@ -25,7 +26,12 @@ from .shared import (
     write_to_public,
 )
 
-def load_ml_forecasts(*, publication_held: bool = False) -> dict[tuple[str, str], dict]:
+def load_ml_forecasts(
+    *, publication_held: bool = False,
+    eligible_forecast_ids: set[str] | None = None,
+    eligible_event_keys: set[str] | None = None,
+    forecast_path: Path | None = None,
+) -> dict[tuple[str, str], dict]:
     """Return the latest *eligible* point-in-time forecast per event.
 
     Once the immutable ledger exists it is authoritative. This prevents a
@@ -37,18 +43,33 @@ def load_ml_forecasts(*, publication_held: bool = False) -> dict[tuple[str, str]
     if publication_held:
         print('ML publication held: omitting upcoming model forecasts')
         return {}
+    if eligible_forecast_ids is not None and not eligible_forecast_ids:
+        return {}
     try:
         import pandas as pd  # local import — only needed when forecasts exist
     except Exception as exc:
         print(f"⚠️  Could not import pandas for forecast loading: {exc}")
         return {}
 
-    if EVENT_PREDICTION_LEDGER_PATH.exists():
+    def authenticated_rows(frame):
+        if eligible_forecast_ids is None:
+            return frame
+        if 'forecast_id' not in frame.columns:
+            return frame.iloc[0:0]
+        selected = frame['forecast_id'].isin(eligible_forecast_ids)
+        if eligible_event_keys is not None:
+            dates = pd.to_datetime(frame['earnings_date'], errors='coerce').dt.strftime('%Y-%m-%d')
+            keys = frame['act_symbol'].astype(str).str.upper().str.strip() + '|' + dates
+            selected &= keys.isin(eligible_event_keys)
+        return frame[selected].copy()
+
+    if forecast_path is None and EVENT_PREDICTION_LEDGER_PATH.exists():
         try:
             df = pd.read_parquet(EVENT_PREDICTION_LEDGER_PATH)
         except Exception as exc:
             print(f"⚠️  Could not read {EVENT_PREDICTION_LEDGER_PATH.name}: {exc}")
             df = pd.DataFrame()
+        df = authenticated_rows(df)
         if not df.empty and "freeze_eligible" in df.columns:
             df = df[df["freeze_eligible"].fillna(False).astype(bool)].copy()
             if not df.empty:
@@ -84,13 +105,18 @@ def load_ml_forecasts(*, publication_held: bool = False) -> dict[tuple[str, str]
                     f"{EVENT_PREDICTION_LEDGER_PATH.name}"
                 )
                 return out
+        if eligible_forecast_ids is not None:
+            return {}
 
-    if not FORECASTS_DIR.exists():
+    if forecast_path is None and not FORECASTS_DIR.exists():
         return {}
-    files = sorted(FORECASTS_DIR.glob("forecasts_*.parquet"))
-    if not files:
-        return {}
-    latest = files[-1]
+    if forecast_path is None:
+        files = sorted(FORECASTS_DIR.glob("forecasts_*.parquet"))
+        if not files:
+            return {}
+        latest = files[-1]
+    else:
+        latest = forecast_path
     try:
         df = pd.read_parquet(latest)
     except Exception as exc:
@@ -99,7 +125,12 @@ def load_ml_forecasts(*, publication_held: bool = False) -> dict[tuple[str, str]
     if df.empty:
         return {}
 
+    df = authenticated_rows(df)
+    if df.empty:
+        return {}
+
     df = df.copy()
+    df['act_symbol'] = df['act_symbol'].astype(str).str.upper().str.strip()
     if "freeze_eligible" in df.columns:
         df = df[df["freeze_eligible"].fillna(False).astype(bool)].copy()
         if df.empty:
@@ -185,13 +216,94 @@ def load_event_forecast_archive(*, forecasts_dir: Path | None = None) -> dict[tu
     return out
 
 
-def withhold_upcoming_ml(public_dir: Path, *, today: date) -> None:
-    """Apply a drift hold to retained files too, preserving reported forecasts."""
+def has_reported_actuals(row: dict) -> bool:
+    """EPS/revenue actuals prove reporting; timing and freeze flags do not."""
+    for field in ('eps_actual', 'revenue_actual'):
+        value = row.get(field)
+        if value is None or isinstance(value, bool):
+            continue
+        try:
+            if math.isfinite(float(value)):
+                return True
+        except (TypeError, ValueError):
+            continue
+    return False
+
+
+def load_reported_event_keys(public_dir: Path, *, today: date) -> set[str]:
+    """Find same-day reported evidence across calendar and symbol history."""
     paths = [public_dir / 'weekly.json', public_dir / 'screener.json',
              *sorted((public_dir / 'weeks').glob('*.json')),
              *sorted((public_dir / 'symbols').glob('*.json'))]
+    keys = set()
+    for path in paths:
+        if not path.is_file() or path.name == 'manifest.json':
+            continue
+        payload = json.loads(path.read_text())
+        nodes = [*(payload.get('events') or []), *(payload.get('earnings_history') or [])]
+        if isinstance(payload.get('expected_move'), dict):
+            nodes.append(payload['expected_move'])
+        for node in nodes:
+            event_iso = str(node.get('earnings_date') or node.get('date') or '')[:10]
+            if event_iso != today.isoformat() or not has_reported_actuals(node):
+                continue
+            symbol = str(node.get('ticker') or node.get('act_symbol') or payload.get('symbol') or path.stem).upper().strip()
+            keys.add(f'{symbol}|{event_iso}')
+    return keys
+
+
+def filter_event_forecast_archive_for_publication(
+    archive: dict[tuple[str, str], dict], *, today: date,
+    eligible_forecast_ids: set[str], eligible_event_keys: set[str],
+    reported_event_keys: set[str],
+) -> dict[tuple[str, str], dict]:
+    """Preserve reported history and admit only current eligible unreported rows."""
+    return {key: row for key, row in archive.items()
+            if date.fromisoformat(key[1]) < today
+            or date.fromisoformat(key[1]) == today and f'{key[0]}|{key[1]}' in reported_event_keys
+            or row.get('forecast_id') in eligible_forecast_ids and f'{key[0]}|{key[1]}' in eligible_event_keys}
+
+
+def withhold_upcoming_ml(
+    public_dir: Path, *, today: date,
+    eligible_forecast_ids: set[str] | None = None,
+    eligible_event_keys: set[str] | None = None,
+    held_event_reasons: dict[str, str] | None = None,
+    align_components: bool = True,
+    reported_event_keys: set[str] | None = None,
+) -> None:
+    """Apply current event eligibility to retained files, preserving reported rows."""
+    paths = [public_dir / 'weekly.json', public_dir / 'screener.json',
+             *sorted((public_dir / 'weeks').glob('*.json')),
+             *sorted((public_dir / 'symbols').glob('*.json'))]
+    reported_keys = set(reported_event_keys or ()) | load_reported_event_keys(public_dir, today=today)
     ml_keys = {'em_ml_pct', 'em_ml_abs', 'correction_factor', 'model_horizon',
                'ml_snapshot_date', 'p10', 'p25', 'p50', 'p75', 'p90'}
+    def clear_ml(node: dict) -> None:
+        for key in list(node):
+            if key in ml_keys or key.startswith('forecast_'):
+                node.pop(key)
+        if node.get('display_forecast_method') == 'ml':
+            for key in ('display_forecast_pct', 'display_forecast_method', 'display_forecast_as_of'):
+                node.pop(key, None)
+        if node.get('em_method') == 'ml_lightgbm':
+            node.pop('em_method', None)
+
+    def eligible(node: dict, payload: dict, path: Path) -> bool:
+        symbol = str(node.get('ticker') or node.get('act_symbol') or payload.get('symbol') or path.stem).upper().strip()
+        event_key = symbol + '|' + str(node.get('earnings_date') or node.get('date') or '')[:10]
+        return (eligible_forecast_ids is not None
+                and node.get('forecast_id') in eligible_forecast_ids
+                and (eligible_event_keys is None or event_key in eligible_event_keys))
+
+    def protected_history(node: dict, payload: dict, path: Path) -> bool:
+        event_iso = str(node.get('earnings_date') or node.get('date') or '')[:10]
+        if not event_iso:
+            return True
+        event_date = date.fromisoformat(event_iso)
+        symbol = str(node.get('ticker') or node.get('act_symbol') or payload.get('symbol') or path.stem).upper().strip()
+        return event_date < today or event_date == today and f'{symbol}|{event_iso}' in reported_keys
+
     symbol_payloads = {}
     for path in paths:
         if not path.is_file() or path.name == 'manifest.json':
@@ -203,20 +315,20 @@ def withhold_upcoming_ml(public_dir: Path, *, today: date) -> None:
         changed = False
         for node in nodes:
             event_date = node.get('earnings_date') or node.get('date')
-            if not event_date or date.fromisoformat(str(event_date)[:10]) <= today:
+            if protected_history(node, payload, path):
                 continue
             changed = True
-            for key in list(node):
-                if key in ml_keys or key.startswith('forecast_'):
-                    node.pop(key)
-            if node.get('display_forecast_method') == 'ml':
-                for key in ('display_forecast_pct', 'display_forecast_method', 'display_forecast_as_of'):
-                    node.pop(key, None)
-            if node.get('em_method') == 'ml_lightgbm':
-                node.pop('em_method', None)
+            if eligible(node, payload, path):
+                node['ml_publication_status'] = 'eligible'
+                node.pop('ml_publication_reason', None)
+                continue
+            symbol = str(node.get('ticker') or node.get('act_symbol') or payload.get('symbol') or path.stem).upper().strip()
+            event_key = symbol + '|' + str(event_date)[:10]
+            clear_ml(node)
             node['ml_status'] = 'unavailable_model'
             node['ml_publication_status'] = 'held'
-            node['ml_publication_reason'] = 'feature_drift'
+            node['ml_publication_reason'] = (held_event_reasons or {}).get(
+                event_key, 'feature_drift' if eligible_forecast_ids is None else 'no_eligible_current_forecast')
             if node.get('display_forecast_method') is None:
                 for key, method in (('em_iv_pct', 'options_math'), ('iv_pct', 'options_math'),
                                     ('em_straddle_pct', 'options_math'), ('straddle_pct', 'options_math'),
@@ -231,6 +343,9 @@ def withhold_upcoming_ml(public_dir: Path, *, today: date) -> None:
             path.write_text(json.dumps(payload, indent=2) + '\n')
         if path.parent == public_dir / 'symbols':
             symbol_payloads[path.stem] = payload
+
+    if not align_components:
+        return
 
     # Removing ML can expose an older historical estimate on one surface. Use
     # the same resolved ticker-page signature that the publication contract
@@ -248,8 +363,18 @@ def withhold_upcoming_ml(public_dir: Path, *, today: date) -> None:
         for node in payload.get('events') or []:
             event_date = str(node.get('earnings_date') or '')[:10]
             symbol = symbol_payloads.get(str(node.get('ticker') or '').upper())
-            if not symbol or not event_date or date.fromisoformat(event_date) <= today:
+            if not symbol or protected_history(node, payload, path):
                 continue
+            if eligible(node, payload, path):
+                continue
+            if eligible_forecast_ids is not None:
+                # A retained calendar row with an old ID may coexist with an
+                # approved ticker forecast. Align only independent components.
+                symbol = deepcopy(symbol)
+                sources = [symbol.get('expected_move') or {}, *(symbol.get('earnings_history') or [])]
+                for source in sources:
+                    if str(source.get('earnings_date') or source.get('date') or '')[:10] == event_date:
+                        clear_ml(source)
             signature, components = _symbol_page_signature(symbol, event_date)
             if signature is None:
                 continue
@@ -347,6 +472,7 @@ def ml_fields(fc: dict | None) -> dict:
         fc["snapshot_date"].isoformat() if fc.get("snapshot_date") else None
     )
     out["forecast_id"] = pick("forecast_id")
+    out["forecast_model_bundle_id"] = pick("model_bundle_id")
     out["forecast_scored_at"] = pick("scored_at")
     out["forecast_published_at"] = pick("published_at", "forecast_published_at")
     out["forecast_feature_cutoff_at"] = pick("feature_cutoff_at")
@@ -640,15 +766,29 @@ def build_dashboard_evidence(receipt: dict) -> dict:
     }
 
 
-def publish_forecast_evidence() -> bool:
+def publish_forecast_evidence(*, expected_forecast_path: Path | None = None) -> bool:
     """Publish one small UI manifest; never duplicate receipts into symbol JSON."""
     public_path = PUBLIC_DIR / "evidence" / "forecast.json"
     if not FORECAST_RECEIPT_PATH.exists():
         public_path.unlink(missing_ok=True)
+        if expected_forecast_path is not None:
+            raise ValueError('eligible forecast evidence receipt is missing')
         print("⚠️  No forecast evidence receipt; public trust manifest removed")
         return False
     try:
         receipt = json.loads(FORECAST_RECEIPT_PATH.read_text())
+        if expected_forecast_path is not None:
+            from ml.evidence_receipt import verify_evidence_receipt
+            from ml.model_artifact import sha256_file
+            verify_evidence_receipt(receipt, expected_scope='forecasts')
+            expected_digest = sha256_file(expected_forecast_path)
+            members = [member for artifact in receipt.get('artifacts', [])
+                       if artifact.get('name') == 'forecast_snapshot'
+                       for member in artifact.get('members', [])]
+            if len(members) != 1 or members[0].get('sha256') != expected_digest:
+                raise ValueError('evidence receipt does not match the eligible forecast')
+            if (receipt.get('quality') or {}).get('status') != 'passed':
+                raise ValueError('eligible forecast evidence must pass validation')
         evidence = build_dashboard_evidence(receipt)
     except (OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
         public_path.unlink(missing_ok=True)

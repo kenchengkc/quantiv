@@ -9,7 +9,19 @@ export type PublicationControl = {
     source_session_lag?: number | null;
     quote_quality_errors?: string[];
   };
-  model: { status?: string; publication_status?: string; publication_hold_reason?: string | null };
+  model: {
+    status?: string;
+    publication_status?: string;
+    publication_hold_reason?: string | null;
+    publication_coverage?: {
+      candidate_events?: number | null;
+      eligible_events?: number | null;
+      held_events?: number | null;
+      candidate_rows?: number | null;
+      eligible_rows?: number | null;
+      held_rows?: number | null;
+    };
+  };
   exceptions: Array<{ code: string; severity: string; summary?: string; count?: number }>;
 };
 
@@ -24,6 +36,16 @@ const OPTIONS_ONLY = new Set([
   'options_stale', 'event_quote_coverage_below_limit', 'option_quote_quality_below_limit',
 ]);
 const ACCEPTABLE = new Set(['passed', 'advisory', 'degraded', 'warning']);
+
+export function modelPublicationCoverageDetail(coverage: PublicationControl['model']['publication_coverage']): string {
+  const events = `${coverage?.eligible_events ?? 0} of ${coverage?.candidate_events ?? 0} scored earnings events have eligible ML forecasts`;
+  const holds = (coverage?.held_events ?? 0) > 0
+    ? `${coverage?.held_events} of those events ${coverage?.held_events === 1 ? 'is' : 'are'} held`
+    : (coverage?.held_rows ?? 0) > 0
+      ? `${coverage?.held_rows} model forecast${coverage?.held_rows === 1 ? '' : 's'} ${coverage?.held_rows === 1 ? 'is' : 'are'} held`
+      : null;
+  return `${events}${holds ? `; ${holds}` : ''}. Other upcoming calendar events remain held for ML and use independent estimates until a current eligible forecast is available.`;
+}
 
 export function publishedForecastStatus(forecast: PublishedForecast): 'passed' | 'failed' | 'unavailable' | 'advisory' {
   if (forecast.quality.status === 'failed'
@@ -45,9 +67,24 @@ export function researchUpdatePresentation(control: PublicationControl, forecast
     || control.publication_eligible == null) {
     return { label: 'Unavailable', tone: 'ink-3', detail: 'Current publication evidence is incomplete.' } as const;
   }
+  const coverage = control.model.publication_coverage;
+  if (control.publication_eligible === true && critical.length === 0
+    && ACCEPTABLE.has(control.data.status ?? '')
+    && control.model.publication_status === 'partial'
+    && (coverage?.eligible_events ?? 0) > 0
+    && ((coverage?.held_events ?? 0) > 0 || (coverage?.held_rows ?? 0) > 0)
+    && coverage?.candidate_events === (coverage?.eligible_events ?? 0) + (coverage?.held_events ?? 0)
+    && ['passed', 'advisory'].includes(publishedForecastStatus(forecast))) {
+    return {
+      label: 'Partially eligible', tone: 'flag',
+      detail: `${modelPublicationCoverageDetail(coverage)} Calendar and independent fallback estimates continue to update.`,
+    } as const;
+  }
   if (control.publication_eligible === true && critical.length === 0
     && ACCEPTABLE.has(control.data.status ?? '') && modelUsable) {
-    return { label: 'Eligible', tone: 'up', detail: 'Current controls permit a new research release.' } as const;
+    return { label: 'Eligible', tone: 'up', detail: control.model.publication_status === 'eligible'
+      && coverage?.candidate_events != null
+      ? modelPublicationCoverageDetail(coverage) : 'Current controls permit a new research release.' } as const;
   }
   if (control.publication_eligible === false && control.model.status === 'failed'
     && control.model.publication_status === 'held' && control.model.publication_hold_reason === 'feature_drift'

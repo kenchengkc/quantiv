@@ -2,6 +2,7 @@ import type { SymbolDetail } from './symbolPageTypes';
 
 type Props = {
   hasModel: boolean;
+  mlPublicationStatus?: 'held' | 'eligible' | null;
   hasOptions: boolean;
   historyCount: number;
   history: SymbolDetail['earnings_history'];
@@ -9,11 +10,13 @@ type Props = {
   note?: { title: string; detail: string; source_url: string };
 };
 
-export default function ResearchAvailability({ hasModel, hasOptions, historyCount, history, today, note }: Props) {
+export default function ResearchAvailability({ hasModel, mlPublicationStatus, hasOptions, historyCount, history, today, note }: Props) {
   const past = (history ?? []).filter((row) => row.date <= today);
   const hasEps = past.some((row) => row.eps_actual != null && Number.isFinite(row.eps_actual));
   const messages = [
-    ...(!hasModel ? [{ title: 'ML forecast unavailable', detail: 'No eligible model forecast is available for this earnings event.' }] : []),
+    ...(!hasModel ? [mlPublicationStatus === 'held'
+      ? { title: 'ML forecast held', detail: 'The current forecast did not pass publication checks. Independent estimates remain available.' }
+      : { title: 'ML forecast unavailable', detail: 'No eligible model forecast is available for this earnings event.' }] : []),
     ...(!hasOptions ? [{ title: 'Options and Greeks unavailable', detail: 'This snapshot has no option pairs that pass quote-quality checks. Expiration analysis and contract Greeks are unavailable.' }] : []),
     ...(historyCount < 2 ? [{ title: 'Price-reaction history unavailable', detail: 'At least two earnings events with recorded closing prices are needed for the historical chart.' }] : []),
     ...(!hasEps ? [{ title: 'EPS actuals unavailable', detail: 'The retained earnings data has no reported EPS actuals. Estimates are not reported results.' }] : []),

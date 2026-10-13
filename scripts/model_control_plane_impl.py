@@ -41,7 +41,6 @@ from ml.model_control import (  # noqa: E402
     update_outcome_history,
 )
 from ml.pipeline_validation import (  # noqa: E402
-    FORECAST_REQUIRED_COLUMNS,
     latest_forecast_path,
     validate_forecast_artifact,
     PipelineValidationError,
@@ -566,6 +565,8 @@ def drift_reference_cohort(
 
 
 def monitor(args: argparse.Namespace) -> int:
+    from event_forecast_eligibility import verify_candidate_identity, select_publication_rows
+
     control_dir = args.models_root / "control"
     pointer = verify_control_pointer(_read_json(control_dir / "champion.json"))
     champion_id = str(pointer["champion_bundle_id"])
@@ -583,28 +584,44 @@ def monitor(args: argparse.Namespace) -> int:
     forecast_path = args.forecast_path or latest_forecast_path(args.forecast_dir)
     if forecast_path is None:
         raise FileNotFoundError("no production forecast snapshot exists")
-    forecasts = pd.read_parquet(forecast_path)
-    if forecasts.empty:
-        missing = sorted(FORECAST_REQUIRED_COLUMNS - set(forecasts.columns))
-        if missing:
-            raise ValueError(f"empty forecast artifact lacks required columns: {missing}")
-    served_ids = set(forecasts["model_bundle_id"].dropna().astype(str))
-    if not forecasts.empty and served_ids != {champion_id}:
-        raise ValueError(
-            f"production forecast bundle {sorted(served_ids)} does not match champion {champion_id}"
-        )
+    data_dir = args.models_root.parent
+    try:
+        forecast_path.resolve().relative_to(data_dir.resolve())
+    except ValueError as exc:
+        raise ValueError("candidate forecast path escapes data directory") from exc
+    forecasts = verify_candidate_identity(pd.read_parquet(forecast_path), champion_dir,
+                                         champion_id, champion_manifest["horizons"])
+    monitoring_dir = args.models_root / "monitoring"
+    ledger_path = monitoring_dir / "prediction_ledger.parquet"
+    migration = _verify_prior_prediction_ledger(monitoring_dir)
+    monitored_at = datetime.now(timezone.utc)
+    eligible, local, publication = select_publication_rows(
+        forecasts, bundle_dir=champion_dir, now=monitored_at,
+        assess_cohort=lambda selected, horizon: _rolling_drift_assessment(
+            selected, champion_dir, bundle_id=champion_id,
+            models_root=args.models_root, horizons=[horizon],
+        ),
+    )
+    eligible_path = args.forecast_dir / "eligible" / f"forecasts_{forecast_path.stem.removeprefix('forecasts_')}.parquet"
+    eligible_path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = eligible_path.with_suffix(".parquet.tmp")
+    eligible.to_parquet(temporary, index=False)
+    temporary.replace(eligible_path)
+    publication.update(candidate_sha256=sha256_file(forecast_path),
+                       eligible_forecast_path=eligible_path.resolve().relative_to(data_dir.resolve()).as_posix(),
+                       eligible_forecast_sha256=sha256_file(eligible_path))
 
-    if forecasts.empty:
+    if local.empty:
         # A run with no eligible current rows is authenticated as a hold. Keep
         # ledger keys typed even when there is no prior or shadow observation.
-        empty_observations = forecasts.copy()
+        empty_observations = local.copy()
         empty_observations["bundle_id"] = pd.Series(dtype="str")
         empty_observations["role"] = pd.Series(dtype="str")
         empty_observations["recorded_at"] = pd.Series(dtype="str")
         ledger_rows = [empty_observations]
     else:
         ledger_rows = [monitoring_rows(
-            forecasts,
+            local,
             champion_dir,
             bundle_id=champion_id,
             role="champion",
@@ -642,14 +659,14 @@ def monitor(args: argparse.Namespace) -> int:
                 "issues": ["no protocol-specific shadow forecasts"],
             }
             continue
-        if forecasts.empty:
+        if local.empty:
             shadows[role] = {
                 "status": "insufficient_data",
                 "issues": ["no current champion forecasts for paired shadow comparison"],
             }
         else:
             shadows[role] = shadow_score_report(
-                shadow_forecasts, champion_dir, champion_forecasts=forecasts
+                shadow_forecasts, champion_dir, champion_forecasts=local
             )
         ledger_rows.append(
             monitoring_rows(
@@ -661,10 +678,6 @@ def monitor(args: argparse.Namespace) -> int:
             )
         )
 
-    monitoring_dir = args.models_root / "monitoring"
-    ledger_path = monitoring_dir / "prediction_ledger.parquet"
-    migration = _verify_prior_prediction_ledger(monitoring_dir)
-    monitored_at = datetime.now(timezone.utc)
     if forecasts.empty:
         try:
             from market_sessions import latest_completed_us_market_session
@@ -686,10 +699,14 @@ def monitor(args: argparse.Namespace) -> int:
             forecasts, champion_dir, bundle_id=champion_id,
             models_root=args.models_root, horizons=champion_manifest["horizons"],
         )
+        if publication["coverage"]["held_rows"] and drift["status"] in {"passed", "warning"}:
+            drift["status"] = "critical"
+            drift["publication_row_rejections"] = publication["held_rows"]
     ledger = append_prediction_ledger(ledger_path, ledger_rows)
     report = {
         "schema": "quantiv.model-monitoring.v1",
-        "status": "passed" if drift["status"] in {"passed", "warning"} else "failed",
+        "status": ("passed" if len(eligible) == len(forecasts) and len(eligible)
+                   else "partial" if len(eligible) else "failed"),
         "monitored_at": monitored_at.isoformat(),
         "snapshot_date": snapshot_date,
         "champion_bundle_id": champion_id,
@@ -706,6 +723,7 @@ def monitor(args: argparse.Namespace) -> int:
         "ledger_rows": len(ledger),
         "ledger_migration": migration,
         "feature_drift": drift,
+        "publication_eligibility": publication,
         "shadow_scoring": shadows,
     }
     report_path = monitoring_dir / "latest_monitoring.json"

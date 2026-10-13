@@ -92,6 +92,10 @@ class MLPredictResponse(BaseModel):
         None,
         description="Timestamp from the nightly/weekly scoring run that wrote this feature row.",
     )
+    model_bundle_id: str | None = Field(
+        None,
+        description="Signed model bundle used to compute this response.",
+    )
     model_version: str | None = Field(
         None,
         description="Version string from the LightGBM model metadata.",

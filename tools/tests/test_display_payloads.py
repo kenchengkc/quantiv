@@ -383,12 +383,13 @@ def test_held_options_projection_suppresses_retained_surfaces_without_resurrecti
     event = _held_options_event()
     event.update(em_ml_pct=0.06, ml_snapshot_date="2026-09-15", as_of_date=retained_source_date)
     frozen = _held_options_event("2026-09-17")
+    frozen['eps_actual'] = 0
     future_history = {
         "date": "2026-09-23", "timing": "bmo", "implied": 0.18,
         "implied_as_of": "2026-09-16", "implied_atm_iv": 0.40,
         "implied_dte": 30, "implied_quality_status": "decision_eligible_eod",
     }
-    frozen_history = {**future_history, "date": "2026-09-17"}
+    frozen_history = {**future_history, "date": "2026-09-17", "eps_actual": 0}
     symbol = {
         "symbol": "A", "as_of_date": "2026-09-16",
         "expected_move": {

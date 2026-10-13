@@ -5,13 +5,16 @@ Use this runbook for failed/stale daily refreshes, rejected options candidates, 
 ## Model drift publication holds
 
 Daily refresh and saved-data publication recovery verify the signed monitoring
-report against the exact scored forecast and active champion. Critical feature
-drift keeps the monitoring result failed and holds new ML publication. The
-workflow skips forecast uploads and Neon imports while rebuilding the calendar,
-IV and historical display estimates. Retained public payloads also withhold
-upcoming ML; reported forecasts keep their original values and dates. The
-control panel identifies the ML hold explicitly. Signature, digest, freshness,
-forecast-validation and other data-control failures still stop the workflow.
+report against the exact scored forecast and active champion. Monitoring selects
+events that pass individual quote, freshness, feature and forecast checks, then
+applies the unchanged rolling model checks independently to each horizon/cohort.
+Its signed event eligibility binds the exact subset, forecast IDs and event keys.
+The full validator, Neon importer and public builder consume that subset. A
+`partial` monitoring result publishes the eligible forecasts and holds the rest;
+zero eligible rows skip forecast uploads and imports while independent calendar,
+IV and historical estimates can publish. Retained public files and prediction
+proxies enforce the same allowlist. Reported forecasts keep their original values
+and dates. Signature, digest and source-integrity failures still stop the workflow.
 
 The hold path snapshots the durable forecast archive before scoring and never
 uses newly scored rows as reported-event evidence. Monitoring reports, signed
@@ -26,13 +29,15 @@ champion. Check that the current forecast contains only that session, that its
 recorded feature vectors contain the accepted quote inputs, and that its cohort
 is supported by the bundle. Historical exact-horizon snapshots belong in the
 retained prediction ledger, not a newly scored current batch. Unsupported rows
-are withheld rather than changing the model's cohort support. Events whose lead
-does not match a trained horizon retain their eligible prior forecast; scoring
-does not select a nearest head or shift a quote's source date.
+are withheld rather than changing the model's cohort support. Upcoming events
+without an eligible current forecast use independent estimates; an older ledger
+row cannot release their ML hold. Scoring does not select a nearest head or shift
+a quote's source date.
 
 Accepted options do not by themselves release an ML publication hold. The
-authenticated monitoring report must still pass current snapshot, feature,
-cohort and rolling evidence checks. The 100-row drift minimum and every model
+authenticated monitoring report must identify each eligible event and bind the
+selected artifact. Its current snapshot, feature, cohort and rolling evidence
+checks still apply. The 100-row drift minimum and every model
 activation/promotion gate remain in force. A healthy daily forecast uses the
 current champion without requiring another retrain or promotion.
 
@@ -150,9 +155,14 @@ A substitute provider must not be introduced during an incident unless field sem
 
 The options resilience path is intentionally allowed to reject a candidate and restore a previously validated baseline.
 
-Aggregate upcoming-event coverage requires 65% eligible option chains. The
-separate per-horizon coverage warning remains at 70%; individual quote eligibility,
-source freshness, and model-promotion controls are unchanged. See the
+Aggregate upcoming-event coverage below 65% and aggregate event quote rejection
+are serving warnings: they do not discard a fresh, reconciled source or suppress
+individually eligible forecasts. Individual quote rules, latest-session
+freshness and source integrity remain mandatory. The separate per-horizon
+coverage warning remains at 70%. The original aggregate limits still block model
+activation, recorded separately in `quality.model_activation_eligible` and checked
+again from the underlying evidence. Model promotion and rollback retain every
+existing gate. See the
 [September 2026 policy evaluation](../research/OPTIONS_COVERAGE_POLICY_2026_09_28.md)
 for the historical comparison and its model-performance limitations. A policy
 change requires a new normal reconciliation run; never relabel an old held receipt.

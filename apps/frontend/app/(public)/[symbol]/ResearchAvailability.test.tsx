@@ -3,6 +3,13 @@ import { afterEach, expect, it } from 'vitest';
 import ResearchAvailability from './ResearchAvailability';
 
 afterEach(cleanup);
+it('explains an event hold while keeping independent coverage available', () => {
+  render(<ResearchAvailability hasModel={false} hasOptions historyCount={4} today="2026-10-13"
+    mlPublicationStatus="held" history={[{ date: '2026-02-05', timing: 'amc', eps_actual: .4 }]} />);
+  expect(screen.getByText('ML forecast held')).toBeTruthy();
+  expect(screen.getByText(/Independent estimates remain available/)).toBeTruthy();
+  expect(screen.queryByText('Options and Greeks unavailable')).toBeNull();
+});
 it('explains independent missing coverage and shows EPS even without price reactions', () => {
   render(<ResearchAvailability hasModel={false} hasOptions={false} historyCount={0} today="2026-09-24"
     history={[{ date: '2026-02-05', timing: 'amc', eps_actual: 0, eps_estimate: .3 },

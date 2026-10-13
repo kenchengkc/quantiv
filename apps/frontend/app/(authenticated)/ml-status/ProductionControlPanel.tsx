@@ -8,6 +8,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import ControlReleaseHistory from './ControlReleaseHistory';
+import { modelPublicationCoverageDetail } from '@/lib/publicationPresentation';
 import {
   isAdvisoryStatus,
   type ControlHistory,
@@ -191,12 +192,16 @@ export default function ProductionControlPanel({
   const { data, model } = snapshot;
   const publicationEligible =
     snapshot.publication_eligible ?? snapshot.decision_safe ?? false;
+  const partialMl = publicationEligible && model.publication_status === 'partial';
+  const scopedMlCoverage = publicationEligible && model.publication_coverage?.candidate_events != null;
   const coveredEventsOnly =
     publicationEligible &&
     data.missing_events != null &&
     data.missing_events > 0;
   const overallLabel = publicationEligible
-    ? coveredEventsOnly
+    ? partialMl
+      ? 'Eligible events published · some ML forecasts held'
+      : coveredEventsOnly
       ? 'Publication eligible · covered events only'
       : 'Publication eligible'
     : snapshot.status === 'unavailable'
@@ -275,7 +280,7 @@ export default function ProductionControlPanel({
             }}
           >
             {publicationEligible
-              ? `Covered forecasts cleared publication gates. ${data.live_trading_eligible ? 'Live-trading controls are eligible.' : 'This is end-of-day research data, not an execution feed.'}`
+              ? `${scopedMlCoverage ? `${modelPublicationCoverageDetail(model.publication_coverage)} ` : 'Covered forecasts cleared publication gates. '}${data.live_trading_eligible ? 'Live-trading controls are eligible.' : 'This is end-of-day research data, not an execution feed.'}`
               : 'One exception-first view of data readiness and model controls. Detailed receipts stay in pipeline artifacts.'}
           </p>
         </div>
@@ -314,7 +319,7 @@ export default function ProductionControlPanel({
             }
           />
           <ControlMetric
-            label="Eligible earnings coverage"
+            label="Eligible options coverage"
             value={percent(data.event_coverage_pct)}
             detail={
               data.expected_events == null
@@ -323,7 +328,7 @@ export default function ProductionControlPanel({
             }
             status={
               data.event_coverage_pct != null && data.event_coverage_pct < 0.7
-                ? 'failed'
+                ? 'advisory'
                 : 'passed'
             }
           />

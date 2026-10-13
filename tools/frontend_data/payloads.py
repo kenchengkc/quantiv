@@ -208,6 +208,7 @@ def _reported_forecast_fields(
                 ml[key] = fallback_ml.get(key)
     for key in (
         "forecast_id",
+        "forecast_model_bundle_id",
         "forecast_scored_at",
         "forecast_feature_cutoff_at",
         "forecast_prediction_deadline_at",
@@ -460,6 +461,7 @@ def attach_frozen_event_forecasts(
                 "fallback_reason",
                 "forecast_frozen",
                 "forecast_id",
+                "forecast_model_bundle_id",
                 "forecast_scored_at",
                 "forecast_feature_cutoff_at",
                 "forecast_prediction_deadline_at",
@@ -536,6 +538,7 @@ def attach_frozen_event_forecasts(
         "fallback_reason": fields.get("fallback_reason"),
         "forecast_frozen": True,
         "forecast_id": fields.get("forecast_id"),
+        "forecast_model_bundle_id": fields.get("forecast_model_bundle_id"),
         "forecast_scored_at": fields.get("forecast_scored_at"),
         "forecast_feature_cutoff_at": fields.get("forecast_feature_cutoff_at"),
         "forecast_prediction_deadline_at": fields.get("forecast_prediction_deadline_at"),

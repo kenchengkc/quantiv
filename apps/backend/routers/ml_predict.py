@@ -216,6 +216,7 @@ async def _predict_response(req: MLPredictRequest) -> MLPredictResponse:
             served_at=datetime.now(timezone.utc),
             snapshot_age_days=snapshot.get("snapshot_age_days"),
             forecast_scored_at=snapshot.get("forecast_scored_at"),
+            model_bundle_id=inference_bundle_id,
             model_version=result.model_version,
             model_trained_at=result.model_trained_at,
             model_loaded_at=result.model_loaded_at,

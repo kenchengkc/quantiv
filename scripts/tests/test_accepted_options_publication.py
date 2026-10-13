@@ -18,6 +18,7 @@ import pytest
 
 from ml.evidence_receipt import build_evidence_receipt, verify_evidence_receipt
 from ml.model_artifact import save_native_model
+from ml.data_reconciliation import build_reconciliation_manifest
 from ml.model_bundle import (
     ModelBundleError,
     create_signed_bundle,
@@ -33,6 +34,7 @@ from scripts.build_data_reconciliation import _event_coverage, _quote_quality
 from scripts.event_forecast_ledger import record_publications
 from scripts.market_sessions import latest_completed_us_market_session
 from scripts.options_snapshot_resilience import finalize_snapshot
+from scripts.verify_retrain_data_gate import verify_retrain_data_gate
 from scripts.setup_duckdb_from_parquet import setup_views
 from tools.frontend_data import forecast_artifacts, shared as frontend_shared
 import model_control_plane_impl as control_plane
@@ -253,6 +255,7 @@ def test_accepted_fresh_quotes_reach_signed_champion_and_public_forecast(accepte
     assert report["feature_drift"]["rolling_evidence"]["current_snapshot_fresh"] is True
     assert report["feature_drift"]["horizons"]["7"]["rows"] == 100
     assert report["champion_bundle_id"] == store["bundle"].name
+    forecast = Path(policy["eligible_forecast_path"])
     # The frontend consumes the same eligible scored rows; stale T14 and the
     # off-head event must never be substituted for this current T7 prediction.
     forecast_dir = store["data"] / "forecasts"
@@ -276,13 +279,16 @@ def test_accepted_fresh_quotes_reach_signed_champion_and_public_forecast(accepte
     monkeypatch.setattr(frontend_shared, "PUBLIC_DIR", public_dir)
     monkeypatch.setattr(forecast_artifacts, "PUBLIC_DIR", public_dir)
     monkeypatch.setattr(forecast_artifacts, "FORECAST_RECEIPT_PATH", receipt_path)
-    assert forecast_artifacts.publish_forecast_evidence() is True
+    assert forecast_artifacts.publish_forecast_evidence(expected_forecast_path=forecast) is True
     evidence = json.loads((public_dir / "evidence/forecast.json").read_text())
     assert evidence["receipt_id"] == receipt["receipt_id"]
     assert evidence["quality"]["status"] == "passed"
     assert evidence["coverage"]["rows"] == 100
     monkeypatch.setattr(forecast_artifacts, "EVENT_PREDICTION_LEDGER_PATH", forecast_dir / "event_prediction_ledger.parquet")
-    public = forecast_artifacts.load_ml_forecasts(publication_held=not policy["can_publish_ml"])
+    public = forecast_artifacts.load_ml_forecasts(
+        forecast_path=forecast, eligible_forecast_ids=set(policy["eligible_forecast_ids"]),
+        eligible_event_keys=set(policy["eligible_event_keys"]),
+    )
     assert len(public) == 100
     published = forecast_artifacts.ml_fields(public[store["symbols"][0], store["event"].isoformat()])
     assert pd.Timestamp(published["ml_snapshot_date"]).date() == store["latest"]
@@ -295,7 +301,7 @@ def test_accepted_fresh_quotes_reach_signed_champion_and_public_forecast(accepte
     _assert_controls_unchanged(store)
 
 
-@pytest.mark.parametrize("mutation", ["stale", "corruption", "unsupported", "sparse"])
+@pytest.mark.parametrize("mutation", ["stale", "corruption", "sparse"])
 def test_signed_current_forecast_holds_survive_repaired_live_scoring(accepted_options, mutation):
     store = accepted_options
     frame = daily_score.get_bundle_forecasts(store["conn"], store["bundle"], 21)
@@ -307,23 +313,108 @@ def test_signed_current_forecast_holds_survive_repaired_live_scoring(accepted_op
         frame["feature_vector"] = json.dumps({"straddle_pct": None})
     elif mutation == "sparse":
         frame = frame.iloc[:19].copy()
-    else:
-        extra = frame.iloc[[0]].copy()
-        extra["act_symbol"] = "UNSUPPORTED"
-        extra["em_math_pct"] = np.nan
-        extra["__cohort"] = "optionless"
-        vector = json.loads(extra.iloc[0]["feature_vector"])
-        vector["straddle_pct"] = None
-        extra["feature_vector"] = json.dumps(vector)
-        frame = pd.concat([frame, extra], ignore_index=True)
     result, policy, report, _ = _monitor_fixture_rows(store, frame)
     assert result == 1 and policy["can_publish_ml"] is False
     assert report["status"] == "failed"
-    expected = {"unsupported": "unsupported_cohort", "sparse": "insufficient_data"}.get(mutation, "critical")
+    expected = {"sparse": "insufficient_data"}.get(mutation, "critical")
     assert report["feature_drift"]["status"] == expected
     assert forecast_artifacts.load_ml_forecasts(publication_held=True) == {}
     assert (model_publication.backup_dir(store["data"]) / "event_forecast_archive.parquet").read_bytes() == (
         store["data"] / "forecasts/event_forecast_archive.parquet").read_bytes()
+    _assert_controls_unchanged(store)
+
+
+def test_sparse_fresh_options_publish_only_valid_current_champion_events(accepted_options, monkeypatch):
+    """Exercise real quote views, signed selection, full validation and public cleanup."""
+    store = accepted_options
+    data, latest = store["data"], store["latest"]
+    partition = data / f"parquet/options_chain/year={latest.year}/month={latest.month:02}/{latest}.parquet"
+    quotes = pd.read_parquet(partition)
+    rejected = quotes.loc[quotes["act_symbol"].eq("CROSSED")]
+    # These current-source events are in the options universe, but each actual
+    # crossed quote fails the unchanged individual contract.
+    bad_symbols = [f"REJECTED{i:03}" for i in range(100)]
+    extra_quotes = [rejected.assign(act_symbol=symbol) for symbol in bad_symbols]
+    pd.concat([quotes, *extra_quotes], ignore_index=True).to_parquet(partition, index=False)
+    calendar = pd.read_parquet(data / "earnings_calendar.parquet")
+    extra_events = pd.DataFrame({"act_symbol": bad_symbols, "date": store["event"], "timing": "bmo"})
+    pd.concat([calendar, extra_events], ignore_index=True).to_parquet(data / "earnings_calendar.parquet", index=False)
+    setup_views(store["conn"], data)
+    quality = _quote_quality(store["conn"], now=store["now"])
+    coverage = _event_coverage(store["conn"], days_ahead=21)
+    assert quality["source_date"] == latest.isoformat() and not quality["errors"]
+    assert coverage["coverage_pct"] < .65 and coverage["status"] == "failed"
+    manifest = build_reconciliation_manifest(
+        generated_at=store["now"].isoformat(),
+        datasets={"options": {"status": "passed", "lag_days": 0, "max_lag_days": 0}},
+        event_coverage=coverage, quote_quality=quality,
+        duplicates={"options": {"duplicate_rows": 0}}, symbol_mappings={},
+        corporate_actions={"continuity_status": "enforced"},
+        pipeline_controls={"quarantine": {"status": "enforced"}, "idempotent_replay": {"status": "verified"}},
+        source_reconciliation={"status": "passed", "source_date": latest.isoformat()},
+    )
+    assert manifest["quality"]["decision_safe"] is True
+    assert manifest["quality"]["model_activation_eligible"] is False
+    assert not any(item["severity"] == "critical" for item in manifest["exceptions"])
+    _write_json(store["manifest"], manifest)
+    decision = finalize_snapshot(manifest_path=store["manifest"], data_dir=data, not_before=store["now"].isoformat())
+    assert decision.state == "accepted" and decision.active_source_date == latest.isoformat()
+    with pytest.raises(RuntimeError, match="model activation is blocked"):
+        verify_retrain_data_gate(data_dir=data, now=store["now"])
+    good = daily_score.get_bundle_forecasts(store["conn"], store["bundle"], 21)
+    assert set(good["act_symbol"]) == set(store["symbols"])
+    assert set(pd.to_datetime(good["snapshot_date"]).dt.date) == {latest}
+    unsupported = good.iloc[:1].copy()
+    unsupported["act_symbol"] = "UNSUPPORTED"
+    unsupported["em_math_pct"] = np.nan
+    unsupported["__cohort"] = "optionless"
+    vector = json.loads(unsupported.iloc[0]["feature_vector"])
+    vector["straddle_pct"] = None
+    unsupported["feature_vector"] = json.dumps(vector)
+    result, policy, report, candidate = _monitor_fixture_rows(store, pd.concat([good, unsupported]))
+    assert result == 1 and policy["state"] == "partial" and policy["can_publish_ml"]
+    assert report["feature_drift"]["status"] == "unsupported_cohort"
+    selected = Path(policy["eligible_forecast_path"])
+    assert set(pd.read_parquet(selected)["act_symbol"]) == set(store["symbols"])
+    receipt_dir = data / "forecasts/receipts"
+    monkeypatch.setattr("sys.argv", [
+        "validate_ml_pipeline.py", "forecasts", "--data-dir", str(data),
+        "--forecast-path", str(selected), "--report", str(data / "validation/daily_forecasts.json"),
+        "--publish-receipt-dir", str(receipt_dir),
+    ])
+    assert validate_ml_pipeline.main() == 0
+    receipt_path = receipt_dir / "latest_forecasts.json"
+    public_dir = data / "public"
+    monkeypatch.setattr(frontend_shared, "PUBLIC_DIR", public_dir)
+    monkeypatch.setattr(forecast_artifacts, "PUBLIC_DIR", public_dir)
+    monkeypatch.setattr(forecast_artifacts, "FORECAST_RECEIPT_PATH", receipt_path)
+    assert forecast_artifacts.publish_forecast_evidence(expected_forecast_path=selected)
+    with pytest.raises(ValueError, match="forecast|receipt"):
+        forecast_artifacts.publish_forecast_evidence(expected_forecast_path=candidate)
+    # A held event's older ledger forecast cannot appear through the subset loader.
+    old = daily_score.save_forecasts(unsupported.assign(em_ml_pct=.03), data,
+                                    output_path=data / "validation/old-unpublished.parquet")
+    monkeypatch.setattr(forecast_artifacts, "EVENT_PREDICTION_LEDGER_PATH", old)
+    public = forecast_artifacts.load_ml_forecasts(
+        forecast_path=selected, eligible_forecast_ids=set(policy["eligible_forecast_ids"]),
+        eligible_event_keys=set(policy["eligible_event_keys"]),
+    )
+    assert len(public) == 100 and ("UNSUPPORTED", store["event"].isoformat()) not in public
+    first = store["symbols"][0]
+    current = {"ticker": first, "earnings_date": store["event"].isoformat(),
+               **forecast_artifacts.ml_fields(public[first, store["event"].isoformat()])}
+    held = {"ticker": "UNSUPPORTED", "earnings_date": store["event"].isoformat(), "em_ml_pct": .03}
+    unscored = {"ticker": "CROSSED", "earnings_date": store["event"].isoformat(), "em_ml_pct": .04}
+    reported = {"ticker": "PREVIOUS", "earnings_date": store["previous"].isoformat(), "em_ml_pct": .02}
+    _write_json(public_dir / "weekly.json", {"events": [current, held, unscored, reported]})
+    forecast_artifacts.withhold_upcoming_ml(
+        public_dir, today=store["now"].date(), eligible_forecast_ids=set(policy["eligible_forecast_ids"]),
+        eligible_event_keys=set(policy["eligible_event_keys"]), align_components=False,
+    )
+    events = json.loads((public_dir / "weekly.json").read_text())["events"]
+    assert events[0]["ml_publication_status"] == "eligible" and events[0]["em_ml_pct"] > 0
+    assert all(item["ml_publication_status"] == "held" and "em_ml_pct" not in item for item in events[1:3])
+    assert events[3]["em_ml_pct"] == .02
     _assert_controls_unchanged(store)
 
 
@@ -401,7 +492,7 @@ def test_malformed_empty_artifact_does_not_create_a_signed_hold(accepted_options
     store = accepted_options
     forecast = store["data"] / "validation/malformed.parquet"
     pd.DataFrame(columns=["model_bundle_id"]).to_parquet(forecast, index=False)
-    with pytest.raises(ValueError, match="empty forecast artifact lacks required columns"):
+    with pytest.raises(ValueError, match="forecast artifact lacks required columns"):
         control_plane.monitor(argparse.Namespace(
             models_root=store["data"] / "models", forecast_dir=store["data"] / "forecasts",
             forecast_path=forecast, days_ahead=21,

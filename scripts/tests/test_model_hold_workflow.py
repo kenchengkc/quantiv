@@ -15,11 +15,13 @@ def test_daily_handoff_uses_exact_scored_artifact_and_holds_empty_batch(job):
     build = next(step for step in steps if step['name'].startswith('Build frontend JSON'))
     assert score.get('id') == 'scoring'
     assert '--github-output "$GITHUB_OUTPUT"' in score['run']
-    assert "steps.scoring.outputs.has_forecasts == 'true'" in validate['if']
+    assert "steps.model_publication.outputs.has_forecasts == 'true'" in validate['if']
     path = '${{ steps.scoring.outputs.forecast_path }}'
-    assert f'--forecast-path "{path}"' in validate['run']
+    selected_path = '${{ steps.model_publication.outputs.eligible_forecast_path }}'
+    assert f'--forecast-path "{selected_path}"' in validate['run']
     assert f'--forecast-path "{path}"' in monitor['run']
     assert build['env']['MODEL_PUBLICATION_FORECAST_PATH'] == path
+    assert steps.index(monitor) < steps.index(validate)
     assert 'has_forecasts' not in monitor.get('if', '')
 
 
@@ -31,7 +33,8 @@ def test_event_freeze_empty_batch_still_records_a_signed_hold():
     monitor = next(step for step in steps if step.get('id') == 'model-publication')
     assert score.get('id') == 'scoring'
     assert '--github-output "$GITHUB_OUTPUT"' in score['run']
-    assert "steps.scoring.outputs.has_forecasts == 'true'" in validate['if']
+    assert "steps.model-publication.outputs.has_forecasts == 'true'" in validate['if']
+    assert steps.index(monitor) < steps.index(validate)
     assert 'has_forecasts' not in monitor.get('if', '')
 
 ROOT = Path(__file__).resolve().parents[2]
