@@ -14,6 +14,47 @@ import apply_ticker_lifecycle as lifecycle  # noqa: E402
 apply_lifecycle = lifecycle.apply_lifecycle
 
 
+def test_psky_history_survives_in_both_artifacts_without_acquirer_history_mix(tmp_path):
+    frame = pd.DataFrame([
+        {"act_symbol": "PSKY", "date": "2026-08-04", "eps_actual": 0.42, "source": "dolthub"},
+        {"act_symbol": "PSKY", "date": "2026-11-03", "eps_actual": 0.0, "source": "prior"},
+        {"act_symbol": "SKYD", "date": "2026-11-03", "eps_actual": 0.5, "source": "fresh"},
+        *[{"act_symbol": symbol, "date": "2026-08-04", "eps_actual": 99.0, "source": "dolthub"}
+          for symbol in ("QRVO", "BLFS", "WBD")],
+        *[{"act_symbol": symbol, "date": "2026-08-04", "eps_actual": 1.0, "source": "dolthub"}
+          for symbol in ("SWKS", "RGEN")],
+    ])
+    csv_path = tmp_path / "earnings_calendar.csv"
+    parquet_path = tmp_path / "earnings_calendar.parquet"
+    frame.to_csv(csv_path, index=False)
+    frame.to_parquet(parquet_path, index=False)
+
+    counts = lifecycle.apply_artifacts(tmp_path)
+
+    expected = pd.DataFrame([
+        {"act_symbol": "RGEN", "date": "2026-08-04", "eps_actual": 1.0, "source": "dolthub"},
+        {"act_symbol": "SKYD", "date": "2026-08-04", "eps_actual": 0.42, "source": "dolthub"},
+        {"act_symbol": "SWKS", "date": "2026-08-04", "eps_actual": 1.0, "source": "dolthub"},
+        {"act_symbol": "SKYD", "date": "2026-11-03", "eps_actual": 0.5, "source": "fresh"},
+    ])
+    pd.testing.assert_frame_equal(pd.read_csv(csv_path), expected)
+    pd.testing.assert_frame_equal(pd.read_parquet(parquet_path), expected)
+    assert counts == {kind: {"renamed_rows": 2, "retired_rows": 3, "deduplicated_rows": 1}
+                      for kind in ("csv", "parquet")}
+
+
+def test_artifact_mismatch_fails_before_either_file_is_written(tmp_path):
+    frame = pd.DataFrame([{"act_symbol": "SKYD", "date": "2026-08-04"}])
+    csv_path = tmp_path / "earnings_calendar.csv"
+    parquet_path = tmp_path / "earnings_calendar.parquet"
+    frame.to_csv(csv_path, index=False)
+    frame.assign(date="2026-08-05").to_parquet(parquet_path, index=False)
+    before = (csv_path.read_bytes(), parquet_path.read_bytes())
+    with pytest.raises(ValueError, match="artifacts disagree"):
+        lifecycle.apply_artifacts(tmp_path)
+    assert (csv_path.read_bytes(), parquet_path.read_bytes()) == before
+
+
 def test_lifecycle_rewrites_renames_removes_retired_and_deduplicates() -> None:
     frame = pd.DataFrame(
         [

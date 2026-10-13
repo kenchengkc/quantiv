@@ -12,6 +12,12 @@ must be absent for several consecutive days (--threshold) before it is promoted
 into config/delisted_tickers.json. Reappearing in the directories clears the
 watch. State persists in data/delisting_watch.json across nightly runs.
 
+Absence is not proof of delisting: the name matcher needs at least two shared
+tokens, and build_ticker_names.mjs replaces names with the current SEC listing
+map before this script runs. A simultaneous name/symbol change (PSKY -> SKYD)
+can therefore evade the heuristic. Verify corporate filings and record confirmed
+renames in config/ticker_renames.json; do not loosen matching to an acquirer.
+
 Run in the daily refresh after scripts/build_ticker_names.mjs and before the
 integrity gate, so a newly promoted delisting is honored in the same commit:
   python scripts/detect_delistings.py            # fetch, update watch, auto-promote
