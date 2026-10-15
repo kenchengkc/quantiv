@@ -1107,3 +1107,41 @@ def test_legacy_exposure_also_bounds_unrecorded_selection_by_training_time():
             "validation_split": {"validation_end": "2026-06-01"},
         }
     ) == pd.Timestamp("2026-07-01T10:00:00")
+
+
+def test_monitoring_ledger_keeps_every_exact_signed_daily_head(tmp_path, monkeypatch):
+    from datetime import datetime, timezone
+    import ml.model_control as control
+    from ml.model_bundle import required_artifact_names
+    from ml.evidence_receipt import build_evidence_receipt
+
+    class FixedDateTime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return cls(2026, 10, 16, 1, tzinfo=timezone.utc)
+
+    monkeypatch.setattr(control, "datetime", FixedDateTime)
+    private, public = _keys(tmp_path)
+    monkeypatch.setenv("MODEL_BUNDLE_PUBLIC_KEY", str(public))
+    models = tmp_path / "models"
+    models.mkdir()
+    for name in required_artifact_names((4, 25)):
+        (models / name).write_text("{}" if name.startswith("metadata") else "native")
+    report = {"status": "passed", "stages": {"models": {"horizons": [4, 25]}}}
+    receipt = build_evidence_receipt(report, scope="models", repo_root=tmp_path, data_dir=tmp_path,
+        training_dir=tmp_path / "training", models_dir=models, forecast_path=None, horizons=(4, 25))
+    report_path, receipt_path = tmp_path / "report.json", tmp_path / "receipt.json"
+    report_path.write_text(json.dumps(report))
+    receipt_path.write_text(json.dumps(receipt))
+    bundle, manifest = create_signed_bundle(models, tmp_path / "bundles", receipt_path=receipt_path,
+        validation_report_path=report_path, source_revision="test", horizons=(4, 25), private_key=private)
+    frame = pd.DataFrame([{
+        "act_symbol": "A", "snapshot_date": "2026-10-15", "earnings_date": event,
+        "model_horizon": horizon, "em_ml_pct": .05, "em_math_pct": .08,
+        "feature_vector": json.dumps({"feature": .5}), "timing": "bmo",
+        "scored_at": "2026-10-16T01:00:00Z",
+        **{f"p{q:02d}": q / 1000 for q in (10, 25, 50, 75, 90)},
+    } for horizon, event in [(4, "2026-10-19"), (25, "2026-11-09")]])
+    result = control.monitoring_rows(frame, bundle, bundle_id=manifest["bundle_id"],
+        role="champion", use_served_predictions=True)
+    assert result["model_horizon"].tolist() == [4, 25]

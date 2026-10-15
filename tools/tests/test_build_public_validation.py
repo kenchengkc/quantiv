@@ -125,6 +125,7 @@ def _install_signed_champion(
     model_mae: float = 0.03,
     baseline_mae: float = 0.06,
     forecast_horizons: tuple[int, ...] = HORIZONS,
+    horizons: tuple[int, ...] = HORIZONS,
 ) -> tuple[str, dict, bytes]:
     models = repo / "data/models"
     training = repo / "data/ml_training"
@@ -135,15 +136,15 @@ def _install_signed_champion(
         f"metadata_T{horizon}.json": _metadata(
             horizon, model_mae=model_mae, baseline_mae=baseline_mae
         )
-        for horizon in HORIZONS
+        for horizon in horizons
     }
-    for name in required_artifact_names(HORIZONS):
+    for name in required_artifact_names(horizons):
         path = models / name
         if name in metadata_by_name:
             _write_json(path, metadata_by_name[name])
         else:
             path.write_bytes(f"artifact:{name}".encode())
-    for horizon in HORIZONS:
+    for horizon in horizons:
         (training / f"training_T{horizon}.parquet").write_bytes(
             f"training:{horizon}".encode()
         )
@@ -156,7 +157,7 @@ def _install_signed_champion(
         "stages": {
             "models": {
                 "status": "passed",
-                "horizons": {str(horizon): {} for horizon in HORIZONS},
+                "horizons": {str(horizon): {} for horizon in horizons},
             }
         },
     }
@@ -168,7 +169,7 @@ def _install_signed_champion(
         training_dir=training,
         models_dir=models,
         forecast_path=None,
-        horizons=HORIZONS,
+        horizons=horizons,
     )
     validation_report["evidence_receipt"] = model_receipt
     _, latest_receipt_path = publish_evidence_receipt(
@@ -188,7 +189,7 @@ def _install_signed_champion(
         receipt_path=latest_receipt_path,
         validation_report_path=report_path,
         source_revision="source-revision-test",
-        horizons=HORIZONS,
+        horizons=horizons,
         private_key=private,
     )
     champion = manifest["bundle_id"]
@@ -227,7 +228,7 @@ def _install_signed_champion(
         training_dir=training,
         models_dir=bundle_dir,
         forecast_path=forecast_path,
-        horizons=HORIZONS,
+        horizons=horizons,
     )
     forecast_model_sha = _receipt_artifact(forecast_receipt, "model_bundle")["sha256"]
     assert forecast_model_sha != _receipt_artifact(model_receipt, "model_bundle")["sha256"]
@@ -434,3 +435,12 @@ def test_signed_champion_rejects_subset_digest_for_different_horizons(tmp_path, 
     _write_json(path, forecast)
     with pytest.raises(ModelBundleError, match="forecast evidence"):
         build_validation(tmp_path)
+
+
+def test_public_validation_reports_every_signed_daily_head(tmp_path, monkeypatch):
+    _install_signed_champion(tmp_path, monkeypatch, horizons=(4, 25), forecast_horizons=(25,))
+    result = build_validation(tmp_path)
+    assert result["summary"]["supported_horizons"] == [4, 25]
+    assert [row["horizon_days"] for row in result["horizons"]] == [4, 25]
+    assert set(result["evaluation_evidence"]["receipt"]["metadata_sha256"]) == {"4", "25"}
+    assert result["current_evidence"]["forecast_model_matches_evaluation"] is True

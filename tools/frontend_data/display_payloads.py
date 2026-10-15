@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import math
 from collections import Counter
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -20,9 +20,7 @@ from fiscal_calendar import (
 
 from .display_forecast import (
     DisplayForecastError,
-    build_universe_historical_prior,
-    load_display_policy,
-    resolve_display_forecast,
+    resolve_upcoming_display_forecast,
 )
 from .realized_moves import reaction_label_lookup
 from .shared import jsonable
@@ -30,6 +28,7 @@ from .shared import jsonable
 
 DISPLAY_METHODS = {
     "ml",
+    "ml_unavailable",
     "options_math",
     "options_indicative",
     "historical",
@@ -118,7 +117,7 @@ def enrich_upcoming_event(
     if not options_available:
         _clear_held_option_inputs(event)
 
-    result = resolve_display_forecast(
+    result = resolve_upcoming_display_forecast(
         conn,
         ticker=str(event.get("ticker") or "").upper(),
         earnings_date=earnings_date,
@@ -128,13 +127,13 @@ def enrich_upcoming_event(
             "em_ml_pct": event.get("em_ml_pct"),
             "ml_snapshot_date": event.get("ml_snapshot_date"),
             "ml_status": event.get("ml_status"),
+            "ml_publication_status": event.get("ml_publication_status"),
         },
         strict_options=_strict_options_from_event(event),
         options_available=options_available,
     )
     event.update(result.public_fields())
-    if not options_available:
-        event["em_method"] = "ml_lightgbm" if result.method == "ml" else result.method
+    event["em_method"] = "ml_lightgbm" if result.method == "ml" else result.method
     return event
 
 
@@ -180,6 +179,18 @@ def _validate_display_provenance(
     fallback_reason = event.get("fallback_reason")
     as_of = event.get("display_forecast_as_of")
 
+    if method == "ml_unavailable":
+        if event.get("display_forecast_pct") is not None:
+            errors.append(f"{identity}: unavailable ML must have null display_forecast_pct")
+        if ml_status not in ML_STATUSES - {"available"}:
+            errors.append(f"{identity}: unavailable ML must identify an unavailable ml_status")
+        if options_status not in OPTIONS_STATUSES:
+            errors.append(f"{identity}: invalid options_status={options_status!r}")
+        if not isinstance(as_of, str) or not as_of:
+            errors.append(f"{identity}: missing display_forecast_as_of")
+        if fallback_reason is not None:
+            errors.append(f"{identity}: unavailable ML must not carry a fallback reason")
+        return
     if pct is None:
         errors.append(f"{identity}: invalid display_forecast_pct")
     if method not in DISPLAY_METHODS:
@@ -277,8 +288,6 @@ def suppress_held_options(
         *sorted((public_dir / "weeks").glob("*.json")),
         *sorted((public_dir / "symbols").glob("*.json")),
     ]
-    policy = None
-    universe_prior = None
     resolved = {}
     for path in paths:
         if not path.is_file() or path.name == "manifest.json":
@@ -296,22 +305,16 @@ def suppress_held_options(
             if not ticker:
                 raise DisplayForecastError(f"{path.name}: future forecast has no ticker")
             _clear_held_option_inputs(node)
-            if policy is None:
-                policy = load_display_policy()
-                universe_prior = build_universe_historical_prior(
-                    conn, cutoff=as_of_date, window_days=policy.universe_prior_window_days,
-                )
             ml_forecast = None if publication_held else {
                 key: node.get(key)
-                for key in ("em_ml_pct", "ml_snapshot_date", "snapshot_date", "ml_status")
+                for key in ("em_ml_pct", "ml_snapshot_date", "snapshot_date", "ml_status", "ml_publication_status")
             }
             key = (ticker, event_iso, json.dumps(ml_forecast, sort_keys=True))
             if key not in resolved:
-                resolved[key] = resolve_display_forecast(
+                resolved[key] = resolve_upcoming_display_forecast(
                     conn, ticker=ticker, earnings_date=date.fromisoformat(event_iso),
                     timing=node.get("timing"), as_of_date=as_of_date,
                     ml_forecast=ml_forecast, options_available=False,
-                    universe_prior=universe_prior, policy=policy,
                 )
             result = resolved[key]
             node.update(result.public_fields())
@@ -355,6 +358,8 @@ def validate_upcoming_display_forecasts(
         if event is None:
             errors.append(f"{identity}: missing week row")
             continue
+        if event.get("display_forecast_method") not in {"ml", "ml_unavailable"}:
+            errors.append(f"{identity}: upcoming headline must be ML or ML unavailable")
         _validate_display_provenance(event, identity=identity, errors=errors)
     if errors:
         raise DisplayForecastError(
@@ -382,25 +387,36 @@ def build_display_forecast_status(
         and payload["window"].get("end")
     ]
     selected: list[dict[str, Any]] = []
+    exclusions = []
+    expected = 0
     for ticker, earnings_date, _timing in published_events:
         if earnings_date <= today:
             continue
-        if windows and not any(start <= earnings_date <= end for start, end in windows):
+        if (windows and earnings_date > today + timedelta(days=21)
+                and not any(start <= earnings_date <= end for start, end in windows)):
             continue
+        expected += 1
         event = rows.get((ticker.upper(), earnings_date.isoformat()))
         if event is not None:
             selected.append(event)
+        else:
+            from market_sessions import is_us_market_session
+            exclusions.append({"event_key": f"{ticker.upper()}|{earnings_date}",
+                               "reason": "missing_public_payload" if is_us_market_session(earnings_date)
+                               else "non_market_session_event"})
     mix = Counter(str(event.get("display_forecast_method")) for event in selected)
     covered = sum(
-        _finite_positive(event.get("display_forecast_pct")) is not None
+        event.get("display_forecast_method") == "ml"
+        and _finite_positive(event.get("display_forecast_pct")) is not None
         for event in selected
     )
-    expected = len(selected)
     return {
         "schema": "quantiv.display-forecast-status.v1",
         "generated_at": generated_at,
         "published_upcoming_events": expected,
         "with_display_forecast": covered,
+        "unavailable_events": expected - covered,
+        "exclusions": exclusions,
         "coverage_pct": covered / expected if expected else 1.0,
         "method_mix": {
             method: int(mix.get(method, 0)) for method in sorted(DISPLAY_METHODS)

@@ -242,3 +242,42 @@ def test_learning_report_retains_recent_fit_without_independent_metric_claim(tmp
     decision.update({"champion_bundle_id": "candidate", "promoted": True})
     promoted = evaluation.learning_evidence_report(metadata, bundle_id="candidate", decision=decision)
     assert promoted["status"] == "promoted"
+
+
+def test_default_reservation_preserves_an_independent_test_for_all_daily_heads(tmp_path):
+    for horizon in range(1, 26):
+        _write_training(tmp_path, horizon=horizon, days=100)
+    reservation = prepare_independent_test(repo_root=tmp_path,
+        training_dir=tmp_path / "data/ml_training", staging_dir=tmp_path / "staging",
+        test_days=10, min_development_rows=20, min_test_rows=10)
+    assert [row["horizon_days"] for row in reservation["horizons"]] == list(range(1, 26))
+
+
+def test_learning_cli_reports_the_exact_verified_daily_heads(tmp_path, monkeypatch):
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    from ml.evidence_receipt import build_evidence_receipt
+    from ml.model_bundle import create_signed_bundle, required_artifact_names
+    key = Ed25519PrivateKey.generate()
+    private = key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption())
+    monkeypatch.setenv("MODEL_BUNDLE_PUBLIC_KEY", key.public_key().public_bytes(serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo).decode())
+    models = tmp_path / "models"
+    models.mkdir()
+    for name in required_artifact_names((4, 25)):
+        payload = {"final_fit": {"rows": 400}, "selection_exposure": {"through_date": "2026-09-01"}}
+        (models / name).write_text(json.dumps(payload) if name.startswith("metadata") else "native")
+    report = {"status": "passed", "stages": {"models": {"horizons": [4, 25]}}}
+    receipt = build_evidence_receipt(report, scope="models", repo_root=tmp_path, data_dir=tmp_path,
+        training_dir=tmp_path / "training", models_dir=models, forecast_path=None, horizons=(4, 25))
+    report_path, receipt_path = tmp_path / "report.json", tmp_path / "receipt.json"
+    report_path.write_text(json.dumps(report))
+    receipt_path.write_text(json.dumps(receipt))
+    bundle, manifest = create_signed_bundle(models, tmp_path / "bundles", receipt_path=receipt_path,
+        validation_report_path=report_path, source_revision="test", horizons=(4, 25), private_key=private)
+    decision = tmp_path / "decision.json"
+    decision.write_text(json.dumps({"candidate_bundle_id": manifest["bundle_id"], "promoted": False}))
+    learning = tmp_path / "learning.json"
+    monkeypatch.setattr("sys.argv", ["independent_model_evaluation.py", "report-learning",
+        "--bundle-dir", str(bundle), "--decision", str(decision), "--report", str(learning)])
+    assert evaluation.main() == 0
+    assert set(json.loads(learning.read_text())["horizons"]) == {"4", "25"}

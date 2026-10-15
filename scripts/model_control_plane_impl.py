@@ -196,6 +196,8 @@ def _retain_candidate(args: argparse.Namespace) -> dict[str, Any]:
             migration_reason = (
                 "existing challenger lacks verified complete archived evidence"
             )
+        elif set(old["horizons"]) < set(manifest["horizons"]):
+            migration_reason = "new challenger expands exact daily lead coverage; prospective evidence restarts"
         if migration_reason:
             frozen = None
     frozen = str(frozen or incoming)
@@ -206,16 +208,25 @@ def _retain_candidate(args: argparse.Namespace) -> dict[str, Any]:
     )
     evaluation_manifest = verify_bundle_dir(evaluation_dir)
     evaluated_at = datetime.now(timezone.utc).isoformat()
+    from ml.prospective_admission import declare_admission
+
+    champion = pointer.get("champion_bundle_id")
+    champion_dir = args.models_root / "bundles" / champion if champion else None
+    prior_contract = (registry.get("decision") or {}).get("admission_contract")
+    admission_contract = declare_admission(evaluation_dir, champion_dir,
+        started_at=(prior_contract or {}).get("started_at", evaluated_at))
+    if prior_contract != admission_contract:
+        admission_contract = declare_admission(evaluation_dir, champion_dir, started_at=evaluated_at)
     decision = {
         "action": "register_candidate",
         "candidate_bundle_id": incoming,
         "challenger_bundle_id": frozen,
         "evaluated_at": evaluated_at,
         "challenger_migration_reason": migration_reason,
+        "admission_contract": admission_contract,
     }
     history = list(registry.get("history") or [])
     history.append(decision)
-    champion = pointer.get("champion_bundle_id")
     previous = pointer.get("previous_bundle_id")
     _atomic_json(
         args.models_root / "control" / "registry.json",
@@ -246,6 +257,7 @@ def _retain_candidate(args: argparse.Namespace) -> dict[str, Any]:
         "evaluation_bundle_dir": str(evaluation_dir),
         "evaluation_manifest": str(evaluation_record),
         "evaluation_evidence_dir": str(args.models_root / "candidates" / frozen),
+        "horizons": list(evaluation_manifest["horizons"]),
         "production_forecast": None,
         "reasons": ["frozen challenger retained for unseen paired evidence"],
     }
@@ -275,7 +287,8 @@ def _activation_gate(args: argparse.Namespace) -> dict[str, Any]:
     from verify_retrain_data_gate import verify_retrain_data_gate
 
     try:
-        return verify_retrain_data_gate(data_dir=args.models_root.parent)
+        return verify_retrain_data_gate(data_dir=args.models_root.parent,
+            forecast_path=getattr(args, "candidate_forecast", None))
     except RuntimeError as exc:
         return {"status": "held", "reason": str(exc)}
 
@@ -288,6 +301,7 @@ def _prospective_comparison(
     *,
     candidate_id: str,
     champion_id: str,
+    contract: dict | None = None,
 ) -> dict[str, Any]:
     path = args.models_root / "monitoring" / "prediction_ledger.parquet"
     report: dict[str, Any] = {
@@ -308,6 +322,20 @@ def _prospective_comparison(
         _read_json(receipt_path), ledger_path=path, report_path=monitoring_report
     )
     ledger = pd.read_parquet(path)
+    if contract is not None:
+        from prospective_outcomes import read_verified_labels
+        from ml.prospective_admission import declare_admission, evaluate_admission
+
+        if contract != declare_admission(candidate_dir, champion_dir, started_at=contract["started_at"]):
+            raise ValueError("prospective admission policy differs from the registered signed bundles")
+        try:
+            labels, source = read_verified_labels(args.models_root.parent, ledger)
+        except (OSError, RuntimeError, ValueError) as exc:
+            return {**report, "status": "insufficient_data", "evaluation_complete": False,
+                    "issues": [f"verified session outcomes unavailable: {exc}"]}
+        result = evaluate_admission(ledger, labels, candidate_dir, champion_dir, contract)
+        result["outcome_source"] = source
+        return result
     for horizon in horizons:
         training = args.training_dir / f"training_T{horizon}.parquet"
         labels = pd.read_parquet(training) if training.exists() else pd.DataFrame()
@@ -393,9 +421,12 @@ def decide(args: argparse.Namespace) -> int:
             if drift["status"] not in {"passed", "warning"}:
                 reasons.append(f"candidate cohort drift evidence is {drift['status']}")
             if champion_dir is not None:
-                comparison = compare_on_common_holdout(
-                    candidate_dir, champion_dir, args.training_dir, horizons=horizons
-                )
+                contract = retained.get("admission_contract")
+                expanded = contract and any(value != "incumbent"
+                    for cohorts in contract["comparators"].values() for value in cohorts.values())
+                comparison = ({"status": "insufficient_data", "issues": ["expanded coverage requires predeclared future evidence"]}
+                    if expanded else compare_on_common_holdout(
+                        candidate_dir, champion_dir, args.training_dir, horizons=horizons))
                 prospective = _prospective_comparison(
                     args,
                     candidate_dir,
@@ -403,6 +434,7 @@ def decide(args: argparse.Namespace) -> int:
                     horizons,
                     candidate_id=candidate_id,
                     champion_id=champion_id,
+                    contract=contract,
                 )
                 evidence = (
                     comparison if comparison["status"] == "passed" else prospective
@@ -415,13 +447,23 @@ def decide(args: argparse.Namespace) -> int:
                     if champion_path is not None and champion_path.exists()
                     else None
                 )
-                if champion_forecasts is None:
+                comparable = candidate_forecasts
+                if contract:
+                    import numpy as np
+                    base = pd.to_numeric(candidate_forecasts["em_math_pct"], errors="coerce")
+                    cohorts = pd.Series(np.where(np.isfinite(base) & (base > 0), "strict_options", "optionless"), index=candidate_forecasts.index)
+                    mask = pd.Series([contract["comparators"][str(int(h))].get(c) == "incumbent"
+                        for h, c in zip(candidate_forecasts["model_horizon"], cohorts)], index=candidate_forecasts.index)
+                    comparable = candidate_forecasts.loc[mask]
+                if comparable.empty:
+                    shadow = {"status": "passed", "issues": [], "reason": "new coverage uses predeclared matched-baseline evidence"}
+                elif champion_forecasts is None:
                     reasons.append(
                         "protocol-specific champion shadow forecast is unavailable"
                     )
                 else:
                     shadow = shadow_score_report(
-                        candidate_forecasts,
+                        comparable,
                         champion_dir,
                         champion_forecasts=champion_forecasts,
                     )
@@ -629,14 +671,15 @@ def monitor(args: argparse.Namespace) -> int:
         )]
     shadows: dict[str, Any] = {}
     shadow_ids = {
+        "champion_evidence": champion_id if max(champion_manifest["horizons"]) > getattr(args, "days_ahead", 21) else None,
         "challenger": registry.get("challenger_bundle_id"),
         "previous": registry.get("previous_bundle_id"),
     }
     for role, bundle_id in shadow_ids.items():
-        if not bundle_id or bundle_id == champion_id:
+        if not bundle_id or bundle_id == champion_id and role != "champion_evidence":
             continue
         bundle_dir = args.models_root / "bundles" / str(bundle_id)
-        verify_bundle_dir(bundle_dir)
+        shadow_manifest = verify_bundle_dir(bundle_dir)
         database = getattr(args, "database", None) or Path(
             os.getenv("DUCKDB_PATH", str(args.models_root.parent / "quantiv.duckdb"))
         )
@@ -647,11 +690,16 @@ def monitor(args: argparse.Namespace) -> int:
             }
             continue
         import duckdb
-        from daily_score import get_bundle_forecasts
+        try:
+            from scripts.daily_score import get_bundle_forecasts
+        except ModuleNotFoundError:
+            from daily_score import get_bundle_forecasts
 
         with duckdb.connect(str(database), read_only=True) as connection:
             shadow_forecasts = get_bundle_forecasts(
-                connection, bundle_dir, getattr(args, "days_ahead", 21)
+                connection, bundle_dir,
+                max(getattr(args, "days_ahead", 21), max(shadow_manifest["horizons"])),
+                now=monitored_at,
             )
         if shadow_forecasts.empty:
             shadows[role] = {
@@ -659,14 +707,17 @@ def monitor(args: argparse.Namespace) -> int:
                 "issues": ["no protocol-specific shadow forecasts"],
             }
             continue
-        if local.empty:
+        keys = ["act_symbol", "earnings_date", "snapshot_date", "model_horizon"]
+        comparable_shadow = (shadow_forecasts.merge(local[keys], on=keys, how="inner", validate="one_to_one")
+            if not local.empty else shadow_forecasts.iloc[:0])
+        if local.empty or comparable_shadow.empty:
             shadows[role] = {
                 "status": "insufficient_data",
-                "issues": ["no current champion forecasts for paired shadow comparison"],
+                "issues": ["no matching current incumbent coverage; observations retained for declared admission"],
             }
         else:
             shadows[role] = shadow_score_report(
-                shadow_forecasts, champion_dir, champion_forecasts=local
+                comparable_shadow, champion_dir, champion_forecasts=local
             )
         ledger_rows.append(
             monitoring_rows(
@@ -836,8 +887,15 @@ def evaluate_outcomes(args: argparse.Namespace) -> int:
         return 0
     champion_dir = args.models_root / "bundles" / champion_id
     comparison_dir = args.models_root / "bundles" / str(comparison_id)
-    verify_bundle_dir(champion_dir)
-    verify_bundle_dir(comparison_dir)
+    champion_manifest = verify_bundle_dir(champion_dir)
+    comparison_manifest = verify_bundle_dir(comparison_dir)
+    common_horizons = sorted(set(champion_manifest["horizons"]) & set(comparison_manifest["horizons"]))
+    if not common_horizons:
+        report = {"schema": "quantiv.model-outcome-monitor.v1", "evaluated_at": evaluated_at,
+                  "status": "insufficient_data", "rolled_back": False,
+                  "reason": "no shared verified model horizons"}
+        _publish_outcome_evidence(args, report, monitoring_dir)
+        return 0
     result = evaluate_realized_outcomes(
         pd.read_parquet(ledger_path),
         args.training_dir,
@@ -846,6 +904,7 @@ def evaluate_outcomes(args: argparse.Namespace) -> int:
         champion_id=champion_id,
         comparison_id=str(comparison_id),
         min_common_rows=args.min_common_rows,
+        horizons=common_horizons,
     )
     gate = _activation_gate(args) if result.get("rollback_recommended") else None
     previously_served = (comparison_id == registry.get("previous_bundle_id")

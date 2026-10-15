@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 import os
+import sys
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone
@@ -15,7 +16,14 @@ from typing import Any, Callable
 from urllib.parse import urlparse
 
 
-REQUIRED_HORIZONS = {1, 2, 3, 7, 14, 21}
+REPO_ROOT = Path(__file__).resolve().parents[1]
+ML_PACKAGE_ROOT = REPO_ROOT / "apps" / "ml"
+if str(ML_PACKAGE_ROOT) not in sys.path:
+    sys.path.insert(0, str(ML_PACKAGE_ROOT))
+
+from ml.model_bundle import verify_bundle_dir  # noqa: E402
+
+DEFAULT_BUNDLE_ROOT = REPO_ROOT / "data" / "models" / "bundles"
 
 
 def _json_object(path: Path) -> dict[str, Any]:
@@ -45,7 +53,7 @@ def expected_bundle_id(decision_path: Path) -> str:
     return bundle_id
 
 
-def _validate_response(payload: dict[str, Any], expected: str) -> None:
+def _validate_response(payload: dict[str, Any], expected: str, required_horizons: set[int]) -> None:
     if payload.get("status") != "activated":
         raise ValueError("backend did not report an activated model bundle")
     if payload.get("bundle_id") != expected:
@@ -61,7 +69,7 @@ def _validate_response(payload: dict[str, Any], expected: str) -> None:
         if not isinstance(row, dict):
             raise ValueError("backend preflight row is invalid")
         horizon = row.get("horizon_days")
-        if not isinstance(horizon, int):
+        if type(horizon) is not int or horizon in observed_horizons:
             raise ValueError("backend preflight horizon is invalid")
         if row.get("quantile_model_count") != 5:
             raise ValueError(f"T-{horizon} did not preflight all quantile heads")
@@ -71,10 +79,10 @@ def _validate_response(payload: dict[str, Any], expected: str) -> None:
         if len(schema_hash) != 64:
             raise ValueError(f"T-{horizon} did not report a feature-schema digest")
         observed_horizons.add(horizon)
-    if observed_horizons != REQUIRED_HORIZONS:
+    if observed_horizons != required_horizons:
         raise ValueError(
             f"backend preflight horizons {sorted(observed_horizons)} do not match "
-            f"required horizons {sorted(REQUIRED_HORIZONS)}"
+            f"required horizons {sorted(required_horizons)}"
         )
 
 
@@ -85,6 +93,7 @@ def activate(
     decision_path: Path,
     receipt_path: Path,
     opener: Callable[..., Any] = urllib.request.urlopen,
+    bundle_root: Path = DEFAULT_BUNDLE_ROOT,
 ) -> dict[str, Any]:
     parsed_url = urlparse(backend_url)
     if parsed_url.scheme not in {"http", "https"} or not parsed_url.netloc:
@@ -93,6 +102,10 @@ def activate(
         raise ValueError("ADMIN_API_KEY is required for a serving activation")
 
     expected = expected_bundle_id(decision_path)
+    manifest = verify_bundle_dir(bundle_root / expected)
+    if manifest["bundle_id"] != expected:
+        raise ValueError("local signed bundle differs from the promotion decision")
+    required_horizons = set(manifest["horizons"])
     endpoint = backend_url.rstrip("/") + "/api/admin/sync-models"
     body = json.dumps({"expected_bundle_id": expected}).encode()
     request = urllib.request.Request(
@@ -116,7 +129,7 @@ def activate(
         raise ValueError("backend activation response was not JSON") from exc
     if not isinstance(payload, dict):
         raise ValueError("backend activation response was not an object")
-    _validate_response(payload, expected)
+    _validate_response(payload, expected, required_horizons)
 
     core = {
         "schema": "quantiv.serving-activation.v1",
@@ -147,6 +160,7 @@ def main() -> int:
     )
     parser.add_argument("--decision", type=Path, required=True)
     parser.add_argument("--receipt", type=Path, required=True)
+    parser.add_argument("--bundle-root", type=Path, default=DEFAULT_BUNDLE_ROOT)
     args = parser.parse_args()
     key = os.getenv("ADMIN_API_KEY", "")
     receipt = activate(
@@ -154,6 +168,7 @@ def main() -> int:
         admin_api_key=key,
         decision_path=args.decision,
         receipt_path=args.receipt,
+        bundle_root=args.bundle_root,
     )
     print(json.dumps(receipt, indent=2, sort_keys=True))
     return 0

@@ -32,7 +32,7 @@ def options_display_available(
     """Return false only for a verified fallback; unknown stale input aborts.
 
     The release and restored reconciliation are checked read-only. A fallback
-    authorizes independent display estimates, never option decision eligibility.
+    permits publication without option decision eligibility.
     Recovery may reuse recent saved evidence rather than invent a new report.
     """
     current = now or datetime.now(timezone.utc)

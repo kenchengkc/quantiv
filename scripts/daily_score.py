@@ -35,6 +35,8 @@ from ml.model_artifact import (  # noqa: E402 - standalone script path setup
 )
 from ml.model_bundle import (  # noqa: E402 - standalone script path setup
     ModelBundleError,
+    DEFAULT_HORIZONS,
+    verify_bundle_dir,
     resolve_champion_bundle,
 )
 from ml.corporate_actions import (  # noqa: E402 - standalone script path setup
@@ -92,16 +94,19 @@ def get_data_dir() -> Path:
 def load_models(models_dir: Path) -> Dict[int, dict]:
     """Load the point and quantile models for every available trained horizon."""
     models = {}
-    bundle_id = None
-    manifest_path = models_dir / "manifest.json"
-    if manifest_path.exists():
-        bundle_id = json.loads(manifest_path.read_text()).get("bundle_id")
-    for meta_path in sorted(models_dir.glob("metadata_T*.json")):
+    manifest = verify_bundle_dir(models_dir) if (models_dir / "manifest.json").exists() else None
+    bundle_id = manifest["bundle_id"] if manifest else None
+    horizons = manifest["horizons"] if manifest else DEFAULT_HORIZONS
+    for horizon in horizons:
+        meta_path = models_dir / f"metadata_T{horizon}.json"
+        if not meta_path.exists():
+            continue
         with open(meta_path) as f:
             meta = json.load(f)
         resolve_feature_protocol(meta)
         target_protocol(meta)
-        horizon = meta["horizon"]
+        if meta.get("horizon") != horizon:
+            raise ValueError(f"T-{horizon} metadata declares another model horizon")
         model_path = models_dir / point_model_name(horizon)
         if not model_path.exists():
             continue
@@ -186,8 +191,11 @@ def get_bundle_upcoming_features(
     conn: duckdb.DuckDBPyConnection, models_dir: Path, days_ahead: int,
 ) -> pd.DataFrame:
     """Build this bundle's features, rather than reuse another model's vectors."""
-    horizons = [int(path.stem.removeprefix("metadata_T"))
-                for path in models_dir.glob("metadata_T*.json")]
+    if (models_dir / "manifest.json").exists():
+        horizons = verify_bundle_dir(models_dir)["horizons"]
+    else:
+        horizons = [horizon for horizon in DEFAULT_HORIZONS
+                    if (models_dir / f"metadata_T{horizon}.json").exists()]
     if not horizons:
         raise ValueError("bundle has no feature protocol metadata")
     return get_upcoming_features(
@@ -220,9 +228,10 @@ def score_upcoming_models(
 
 def get_bundle_forecasts(
     conn: duckdb.DuckDBPyConnection, models_dir: Path, days_ahead: int,
+    *, now: datetime | None = None,
 ) -> pd.DataFrame:
     """Protocol-specific shadow predictions for model-control consumers."""
-    return score_upcoming_models(conn, load_models(models_dir), days_ahead)
+    return score_upcoming_models(conn, load_models(models_dir), days_ahead, now=now)
 
 
 def _get_legacy_upcoming_features(
@@ -877,7 +886,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="Score upcoming earnings with trained models"
     )
-    parser.add_argument("--days-ahead", type=int, default=14)
+    parser.add_argument("--days-ahead", type=int, default=21)
     parser.add_argument("--models-dir", type=Path, default=None)
     parser.add_argument("--github-output", type=Path)
     parser.add_argument(

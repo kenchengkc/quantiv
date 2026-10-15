@@ -31,7 +31,7 @@ from market_sessions import (  # noqa: E402
 )
 
 
-MODEL_HORIZONS = (1, 2, 3, 7, 14, 21)
+MODEL_HORIZONS = tuple(range(1, 26))
 
 
 def _retired_symbol_sql(column: str) -> str:
@@ -303,7 +303,7 @@ def _event_coverage(
             FROM v_earnings e
             JOIN active_symbols a USING (act_symbol)
             CROSS JOIN latest l
-            WHERE (CAST(e.date AS DATE) - l.snapshot_date) IN (1, 2, 3, 7, 14, 21)
+            WHERE (CAST(e.date AS DATE) - l.snapshot_date) BETWEEN 1 AND 25
         ), covered AS (
             SELECT DISTINCT e.act_symbol, e.earnings_date, e.horizon
             FROM expected e
@@ -704,7 +704,7 @@ def _symbol_mappings(conn: duckdb.DuckDBPyConnection) -> dict[str, Any]:
 def _corporate_actions(
     conn: duckdb.DuckDBPyConnection, data_dir: Path
 ) -> dict[str, Any]:
-    """Verify the canonical split/dividend snapshot and its active-universe receipt."""
+    """Verify actions for the current options and receipt-bound event universe."""
     latest = conn.execute("SELECT MAX(date) FROM v_options").fetchone()[0]
     receipt_name = f"{latest}.json" if latest is not None else "missing.json"
     receipt_root = data_dir / "control" / "ingestion" / "corporate_actions"
@@ -728,7 +728,7 @@ def _corporate_actions(
             "errors": [f"corporate-action receipt unavailable: {exc}"],
         }
 
-    if payload.get("schema") != "quantiv.corporate-action-ingestion.v1":
+    if payload.get("schema") not in {"quantiv.corporate-action-ingestion.v1", "quantiv.corporate-action-ingestion.v2"}:
         errors.append("corporate-action receipt schema is unsupported")
     if payload.get("source") != "dolthub:post-no-preference/stocks":
         errors.append("corporate-action source is not the canonical DoltHub stock feed")
@@ -769,12 +769,28 @@ def _corporate_actions(
         }
     )
     symbols = [symbol for symbol in symbols if symbol]
+    if payload.get("schema") == "quantiv.corporate-action-ingestion.v2":
+        from verify_historical_training_gate import verify_historical_corporate_actions
+        from data_release import MUTABLE_PARQUET_ALIASES
+
+        # Reconciliation precedes release promotion. Authenticate the exact
+        # source/action bytes now; historical admission additionally requires
+        # these objects to belong to the admitted release manifest.
+        declared = {item.relative_to(data_dir).as_posix()
+                    for item in (data_dir / "parquet").rglob("*.parquet")} - MUTABLE_PARQUET_ALIASES
+        try:
+            evidence = verify_historical_corporate_actions(data_dir, declared)
+            if not set(symbols) <= set(evidence["covered_symbols"]):
+                errors.append("corporate-action receipt omits active latest options symbols")
+            symbols = evidence["covered_symbols"]
+        except RuntimeError as exc:
+            errors.append(str(exc))
     symbol_digest = hashlib.sha256("\n".join(symbols).encode()).hexdigest()
     universe = payload.get("universe") or {}
     if receipt_int(universe.get("symbols"), "corporate-action universe count") != len(symbols):
-        errors.append("corporate-action universe row count does not match active options")
+        errors.append("corporate-action universe row count does not match authenticated sources")
     if universe.get("symbols_sha256") != symbol_digest:
-        errors.append("corporate-action universe hash does not match active options")
+        errors.append("corporate-action universe hash does not match authenticated sources")
 
     verified_paths: dict[str, Path] = {}
     dataset_summary: dict[str, Any] = {}
@@ -847,7 +863,7 @@ def _corporate_actions(
             if batch_rows != receipt_int(dataset.get("rows"), f"{name} row count"):
                 errors.append(f"{name} batch rows do not reconcile to the receipt")
             if batch_symbols != len(symbols):
-                errors.append(f"{name} batches do not cover the active universe")
+                errors.append(f"{name} batches do not cover the authenticated universe")
         if partition is not None and partition.stem != dataset.get("content_sha256"):
             errors.append(f"{name} content address does not match the receipt")
 

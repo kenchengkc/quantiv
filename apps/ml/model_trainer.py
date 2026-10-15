@@ -22,6 +22,7 @@ import pandas as pd
 from lightgbm import LGBMRegressor, early_stopping, log_evaluation
 from ml.model_artifact import save_native_model
 from ml.model_protocol import CAUSAL_FEATURE_PROTOCOL, feature_protocol, target_protocol
+from ml.model_bundle import DAILY_HORIZONS
 from ml.quantiles import rearrange_quantile_array
 from ml.training_split import (
     chronological_train_val_split, eligible_mature_rows, half_life_weights,
@@ -32,7 +33,7 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
-HORIZONS = [1, 2, 3, 7, 14, 21]
+HORIZONS = list(DAILY_HORIZONS)
 QUANTILES = [0.10, 0.25, 0.50, 0.75, 0.90]
 
 

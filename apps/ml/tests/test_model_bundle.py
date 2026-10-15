@@ -258,3 +258,14 @@ def test_realized_outcome_evidence_is_signed_as_one_unit(tmp_path: Path) -> None
             history_path=history,
             public_key=public,
         )
+
+
+@pytest.mark.parametrize("horizons", [[], [True], ["4"], [4, 4], [0], [26]])
+def test_signed_manifest_rejects_invalid_or_unsupported_head_declarations(horizons):
+    from ml.model_bundle import _bundle_core, _sign, verify_bundle_manifest
+    private, public = _keys()
+    core = _bundle_core(artifacts=[], receipt_id="sha256:" + "a" * 64,
+        horizons=horizons, source_revision="test", created_at="2026-10-15")
+    core["horizons"] = horizons
+    with pytest.raises(ModelBundleError, match="horizon"):
+        verify_bundle_manifest(_sign(core, private), public_key=public)

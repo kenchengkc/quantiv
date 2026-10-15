@@ -26,6 +26,7 @@ from ml.live_forecast_validation import (  # noqa: E402 - standalone script path
 from ml.model_bundle import (  # noqa: E402 - standalone script path setup
     ModelBundleError,
     resolve_champion_bundle,
+    verify_bundle_dir,
 )
 from ml.pipeline_validation import (  # noqa: E402 - standalone script path setup
     DEFAULT_HORIZONS,
@@ -54,7 +55,7 @@ def main() -> int:
     parser.add_argument("--models-dir", type=Path, default=None)
     parser.add_argument("--forecast-path", type=Path, default=None)
     parser.add_argument(
-        "--horizons", nargs="+", type=int, default=list(DEFAULT_HORIZONS)
+        "--horizons", nargs="+", type=int
     )
     parser.add_argument("--min-training-rows", type=int, default=1_000)
     parser.add_argument("--min-symbols", type=int, default=20)
@@ -82,6 +83,10 @@ def main() -> int:
     else:
         models_dir = models_root
     forecast_path = args.forecast_path or latest_forecast_path(data_dir / "forecasts")
+    horizons = args.horizons
+    if horizons is None:
+        horizons = (verify_bundle_dir(models_dir)["horizons"]
+                    if (models_dir / "manifest.json").exists() else list(DEFAULT_HORIZONS))
 
     stages = (
         [args.stage] if args.stage != "all" else ["training", "models", "forecasts"]
@@ -97,7 +102,7 @@ def main() -> int:
             if stage == "training":
                 result = validate_training_artifacts(
                     training_dir,
-                    horizons=args.horizons,
+                    horizons=horizons,
                     min_rows=args.min_training_rows,
                     min_symbols=args.min_symbols,
                     min_history_days=args.min_history_days,
@@ -105,7 +110,7 @@ def main() -> int:
             elif stage == "models":
                 result = validate_model_artifacts(
                     models_dir,
-                    horizons=args.horizons,
+                    horizons=horizons,
                     training_dir=training_dir,
                     min_train_rows=args.min_training_rows,
                 )
@@ -140,7 +145,7 @@ def main() -> int:
         training_dir=training_dir,
         models_dir=models_dir,
         forecast_path=forecast_path,
-        horizons=args.horizons,
+        horizons=horizons,
     )
     _write_report(args.report, report)
     if args.publish_receipt_dir is not None:

@@ -1,6 +1,8 @@
 """Exercise independent rollback sequencing and remote control coherence."""
 
 import json
+import hashlib
+from datetime import datetime, timezone
 import os
 from pathlib import Path
 import subprocess
@@ -66,17 +68,26 @@ def test_late_held_data_prevents_every_remote_model_mutation(tmp_path, name):
     validation = tmp_path / "data/validation"
     validation.mkdir(parents=True)
     (validation / "retrain_activation.json").write_text(json.dumps({"status": "passed"}))
-    (validation / "data_reconciliation.json").write_text(json.dumps({
+    reconciliation = {
         "schema": "quantiv.data-reconciliation.v2",
+        "generated_at": datetime.now(timezone.utc).isoformat(),
         "quality": {"decision_safe": False, "critical_exceptions": 1},
         "exceptions": [{"severity": "critical", "code": "late_hold"}],
-    }))
+        "source_reconciliation": {}, "quote_quality": {}, "datasets": {},
+    }
+    core = {key: value for key, value in reconciliation.items() if key != "generated_at"}
+    reconciliation["manifest_id"] = "sha256:" + hashlib.sha256(json.dumps(
+        core, sort_keys=True, separators=(",", ":"), default=str).encode()).hexdigest()
+    (validation / "data_reconciliation.json").write_text(json.dumps(reconciliation))
+    (validation / "model_decision.json").write_text(json.dumps({
+        "production_forecast": "data/forecasts/promoted.parquet"}))
     executable = tmp_path / "rclone"
     executable.write_text('#!/bin/sh\nprintf "%s\\n" "$*" >> "$CALL_LOG"\n')
     executable.chmod(0o755)
     log = tmp_path / "calls"
     result = subprocess.run(["bash", "-euc", push["run"]], cwd=tmp_path,
         env={**os.environ, "PATH": f"{Path(sys.executable).parent}:{tmp_path}:{os.environ['PATH']}",
+             "PYTHONPATH": os.pathsep.join(str(ROOT / path) for path in ("apps/ml", "scripts", "tools", ".")),
              "CALL_LOG": str(log)}, capture_output=True, text=True)
     assert result.returncode != 0
     assert "late_hold" in result.stderr
@@ -173,7 +184,7 @@ def test_rollback_handoff_report_is_bound_to_a_gated_previous_champion(tmp_path,
     report.write_text("{}")
     (monitoring / "latest_monitoring.receipt.json").write_text(json.dumps(create_signed_monitor_receipt(
         ledger_path=ledger, report_path=report, snapshot_date="2026-10-02")))
-    monkeypatch.setattr(plane, "verify_bundle_dir", lambda *args, **kwargs: {})
+    monkeypatch.setattr(plane, "verify_bundle_dir", lambda *args, **kwargs: {"horizons": [4, 25]})
     monkeypatch.setattr(plane, "evaluate_realized_outcomes", lambda *args, **kwargs: {
         "status": "failed", "rollback_recommended": True, "rollback_reasons": ["MAE regression"],
         "champion": {"mae": .1}, "comparison": {"mae": .05},

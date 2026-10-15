@@ -128,3 +128,13 @@ describe('ML nightly fallback payload', () => {
     ).toBe('end_of_day_research');
   });
 });
+
+
+describe('ML daily horizon requests', () => {
+  it.each([4, 25])('accepts exact daily horizon T%s', (horizon) => {
+    expect(PredictRequestSchema.parse({ symbol: 'CRM', horizon_days: horizon }).horizon_days).toBe(horizon);
+  });
+  it.each([0, 26, 4.5])('rejects unsupported horizon %s', (horizon) => {
+    expect(PredictRequestSchema.safeParse({ symbol: 'CRM', horizon_days: horizon }).success).toBe(false);
+  });
+});

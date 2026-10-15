@@ -44,6 +44,7 @@ type SymbolSummary = {
     timing?: string;
     lead_time_days?: number;
   };
+  earnings_history?: Array<{ date: string; actual?: number | null; eps_actual?: number | null; revenue_actual?: number | null }>;
   next_earnings?: string | null;
   next_earnings_timing?: string;
 };
@@ -862,8 +863,8 @@ export default function WatchlistPage() {
             const spot = quotePending ? null : tick?.price ?? sum?.spot_price ?? null;
             const mlCandidate = mlCandidates.find((item) => item.symbol === t);
             const mlState = liveMl[t]?.key === mlCandidate?.key ? liveMl[t] : undefined;
-            // Keep the same static product hierarchy as the calendar and ticker
-            // hero: validated ML, then IV/options, then historical context.
+            // Match the calendar and ticker hero: eligible ML or unavailable
+            // for upcoming events, with frozen history for reported events.
             // Spot-updated ML is an interactive overlay and only replaces a
             // historical/no-data fallback; it does not rewrite the frozen static
             // publication snapshot.
@@ -873,9 +874,12 @@ export default function WatchlistPage() {
               mlState.response?.source !== 'nightly_fallback'
                 ? finiteDisplayForecast(mlState.response?.em_ml_pct)
                 : null;
-            const staticDisplay = emMatches
-              ? resolveDisplayForecastCompat(em)
-              : { pct: null, method: null };
+            const reportedEvent = sum?.earnings_history?.find((row) => row.date.slice(0, 10) === earningsIso);
+            const staticDisplay = resolveDisplayForecastCompat(
+              emMatches ? { ...em, actual: reportedEvent?.actual, eps_actual: reportedEvent?.eps_actual,
+                revenue_actual: reportedEvent?.revenue_actual } : null,
+              null, earningsIso,
+            );
             const staticIsHistorical =
               staticDisplay.method === 'historical' ||
               staticDisplay.method === 'historical_prior';

@@ -14,9 +14,14 @@ import argparse
 import json
 import math
 import re
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+ML_PACKAGE_ROOT = Path(__file__).resolve().parents[1] / "apps" / "ml"
+if str(ML_PACKAGE_ROOT) not in sys.path:
+    sys.path.insert(0, str(ML_PACKAGE_ROOT))
 
 try:
     from market_sessions import latest_completed_us_market_session
@@ -99,7 +104,17 @@ def verify_retrain_data_gate(
     data_dir: Path,
     now: datetime | None = None,
     max_report_age_hours: float = 36.0,
+    forecast_path: Path | None = None,
 ) -> dict[str, Any]:
+    if forecast_path is not None:
+        try:
+            from forecast_activation_gate import verify_forecast_activation_gate
+        except ModuleNotFoundError:
+            from scripts.forecast_activation_gate import verify_forecast_activation_gate
+        return verify_forecast_activation_gate(
+            data_dir=data_dir, forecast_path=forecast_path, now=now,
+            max_report_age_hours=max_report_age_hours,
+        )
     report_path = data_dir / "validation" / "data_reconciliation.json"
     manifest = _read_json(report_path)
 
@@ -208,6 +223,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data-dir", type=Path, default=Path("data"))
     parser.add_argument("--max-report-age-hours", type=float, default=36.0)
+    parser.add_argument("--forecast-path", type=Path,
+                        help="Bind activation to the actual signed forecast cohorts")
     parser.add_argument("--report", type=Path)
     parser.add_argument("--allow-hold", action="store_true",
                         help="Record an activation hold without blocking historical training")
@@ -217,6 +234,7 @@ def main() -> int:
         result = verify_retrain_data_gate(
             data_dir=args.data_dir,
             max_report_age_hours=args.max_report_age_hours,
+            forecast_path=args.forecast_path,
         )
     except RuntimeError as exc:
         if not args.allow_hold:

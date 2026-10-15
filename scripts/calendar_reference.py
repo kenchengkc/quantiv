@@ -265,12 +265,12 @@ def build_release(
     anchor = today or market_today()
     current_monday = monday_of(anchor)
     start = current_monday - timedelta(days=7)
-    end = current_monday + timedelta(days=18)  # Friday of offset +2.
+    end = max(current_monday + timedelta(days=25), anchor + timedelta(days=21))
 
     symbols, universe_id = load_universe(symbols_dir)
     events, dropped = load_events(calendar, set(symbols), start, end)
     if not events:
-        raise RuntimeError("calendar reference has no events in the supported four-week window")
+        raise RuntimeError("calendar reference has no events in the supported calendar window")
 
     source_sha = _sha256_file(calendar)
     baseline_sha = _sha256_file(baseline)

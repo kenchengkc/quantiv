@@ -74,12 +74,11 @@ def _json_object(value: Any) -> Dict[str, Any]:
     return {}
 
 
-VALID_HORIZONS = {1, 2, 3, 7, 14, 21}
 RESPONSE_TTL_SECONDS = 30
 
 
 def _supported_horizons() -> list[int]:
-    return sorted(VALID_HORIZONS)
+    return predict_service.supported_horizons()
 
 
 def _active_bundle_id(horizon: int) -> str | None:
@@ -130,10 +129,11 @@ async def _cached_set(key: str, payload: Dict[str, Any]) -> None:
 
 
 async def _predict_response(req: MLPredictRequest) -> MLPredictResponse:
-    if req.horizon_days not in VALID_HORIZONS:
+    horizons = _supported_horizons()
+    if req.horizon_days not in horizons:
         raise HTTPException(
             status_code=400,
-            detail=f"horizon_days must be one of {sorted(VALID_HORIZONS)}",
+            detail=f"horizon_days must be one of {horizons}",
         )
 
     pool = _pool()

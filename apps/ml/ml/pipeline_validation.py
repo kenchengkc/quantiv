@@ -13,6 +13,7 @@ import numpy as np
 import pandas as pd
 
 from ml.model_artifact import load_native_model, point_model_name, quantile_model_name
+from ml.model_bundle import DAILY_HORIZONS, verify_bundle_dir
 from ml.model_protocol import CAUSAL_FEATURE_PROTOCOL, feature_protocol, target_protocol
 from ml.provider_signal_policy import (
     DEFAULT_POLICY_PATH,
@@ -22,7 +23,7 @@ from ml.provider_signal_policy import (
 )
 from ml.training_split import chronological_train_val_split, eligible_mature_rows, temporal_dates, training_row_digest
 
-DEFAULT_HORIZONS = (1, 2, 3, 7, 14, 21)
+DEFAULT_HORIZONS = DAILY_HORIZONS
 QUANTILE_LEVELS = (10, 25, 50, 75, 90)
 
 
@@ -392,7 +393,7 @@ def _feature_names(estimator: Any) -> list[str]:
 def validate_model_artifacts(
     models_dir: Path,
     *,
-    horizons: Sequence[int] = DEFAULT_HORIZONS,
+    horizons: Sequence[int] | None = None,
     training_dir: Path | None = None,
     min_train_rows: int = 1_000,
     min_validation_rows: int = 200,
@@ -401,6 +402,9 @@ def validate_model_artifacts(
     max_negative_rate: float = 0.05,
 ) -> dict[str, Any]:
     """Validate model bundles, schemas, holdout metrics, and smoke inference."""
+    if horizons is None:
+        horizons = (verify_bundle_dir(models_dir)["horizons"]
+                    if (models_dir / "manifest.json").exists() else DEFAULT_HORIZONS)
     issues: list[ValidationIssue] = []
     horizon_summaries: dict[str, Any] = {}
 

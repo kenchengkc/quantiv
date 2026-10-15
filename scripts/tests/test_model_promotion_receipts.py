@@ -167,3 +167,17 @@ def test_decision_report_records_receipt_identities(tmp_path: Path) -> None:
     attach_decision_evidence(report, evidence)
     payload = json.loads(report.read_text())
     assert payload["promotion_evidence"] == evidence
+
+
+def test_promotion_evidence_accepts_independently_bound_daily_heads(tmp_path):
+    training = tmp_path / "training"
+    _write_training(training, 4, snapshot_offset=4)
+    _write_training(training, 25, snapshot_offset=25)
+    candidate = tmp_path / "candidate.json"
+    bundle_id = _candidate(candidate)
+    temporal_path, statistical_path = tmp_path / "temporal.json", tmp_path / "statistical.json"
+    temporal, _ = build_promotion_receipts(candidate, training_dir=training,
+        temporal_path=temporal_path, statistical_path=statistical_path)
+    assert {row["horizon"] for row in temporal["horizons"]} == {4, 25}
+    assert verify_promotion_receipts(bundle_id, training_dir=training,
+        temporal_path=temporal_path, statistical_path=statistical_path)

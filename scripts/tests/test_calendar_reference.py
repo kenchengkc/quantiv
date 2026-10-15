@@ -212,3 +212,13 @@ def test_calendar_projection_does_not_mutate_retained_research_bytes(tmp_path: P
         public / "evidence" / "calendar-reference-receipt.json",
     )
     assert {path: path.read_bytes() for path in retained} == before
+
+
+@pytest.mark.parametrize("today", [date(2026, 10, 15), date(2026, 10, 17), date(2026, 10, 18)])
+def test_reference_includes_every_event_through_today_plus_21_days(tmp_path, today):
+    paths = _fixture(tmp_path, today)
+    boundary = today + timedelta(days=21)
+    _write_calendar(paths["calendar"], [_row("AAA", boundary), _row("BBB", boundary + timedelta(days=1))])
+    release, _, _ = _build(paths, today)
+    assert release["window"]["end"] >= boundary.isoformat()
+    assert {event["ticker"] for event in release["events"]} >= {"AAA"}

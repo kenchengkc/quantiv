@@ -42,7 +42,8 @@ def verify_historical_corporate_actions(data_dir: Path, declared: set[str]) -> d
             key: value for key, value in receipt.items() if key != "receipt_id"
         }):
             raise ValueError("receipt identity does not match its contents")
-        if (receipt["schema"] != "quantiv.corporate-action-ingestion.v1"
+        schema = receipt["schema"]
+        if (schema not in {"quantiv.corporate-action-ingestion.v1", "quantiv.corporate-action-ingestion.v2"}
                 or receipt["source"] != "dolthub:post-no-preference/stocks"
                 or receipt["replay_equivalence"] != "verified"):
             raise ValueError("receipt does not prove canonical replay-verified actions")
@@ -67,14 +68,23 @@ def verify_historical_corporate_actions(data_dir: Path, declared: set[str]) -> d
 
         source_relative = f"parquet/options_chain/year={source_date.year}/month={source_date.month:02d}/{source_date}.parquet"
         source = release_member(source_relative)
-        raw_symbols = pd.read_parquet(source, columns=["act_symbol"])["act_symbol"]
-        symbols = sorted({canonical_ticker(symbol) for symbol in raw_symbols.dropna()
-                          if not is_delisted(symbol)} - {""})
         universe = receipt["universe"]
-        if (not symbols or universe["symbols"] != len(symbols)
-                or universe["symbols_sha256"] != hashlib.sha256("\n".join(symbols).encode()).hexdigest()
-                or universe["method"] != "latest_options_partition_excluding_retired_symbols"):
-            raise ValueError("receipt universe does not match its immutable source snapshot")
+        if schema == "quantiv.corporate-action-ingestion.v2":
+            try:
+                from corporate_action_universe import verify_universe
+            except ModuleNotFoundError:
+                from scripts.corporate_action_universe import verify_universe
+            symbols, symbol_window_ends = verify_universe(
+                data_dir, universe, source_date, query_start, query_end, release_member)
+        else:
+            raw_symbols = pd.read_parquet(source, columns=["act_symbol"])["act_symbol"]
+            symbols = sorted({canonical_ticker(symbol) for symbol in raw_symbols.dropna()
+                              if not is_delisted(symbol)} - {""})
+            symbol_window_ends = {symbol: query_end.isoformat() for symbol in symbols}
+            if (not symbols or universe["symbols"] != len(symbols)
+                    or universe["symbols_sha256"] != hashlib.sha256("\n".join(symbols).encode()).hexdigest()
+                    or universe["method"] != "latest_options_partition_excluding_retired_symbols"):
+                raise ValueError("receipt universe does not match its immutable source snapshot")
 
         datasets = {}
         for name, values in (("splits", ["to_factor", "for_factor"]), ("dividends", ["amount"])):
@@ -103,6 +113,23 @@ def verify_historical_corporate_actions(data_dir: Path, declared: set[str]) -> d
                     or sum(int(batch["rows"]) for batch in batches) != len(frame)
                     or sum(int(batch["symbols"]) for batch in batches) != len(symbols)):
                 raise ValueError(f"{name} does not prove exhaustive source pagination")
+            if schema == "quantiv.corporate-action-ingestion.v2":
+                cursor = 0
+                for index, batch in enumerate(batches):
+                    count = int(batch["symbols"])
+                    selected = symbols[cursor:cursor + count]
+                    pages = batch["page_rows"]
+                    limit = batch["page_limit"]
+                    if (batch["batch"] != index or len(selected) != count
+                            or batch["symbols_sha256"] != hashlib.sha256("\n".join(selected).encode()).hexdigest()
+                            or type(limit) is not int or not 1 <= limit <= 1000
+                            or not isinstance(pages, list) or len(pages) != batch["pages"]
+                            or not pages or any(type(rows) is not int or rows != limit for rows in pages[:-1])
+                            or type(pages[-1]) is not int or not 0 <= pages[-1] < limit
+                            or sum(pages) != batch["rows"]
+                            or len(frame[frame["act_symbol"].isin(selected)]) != batch["rows"]):
+                        raise ValueError(f"{name} has invalid symbol-bound exhaustive pagination")
+                    cursor += count
             datasets[name] = {"partition": dataset["partition"], "partition_sha256": digest,
                               "content_sha256": content, "rows": len(frame)}
         return {"receipt_id": identity, "receipt_path": path.relative_to(data_dir).as_posix(),
@@ -112,6 +139,7 @@ def verify_historical_corporate_actions(data_dir: Path, declared: set[str]) -> d
                 "source_options_date": source_date.isoformat(),
                 "universe_source": {"path": source_relative, "sha256": hashlib.sha256(source.read_bytes()).hexdigest()},
                 "universe": universe, "covered_symbols": symbols,
+                "symbol_window_ends": symbol_window_ends,
                 "query_start": query_start.isoformat(), "query_end": query_end.isoformat(),
                 "datasets": datasets}
     except (OSError, ValueError, TypeError, KeyError, AttributeError) as exc:

@@ -212,3 +212,77 @@ def test_nonempty_main_reports_exact_candidate_and_true_workflow_output(
     }
     assert pd.read_parquet(candidate)["act_symbol"].tolist() == ["COVERED"]
     assert not (tmp_path / "forecasts/event_prediction_ledger.parquet").exists()
+
+
+@pytest.fixture
+def signed_daily_models(tmp_path, monkeypatch):
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    from ml.evidence_receipt import build_evidence_receipt
+    from ml.model_bundle import create_signed_bundle, required_artifact_names
+    from ml.model_artifact import save_native_model
+    key = Ed25519PrivateKey.generate()
+    private = key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption())
+    monkeypatch.setenv("MODEL_BUNDLE_PUBLIC_KEY", key.public_key().public_bytes(serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo).decode())
+    models = tmp_path / "models"
+    models.mkdir()
+    native = _native_model(FEATURE_PROTOCOL_LEGACY)["model"]
+    for name in required_artifact_names((4, 25)):
+        if name.startswith("metadata"):
+            horizon = int(name.removeprefix("metadata_T").removesuffix(".json"))
+            (models / name).write_text(json.dumps({"horizon": horizon, "feature_cols": ["straddle_pct"]}))
+        else:
+            save_native_model(native, models / name)
+    report = {"status": "passed", "stages": {"models": {"horizons": [4, 25]}}}
+    receipt = build_evidence_receipt(report, scope="models", repo_root=tmp_path, data_dir=tmp_path,
+        training_dir=tmp_path / "training", models_dir=models, forecast_path=None, horizons=(4, 25))
+    report_path, receipt_path = tmp_path / "report.json", tmp_path / "receipt.json"
+    report_path.write_text(json.dumps(report))
+    receipt_path.write_text(json.dumps(receipt))
+    bundle, _ = create_signed_bundle(models, tmp_path / "bundles", receipt_path=receipt_path,
+        validation_report_path=report_path, source_revision="test", horizons=(4, 25), private_key=private)
+    return bundle
+
+
+def test_daily_loading_ignores_undeclared_metadata(signed_daily_models):
+    (signed_daily_models / "metadata_T7.json").write_text(json.dumps({"horizon": 7, "feature_protocol": "unknown"}))
+    assert sorted(daily_score.load_models(signed_daily_models)) == [4, 25]
+
+
+def test_daily_loading_rejects_missing_signed_head(signed_daily_models):
+    from ml.model_bundle import ModelBundleError
+    (signed_daily_models / "lgbm_T25.txt").unlink()
+    with pytest.raises(ModelBundleError, match="missing"):
+        daily_score.load_models(signed_daily_models)
+
+
+def test_bundle_feature_construction_ignores_undeclared_metadata(signed_daily_models, market_clock):
+    (signed_daily_models / "metadata_T7.json").write_text(json.dumps({"horizon": 7, "feature_protocol": "unknown"}))
+    with _connection() as connection:
+        frame = daily_score.get_bundle_upcoming_features(connection, signed_daily_models, 21)
+    assert len(frame) == 2
+
+
+def test_default_daily_score_covers_the_twenty_first_upcoming_day(market_clock, tmp_path, monkeypatch):
+    output = tmp_path / "github-output"
+    connection = _connection()
+    connection.execute("INSERT INTO v_earnings VALUES ('TAIL', DATE '2026-10-29', 'bmo')")
+    connection.execute("INSERT INTO prices_input VALUES ('TAIL', DATE '2026-10-07', 100.)")
+    model = _native_model(FEATURE_PROTOCOL_CAUSAL, supported=("strict_options", "optionless"))
+    monkeypatch.setattr("sys.argv", ["daily_score.py", "--models-dir", str(tmp_path / "models"),
+        "--github-output", str(output), "--output-path", str(tmp_path / "candidate.parquet")])
+    monkeypatch.setattr(daily_score, "get_data_dir", lambda: tmp_path)
+    monkeypatch.setattr(daily_score, "load_models", lambda models_dir: {22: model})
+    monkeypatch.setattr(daily_score.duckdb, "connect", lambda *args, **kwargs: connection)
+    daily_score.main()
+    values = dict(line.split("=", 1) for line in output.read_text().splitlines())
+    assert pd.read_parquet(values["forecast_path"])["act_symbol"].tolist() == ["TAIL"]
+
+
+def test_alternate_serving_pipeline_loads_exact_signed_daily_heads(signed_daily_models):
+    from ml.serving_pipeline import MLServingPipeline
+    pipeline = MLServingPipeline.__new__(MLServingPipeline)
+    pipeline.models_dir = signed_daily_models
+    pipeline.models = {}
+    pipeline._load_models()
+    assert sorted(pipeline.models) == [4, 25]

@@ -327,6 +327,13 @@ def test_register_migrates_legacy_challenger_without_champion_change(
     assert report["challenger_bundle_id"] == repaired.name
     assert report["challenger_migration_reason"]
     assert pointer.read_bytes() == original
+    contract = report["admission_contract"]
+    assert contract["candidate_bundle_id"] == repaired.name
+    assert contract["champion_bundle_id"] == legacy.name
+    assert contract["minimum_rows"] == 200
+    assert contract["comparators"] == {"1": {"strict_options": "incumbent"}}
+    assert plane.register_candidate(args) == 0
+    assert json.loads(args.report.read_text())["admission_contract"] == contract
 
 
 def test_prospective_promotion_rejects_unsigned_prediction_ledger(tmp_path):

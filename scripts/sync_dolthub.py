@@ -29,6 +29,7 @@ Usage:
 import argparse
 import hashlib
 import json
+import math
 import os
 import sys
 import time
@@ -970,7 +971,7 @@ def _fetch_action_table(
     start: date,
     end: date,
 ) -> tuple[pd.DataFrame, list[dict[str, object]]]:
-    """Exhaust every PK-ordered page for bounded active-universe batches."""
+    """Exhaust every PK-ordered page for receipt-bound symbol batches."""
     columns = ["act_symbol", "ex_date", *value_columns]
     all_rows: list[dict] = []
     evidence: list[dict[str, object]] = []
@@ -980,6 +981,7 @@ def _fetch_action_table(
         last_key: tuple[str, str] | None = None
         batch_rows = 0
         pages = 0
+        page_rows = []
         while True:
             keyset = ""
             if last_key is not None:
@@ -995,7 +997,27 @@ def _fetch_action_table(
                 f"ORDER BY act_symbol, ex_date LIMIT {ROW_LIMIT}"
             )
             rows = query(sql, STOCKS_API)
+            if not isinstance(rows, list) or len(rows) > ROW_LIMIT:
+                raise RuntimeError(f"{table_name} returned an invalid page size")
+            page_keys = []
+            try:
+                for row in rows:
+                    symbol = str(row["act_symbol"])
+                    day = date.fromisoformat(str(row["ex_date"]))
+                    values = [float(row[column]) for column in value_columns]
+                    key = (symbol, day.isoformat())
+                    if (symbol not in batch or not start <= day <= end
+                            or any(not math.isfinite(value) for value in values)
+                            or (any(value <= 0 for value in values) if table_name == "split"
+                                else any(value < 0 for value in values))
+                            or (last_key is not None and key <= last_key)
+                            or (page_keys and key <= page_keys[-1])):
+                        raise ValueError("out-of-scope, invalid or unordered action row")
+                    page_keys.append(key)
+            except (KeyError, TypeError, ValueError) as exc:
+                raise RuntimeError(f"{table_name} returned an invalid source page: {exc}") from exc
             pages += 1
+            page_rows.append(len(rows))
             all_rows.extend(rows)
             batch_rows += len(rows)
             if len(rows) < ROW_LIMIT:
@@ -1007,8 +1029,11 @@ def _fetch_action_table(
             {
                 "batch": batch_index // CORPORATE_ACTION_BATCH_SIZE,
                 "symbols": len(batch),
+                "symbols_sha256": hashlib.sha256("\n".join(batch).encode()).hexdigest(),
                 "rows": batch_rows,
                 "pages": pages,
+                "page_rows": page_rows,
+                "page_limit": ROW_LIMIT,
                 "completion": "short_page",
             }
         )
@@ -1147,14 +1172,19 @@ def sync_corporate_actions(
     start_date_str: Optional[str] = None,
     end_date_str: Optional[str] = None,
 ) -> dict:
-    """Snapshot split/dividend history for the current options universe."""
-    source_date, symbols = _latest_option_universe()
+    """Snapshot actions for options and bounded historical/prospective events."""
+    from corporate_action_universe import snapshot_universe
+
+    source_date, _ = _latest_option_universe()
     start = date.fromisoformat(start_date_str) if start_date_str else CORPORATE_ACTION_START
     end = date.fromisoformat(end_date_str) if end_date_str else date.today()
     if end < start:
         raise ValueError("corporate-action end date precedes start date")
+    if not start <= source_date <= end:
+        raise ValueError("corporate-action window does not cover the options source date")
+    universe, symbols = snapshot_universe(data_dir(), source_date, start, end)
     print(
-        f"CORPORATE ACTION SYNC: {len(symbols):,} active symbols · {start} → {end}"
+        f"CORPORATE ACTION SYNC: {len(symbols):,} source-bound symbols · {start} → {end}"
     )
     splits, split_batches = _fetch_action_table(
         "split", ["to_factor", "for_factor"], symbols, start, end
@@ -1192,18 +1222,13 @@ def sync_corporate_actions(
     ):
         raise RuntimeError("corporate-action Parquet replay digest mismatch")
 
-    symbol_digest = hashlib.sha256("\n".join(symbols).encode()).hexdigest()
     manifest = {
-        "schema": "quantiv.corporate-action-ingestion.v1",
+        "schema": "quantiv.corporate-action-ingestion.v2",
         "source": "dolthub:post-no-preference/stocks",
         "source_options_date": source_date.isoformat(),
         "query_start": start.isoformat(),
         "query_end": end.isoformat(),
-        "universe": {
-            "symbols": len(symbols),
-            "symbols_sha256": symbol_digest,
-            "method": "latest_options_partition_excluding_retired_symbols",
-        },
+        "universe": universe,
         "datasets": {
             "splits": {
                 "rows": len(splits),
@@ -1459,7 +1484,7 @@ def main():
     parser.add_argument(
         "--corporate-actions",
         action="store_true",
-        help="Sync split/dividend controls for the latest active options universe",
+        help="Sync split/dividend controls for options and source-bound earnings events",
     )
 
     args = parser.parse_args()

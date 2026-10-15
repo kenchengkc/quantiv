@@ -204,3 +204,38 @@ def test_malformed_candidate_row_does_not_crash_registered_shadow(accepted_optio
     assert report["shadow_scoring"]["challenger"]["status"] in {"passed", "warning"}
     ledger = pd.read_parquet(store["data"] / "models/monitoring/prediction_ledger.parquet")
     assert (ledger["role"] == "challenger").sum() == 100
+
+
+@pytest.mark.parametrize("accepted_options", ["2026-10-13T07:00:00+00:00"], indirect=True)
+def test_registered_daily_head_collects_evidence_beyond_public_window(accepted_options, tmp_path):
+    import duckdb
+    import shutil
+    from ml.model_bundle import create_signed_registry
+    from scripts.setup_duckdb_from_parquet import setup_views
+
+    store = accepted_options
+    data = tmp_path / "daily-shadow-data"
+    data.mkdir()
+    fixture = tmp_path / "daily-shadow-fixture"
+    fixture.mkdir()
+    shadow = _signed_champion(data, fixture, horizons=(25,),
+        metadata_overrides={"supported_cohorts": ["strict_options", "optionless"]})
+    shutil.copytree(shadow, store["data"] / "models/bundles" / shadow.name)
+    registry = create_signed_registry(champion_bundle_id=store["bundle"].name,
+        challenger_bundle_id=shadow.name, previous_bundle_id=None, decision={})
+    (store["data"] / "models/control/registry.json").write_text(json.dumps(registry))
+    database = store["data"] / "daily-shadow.duckdb"
+    with duckdb.connect(str(database)) as conn:
+        setup_views(conn, store["data"])
+        conn.execute("DROP VIEW v_earnings")
+        conn.execute("CREATE OR REPLACE TABLE v_earnings AS SELECT act_symbol, CAST(? AS DATE) date, 'bmo' timing FROM v_ohlcv GROUP BY act_symbol", [store["latest"] + pd.Timedelta(days=25)])
+        conn.execute("""CREATE VIEW v_volhist AS SELECT NULL::DATE AS date, NULL::VARCHAR AS act_symbol,
+             NULL::DOUBLE AS hv_current, NULL::DOUBLE AS hv_year_high, NULL::DOUBLE AS hv_year_low,
+             NULL::DOUBLE AS iv_current, NULL::DOUBLE AS iv_week_ago, NULL::DOUBLE AS iv_month_ago,
+             NULL::DOUBLE AS iv_year_high, NULL::DOUBLE AS iv_year_low WHERE FALSE""")
+    good = daily_score.get_bundle_forecasts(store["conn"], store["bundle"], 21)
+    _monitor_fixture_rows(store, good, database=database)
+    ledger = pd.read_parquet(store["data"] / "models/monitoring/prediction_ledger.parquet")
+    observed = ledger.loc[ledger.bundle_id.eq(shadow.name)]
+    assert len(observed) > 0
+    assert set(observed.model_horizon) == {25}

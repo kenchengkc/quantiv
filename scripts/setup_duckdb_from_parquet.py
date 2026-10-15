@@ -87,7 +87,7 @@ def setup_corporate_action_coverage(conn: duckdb.DuckDBPyConnection, data_dir: P
 
     rows = ",".join(
         f"({literal(symbol)}, DATE {literal(evidence['query_start'])}, "
-        f"DATE {literal(evidence['query_end'])}, {literal(evidence['receipt_id'])})"
+        f"DATE {literal(evidence['symbol_window_ends'][symbol])}, {literal(evidence['receipt_id'])})"
         for symbol in evidence["covered_symbols"]
     )
     conn.execute(f"""

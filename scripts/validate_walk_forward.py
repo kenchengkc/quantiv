@@ -15,6 +15,7 @@ ML_PACKAGE_ROOT = REPO_ROOT / "apps" / "ml"
 if str(ML_PACKAGE_ROOT) not in sys.path:
     sys.path.insert(0, str(ML_PACKAGE_ROOT))
 
+from ml.model_bundle import verify_bundle_dir  # noqa: E402
 from ml.pipeline_validation import DEFAULT_HORIZONS  # noqa: E402
 from ml.walk_forward_validation import run_walk_forward_gate  # noqa: E402
 
@@ -31,7 +32,7 @@ def main() -> int:
     data_dir = Path(os.getenv("DATA_DIR", REPO_ROOT / "data"))
     parser.add_argument("--training-dir", type=Path, default=data_dir / "ml_training")
     parser.add_argument("--models-dir", type=Path, default=data_dir / "models")
-    parser.add_argument("--horizons", nargs="+", type=int, default=list(DEFAULT_HORIZONS))
+    parser.add_argument("--horizons", nargs="+", type=int)
     parser.add_argument("--folds", type=int, default=4)
     parser.add_argument("--test-days", type=int, default=60)
     parser.add_argument("--purge-days", type=int, default=5)
@@ -52,7 +53,11 @@ def main() -> int:
         "horizons": {},
         "issues": [],
     }
-    for horizon in args.horizons:
+    horizons = args.horizons
+    if horizons is None:
+        horizons = (verify_bundle_dir(args.models_dir)["horizons"]
+                    if (args.models_dir / "manifest.json").exists() else list(DEFAULT_HORIZONS))
+    for horizon in horizons:
         training_path = args.training_dir / f"training_T{horizon}.parquet"
         metadata_path = args.models_dir / f"metadata_T{horizon}.json"
         try:

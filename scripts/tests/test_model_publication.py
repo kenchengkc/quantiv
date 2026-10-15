@@ -182,8 +182,8 @@ def test_hold_removes_upcoming_ml_from_retained_symbol_files_but_preserves_histo
     expected = result['expected_move']
     assert expected.get('em_ml_pct') is None
     assert expected.get('p10') is None and expected.get('forecast_id') is None
-    assert expected['display_forecast_method'] == 'options_math'
-    assert expected['display_forecast_pct'] == .07
+    assert expected['display_forecast_method'] == 'ml_unavailable'
+    assert expected['display_forecast_pct'] is None
     assert expected['display_forecast_as_of'] == '2026-09-28'
     assert result['earnings_history'][0] == historical
     assert result['earnings_history'][1].get('em_ml_pct') is None
@@ -192,7 +192,7 @@ def test_hold_removes_upcoming_ml_from_retained_symbol_files_but_preserves_histo
     assert result['earnings_history'][1].get('display_forecast_method') != 'ml'
 
 
-def test_hold_calendar_and_symbol_use_same_historical_fallback(tmp_path):
+def test_hold_calendar_and_symbol_are_unavailable_while_history_stays_informational(tmp_path):
     from datetime import date
     from tools.frontend_data import forecast_artifacts
     symbols = tmp_path / 'symbols'
@@ -209,16 +209,15 @@ def test_hold_calendar_and_symbol_use_same_historical_fallback(tmp_path):
     path.write_text(json.dumps({'events': [event]}))
     forecast_artifacts.withhold_upcoming_ml(tmp_path, today=date(2026, 10, 2))
     held = json.loads(path.read_text())['events'][0]
-    assert held['display_forecast_method'] == 'historical'
-    assert held['display_forecast_pct'] == pytest.approx(.07)
-    assert held['hist_move_med_4q'] == pytest.approx(.07)
+    assert held['display_forecast_method'] == 'ml_unavailable'
+    assert held['display_forecast_pct'] is None
+    assert held['hist_move_med_4q'] == .12
     assert held['display_forecast_as_of'] == '2026-09-30'
     assert held['options_status'] == 'unavailable'
-    assert held['historical_event_count'] == 4
-    assert held['em_method'] == 'historical'
+    assert held['em_method'] == 'ml_unavailable'
 
 
-def test_hold_refuses_aligning_forecasts_from_different_source_dates(tmp_path):
+def test_hold_does_not_reuse_forecasts_from_different_source_dates(tmp_path):
     from datetime import date
     from tools.frontend_data import forecast_artifacts
     symbols = tmp_path / 'symbols'
@@ -228,8 +227,12 @@ def test_hold_refuses_aligning_forecasts_from_different_source_dates(tmp_path):
     (tmp_path / 'weekly.json').write_text(json.dumps({'events': [{'ticker': 'TEST',
         'earnings_date': '2026-10-21', 'as_of_date': '2026-09-20', 'em_ml_pct': .09,
         'display_forecast_method': 'ml', 'display_forecast_pct': .09}]}))
-    with pytest.raises(RuntimeError, match='source dates'):
-        forecast_artifacts.withhold_upcoming_ml(tmp_path, today=date(2026, 10, 2))
+    forecast_artifacts.withhold_upcoming_ml(tmp_path, today=date(2026, 10, 2))
+    for path, key in ((symbols / 'TEST.json', 'expected_move'), (tmp_path / 'weekly.json', 'events')):
+        payload = json.loads(path.read_text())[key]
+        node = payload[0] if isinstance(payload, list) else payload
+        assert node['display_forecast_method'] == 'ml_unavailable'
+        assert node['display_forecast_pct'] is None
 
 
 @pytest.mark.parametrize('compact_actuals', [[None], [0, 0]])
@@ -237,7 +240,7 @@ def test_hold_refuses_aligning_forecasts_from_different_source_dates(tmp_path):
     ('historical', 4, 'quote_quality'),
     ('historical_prior', 1, 'insufficient_ticker_history'),
 ])
-def test_hold_preserves_canonical_history_provenance_when_page_history_is_truncated(
+def test_hold_preserves_reported_canonical_history_when_page_history_is_truncated(
     tmp_path, method, count, reason, compact_actuals,
 ):
     from datetime import date
@@ -262,20 +265,17 @@ def test_hold_preserves_canonical_history_provenance_when_page_history_is_trunca
     }))
     path = tmp_path / 'screener.json'
     path.write_text(json.dumps({'as_of_date': '2026-10-05', 'events': [{
-        'ticker': 'TEST', 'earnings_date': '2026-10-15',
-        'em_ml_pct': .99, 'p90': .99, 'forecast_id': 'held-candidate',
+        'ticker': 'TEST', **expected,
     }]}))
 
-    forecast_artifacts.withhold_upcoming_ml(tmp_path, today=date(2026, 10, 6))
+    forecast_artifacts.withhold_upcoming_ml(tmp_path, today=date(2026, 10, 16))
 
     held = json.loads(path.read_text())['events'][0]
     for field in ('display_forecast_pct', 'display_forecast_method',
                   'display_forecast_as_of', 'historical_event_count', 'fallback_reason'):
         assert held[field] == expected[field]
-    assert held['ml_publication_status'] == 'held'
-    assert held.get('em_ml_pct') is None
-    assert held.get('p90') is None
-    assert held.get('forecast_id') is None
+    assert json.loads((symbols / 'TEST.json').read_text())['expected_move'] == expected
+    assert 'ml_publication_status' not in held
 
 
 @pytest.mark.parametrize('compact_actuals', [[], [0, 0]])
@@ -283,7 +283,7 @@ def test_hold_preserves_canonical_history_provenance_when_page_history_is_trunca
     ('historical', 0), ('historical', True),
     ('historical_prior', -1), ('historical_prior', None),
 ])
-def test_hold_rejects_invalid_canonical_historical_provenance(
+def test_hold_does_not_promote_invalid_historical_context_into_upcoming_headlines(
     tmp_path, method, count, compact_actuals,
 ):
     from datetime import date
@@ -308,5 +308,10 @@ def test_hold_rejects_invalid_canonical_historical_provenance(
         'events': [{'ticker': 'TEST', 'earnings_date': '2026-10-15'}],
     }))
 
-    with pytest.raises(RuntimeError, match='historical_event_count'):
-        forecast_artifacts.withhold_upcoming_ml(tmp_path, today=date(2026, 10, 6))
+    forecast_artifacts.withhold_upcoming_ml(tmp_path, today=date(2026, 10, 6))
+    expected = json.loads((symbols / 'TEST.json').read_text())['expected_move']
+    event = json.loads((tmp_path / 'screener.json').read_text())['events'][0]
+    for node in (expected, event):
+        assert node['display_forecast_method'] == 'ml_unavailable'
+        assert node['display_forecast_pct'] is None
+    assert expected['historical_event_count'] == count

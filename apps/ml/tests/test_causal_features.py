@@ -521,7 +521,7 @@ def reaction_training_connection(post_day, prior_session, amc_snapshot):
     "clock,post_day,prior_session,amc_snapshot,expected_horizons",
     [
         ("2026-10-05T15:59:00", "2026-10-05", "2026-10-02", "2026-10-01", set()),
-        ("2026-10-05T16:00:00", "2026-10-05", "2026-10-02", "2026-10-01", {1, 3}),
+        ("2026-10-05T16:00:00", "2026-10-05", "2026-10-02", "2026-10-01", {1, 3, 4}),
         ("2026-11-27T12:59:00", "2026-11-27", "2026-11-25", "2026-11-24", set()),
         ("2026-11-27T13:00:00", "2026-11-27", "2026-11-25", "2026-11-24", {1, 2, 3}),
     ],
@@ -574,7 +574,7 @@ def test_explicit_training_asof_preserves_eod_replay_semantics(monkeypatch):
         features = extract_training_data(
             conn, "2026-10-01", "2026-10-05", as_of_date=date(2026, 10, 5)
         )
-        assert set(features) == {1, 3}
+        assert set(features) == {1, 3, 4}
         assert features[1].symbol.str.startswith("amc").all()
         assert features[3].symbol.str.startswith("bmo").all()
     finally:

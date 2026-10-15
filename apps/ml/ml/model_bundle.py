@@ -37,6 +37,8 @@ MONITOR_SCHEMA = "quantiv.model-monitor.v1"
 OUTCOME_SCHEMA = "quantiv.model-outcome-receipt.v1"
 SIGNATURE_ALGORITHM = "ed25519"
 DEFAULT_HORIZONS = (1, 2, 3, 7, 14, 21)
+# Daily generation covers 21 upcoming days plus a four-day completed-close lag.
+DAILY_HORIZONS = tuple(range(1, 26))
 DEFAULT_QUANTILES = (10, 25, 50, 75, 90)
 _BUNDLE_ID_RE = re.compile(r"^[0-9a-f]{64}$")
 
@@ -256,6 +258,14 @@ def verify_bundle_manifest(
     payload = verify_signed_payload(manifest, public_key=public_key)
     if payload.get("schema") != BUNDLE_SCHEMA:
         raise ModelBundleError("unsupported model bundle schema")
+    horizons = payload.get("horizons")
+    if (
+        not isinstance(horizons, list)
+        or not horizons
+        or any(type(horizon) is not int or horizon not in DAILY_HORIZONS for horizon in horizons)
+        or len(set(horizons)) != len(horizons)
+    ):
+        raise ModelBundleError("signed model bundle has invalid or unsupported horizons")
     bundle_id = str(payload.get("bundle_id", ""))
     if not _BUNDLE_ID_RE.fullmatch(bundle_id):
         raise ModelBundleError("invalid model bundle id")
@@ -513,6 +523,7 @@ __all__ = [
     "MONITOR_SCHEMA",
     "OUTCOME_SCHEMA",
     "DEFAULT_HORIZONS",
+    "DAILY_HORIZONS",
     "DEFAULT_QUANTILES",
     "ModelBundleError",
     "create_signed_bundle",

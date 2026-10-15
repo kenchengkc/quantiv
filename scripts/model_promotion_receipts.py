@@ -24,7 +24,7 @@ from typing import Any
 import pandas as pd
 from ml.candidate_evidence import verify_candidate_evidence
 from ml.evidence_receipt import verify_evidence_receipt
-from ml.model_bundle import verify_bundle_dir
+from ml.model_bundle import DAILY_HORIZONS, verify_bundle_dir
 from ml.model_protocol import CAUSAL_FEATURE_PROTOCOL, feature_protocol
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -36,7 +36,7 @@ DEFAULT_TEMPORAL_RECEIPT = (
 DEFAULT_STATISTICAL_RECEIPT = (
     REPO_ROOT / "data" / "validation" / "promotion" / "statistical_selection.json"
 )
-SUPPORTED_HORIZONS = frozenset({1, 2, 3, 7, 14, 21})
+SUPPORTED_HORIZONS = frozenset(DAILY_HORIZONS)
 _FORBIDDEN_FEATURE_PATTERNS = (
     re.compile(r"^post_", re.IGNORECASE),
     re.compile(r"future", re.IGNORECASE),

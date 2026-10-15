@@ -34,7 +34,7 @@ class MLPredictRequest(BaseModel):
     features, and re-runs the LightGBM head for `horizon_days`."""
 
     symbol: str = Field(..., min_length=1, max_length=10, description="e.g. AAPL")
-    horizon_days: int = Field(..., description="Must be one of 1, 2, 3, 7, 14, 21")
+    horizon_days: int = Field(..., description="Exact calendar lead admitted by the active signed model bundle")
     spot_override: float | None = Field(
         None, gt=0,
         description=(

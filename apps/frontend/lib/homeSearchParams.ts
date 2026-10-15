@@ -1,7 +1,7 @@
 export type HomeCalendarFilter = 'popular' | 'sp500' | 'movers' | 'all';
 
 const MIN_OFFSET = -1;
-const MAX_OFFSET = 2;
+const MAX_OFFSET = 3;
 
 export function parseHomeSearchParams(sp: {
   offset?: string;

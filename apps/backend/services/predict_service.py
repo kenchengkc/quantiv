@@ -29,7 +29,7 @@ from typing import Any, Dict, List, Optional
 
 import pandas as pd
 from ml.model_artifact import load_native_model, point_model_name, quantile_model_name
-from ml.model_bundle import verify_bundle_dir
+from ml.model_bundle import DAILY_HORIZONS, DEFAULT_HORIZONS, verify_bundle_dir
 from ml.model_protocol import (
     CAUSAL_FEATURE_PROTOCOL, LEGACY_FEATURE_PROTOCOL,
     bundle_feature_protocol, feature_protocol, target_protocol,
@@ -52,7 +52,7 @@ def _models_dir() -> Path:
 
 # Quantile suffixes we expect alongside the point model file.
 _QUANTILES = [10, 25, 50, 75, 90]
-_HORIZONS = (1, 2, 3, 7, 14, 21)
+_HORIZONS = DAILY_HORIZONS
 _POINT_MODEL_NAMES = {horizon: point_model_name(horizon) for horizon in _HORIZONS}
 _METADATA_NAMES = {horizon: f"metadata_T{horizon}.json" for horizon in _HORIZONS}
 _QUANTILE_MODEL_NAMES = {
@@ -60,6 +60,14 @@ _QUANTILE_MODEL_NAMES = {
     for horizon in _HORIZONS
     for quantile in _QUANTILES
 }
+
+
+def supported_horizons(models_dir: Path | None = None) -> List[int]:
+    """Read the exact authenticated head set; baked legacy models keep six heads."""
+    directory = Path(models_dir if models_dir is not None else _models_dir())
+    if (directory / "manifest.json").exists():
+        return sorted(verify_bundle_dir(directory)["horizons"])
+    return list(DEFAULT_HORIZONS)
 
 
 @dataclass
@@ -128,6 +136,8 @@ def _mtime(path: Path) -> Optional[datetime]:
 
 def _load_bundle_from_dir(models_dir: Path, horizon: int) -> Optional[_ModelBundle]:
     """Deserialize and validate one horizon from an explicit verified directory."""
+    if horizon not in supported_horizons(models_dir):
+        return None
     point_name = _POINT_MODEL_NAMES.get(horizon)
     if point_name is None:
         logger.warning("Unsupported model horizon requested")
@@ -177,9 +187,10 @@ def _load_bundle_from_dir(models_dir: Path, horizon: int) -> Optional[_ModelBund
 
 def validate_models_dir(models_dir: Path) -> List[Dict[str, Any]]:
     """Preflight every required native model before a directory is activated."""
-    bundle_feature_protocol(models_dir, horizons=_HORIZONS)
+    horizons = supported_horizons(models_dir)
+    bundle_feature_protocol(models_dir, horizons=horizons)
     verified: List[Dict[str, Any]] = []
-    for horizon in _HORIZONS:
+    for horizon in horizons:
         bundle = _load_bundle_from_dir(models_dir, horizon)
         if bundle is None:
             raise ValueError(f"T-{horizon} point model is unavailable")
@@ -246,8 +257,8 @@ def model_inventory() -> List[Dict[str, Any]]:
             horizons.add(int(suffix))
 
     rows: List[Dict[str, Any]] = []
-    for horizon in sorted(horizons):
-        if horizon not in _POINT_MODEL_NAMES:
+    for horizon in supported_horizons(models_dir):
+        if horizon not in horizons or horizon not in _POINT_MODEL_NAMES:
             continue
         point_path = models_dir / _POINT_MODEL_NAMES[horizon]
         meta_path = models_dir / _METADATA_NAMES[horizon]

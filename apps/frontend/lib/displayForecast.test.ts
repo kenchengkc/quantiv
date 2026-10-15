@@ -131,3 +131,49 @@ describe('display forecast helpers', () => {
     },
   );
 });
+
+
+describe('upcoming ML headline contract', () => {
+  it.each(['historical', 'historical_prior', 'options_math', 'options_indicative'] as const)(
+    'does not resurrect %s from upcoming legacy payloads', (method) => {
+      expect(resolveDisplayForecastCompat({
+        earnings_date: '2099-10-21', display_forecast_method: method,
+        display_forecast_pct: 0.08, em_iv_pct: 0.12, hist_move_med_4q: 0.09,
+      }, 0.10)).toEqual({ pct: null, method: 'ml_unavailable' });
+    },
+  );
+  it('requires eligible ML publication on upcoming rows', () => {
+    expect(resolveDisplayForecastCompat({
+      earnings_date: '2099-10-21', em_ml_pct: 0.07,
+      ml_publication_status: 'eligible',
+    })).toEqual({ pct: 0.07, method: 'ml' });
+    expect(resolveDisplayForecastCompat({
+      earnings_date: '2099-10-21', em_ml_pct: 0.07,
+      ml_publication_status: 'held', em_iv_pct: 0.12,
+    })).toEqual({ pct: null, method: 'ml_unavailable' });
+    expect(resolveDisplayForecastCompat({
+      earnings_date: '2099-10-21', em_ml_pct: 0.07,
+    })).toEqual({ pct: null, method: 'ml_unavailable' });
+  });
+  it('does not use symbol history when an upcoming hero has no expected-move row', () => {
+    expect(resolveDisplayForecastCompat({}, 0.09, '2099-10-21'))
+      .toEqual({ pct: null, method: 'ml_unavailable' });
+  });
+  it('preserves a reported forecast even when actual EPS is zero', () => {
+    expect(resolveDisplayForecastCompat({
+      earnings_date: '2099-10-21', eps_actual: 0,
+      display_forecast_pct: 0.08, display_forecast_method: 'historical',
+    })).toEqual({ pct: 0.08, method: 'historical' });
+  });
+  it('labels the unavailable state explicitly', () => {
+    expect(displayForecastLabel('ml_unavailable')).toBe('ML unavailable');
+  });
+});
+
+
+it('preserves explicit unavailable publication even beside stale eligible raw ML', () => {
+  expect(resolveDisplayForecastCompat({
+    display_forecast_method: 'ml_unavailable', display_forecast_pct: null,
+    em_ml_pct: 0.07, ml_publication_status: 'eligible',
+  })).toEqual({ pct: null, method: 'ml_unavailable' });
+});

@@ -46,7 +46,7 @@ const KNOWN_SESSIONS = new Set(['bmo', 'amc', 'dmh']);
 
 type LegacyForecastOverlay = {
   display_forecast_pct?: number | null;
-  display_forecast_method?: 'ml' | 'options_math' | 'options_indicative' | 'historical' | 'historical_prior' | null;
+  display_forecast_method?: 'ml' | 'ml_unavailable' | 'options_math' | 'options_indicative' | 'historical' | 'historical_prior' | null;
   em_ml_pct?: number | null;
   em_straddle_pct?: number | null;
   em_iv_pct?: number | null;
@@ -112,12 +112,10 @@ function addDays(iso: string, days: number): string {
  * on an exact ticker/date match when sessions do not disagree, including when
  * both sides are still unknown.
  *
- * A revised ticker/date or a conflicting known session still rejects old
- * options/model metrics. During migration from older pinned public releases,
- * point-in-time historical summaries may still supply display-only fallback
- * provenance because they are independent of the revised event's option/model
- * identity. If no ticker history exists, a median of the legacy week's
- * historical summaries is used only as a temporary historical prior.
+ * A revised ticker/date or a conflicting known session rejects old model
+ * metrics. Upcoming rows require eligible ML and otherwise remain explicitly
+ * unavailable. Retained reported rows keep their historical compatibility
+ * estimates while older research releases are still readable.
  *
  * The reference is authoritative only inside its declared publication window.
  * If the browser advances to a week the retained reference does not fully cover
@@ -174,14 +172,12 @@ export function mergeCalendarReference<
         const compatForecast = resolveDisplayForecastCompat(
           researchMatch as TEvent & LegacyForecastOverlay,
         );
-        // R2 can temporarily serve a pre-migration week artifact while the
-        // independent calendar reference is newer. Preserve strict ML/options
-        // semantics, but hydrate history-only exact matches so the UI does not
-        // turn an available historical estimate into a dash. If the old row has
-        // no usable display estimate at all, use the legacy prior rather than a
-        // synthetic zero.
+        // Retained releases may predate the current headline contract.
+        // Suppress upcoming fallback values and retain reported compatibility.
         const displayCompat =
-          compatForecast.method === 'historical' && compatForecast.pct != null
+          compatForecast.method === 'ml_unavailable'
+            ? { display_forecast_pct: null, display_forecast_method: 'ml_unavailable' as const }
+            : compatForecast.method === 'historical' && compatForecast.pct != null
             ? {
                 display_forecast_pct: compatForecast.pct,
                 display_forecast_method: 'historical' as const,
@@ -208,13 +204,14 @@ export function mergeCalendarReference<
         };
       }
 
-      // Do not spread the stale research row here. A revised date or conflicting
-      // session may reuse only ticker-level historical context; old ML/options
-      // remain fail-closed. If that is unavailable, the legacy week median is a
-      // presentation-only prior until the canonical R2 release catches up.
+      // A revised identity cannot inherit a stale forecast. Upcoming events
+      // stay unavailable; reported rows retain legacy historical compatibility.
       const tickerHistoricalPct = legacyHistoryByTicker.get(event.ticker) ?? null;
+      const upcomingUnavailable = resolveDisplayForecastCompat({}, null, event.earnings_date).method === 'ml_unavailable';
       const fallbackDisplay =
-        tickerHistoricalPct != null
+        upcomingUnavailable
+          ? { display_forecast_pct: null, display_forecast_method: 'ml_unavailable' as const }
+          : tickerHistoricalPct != null
           ? {
               display_forecast_pct: tickerHistoricalPct,
               display_forecast_method: 'historical' as const,

@@ -10,6 +10,8 @@ import json
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
+from ml.model_bundle import DEFAULT_HORIZONS, verify_bundle_dir
+
 LEGACY_FEATURE_PROTOCOL = "quantiv.earnings-legacy.v1"
 CAUSAL_FEATURE_PROTOCOL = "quantiv.earnings-causal.v2"
 LEGACY_TARGET_PROTOCOL = "quantiv.generic-reaction.v1"
@@ -42,8 +44,14 @@ def target_protocol(metadata: Mapping[str, Any]) -> str:
 
 
 def bundle_feature_protocol(
-    models_dir: Path, *, horizons: Sequence[int] = (1, 2, 3, 7, 14, 21)
+    models_dir: Path, *, horizons: Sequence[int] | None = None
 ) -> str:
+    declared = (verify_bundle_dir(models_dir)["horizons"]
+                if (models_dir / "manifest.json").exists() else None)
+    if horizons is None:
+        horizons = declared if declared is not None else DEFAULT_HORIZONS
+    elif declared is not None and not set(horizons).issubset(declared):
+        raise ValueError("feature protocol horizons are outside the signed model bundle")
     protocols = set()
     for horizon in horizons:
         metadata = json.loads((models_dir / f"metadata_T{horizon}.json").read_text())
