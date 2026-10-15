@@ -329,7 +329,7 @@ def validate_upcoming_display_forecasts(
     *,
     today: date,
 ) -> None:
-    """Fail publication when an upcoming published row would render a dash."""
+    """Require display forecasts only before events enter their freeze date."""
 
     rows = _event_identity_map(week_payloads)
     windows = [
@@ -344,7 +344,9 @@ def validate_upcoming_display_forecasts(
     ]
     errors: list[str] = []
     for ticker, earnings_date, _timing in published_events:
-        if earnings_date < today:
+        # Match enrich_upcoming_event's date-only freeze boundary. Event-day
+        # rows may lack admitted pre-event evidence and must not be recomputed.
+        if earnings_date <= today:
             continue
         if windows and not any(start <= earnings_date <= end for start, end in windows):
             continue
@@ -367,6 +369,7 @@ def build_display_forecast_status(
     today: date,
     generated_at: str,
 ) -> dict[str, Any]:
+    """Measure coverage for future dates eligible for display enrichment."""
     rows = _event_identity_map(week_payloads)
     windows = [
         (
@@ -380,7 +383,7 @@ def build_display_forecast_status(
     ]
     selected: list[dict[str, Any]] = []
     for ticker, earnings_date, _timing in published_events:
-        if earnings_date < today:
+        if earnings_date <= today:
             continue
         if windows and not any(start <= earnings_date <= end for start, end in windows):
             continue
