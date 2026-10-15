@@ -44,6 +44,67 @@ def test_upcoming_published_event_requires_finite_display_forecast():
     validate_upcoming_display_forecasts(published, week, today=date(2026, 9, 16))
 
 
+@pytest.mark.parametrize("timing", ["bmo", "amc", "unknown"])
+def test_event_day_without_frozen_forecast_does_not_block_future_publication(timing):
+    # A provider revision can first introduce an event on its freeze date.
+    # With no admitted pre-event evidence, it must remain unpriced.
+    event = {
+        "ticker": "IBKR",
+        "earnings_date": "2026-10-15",
+        "timing": timing,
+        "display_forecast_pct": None,
+        "display_forecast_method": None,
+    }
+    frozen = copy.deepcopy(event)
+    with duckdb.connect() as conn:
+        enrich_upcoming_event(
+            conn, event, as_of_date=date(2026, 9, 30), today=date(2026, 10, 15),
+            options_available=False,
+        )
+
+    assert event == frozen
+    published = [("IBKR", date(2026, 10, 15), timing)]
+    weeks = {date(2026, 10, 12): {
+        "window": {"start": "2026-10-12", "end": "2026-10-16"},
+        "events": [event],
+    }}
+    validate_upcoming_display_forecasts(published, weeks, today=date(2026, 10, 15))
+    # The same missing forecast must still fail before the event enters freeze.
+    with pytest.raises(DisplayForecastError, match="IBKR 2026-10-15"):
+        validate_upcoming_display_forecasts(published, weeks, today=date(2026, 10, 14))
+
+
+@pytest.mark.parametrize("frozen_method", [None, "ml", "options_math"])
+def test_display_status_excludes_event_day_from_upcoming_coverage(frozen_method):
+    frozen = {
+        "ticker": "IBKR", "earnings_date": "2026-10-15",
+        "display_forecast_pct": None if frozen_method is None else 0.05,
+        "display_forecast_method": frozen_method,
+    }
+    future = {**_indicative_event(), "earnings_date": "2026-10-16"}
+    weeks = {date(2026, 10, 12): {
+        "window": {"start": "2026-10-12", "end": "2026-10-16"},
+        "events": [frozen, future],
+    }}
+    published = [
+        ("IBKR", date(2026, 10, 15), "amc"),
+        ("PAYX", date(2026, 10, 16), "bmo"),
+    ]
+
+    status = build_display_forecast_status(
+        published, weeks, today=date(2026, 10, 15),
+        generated_at="2026-10-15T07:30:00Z",
+    )
+
+    assert status["published_upcoming_events"] == 1
+    assert status["with_display_forecast"] == 1
+    assert status["coverage_pct"] == 1.0
+    assert status["method_mix"] == {
+        "ml": 0, "options_math": 0, "options_indicative": 1,
+        "historical": 0, "historical_prior": 0,
+    }
+
+
 def test_enrichment_preserves_ml_snapshot_date_as_display_provenance():
     conn = duckdb.connect()
     event = {

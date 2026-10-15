@@ -45,6 +45,12 @@ After an event reports, the selected ML → IV/options → history headline come
 
 A build-time invariant requires every upcoming published calendar identity in the generated span to have exactly one finite, positive canonical display forecast. Failure aborts frontend-data publication. This invariant is deliberately separate from strict research eligibility: display coverage can be 100% while strict option coverage is lower.
 
+For this invariant and its coverage counters, upcoming means an earnings date
+strictly after the builder's `today` date. Event-day and earlier rows are inside
+the date-only freeze boundary: preserve admitted pre-event evidence, and allow
+an unavailable forecast when none exists. A newly introduced or revised event
+must not acquire a recomputed forecast on its freeze date.
+
 ### Forecast evidence
 
 The dashboard evidence receipt identifies the exact validated forecast release and its coverage/control outcome. It is the browser-safe lineage bridge from public research data back to the validated artifacts that produced it.

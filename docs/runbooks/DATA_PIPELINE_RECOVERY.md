@@ -221,6 +221,16 @@ Keep the failed reconciliation/options/forecast reports, relevant workflow logs/
 
 ## Frontend forecast-component mismatch
 
+If `Build frontend JSON` fails with `invalid display_forecast_pct` and
+`invalid display_forecast_method=None` for an event dated on the build day,
+check the enrichment/validation date boundary. Event-day rows are already
+frozen; a provider revision can introduce an identity without admitted
+pre-event evidence. The upcoming-display invariant and its coverage counters
+apply only to dates strictly after the builder's `today`. Preserve unavailable
+event-day forecasts instead of recomputing them, and keep future-row validation
+strict. Once the builder is repaired, use provider-free recovery with the exact
+promoted data-release and restored reconciliation IDs if ingestion completed.
+
 The daily generator and forecast restoration must complete before publication.
 Restoration selects the frozen headline forecast separately from its option
 comparison snapshot and historical context. Eligible option percentages move
