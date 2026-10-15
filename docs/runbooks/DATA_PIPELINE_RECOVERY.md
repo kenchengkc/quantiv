@@ -231,6 +231,13 @@ event-day forecasts instead of recomputing them, and keep future-row validation
 strict. Once the builder is repaired, use provider-free recovery with the exact
 promoted data-release and restored reconciliation IDs if ingestion completed.
 
+If withholding fails with `incompatible options provenance` after rebuilding a
+same-day symbol, check that the retained canonical display forecast carries its
+`options_publication_status` and `options_publication_source_date` into the
+symbol projection. A frozen historical forecast under an options hold must
+retain those markers and clear newly computed option inputs. Keep the
+provenance guard intact; do not relabel unavailable options as eligible.
+
 The daily generator and forecast restoration must complete before publication.
 Restoration selects the frozen headline forecast separately from its option
 comparison snapshot and historical context. Eligible option percentages move

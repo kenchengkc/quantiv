@@ -421,6 +421,8 @@ def display_fields_from_event(event: dict[str, Any] | None) -> dict[str, Any]:
             "options_status",
             "fallback_reason",
             "historical_event_count",
+            "options_publication_status",
+            "options_publication_source_date",
         )
         if key in event
     }
@@ -524,6 +526,13 @@ def ensure_symbol_display_detail(
                 "earnings_date": earnings_date.isoformat(),
             }
             expected_move.update(fields)
+            if (fields.get("options_publication_status") == "held"
+                    and fields.get("options_status") == "unavailable"):
+                # A rebuilt detail can contain raw options even when its
+                # retained event was already frozen under an options hold.
+                _clear_held_option_inputs(expected_move)
+                method = fields.get("display_forecast_method")
+                expected_move["em_method"] = "ml_lightgbm" if method == "ml" else method
             detail["expected_move"] = expected_move
         return detail
 
