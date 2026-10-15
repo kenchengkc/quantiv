@@ -1084,9 +1084,8 @@ def ml_gate_drops_event(
     calendar-reference is now authoritative for membership, so the row is
     published anyway and simply renders with no expected move at all.
 
-    An event the calendar already publishes is therefore never dropped here. It
-    falls through to the options-math baseline priced at its current date, which
-    is the same evidence the surrounding weeks publish when ML is unavailable.
+    An event the calendar already publishes is therefore never dropped here.
+    Without eligible ML, its upcoming headline remains unavailable.
     Events outside the published calendar keep the strict gate, so an unscored
     event does not quietly widen the research universe.
     """

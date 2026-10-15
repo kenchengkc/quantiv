@@ -196,7 +196,7 @@ def main():
 
     this_monday = monday_of_week(today) if today.weekday() < 5 else today + timedelta(days=(7 - today.weekday()))
 
-    # Build each week (last, this, next, +2) and collect unique tickers for detail pages.
+    # Build each visible week and collect unique tickers for detail pages.
     # On --resume: reuse the existing per-week JSONs on disk — don't rebuild them.
     skip_weeks = args.skip_weeks or args.resume
     week_payloads = {}
@@ -270,9 +270,8 @@ def main():
     for offset in ([] if skip_weeks else WEEK_OFFSETS):
         wk_start = this_monday + timedelta(days=7 * offset)
         wk_end = wk_start + timedelta(days=4)
-        # daily_score.py only scores upcoming earnings within a ~21-day window,
-        # so require_ml would leave last/+2 weeks empty. Fall back to the
-        # options_math baseline for those; enforce ML on current + next week.
+        # Preserve calendar membership across the wider navigation window.
+        # Upcoming rows without eligible ML keep an unavailable headline.
         require_ml = offset in (0, 1)
         events = build_week_events(conn, as_of_date, wk_start, wk_end, ml_lookup, provider_lookup,
                                    require_ml=require_ml, canonical=canonical_keys,

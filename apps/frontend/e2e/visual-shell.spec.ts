@@ -94,6 +94,16 @@ test('compact navigation replaces the desktop menu before labels can crowd or wr
     await expect(nav).toBeHidden();
     await expect(menuButton).toBeVisible();
     await expectNoHorizontalOverflow(page);
+    if (width <= 640) {
+      const weekChoices = page.locator('.qv-week-picker > div > .chip');
+      await expect(weekChoices).toHaveCount(5);
+      const clippedLabels = await weekChoices.evaluateAll((buttons) =>
+        buttons.filter((button) => button.scrollWidth > button.clientWidth + 1)
+          .map((button) => button.textContent),
+      );
+      expect(clippedLabels).toEqual([]);
+      await expect(page.getByRole('button', { name: 'In three weeks', exact: true })).toBeVisible();
+    }
 
     await menuButton.click();
     await expect(header.getByRole('button', { name: 'Close menu' })).toHaveAttribute(
