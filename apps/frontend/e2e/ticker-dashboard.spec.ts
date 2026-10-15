@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
+import type { SymbolDetail } from "../app/(public)/[symbol]/symbolPageTypes";
 
 function forecastFixtureSymbol(): string | null {
   const symbolsDir = path.resolve(__dirname, "..", "public", "symbols");
@@ -8,13 +9,21 @@ function forecastFixtureSymbol(): string | null {
     if (!filename.endsWith(".json")) return false;
     const payload = JSON.parse(
       fs.readFileSync(path.join(symbolsDir, filename), "utf8"),
-    ) as {
-      expected_move?: { p10?: number | null; p90?: number | null };
-      earnings_history?: unknown[];
-    };
+    ) as Partial<SymbolDetail>;
+    const forecast = payload.expected_move;
+    // Stored quantiles can outlive publication eligibility. This dashboard
+    // case needs an available model and straddle to render exceedance.
     return (
-      payload.expected_move?.p10 != null &&
-      payload.expected_move.p90 != null &&
+      forecast?.ml_publication_status !== "held" &&
+      [
+        payload.spot_price,
+        forecast?.em_ml_pct,
+        forecast?.p10,
+        forecast?.p50,
+        forecast?.p90,
+        forecast?.straddle_pct,
+      ].every((value) => typeof value === "number" && Number.isFinite(value) && value > 0) &&
+      (payload.straddle_features?.length ?? 0) > 0 &&
       (payload.earnings_history?.length ?? 0) >= 2
     );
   });
@@ -27,7 +36,7 @@ test("ticker dashboard presents one market-model-history view before detail", as
   const symbol = forecastFixtureSymbol();
   test.skip(
     symbol == null,
-    "No committed ticker fixture includes an ML forecast",
+    "No committed ticker fixture includes an available model and straddle comparison",
   );
 
   await page.goto(`/${symbol}`, { waitUntil: "domcontentloaded" });
