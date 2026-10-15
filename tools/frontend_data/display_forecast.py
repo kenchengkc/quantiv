@@ -27,6 +27,7 @@ DEFAULT_POLICY_PATH = REPO_ROOT / "config" / "option_display_quality.json"
 
 DisplayMethod = Literal[
     "ml",
+    "ml_unavailable",
     "options_math",
     "options_indicative",
     "historical",
@@ -65,7 +66,7 @@ class DisplayPolicy:
 
 @dataclass(frozen=True)
 class DisplayForecast:
-    pct: float
+    pct: float | None
     method: DisplayMethod
     as_of: str | None
     ml_status: MLStatus
@@ -832,4 +833,36 @@ def resolve_display_forecast(
         options_status="unavailable",
         fallback_reason="insufficient_ticker_history",
         historical_event_count=len(historical),
+    )
+
+
+def resolve_upcoming_display_forecast(
+    conn: duckdb.DuckDBPyConnection,
+    *,
+    ticker: str,
+    earnings_date: date,
+    timing: str | None,
+    as_of_date: date,
+    ml_forecast: dict[str, Any] | None,
+    strict_options: dict[str, Any] | None = None,
+    options_available: bool = True,
+) -> DisplayForecast:
+    """Publish an ML headline or an explicit unavailable state for an unreported event."""
+    ml = ml_forecast or {}
+    if ml.get("ml_publication_status") != "held" and _finite_positive(ml.get("em_ml_pct")) is not None:
+        return resolve_display_forecast(
+            conn, ticker=ticker, earnings_date=earnings_date, timing=timing,
+            as_of_date=as_of_date, ml_forecast=ml,
+            strict_options=strict_options, options_available=options_available,
+        )
+    strict = strict_options or {}
+    has_options = options_available and any(
+        _finite_positive(strict.get(key)) is not None
+        for key in ("em_baseline_iv", "em_baseline_straddle", "straddle_pct")
+    )
+    return DisplayForecast(
+        pct=None, method="ml_unavailable", as_of=as_of_date.isoformat(),
+        ml_status=_missing_ml_status(ml),
+        options_status="decision_eligible" if has_options else "unavailable",
+        fallback_reason=None,
     )

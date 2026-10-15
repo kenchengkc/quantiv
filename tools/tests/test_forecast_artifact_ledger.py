@@ -108,8 +108,8 @@ def test_partial_hold_cleans_retained_surfaces_and_preserves_reported_history(tm
         for row in events[1:]:
             assert 'em_ml_pct' not in row and 'forecast_id' not in row and 'p90' not in row
             assert row['ml_publication_status'] == 'held'
-            assert row['display_forecast_method'] == 'options_math'
-            assert row['display_forecast_pct'] == .07
+            assert row['display_forecast_method'] == 'ml_unavailable'
+            assert row['display_forecast_pct'] is None
         assert events[1]['ml_publication_reason'] == 'unsupported_cohort'
     assert json.loads((tmp_path / 'symbols/HELD.json').read_text())['earnings_history'] == [past]
 
@@ -146,8 +146,8 @@ def test_retained_calendar_cannot_recover_old_id_from_an_eligible_symbol(tmp_pat
     artifacts.withhold_upcoming_ml(tmp_path, today=date(2026, 10, 13), eligible_forecast_ids={'approved'})
     row = json.loads((tmp_path / 'weekly.json').read_text())['events'][0]
     assert row.get('forecast_id') is None
-    assert row['display_forecast_method'] == 'options_math'
-    assert row['display_forecast_pct'] == .07
+    assert row['display_forecast_method'] == 'ml_unavailable'
+    assert row['display_forecast_pct'] is None
 
 
 @pytest.mark.parametrize('timing', ['bmo', 'amc'])
@@ -176,7 +176,7 @@ def test_same_day_unreported_events_require_exact_eligibility(tmp_path, timing):
         events = json.loads((tmp_path / relative).read_text())['events']
         assert events[0]['ml_publication_status'] == 'held'
         assert events[0].get('em_ml_pct') is None and events[0].get('forecast_id') is None
-        assert events[0]['display_forecast_method'] == 'options_math'
+        assert events[0]['display_forecast_method'] == 'ml_unavailable'
         assert events[1]['ml_publication_status'] == 'eligible' and events[1]['em_ml_pct'] == .09
         assert events[2] == rows[2]
     held = json.loads((tmp_path / 'symbols/HELD.json').read_text())

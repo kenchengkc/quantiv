@@ -56,7 +56,7 @@ from ml.evidence_receipt import verify_evidence_receipt  # noqa: E402
 from ml.model_protocol import feature_protocol, target_protocol  # noqa: E402
 from ml.training_split import temporal_dates  # noqa: E402
 from ml.model_bundle import (  # noqa: E402
-    DEFAULT_HORIZONS,
+    DAILY_HORIZONS,
     ModelBundleError,
     verify_bundle_dir,
     verify_control_pointer,
@@ -263,7 +263,7 @@ def prepare_independent_test(
     repo_root: Path,
     training_dir: Path,
     staging_dir: Path,
-    horizons: Sequence[int] = DEFAULT_HORIZONS,
+    horizons: Sequence[int] = DAILY_HORIZONS,
     test_days: int = DEFAULT_TEST_DAYS,
     purge_days: int = DEFAULT_PURGE_DAYS,
     label_availability_days: int = DEFAULT_LABEL_AVAILABILITY_DAYS,
@@ -607,7 +607,7 @@ def evaluate_independent_test(
     decision_path: Path,
     models_root: Path,
     output_root: Path,
-    horizons: Sequence[int] = DEFAULT_HORIZONS,
+    horizons: Sequence[int] | None = None,
     source_revision: str | None = None,
     bootstrap_draws: int = DEFAULT_BOOTSTRAP_DRAWS,
     bootstrap_seed: int = DEFAULT_BOOTSTRAP_SEED,
@@ -625,6 +625,9 @@ def evaluate_independent_test(
         raise ValueError("independent-test reservation id does not match its contents")
 
     bundle_manifest = verify_bundle_dir(bundle_dir)
+    horizons = bundle_manifest["horizons"] if horizons is None else list(horizons)
+    if sorted(horizons) != sorted(bundle_manifest["horizons"]):
+        raise ModelBundleError("evaluation horizons differ from the signed model bundle")
     bundle_id = str(bundle_manifest["bundle_id"])
     decision = _read_json(decision_path)
     if decision.get("status") != "passed" or decision.get("promoted") is not True:
@@ -895,7 +898,7 @@ def _parser() -> argparse.ArgumentParser:
     learning.add_argument("--bundle-dir", type=Path, required=True)
     learning.add_argument("--decision", type=Path, required=True)
     learning.add_argument("--report", type=Path, required=True)
-    learning.add_argument("--horizons", nargs="+", type=int, default=list(DEFAULT_HORIZONS))
+    learning.add_argument("--horizons", nargs="+", type=int)
 
     prepare = subparsers.add_parser(
         "prepare", help="seal the final test and rewrite training to development rows"
@@ -912,6 +915,7 @@ def _parser() -> argparse.ArgumentParser:
         type=Path,
         default=REPO_ROOT / "data/models/monitoring/prediction_ledger.parquet",
     )
+    prepare.add_argument("--horizons", nargs="+", type=int, default=list(DAILY_HORIZONS))
     prepare.add_argument("--test-days", type=int, default=DEFAULT_TEST_DAYS)
     prepare.add_argument("--purge-days", type=int, default=DEFAULT_PURGE_DAYS)
     prepare.add_argument(
@@ -946,6 +950,7 @@ def _parser() -> argparse.ArgumentParser:
         type=Path,
         default=REPO_ROOT / "data/models/evaluations",
     )
+    evaluate.add_argument("--horizons", nargs="+", type=int)
     evaluate.add_argument("--bootstrap-draws", type=int, default=DEFAULT_BOOTSTRAP_DRAWS)
     evaluate.add_argument("--bootstrap-seed", type=int, default=DEFAULT_BOOTSTRAP_SEED)
     evaluate.add_argument("--source-revision")
@@ -962,8 +967,11 @@ def main() -> int:
     if args.command == "report-learning":
         bundle_dir = args.bundle_dir.resolve()
         manifest = verify_bundle_dir(bundle_dir)
+        horizons = manifest["horizons"] if args.horizons is None else args.horizons
+        if sorted(horizons) != sorted(manifest["horizons"]):
+            raise ModelBundleError("learning horizons differ from the signed model bundle")
         report = learning_evidence_report(
-            {horizon: _read_json(bundle_dir / f"metadata_T{horizon}.json") for horizon in args.horizons},
+            {horizon: _read_json(bundle_dir / f"metadata_T{horizon}.json") for horizon in horizons},
             bundle_id=str(manifest["bundle_id"]), decision=_read_json(args.decision.resolve()),
         )
         _atomic_json(args.report.resolve(), report)
@@ -973,6 +981,7 @@ def main() -> int:
         reservation = prepare_independent_test(
             repo_root=args.repo_root.resolve(),
             training_dir=args.training_dir.resolve(),
+            horizons=args.horizons,
             staging_dir=args.staging_dir.resolve(),
             prediction_ledger_path=args.prediction_ledger.resolve(),
             test_days=args.test_days,
@@ -988,6 +997,7 @@ def main() -> int:
         receipt_path, receipt = evaluate_independent_test(
             repo_root=args.repo_root.resolve(),
             bundle_dir=args.bundle_dir.resolve(),
+            horizons=args.horizons,
             reservation_path=args.reservation.resolve(),
             decision_path=args.decision.resolve(),
             models_root=args.models_root.resolve(),

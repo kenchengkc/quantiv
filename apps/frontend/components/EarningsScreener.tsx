@@ -752,16 +752,11 @@ function dedupeEvents(rows: ScreenerEvent[]): ScreenerEvent[] {
     if (seen.has(k)) continue;
     seen.add(k);
     const compat = resolveDisplayForecastCompat(ev);
-    out.push(
-      compat.pct != null
-        ? {
-            ...ev,
-            display_forecast_pct: compat.pct,
-            display_forecast_method: compat.method,
-          }
-        : ev,
-    );
-  }
+    out.push({
+      ...ev,
+      display_forecast_pct: compat.pct,
+      display_forecast_method: compat.method,
+    });  }
   return out;
 }
 
@@ -1872,7 +1867,7 @@ export default function EarningsScreener() {
             >
               Session
             </th>
-            {th('straddle', 'Expected move', 'Canonical display estimate: ML, strict or indicative options, or a historical fallback.')}
+            {th('straddle', 'Expected move', 'Eligible ML forecast for upcoming earnings; unavailable when no eligible forecast exists.')}
             {th('hist_avg', 'Hist 4Q avg', 'Mean absolute close-to-close move over the last 4 prints.')}
             {th('hist_edge', 'Hist edge', '(Straddle EM − hist 4Q avg) / hist 4Q avg. Positive = richer.')}
             {th('short', 'Short DTC', 'Short-interest days to cover from provider enrichment. Higher = more crowded borrow/short positioning.')}
@@ -1974,7 +1969,9 @@ export default function EarningsScreener() {
                 title={displayForecastLabel(ev.display_forecast_method)}
                 style={{ padding: '16px 14px' }}
               >
-                <MoveBar value={ev.display_forecast_pct} max={maxDisplayForecast} />
+                {ev.display_forecast_method === 'ml_unavailable'
+                  ? <span style={{ fontSize: 11, color: 'var(--ink-4)' }}>ML unavailable</span>
+                  : <MoveBar value={ev.display_forecast_pct} max={maxDisplayForecast} />}
               </td>
               <td className="mono tnum" style={{ textAlign: 'right', padding: '16px 14px', color: 'var(--ink-2)' }}>
                 {pct1(ev.hist_move_avg_4q)}

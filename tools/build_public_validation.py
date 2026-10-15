@@ -139,7 +139,7 @@ def _verify_receipt_model_members(
 
 
 def _forecast_stage_model_bundle_sha(
-    manifest: Mapping[str, Any], horizons: list[int] | tuple[int, ...] = HORIZONS
+    manifest: Mapping[str, Any], horizons: list[int] | tuple[int, ...] | None = None
 ) -> str:
     """Reproduce the forecast evidence receipt's path-sensitive model digest.
 
@@ -155,7 +155,7 @@ def _forecast_stage_model_bundle_sha(
     if not bundle_id or not isinstance(artifacts, list):
         raise ModelBundleError("signed model manifest cannot identify forecast model bundle")
 
-    required_names = set(required_artifact_names(horizons))
+    required_names = set(required_artifact_names(manifest["horizons"] if horizons is None else horizons))
     members: list[dict[str, Any]] = []
     for artifact in sorted(
         artifacts,
@@ -228,10 +228,6 @@ def _model_source(
             manifest_horizons = sorted(int(value) for value in manifest.get("horizons") or [])
         except (TypeError, ValueError) as exc:
             raise ModelBundleError("signed champion has invalid horizon declarations") from exc
-        if manifest_horizons != list(HORIZONS):
-            raise ModelBundleError(
-                "signed champion horizons do not match the public validation contract"
-            )
 
         receipt_path = _immutable_model_receipt_path(models_root, manifest)
         try:
@@ -251,9 +247,9 @@ def _model_source(
             receipt_horizons = sorted(int(value) for value in receipt.get("horizons") or [])
         except (TypeError, ValueError) as exc:
             raise ModelBundleError("model validation receipt has invalid horizons") from exc
-        if receipt_horizons != list(HORIZONS):
+        if receipt_horizons != manifest_horizons:
             raise ModelBundleError(
-                "model validation receipt horizons do not match the public validation contract"
+                "model validation receipt horizons do not match the signed champion"
             )
 
         training_bundle = _artifact(receipt, "training_bundle")
@@ -371,10 +367,10 @@ def _verified_protocol(
     metadata_by_horizon: Mapping[int, Mapping[str, Any]],
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]:
     holdouts = [
-        _holdout_split(metadata_by_horizon[horizon], horizon) for horizon in HORIZONS
+        _holdout_split(metadata_by_horizon[horizon], horizon) for horizon in sorted(metadata_by_horizon)
     ]
     walk_forwards = [
-        _walk_forward(metadata_by_horizon[horizon], horizon) for horizon in HORIZONS
+        _walk_forward(metadata_by_horizon[horizon], horizon) for horizon in sorted(metadata_by_horizon)
     ]
     protocol_keys = ("method", "purge_days", "test_days", "requested_folds")
     first = walk_forwards[0]
@@ -438,7 +434,7 @@ def _evaluation_receipt(
             if isinstance(item, Mapping)
             and item.get("name") == f"metadata_T{horizon}.json"
         )
-        for horizon in HORIZONS
+        for horizon in manifest["horizons"]
     }
     core = {
         "schema": EVALUATION_RECEIPT_SCHEMA,
@@ -463,9 +459,10 @@ def _evaluation_receipt(
 
 def build_validation(repo_root: Path, *, generated_at: str | None = None) -> dict[str, Any]:
     metadata_dir, source_kind, bundle_id, manifest, model_receipt = _model_source(repo_root)
+    horizons = list(manifest["horizons"]) if manifest else list(HORIZONS)
     rows: list[dict[str, Any]] = []
     metadata_by_horizon: dict[int, dict[str, Any]] = {}
-    for horizon in HORIZONS:
+    for horizon in horizons:
         path = metadata_dir / f"metadata_T{horizon}.json"
         metadata = _read(path)
         if not metadata:
@@ -524,7 +521,7 @@ def build_validation(repo_root: Path, *, generated_at: str | None = None) -> dic
             if (
                 not isinstance(forecast_horizons, list)
                 or not forecast_horizons
-                or any(type(horizon) is not int or horizon not in HORIZONS for horizon in forecast_horizons)
+                or any(type(horizon) is not int or horizon not in horizons for horizon in forecast_horizons)
                 or len(set(forecast_horizons)) != len(forecast_horizons)
             ):
                 raise ModelBundleError("forecast evidence has invalid or missing horizons")
@@ -565,7 +562,7 @@ def build_validation(repo_root: Path, *, generated_at: str | None = None) -> dic
             "receipt": evaluation_receipt,
         },
         "summary": {
-            "supported_horizons": list(HORIZONS),
+            "supported_horizons": horizons,
             "validation_row_observations": sum(
                 int(row["n_validation"]) for row in rows
             ),

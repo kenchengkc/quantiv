@@ -556,3 +556,32 @@ def test_forecast_gate_rejects_unsynchronized_intraday_quotes(tmp_path: Path) ->
         )
 
     assert "unsynchronized_quote_timestamps" in _issue_codes(error.value)
+
+
+def test_default_validation_requires_daily_heads_through_t25(tmp_path):
+    with pytest.raises(PipelineValidationError) as error:
+        validate_model_artifacts(tmp_path)
+    missing = {Path(issue.artifact).name for issue in error.value.issues if issue.code == "missing_model_metadata"}
+    assert "metadata_T4.json" in missing
+    assert "metadata_T25.json" in missing
+    assert len(missing) == 25
+
+
+def test_default_model_validation_preserves_existing_signed_head_set(tmp_path, monkeypatch):
+    from test_model_bundle import _keys
+    from ml.evidence_receipt import build_evidence_receipt
+    from ml.model_bundle import create_signed_bundle
+    models = tmp_path / "models"
+    _write_model_artifacts(models)
+    private, public = _keys()
+    monkeypatch.setenv("MODEL_BUNDLE_PUBLIC_KEY", public.decode())
+    report = {"status": "passed", "stages": {"models": {"horizons": [1]}}}
+    receipt = build_evidence_receipt(report, scope="models", repo_root=tmp_path, data_dir=tmp_path,
+        training_dir=tmp_path / "training", models_dir=models, forecast_path=None, horizons=[1])
+    report_path, receipt_path = tmp_path / "report.json", tmp_path / "receipt.json"
+    report_path.write_text(json.dumps(report))
+    receipt_path.write_text(json.dumps(receipt))
+    bundle, _ = create_signed_bundle(models, tmp_path / "bundles", receipt_path=receipt_path,
+        validation_report_path=report_path, source_revision="test", horizons=[1], private_key=private)
+    result = validate_model_artifacts(bundle, min_train_rows=10, min_validation_rows=4)
+    assert set(result["horizons"]) == {"1"}

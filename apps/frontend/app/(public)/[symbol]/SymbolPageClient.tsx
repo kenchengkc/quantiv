@@ -509,7 +509,7 @@ export default function SymbolPage({
     if (!symbol || !data || !em || !horizon || !earningsDate || !price || price <= 0) {
       return null;
     }
-    if (![1, 2, 3, 7, 14, 21].includes(horizon)) return null;
+    if (!Number.isInteger(horizon) || horizon < 1 || horizon > 25) return null;
     const roundedSpot = Math.round(price * 10) / 10;
     const eventDate = earningsDate.slice(0, 10);
     return {
@@ -712,8 +712,12 @@ export default function SymbolPage({
     rawActivePredictionPct != null && Number.isFinite(rawActivePredictionPct)
       ? Math.max(0, rawActivePredictionPct)
       : null;
+  const reportedEvent = data.earnings_history?.find((row) => row.date.slice(0, 10) === earningsDate);
   const headlineForecastFields = {
     ...(em ?? {}),
+    actual: reportedEvent?.actual,
+    eps_actual: reportedEvent?.eps_actual,
+    revenue_actual: reportedEvent?.revenue_actual,
     iv_pct:
       finiteDisplayForecast(em?.iv_pct) ??
       frozenHistoryForecast?.ivPct ??
@@ -730,10 +734,11 @@ export default function SymbolPage({
   const compatDisplayForecast = resolveDisplayForecastCompat(
     headlineForecastFields,
     historicalCompatPct,
+    earningsDate,
   );
   const staticDisplayPct = compatDisplayForecast.pct;
-  // The hero uses the same canonical hierarchy as every other surface:
-  // validated ML first, then point-in-time IV/options, then history.
+  // Upcoming heroes use eligible ML or an explicit unavailable state.
+  // Reported events retain their frozen forecast history.
   // Spot-updated ML remains a separate interactive comparison and does not
   // rewrite the frozen static research snapshot.
   const displayForecastPct = staticDisplayPct;

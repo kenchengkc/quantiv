@@ -42,7 +42,7 @@
           "display_forecast_pct": { "type": ["number", "null"], "exclusiveMinimum": 0 },
           "display_forecast_method": {
             "type": ["string", "null"],
-            "enum": ["ml", "options_math", "options_indicative", "historical", "historical_prior", null]
+            "enum": ["ml", "ml_unavailable", "options_math", "options_indicative", "historical", "historical_prior", null]
           },
           "display_forecast_as_of": { "type": ["string", "null"] },
           "ml_status": {

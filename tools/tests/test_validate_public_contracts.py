@@ -559,3 +559,57 @@ def test_source_level_research_history_rejects_future_retired_earnings_source(
 
     with pytest.raises(contracts.ContractError, match="event on/after source as-of"):
         contracts.validate_research_history()
+
+
+@pytest.mark.parametrize("method", ["historical", "historical_prior", "options_math", "options_indicative"])
+def test_upcoming_signature_cannot_resolve_independent_context_as_a_headline(method):
+    assert contracts._resolved_forecast_signature({
+        "earnings_date": "2099-10-21", "display_forecast_pct": 0.08,
+        "display_forecast_method": method, "em_iv_pct": 0.12,
+        "hist_move_med_4q": 0.09,
+    }, historical_fallback=0.10) is None
+
+
+def test_upcoming_signature_requires_eligible_ml_and_preserves_reported_history():
+    event = {"earnings_date": "2099-10-21", "em_ml_pct": 0.07,
+             "display_forecast_pct": 0.08, "display_forecast_method": "historical"}
+    assert contracts._resolved_forecast_signature({**event, "ml_publication_status": "held"}) is None
+    assert contracts._resolved_forecast_signature({**event, "ml_publication_status": "eligible"}) == ("ml", 0.07)
+    assert contracts._resolved_forecast_signature({**event, "em_ml_pct": None, "eps_actual": 0}) == ("historical", 0.08)
+
+
+def test_upcoming_symbol_signature_never_reconstructs_headline_from_history():
+    symbol = {"expected_move": {}, "earnings_history": [
+        {"date": "2026-07-16", "actual": 0.09},
+        {"date": "2026-04-16", "actual": -0.07},
+    ]}
+    assert contracts._symbol_page_signature(symbol, "2099-10-21")[0] is None
+
+
+@pytest.mark.parametrize("mutation", [
+    {"display_forecast_pct": 0.08}, {"ml_status": "available"},
+    {"ml_publication_status": "eligible"}, {"em_ml_pct": 0.07},
+])
+def test_explicit_unavailable_public_contract_rejects_a_forecast_value(tmp_path, monkeypatch, mutation):
+    public = tmp_path / "public"
+    public.mkdir()
+    event = {
+        "ticker": "TEST", "earnings_date": "2099-10-21", "as_of_date": "2026-10-15",
+        "em_method": "ml_unavailable", "display_forecast_method": "ml_unavailable",
+        "display_forecast_pct": None, "display_forecast_as_of": "2026-10-15",
+        "ml_status": "unavailable_model", "ml_publication_status": "held", **mutation,
+    }
+    (public / "screener.json").write_text(json.dumps({
+        "metadata": {"version": "v1", "as_of_date": "2026-10-15", "generated_at": "2026-10-15", "event_count": 1},
+        "events": [event],
+    }))
+    monkeypatch.setattr(contracts, "PUBLIC", public)
+    with pytest.raises(contracts.ContractError, match="ML unavailable"):
+        contracts.validate_screener()
+
+
+def test_explicit_unavailable_signature_never_recovers_stale_eligible_raw_ml():
+    assert contracts._resolved_forecast_signature({
+        "display_forecast_method": "ml_unavailable", "display_forecast_pct": None,
+        "em_ml_pct": 0.07, "ml_publication_status": "eligible",
+    }) is None

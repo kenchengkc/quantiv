@@ -7,7 +7,8 @@ import hashlib
 import json
 import math
 import re
-from datetime import date
+from datetime import date, datetime
+from zoneinfo import ZoneInfo
 from pathlib import Path
 from typing import Any, Callable
 
@@ -20,6 +21,7 @@ SOURCE_UNIVERSE_SCHEMA = "quantiv.historical-event-universe.v1"
 PREVIEW_UNIVERSE_SCHEMA = "quantiv.historical-event-universe.preview.v1"
 DISPLAY_FORECAST_METHODS = {
     "ml",
+    "ml_unavailable",
     "options_math",
     "options_indicative",
     "historical",
@@ -100,6 +102,19 @@ def validate_schema_documents() -> None:
             raise ContractError(f"{path} top-level type must be object")
 
 
+def _validate_unavailable_headline(node: dict[str, Any], label: str) -> None:
+    """Validate the explicit unavailable contract while accepting legacy artifacts."""
+    if node.get("display_forecast_method") != "ml_unavailable":
+        return
+    unavailable_statuses = {"unavailable_inputs", "unavailable_model", "unavailable_event"}
+    if (node.get("display_forecast_pct") is not None
+            or node.get("ml_status") not in unavailable_statuses
+            or node.get("ml_publication_status") == "eligible"
+            or node.get("em_ml_pct") is not None
+            or node.get("fallback_reason") is not None):
+        raise ContractError(f"{label}: ML unavailable must have null forecast values and unavailable ML status")
+
+
 def validate_screener() -> None:
     path = PUBLIC / "screener.json"
     payload = _object(_read(path), str(path))
@@ -114,6 +129,7 @@ def validate_screener() -> None:
     for index, event_raw in enumerate(events):
         event = _object(event_raw, f"screener.events[{index}]")
         _required(event, f"screener.events[{index}]", "ticker", "earnings_date", "as_of_date", "em_method")
+        _validate_unavailable_headline(event, f"screener.events[{index}]")
         symbol = _string(event["ticker"], f"screener.events[{index}].ticker")
         if not SYMBOL_RE.fullmatch(symbol):
             raise ContractError(f"invalid ticker in screener row: {symbol}")
@@ -131,6 +147,10 @@ def validate_symbol_payloads() -> None:
             raise ContractError(f"symbol payload/path mismatch: {path.name} -> {symbol}")
         _list(payload["straddle_features"], f"{path.name}.straddle_features")
         _list(payload["earnings_history"], f"{path.name}.earnings_history")
+        nodes = [payload.get("expected_move"), *(payload.get("earnings_history") or [])]
+        for node in nodes:
+            if isinstance(node, dict):
+                _validate_unavailable_headline(node, path.name)
 
 
 
@@ -148,20 +168,38 @@ def _resolved_forecast_signature(
     payload: dict[str, Any] | None,
     *,
     historical_fallback: float | None = None,
+    earnings_date: str | None = None,
 ) -> tuple[str, float] | None:
     """Python mirror of frontend resolveDisplayForecastCompat()."""
 
+    fields = payload or {}
+    event_date = str(earnings_date or fields.get("earnings_date") or fields.get("date") or "")[:10]
+    today = datetime.now(ZoneInfo("America/New_York")).date().isoformat()
+    reported = any(
+        isinstance(fields.get(key), (int, float)) and not isinstance(fields.get(key), bool)
+        and math.isfinite(fields[key])
+        for key in ("eps_actual", "revenue_actual", "actual", "realized_move_pct")
+    )
+    if fields.get("display_forecast_method") == "ml_unavailable":
+        return None
+    if event_date >= today and not reported:
+        if fields.get("ml_publication_status") != "eligible" or fields.get("ml_status") not in {None, "available"}:
+            return None
+        ml = _positive_optional(fields.get("em_ml_pct"))
+        if ml is None and fields.get("display_forecast_method") == "ml":
+            ml = _positive_optional(fields.get("display_forecast_pct"))
+        return ("ml", ml) if ml is not None else None
     explicit_historical = _positive_optional(historical_fallback)
     if not payload:
         return ("historical", explicit_historical) if explicit_historical else None
 
-    ml = _positive_optional(payload.get("em_ml_pct"))
+    ml = None if payload.get("ml_publication_status") == "held" else _positive_optional(payload.get("em_ml_pct"))
     if ml is not None:
         return ("ml", ml)
 
     canonical = _positive_optional(payload.get("display_forecast_pct"))
     canonical_method = payload.get("display_forecast_method")
-    if canonical is not None and canonical_method == "ml":
+    if canonical is not None and canonical_method == "ml" and payload.get("ml_publication_status") != "held":
         return ("ml", canonical)
 
     projection_cutoff = payload.get("options_publication_source_date")
@@ -320,8 +358,11 @@ def _symbol_page_signature(
         else {}
     )
     components = _symbol_page_components(payload, event_date)
+    history_row = next((row for row in payload.get("earnings_history") or []
+                        if isinstance(row, dict) and str(row.get("date") or "")[:10] == event_date), {})
     headline_fields = {
         **active_expected,
+        **{key: history_row[key] for key in ("actual", "eps_actual", "revenue_actual") if key in history_row},
         "em_ml_pct": components["ml"],
         "iv_pct": components["iv"],
         "straddle_pct": components["straddle"],
@@ -330,6 +371,7 @@ def _symbol_page_signature(
         _resolved_forecast_signature(
             headline_fields,
             historical_fallback=components["historical"],
+            earnings_date=event_date,
         ),
         components,
     )

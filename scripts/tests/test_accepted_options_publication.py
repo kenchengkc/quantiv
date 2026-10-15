@@ -55,7 +55,7 @@ def _write_parquet(root: Path, dataset: str, source_date, rows) -> Path:
     return path
 
 
-def _signed_champion(data: Path, tmp_path: Path, *, metadata_overrides=None) -> Path:
+def _signed_champion(data: Path, tmp_path: Path, *, metadata_overrides=None, horizons=(7, 14)) -> Path:
     models = data / "models"
     models.mkdir()
     training = tmp_path / "training"
@@ -79,7 +79,7 @@ def _signed_champion(data: Path, tmp_path: Path, *, metadata_overrides=None) -> 
         "quantiles": [.10, .25, .50, .75, .90],
     }
     metadata.update(metadata_overrides or {})
-    for horizon in (7, 14):
+    for horizon in horizons:
         head_metadata = {**metadata, "horizon": horizon}
         for name in required_artifact_names([horizon]):
             if name.endswith(".txt"):
@@ -90,10 +90,10 @@ def _signed_champion(data: Path, tmp_path: Path, *, metadata_overrides=None) -> 
             training / f"training_T{horizon}.parquet", index=False,
         )
         _write_json(training / f"metadata_T{horizon}.json", head_metadata)
-    report = {"status": "passed", "stages": {"models": {"horizons": [7, 14]}}}
+    report = {"status": "passed", "stages": {"models": {"horizons": list(horizons)}}}
     receipt = build_evidence_receipt(
         report, scope="models", repo_root=tmp_path, data_dir=data,
-        training_dir=training, models_dir=models, forecast_path=None, horizons=[7, 14],
+        training_dir=training, models_dir=models, forecast_path=None, horizons=horizons,
     )
     report["evidence_receipt"] = receipt
     report_path = data / "validation/models.json"
@@ -102,7 +102,7 @@ def _signed_champion(data: Path, tmp_path: Path, *, metadata_overrides=None) -> 
     _write_json(receipt_path, receipt)
     bundle, manifest = create_signed_bundle(
         models, models / "bundles", receipt_path=receipt_path,
-        validation_report_path=report_path, source_revision="accepted-options-test", horizons=[7, 14],
+        validation_report_path=report_path, source_revision="accepted-options-test", horizons=horizons,
     )
     identity = manifest["bundle_id"]
     _write_json(models / "control/champion.json", create_signed_control_pointer(
@@ -116,7 +116,7 @@ def _signed_champion(data: Path, tmp_path: Path, *, metadata_overrides=None) -> 
 
 
 @pytest.fixture
-def accepted_options(tmp_path, monkeypatch):
+def accepted_options(tmp_path, monkeypatch, request):
     key = Ed25519PrivateKey.generate()
     monkeypatch.setenv("MODEL_BUNDLE_SIGNING_KEY", key.private_bytes(
         serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
@@ -127,7 +127,8 @@ def accepted_options(tmp_path, monkeypatch):
     ).decode())
     # Freeze one real calendar day before the US session opens; all consumers use
     # one instant, including scored_at and the monitor's prospective checks.
-    now = datetime.combine(datetime.now(timezone.utc).date(), time(7), tzinfo=timezone.utc)
+    now = (datetime.fromisoformat(request.param) if hasattr(request, "param") else
+           datetime.combine(datetime.now(timezone.utc).date(), time(7), tzinfo=timezone.utc))
 
     class Clock(datetime):
         @classmethod

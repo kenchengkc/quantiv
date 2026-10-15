@@ -13,6 +13,7 @@ import logging
 import json
 
 from ml.model_artifact import load_native_model, point_model_name
+from ml.model_bundle import DEFAULT_HORIZONS, verify_bundle_dir
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -98,7 +99,8 @@ class MLServingPipeline:
     
     def _load_models(self):
         """Load trained ML models"""
-        horizons = [1, 2, 3, 7, 14, 21]
+        horizons = (verify_bundle_dir(self.models_dir)["horizons"]
+                    if (self.models_dir / "manifest.json").exists() else DEFAULT_HORIZONS)
         
         for horizon in horizons:
             model_path = self.models_dir / point_model_name(horizon)

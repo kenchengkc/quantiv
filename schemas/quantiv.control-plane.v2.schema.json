@@ -24,6 +24,7 @@
           "type": ["object", "null"],
           "properties": {
             "ml": { "type": "integer", "minimum": 0 },
+            "ml_unavailable": { "type": "integer", "minimum": 0 },
             "options_math": { "type": "integer", "minimum": 0 },
             "options_indicative": { "type": "integer", "minimum": 0 },
             "historical": { "type": "integer", "minimum": 0 },

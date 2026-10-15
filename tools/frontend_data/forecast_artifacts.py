@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import math
-from copy import deepcopy
 from datetime import date
 from pathlib import Path
 
@@ -304,7 +303,6 @@ def withhold_upcoming_ml(
         symbol = str(node.get('ticker') or node.get('act_symbol') or payload.get('symbol') or path.stem).upper().strip()
         return event_date < today or event_date == today and f'{symbol}|{event_iso}' in reported_keys
 
-    symbol_payloads = {}
     for path in paths:
         if not path.is_file() or path.name == 'manifest.json':
             continue
@@ -318,8 +316,16 @@ def withhold_upcoming_ml(
             if protected_history(node, payload, path):
                 continue
             changed = True
-            if eligible(node, payload, path):
-                node['ml_publication_status'] = 'eligible'
+            ml_pct = node.get('em_ml_pct')
+            valid_ml = (isinstance(ml_pct, (int, float)) and not isinstance(ml_pct, bool)
+                        and math.isfinite(ml_pct) and ml_pct > 0)
+            if eligible(node, payload, path) and valid_ml:
+                node.update(ml_publication_status='eligible', ml_status='available',
+                            display_forecast_pct=ml_pct, display_forecast_method='ml',
+                            display_forecast_as_of=node.get('ml_snapshot_date')
+                            or node.get('display_forecast_as_of') or today.isoformat(),
+                            em_method='ml_lightgbm', fallback_reason=None)
+                node.setdefault('options_status', 'unavailable')
                 node.pop('ml_publication_reason', None)
                 continue
             symbol = str(node.get('ticker') or node.get('act_symbol') or payload.get('symbol') or path.stem).upper().strip()
@@ -329,123 +335,11 @@ def withhold_upcoming_ml(
             node['ml_publication_status'] = 'held'
             node['ml_publication_reason'] = (held_event_reasons or {}).get(
                 event_key, 'feature_drift' if eligible_forecast_ids is None else 'no_eligible_current_forecast')
-            if node.get('display_forecast_method') is None:
-                for key, method in (('em_iv_pct', 'options_math'), ('iv_pct', 'options_math'),
-                                    ('em_straddle_pct', 'options_math'), ('straddle_pct', 'options_math'),
-                                    ('hist_move_med_4q', 'historical'), ('hist_move_avg_4q', 'historical')):
-                    value = node.get(key)
-                    if isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value) and value > 0:
-                        node.update(display_forecast_pct=value, display_forecast_method=method,
-                                    display_forecast_as_of=node.get('as_of_date') or payload.get('as_of_date'),
-                                    em_method='options_math' if method == 'options_math' else 'historical')
-                        break
-        if changed:
-            path.write_text(json.dumps(payload, indent=2) + '\n')
-        if path.parent == public_dir / 'symbols':
-            symbol_payloads[path.stem] = payload
-
-    if not align_components:
-        return
-
-    # Removing ML can expose an older historical estimate on one surface. Use
-    # the same resolved ticker-page signature that the publication contract
-    # validates; this preserves the existing IV -> historical display order.
-    try:
-        from tools.validate_public_contracts import _symbol_historical_median, _symbol_page_signature
-    except ModuleNotFoundError:
-        from validate_public_contracts import _symbol_historical_median, _symbol_page_signature
-    from .display_payloads import _validate_display_provenance
-    for path in paths:
-        if path.parent == public_dir / 'symbols' or not path.is_file() or path.name == 'manifest.json':
-            continue
-        payload = json.loads(path.read_text())
-        changed = False
-        for node in payload.get('events') or []:
-            event_date = str(node.get('earnings_date') or '')[:10]
-            symbol = symbol_payloads.get(str(node.get('ticker') or '').upper())
-            if not symbol or protected_history(node, payload, path):
-                continue
-            if eligible(node, payload, path):
-                continue
-            if eligible_forecast_ids is not None:
-                # A retained calendar row with an old ID may coexist with an
-                # approved ticker forecast. Align only independent components.
-                symbol = deepcopy(symbol)
-                sources = [symbol.get('expected_move') or {}, *(symbol.get('earnings_history') or [])]
-                for source in sources:
-                    if str(source.get('earnings_date') or source.get('date') or '')[:10] == event_date:
-                        clear_ml(source)
-            signature, components = _symbol_page_signature(symbol, event_date)
-            if signature is None:
-                continue
-            expected = symbol.get('expected_move') or {}
-            source = (expected if str(expected.get('earnings_date') or '')[:10] == event_date
-                      else next((row for row in symbol.get('earnings_history') or []
-                                 if str(row.get('date') or '')[:10] == event_date), {}))
-            calendar_date = (node.get('as_of_date') or payload.get('as_of_date')
-                             or (payload.get('metadata') or {}).get('as_of_date'))
-            symbol_date = symbol.get('as_of_date')
-            projection_date = node.get('options_publication_source_date')
-            matching_options_projection = (
-                node.get('options_publication_status') == 'held'
-                and source.get('options_publication_status') == 'held'
-                and projection_date
-                and projection_date == source.get('options_publication_source_date')
-                and projection_date == node.get('display_forecast_as_of')
-                and projection_date == source.get('display_forecast_as_of')
-                and node.get('options_status') == source.get('options_status') == 'unavailable'
-                and node.get('display_forecast_method') in {'historical', 'historical_prior'}
-                and source.get('display_forecast_method') in {'historical', 'historical_prior'}
-                and signature[0] in {'historical', 'historical_prior'}
-            )
-            if (not calendar_date or not symbol_date
-                    or calendar_date != symbol_date and not matching_options_projection):
-                raise RuntimeError(f"{path.name}/{node.get('ticker')}: incompatible source dates "
-                                   f"{calendar_date!r} and {symbol_date!r}")
-            method, pct = signature
-            if method == 'ml':
-                raise RuntimeError(f"{path.name}/{node.get('ticker')}: ML remains under publication hold")
-            _, historical_count = _symbol_historical_median(symbol, event_date)
-            canonical_pct = source.get('display_forecast_pct')
-            historical_pct = components['historical']
-            if (method.startswith('historical')
-                    and (matching_options_projection
-                         or historical_pct is None or not math.isfinite(historical_pct)
-                         or historical_pct <= 0)
-                    and source.get('display_forecast_method') == method
-                    and isinstance(canonical_pct, (int, float))
-                    and not isinstance(canonical_pct, bool) and canonical_pct == pct):
-                # A held canonical projection retains its point-in-time count;
-                # compact page history can contain reactions after that cutoff.
-                historical_count = source.get('historical_event_count')
-            options_status = {'options_math': 'decision_eligible', 'options_indicative': 'indicative',
-                              'historical': 'unavailable', 'historical_prior': 'unavailable'}[method]
-            if method == 'options_math' and source.get('options_status') not in {None, 'decision_eligible'}:
-                raise RuntimeError(f"{path.name}/{node.get('ticker')}: incompatible options provenance")
-            fallback_reason = None
-            if method == 'historical_prior':
-                fallback_reason = 'insufficient_ticker_history'
-            elif method in {'historical', 'options_indicative'}:
-                fallback_reason = source.get('fallback_reason') or 'no_same_strike_pair'
-            as_of = symbol_date
-            if method.startswith('options_'):
-                as_of = (source.get('display_forecast_as_of')
-                         if source.get('display_forecast_method') == method else None)
-                as_of = as_of or source.get('implied_as_of') or symbol_date
-            elif source.get('display_forecast_method') == method:
-                as_of = source.get('display_forecast_as_of') or symbol_date
-            for key, component in (('em_iv_pct', 'iv'), ('em_straddle_pct', 'straddle'),
-                                   ('hist_move_med_4q', 'historical')):
-                node[key] = components[component]
-            node.update(display_forecast_method=method, display_forecast_pct=pct,
-                        display_forecast_as_of=as_of, em_method=method,
-                        options_status=options_status, fallback_reason=fallback_reason,
-                        historical_event_count=historical_count if method.startswith('historical') else None)
-            errors = []
-            _validate_display_provenance(node, identity=f"{path.name}/{node.get('ticker')}", errors=errors)
-            if errors:
-                raise RuntimeError('Invalid held display provenance: ' + '; '.join(errors))
-            changed = True
+            node.update(display_forecast_pct=None, display_forecast_method='ml_unavailable',
+                        display_forecast_as_of=node.get('as_of_date') or payload.get('as_of_date')
+                        or (payload.get('metadata') or {}).get('as_of_date') or today.isoformat(),
+                        em_method='ml_unavailable', fallback_reason=None)
+            node.setdefault('options_status', 'unavailable')
         if changed:
             path.write_text(json.dumps(payload, indent=2) + '\n')
 

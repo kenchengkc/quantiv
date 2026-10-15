@@ -80,7 +80,7 @@ export interface WeeklyData {
 type Filter = HomeCalendarFilter;
 
 const MIN_OFFSET = -1;
-const MAX_OFFSET = 2;
+const MAX_OFFSET = 3;
 const MIN_GRID_LOADING_MS = 750;
 const LOGO_PRELOAD_TIMEOUT_MS = 1_500;
 const OFFSETS: { v: number; l: string }[] = [
@@ -88,6 +88,7 @@ const OFFSETS: { v: number; l: string }[] = [
   { v: 0, l: 'This week' },
   { v: 1, l: 'Next week' },
   { v: 2, l: 'In two weeks' },
+  { v: 3, l: 'In three weeks' },
 ];
 
 function parseLocalDate(iso: string) {
@@ -418,7 +419,7 @@ function TickerRow({
               <span style={{ fontSize: 9, color: 'currentColor', opacity: 0.72, marginLeft: 1 }}>%</span>
             </>
           ) : (
-            <span style={{ fontSize: 11, color: 'var(--ink-4)' }}>—</span>
+            <span style={{ fontSize: 11, color: 'var(--ink-4)' }}>{method === 'ml_unavailable' ? 'ML unavailable' : '—'}</span>
           )}
         </div>
         {bandLo != null && bandHi != null && (

@@ -190,7 +190,7 @@ def main():
         print(f"❌ {exc}", file=sys.stderr)
         sys.exit(2)
     if not options_available:
-        print('Options publication held: using independent historical display estimates')
+        print('Options publication held: upcoming forecasts require eligible ML or remain unavailable')
     if age_days > 1:
         print(f"⚠ Options chain is {age_days} days old (as_of={as_of_date})")
 
@@ -409,7 +409,7 @@ def main():
             label="weekly calendar",
         )
 
-    # Never-dash is a build contract, not a React fallback. Validate before
+    # ML availability is a publication contract. Validate before
     # manifest/screener publication and retain a compact runtime status artifact
     # for the control-plane projection.
     validate_upcoming_display_forecasts(

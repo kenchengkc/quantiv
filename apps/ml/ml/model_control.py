@@ -1025,7 +1025,9 @@ def monitoring_rows(
 ) -> pd.DataFrame:
     vectors = _parse_feature_vectors(forecast_frame)
     rows: list[pd.DataFrame] = []
-    for horizon in DEFAULT_HORIZONS:
+    horizons = (verify_bundle_dir(bundle_dir)["horizons"]
+                if (bundle_dir / "manifest.json").exists() else DEFAULT_HORIZONS)
+    for horizon in horizons:
         mask = forecast_frame["model_horizon"].astype(int) == horizon
         if not mask.any():
             continue

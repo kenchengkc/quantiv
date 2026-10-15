@@ -71,34 +71,35 @@ def test_unknown_feature_semantics_rejected_before_native_loading(tmp_path, monk
         service._load_bundle_from_dir(tmp_path, 1)
 
 
-def _signed_serving_models(tmp_path, monkeypatch):
+def _signed_serving_models(tmp_path, monkeypatch, horizons=(7,)):
     models = tmp_path / "source"
     models.mkdir()
     features = ["log_spot", "straddle_pct", "timing_bmo", "timing_amc"]
     frame = pd.DataFrame([[4.6, .05, 1., 0.]] * 20, columns=features)
     estimator = LGBMRegressor(n_estimators=1, min_child_samples=2, verbose=-1)
     estimator.fit(frame, [.06] * len(frame))
-    for suffix in ["", "_q10", "_q25", "_q50", "_q75", "_q90"]:
-        save_native_model(estimator, models / f"lgbm_T7{suffix}.txt")
-    (models / "metadata_T7.json").write_text(json.dumps({
-        "feature_cols": features, "feature_protocol": "quantiv.earnings-causal.v2",
-        "target_protocol": "quantiv.session-reaction.v2", "supported_cohorts": ["strict_options"],
-    }))
+    for horizon in horizons:
+        for suffix in ["", "_q10", "_q25", "_q50", "_q75", "_q90"]:
+            save_native_model(estimator, models / f"lgbm_T{horizon}{suffix}.txt")
+        (models / f"metadata_T{horizon}.json").write_text(json.dumps({
+            "feature_cols": features, "feature_protocol": "quantiv.earnings-causal.v2",
+            "target_protocol": "quantiv.session-reaction.v2", "supported_cohorts": ["strict_options"],
+        }))
     private = Ed25519PrivateKey.generate()
     private_pem = private.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption())
     public = tmp_path / "public.pem"
     public.write_bytes(private.public_key().public_bytes(serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo))
     monkeypatch.setenv("MODEL_BUNDLE_PUBLIC_KEY", str(public))
     report = tmp_path / "report.json"
-    validation = {"status": "passed", "issues": [], "stages": {"models": {"horizons": [7]}}}
+    validation = {"status": "passed", "issues": [], "stages": {"models": {"horizons": list(horizons)}}}
     report.write_text(json.dumps(validation))
     receipt = tmp_path / "receipt.json"
     receipt.write_text(json.dumps(build_evidence_receipt(
         validation, scope="models", repo_root=tmp_path, data_dir=tmp_path / "data",
-        training_dir=tmp_path / "training", models_dir=models, forecast_path=None, horizons=[7],
+        training_dir=tmp_path / "training", models_dir=models, forecast_path=None, horizons=list(horizons),
     )))
     bundle_dir, manifest = create_signed_bundle(models, tmp_path / "bundles", receipt_path=receipt,
-                                              validation_report_path=report, source_revision="test", horizons=[7], private_key=private_pem)
+                                              validation_report_path=report, source_revision="test", horizons=list(horizons), private_key=private_pem)
     monkeypatch.setenv("ML_MODELS_DIR", str(bundle_dir))
     return manifest["bundle_id"]
 
@@ -415,3 +416,25 @@ def test_predict_handles_missing_feature_keys():
     assert result is not None
     assert math.isfinite(result.em_ml_pct)
     assert result.feature_schema_hash
+
+
+@pytest.mark.parametrize("horizons", [(4, 25), (1, 2, 3, 7, 14, 21)])
+def test_signed_preflight_uses_exact_declared_heads_and_supports_legacy_rollback(tmp_path, monkeypatch, horizons):
+    service = _import()
+    _signed_serving_models(tmp_path, monkeypatch, horizons=horizons)
+    inventory = service.validate_models_dir(service._models_dir())
+    assert [row["horizon_days"] for row in inventory] == list(horizons)
+    assert [row["horizon_days"] for row in service.model_inventory()] == list(horizons)
+    for horizon in horizons:
+        assert service.get_bundle(horizon) is not None
+    assert service.get_bundle(5) is None
+
+
+def test_signed_preflight_rejects_missing_admitted_head(tmp_path, monkeypatch):
+    from ml.model_bundle import ModelBundleError
+
+    service = _import()
+    _signed_serving_models(tmp_path, monkeypatch, horizons=(4, 25))
+    (service._models_dir() / "lgbm_T25_q90.txt").unlink()
+    with pytest.raises(ModelBundleError, match="missing"):
+        service.validate_models_dir(service._models_dir())

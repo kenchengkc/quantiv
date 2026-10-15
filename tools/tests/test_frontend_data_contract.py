@@ -63,7 +63,8 @@ def test_committed_screener_matches_public_contract():
 
     assert metadata["version"] == "v1"
     assert metadata["event_count"] == len(events)
-    assert len(metadata["week_starts"]) == len(WEEK_OFFSETS)
+    manifest = _read_json(PUBLIC_DIR / "weeks" / "manifest.json")
+    assert metadata["week_starts"] == [week["start"] for week in manifest["weeks"]]
     assert events
 
     identities = [(event["ticker"], event["earnings_date"]) for event in events]
@@ -77,7 +78,8 @@ def test_week_manifest_references_valid_payloads_with_matching_counts():
     manifest = _read_json(PUBLIC_DIR / "weeks" / "manifest.json")
 
     assert manifest["current_week"]
-    assert len(manifest["weeks"]) == len(WEEK_OFFSETS)
+    assert manifest["weeks"]
+    assert len({week["start"] for week in manifest["weeks"]}) == len(manifest["weeks"])
     assert manifest["current_week"] in {week["start"] for week in manifest["weeks"]}
 
     for week in manifest["weeks"]:
@@ -135,3 +137,13 @@ def test_dashboard_evidence_is_one_compact_run_level_manifest():
     assert evidence["controls"]["exceptions"] == 0
     assert evidence["artifact_bundles"][0]["sha256"] == "b" * 64
     assert "members" not in evidence["artifact_bundles"][0]
+
+
+def test_screener_exports_the_week_containing_the_full_21_day_horizon():
+    monday = date(2026, 10, 12)
+    event = {"ticker": "HORIZON", "earnings_date": "2026-11-05"}
+    result = build_screener_payload(date(2026, 10, 15), monday, {
+        date(2026, 11, 2): {"events": [event]},
+    })
+    assert result["events"] == [event]
+    assert "2026-11-02" in result["metadata"]["week_starts"]

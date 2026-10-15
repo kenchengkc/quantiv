@@ -14,7 +14,7 @@ ML_PACKAGE_ROOT = REPO_ROOT / "apps" / "ml"
 if str(ML_PACKAGE_ROOT) not in sys.path:
     sys.path.insert(0, str(ML_PACKAGE_ROOT))
 
-from ml.model_bundle import create_signed_bundle  # noqa: E402 - standalone script path setup
+from ml.model_bundle import DAILY_HORIZONS, create_signed_bundle  # noqa: E402 - standalone script path setup
 from model_promotion_receipts import build_promotion_receipts  # noqa: E402
 
 
@@ -44,6 +44,7 @@ def main() -> int:
         type=Path,
         default=REPO_ROOT / "data" / "models" / "receipts" / "latest_models.json",
     )
+    parser.add_argument("--horizons", nargs="+", type=int, default=list(DAILY_HORIZONS))
     parser.add_argument("--source-revision", default=os.getenv("GITHUB_SHA", "local"))
     parser.add_argument(
         "--output-manifest",
@@ -59,6 +60,7 @@ def main() -> int:
         receipt_path=args.receipt,
         validation_report_path=args.validation_report,
         source_revision=args.source_revision,
+        horizons=args.horizons,
     )
     print(f"Packaged signed model bundle: {manifest['bundle_id']}")
     if args.output_manifest is not None:

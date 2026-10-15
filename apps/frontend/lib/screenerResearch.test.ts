@@ -13,6 +13,7 @@ const rows: ResearchScreenerEvent[] = [
     timing: 'after_market_close',
     spot_price: 200,
     em_method: 'ml_lightgbm',
+    ml_publication_status: 'eligible',
     em_straddle_pct: 0.08,
     em_ml_pct: 0.06,
     display_forecast_pct: 0.06,
@@ -28,6 +29,7 @@ const rows: ResearchScreenerEvent[] = [
     timing: 'before_market_open',
     spot_price: 300,
     em_method: 'ml_lightgbm',
+    ml_publication_status: 'eligible',
     em_straddle_pct: 0.11,
     em_ml_pct: 0.09,
     display_forecast_pct: 0.09,
@@ -96,7 +98,7 @@ describe('screener research query', () => {
     expect(result.map((row) => row.ticker)).toEqual(['MSFT', 'AAPL']);
   });
 
-  it('uses the ML-first display resolver for big movers and expected-move sorting', () => {
+  it('excludes upcoming historical context and subthreshold ML from big movers', () => {
     const displayDriven: ResearchScreenerEvent[] = [
       {
         ...rows[0],
@@ -119,16 +121,10 @@ describe('screener research query', () => {
       new URLSearchParams('preset=big_movers&sort=straddle&dir=desc'),
     );
 
-    // STRICT has a stale canonical 7% value plus a raw 9% ML value and a
-    // 14% straddle. ML is the headline, so it is below the 10% big-mover
-    // threshold. HIST remains because its 12% historical fallback is the best
-    // available signal for that row.
-    expect(applyScreenerResearchQuery(displayDriven, query).map((row) => row.ticker)).toEqual([
-      'HIST',
-    ]);
+    expect(applyScreenerResearchQuery(displayDriven, query).map((row) => row.ticker)).toEqual([]);
   });
 
-  it('keeps pre-migration screener rows usable until regenerated payloads land', () => {
+  it('admits eligible legacy ML while excluding upcoming legacy options from big movers', () => {
     const legacyRows: ResearchScreenerEvent[] = [
       {
         ...rows[0],
@@ -153,7 +149,6 @@ describe('screener research query', () => {
 
     expect(applyScreenerResearchQuery(legacyRows, query).map((row) => row.ticker)).toEqual([
       'LEGACYML',
-      'LEGACYOPT',
     ]);
   });
 

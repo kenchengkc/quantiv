@@ -38,7 +38,8 @@ def prepare_candidate_evidence(*, bundle_dir: Path, data_dir: Path) -> Path:
         shutil.copytree(data_dir / "validation/promotion", temporary / "promotion")
         source = temporary / "source"
         source.mkdir(parents=True)
-        for relative in ("apps/ml/feature_engineering.py", "apps/ml/ml/causal_features.py", "apps/ml/ml/corporate_actions.py", "apps/ml/ml/model_protocol.py", "config/market_sessions.json"):
+        for relative in ("apps/ml/feature_engineering.py", "apps/ml/ml/causal_features.py", "apps/ml/ml/corporate_actions.py", "apps/ml/ml/model_protocol.py", "config/market_sessions.json",
+                         "scripts/corporate_action_universe.py", "scripts/verify_historical_training_gate.py"):
             path = REPO_ROOT / relative
             if path.exists():
                 shutil.copyfile(path, source / path.name)

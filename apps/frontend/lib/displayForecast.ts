@@ -1,5 +1,6 @@
 export type DisplayForecastMethod =
   | 'ml'
+  | 'ml_unavailable'
   | 'options_math'
   | 'options_indicative'
   | 'historical'
@@ -36,6 +37,12 @@ export type DisplayForecastFields = {
 };
 
 type LegacyDisplayForecastFields = DisplayForecastFields & {
+  earnings_date?: string | null;
+  date?: string | null;
+  eps_actual?: number | null;
+  revenue_actual?: number | null;
+  actual?: number | null;
+  realized_move_pct?: number | null;
   em_ml_pct?: number | null;
   em_straddle_pct?: number | null;
   em_iv_pct?: number | null;
@@ -45,10 +52,16 @@ type LegacyDisplayForecastFields = DisplayForecastFields & {
   hist_move_avg_4q?: number | null;
 };
 
+const MARKET_DATE_FORMAT = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit',
+});
+
 export function displayForecastLabel(method: DisplayForecastMethod | null | undefined): string {
   switch (method) {
     case 'ml':
       return 'ML forecast';
+    case 'ml_unavailable':
+      return 'ML unavailable';
     case 'options_math':
     case 'options_indicative':
       return 'IV forecast';
@@ -94,19 +107,25 @@ export function finiteDisplayForecast(value: number | null | undefined): number 
   return value != null && Number.isFinite(value) && value > 0 ? value : null;
 }
 
-/**
- * Transitional read compatibility for public JSON generated before the
- * display-forecast contract landed.
- *
- * Product headline priority is ML -> IV/options -> historical. This helper
- * intentionally ignores a stale canonical historical/options field when a
- * stronger raw ML signal is present so calendar, screener, watchlist and symbol
- * pages cannot drift during a publication transition.
- */
+/** Resolve an upcoming ML headline while retaining reported-history compatibility. */
 export function resolveDisplayForecastCompat(
   fields: LegacyDisplayForecastFields | null | undefined,
   historicalFallbackPct: number | null | undefined = null,
+  earningsDate?: string | null,
 ): { pct: number | null; method: DisplayForecastMethod | null } {
+  const eventDate = (earningsDate ?? fields?.earnings_date ?? fields?.date)?.slice(0, 10);
+  const today = MARKET_DATE_FORMAT.format(new Date());
+  const hasActual = [fields?.eps_actual, fields?.revenue_actual, fields?.actual, fields?.realized_move_pct]
+    .some((value) => value != null && Number.isFinite(value));
+  if (fields?.display_forecast_method === 'ml_unavailable') return { pct: null, method: 'ml_unavailable' };
+  if (eventDate && eventDate >= today && !hasActual) {
+    const ml = fields?.ml_publication_status === 'eligible' &&
+      (fields.ml_status == null || fields.ml_status === 'available')
+      ? finiteDisplayForecast(fields.em_ml_pct) ??
+        (fields.display_forecast_method === 'ml' ? finiteDisplayForecast(fields.display_forecast_pct) : null)
+      : null;
+    return ml != null ? { pct: ml, method: 'ml' } : { pct: null, method: 'ml_unavailable' };
+  }
   const explicitHistorical = finiteDisplayForecast(historicalFallbackPct);
   if (!fields) {
     return explicitHistorical != null

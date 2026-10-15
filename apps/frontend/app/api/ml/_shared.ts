@@ -12,14 +12,7 @@ export const ML_MARKET_DATA_MODE = 'end_of_day' as const;
 
 export const PredictRequestSchema = z.object({
   symbol: z.string().trim().toUpperCase().regex(SYMBOL_RE),
-  horizon_days: z.union([
-    z.literal(1),
-    z.literal(2),
-    z.literal(3),
-    z.literal(7),
-    z.literal(14),
-    z.literal(21),
-  ]),
+  horizon_days: z.number().int().min(1).max(25),
   spot_override: z.number().positive().optional(),
   earnings_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   intended_use: z.literal(ML_DECISION_SCOPE).optional().default(ML_DECISION_SCOPE),

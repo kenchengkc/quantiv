@@ -19,7 +19,7 @@ EVENT_PREDICTION_PUBLICATIONS_PATH = FORECASTS_DIR / "event_prediction_publicati
 FORECAST_RECEIPT_PATH = FORECASTS_DIR / "receipts" / "latest_forecasts.json"
 PROVIDER_ENRICHMENTS_DIR = DATA_DIR / "provider_enrichments"
 MARKET_SESSIONS_JSON = REPO_ROOT / "config" / "market_sessions.json"
-WEEK_OFFSETS = [-1, 0, 1, 2]
+WEEK_OFFSETS = [-1, 0, 1, 2, 3]
 ET = ZoneInfo("America/New_York")
 
 

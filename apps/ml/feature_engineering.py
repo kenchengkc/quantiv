@@ -29,6 +29,7 @@ from ml.corporate_actions import (
     ensure_corporate_action_views,
 )
 
+from ml.model_bundle import DAILY_HORIZONS
 from ml.causal_features import build_causal_features
 from ml.model_protocol import (
     FEATURE_PROTOCOL_CAUSAL, FEATURE_PROTOCOL_LEGACY,
@@ -44,7 +45,7 @@ from scripts.market_sessions import latest_completed_us_market_session  # noqa: 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
-HORIZONS = [1, 2, 3, 7, 14, 21]
+HORIZONS = list(DAILY_HORIZONS)
 
 
 @dataclass

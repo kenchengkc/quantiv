@@ -87,3 +87,17 @@ describe('calendar legacy display forecast compatibility', () => {
     });
   });
 });
+
+
+it('keeps a revised upcoming date ML-unavailable without synthesizing a historical prior', () => {
+  const merged = mergeCalendarReference({
+    ...reference([{ ticker: 'TEST', earnings_date: '2099-09-22', timing: 'bmo' }]),
+    window: { start: '2099-09-21', end: '2099-09-25' },
+  }, research([{
+    ticker: 'TEST', earnings_date: '2099-09-21', timing: 'bmo',
+    em_ml_pct: 0.07, hist_move_med_4q: 0.08,
+  }]), '2099-09-21');
+  expect(merged.events[0]).toMatchObject({
+    display_forecast_pct: null, display_forecast_method: 'ml_unavailable',
+  });
+});
