@@ -597,3 +597,94 @@ def test_python_display_compatibility_keeps_validated_held_cutoff_ahead_of_legac
     assert _resolved_forecast_signature({
         **fields, "options_publication_source_date": "2026-09-15",
     }, historical_fallback=0.06) == ("options_math", 0.20)
+
+
+@pytest.mark.parametrize("method,count", [("historical", 4), ("historical_prior", 1)])
+def test_frozen_held_display_survives_symbol_rebuild_and_ml_projection(tmp_path, method, count):
+    from frontend_data.forecast_artifacts import withhold_upcoming_ml
+    from tools.validate_public_contracts import _symbol_page_signature
+
+    event = {
+        "ticker": "AA", "earnings_date": "2026-10-15", "timing": "amc",
+        "as_of_date": "2026-09-30", "eps_actual": None, "revenue_actual": None,
+        "display_forecast_pct": 0.06464472383661662,
+        "display_forecast_method": method,
+        "display_forecast_as_of": "2026-09-30",
+        "ml_status": "unavailable_model", "options_status": "unavailable",
+        "fallback_reason": "options_held" if method == "historical" else "insufficient_ticker_history",
+        "historical_event_count": count,
+        "options_publication_status": "held",
+        "options_publication_source_date": "2026-09-30",
+    }
+    detail = {
+        "symbol": "AA", "as_of_date": "2026-09-30",
+        "expected_move": {
+            "earnings_date": "2026-10-15", "iv_pct": 0.113604,
+            "straddle_pct": 0.090353, "atm_iv": 0.6, "dte": 30,
+            "em_method": "options_math",
+        },
+        "earnings_history": [
+            {"date": "2026-10-15", "actual": None},
+            {"date": "2026-07-16", "actual": -0.06},
+            {"date": "2026-04-16", "actual": -0.08},
+        ],
+    }
+    with duckdb.connect() as conn:
+        detail = ensure_symbol_display_detail(
+            conn, detail, ticker="AA", as_of_date=date(2026, 9, 30),
+            earnings_date=date(2026, 10, 15), display_event=event,
+        )
+        # Event-day projections must use retained evidence without recomputing.
+        for relative, payload in [("weekly.json", {"events": [event]}),
+                                  ("symbols/AA.json", detail)]:
+            path = tmp_path / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps(payload))
+        display_payloads.suppress_held_options(
+            tmp_path, conn=conn, as_of_date=date(2026, 9, 30),
+            today=date(2026, 10, 15), publication_held=True,
+        )
+        withhold_upcoming_ml(tmp_path, today=date(2026, 10, 15),
+                             eligible_forecast_ids=set(), eligible_event_keys=set())
+
+    rebuilt = json.loads((tmp_path / "symbols/AA.json").read_text())
+    projected = json.loads((tmp_path / "weekly.json").read_text())["events"][0]
+    for node in [rebuilt["expected_move"], projected]:
+        assert node["display_forecast_method"] == method
+        assert node["display_forecast_pct"] == 0.06464472383661662
+        assert node["display_forecast_as_of"] == "2026-09-30"
+        assert node["historical_event_count"] == count
+        assert node["options_status"] == "unavailable"
+        assert node["options_publication_status"] == "held"
+        assert node["options_publication_source_date"] == "2026-09-30"
+        assert node["em_method"] == method
+    assert rebuilt["expected_move"]["iv_pct"] is None
+    assert rebuilt["expected_move"]["straddle_pct"] is None
+    assert rebuilt["expected_move"]["atm_iv"] is None
+    assert rebuilt["expected_move"]["dte"] is None
+    assert projected["em_iv_pct"] is None
+    assert projected["em_straddle_pct"] is None
+    assert _symbol_page_signature(rebuilt, "2026-10-15")[0] == (method, 0.06464472383661662)
+
+
+def test_symbol_overlay_preserves_admitted_frozen_option_evidence():
+    event = {
+        "ticker": "IBKR", "earnings_date": "2026-10-14",
+        "display_forecast_pct": 0.12, "display_forecast_method": "options_math",
+        "display_forecast_as_of": "2026-09-30", "ml_status": "unavailable_model",
+        "options_status": "decision_eligible", "fallback_reason": None,
+        "options_publication_status": "held",
+        "options_publication_source_date": "2026-09-30",
+    }
+    detail = {"expected_move": {"earnings_date": "2026-10-14",
+        "iv_pct": 0.12, "straddle_pct": 0.10, "atm_strike": 83.0}}
+    with duckdb.connect() as conn:
+        rebuilt = ensure_symbol_display_detail(
+            conn, detail, ticker="IBKR", as_of_date=date(2026, 9, 30),
+            earnings_date=date(2026, 10, 14), display_event=event,
+        )
+    assert rebuilt["expected_move"]["iv_pct"] == 0.12
+    assert rebuilt["expected_move"]["straddle_pct"] == 0.10
+    assert rebuilt["expected_move"]["atm_strike"] == 83.0
+    assert rebuilt["expected_move"]["display_forecast_pct"] == 0.12
+    assert rebuilt["expected_move"]["options_status"] == "decision_eligible"
