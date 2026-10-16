@@ -444,3 +444,141 @@ def test_public_validation_reports_every_signed_daily_head(tmp_path, monkeypatch
     assert [row["horizon_days"] for row in result["horizons"]] == [4, 25]
     assert set(result["evaluation_evidence"]["receipt"]["metadata_sha256"]) == {"4", "25"}
     assert result["current_evidence"]["forecast_model_matches_evaluation"] is True
+
+
+@pytest.fixture
+def historical_champion(tmp_path, monkeypatch):
+    import pandas as pd
+    from apps.ml.tests.test_historical_admission import _candidate
+    import ml.historical_admission as engine
+    from ml.model_bundle import create_historically_admitted_bundle
+
+    prepare = engine.prepare_historical_admission
+
+    def prepare_cohorts(**kwargs):
+        path = kwargs['source_training_dir'] / 'training_T7.parquet'
+        strict = pd.read_parquet(path)
+        optionless = strict.copy()
+        optionless['__symbol'] = 'O' + optionless['__symbol']
+        optionless['straddle_pct'] = float('nan')
+        optionless['target'] += .001
+        # Calibration uses all rows; the benchmark comparison has fewer matches.
+        optionless.loc[optionless.index % 20 == 0, 'hist_move_med_4q'] = float('nan')
+        pd.concat([strict, optionless], ignore_index=True).to_parquet(path, index=False)
+        return prepare(**kwargs)
+
+    monkeypatch.setattr(engine, 'prepare_historical_admission', prepare_cohorts)
+
+    def install(name='historical', selection_mae=.9):
+        repo = tmp_path / name
+        repo.mkdir()
+        metadata = _metadata(7, model_mae=selection_mae, baseline_mae=1.)
+        metadata.pop('horizon')
+        metadata.pop('feature_cols')
+        source, reservation, receipt, private, public = _candidate(
+            repo, monkeypatch, horizons=(7, 14), metadata_overrides=metadata)
+        _, historical = engine.evaluate_historical_admission(source, reservation, receipt,
+            repo / 'dev', repo / 'evidence', private_key=private, public_key=public,
+            reservation_registry=repo / 'registry')
+        models = repo / 'data/models'
+        serving, manifest = create_historically_admitted_bundle(source, models / 'bundles',
+            admission_receipt=historical, source_revision='historical-test', private_key=private)
+        _write_json(models / 'candidates' / source.name / 'model_validation_receipt.json', receipt)
+        _write_json(models / 'control/champion.json', create_signed_control_pointer(
+            bundle_id=serving.name, previous_bundle_id=None, decision={'action': 'promote'}, private_key=private))
+        return repo, manifest, historical, receipt
+
+    return install
+
+
+def test_historical_projection_uses_signed_admitted_cells_and_correct_denominators(historical_champion, monkeypatch):
+    repo, manifest, historical, receipt = historical_champion()
+    assert receipt['horizons'] == [7, 14]
+    assert manifest['horizons'] == [7]
+    assert manifest['serving_capabilities'] == {'7': ['optionless', 'strict_options']}
+    payload = build_validation(repo)
+    rows = {row['cohort']: row for row in payload['horizons']}
+    assert set(rows) == {'optionless', 'strict_options'}
+    assert payload['summary']['supported_horizons'] == [7]
+    assert payload['summary']['metric_rows'] == 2
+    for cohort, row in rows.items():
+        cell = historical['horizons']['7']['cohorts'][cohort]
+        assert row['metric_scope'] == 'historical_out_of_sample'
+        assert row['model_mae'] == cell['model_mae']
+        assert row['baseline_mae'] == row['straddle_baseline_mae'] == cell['baseline_mae']
+        assert row['n_validation'] == 220
+        assert row['n_matched_baseline'] == (209 if cohort == 'optionless' else 220)
+        assert row['coverage']['p10'] == cell['coverage']['q10_coverage']
+        assert row['model_rmse'] is None
+    expected_mae = (rows['optionless']['model_mae'] * 209 + rows['strict_options']['model_mae'] * 220) / 429
+    assert payload['summary']['weighted_model_mae'] == pytest.approx(expected_mae)
+    assert payload['summary']['weighted_baseline_mae'] == pytest.approx(
+        (rows['optionless']['baseline_mae'] * 209 + rows['strict_options']['baseline_mae'] * 220) / 429)
+    assert payload['summary']['matched_baseline_row_observations'] == 429
+    assert payload['summary']['validation_row_observations'] == 440
+    assert rows['optionless']['coverage']['p10'] != rows['strict_options']['coverage']['p10']
+    assert payload['summary']['weighted_coverage']['p10'] == pytest.approx(
+        (rows['optionless']['coverage']['p10'] + rows['strict_options']['coverage']['p10']) / 2)
+    assert rows['optionless']['baseline_label'] == 'Historical move'
+    assert rows['strict_options']['baseline_label'] == 'Market straddle'
+    protocol = payload['validation_protocol']
+    assert protocol['evaluation_scope'] == 'historical_out_of_sample'
+    assert protocol['walk_forward']['evaluation_scope'] == 'development'
+    assert protocol['historical_admission']['admission_id'] == historical['admission_id']
+    evaluation = payload['evaluation_evidence']['receipt']
+    assert evaluation['source_bundle_id'] == historical['bundle_id']
+    assert evaluation['historical_admission_id'] == historical['admission_id']
+    assert evaluation['serving_capabilities'] == manifest['serving_capabilities']
+    assert evaluation['metrics'] == payload['horizons']
+    import tools.validate_public_contracts as contracts
+    public = repo / 'apps/frontend/public'
+    _write_json(public / 'evidence/model-validation.json', payload)
+    monkeypatch.setattr(contracts, 'PUBLIC', public)
+    contracts.validate_model_validation()
+
+
+def test_selection_metrics_do_not_become_historical_headline_metrics(historical_champion):
+    first, *_ = historical_champion('first', selection_mae=.9)
+    before = build_validation(first)
+    second, *_ = historical_champion('second', selection_mae=.001)
+    after = build_validation(second)
+    assert before['summary'] == after['summary']
+    assert before['horizons'] == after['horizons']
+    assert before['validation_protocol']['walk_forward'] != after['validation_protocol']['walk_forward']
+
+
+@pytest.mark.parametrize('mutation', ['metric', 'receipt_member', 'receipt_horizon'])
+def test_historical_public_projection_rejects_tampered_evidence(historical_champion, mutation):
+    repo, manifest, historical, receipt = historical_champion()
+    if mutation == 'metric':
+        path = repo / 'data/models/bundles' / manifest['bundle_id'] / 'manifest.json'
+        changed = json.loads(path.read_text())
+        changed['historical_admission']['receipt']['horizons']['7']['cohorts']['optionless']['model_mae'] = 0.
+    else:
+        path = repo / 'data/models/candidates' / historical['bundle_id'] / 'model_validation_receipt.json'
+        changed = json.loads(path.read_text())
+        if mutation == 'receipt_member':
+            _receipt_artifact(changed, 'model_bundle')['members'].append({'path': 'metadata_T25.json', 'bytes': 1, 'sha256': 'f' * 64})
+        else:
+            changed['horizons'].append(25)
+    _write_json(path, changed)
+    with pytest.raises(ModelBundleError):
+        build_validation(repo)
+
+
+@pytest.mark.parametrize('mutation', ['duplicate', 'unauthorized_head', 'missing_cohort'])
+def test_historical_contract_rejects_changed_metric_cell_scope(historical_champion, monkeypatch, mutation):
+    import tools.validate_public_contracts as contracts
+    repo, *_ = historical_champion()
+    payload = build_validation(repo)
+    if mutation == 'duplicate':
+        payload['horizons'].append(payload['horizons'][0])
+    elif mutation == 'unauthorized_head':
+        payload['horizons'][0]['horizon_days'] = 14
+    else:
+        payload['horizons'].pop()
+    public = repo / 'apps/frontend/public'
+    _write_json(public / 'evidence/model-validation.json', payload)
+    monkeypatch.setattr(contracts, 'PUBLIC', public)
+    with pytest.raises(contracts.ContractError, match='admitted'):
+        contracts.validate_model_validation()

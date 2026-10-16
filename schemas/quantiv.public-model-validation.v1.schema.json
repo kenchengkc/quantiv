@@ -41,7 +41,12 @@
                 "metadata_sha256": {"type": "object", "additionalProperties": {"type": "string"}},
                 "holdout_splits": {"type": "array", "items": {"type": "object"}},
                 "walk_forward": {"type": "array", "items": {"type": "object"}},
-                "metrics": {"type": "array", "items": {"type": "object"}}
+                "metrics": {"type": "array", "items": {"type": "object"}},
+                "evaluation_scope": {"const": "historical_out_of_sample"},
+                "source_bundle_id": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+                "historical_admission_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+                "serving_capabilities": {"$ref": "#/$defs/capabilities"},
+                "historical_admission": {"$ref": "#/$defs/historicalAdmission"}
               }
             }
           ]
@@ -56,6 +61,9 @@
         "validation_row_observations": {"type": "integer", "minimum": 0},
         "weighted_model_mae": {"type": "number", "minimum": 0},
         "weighted_straddle_mae": {"type": "number", "minimum": 0},
+        "weighted_baseline_mae": {"type": "number", "minimum": 0},
+        "matched_baseline_row_observations": {"type": "integer", "minimum": 0},
+        "metric_rows": {"type": "integer", "minimum": 1},
         "weighted_relative_mae_improvement": {"type": "number"},
         "weighted_coverage": {
           "type": "object",
@@ -76,6 +84,11 @@
           "n_validation": {"type": "integer", "minimum": 0},
           "model_mae": {"type": "number", "minimum": 0},
           "straddle_baseline_mae": {"type": "number", "minimum": 0},
+          "baseline_mae": {"type": "number", "minimum": 0},
+          "baseline_label": {"enum": ["Market straddle", "Historical move"]},
+          "cohort": {"enum": ["strict_options", "optionless"]},
+          "n_matched_baseline": {"type": "integer", "minimum": 1},
+          "metric_scope": {"const": "historical_out_of_sample"},
           "relative_mae_improvement": {"type": "number"},
           "coverage": {"type": "object"},
           "quantiles": {"type": "array", "items": {"type": "number"}},
@@ -87,6 +100,8 @@
       "type": "object",
       "required": ["target", "baseline", "chronological_holdout", "walk_forward", "promotion_controls", "decision_scope", "live_trading_eligible"],
       "properties": {
+        "evaluation_scope": {"const": "historical_out_of_sample"},
+        "historical_admission": {"$ref": "#/$defs/historicalAdmission"},
         "decision_scope": {"const": "end_of_day_research"},
         "live_trading_eligible": {"const": false},
         "chronological_holdout": {"type": "boolean"},
@@ -99,6 +114,7 @@
             "purge_days": {"type": "integer", "minimum": 0},
             "method": {"type": "string"},
             "source": {"enum": ["verified_model_metadata", "preview_unverified"]},
+            "evaluation_scope": {"const": "development"},
             "horizons": {"type": "array", "items": {"type": "object"}}
           }
         },
@@ -117,6 +133,26 @@
         "data_status": {"type": ["string", "null"]},
         "model_status": {"type": ["string", "null"]},
         "drift_status": {"type": ["string", "null"]}
+      }
+    }
+  },
+  "$defs": {
+    "capabilities": {
+      "type": "object", "minProperties": 1,
+      "additionalProperties": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"enum": ["strict_options", "optionless"]}}
+    },
+    "historicalAdmission": {
+      "type": "object",
+      "required": ["admission_id", "source_bundle_id", "serving_bundle_id", "reservation_id", "panel_id", "admitted_cohorts", "protocol", "policy", "global_temporal_boundary", "limitations"],
+      "properties": {
+        "admission_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "source_bundle_id": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "serving_bundle_id": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "reservation_id": {"type": "string"}, "panel_id": {"type": "string"},
+        "admitted_cohorts": {"$ref": "#/$defs/capabilities"},
+        "protocol": {"type": "object"}, "policy": {"type": "object"},
+        "global_temporal_boundary": {"type": "object"},
+        "limitations": {"type": "array", "items": {"type": "string"}}
       }
     }
   }

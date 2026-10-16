@@ -558,9 +558,21 @@ def validate_model_validation() -> None:
     horizons = _list(payload["horizons"], "model-validation.horizons")
     expected = list(summary["supported_horizons"])
     actual = [row.get("horizon_days") for row in horizons if isinstance(row, dict)]
-    if actual != expected:
-        raise ContractError(f"model-validation horizon rows {actual} do not match summary {expected}")
     protocol = _object(payload["validation_protocol"], "model-validation.validation_protocol")
+    if protocol.get("evaluation_scope") == "historical_out_of_sample":
+        admission = _object(protocol.get("historical_admission"), "historical admission")
+        capabilities = _object(admission.get("admitted_cohorts"), "historical admitted cohorts")
+        cells = [(row.get("horizon_days"), row.get("cohort")) for row in horizons if isinstance(row, dict)]
+        authorized = {(int(head), cohort) for head, cohorts in capabilities.items() for cohort in cohorts}
+        if (len(cells) != len(horizons) or len(cells) != len(set(cells))
+                or set(cells) != authorized or sorted(set(actual)) != expected):
+            raise ContractError("historical metric cells do not match exact admitted heads/cohorts")
+        if summary.get("metric_rows") != len(cells) or any(
+            row.get("metric_scope") != "historical_out_of_sample" for row in horizons
+        ):
+            raise ContractError("historical metrics must declare their scope and row count")
+    elif actual != expected:
+        raise ContractError(f"model-validation horizon rows {actual} do not match summary {expected}")
     if protocol.get("decision_scope") != "end_of_day_research" or protocol.get("live_trading_eligible") is not False:
         raise ContractError("model-validation decision scope must remain EOD research-only")
 
