@@ -1105,7 +1105,8 @@ def build_week_events(conn, as_of_date: date, week_start: date, week_end: date,
                       provider_lookup: dict[str, dict] | None = None,
                       require_ml: bool = True,
                       canonical: set[tuple[str, str]] | None = None,
-                      published: dict[tuple[str, str], str] | set[tuple[str, str]] | None = None) -> list[dict]:
+                      published: dict[tuple[str, str], str] | set[tuple[str, str]] | None = None,
+                      options_available: bool = True) -> list[dict]:
     # Read event identities first; outcomes share the exact adjusted ML target.
     event_rows = conn.execute(
         """
@@ -1164,11 +1165,12 @@ def build_week_events(conn, as_of_date: date, week_start: date, week_end: date,
         if ml_gate_drops_event(ticker, earnings_iso, today, ml_lookup, require_ml, published):
             skipped_no_ml += 1
             continue
-        em = compute_em_math(conn, ticker, as_of_date, earnings_dt, timing)
+        em = (compute_em_math(conn, ticker, as_of_date, earnings_dt, timing)
+              if options_available or earnings_dt < today else None)
         is_published = (ticker, earnings_iso) in (published or set())
         ml = ml_fields(fc)
         if not em:
-            if is_published:
+            if is_published or ml:
                 published_without_options.append(f"{ticker} {earnings_iso}")
                 if not ml:
                     published_without_ml.append(f"{ticker} {earnings_iso}")
@@ -1277,7 +1279,8 @@ def build_week_events(conn, as_of_date: date, week_start: date, week_end: date,
         revenue_estimate = row[5] if row else None
         fc = ml_lookup.get((ticker, iso))
         ml = ml_fields(fc)
-        em = compute_em_math(conn, ticker, as_of_date, earn_dt, timing)
+        em = (compute_em_math(conn, ticker, as_of_date, earn_dt, timing)
+              if options_available or earn_dt < today else None)
         extras = screener_extras(conn, ticker, earn_dt, as_of_date)
         provider_fields = provider_event_fields((provider_lookup or {}).get(str(ticker).upper()))
         if not em:

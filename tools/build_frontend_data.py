@@ -275,7 +275,7 @@ def main():
         require_ml = offset in (0, 1)
         events = build_week_events(conn, as_of_date, wk_start, wk_end, ml_lookup, provider_lookup,
                                    require_ml=require_ml, canonical=canonical_keys,
-                                   published=published_timings)
+                                   published=published_timings, options_available=options_available)
 
         # Reported-event preservation: an expected move is only observable
         # before the print, so once an earnings date passes compute_em_math
