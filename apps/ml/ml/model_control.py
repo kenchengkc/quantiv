@@ -654,7 +654,9 @@ def feature_drift_report(
             psi = _population_stability_index(current, reference)
             missing_rate = float(current.isna().mean()) if len(current) else 1.0
             training_missing_rate = float(reference.get("missing_rate", 0.0))
-            missing_delta = abs(missing_rate - training_missing_rate)
+            # Missing inputs can indicate corruption. Improved availability is
+            # a distribution change to monitor, not evidence of lost inputs.
+            missing_delta = missing_rate - training_missing_rate
             is_hard_missing = (
                 horizon_rows >= min_missingness_rows
                 and missing_rate >= 0.999
@@ -670,7 +672,7 @@ def feature_drift_report(
                 status = "critical"
                 critical += 1
                 corruption += 1
-            elif horizon_rows >= min_missingness_rows and missing_delta >= 0.15:
+            elif horizon_rows >= min_missingness_rows and abs(missing_delta) >= 0.15:
                 status = "warning"
                 warning += 1
             elif horizon_rows < min_rows:
