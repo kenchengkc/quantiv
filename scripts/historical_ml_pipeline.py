@@ -157,6 +157,18 @@ def fit(data: Path, revision: str):
     _write(data / "validation/historical_fit.json", result)
 
 
+def validate_selected_publication(data: Path, bundle: Path, candidate: Path):
+    """Bind frontend validation evidence to the signed monitor's exact subset."""
+    from model_publication import verify_publication
+
+    publication = verify_publication(data, forecast_path=candidate)
+    if publication["can_publish_ml"]:
+        _python("scripts/validate_ml_pipeline.py", "forecasts", "--data-dir", data,
+                "--models-dir", bundle, "--forecast-path", Path(publication["eligible_forecast_path"]),
+                "--report", data / "validation/historical_publication.json",
+                "--publish-receipt-dir", data / "forecasts/receipts")
+
+
 def activate(data: Path, bundle_id: str):
     from ml.model_bundle import verify_bundle_dir
 
@@ -212,6 +224,7 @@ def activate(data: Path, bundle_id: str):
     # A fresh daily-style monitor issues the publication authorization and preserves rollback evidence.
     _python("scripts/model_publication.py", "snapshot")
     _python("scripts/model_publication.py", "monitor", "--forecast-path", production)
+    validate_selected_publication(data, bundle, Path(production))
     _run("bash", "scripts/r2_push.sh", "--monitoring-only")
     _run("bash", "scripts/r2_push.sh", "--forecasts-only")
     environment = {**os.environ, "MODEL_PUBLICATION_FORECAST_PATH": production}

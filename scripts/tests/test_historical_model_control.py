@@ -306,6 +306,8 @@ def test_historical_pipeline_retry_reaches_remaining_handoff_without_repromotion
 
     monkeypatch.setattr(pipeline, "_python", python)
     monkeypatch.setattr(pipeline, "_run", run)
+    monkeypatch.setattr(pipeline, "validate_selected_publication",
+                        lambda *args: handed_off.append("validate-publication"))
     pipeline.activate(args.models_root.parent, "b" * 64)
-    assert handed_off == ["activate", "import", "monitor", "publish-monitor"]
+    assert handed_off == ["activate", "import", "monitor", "validate-publication", "publish-monitor"]
     assert {path: path.read_bytes() for path in originals} == originals

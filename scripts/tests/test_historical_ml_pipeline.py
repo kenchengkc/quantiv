@@ -233,3 +233,36 @@ def test_held_activation_retains_candidate_without_external_activation(tmp_path,
 def test_candidate_identity_cannot_escape_storage(value):
     with pytest.raises(ValueError, match="identity"):
         pipeline._bundle_id(value)
+
+
+def test_historical_publication_validates_exact_signed_monitor_subset(tmp_path, monkeypatch):
+    import model_publication
+
+    candidate = tmp_path / "forecasts/candidate.parquet"
+    selected = tmp_path / "forecasts/eligible/selected.parquet"
+    bundle = tmp_path / "models/bundles" / ("a" * 64)
+    calls = []
+
+    def verify(data, *, forecast_path):
+        assert data == tmp_path and forecast_path == candidate
+        return {"can_publish_ml": True, "state": "partial", "eligible_forecast_path": str(selected)}
+
+    monkeypatch.setattr(model_publication, "verify_publication", verify)
+    monkeypatch.setattr(pipeline, "_python", lambda *args: calls.append(args))
+    pipeline.validate_selected_publication(tmp_path, bundle, candidate)
+    assert len(calls) == 1
+    call = calls[0]
+    assert call[:2] == ("scripts/validate_ml_pipeline.py", "forecasts")
+    assert call[call.index("--forecast-path") + 1] == selected
+    assert call[call.index("--models-dir") + 1] == bundle
+    assert call[call.index("--publish-receipt-dir") + 1] == tmp_path / "forecasts/receipts"
+
+
+def test_held_historical_publication_does_not_issue_an_eligible_receipt(tmp_path, monkeypatch):
+    import model_publication
+
+    monkeypatch.setattr(model_publication, "verify_publication", lambda *a, **kw: {"can_publish_ml": False})
+    calls = []
+    monkeypatch.setattr(pipeline, "_python", lambda *args: calls.append(args))
+    pipeline.validate_selected_publication(tmp_path, tmp_path / "bundle", tmp_path / "candidate.parquet")
+    assert calls == []
