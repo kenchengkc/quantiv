@@ -9,6 +9,7 @@ from pathlib import Path
 from ml.candidate_evidence import verify_candidate_bindings, verify_candidate_evidence
 from ml.historical_admission import verify_historical_admission_receipt
 from ml.model_bundle import verify_bundle_dir
+from ml.serving_capabilities import validate_serving_capabilities
 from model_promotion_receipts import verify_promotion_receipts
 
 
@@ -38,6 +39,8 @@ def verify_historical_candidate(models_root: Path, bundle_dir: Path) -> dict:
     source_admission = archive / "historical_admission.json"
     if evidence.get("source_admission", {}).get("sha256") != hashlib.sha256(source_admission.read_bytes()).hexdigest():
         raise ValueError("historical test source admission differs from the retained fitting source")
-    if evidence["status"] != "passed" or evidence["admitted_cohorts"] != bundle["serving_capabilities"]:
+    admitted = validate_serving_capabilities(evidence["admitted_cohorts"], bundle["horizons"])
+    capabilities = validate_serving_capabilities(bundle["serving_capabilities"], bundle["horizons"])
+    if evidence["status"] != "passed" or admitted != capabilities:
         raise ValueError("historical evidence does not authorize the serving candidate")
     return {**evidence, "source_promotion_evidence": promotion}

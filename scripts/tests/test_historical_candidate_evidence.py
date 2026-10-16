@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import shutil
 import sys
 from pathlib import Path
 
 import pytest
+import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
@@ -17,9 +19,26 @@ from historical_candidate_evidence import verify_historical_candidate  # noqa: E
 
 
 @pytest.fixture
-def retained_candidate(tmp_path, monkeypatch):
+def retained_candidate(tmp_path, monkeypatch, request):
     import archive_model_candidate as archive
     import model_promotion_receipts as promotion
+    import ml.historical_admission as historical_engine
+
+    if getattr(request, "param", None) == "dual_cohort":
+        prepare = historical_engine.prepare_historical_admission
+
+        def prepare_dual_cohort(**kwargs):
+            # Add independent optionless issuers before reservation and fitting;
+            # both cohorts then have 220 genuine held-out native predictions.
+            path = kwargs["source_training_dir"] / "training_T7.parquet"
+            strict = pd.read_parquet(path)
+            optionless = strict.copy()
+            optionless["__symbol"] = "O" + optionless["__symbol"]
+            optionless["straddle_pct"] = float("nan")
+            pd.concat([strict, optionless], ignore_index=True).to_parquet(path, index=False)
+            return prepare(**kwargs)
+
+        monkeypatch.setattr(historical_engine, "prepare_historical_admission", prepare_dual_cohort)
 
     real_root = Path(__file__).resolve().parents[2]
     for relative in ("apps/ml/feature_engineering.py", "apps/ml/ml/causal_features.py",
@@ -70,6 +89,37 @@ def test_retained_native_candidate_archive_and_historical_admission_replay_befor
     assert report["status"] == "passed"
     assert report["admitted_cohorts"] == {"7": ["strict_options"]}
     assert report["source_promotion_evidence"]["temporal_integrity"]["receipt_id"]
+
+
+@pytest.mark.parametrize("retained_candidate", ["dual_cohort"], indirect=True)
+def test_signed_dual_cohort_candidate_replays_despite_canonical_serving_order(retained_candidate):
+    models_root, serving, _, _ = retained_candidate
+    manifest = json.loads((serving / "manifest.json").read_text())
+    assert manifest["serving_capabilities"] == {"7": ["optionless", "strict_options"]}
+    assert manifest["historical_admission"]["receipt"]["admitted_cohorts"] == {
+        "7": ["strict_options", "optionless"]}
+    report = verify_historical_candidate(models_root, serving)
+    assert report["status"] == "passed"
+    assert report["admitted_cohorts"] == {"7": ["strict_options", "optionless"]}
+
+
+@pytest.mark.parametrize("capabilities", [
+    {"7": ["optionless", "strict_options"]},
+    {"7": ["strict_options"], "14": ["strict_options"]},
+])
+def test_signed_candidate_cannot_expand_historical_cohort_or_head_scope(retained_candidate, capabilities):
+    from ml.model_bundle import _bundle_core, _sign
+
+    models_root, serving, _, _ = retained_candidate
+    manifest = json.loads((serving / "manifest.json").read_text())
+    core = _bundle_core(**{key: manifest[key] for key in (
+        "artifacts", "receipt_id", "horizons", "source_revision", "created_at", "historical_admission")},
+        serving_capabilities=capabilities)
+    forged = models_root / "bundles" / core["bundle_id"]
+    shutil.copytree(serving, forged)
+    (forged / "manifest.json").write_text(json.dumps(_sign(core, os.environ["MODEL_BUNDLE_SIGNING_KEY"])))
+    with pytest.raises(RuntimeError, match="historical|capabilities"):
+        verify_historical_candidate(models_root, forged)
 
 
 @pytest.mark.parametrize("member", ["reservation.json", "candidate_binding.json", "final_test_T7.parquet",
