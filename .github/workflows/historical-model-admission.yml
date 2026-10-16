@@ -69,10 +69,13 @@ jobs:
           MODEL_BUNDLE_SIGNING_KEY: ${{ secrets.MODEL_BUNDLE_SIGNING_KEY }}
           OMP_NUM_THREADS: '4'
           OMP_THREAD_LIMIT: '4'
-          DUCKDB_MEMORY_LIMIT: '4GB'
+          # Full-source extraction passed with this budget. Public Linux runners
+          # provide 16 GB, leaving 4 GB for Python, native libraries and the OS.
+          DUCKDB_MEMORY_LIMIT: '12GB'
           DUCKDB_THREADS: '4'
         run: |
           set -euo pipefail
+          free -h
           python scripts/historical_ml_pipeline.py fit --source-revision "$GITHUB_SHA"
           echo "bundle_id=$(jq -r '.bundle_id // empty' data/validation/historical_fit.json)" >> "$GITHUB_OUTPUT"
           cat data/validation/historical_fit.json >> "$GITHUB_STEP_SUMMARY"
