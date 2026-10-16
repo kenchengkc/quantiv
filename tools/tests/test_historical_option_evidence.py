@@ -106,7 +106,7 @@ def _option(
     }
 
 
-def test_historical_evidence_filters_parquet_before_ranking_unrelated_symbols(
+def test_historical_evidence_reuses_cached_pairs_and_filters_unrelated_symbols(
     tmp_path: Path,
 ) -> None:
     rows = [
@@ -144,9 +144,13 @@ def test_historical_evidence_filters_parquet_before_ranking_unrelated_symbols(
             yield node
             yield from operators(node.get("children", []))
 
-    scans = [node for node in operators(planned.plan) if node["name"] == "READ_PARQUET"]
+    nodes = list(operators(planned.plan))
+    assert not any(node["name"].strip() == "READ_PARQUET" for node in nodes)
+    scans = [node for node in nodes if str(node["extra_info"].get("Table", "")).endswith(
+        "_frontend_cache_v_eligible_straddles"
+    )]
     assert scans
-    assert all("act_symbol='ACME'" in str(scan["extra_info"].get("Filters", "")) for scan in scans)
+    assert all("ticker='ACME'" in str(scan["extra_info"].get("Filters", "")) for scan in scans)
     assert list(evidence) == [date(2026, 2, 11)]
     assert evidence[date(2026, 2, 11)]["implied"] == 0.082
     assert evidence[date(2026, 2, 11)]["implied_quality_status"] == "decision_eligible_eod"

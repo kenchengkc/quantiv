@@ -3,7 +3,19 @@
   "as_of_date": "2026-09-30",
   "spot_price": 13.0,
   "expected_move": {
-    "earnings_date": "2026-10-19",
+    "earnings_date": "2026-11-05",
+    "expiration": null,
+    "dte": null,
+    "lead_time_days": null,
+    "atm_strike": null,
+    "atm_iv": null,
+    "straddle_abs": null,
+    "straddle_pct": null,
+    "iv_pct": null,
+    "skew_atm": -0.008833,
+    "term_slope": null,
+    "total_vega": 0.0374,
+    "em_method": "ml_unavailable",
     "display_forecast_pct": null,
     "display_forecast_method": "ml_unavailable",
     "display_forecast_as_of": "2026-09-30",
@@ -11,10 +23,9 @@
     "options_status": "unavailable",
     "fallback_reason": null,
     "historical_event_count": null,
-    "timing": "unknown",
+    "timing": "amc",
     "ml_publication_status": "held",
     "ml_publication_reason": "no_eligible_current_forecast",
-    "em_method": "ml_unavailable",
     "options_publication_status": "held",
     "options_publication_source_date": "2026-09-30"
   },
@@ -39,7 +50,7 @@
   ],
   "earnings_history": [
     {
-      "date": "2026-10-19",
+      "date": "2026-11-05",
       "timing": "after_market_close",
       "q": "Q3 26",
       "fiscal_year": 2026,
@@ -428,7 +439,7 @@
       "forecast_frozen": true
     }
   ],
-  "next_earnings": "2026-10-19",
+  "next_earnings": "2026-11-05",
   "vol_regime": {
     "iv_current": 0.4518,
     "iv_rank": 0.575792,
@@ -439,5 +450,5 @@
     "iv_mom_week": 0.0594,
     "iv_mom_month": null
   },
-  "next_earnings_timing": "unknown"
+  "next_earnings_timing": "amc"
 }

@@ -1,37 +1,30 @@
 {
-  "deduplicated_event_count": 7,
-  "event_count": 781,
+  "deduplicated_event_count": 24,
+  "event_count": 1518,
   "integrity": {
-    "baseline_sha256": "ae855fc14889ec59d5460347f88f00daaf0885a0759685d7323c9fd4250cfd67",
+    "baseline_sha256": "1fa19af547ed252a3d2a245b050d0149d89184fa8984b18cecd725a5483c556d",
     "status": "passed",
-    "stdout_sha256": "01f3e2c8ad1ff5471548b76e6213f25a2f36a1711da29996f34589fc7be75f12"
+    "stdout_sha256": "45645ad6e50462df23067dfd058c22c38bc3ada4d32f48e958715569c32b78ed"
   },
-  "observed_at": "2026-10-15T06:41:05Z",
-  "receipt_id": "4c75913181a8837103697fba55a85a5c95ddf75039209d35a858b609048ba55b",
-  "release_id": "91f8da289c449288be502d0daf7712f4893751dee1b2a38643e4b6042d3fe791",
+  "observed_at": "2026-10-16T09:25:59.371330Z",
+  "receipt_id": "c57cdc9770b204ccd042044d285d75f1756b299002adb2eb2a2f5bbbe524e117",
+  "release_id": "cac2eda31e7441049b256fa8bf55806caa1ee6352aff653b44db57878fe71d29",
   "schema": "quantiv.calendar-reference-receipt.v1",
   "source_evidence": [
     {
       "date_max": "2028-10-10",
       "date_min": "2020-01-22",
-      "metadata_sha256": "fcaa40c6001061fdc7b88eeb5e76da93fff048abe19aef386e64f40978aed336",
-      "observed_at": "2026-10-15T06:40:57.375364Z",
+      "metadata_sha256": "74fec5a88a8cb0b3724e876f7729b872ba18b85bfe202795e59adf489e674756",
+      "observed_at": "2026-10-16T09:25:59.371330Z",
       "provider": "dolthub",
-      "rows": 130722,
+      "rows": 130719,
       "symbols": 7417
-    },
-    {
-      "from": "2026-09-15",
-      "metadata_sha256": "f9c9135f9170ef6a2ce456337a1f1025dac329a02dd0ca6c826d5520eb537c9f",
-      "observed_at": "2026-10-15T06:41:05Z",
-      "provider": "fmp",
-      "to": "2026-12-14"
     }
   ],
   "source_file": {
     "path": "data/earnings_calendar.csv",
-    "sha256": "1fa19af547ed252a3d2a245b050d0149d89184fa8984b18cecd725a5483c556d"
+    "sha256": "b34aabdd1b101c20f6d5da3a82cc571bb29e1fbb6e22ed34c19a74b4e03a6684"
   },
-  "source_revision": "0a2b64347f38693a256d6eae80e0dc066c44ec74",
-  "universe_id": "d59ae91c628262dc3fa62863dc08c5b3502b3a5c3693083080a7c3ce05bda3b7"
+  "source_revision": "cbaa472a707c9f665ace863fc54faeedb5d57916",
+  "universe_id": "4f4b951990e87d41c251a9a38118d5d4aa289c7977bcaf5f32634d0bd3ae43b8"
 }

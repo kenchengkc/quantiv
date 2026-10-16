@@ -3,25 +3,41 @@
   "as_of_date": "2026-09-30",
   "spot_price": 73.12,
   "expected_move": {
-    "earnings_date": "2026-10-26",
-    "display_forecast_pct": null,
-    "display_forecast_method": "ml_unavailable",
-    "display_forecast_as_of": "2026-09-30",
-    "ml_status": "unavailable_model",
+    "earnings_date": "2026-10-28",
+    "em_ml_pct": 0.073527,
+    "em_ml_abs": 5.203515,
+    "model_horizon": 13,
+    "ml_snapshot_date": "2026-10-15",
+    "forecast_id": "2a974aeda77099f358fd25cd5f30c4e528855bbb1fad7954206f33cbd9d4dd6b",
+    "forecast_model_bundle_id": "d14dc7f2aa6b175956922eb6266b8523742add962668b7d6b8833cc2c869dd1b",
+    "forecast_scored_at": "2026-10-16T10:23:25.082522+00:00",
+    "forecast_feature_cutoff_at": "2026-10-28T19:55:00+00:00",
+    "forecast_prediction_deadline_at": "2026-10-28T19:55:00+00:00",
+    "forecast_feature_snapshot_at": "2026-10-15T20:00:00+00:00",
+    "forecast_feature_hash": "2d84b0d33590eafed5399ecbf94fccf7c28ba1d8871971f0c847c9ae604366d0",
+    "forecast_frozen_eligible": true,
+    "p10": 0.014177,
+    "p25": 0.034054,
+    "p50": 0.070098,
+    "p75": 0.127419,
+    "p90": 0.17821,
+    "em_method": "ml_lightgbm",
+    "display_forecast_pct": 0.073527,
+    "display_forecast_method": "ml",
+    "display_forecast_as_of": "2026-10-15",
+    "ml_status": "available",
     "options_status": "unavailable",
     "fallback_reason": null,
     "historical_event_count": null,
-    "timing": "unknown",
-    "ml_publication_status": "held",
-    "ml_publication_reason": "no_eligible_current_forecast",
-    "em_method": "ml_unavailable",
+    "timing": "amc",
+    "ml_publication_status": "eligible",
     "options_publication_status": "held",
     "options_publication_source_date": "2026-09-30"
   },
   "straddle_features": [],
   "earnings_history": [
     {
-      "date": "2026-10-26",
+      "date": "2026-10-28",
       "timing": "after_market_close",
       "q": "Q3 26",
       "fiscal_year": 2026,
@@ -410,7 +426,7 @@
       "forecast_frozen": true
     }
   ],
-  "next_earnings": "2026-10-26",
+  "next_earnings": "2026-10-28",
   "vol_regime": {
     "iv_current": 0.5215,
     "iv_rank": 0.721429,
@@ -421,5 +437,5 @@
     "iv_mom_week": 0.0746,
     "iv_mom_month": null
   },
-  "next_earnings_timing": "unknown"
+  "next_earnings_timing": "amc"
 }
