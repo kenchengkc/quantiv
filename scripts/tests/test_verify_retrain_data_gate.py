@@ -403,6 +403,30 @@ def test_optionless_actual_forecast_uses_current_prices_despite_stale_sparse_opt
     assert result["forecast_validation"]["rows"] == 1
 
 
+def test_actual_forecast_admission_accepts_verified_one_session_grace(scoped_release):
+    from scripts.data_release import build_release
+
+    store = scoped_release
+    prices = pd.read_parquet(store["prices"])
+    prices["date"] = "2026-09-03"
+    prices.to_parquet(store["prices"], index=False)
+    frame = pd.read_parquet(store["forecast"])
+    frame["snapshot_date"] = "2026-09-03"
+    frame["model_horizon"] = 5
+    frame.to_parquet(store["forecast"], index=False)
+    manifest = json.loads(store["manifest_path"].read_text())
+    manifest["datasets"]["ohlcv"]["max_date"] = "2026-09-03"
+    _save_scoped_manifest(store, manifest)
+    build_release(store["data_dir"])
+
+    result = _scoped_gate(store)
+    assert result["status"] == "passed"
+    assert result["snapshot_date"] == result["source_date"] == "2026-09-03"
+    assert result["expected_source_date"] == "2026-09-04"
+    assert result["source_session_lag"] == 1
+    assert result["source_evidence"]["ohlcv"]["source_date"] == "2026-09-03"
+
+
 def test_optionless_scoping_does_not_change_legacy_global_gate(scoped_release):
     with pytest.raises(RuntimeError, match="held by reconciliation"):
         verify_retrain_data_gate(data_dir=scoped_release["data_dir"], now=scoped_release["now"])

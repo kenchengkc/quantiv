@@ -265,6 +265,39 @@ def _assert_controls_unchanged(store):
     assert registry["challenger_bundle_id"] is None
 
 
+@pytest.mark.parametrize("accepted_options", ["2026-10-08T07:00:00+00:00"], indirect=True)
+def test_grace_snapshot_reaches_signed_monitor_and_publication_without_redating(accepted_options, monkeypatch):
+    store = accepted_options
+    now = store["now"] + timedelta(days=1)
+
+    class Clock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return now.astimezone(tz) if tz else now.replace(tzinfo=None)
+
+    for module in (daily_score, control_plane, model_control, model_publication,
+                   validate_ml_pipeline, live_validation, pipeline_validation):
+        monkeypatch.setattr(module, "datetime", Clock)
+    store["now"] = now
+    quality = _quote_quality(store["conn"], now=now)
+    assert quality["source_session_lag"] == 1
+    assert quality["errors"] == []
+    expired = _quote_quality(store["conn"], now=now + timedelta(days=1))
+    assert expired["source_session_lag"] == 2
+    assert any("market session(s)" in message for message in expired["errors"])
+    frame = daily_score.get_bundle_forecasts(store["conn"], store["bundle"], 21)
+    assert len(frame) == 100
+    assert set(pd.to_datetime(frame["snapshot_date"]).dt.date) == {store["latest"]}
+    assert set(frame["model_horizon"]) == {7}
+    result, policy, report, candidate = _monitor_fixture_rows(store, frame)
+    assert result == 0 and policy["can_publish_ml"]
+    assert report["snapshot_date"] == store["latest"].isoformat()
+    assert report["feature_drift"]["rolling_evidence"]["current_snapshot_fresh"]
+    eligible = pd.read_parquet(policy["eligible_forecast_path"])
+    assert set(pd.to_datetime(eligible["snapshot_date"]).dt.date) == {store["latest"]}
+    _assert_controls_unchanged(store)
+
+
 def test_accepted_fresh_quotes_reach_signed_champion_and_public_forecast(accepted_options, monkeypatch):
     store = accepted_options
     frame = daily_score.get_bundle_forecasts(store["conn"], store["bundle"], 21)

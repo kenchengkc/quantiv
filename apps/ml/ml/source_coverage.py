@@ -10,7 +10,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 
-def completed_market_session(now: datetime) -> date:
+def _market_session_contract(now: datetime) -> dict:
     candidates = (Path(__file__).resolve().parents[3] / "config/market_sessions.json",
                   Path("/app/config/market_sessions.json"))
     path = next((candidate for candidate in candidates if candidate.is_file()), None)
@@ -20,6 +20,11 @@ def completed_market_session(now: datetime) -> date:
     if (contract.get("schema") != "quantiv.market-sessions.v1"
             or now.date().isoformat() > contract["source"]["verified_through"]):
         raise ValueError("current market-session contract is unavailable")
+    return contract
+
+
+def completed_market_session(now: datetime) -> date:
+    contract = _market_session_contract(now)
     eastern = now.astimezone(ZoneInfo("America/New_York"))
     candidate = eastern.date()
     close = contract.get("early_closes", {}).get(candidate.isoformat(), "16:00")
@@ -30,6 +35,21 @@ def completed_market_session(now: datetime) -> date:
     while candidate.weekday() >= 5 or candidate.isoformat() in holidays:
         candidate -= timedelta(days=1)
     return candidate
+
+
+def forecast_snapshot_sessions(now: datetime) -> tuple[date, date]:
+    """Admit the last completed session and one previous trading session.
+
+    The actual source date is retained. Grace never admits an unfinished session,
+    a holiday or weekend snapshot, or inputs two completed sessions behind.
+    """
+    contract = _market_session_contract(now)
+    latest = completed_market_session(now)
+    previous = latest - timedelta(days=1)
+    holidays = set(contract["holidays"])
+    while previous.weekday() >= 5 or previous.isoformat() in holidays:
+        previous -= timedelta(days=1)
+    return latest, previous
 
 
 def filter_source_covered_snapshots(

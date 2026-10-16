@@ -102,6 +102,29 @@ def test_missing_current_price_does_not_fall_back_or_use_future_price(market_clo
 
 
 @pytest.mark.parametrize("protocol", PROTOCOLS)
+def test_one_session_grace_preserves_snapshot_features_and_exact_head(market_clock, protocol):
+    model = _native_model(protocol, supported=("strict_options", "optionless"))
+    with _connection(quote_date="2026-10-06", with_current_price=False) as conn:
+        conn.execute("INSERT INTO prices_input SELECT act_symbol, DATE '2026-10-06', close FROM prices_input WHERE date=DATE '2026-09-30'")
+        features = daily_score.get_upcoming_features(conn, 21, feature_protocol=protocol)
+        assert set(features["snapshot_date"].dt.date.astype(str)) == {"2026-10-06"}
+        forecasts = daily_score.score_upcoming_models(conn, {7: model, 8: model}, 21)
+    assert forecasts["act_symbol"].tolist() == ["COVERED"]
+    assert forecasts["model_horizon"].tolist() == [8]
+    assert str(forecasts.iloc[0]["snapshot_date"])[:10] == "2026-10-06"
+    assert json.loads(forecasts.iloc[0]["feature_vector"])["straddle_pct"] == .1
+
+
+@pytest.mark.parametrize("protocol", PROTOCOLS)
+def test_live_scoring_excludes_events_past_prediction_deadline(market_clock, protocol):
+    model = _native_model(protocol, supported=("strict_options", "optionless"))
+    with _connection() as conn:
+        conn.execute("UPDATE v_earnings SET date=DATE '2026-10-08'")
+        forecasts = daily_score.score_upcoming_models(conn, {1: model}, 21)
+    assert forecasts["act_symbol"].tolist() == ["OFF_HEAD"]
+
+
+@pytest.mark.parametrize("protocol", PROTOCOLS)
 def test_current_strict_quotes_reach_recorded_vector_and_native_prediction(market_clock, protocol):
     model = _native_model(protocol)
     predicted = []

@@ -8,9 +8,10 @@ import os
 import re
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 from ml.model_bundle import MONITOR_SCHEMA, ModelBundleError, verify_signed_payload
-from ml.source_coverage import completed_market_session
+from ml.source_coverage import forecast_snapshot_sessions
 from ml.forecast_snapshot import forecast_snapshot_id, forecast_snapshot_key
 from services import r2_models
 
@@ -23,9 +24,12 @@ class PublicationAuthority:
     eligible_event_keys: frozenset[str]
     eligible_snapshot_ids: frozenset[str]
     snapshot_bindings: dict[str, str]
+    publication_date: date | None = None
 
     def allows(self, symbol: str, horizon: int, earnings_date: date | None = None) -> bool:
         expected_event = self.snapshot_date + timedelta(days=horizon)
+        if self.publication_date is not None and expected_event < self.publication_date:
+            return False
         if earnings_date is not None and earnings_date != expected_event:
             return False
         return f"{symbol.strip().upper()}|{expected_event.isoformat()}" in self.eligible_event_keys
@@ -80,13 +84,14 @@ def load_current_authority(bundle_id: str, *, now: datetime | None = None) -> Pu
             or artifact.get("sha256") != hashlib.sha256(raw).hexdigest()):
         raise ModelBundleError("current forecast monitor report digest differs")
     report = json.loads(raw)
-    snapshot = completed_market_session(current)
+    snapshot = date.fromisoformat(str(report.get("snapshot_date", "")))
     monitored = datetime.fromisoformat(str(report.get("monitored_at", "")).replace("Z", "+00:00"))
     if (monitored.tzinfo is None or monitored > current or current - monitored > timedelta(days=4)
             or report.get("schema") != "quantiv.model-monitoring.v1"
             or report.get("champion_bundle_id") != bundle_id
             or report.get("current_data_release_id") != release_id
-            or report.get("snapshot_date") != snapshot.isoformat()
+            or snapshot not in forecast_snapshot_sessions(current)
+            or snapshot not in forecast_snapshot_sessions(monitored)
             or verified.get("snapshot_date") != snapshot.isoformat()):
         raise ModelBundleError("current forecast authority differs from the active sources, model or session")
     eligibility = report.get("publication_eligibility") or {}
@@ -106,4 +111,6 @@ def load_current_authority(bundle_id: str, *, now: datetime | None = None) -> Pu
             or (report["status"] == "failed" and events)):
         raise ModelBundleError("current forecast event eligibility is invalid")
     identity = hashlib.sha256(json.dumps(receipt, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
-    return PublicationAuthority(f"{release_id}:{identity}", bundle_id, snapshot, frozenset(events), frozenset(snapshots), bindings)
+    return PublicationAuthority(f"{release_id}:{identity}", bundle_id, snapshot,
+        frozenset(events), frozenset(snapshots), bindings,
+        current.astimezone(ZoneInfo("America/New_York")).date())

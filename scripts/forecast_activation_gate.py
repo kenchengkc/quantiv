@@ -20,12 +20,11 @@ import pandas as pd
 from ml.model_bundle import verify_bundle_dir
 from ml.model_control import prospective_event_mask, prospective_snapshot_mask, score_bundle_frame
 from ml.pipeline_validation import validate_forecast_artifact
+from ml.source_coverage import forecast_snapshot_sessions
 
 try:
-    from market_sessions import latest_completed_us_market_session
     from verify_historical_training_gate import verify_historical_training_gate
 except ModuleNotFoundError:
-    from scripts.market_sessions import latest_completed_us_market_session
     from scripts.verify_historical_training_gate import verify_historical_training_gate
 
 
@@ -369,19 +368,26 @@ def verify_forecast_activation_gate(*, data_dir: Path, forecast_path: Path,
         if blocking:
             raise RuntimeError("published data release is held by reconciliation: " + ", ".join(sorted(blocking)))
         historical, members = _immutable_sources(data_dir)
-        expected = latest_completed_us_market_session(current).isoformat()
-        prices = _shared_sources(data_dir, members, historical, frame, manifest, expected)
+        sessions = forecast_snapshot_sessions(current)
+        snapshots = pd.to_datetime(frame["snapshot_date"]).dt.date
+        if snapshots.nunique() != 1 or snapshots.iloc[0] not in sessions:
+            raise RuntimeError("actual forecasts require one source session within one-session grace")
+        snapshot = snapshots.iloc[0]
+        expected = sessions[0].isoformat()
+        source_date = snapshot.isoformat()
+        prices = _shared_sources(data_dir, members, historical, frame, manifest, source_date)
         sources = {"data_release": {key: historical[key] for key in ("release_id", "files", "bytes")},
                    "ohlcv": prices, "corporate_actions": historical["corporate_actions"],
                    "earnings_calendar": historical["calendar_source"]}
         if "strict_options" in cohorts:
-            sources["options"] = _strict_options(data_dir, members, manifest, expected, frame)
+            sources["options"] = _strict_options(data_dir, members, manifest, source_date, frame)
         advisory = {str(item["code"]) for item in manifest["exceptions"]
                     if item.get("code") in _OPTIONS_ONLY_CODES}
         advisory.update(set(codes) & (allowed | _AGGREGATE_CODES))
         return {"status": "passed", "manifest_id": manifest["manifest_id"],
                 "model_bundle_id": bundle["bundle_id"], "cohorts": cohorts,
-                "snapshot_date": expected, "source_date": expected,
+                "snapshot_date": source_date, "source_date": source_date,
+                "source_session_lag": sessions.index(snapshot),
                 "expected_source_date": expected, "generated_at": manifest["generated_at"],
                 "age_hours": round(age, 3), "source_evidence": sources,
                 "forecast_validation": validation, "advisory_codes": sorted(advisory)}

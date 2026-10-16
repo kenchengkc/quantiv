@@ -23,9 +23,13 @@ class _CapturingConnection:
     def __init__(self):
         self.sql = ""
 
-    def execute(self, sql: str):
+    def execute(self, sql: str, parameters=None):
         self.sql = sql
+        self.parameters = parameters
         return self
+
+    def fetchone(self):
+        return (self.parameters[0],)
 
     def fetchall(self):
         return []
