@@ -20,6 +20,8 @@ Prospective admission requires at least 200 independent future events and 200 ma
 
 The benchmark is only an admission comparison. It is never substituted for the model's public prediction. Insufficient evidence retains the incumbent and leaves unsupported public rows unavailable.
 
+A historically admitted bundle can activate when some current lead/cohort groups pass the existing drift checks while others are held. Each populated group uses the same rolling assessment as signed publication monitoring; current corruption cannot be hidden by healthy historical observations. The signed decision retains the aggregate failure and each group's status and row count. All-held candidates remain blocked. Activation does not authorize every row: the subsequent signed monitor withholds failed groups, and the API and public artifacts serve only its exact eligible snapshot bindings.
+
 ## Rollout
 
 1. Deploy the code and run the normal data refresh to create a genuine v2 corporate-action receipt and verified release. Options older than the one-session grace remain held; strict forecasts require verified options and prices from the same actual snapshot date.
