@@ -21,7 +21,9 @@ dockerfilePath = "apps/backend/Dockerfile"
 # No startCommand — use Dockerfile CMD. Railway does not expand ${PORT:-8000}
 # in startCommand, so uvicorn would get a literal port string and crash.
 healthcheckPath = "/health"
-healthcheckTimeout = 30
+# Verify and load every native model head before accepting traffic. The
+# admitted multi-horizon bundle can take more than 30 seconds on a cold start.
+healthcheckTimeout = 180
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 10
 
