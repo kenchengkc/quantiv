@@ -37,7 +37,7 @@ jobs:
       - uses: ./.github/actions/setup-historical-ml
       - name: Pull verified source and runtime state
         run: bash scripts/r2_pull.sh
-      - name: Refresh genuine price and corporate-action sources
+      - name: Refresh genuine prices, corporate actions and market context
         run: python scripts/historical_ml_pipeline.py prepare-data
       - name: Retain source verification and honest freshness holds
         if: always()

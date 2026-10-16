@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
+import subprocess
 from types import SimpleNamespace
 
 import pytest
@@ -23,6 +24,61 @@ def test_source_coverage_end_stays_on_completed_us_session_after_utc_midnight(tm
     monkeypatch.setattr(pipeline, "_run", lambda *args, **kw: None)
     pipeline.prepare_data(tmp_path)
     assert ("scripts/sync_dolthub.py", "--corporate-actions", "--end-date", "2026-10-15") in calls
+
+
+def test_source_freeze_has_provider_current_market_context(tmp_path, monkeypatch):
+    import duckdb
+    import pandas as pd
+    import market_sessions
+    from ml.causal_features import causal_macro_features
+
+    completed = date(2026, 10, 15)
+    previous = date(2026, 10, 14)
+    monkeypatch.setattr(market_sessions, "latest_completed_us_market_session", lambda: completed)
+    paths = {name: tmp_path / f"{name}.parquet" for name in ("vix", "volhist")}
+    for path in paths.values():
+        pd.DataFrame({"date": [previous], "vix_close": [16.87]}).to_parquet(path)
+
+    def python(script, *args, **kwargs):
+        provider = ("vix" if script == "scripts/sync_vix.py" else
+                    "volhist" if script == "scripts/sync_dolthub.py" and "--volhist" in args else None)
+        if provider:
+            pd.DataFrame({"date": [previous, completed], "vix_close": [16.87, 16.46]}).to_parquet(paths[provider])
+        if script == "scripts/data_release.py":
+            with duckdb.connect() as conn:
+                conn.execute(f"CREATE VIEW v_vix AS SELECT * FROM read_parquet('{paths['vix']}')")
+                prices = pd.DataFrame({"date": [previous, completed] * 2,
+                                       "act_symbol": ["SPY", "SPY", "TLT", "TLT"],
+                                       "close": [100.0, 101.0, 90.0, 91.0]})
+                conn.register("v_ohlcv", prices)
+                macro = causal_macro_features(conn, as_of_date=completed)
+                current = macro.loc[pd.to_datetime(macro["date"]).dt.date.eq(completed)]
+                assert current["vix_current"].tolist() == [16.46], "current VIX must be fetched before source freeze"
+            assert pd.read_parquet(paths["volhist"])["date"].max() == completed
+
+    monkeypatch.setattr(pipeline, "_python", python)
+    monkeypatch.setattr(pipeline, "_run", lambda *args, **kwargs: None)
+    pipeline.prepare_data(tmp_path)
+
+
+@pytest.mark.parametrize("provider", ["vix", "volhist"])
+def test_failed_market_context_fetch_stops_source_publication(tmp_path, monkeypatch, provider):
+    published = []
+
+    def python(script, *args, **kwargs):
+        if (provider == "vix" and script == "scripts/sync_vix.py" or
+                provider == "volhist" and script == "scripts/sync_dolthub.py" and "--volhist" in args):
+            if kwargs.get("check", True):
+                raise subprocess.CalledProcessError(1, [script, *args])
+            return SimpleNamespace(returncode=1)
+        if script == "scripts/data_release.py":
+            published.append("freeze")
+
+    monkeypatch.setattr(pipeline, "_python", python)
+    monkeypatch.setattr(pipeline, "_run", lambda *args, **kwargs: published.append("upload"))
+    with pytest.raises(subprocess.CalledProcessError):
+        pipeline.prepare_data(tmp_path)
+    assert published == []
 
 
 def _fit_fixture(tmp_path, monkeypatch):
