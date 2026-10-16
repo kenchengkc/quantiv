@@ -1,0 +1,29 @@
+name: Setup historical ML runtime
+description: Install the pinned Python dependencies and configure authenticated object storage.
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      with:
+        python-version: '3.11'
+        cache: pip
+    - shell: bash
+      run: pip install --require-hashes -r requirements.txt
+    - shell: bash
+      run: bash scripts/install_rclone.sh
+    - shell: bash
+      run: |
+        set -euo pipefail
+        test -n "$R2_ACCOUNT_ID"
+        test -n "$R2_ACCESS_KEY_ID"
+        test -n "$R2_SECRET_ACCESS_KEY"
+        mkdir -p ~/.config/rclone
+        cat > ~/.config/rclone/rclone.conf <<EOF
+        [r2]
+        type = s3
+        provider = Cloudflare
+        access_key_id = $R2_ACCESS_KEY_ID
+        secret_access_key = $R2_SECRET_ACCESS_KEY
+        endpoint = https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com
+        region = auto
+        EOF

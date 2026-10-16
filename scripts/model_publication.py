@@ -53,6 +53,10 @@ def verify_publication(data_dir: Path, *, not_before: str | None = None, forecas
     pointer = verify_control_pointer(json.loads((data_dir / 'models/control/champion.json').read_text()))
     if report.get('champion_bundle_id') != pointer['champion_bundle_id']:
         raise RuntimeError('monitoring champion does not match the active signed pointer')
+    data_pointer = data_dir / 'control/current_data_release.json'
+    release_id = json.loads(data_pointer.read_text()).get('release_id') if data_pointer.is_file() else None
+    if report.get('current_data_release_id') != release_id:
+        raise RuntimeError('monitoring data release does not match the current source release')
     configured = os.getenv('MODEL_PUBLICATION_FORECAST_PATH')
     forecast = forecast_path or (Path(configured) if configured else latest_forecast_path(data_dir / 'forecasts'))
     if forecast is not None:
@@ -127,6 +131,14 @@ def _verify_event_eligibility(data_dir: Path, candidate_path: Path, report: dict
     manifest = verify_bundle_dir(bundle)
     candidate = verify_candidate_identity(pd.read_parquet(candidate_path), bundle, champion_id, manifest['horizons'])
     selected = pd.read_parquet(eligible_path)
+    verify_candidate_identity(selected, bundle, champion_id, manifest['horizons'],
+                              require_admitted_cohorts=True)
+    from ml.forecast_snapshot import forecast_snapshot_id, forecast_snapshot_key
+    if selection.get('eligible_snapshot_ids') != sorted(forecast_snapshot_id(row) for row in selected.to_dict('records')):
+        raise RuntimeError('eligible snapshot bindings differ from signed monitoring')
+    if selection.get('eligible_snapshot_bindings') != {forecast_snapshot_key(row): forecast_snapshot_id(row)
+                                                      for row in selected.to_dict('records')}:
+        raise RuntimeError('eligible event snapshot bindings differ from signed monitoring')
     if set(selected.columns) != set(candidate.columns):
         raise RuntimeError('eligible forecast schema differs from candidate')
     ids = sorted(selected['forecast_id'].astype(str).tolist())

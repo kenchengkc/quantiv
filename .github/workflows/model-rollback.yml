@@ -167,6 +167,22 @@ jobs:
             --activation-receipt data/validation/provenance-recovery/activation.json \
             --receipt data/validation/provenance-recovery/import.json
 
+      - name: Refresh signed recovered forecast authority when current sources pass
+        id: recovery-authority
+        env:
+          MODEL_BUNDLE_SIGNING_KEY: ${{ secrets.MODEL_BUNDLE_SIGNING_KEY }}
+        run: |
+          FORECAST_PATH=$(jq -er .production_forecast data/validation/provenance-recovery/decision.json)
+          cp data/validation/provenance-recovery/reconciliation-before.json data/validation/data_reconciliation.json
+          if python scripts/verify_retrain_data_gate.py --forecast-path "$FORECAST_PATH" \
+            --report data/validation/provenance-recovery/current-source-gate.json; then
+            python scripts/model_publication.py snapshot
+            python scripts/model_publication.py monitor --forecast-path "$FORECAST_PATH"
+            bash scripts/r2_push.sh --monitoring-only
+          else
+            echo "::warning::Restored model remains unavailable for inference until current source evidence passes and a fresh signed monitor is published."
+          fi
+
       - name: Verify read-back identities and publication hold
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}

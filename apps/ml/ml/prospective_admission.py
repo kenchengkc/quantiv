@@ -19,6 +19,7 @@ from ml.model_control import (
     selection_exposure_end,
 )
 from ml.model_protocol import feature_protocol
+from ml.serving_capabilities import allowed_cohorts
 
 SCHEMA = "quantiv.prospective-admission.v1"
 MINIMUM_ROWS = 200
@@ -31,6 +32,7 @@ def policy_fingerprint() -> str:
         "apps/ml/ml/prospective_admission.py",
         "apps/ml/ml/model_control.py",
         "apps/ml/ml/model_protocol.py",
+        "apps/ml/ml/serving_capabilities.py",
         "apps/ml/ml/quantiles.py",
         "apps/ml/ml/causal_features.py",
         "apps/ml/ml/corporate_actions.py",
@@ -62,11 +64,9 @@ def declare_admission(
     hm = verify_bundle_dir(champion) if champion is not None else None
     comparators = {}
     for horizon in cm["horizons"]:
-        supported = _metadata(candidate, horizon).get(
-            "supported_cohorts", ["strict_options"]
-        )
+        supported = allowed_cohorts(cm, horizon, _metadata(candidate, horizon))
         incumbent = (
-            _metadata(champion, horizon).get("supported_cohorts", ["strict_options"])
+            allowed_cohorts(hm, horizon, _metadata(champion, horizon))
             if hm and horizon in hm["horizons"]
             else []
         )
@@ -206,6 +206,9 @@ def evaluate_admission(ledger, labels, candidate, champion, contract, *, now=Non
     if start.tzinfo is None:
         raise ValueError("prospective admission start must include a timezone")
     current = pd.Timestamp(now or datetime.now(timezone.utc))
+    candidate_manifest = verify_bundle_dir(candidate) if (candidate / "manifest.json").exists() else None
+    if candidate_manifest is not None and set(contract["comparators"]) != {str(h) for h in candidate_manifest["horizons"]}:
+        raise ValueError("admission contract does not cover the authenticated model heads")
     report = {
         "status": "passed",
         "method": "predeclared_prospective_cohort_admission",
@@ -216,8 +219,8 @@ def evaluate_admission(ledger, labels, candidate, champion, contract, *, now=Non
     for key, cohorts in contract["comparators"].items():
         horizon = int(key)
         cm = _metadata(candidate, horizon)
-        if set(cohorts) != set(cm.get("supported_cohorts", ["strict_options"])):
-            raise ValueError("admission contract does not cover every supported cohort")
+        if set(cohorts) != set(allowed_cohorts(candidate_manifest, horizon, cm)):
+            raise ValueError("admission contract does not cover every admitted cohort")
         c = _observations(
             ledger, labels, contract["candidate_bundle_id"], cm, horizon, start, current
         )

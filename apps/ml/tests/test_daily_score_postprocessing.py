@@ -34,6 +34,20 @@ class _CapturingConnection:
         return pd.DataFrame()
 
 
+def test_batch_scoring_withholds_unadmitted_head_cohort_combinations():
+    frame = pd.DataFrame({
+        "act_symbol": ["STRICT", "OPTIONLESS"], "earnings_date": ["2026-09-01"] * 2,
+        "lead_days": [7, 7], "spot_price": [100.] * 2, "timing": ["amc"] * 2,
+        "straddle_pct": [.06, np.nan],
+    })
+    model = {
+        "feature_cols": ["straddle_pct"], "model": _ConstantModel(.05),
+        "residual_std": .03, "metadata": {"supported_cohorts": ["strict_options", "optionless"]},
+        "manifest": {"horizons": [7], "serving_capabilities": {"7": ["optionless"]}},
+    }
+    assert score(frame, {7: model})["act_symbol"].tolist() == ["OPTIONLESS"]
+
+
 def test_batch_score_clips_point_and_rearranges_crossed_quantiles():
     frame = pd.DataFrame(
         {

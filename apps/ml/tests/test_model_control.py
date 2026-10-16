@@ -1087,6 +1087,26 @@ def test_drift_does_not_hide_a_sparse_supported_cohort(tmp_path):
     assert report["status"] == "insufficient_data"
 
 
+def test_drift_cannot_claim_health_for_unadmitted_metadata_cohort(tmp_path, monkeypatch):
+    import ml.model_control as control
+    bundle = tmp_path / "bundle"
+    bundle.mkdir()
+    (bundle / "manifest.json").write_text("{}")
+    reference = {"feature": {"missing_rate": 0., "cuts": [.5], "probabilities": [.5, .5]}}
+    (bundle / "metadata_T1.json").write_text(json.dumps({
+        "supported_cohorts": ["strict_options", "optionless"],
+        "cohort_reference": {"optionless": {"rows": 200, "feature_reference": reference}},
+    }))
+    monkeypatch.setattr(control, "verify_bundle_dir", lambda directory: {
+        "horizons": [1], "serving_capabilities": {"1": ["strict_options"]},
+    })
+    rows = pd.DataFrame({"model_horizon": [1] * 200, "em_math_pct": [np.nan] * 200,
+        "feature_vector": [json.dumps({"feature": index % 2}) for index in range(200)]})
+    report = control.cohort_drift_report(rows, bundle, horizons=[1])
+    assert report["status"] == "unsupported_cohort"
+    assert report["unsupported_rows"] == 200
+
+
 def test_drift_without_reference_does_not_claim_health(tmp_path):
     bundle = tmp_path / "bundle"
     bundle.mkdir()

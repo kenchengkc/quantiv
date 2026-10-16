@@ -76,7 +76,26 @@ def verify_historical_corporate_actions(data_dir: Path, declared: set[str]) -> d
                 from scripts.corporate_action_universe import verify_universe
             symbols, symbol_window_ends = verify_universe(
                 data_dir, universe, source_date, query_start, query_end, release_member)
+            quarantined_symbols = []
+            if "quarantine" in receipt:
+                try:
+                    from corporate_action_universe import verify_action_quarantine, symbols_digest
+                except ModuleNotFoundError:
+                    from scripts.corporate_action_universe import verify_action_quarantine, symbols_digest
+                quarantined_symbols = verify_action_quarantine(
+                    receipt["quarantine"], symbols, query_start, query_end, release_member)
+                symbols = [symbol for symbol in symbols if symbol not in set(quarantined_symbols)]
+                symbol_window_ends = {symbol: symbol_window_ends[symbol] for symbol in symbols}
+                coverage = receipt["coverage_universe"]
+                if (not symbols or coverage["symbols"] != len(symbols)
+                        or coverage["symbols_sha256"] != symbols_digest(symbols)):
+                    raise ValueError("action coverage differs from authenticated union minus quarantine")
+            elif "coverage_universe" in receipt:
+                raise ValueError("partial action coverage lacks provider quarantine evidence")
         else:
+            quarantined_symbols = []
+            if "quarantine" in receipt or "coverage_universe" in receipt:
+                raise ValueError("legacy action receipt cannot declare unsupported quarantine")
             raw_symbols = pd.read_parquet(source, columns=["act_symbol"])["act_symbol"]
             symbols = sorted({canonical_ticker(symbol) for symbol in raw_symbols.dropna()
                               if not is_delisted(symbol)} - {""})
@@ -139,10 +158,12 @@ def verify_historical_corporate_actions(data_dir: Path, declared: set[str]) -> d
                 "source_options_date": source_date.isoformat(),
                 "universe_source": {"path": source_relative, "sha256": hashlib.sha256(source.read_bytes()).hexdigest()},
                 "universe": universe, "covered_symbols": symbols,
+                "quarantined_symbols": quarantined_symbols,
+                "quarantine": receipt.get("quarantine"),
                 "symbol_window_ends": symbol_window_ends,
                 "query_start": query_start.isoformat(), "query_end": query_end.isoformat(),
                 "datasets": datasets}
-    except (OSError, ValueError, TypeError, KeyError, AttributeError) as exc:
+    except (OSError, ValueError, TypeError, KeyError, AttributeError, IndexError) as exc:
         raise RuntimeError(f"historical corporate-action receipt verification failed: {exc}") from exc
 
 

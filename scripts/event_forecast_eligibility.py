@@ -13,7 +13,10 @@ import pandas as pd
 from ml.live_forecast_validation import validate_live_forecast_artifact
 from ml.model_control import prospective_event_mask, prospective_snapshot_mask
 from ml.model_protocol import LEGACY_FEATURE_PROTOCOL, LEGACY_TARGET_PROTOCOL, feature_protocol, target_protocol
+from ml.model_bundle import verify_bundle_dir
+from ml.serving_capabilities import allowed_cohorts
 from ml.pipeline_validation import FORECAST_REQUIRED_COLUMNS, PipelineValidationError
+from ml.forecast_snapshot import forecast_snapshot_id, forecast_snapshot_key
 
 try:
     from event_forecast_ledger import annotate_forecasts
@@ -29,8 +32,23 @@ def event_keys(frame: pd.DataFrame) -> list[str]:
     return (frame["act_symbol"].astype(str).str.strip().str.upper() + "|" + dates).tolist()
 
 
+def _current_source_coverage(bundle_dir: Path) -> dict[str, tuple[str, str]]:
+    try:
+        from verify_historical_training_gate import verify_historical_corporate_actions
+        from data_release import MUTABLE_PARQUET_ALIASES
+    except ModuleNotFoundError:
+        from scripts.verify_historical_training_gate import verify_historical_corporate_actions
+        from scripts.data_release import MUTABLE_PARQUET_ALIASES
+    data_dir = bundle_dir.parent.parent.parent
+    declared = {path.relative_to(data_dir).as_posix()
+                for path in (data_dir / "parquet").rglob("*.parquet")} - MUTABLE_PARQUET_ALIASES
+    evidence = verify_historical_corporate_actions(data_dir, declared)
+    return {symbol: (evidence["query_start"], evidence["symbol_window_ends"][symbol])
+            for symbol in evidence["covered_symbols"]}
+
+
 def verify_candidate_identity(frame: pd.DataFrame, bundle_dir: Path, bundle_id: str,
-                              horizons: list[int]) -> pd.DataFrame:
+                              horizons: list[int], *, require_admitted_cohorts: bool = False) -> pd.DataFrame:
     missing = sorted(FORECAST_REQUIRED_COLUMNS - set(frame.columns))
     if missing:
         raise ValueError(f"forecast artifact lacks required columns: {missing}")
@@ -55,9 +73,17 @@ def verify_candidate_identity(frame: pd.DataFrame, bundle_dir: Path, bundle_id: 
     numeric_horizons = pd.to_numeric(frame["model_horizon"], errors="coerce")
     if not numeric_horizons.isin(horizons).all():
         raise ValueError("forecast model horizon does not match champion")
+    manifest = verify_bundle_dir(bundle_dir) if (bundle_dir / "manifest.json").exists() else None
+    if manifest is not None and (manifest["bundle_id"] != bundle_id or set(manifest["horizons"]) != set(horizons)):
+        raise ValueError("forecast serving contract differs from the authenticated champion")
     for horizon in numeric_horizons.unique():
         metadata = json.loads((bundle_dir / f"metadata_T{int(horizon)}.json").read_text())
         selected = frame.loc[numeric_horizons.eq(horizon)]
+        if manifest is not None and require_admitted_cohorts:
+            baseline = pd.to_numeric(selected["em_math_pct"], errors="coerce")
+            cohorts = set(np.where(np.isfinite(baseline) & baseline.gt(0), "strict_options", "optionless"))
+            if not cohorts.issubset(allowed_cohorts(manifest, int(horizon), metadata)):
+                raise ValueError("forecast cohort is not admitted by the champion serving capability")
         for column, expected, legacy in (
             ("feature_protocol", feature_protocol(metadata), LEGACY_FEATURE_PROTOCOL),
             ("target_protocol", target_protocol(metadata), LEGACY_TARGET_PROTOCOL),
@@ -100,9 +126,17 @@ def select_publication_rows(frame: pd.DataFrame, *, bundle_dir: Path, now: datet
                             assess_cohort: Callable[[pd.DataFrame, int], dict[str, Any]]) -> tuple[pd.DataFrame, pd.DataFrame, dict[str, Any]]:
     """Validate each actual row, then apply the unchanged rolling cohort gate."""
     reasons: dict[int, list[str]] = {}
+    try:
+        source_coverage = _current_source_coverage(bundle_dir)
+    except (RuntimeError, ValueError, OSError):
+        source_coverage = {}
     with tempfile.TemporaryDirectory(prefix="quantiv-event-eligibility-") as temp_dir:
         row_path = Path(temp_dir) / "row.parquet"
         for index, row in frame.iterrows():
+            window = source_coverage.get(str(row["act_symbol"]).strip().upper())
+            snapshot = str(row["snapshot_date"])[:10]
+            if window is None or not window[0] <= snapshot <= window[1]:
+                reasons[index] = ["corporate_action_source_unavailable"]
             row_frame = frame.loc[[index]].copy()
             row_frame.to_parquet(row_path, index=False)
             try:
@@ -141,6 +175,9 @@ def select_publication_rows(frame: pd.DataFrame, *, bundle_dir: Path, now: datet
                 "held_rows": len(frame) - len(eligible), "candidate_events": len(set(all_keys)),
                 "eligible_events": len(eligible_keys), "held_events": len(held)}
     contract = {"schema": SCHEMA, "eligible_forecast_rows": len(eligible),
+                "eligible_snapshot_ids": sorted(forecast_snapshot_id(row) for row in eligible.to_dict("records")),
+                "eligible_snapshot_bindings": {forecast_snapshot_key(row): forecast_snapshot_id(row)
+                                                for row in eligible.to_dict("records")},
                 "eligible_forecast_ids": sorted(eligible["forecast_id"].astype(str).tolist()),
                 "eligible_event_keys": eligible_keys, "held_event_keys": sorted(held),
                 "held_events": [{"event_key": key, "reasons": sorted(held[key])} for key in sorted(held)],

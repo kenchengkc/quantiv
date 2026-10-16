@@ -17,6 +17,29 @@ from scripts.tests.test_accepted_options_publication import (
 pytest_plugins = ["scripts.tests.test_accepted_options_publication"]
 
 
+def test_publication_identity_rejects_unadmitted_cohort(accepted_options, monkeypatch):
+    import event_forecast_eligibility as eligibility
+    store = accepted_options
+    frame = daily_score.get_bundle_forecasts(store["conn"], store["bundle"], 21)
+    monkeypatch.setattr(eligibility, "verify_bundle_dir", lambda directory: {
+        "bundle_id": store["bundle"].name, "horizons": [1, 2, 3, 7, 14, 21],
+        "serving_capabilities": {str(h): ["optionless"] for h in (1, 2, 3, 7, 14, 21)},
+    }, raising=False)
+    with pytest.raises(ValueError, match="(admitted|capability)"):
+        eligibility.verify_candidate_identity(frame, store["bundle"], store["bundle"].name,
+                                             [1, 2, 3, 7, 14, 21], require_admitted_cohorts=True)
+
+
+def test_same_session_candidate_cannot_republish_a_quarantined_issuer(accepted_options):
+    store = accepted_options
+    good = daily_score.get_bundle_forecasts(store["conn"], store["bundle"], 21)
+    quarantined = good.iloc[:1].assign(act_symbol="QUARANTINED")
+    _, policy, report, _ = _monitor_fixture_rows(store, pd.concat([good, quarantined]))
+    assert policy["coverage"]["eligible_rows"] == len(good)
+    assert policy["coverage"]["held_rows"] == 1
+    assert report["publication_eligibility"]["held_events"][0]["reasons"] == ["corporate_action_source_unavailable"]
+
+
 @pytest.mark.parametrize("mutation", ["prediction", "stale", "vector", "quantiles"])
 def test_healthy_events_publish_when_one_row_fails_local_checks(accepted_options, mutation):
     store = accepted_options
@@ -50,8 +73,13 @@ def test_healthy_events_publish_when_one_row_fails_local_checks(accepted_options
     assert signed["candidate_sha256"] == report["forecast_sha256"]
 
 
-def test_sparse_horizon_cannot_hold_healthy_horizon(accepted_options):
+def test_sparse_horizon_cannot_hold_healthy_horizon(accepted_options, monkeypatch):
+    import event_forecast_eligibility as eligibility
+
     store = accepted_options
+    coverage = eligibility._current_source_coverage(store["bundle"])
+    coverage["SPARSE"] = ("2019-01-01", store["latest"].isoformat())
+    monkeypatch.setattr(eligibility, "_current_source_coverage", lambda _bundle: coverage)
     good = daily_score.get_bundle_forecasts(store["conn"], store["bundle"], 21)
     sparse = good.iloc[:1].copy()
     sparse["act_symbol"] = "SPARSE"

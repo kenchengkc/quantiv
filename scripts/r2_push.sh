@@ -45,6 +45,8 @@ push_models() {
     --exclude "/control/**" \
     --exclude "/bundles/**" \
     --exclude "/candidates/**" \
+    --exclude "/historical_reservations/**" \
+    --exclude "/historical_admissions/**" \
     --exclude "/evaluations/**" \
     --exclude "/monitoring/**" \
     --fast-list --transfers=8 --progress

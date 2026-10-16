@@ -14,6 +14,7 @@ from sklearn.metrics import mean_absolute_error
 
 from ml.model_artifact import load_native_model, point_model_name, quantile_model_name
 from ml.model_bundle import DEFAULT_HORIZONS, DEFAULT_QUANTILES, verify_bundle_dir
+from ml.serving_capabilities import allowed_cohorts
 from ml.quantiles import rearrange_quantile_array
 from ml.model_protocol import feature_protocol, target_protocol, SESSION_TARGET_PROTOCOL, LEGACY_FEATURE_PROTOCOL, LEGACY_TARGET_PROTOCOL
 
@@ -305,7 +306,7 @@ def compare_on_common_holdout(
     max_calibration_regression: float = 0.05,
 ) -> dict[str, Any]:
     """Compare only mutually unexposed prediction snapshots with matching protocols."""
-    verify_bundle_dir(candidate_dir)
+    candidate_manifest = verify_bundle_dir(candidate_dir)
     verify_bundle_dir(champion_dir)
     report: dict[str, Any] = {
         "status": "passed",
@@ -388,7 +389,7 @@ def compare_on_common_holdout(
                     baseline,
                     historical,
                     cohorts,
-                    supported_cohorts=cm.get("supported_cohorts", ["strict_options"]),
+                    supported_cohorts=allowed_cohorts(candidate_manifest, horizon, cm),
                     max_mae_regression=max_mae_regression,
                     max_calibration_regression=max_calibration_regression,
                 )
@@ -481,6 +482,7 @@ def compare_prospective_outcomes(
 ) -> dict[str, Any]:
     """Evaluate frozen forecasts against the common desired session-reaction target."""
     cm, hm = _metadata(candidate_dir, horizon), _metadata(champion_dir, horizon)
+    candidate_manifest = verify_bundle_dir(candidate_dir) if (candidate_dir / "manifest.json").exists() else None
     ce, he = selection_exposure_end(cm), selection_exposure_end(hm)
     empty = {
         "status": "insufficient_data",
@@ -569,7 +571,7 @@ def compare_prospective_outcomes(
         baseline,
         historical,
         cohorts,
-        supported_cohorts=cm.get("supported_cohorts", ["strict_options"]),
+        supported_cohorts=allowed_cohorts(candidate_manifest, horizon, cm),
         min_rows=min_rows,
     )
     report["evaluation_target_protocol"] = SESSION_TARGET_PROTOCOL
@@ -731,6 +733,58 @@ def feature_drift_report(
     return report
 
 
+def _guard_sparse_historical_corruption(report: dict[str, Any], horizon: int) -> None:
+    current = report["horizons"][str(horizon)]
+    if current["rows"] >= 20:
+        return
+    missing = sorted(
+        name for name, feature in current["features"].items()
+        if feature["missing_rate"] >= .999 and feature["training_missing_rate"] <= .50
+    )
+    report["sparse_corruption_guard"] = {
+        "method": "fully_missing_observed_reference", "features": missing,
+        "limitation": "fractional missingness changes require the normal 20-row sample",
+    }
+    if not missing:
+        return
+    for name in missing:
+        current["features"][name]["status"] = "critical"
+    current["critical_features"] += len(missing)
+    current["hard_missing_features"] += len(missing)
+    report["critical_features"] += len(missing)
+    report["hard_missing_features"] += len(missing)
+    report["corruption_features"] += len(missing)
+    report["status"] = report["corruption_status"] = "critical"
+
+
+def _historical_sparse_warning(
+    report: dict[str, Any], manifest: Mapping[str, Any] | None,
+    reference: Mapping[str, Any], horizon: int, cohort: str,
+) -> bool:
+    """Use authenticated native quality without claiming adequate current PSI."""
+    if (not manifest or "historical_admission" not in manifest
+            or cohort not in manifest["serving_capabilities"].get(str(horizon), [])
+            or int(reference.get("rows") or 0) < 200
+            or not reference.get("feature_reference")
+            or report["covariate_status"] != "insufficient_data"
+            or report["corruption_status"] != "passed"):
+        return False
+    _guard_sparse_historical_corruption(report, horizon)
+    if report["corruption_status"] != "passed":
+        return False
+    receipt = manifest["historical_admission"]["receipt"]
+    report["status"] = "warning"
+    report["historical_admission"] = {
+        "admission_id": receipt["admission_id"], "source_bundle_id": receipt["bundle_id"],
+        "admitted_cohorts": {str(horizon): [cohort]},
+        "reference_rows": int(reference["rows"]),
+        "sufficient_for": "native_model_quality_only",
+        "sampling_reason": "current_cohort_below_covariate_sample_floor",
+        "limitation": "historical quality does not establish current covariate stability",
+    }
+    return True
+
+
 def cohort_drift_report(
     forecasts: pd.DataFrame,
     bundle_dir: Path,
@@ -757,6 +811,7 @@ def cohort_drift_report(
     }
     enough = False
     sparse = False
+    manifest = verify_bundle_dir(bundle_dir) if (bundle_dir / "manifest.json").exists() else None
     for horizon in horizons:
         metadata = _metadata(bundle_dir, horizon)
         references = metadata.get("cohort_reference") or {
@@ -772,7 +827,7 @@ def cohort_drift_report(
             if not len(selected):
                 parts[name] = {"status": "insufficient_data", "rows": 0}
                 continue
-            supported = metadata.get("supported_cohorts", ["strict_options"])
+            supported = allowed_cohorts(manifest, horizon, metadata)
             if (
                 name not in supported
                 or not reference
@@ -789,9 +844,12 @@ def cohort_drift_report(
                     horizon: reference.get("feature_reference") or {}
                 },
             )
+            historical_warning = _historical_sparse_warning(
+                report, manifest, reference, horizon, name,
+            )
             parts[name] = report
-            enough |= report["covariate_status"] != "insufficient_data"
-            sparse |= report["covariate_status"] == "insufficient_data"
+            enough |= report["covariate_status"] != "insufficient_data" or historical_warning
+            sparse |= report["covariate_status"] == "insufficient_data" and not historical_warning
             result["critical_features"] += report["critical_features"]
             if report["corruption_status"] == "critical":
                 result["corruption_status"] = "critical"

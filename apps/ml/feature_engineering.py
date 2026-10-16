@@ -88,6 +88,22 @@ def _profile_metadata() -> dict[str, dict[str, Any]]:
 def connect_duckdb() -> duckdb.DuckDBPyConnection:
     db_path = os.getenv("DUCKDB_PATH", str(get_data_dir() / "quantiv.duckdb"))
     conn = duckdb.connect(db_path, read_only=False)
+    try:
+        memory_limit = os.getenv("DUCKDB_MEMORY_LIMIT")
+        if memory_limit:
+            conn.execute("SET memory_limit = ?", [memory_limit])
+        thread_limit = os.getenv("DUCKDB_THREADS")
+        if thread_limit:
+            try:
+                threads = int(thread_limit)
+            except ValueError as exc:
+                raise ValueError("DUCKDB_THREADS must be a positive integer") from exc
+            if threads < 1:
+                raise ValueError("DUCKDB_THREADS must be a positive integer")
+            conn.execute("SET threads = ?", [threads])
+    except Exception:
+        conn.close()
+        raise
     views = [r[0] for r in conn.execute(
         "SELECT table_name FROM information_schema.tables WHERE table_type='VIEW'"
     ).fetchall()]

@@ -29,7 +29,6 @@ Usage:
 import argparse
 import hashlib
 import json
-import math
 import os
 import sys
 import time
@@ -970,32 +969,23 @@ def _fetch_action_table(
     symbols: list[str],
     start: date,
     end: date,
+    *,
+    source_pages: list[dict] | None = None,
+    allow_invalid_values: bool = False,
 ) -> tuple[pd.DataFrame, list[dict[str, object]]]:
     """Exhaust every PK-ordered page for receipt-bound symbol batches."""
+    from corporate_action_universe import action_query, invalid_action_values
     columns = ["act_symbol", "ex_date", *value_columns]
     all_rows: list[dict] = []
     evidence: list[dict[str, object]] = []
     for batch_index in range(0, len(symbols), CORPORATE_ACTION_BATCH_SIZE):
         batch = symbols[batch_index:batch_index + CORPORATE_ACTION_BATCH_SIZE]
-        symbol_list = ", ".join(_sql_literal(symbol) for symbol in batch)
         last_key: tuple[str, str] | None = None
         batch_rows = 0
         pages = 0
         page_rows = []
         while True:
-            keyset = ""
-            if last_key is not None:
-                keyset = (
-                    " AND (act_symbol, ex_date) > "
-                    f"({_sql_literal(last_key[0])}, {_sql_literal(last_key[1])})"
-                )
-            sql = (
-                f"SELECT {', '.join(columns)} FROM {table_name} "
-                f"WHERE act_symbol IN ({symbol_list}) "
-                f"AND ex_date BETWEEN {_sql_literal(start.isoformat())} "
-                f"AND {_sql_literal(end.isoformat())}{keyset} "
-                f"ORDER BY act_symbol, ex_date LIMIT {ROW_LIMIT}"
-            )
+            sql = action_query(table_name, columns, batch, start, end, ROW_LIMIT, last_key)
             rows = query(sql, STOCKS_API)
             if not isinstance(rows, list) or len(rows) > ROW_LIMIT:
                 raise RuntimeError(f"{table_name} returned an invalid page size")
@@ -1004,18 +994,18 @@ def _fetch_action_table(
                 for row in rows:
                     symbol = str(row["act_symbol"])
                     day = date.fromisoformat(str(row["ex_date"]))
-                    values = [float(row[column]) for column in value_columns]
                     key = (symbol, day.isoformat())
                     if (symbol not in batch or not start <= day <= end
-                            or any(not math.isfinite(value) for value in values)
-                            or (any(value <= 0 for value in values) if table_name == "split"
-                                else any(value < 0 for value in values))
+                            or (not allow_invalid_values and invalid_action_values(table_name, row))
                             or (last_key is not None and key <= last_key)
                             or (page_keys and key <= page_keys[-1])):
                         raise ValueError("out-of-scope, invalid or unordered action row")
                     page_keys.append(key)
             except (KeyError, TypeError, ValueError) as exc:
                 raise RuntimeError(f"{table_name} returned an invalid source page: {exc}") from exc
+            if source_pages is not None:
+                source_pages.append({"batch": batch_index // CORPORATE_ACTION_BATCH_SIZE,
+                                     "page": pages, "query": sql, "rows": rows})
             pages += 1
             page_rows.append(len(rows))
             all_rows.extend(rows)
@@ -1049,7 +1039,7 @@ def _fetch_action_table(
     frame["act_symbol"] = frame["act_symbol"].map(canonical_ticker)
     frame["ex_date"] = pd.to_datetime(frame["ex_date"], errors="raise").dt.date
     for column in value_columns:
-        frame[column] = pd.to_numeric(frame[column], errors="raise")
+        frame[column] = pd.to_numeric(frame[column], errors="coerce" if allow_invalid_values else "raise")
     duplicates = int(frame.duplicated(["act_symbol", "ex_date"]).sum())
     if duplicates:
         raise RuntimeError(f"{table_name} returned {duplicates:,} duplicate primary keys")
@@ -1173,7 +1163,8 @@ def sync_corporate_actions(
     end_date_str: Optional[str] = None,
 ) -> dict:
     """Snapshot actions for options and bounded historical/prospective events."""
-    from corporate_action_universe import snapshot_universe
+    from corporate_action_universe import (snapshot_universe, invalid_action_values,
+                                           retain_action_quarantine, symbols_digest)
 
     source_date, _ = _latest_option_universe()
     start = date.fromisoformat(start_date_str) if start_date_str else CORPORATE_ACTION_START
@@ -1186,12 +1177,34 @@ def sync_corporate_actions(
     print(
         f"CORPORATE ACTION SYNC: {len(symbols):,} source-bound symbols · {start} → {end}"
     )
+    split_pages, dividend_pages = [], []
     splits, split_batches = _fetch_action_table(
-        "split", ["to_factor", "for_factor"], symbols, start, end
+        "split", ["to_factor", "for_factor"], symbols, start, end,
+        source_pages=split_pages, allow_invalid_values=True,
     )
     dividends, dividend_batches = _fetch_action_table(
-        "dividend", ["amount"], symbols, start, end
+        "dividend", ["amount"], symbols, start, end,
+        source_pages=dividend_pages, allow_invalid_values=True,
     )
+    excluded = sorted({row["act_symbol"]
+                       for table, pages in (("split", split_pages), ("dividend", dividend_pages))
+                       for page in pages for row in page["rows"]
+                       if invalid_action_values(table, row)})
+    quarantine = None
+    if excluded:
+        quarantine = retain_action_quarantine(data_dir(), {
+            "schema": "quantiv.corporate-action-source-pages.v1",
+            "source": "dolthub:post-no-preference/stocks",
+            "query_start": start.isoformat(), "query_end": end.isoformat(),
+            "datasets": {"splits": {"pages": split_pages, "batches": split_batches},
+                         "dividends": {"pages": dividend_pages, "batches": dividend_batches}},
+        }, excluded)
+        symbols = [symbol for symbol in symbols if symbol not in set(excluded)]
+        if not symbols:
+            raise RuntimeError("all corporate-action issuers are quarantined")
+        print(f"  Quarantined {len(excluded):,} issuers with invalid provider actions; requerying valid coverage", flush=True)
+        splits, split_batches = _fetch_action_table("split", ["to_factor", "for_factor"], symbols, start, end)
+        dividends, dividend_batches = _fetch_action_table("dividend", ["amount"], symbols, start, end)
     if not splits.empty and (
         (splits["to_factor"] <= 0).any() or (splits["for_factor"] <= 0).any()
     ):
@@ -1253,6 +1266,9 @@ def sync_corporate_actions(
             "scope": "earnings realized moves and trailing realized-move features",
         },
     }
+    if quarantine is not None:
+        manifest["quarantine"] = quarantine
+        manifest["coverage_universe"] = {"symbols": len(symbols), "symbols_sha256": symbols_digest(symbols)}
     manifest = _publish_corporate_action_receipt(source_date, manifest)
     print(
         f"✅ Corporate actions: {len(splits):,} splits · {len(dividends):,} dividends · "

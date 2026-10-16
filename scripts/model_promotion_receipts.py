@@ -285,7 +285,7 @@ def build_promotion_receipts(
             "uses_p_values": False,
             "multiple_testing": {
                 "disposition": "not_applicable",
-                "reason": "Production champion/challenger selection uses predeclared predictive/control gates rather than null-hypothesis p-value selection; manufacturing p-values would be methodologically incorrect.",
+                "reason": "This receipt binds development predictive/control gates rather than p-value selection. Historical exact-artifact admission, when used, requires its own signed receipt with simultaneous clustered uncertainty bounds.",
                 "correction_method": None,
                 "alpha": None,
                 "hypothesis_family": [],
@@ -294,11 +294,11 @@ def build_promotion_receipts(
                 "validated signed candidate bundle",
                 "mandatory purged walk-forward validation",
                 "matching serving cohorts must pass feature-contract and reference-evidence checks; covariate PSI remains diagnostic",
-                "mutually unseen paired holdout or signed prospective matched-snapshot comparison must pass when a champion exists",
+                "mutually unseen paired holdout, signed prospective matched-snapshot comparison, or separately signed sealed historical exact-artifact admission must pass",
                 "each served cohort requires at least 200 matched baseline observations per horizon and unchanged MAE/calibration limits",
                 "shadow scoring must pass when a champion exists",
             ],
-            "research_policy": "Any separate experiment that selects from a family of p-values must preserve raw statistics and Holm/BH correction evidence; that is not the production champion-selection rule.",
+            "research_policy": "Any separate selection experiment must retain its raw statistics and declared multiplicity correction. The historical admission receipt retains both ordinary and Bonferroni-adjusted clustered uncertainty bounds over all declared candidate cells.",
         }
     )
     _atomic_json(temporal_path, temporal)

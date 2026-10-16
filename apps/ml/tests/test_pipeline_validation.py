@@ -149,6 +149,52 @@ def test_forecast_gate_accepts_supported_optionless_cohort_without_inventing_quo
     assert validate_forecast_artifact(path, models_dir=models, now=now)["status"] == "passed"
 
 
+def test_strict_forecast_cannot_publish_outside_signed_cohort_capability(tmp_path, monkeypatch):
+    from ml import pipeline_validation
+    now = datetime(2026, 8, 22, 12, tzinfo=timezone.utc)
+    models, path = tmp_path / "models", tmp_path / "forecast.parquet"
+    _write_forecast_artifact(path, models, now=now)
+    (models / "manifest.json").write_text(json.dumps({"bundle_id": "test-bundle"}))
+    monkeypatch.setattr(pipeline_validation, "verify_bundle_dir", lambda directory: {
+        "bundle_id": "test-bundle", "horizons": [1], "serving_capabilities": {"1": ["optionless"]},
+    })
+    with pytest.raises(PipelineValidationError) as exc:
+        validate_forecast_artifact(path, models_dir=models, now=now)
+    assert "forecast_serving_capability" in _issue_codes(exc.value)
+
+
+def test_live_ml_only_forecast_requires_its_declared_cohort(tmp_path):
+    from ml.live_forecast_validation import validate_live_forecast_artifact
+    _, path, models, now = _write_causal_optionless_forecast(tmp_path)
+    metadata_path = models / "metadata_T1.json"
+    metadata = json.loads(metadata_path.read_text())
+    metadata["supported_cohorts"] = ["strict_options"]
+    metadata_path.write_text(json.dumps(metadata))
+    with pytest.raises(PipelineValidationError) as exc:
+        validate_live_forecast_artifact(path, models_dir=models, now=now)
+    assert "forecast_serving_capability" in _issue_codes(exc.value)
+
+
+@pytest.mark.parametrize("mutation,code", [
+    ("protocol", "forecast_protocol_mismatch"),
+    ("timing", "forecast_timing_contract"),
+    ("quote_vector", "optionless_quote_evidence"),
+])
+def test_live_ml_only_cannot_change_the_admitted_feature_contract(tmp_path, mutation, code):
+    from ml.live_forecast_validation import validate_live_forecast_artifact
+    frame, path, models, now = _write_causal_optionless_forecast(tmp_path)
+    if mutation == "protocol":
+        frame["feature_protocol"] = "quantiv.earnings-legacy.v1"
+    else:
+        vector = json.loads(frame.loc[0, "feature_vector"])
+        vector["timing_bmo" if mutation == "timing" else "straddle_pct"] = 0. if mutation == "timing" else .05
+        frame["feature_vector"] = json.dumps(vector)
+    frame.to_parquet(path, index=False)
+    with pytest.raises(PipelineValidationError) as exc:
+        validate_live_forecast_artifact(path, models_dir=models, now=now)
+    assert code in _issue_codes(exc.value)
+
+
 @pytest.mark.parametrize("field,value", [("call_bid", 1.), ("atm_iv", .5), ("quote_quality_status", "passed")])
 def test_optionless_cohort_cannot_hide_partial_or_rejected_option_evidence(tmp_path, field, value):
     frame, path, models, now = _write_causal_optionless_forecast(tmp_path)

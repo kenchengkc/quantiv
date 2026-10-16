@@ -5,6 +5,7 @@ on:
     workflows:
       - "Daily data refresh"
       - "Refresh ticker names"
+      - "Historical model admission"
       - "CI"
     types: [completed]
   workflow_dispatch:

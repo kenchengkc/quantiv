@@ -60,6 +60,31 @@ def test_late_candidate_publication_never_reuses_an_earlier_rollback_flag():
     assert retained > imported
 
 
+def test_every_model_handoff_refreshes_signed_authority_after_exact_import():
+    steps = _steps()
+    ids = [step.get("id") for step in steps]
+    rollback = steps[ids.index("rollback-authority")]
+    assert ids.index("rollback-import") < ids.index("rollback-authority") < ids.index("fit-models")
+    assert "steps.rollback-apply.outputs.rolled_back == 'true'" in rollback["if"]
+    weekly = next(step for step in steps if step.get("id") == "promotion-authority")
+    assert steps.index(weekly) > next(i for i, step in enumerate(steps) if step["name"] == "Import exact retrain forecast into Neon")
+    for step in (rollback, weekly):
+        assert "model_publication.py snapshot" in step["run"]
+        assert "model_publication.py monitor" in step["run"]
+        assert "r2_push.sh --monitoring-only" in step["run"]
+
+
+def test_provenance_recovery_cannot_create_authority_from_held_sources():
+    steps = yaml.safe_load((ROOT / ".github/workflows/model-rollback.yml").read_text())["jobs"]["rollback"]["steps"]
+    authority = next(step for step in steps if step.get("id") == "recovery-authority")
+    imported = next(i for i, step in enumerate(steps) if step.get("name") == "Import exact restored forecast into Neon")
+    assert steps.index(authority) > imported
+    run = authority["run"]
+    assert "verify_retrain_data_gate.py --forecast-path" in run
+    assert "--allow-hold" not in run
+    assert run.index("verify_retrain_data_gate.py") < run.index("model_publication.py monitor") < run.index("r2_push.sh --monitoring-only")
+
+
 @pytest.mark.parametrize("name", ["Push activated models to R2", "Publish validated automatic rollback before training"])
 def test_late_held_data_prevents_every_remote_model_mutation(tmp_path, name):
     steps = _steps()

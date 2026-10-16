@@ -172,6 +172,17 @@ def accepted_options(tmp_path, monkeypatch, request):
     vix = data / "parquet/vix/vix.parquet"
     vix.parent.mkdir(parents=True)
     pd.DataFrame({"date": [previous, latest], "vix_close": [20., 20.]}).to_parquet(vix, index=False)
+    # These quote/publication tests inject independently verified source
+    # coverage at the view boundary; receipt reconstruction has its own suite.
+    from scripts import setup_duckdb_from_parquet as source_views
+    def action_coverage(connection, _data_dir):
+        values = ",".join(f"('{symbol}', DATE '2019-01-01', DATE '{latest}')" for symbol in symbols)
+        connection.execute(f"""CREATE OR REPLACE VIEW v_corporate_action_coverage AS
+            SELECT * FROM (VALUES {values}) AS coverage(act_symbol,window_start,window_end)""")
+    monkeypatch.setattr(source_views, "setup_corporate_action_coverage", action_coverage)
+    import event_forecast_eligibility as eligibility
+    monkeypatch.setattr(eligibility, "_current_source_coverage",
+                        lambda _bundle: {symbol: ("2019-01-01", latest.isoformat()) for symbol in symbols})
     conn = duckdb.connect()
     setup_views(conn, data)
     conn.execute("""
@@ -202,6 +213,22 @@ def accepted_options(tmp_path, monkeypatch, request):
            "previous": previous, "now": now, "event": event, "symbols": good,
            "controls": controls, "manifest": manifest_path}
     conn.close()
+
+
+def test_signed_monitor_binds_the_current_immutable_data_release(accepted_options):
+    store = accepted_options
+    release_id = "c" * 64
+    _write_json(store["data"] / "control/current_data_release.json", {
+        "release_id": release_id, "manifest": f"control/releases/{release_id}.json",
+    })
+    frame = daily_score.get_bundle_forecasts(store["conn"], store["bundle"], 21)
+    _, _, report, candidate = _monitor_fixture_rows(store, frame)
+    assert report["current_data_release_id"] == release_id
+    _write_json(store["data"] / "control/current_data_release.json", {
+        "release_id": "d" * 64, "manifest": f"control/releases/{'d' * 64}.json",
+    })
+    with pytest.raises(RuntimeError, match="data release"):
+        model_publication.verify_publication(store["data"], forecast_path=candidate)
 
 
 def _monitor_fixture_rows(store, frame, *, database=None, production=False):

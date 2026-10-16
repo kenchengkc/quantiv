@@ -138,6 +138,8 @@ def _bundle_core(
     horizons: Sequence[int],
     source_revision: str,
     created_at: str,
+    serving_capabilities: Mapping[str, Any] | None = None,
+    historical_admission: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     identity = {
         "artifacts": artifacts,
@@ -145,6 +147,10 @@ def _bundle_core(
         "horizons": sorted(set(horizons)),
         "source_revision": source_revision,
     }
+    if serving_capabilities is not None:
+        identity["serving_capabilities"] = dict(serving_capabilities)
+    if historical_admission is not None:
+        identity["historical_admission"] = dict(historical_admission)
     bundle_id = hashlib.sha256(_canonical(identity)).hexdigest()
     return {
         "schema": BUNDLE_SCHEMA,
@@ -266,6 +272,13 @@ def verify_bundle_manifest(
         or len(set(horizons)) != len(horizons)
     ):
         raise ModelBundleError("signed model bundle has invalid or unsupported horizons")
+    if ("serving_capabilities" in payload) != ("historical_admission" in payload):
+        raise ModelBundleError("serving capabilities require bound historical admission")
+    if "historical_admission" in payload and (
+        not isinstance(payload["historical_admission"], Mapping)
+        or not isinstance(payload["serving_capabilities"], Mapping)
+    ):
+        raise ModelBundleError("historical admission and serving capabilities must be objects")
     bundle_id = str(payload.get("bundle_id", ""))
     if not _BUNDLE_ID_RE.fullmatch(bundle_id):
         raise ModelBundleError("invalid model bundle id")
@@ -275,10 +288,119 @@ def verify_bundle_manifest(
         horizons=list(payload.get("horizons") or []),
         source_revision=str(payload.get("source_revision", "")),
         created_at=str(payload.get("created_at", "")),
+        serving_capabilities=payload.get("serving_capabilities"),
+        historical_admission=payload.get("historical_admission"),
     )["bundle_id"]
     if bundle_id != expected:
         raise ModelBundleError("model bundle id does not match its signed contents")
+    if "historical_admission" in payload:
+        _verify_historical_bundle(payload, public_key=public_key)
     return payload
+
+
+def _artifact_map(payload: Mapping[str, Any]) -> dict[str, Mapping[str, Any]]:
+    artifacts = payload.get("artifacts")
+    if not isinstance(artifacts, list):
+        raise ModelBundleError("model bundle artifacts must be a list")
+    result: dict[str, Mapping[str, Any]] = {}
+    for artifact in artifacts:
+        if (not isinstance(artifact, Mapping) or not isinstance(artifact.get("name"), str)
+                or artifact["name"] in result or type(artifact.get("bytes")) is not int
+                or artifact["bytes"] < 0 or not isinstance(artifact.get("sha256"), str)
+                or not _BUNDLE_ID_RE.fullmatch(artifact["sha256"])):
+            raise ModelBundleError("invalid or duplicate signed model artifact")
+        result[artifact["name"]] = artifact
+    if set(result) != set(required_artifact_names(payload["horizons"])):
+        raise ModelBundleError("signed model artifact set differs from exact declared horizons")
+    return result
+
+
+def _verify_historical_bundle(
+    payload: Mapping[str, Any], *, public_key: str | bytes | None,
+) -> None:
+    from ml.historical_admission import verify_historical_admission_receipt
+    from ml.serving_capabilities import validate_serving_capabilities
+
+    admission = payload["historical_admission"]
+    try:
+        if not isinstance(admission, Mapping) or set(admission) != {"source_manifest", "receipt"}:
+            raise ValueError("historical admission must bind the source manifest and receipt")
+        source = admission["source_manifest"]
+        if not isinstance(source, Mapping) or "historical_admission" in source or "serving_capabilities" in source:
+            raise ValueError("historical admission source must be an original model bundle")
+        parent = verify_bundle_manifest(source, public_key=public_key)
+        receipt = verify_historical_admission_receipt(
+            admission["receipt"], bundle_manifest=parent, public_key=public_key,
+        )
+        capabilities = validate_serving_capabilities(payload["serving_capabilities"], payload["horizons"])
+        admitted = validate_serving_capabilities(receipt["admitted_cohorts"], payload["horizons"])
+        if capabilities != admitted or payload["receipt_id"] != parent["receipt_id"]:
+            raise ValueError("historical admission differs from serving capabilities or model receipt")
+        parent_artifacts = _artifact_map(parent)
+        if not set(payload["horizons"]).issubset(parent["horizons"]):
+            raise ValueError("admitted model heads exceed the historical source bundle")
+        for name, artifact in _artifact_map(payload).items():
+            if artifact != parent_artifacts.get(name):
+                raise ValueError("admitted model artifact differs from the historical source bundle")
+    except (ValueError, KeyError, TypeError, AttributeError) as exc:
+        raise ModelBundleError(f"invalid historical model admission: {exc}") from exc
+
+
+def create_historically_admitted_bundle(
+    source_bundle_dir: Path,
+    bundle_root: Path,
+    *,
+    admission_receipt: Mapping[str, Any],
+    source_revision: str,
+    private_key: str | bytes | None = None,
+) -> tuple[Path, dict[str, Any]]:
+    """Sign only proven head/cohort combinations without changing trained bytes."""
+    from ml.historical_admission import verify_historical_admission_receipt
+    from ml.serving_capabilities import validate_serving_capabilities
+
+    public_key = _public_from_private(private_key)
+    parent = verify_bundle_dir(source_bundle_dir, public_key=public_key)
+    if "historical_admission" in parent:
+        raise ModelBundleError("historically admitted bundles cannot be derived again")
+    try:
+        receipt = verify_historical_admission_receipt(
+            admission_receipt, bundle_manifest=parent, public_key=public_key,
+        )
+        horizons = sorted(int(value) for value in receipt["admitted_cohorts"])
+        if not horizons:
+            raise ValueError("historical admission has no qualifying model heads")
+        capabilities = validate_serving_capabilities(receipt["admitted_cohorts"], horizons)
+        if not set(horizons).issubset(parent["horizons"]):
+            raise ValueError("historical admission exceeds the source model heads")
+    except (ValueError, KeyError, TypeError, AttributeError) as exc:
+        raise ModelBundleError(f"invalid historical model admission: {exc}") from exc
+    source_manifest = json.loads((source_bundle_dir / "manifest.json").read_text())
+    parent_artifacts = _artifact_map(parent)
+    core = _bundle_core(
+        artifacts=[dict(parent_artifacts[name]) for name in required_artifact_names(horizons)],
+        receipt_id=parent["receipt_id"], horizons=horizons,
+        source_revision=source_revision, created_at=_utc_now(),
+        serving_capabilities=capabilities,
+        historical_admission={"source_manifest": source_manifest, "receipt": dict(admission_receipt)},
+    )
+    manifest = _sign(core, private_key)
+    verify_bundle_manifest(manifest, public_key=public_key)
+    destination = bundle_root / core["bundle_id"]
+    if destination.exists():
+        verify_bundle_dir(destination, public_key=public_key)
+        return destination, manifest
+    bundle_root.mkdir(parents=True, exist_ok=True)
+    temporary = Path(tempfile.mkdtemp(prefix=f".{core['bundle_id'][:12]}-", dir=bundle_root))
+    try:
+        for artifact in core["artifacts"]:
+            shutil.copy2(source_bundle_dir / artifact["name"], temporary / artifact["name"])
+        (temporary / "manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
+        verify_bundle_dir(temporary, public_key=public_key)
+        temporary.replace(destination)
+    except Exception:
+        shutil.rmtree(temporary, ignore_errors=True)
+        raise
+    return destination, manifest
 
 
 def verify_bundle_dir(
@@ -312,6 +434,14 @@ def verify_bundle_dir(
         observed_names.add(name)
     if observed_names != allowed_names:
         raise ModelBundleError("model bundle does not contain the exact required artifact set")
+    if "serving_capabilities" in payload:
+        from ml.serving_capabilities import allowed_cohorts
+        for horizon in payload["horizons"]:
+            try:
+                metadata = json.loads((bundle_dir / f"metadata_T{horizon}.json").read_text())
+                allowed_cohorts(payload, horizon, metadata)
+            except (ValueError, TypeError, AttributeError) as exc:
+                raise ModelBundleError(f"invalid admitted model metadata: {exc}") from exc
     return payload
 
 
@@ -527,6 +657,7 @@ __all__ = [
     "DEFAULT_QUANTILES",
     "ModelBundleError",
     "create_signed_bundle",
+    "create_historically_admitted_bundle",
     "create_signed_control_pointer",
     "create_signed_monitor_receipt",
     "create_signed_outcome_receipt",
