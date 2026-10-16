@@ -79,6 +79,75 @@ def test_failed_historical_evidence_cannot_bootstrap(tmp_path, monkeypatch):
     assert calls == [True]
 
 
+@pytest.mark.parametrize("passing_status", ["passed", "warning"])
+def test_one_held_cohort_does_not_block_other_historically_admitted_scopes(tmp_path, monkeypatch, passing_status):
+    plane, args, _ = _decision(tmp_path, monkeypatch, drift="critical")
+    original = pd.read_parquet(args.candidate_forecast)
+    rows = pd.concat([original, original.assign(model_horizon=14)], ignore_index=True)
+    rows.to_parquet(args.candidate_forecast)
+    plane.verify_bundle_dir(None)["horizons"] = [7, 14]
+    monkeypatch.setattr(plane, "verify_historical_candidate", lambda *a: {
+        "status": "passed", "admission_id": "receipt", "admitted_cohorts": {"7": ["optionless"], "14": ["optionless"]}})
+
+    def assess(selected, *a, **kw):
+        return {"status": passing_status if selected["model_horizon"].eq(14).all() else "critical"}
+
+    monkeypatch.setattr(plane, "_rolling_drift_assessment", assess)
+    assert plane.decide(args) == 0
+    report = json.loads(args.report.read_text())
+    assert report["promoted"] is True
+    assert report["feature_drift"]["status"] == "critical"
+    scopes = report["activation_scopes"]
+    assert scopes["aggregate_status"] == "critical"
+    assert scopes["eligible_rows"] == scopes["held_rows"] == 1
+    assert scopes["cohorts"]["7|optionless"]["status"] == "critical"
+    assert scopes["cohorts"]["14|optionless"]["status"] == passing_status
+    assert scopes["publication_requires_signed_monitor"] is True
+    # Keep held observations for the signed per-event monitor to quarantine.
+    pd.testing.assert_frame_equal(pd.read_parquet(report["production_forecast"]), rows)
+
+
+@pytest.mark.parametrize("scope_status", ["critical", "insufficient_data", "unsupported_cohort"])
+def test_no_eligible_historical_cohort_keeps_original_champion(tmp_path, monkeypatch, scope_status):
+    plane, args, _ = _decision(tmp_path, monkeypatch, drift=scope_status)
+    assert plane.decide(args) == 0
+    report = json.loads(args.report.read_text())
+    assert report["promoted"] is False
+    assert report["activation_scopes"]["eligible_rows"] == 0
+    assert not (args.models_root / "control/champion.json").exists()
+
+
+def test_prospective_candidate_keeps_aggregate_drift_hold(tmp_path, monkeypatch):
+    plane, args, _ = _decision(tmp_path, monkeypatch, drift="critical")
+    plane.verify_bundle_dir(None).pop("historical_admission")
+
+    def unexpected(*a, **kw):
+        raise AssertionError("partial historical activation cannot admit a prospective candidate")
+
+    monkeypatch.setattr(plane, "_historical_activation_scopes", unexpected)
+    assert plane.decide(args) == 0
+    report = json.loads(args.report.read_text())
+    assert report["promoted"] is False
+    assert "activation_scopes" not in report
+
+
+def test_scope_assessment_preserves_current_corruption_despite_healthy_history(tmp_path, monkeypatch):
+    plane, args, _ = _decision(tmp_path, monkeypatch)
+    checks = []
+
+    def assess(selected, *a, **kw):
+        checks.append(kw["horizons"])
+        return {"status": "critical", "current_snapshot": {"corruption_status": "critical"},
+            "horizons": {"7": {"cohorts": {"optionless": {"status": "passed"}}}}}
+
+    monkeypatch.setattr(plane, "_rolling_drift_assessment", assess)
+    assert plane.decide(args) == 0
+    report = json.loads(args.report.read_text())
+    assert not report["promoted"]
+    assert report["activation_scopes"]["eligible_rows"] == 0
+    assert checks == [[7], [7]]
+
+
 def test_historical_candidate_requires_retained_source_and_test_files(tmp_path):
     from historical_candidate_evidence import verify_historical_candidate
 

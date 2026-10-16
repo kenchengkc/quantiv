@@ -403,6 +403,30 @@ def _prospective_comparison(
     return report
 
 
+def _historical_activation_scopes(
+    forecasts: pd.DataFrame, bundle_dir: Path, *, bundle_id: str, models_root: Path,
+) -> dict[str, Any]:
+    """Use the monitor's unchanged cohort gate; publication still needs its receipt."""
+    baseline = pd.to_numeric(forecasts["em_math_pct"], errors="coerce")
+    cohorts = baseline.gt(0) & baseline.lt(float("inf"))
+    scoped = forecasts.assign(__cohort=cohorts.map({True: "strict_options", False: "optionless"}))
+    checks = {}
+    eligible_rows = 0
+    for (horizon, cohort), selected in scoped.groupby(["model_horizon", "__cohort"], sort=True):
+        # Assess the actual current group, exactly as monitor() does. Reading
+        # only combined history's nested status could hide current corruption.
+        assessment = _rolling_drift_assessment(selected, bundle_dir, bundle_id=bundle_id,
+            models_root=models_root, horizons=[int(horizon)])
+        allowed = assessment["status"] in {"passed", "warning"}
+        eligible_rows += len(selected) if allowed else 0
+        checks[f"{int(horizon)}|{cohort}"] = {"status": assessment["status"],
+            "current_rows": len(selected), "assessment": assessment}
+    return {"schema": "quantiv.historical-activation-scopes.v1",
+        "candidate_rows": len(forecasts), "eligible_rows": eligible_rows,
+        "held_rows": len(forecasts) - eligible_rows, "cohorts": checks,
+        "publication_requires_signed_monitor": True}
+
+
 def decide(args: argparse.Namespace) -> int:
     retained = _retain_candidate(args)
     candidate_id = retained["challenger_bundle_id"]
@@ -415,6 +439,7 @@ def decide(args: argparse.Namespace) -> int:
     gate = _activation_gate(args)
     reasons = []
     drift = comparison = shadow = prospective = historical = None
+    activation_scopes = None
     forecast_validation = None
     candidate_forecasts = None
     if gate["status"] != "passed":
@@ -446,12 +471,17 @@ def decide(args: argparse.Namespace) -> int:
                 candidate_forecasts, candidate_dir, bundle_id=candidate_id,
                 models_root=args.models_root, horizons=horizons,
             )
-            if drift["status"] not in {"passed", "warning"}:
-                reasons.append(f"candidate cohort drift evidence is {drift['status']}")
             if manifest.get("historical_admission"):
                 historical = verify_historical_candidate(args.models_root, candidate_dir)
                 if historical["status"] != "passed":
                     reasons.append("historical admission evidence did not pass")
+            if drift["status"] not in {"passed", "warning"}:
+                if historical is not None and historical["status"] == "passed":
+                    activation_scopes = _historical_activation_scopes(candidate_forecasts,
+                        candidate_dir, bundle_id=candidate_id, models_root=args.models_root)
+                    activation_scopes["aggregate_status"] = drift["status"]
+                if not activation_scopes or not activation_scopes["eligible_rows"]:
+                    reasons.append(f"candidate cohort drift evidence is {drift['status']}")
             if champion_dir is not None and not resuming_champion:
                 contract = retained.get("admission_contract")
                 expanded = contract and any(value != "incumbent"
@@ -518,6 +548,8 @@ def decide(args: argparse.Namespace) -> int:
             "admission_id": historical["admission_id"],
             "admitted_cohorts": historical["admitted_cohorts"],
         }
+    if activation_scopes is not None:
+        summary["activation_scopes"] = activation_scopes
     production_forecast = None
     rejected_evidence = None
     if (not promoted and gate["status"] == "passed" and forecast_validation
