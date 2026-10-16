@@ -2,125 +2,506 @@
   "current_evidence": {
     "control_plane_status": "failed",
     "data_status": "failed",
-    "drift_status": "insufficient_data",
+    "drift_status": "critical",
     "forecast_control_exceptions": 0,
-    "forecast_events": 546,
+    "forecast_events": 416,
     "forecast_model_matches_evaluation": true,
     "forecast_quality": "passed",
-    "forecast_receipt_id": "sha256:bd9012515a8c0b92f570382155ac946910af74849057bf961d065296fe464aa5",
-    "forecast_rows": 712,
-    "forecast_validated_at": "2026-10-01T08:44:30.766878+00:00",
-    "model_status": "failed",
+    "forecast_receipt_id": "sha256:e7586c56d22f5cc5f0afef91e873f5a11d0ec43ab7a77e5a65c2b9e2ed585277",
+    "forecast_rows": 416,
+    "forecast_validated_at": "2026-10-16T06:24:38.294838+00:00",
+    "model_status": "advisory",
     "publication_eligible": false
   },
   "evaluation_evidence": {
     "receipt": {
-      "bundle_id": "4d1ab76dc3401072f1c9a809c71aa76d0c905e5117f7d98d31928219a79a8b78",
+      "bundle_id": "d14dc7f2aa6b175956922eb6266b8523742add962668b7d6b8833cc2c869dd1b",
+      "evaluation_scope": "historical_out_of_sample",
+      "historical_admission": {
+        "admission_id": "sha256:36751a510678c1c256832b5530ebc662a53d8f0907dde3a594851fc86c15e7fe",
+        "admitted_cohorts": {
+          "1": [
+            "optionless"
+          ],
+          "10": [
+            "strict_options"
+          ],
+          "11": [
+            "optionless"
+          ],
+          "12": [
+            "optionless"
+          ],
+          "13": [
+            "optionless"
+          ],
+          "14": [
+            "optionless",
+            "strict_options"
+          ],
+          "15": [
+            "optionless",
+            "strict_options"
+          ],
+          "16": [
+            "strict_options"
+          ],
+          "17": [
+            "strict_options"
+          ],
+          "18": [
+            "optionless",
+            "strict_options"
+          ],
+          "19": [
+            "optionless"
+          ],
+          "2": [
+            "optionless",
+            "strict_options"
+          ],
+          "20": [
+            "optionless",
+            "strict_options"
+          ],
+          "21": [
+            "strict_options"
+          ],
+          "22": [
+            "optionless"
+          ],
+          "23": [
+            "optionless",
+            "strict_options"
+          ],
+          "24": [
+            "strict_options"
+          ],
+          "25": [
+            "strict_options"
+          ],
+          "3": [
+            "strict_options"
+          ],
+          "4": [
+            "optionless"
+          ],
+          "5": [
+            "optionless"
+          ],
+          "6": [
+            "optionless"
+          ],
+          "7": [
+            "optionless",
+            "strict_options"
+          ]
+        },
+        "global_temporal_boundary": {
+          "calendar_end": "2026-10-14T00:00:00",
+          "calendar_start": "2026-04-18T00:00:00",
+          "first_test_snapshot": "2026-03-26T00:00:00",
+          "rule": "all_requested_heads_development_labels_strictly_before_earliest_reserved_snapshot",
+          "selection_label_cutoff": "2026-03-26T00:00:00"
+        },
+        "limitations": [
+          "The exact candidate excludes reserved labels from fitting, selection, early stopping and quantile calibration.",
+          "Complete point-in-time calendar revision history and historical provider delivery timestamps are not established.",
+          "Prior model-family exposure to this history is not established; this is not a claim of globally untouched history.",
+          "Metrics describe admitted historical head/cohort cells; aggregate summaries do not establish aggregate statistical significance or live trading performance."
+        ],
+        "panel_id": "sha256:c48c61e803f3b5b5565d84a0b913580dd100af3fe80f5145e48fd012c8bb2b33",
+        "policy": {
+          "aggregate_significance_claim": false,
+          "bootstrap_draws": 5000,
+          "bootstrap_seed": 17,
+          "coverage_tolerance": 0.08,
+          "diagnostic_blocks": 3,
+          "familywise_alpha": 0.05,
+          "maximum_block_mae_ratio": 1.5,
+          "maximum_raw_crossing_rate": 0.2,
+          "maximum_raw_negative_rate": 0.05,
+          "method": "sealed_temporal_exact_artifact_test",
+          "minimum_block_rows": 30,
+          "minimum_events": 200,
+          "minimum_matched_baseline_rows": 200,
+          "multiplicity": "bonferroni_over_all_development_declared_horizon_cohort_cells",
+          "requires_conservative_clustered_ci_upper_below_zero": true,
+          "version": "quantiv.historical-exact-artifact-policy.v1"
+        },
+        "protocol": {
+          "calendar_vintage_status": "complete_point_in_time_revision_history_not_established",
+          "candidate_attempts_per_reservation": 1,
+          "global_untouched_history_claim": false,
+          "historical_model_family_exposure_status": "not_established",
+          "historical_provider_delivery_timestamps": "not_retained",
+          "historical_source_availability": "reconstructed_end_of_day_market_observations",
+          "method": "sealed_temporal_exact_artifact_test",
+          "scope": "current_exact_candidate_excludes_reserved_labels_from_fit_and_selection",
+          "selection_test_labels_used": false,
+          "test_labels_used_for_early_stopping": false,
+          "test_labels_used_for_hyperparameter_tuning": false,
+          "test_labels_used_for_quantile_calibration": false
+        },
+        "reservation_id": "sha256:fd05c255ceb02f9f11ed352e6c62404c0cb7919bf137171ba82de4959d09669a",
+        "serving_bundle_id": "d14dc7f2aa6b175956922eb6266b8523742add962668b7d6b8833cc2c869dd1b",
+        "source_bundle_id": "629386dcbf2736b8868df166bd54c5a656c197a34c55d1d7be44b5b9bc12c2ff"
+      },
+      "historical_admission_id": "sha256:36751a510678c1c256832b5530ebc662a53d8f0907dde3a594851fc86c15e7fe",
       "holdout_splits": [
         {
+          "evaluation_scope": "development",
           "horizon_days": 1,
           "purge_days": 5,
-          "rows_purged": 31,
-          "rows_total": 10709,
-          "rows_train": 7961,
-          "rows_validation": 2717,
-          "train_end": "2026-01-22",
-          "train_start": "2023-01-05",
-          "validation_end": "2026-08-27",
-          "validation_start": "2026-01-28"
+          "rows_purged": 39,
+          "rows_total": 34750,
+          "rows_train": 26023,
+          "rows_validation": 8688,
+          "train_end": "2025-05-21",
+          "train_start": "2023-04-14",
+          "validation_end": "2026-03-25",
+          "validation_start": "2025-05-23"
         },
         {
+          "evaluation_scope": "development",
           "horizon_days": 2,
           "purge_days": 5,
-          "rows_purged": 13,
-          "rows_total": 7775,
-          "rows_train": 5780,
-          "rows_validation": 1982,
-          "train_end": "2026-01-29",
-          "train_start": "2023-01-06",
-          "validation_end": "2026-08-27",
-          "validation_start": "2026-02-04"
+          "rows_purged": 0,
+          "rows_total": 25125,
+          "rows_train": 18836,
+          "rows_validation": 6289,
+          "train_end": "2025-07-11",
+          "train_start": "2023-04-19",
+          "validation_end": "2026-03-25",
+          "validation_start": "2025-07-16"
         },
         {
+          "evaluation_scope": "development",
           "horizon_days": 3,
           "purge_days": 5,
-          "rows_purged": 121,
-          "rows_total": 6402,
-          "rows_train": 4669,
-          "rows_validation": 1612,
-          "train_end": "2025-10-24",
-          "train_start": "2023-01-05",
-          "validation_end": "2026-08-27",
-          "validation_start": "2025-10-31"
+          "rows_purged": 4,
+          "rows_total": 18112,
+          "rows_train": 13577,
+          "rows_validation": 4531,
+          "train_end": "2025-07-11",
+          "train_start": "2023-04-17",
+          "validation_end": "2026-03-23",
+          "validation_start": "2025-07-17"
         },
         {
+          "evaluation_scope": "development",
+          "horizon_days": 4,
+          "purge_days": 5,
+          "rows_purged": 187,
+          "rows_total": 15787,
+          "rows_train": 11631,
+          "rows_validation": 3969,
+          "train_end": "2025-05-06",
+          "train_start": "2023-04-17",
+          "validation_end": "2026-03-24",
+          "validation_start": "2025-05-13"
+        },
+        {
+          "evaluation_scope": "development",
+          "horizon_days": 5,
+          "purge_days": 5,
+          "rows_purged": 274,
+          "rows_total": 25752,
+          "rows_train": 18989,
+          "rows_validation": 6489,
+          "train_end": "2025-05-07",
+          "train_start": "2023-04-18",
+          "validation_end": "2026-03-25",
+          "validation_start": "2025-05-14"
+        },
+        {
+          "evaluation_scope": "development",
+          "horizon_days": 6,
+          "purge_days": 5,
+          "rows_purged": 56,
+          "rows_total": 37997,
+          "rows_train": 28433,
+          "rows_validation": 9508,
+          "train_end": "2025-05-21",
+          "train_start": "2023-04-19",
+          "validation_end": "2026-03-25",
+          "validation_start": "2025-05-28"
+        },
+        {
+          "evaluation_scope": "development",
           "horizon_days": 7,
           "purge_days": 5,
-          "rows_purged": 129,
-          "rows_total": 10738,
-          "rows_train": 7911,
-          "rows_validation": 2698,
-          "train_end": "2026-01-30",
-          "train_start": "2023-01-09",
-          "validation_end": "2026-08-27",
-          "validation_start": "2026-02-05"
+          "rows_purged": 245,
+          "rows_total": 39444,
+          "rows_train": 29311,
+          "rows_validation": 9888,
+          "train_end": "2025-05-14",
+          "train_start": "2023-04-20",
+          "validation_end": "2026-03-25",
+          "validation_start": "2025-05-22"
         },
         {
+          "evaluation_scope": "development",
+          "horizon_days": 10,
+          "purge_days": 5,
+          "rows_purged": 56,
+          "rows_total": 17746,
+          "rows_train": 13251,
+          "rows_validation": 4439,
+          "train_end": "2025-05-22",
+          "train_start": "2023-04-24",
+          "validation_end": "2026-03-23",
+          "validation_start": "2025-06-02"
+        },
+        {
+          "evaluation_scope": "development",
+          "horizon_days": 11,
+          "purge_days": 5,
+          "rows_purged": 625,
+          "rows_total": 15557,
+          "rows_train": 11012,
+          "rows_validation": 3920,
+          "train_end": "2025-04-28",
+          "train_start": "2023-04-24",
+          "validation_end": "2026-03-24",
+          "validation_start": "2025-05-13"
+        },
+        {
+          "evaluation_scope": "development",
+          "horizon_days": 12,
+          "purge_days": 5,
+          "rows_purged": 1041,
+          "rows_total": 25444,
+          "rows_train": 17956,
+          "rows_validation": 6447,
+          "train_end": "2025-04-29",
+          "train_start": "2023-04-25",
+          "validation_end": "2026-03-25",
+          "validation_start": "2025-05-14"
+        },
+        {
+          "evaluation_scope": "development",
+          "horizon_days": 13,
+          "purge_days": 5,
+          "rows_purged": 150,
+          "rows_total": 37555,
+          "rows_train": 28013,
+          "rows_validation": 9392,
+          "train_end": "2025-05-21",
+          "train_start": "2023-04-26",
+          "validation_end": "2026-03-25",
+          "validation_start": "2025-06-04"
+        },
+        {
+          "evaluation_scope": "development",
           "horizon_days": 14,
           "purge_days": 5,
-          "rows_purged": 80,
-          "rows_total": 10482,
-          "rows_train": 7734,
-          "rows_validation": 2668,
-          "train_end": "2026-01-29",
-          "train_start": "2023-01-18",
-          "validation_end": "2026-08-27",
-          "validation_start": "2026-02-04"
+          "rows_purged": 207,
+          "rows_total": 39013,
+          "rows_train": 29045,
+          "rows_validation": 9761,
+          "train_end": "2025-05-19",
+          "train_start": "2023-04-27",
+          "validation_end": "2026-03-25",
+          "validation_start": "2025-06-03"
         },
         {
+          "evaluation_scope": "development",
+          "horizon_days": 15,
+          "purge_days": 5,
+          "rows_purged": 77,
+          "rows_total": 33897,
+          "rows_train": 25339,
+          "rows_validation": 8481,
+          "train_end": "2025-05-30",
+          "train_start": "2023-04-28",
+          "validation_end": "2026-03-25",
+          "validation_start": "2025-06-17"
+        },
+        {
+          "evaluation_scope": "development",
+          "horizon_days": 16,
+          "purge_days": 5,
+          "rows_purged": 77,
+          "rows_total": 24482,
+          "rows_train": 18254,
+          "rows_validation": 6151,
+          "train_end": "2025-07-02",
+          "train_start": "2023-05-03",
+          "validation_end": "2026-03-25",
+          "validation_start": "2025-07-23"
+        },
+        {
+          "evaluation_scope": "development",
+          "horizon_days": 17,
+          "purge_days": 5,
+          "rows_purged": 52,
+          "rows_total": 17617,
+          "rows_train": 13134,
+          "rows_validation": 4431,
+          "train_end": "2025-06-30",
+          "train_start": "2023-05-01",
+          "validation_end": "2026-03-23",
+          "validation_start": "2025-07-24"
+        },
+        {
+          "evaluation_scope": "development",
+          "horizon_days": 18,
+          "purge_days": 5,
+          "rows_purged": 613,
+          "rows_total": 15171,
+          "rows_train": 10666,
+          "rows_validation": 3892,
+          "train_end": "2025-04-22",
+          "train_start": "2023-05-01",
+          "validation_end": "2026-03-24",
+          "validation_start": "2025-05-13"
+        },
+        {
+          "evaluation_scope": "development",
+          "horizon_days": 19,
+          "purge_days": 5,
+          "rows_purged": 835,
+          "rows_total": 24713,
+          "rows_train": 17691,
+          "rows_validation": 6187,
+          "train_end": "2025-04-30",
+          "train_start": "2023-05-02",
+          "validation_end": "2026-03-25",
+          "validation_start": "2025-05-21"
+        },
+        {
+          "evaluation_scope": "development",
+          "horizon_days": 20,
+          "purge_days": 5,
+          "rows_purged": 51,
+          "rows_total": 36359,
+          "rows_train": 27204,
+          "rows_validation": 9104,
+          "train_end": "2025-06-24",
+          "train_start": "2023-05-03",
+          "validation_end": "2026-03-25",
+          "validation_start": "2025-07-15"
+        },
+        {
+          "evaluation_scope": "development",
           "horizon_days": 21,
           "purge_days": 5,
-          "rows_purged": 103,
-          "rows_total": 10183,
-          "rows_train": 7531,
-          "rows_validation": 2549,
-          "train_end": "2026-01-30",
-          "train_start": "2023-01-23",
-          "validation_end": "2026-08-27",
-          "validation_start": "2026-02-05"
+          "rows_purged": 97,
+          "rows_total": 37679,
+          "rows_train": 28132,
+          "rows_validation": 9450,
+          "train_end": "2025-06-27",
+          "train_start": "2023-05-04",
+          "validation_end": "2026-03-25",
+          "validation_start": "2025-07-21"
+        },
+        {
+          "evaluation_scope": "development",
+          "horizon_days": 22,
+          "purge_days": 5,
+          "rows_purged": 169,
+          "rows_total": 32641,
+          "rows_train": 24210,
+          "rows_validation": 8262,
+          "train_end": "2025-06-27",
+          "train_start": "2023-05-05",
+          "validation_end": "2026-03-25",
+          "validation_start": "2025-07-23"
+        },
+        {
+          "evaluation_scope": "development",
+          "horizon_days": 23,
+          "purge_days": 5,
+          "rows_purged": 371,
+          "rows_total": 23498,
+          "rows_train": 17217,
+          "rows_validation": 5910,
+          "train_end": "2025-07-02",
+          "train_start": "2023-05-10",
+          "validation_end": "2026-03-25",
+          "validation_start": "2025-07-30"
+        },
+        {
+          "evaluation_scope": "development",
+          "horizon_days": 24,
+          "purge_days": 5,
+          "rows_purged": 85,
+          "rows_total": 16866,
+          "rows_train": 12423,
+          "rows_validation": 4358,
+          "train_end": "2025-06-27",
+          "train_start": "2023-05-08",
+          "validation_end": "2026-03-23",
+          "validation_start": "2025-07-24"
+        },
+        {
+          "evaluation_scope": "development",
+          "horizon_days": 25,
+          "purge_days": 5,
+          "rows_purged": 817,
+          "rows_total": 14724,
+          "rows_train": 10086,
+          "rows_validation": 3821,
+          "train_end": "2025-04-15",
+          "train_start": "2023-05-08",
+          "validation_end": "2026-03-24",
+          "validation_start": "2025-05-12"
         }
       ],
       "metadata_sha256": {
-        "1": "7df60ec052aff29a971a94b9c4714725ccfc1aabee88253e4038b595c5f59554",
-        "14": "26cad1c88fac779681fda2a2fb464442d90b54722161a00a45a245c354a03c6d",
-        "2": "83c713d0caafbcca2a9954d7428ab26b977d6a89b77298e0eaeb7d6881babc54",
-        "21": "50cf4951c18c86d259360f1a8d9b10d5cd26a5ea757f6db69f7766f5d353542b",
-        "3": "4d256f8b221dff327554dc866d6b2c0292722fc3704b3ef9b65ddba669558b56",
-        "7": "74a267b25525e3a9fef5f9b9085962ce3a7dd91713f24aef57be9dfe3e9068c6"
+        "1": "23fcaa6cb51163cf0dd26dc79bffec6cdc2ea90bdee60d009ad28de01ba61e05",
+        "10": "490c5fe11446dc5b2a68d07bfa4da9b6d516bfbc5d48884e4b29885793cf8d1c",
+        "11": "90b6a4de935a79c1c86c92d56e80852cd79d8f707e3a41e48383284f80c87cab",
+        "12": "4f1bf6d3e3e5bf696e0453d038994e84c1805f08148e848d15e263920bb63e24",
+        "13": "930a0bfe3406f378bd8dcd02a88a4be826bd5ac3ea6a999bad005f4d18faf795",
+        "14": "f2dc9ede0f50ac2899c8f33cd0b0c65cd3cc7c84ea5a5cc3c5bee05d7e4391b2",
+        "15": "fd792f756548f6c225b5d8eec7347361e2e2d781116ea5283200d8e2c68ada27",
+        "16": "211ac1963fdcfeae83702e8a13606a4d515ac20bbf2ad54d258684951ef0b3b4",
+        "17": "f8a258cbbd5027fa6a803d7e7db5d6d281ac05e649c8928fd7b544cf51c3fbc4",
+        "18": "95140f3de8b2653240a56ec32cae7bc466bc19b5afdb85d607815694b1648a65",
+        "19": "5f694fa5fc31f5c60c9b051783f45ec76da5ea67748be9a03f4a7b04d52a3b7b",
+        "2": "c7919157748925a86a586027c371931867f2e36f8c41ce0fb453ac72a52516e4",
+        "20": "6b6b84c8f9c70a0c42ac23dfa43978e0d69ea7e4c4dd000eae092a42178ebfab",
+        "21": "8c740afe47a8ab90e3326d0ec729d12bb00ce04683b709f7549ec1cec4123bc7",
+        "22": "62d1e07156ff2c1808eae1b69176dd434db47511cb7d62e653354b6a98070c93",
+        "23": "21657bde2bfd11e9ad00aa206e92eb79c2450e13378e2869000d7b6ded29de6a",
+        "24": "57ab32b8416c788d5f14b51911a32a20288fea8e62fed0fbba3df278e7796b44",
+        "25": "d94e1e56120ea81b17fdedf7346187555d0643e6ee74e1576d79b1fea0902f05",
+        "3": "7623323226f7f2e901557d000865cab121986638a79f3c7a1296a28e30a12b59",
+        "4": "911df5d0416f340642788a8d2908dbc57a9e8155780498989465699bb5746c66",
+        "5": "94f22ff72a8b8ca7c85a8134f0447be13537833dabe0564a5f6e9b0c88e5713f",
+        "6": "ae2a353d2a3b6659eecddac3c46c038dc6e51ae5635a198036bdc94906516d4e",
+        "7": "9600ed98b8154b0a3da8d9362ec362175d349a916ea4a90e3bf5876d32a8cb90"
       },
       "metrics": [
         {
+          "baseline_label": "Historical move",
+          "baseline_mae": 0.05773682132039139,
+          "cohort": "optionless",
           "coverage": {
-            "interval_50": 0.48656606551343395,
-            "interval_80": 0.7964666912035333,
-            "p10": 0.10268678689731321,
-            "p25": 0.27677585572322416,
-            "p50": 0.5299963194700037,
-            "p75": 0.7633419212366581,
-            "p90": 0.8991534781008466
+            "interval_50": 0.48518111964873767,
+            "interval_80": 0.783205268935236,
+            "p10": 0.13172338090010977,
+            "p25": 0.3102817416758141,
+            "p50": 0.5735455543358946,
+            "p75": 0.7954628613245518,
+            "p90": 0.9149286498353457
           },
           "feature_count": 45,
           "horizon_days": 1,
           "interval_width": {
-            "interval_50_mean": 0.07532579056847942,
-            "interval_80_mean": 0.14141775025219905
+            "interval_50_mean": null,
+            "interval_80_mean": null
           },
-          "model_mae": 0.044159224751165016,
-          "model_r2": 0.1159767073479403,
-          "model_rmse": 0.06439306001074137,
+          "metric_scope": "historical_out_of_sample",
+          "model_mae": 0.05168738128125703,
+          "model_r2": null,
+          "model_rmse": null,
           "model_version": "v3",
-          "n_train": 7961,
-          "n_validation": 2717,
+          "n_matched_baseline": 4917,
+          "n_train": 26023,
+          "n_validation": 5466,
           "quantiles": [
             0.1,
             0.25,
@@ -128,32 +509,37 @@
             0.75,
             0.9
           ],
-          "relative_mae_improvement": 0.26643696747083245,
-          "straddle_baseline_mae": 0.06019826898707464,
-          "trained_at": "2026-08-30T17:42:10.571288"
+          "relative_mae_improvement": 0.10477611861527658,
+          "straddle_baseline_mae": 0.05773682132039139,
+          "trained_at": "2026-10-16T02:54:23.768245+00:00"
         },
         {
+          "baseline_label": "Historical move",
+          "baseline_mae": 0.05760336144855015,
+          "cohort": "optionless",
           "coverage": {
-            "interval_50": 0.4853683148335015,
-            "interval_80": 0.7946518668012109,
-            "p10": 0.0958627648839556,
-            "p25": 0.2749747729566095,
-            "p50": 0.5221997981836529,
-            "p75": 0.760343087790111,
-            "p90": 0.8905146316851665
+            "interval_50": 0.5015757575757576,
+            "interval_80": 0.7830303030303031,
+            "p10": 0.13624242424242425,
+            "p25": 0.30933333333333335,
+            "p50": 0.5718787878787879,
+            "p75": 0.8109090909090909,
+            "p90": 0.9192727272727272
           },
           "feature_count": 45,
           "horizon_days": 2,
           "interval_width": {
-            "interval_50_mean": 0.07301588694006782,
-            "interval_80_mean": 0.13510030639802253
+            "interval_50_mean": null,
+            "interval_80_mean": null
           },
-          "model_mae": 0.044373845834330586,
-          "model_r2": 0.09550221479018195,
-          "model_rmse": 0.06580575747834921,
+          "metric_scope": "historical_out_of_sample",
+          "model_mae": 0.05136541557700659,
+          "model_r2": null,
+          "model_rmse": null,
           "model_version": "v3",
-          "n_train": 5780,
-          "n_validation": 1982,
+          "n_matched_baseline": 3699,
+          "n_train": 18836,
+          "n_validation": 4125,
           "quantiles": [
             0.1,
             0.25,
@@ -161,32 +547,75 @@
             0.75,
             0.9
           ],
-          "relative_mae_improvement": 0.2752704873479973,
-          "straddle_baseline_mae": 0.06122814796371873,
-          "trained_at": "2026-08-30T17:42:24.028872"
+          "relative_mae_improvement": 0.10829135166209225,
+          "straddle_baseline_mae": 0.05760336144855015,
+          "trained_at": "2026-10-16T02:55:50.035024+00:00"
         },
         {
+          "baseline_label": "Market straddle",
+          "baseline_mae": 0.0627083015063242,
+          "cohort": "strict_options",
           "coverage": {
-            "interval_50": 0.46153846153846156,
-            "interval_80": 0.7866004962779156,
-            "p10": 0.11228287841191067,
-            "p25": 0.31389578163771714,
-            "p50": 0.5403225806451613,
-            "p75": 0.7754342431761787,
-            "p90": 0.8988833746898263
+            "interval_50": 0.4826568265682657,
+            "interval_80": 0.7284132841328413,
+            "p10": 0.17047970479704797,
+            "p25": 0.3077490774907749,
+            "p50": 0.5712177121771218,
+            "p75": 0.7904059040590405,
+            "p90": 0.8988929889298893
+          },
+          "feature_count": 45,
+          "horizon_days": 2,
+          "interval_width": {
+            "interval_50_mean": null,
+            "interval_80_mean": null
+          },
+          "metric_scope": "historical_out_of_sample",
+          "model_mae": 0.04311834158638107,
+          "model_r2": null,
+          "model_rmse": null,
+          "model_version": "v3",
+          "n_matched_baseline": 1355,
+          "n_train": 18836,
+          "n_validation": 1355,
+          "quantiles": [
+            0.1,
+            0.25,
+            0.5,
+            0.75,
+            0.9
+          ],
+          "relative_mae_improvement": 0.31239819050062223,
+          "straddle_baseline_mae": 0.0627083015063242,
+          "trained_at": "2026-10-16T02:55:50.035024+00:00"
+        },
+        {
+          "baseline_label": "Market straddle",
+          "baseline_mae": 0.06259107719725943,
+          "cohort": "strict_options",
+          "coverage": {
+            "interval_50": 0.4715447154471545,
+            "interval_80": 0.743321718931475,
+            "p10": 0.148664343786295,
+            "p25": 0.31126596980255516,
+            "p50": 0.5737514518002322,
+            "p75": 0.7828106852497096,
+            "p90": 0.89198606271777
           },
           "feature_count": 45,
           "horizon_days": 3,
           "interval_width": {
-            "interval_50_mean": 0.07466605642760021,
-            "interval_80_mean": 0.13733628973851433
+            "interval_50_mean": null,
+            "interval_80_mean": null
           },
-          "model_mae": 0.044490369629784914,
-          "model_r2": 0.13592252198718346,
-          "model_rmse": 0.06752530692175036,
+          "metric_scope": "historical_out_of_sample",
+          "model_mae": 0.0425441477794308,
+          "model_r2": null,
+          "model_rmse": null,
           "model_version": "v3",
-          "n_train": 4669,
-          "n_validation": 1612,
+          "n_matched_baseline": 861,
+          "n_train": 13577,
+          "n_validation": 861,
           "quantiles": [
             0.1,
             0.25,
@@ -194,32 +623,151 @@
             0.75,
             0.9
           ],
-          "relative_mae_improvement": 0.26914007234085835,
-          "straddle_baseline_mae": 0.060874003274857785,
-          "trained_at": "2026-08-30T17:42:33.095621"
+          "relative_mae_improvement": 0.32028414137448946,
+          "straddle_baseline_mae": 0.06259107719725943,
+          "trained_at": "2026-10-16T02:56:29.240545+00:00"
         },
         {
+          "baseline_label": "Historical move",
+          "baseline_mae": 0.06003842814919881,
+          "cohort": "optionless",
           "coverage": {
-            "interval_50": 0.49147516679021497,
-            "interval_80": 0.7742772424017791,
-            "p10": 0.12083024462564863,
-            "p25": 0.28687916975537436,
-            "p50": 0.536693847294292,
-            "p75": 0.7783543365455893,
-            "p90": 0.8951074870274277
+            "interval_50": 0.4970437524635396,
+            "interval_80": 0.7836026803310997,
+            "p10": 0.12534489554592038,
+            "p25": 0.3054789121009066,
+            "p50": 0.5668111943240047,
+            "p75": 0.8025226645644462,
+            "p90": 0.9089475758770201
+          },
+          "feature_count": 45,
+          "horizon_days": 4,
+          "interval_width": {
+            "interval_50_mean": null,
+            "interval_80_mean": null
+          },
+          "metric_scope": "historical_out_of_sample",
+          "model_mae": 0.054461462701629784,
+          "model_r2": null,
+          "model_rmse": null,
+          "model_version": "v3",
+          "n_matched_baseline": 2250,
+          "n_train": 11631,
+          "n_validation": 2537,
+          "quantiles": [
+            0.1,
+            0.25,
+            0.5,
+            0.75,
+            0.9
+          ],
+          "relative_mae_improvement": 0.09288993099069753,
+          "straddle_baseline_mae": 0.06003842814919881,
+          "trained_at": "2026-10-16T02:57:05.145112+00:00"
+        },
+        {
+          "baseline_label": "Historical move",
+          "baseline_mae": 0.058095022055892974,
+          "cohort": "optionless",
+          "coverage": {
+            "interval_50": 0.4997397188964081,
+            "interval_80": 0.7766788131181677,
+            "p10": 0.13092139510671524,
+            "p25": 0.29385736595523165,
+            "p50": 0.5611660593440916,
+            "p75": 0.7935970848516398,
+            "p90": 0.9076002082248829
+          },
+          "feature_count": 45,
+          "horizon_days": 5,
+          "interval_width": {
+            "interval_50_mean": null,
+            "interval_80_mean": null
+          },
+          "metric_scope": "historical_out_of_sample",
+          "model_mae": 0.053048014808946393,
+          "model_r2": null,
+          "model_rmse": null,
+          "model_version": "v3",
+          "n_matched_baseline": 3501,
+          "n_train": 18989,
+          "n_validation": 3842,
+          "quantiles": [
+            0.1,
+            0.25,
+            0.5,
+            0.75,
+            0.9
+          ],
+          "relative_mae_improvement": 0.08687503796953333,
+          "straddle_baseline_mae": 0.058095022055892974,
+          "trained_at": "2026-10-16T02:58:20.126502+00:00"
+        },
+        {
+          "baseline_label": "Historical move",
+          "baseline_mae": 0.058947366705283076,
+          "cohort": "optionless",
+          "coverage": {
+            "interval_50": 0.4943249195324411,
+            "interval_80": 0.784855158394037,
+            "p10": 0.1316279857699475,
+            "p25": 0.3101812637641877,
+            "p50": 0.5739454514653566,
+            "p75": 0.8045061832966288,
+            "p90": 0.9164831441639845
+          },
+          "feature_count": 45,
+          "horizon_days": 6,
+          "interval_width": {
+            "interval_50_mean": null,
+            "interval_80_mean": null
+          },
+          "metric_scope": "historical_out_of_sample",
+          "model_mae": 0.053459054468152474,
+          "model_r2": null,
+          "model_rmse": null,
+          "model_version": "v3",
+          "n_matched_baseline": 5366,
+          "n_train": 28433,
+          "n_validation": 5903,
+          "quantiles": [
+            0.1,
+            0.25,
+            0.5,
+            0.75,
+            0.9
+          ],
+          "relative_mae_improvement": 0.09310529958989189,
+          "straddle_baseline_mae": 0.058947366705283076,
+          "trained_at": "2026-10-16T03:00:02.851451+00:00"
+        },
+        {
+          "baseline_label": "Historical move",
+          "baseline_mae": 0.05873420664806907,
+          "cohort": "optionless",
+          "coverage": {
+            "interval_50": 0.5049615877080665,
+            "interval_80": 0.7962548015364916,
+            "p10": 0.12483994878361075,
+            "p25": 0.30873879641485275,
+            "p50": 0.573943661971831,
+            "p75": 0.8137003841229193,
+            "p90": 0.9210947503201025
           },
           "feature_count": 45,
           "horizon_days": 7,
           "interval_width": {
-            "interval_50_mean": 0.07963124145096621,
-            "interval_80_mean": 0.1375577173019996
+            "interval_50_mean": null,
+            "interval_80_mean": null
           },
-          "model_mae": 0.04541132683245346,
-          "model_r2": 0.09658732027061412,
-          "model_rmse": 0.0675842783416685,
+          "metric_scope": "historical_out_of_sample",
+          "model_mae": 0.05284534019301179,
+          "model_r2": null,
+          "model_rmse": null,
           "model_version": "v3",
-          "n_train": 7911,
-          "n_validation": 2698,
+          "n_matched_baseline": 5622,
+          "n_train": 29311,
+          "n_validation": 6248,
           "quantiles": [
             0.1,
             0.25,
@@ -227,32 +775,227 @@
             0.75,
             0.9
           ],
-          "relative_mae_improvement": 0.2957932433014726,
-          "straddle_baseline_mae": 0.06448578688076144,
-          "trained_at": "2026-08-30T17:42:45.764660"
+          "relative_mae_improvement": 0.10026297776256554,
+          "straddle_baseline_mae": 0.05873420664806907,
+          "trained_at": "2026-10-16T03:02:13.282895+00:00"
         },
         {
+          "baseline_label": "Market straddle",
+          "baseline_mae": 0.06650078419495664,
+          "cohort": "strict_options",
           "coverage": {
-            "interval_50": 0.49212893553223386,
-            "interval_80": 0.7837331334332833,
-            "p10": 0.106071964017991,
-            "p25": 0.27511244377811095,
-            "p50": 0.5224887556221889,
-            "p75": 0.7672413793103449,
-            "p90": 0.8898050974512743
+            "interval_50": 0.47923156801661476,
+            "interval_80": 0.7559709241952233,
+            "p10": 0.15680166147455868,
+            "p25": 0.3291796469366563,
+            "p50": 0.5763239875389408,
+            "p75": 0.8084112149532711,
+            "p90": 0.9127725856697819
+          },
+          "feature_count": 45,
+          "horizon_days": 7,
+          "interval_width": {
+            "interval_50_mean": null,
+            "interval_80_mean": null
+          },
+          "metric_scope": "historical_out_of_sample",
+          "model_mae": 0.04343762034000869,
+          "model_r2": null,
+          "model_rmse": null,
+          "model_version": "v3",
+          "n_matched_baseline": 1926,
+          "n_train": 29311,
+          "n_validation": 1926,
+          "quantiles": [
+            0.1,
+            0.25,
+            0.5,
+            0.75,
+            0.9
+          ],
+          "relative_mae_improvement": 0.3468104043304957,
+          "straddle_baseline_mae": 0.06650078419495664,
+          "trained_at": "2026-10-16T03:02:13.282895+00:00"
+        },
+        {
+          "baseline_label": "Market straddle",
+          "baseline_mae": 0.06714521867325736,
+          "cohort": "strict_options",
+          "coverage": {
+            "interval_50": 0.46674182638105977,
+            "interval_80": 0.7643742953776775,
+            "p10": 0.15107102593010147,
+            "p25": 0.3201803833145434,
+            "p50": 0.5704622322435174,
+            "p75": 0.7869222096956031,
+            "p90": 0.915445321307779
+          },
+          "feature_count": 45,
+          "horizon_days": 10,
+          "interval_width": {
+            "interval_50_mean": null,
+            "interval_80_mean": null
+          },
+          "metric_scope": "historical_out_of_sample",
+          "model_mae": 0.04328001605349977,
+          "model_r2": null,
+          "model_rmse": null,
+          "model_version": "v3",
+          "n_matched_baseline": 887,
+          "n_train": 13251,
+          "n_validation": 887,
+          "quantiles": [
+            0.1,
+            0.25,
+            0.5,
+            0.75,
+            0.9
+          ],
+          "relative_mae_improvement": 0.35542668698259283,
+          "straddle_baseline_mae": 0.06714521867325736,
+          "trained_at": "2026-10-16T03:05:43.134753+00:00"
+        },
+        {
+          "baseline_label": "Historical move",
+          "baseline_mae": 0.059983297226924054,
+          "cohort": "optionless",
+          "coverage": {
+            "interval_50": 0.49206349206349204,
+            "interval_80": 0.7871387871387872,
+            "p10": 0.12657712657712658,
+            "p25": 0.31868131868131866,
+            "p50": 0.5791615791615792,
+            "p75": 0.8107448107448108,
+            "p90": 0.9137159137159138
+          },
+          "feature_count": 45,
+          "horizon_days": 11,
+          "interval_width": {
+            "interval_50_mean": null,
+            "interval_80_mean": null
+          },
+          "metric_scope": "historical_out_of_sample",
+          "model_mae": 0.054826564778787855,
+          "model_r2": null,
+          "model_rmse": null,
+          "model_version": "v3",
+          "n_matched_baseline": 2165,
+          "n_train": 11012,
+          "n_validation": 2457,
+          "quantiles": [
+            0.1,
+            0.25,
+            0.5,
+            0.75,
+            0.9
+          ],
+          "relative_mae_improvement": 0.08596947294557111,
+          "straddle_baseline_mae": 0.059983297226924054,
+          "trained_at": "2026-10-16T03:06:22.516991+00:00"
+        },
+        {
+          "baseline_label": "Historical move",
+          "baseline_mae": 0.058428484272312765,
+          "cohort": "optionless",
+          "coverage": {
+            "interval_50": 0.49503622216259724,
+            "interval_80": 0.7880332707271264,
+            "p10": 0.12503353903944192,
+            "p25": 0.3058760397102227,
+            "p50": 0.5661389857794473,
+            "p75": 0.8006439495572847,
+            "p90": 0.912798497451033
+          },
+          "feature_count": 45,
+          "horizon_days": 12,
+          "interval_width": {
+            "interval_50_mean": null,
+            "interval_80_mean": null
+          },
+          "metric_scope": "historical_out_of_sample",
+          "model_mae": 0.05305198655644859,
+          "model_r2": null,
+          "model_rmse": null,
+          "model_version": "v3",
+          "n_matched_baseline": 3390,
+          "n_train": 17956,
+          "n_validation": 3727,
+          "quantiles": [
+            0.1,
+            0.25,
+            0.5,
+            0.75,
+            0.9
+          ],
+          "relative_mae_improvement": 0.0920184355768392,
+          "straddle_baseline_mae": 0.058428484272312765,
+          "trained_at": "2026-10-16T03:07:37.178658+00:00"
+        },
+        {
+          "baseline_label": "Historical move",
+          "baseline_mae": 0.05913779194212162,
+          "cohort": "optionless",
+          "coverage": {
+            "interval_50": 0.4941257774706289,
+            "interval_80": 0.7914651002073255,
+            "p10": 0.12664132688320665,
+            "p25": 0.30787836903939186,
+            "p50": 0.5691085003455425,
+            "p75": 0.8020041465100207,
+            "p90": 0.9181064270905321
+          },
+          "feature_count": 45,
+          "horizon_days": 13,
+          "interval_width": {
+            "interval_50_mean": null,
+            "interval_80_mean": null
+          },
+          "metric_scope": "historical_out_of_sample",
+          "model_mae": 0.05342757618009458,
+          "model_r2": null,
+          "model_rmse": null,
+          "model_version": "v3",
+          "n_matched_baseline": 5245,
+          "n_train": 28013,
+          "n_validation": 5788,
+          "quantiles": [
+            0.1,
+            0.25,
+            0.5,
+            0.75,
+            0.9
+          ],
+          "relative_mae_improvement": 0.09655781141804631,
+          "straddle_baseline_mae": 0.05913779194212162,
+          "trained_at": "2026-10-16T03:08:57.211695+00:00"
+        },
+        {
+          "baseline_label": "Historical move",
+          "baseline_mae": 0.05870801316103943,
+          "cohort": "optionless",
+          "coverage": {
+            "interval_50": 0.49768037114061753,
+            "interval_80": 0.7891537354023356,
+            "p10": 0.12877939529675253,
+            "p25": 0.3098704207326828,
+            "p50": 0.5746280595104784,
+            "p75": 0.8073908174692049,
+            "p90": 0.9177731562949928
           },
           "feature_count": 45,
           "horizon_days": 14,
           "interval_width": {
-            "interval_50_mean": 0.07428982979256715,
-            "interval_80_mean": 0.13472480913104082
+            "interval_50_mean": null,
+            "interval_80_mean": null
           },
-          "model_mae": 0.04434979706580183,
-          "model_r2": 0.0912997090174631,
-          "model_rmse": 0.0656408705238556,
+          "metric_scope": "historical_out_of_sample",
+          "model_mae": 0.052933154330943546,
+          "model_r2": null,
+          "model_rmse": null,
           "model_version": "v3",
-          "n_train": 7734,
-          "n_validation": 2668,
+          "n_matched_baseline": 5613,
+          "n_train": 29045,
+          "n_validation": 6251,
           "quantiles": [
             0.1,
             0.25,
@@ -260,32 +1003,417 @@
             0.75,
             0.9
           ],
-          "relative_mae_improvement": 0.32158447844029536,
-          "straddle_baseline_mae": 0.06537261553780471,
-          "trained_at": "2026-08-30T17:43:00.506011"
+          "relative_mae_improvement": 0.09836576847278267,
+          "straddle_baseline_mae": 0.05870801316103943,
+          "trained_at": "2026-10-16T03:10:20.099446+00:00"
         },
         {
+          "baseline_label": "Market straddle",
+          "baseline_mae": 0.06795098815887918,
+          "cohort": "strict_options",
           "coverage": {
-            "interval_50": 0.48528834837191054,
-            "interval_80": 0.7791290702236171,
-            "p10": 0.1114162416633974,
-            "p25": 0.2801098469988231,
-            "p50": 0.52138093369949,
-            "p75": 0.7653981953707336,
-            "p90": 0.8905453118870145
+            "interval_50": 0.4802289281997919,
+            "interval_80": 0.7695109261186265,
+            "p10": 0.14880332986472425,
+            "p25": 0.31997918834547345,
+            "p50": 0.568678459937565,
+            "p75": 0.8002081165452654,
+            "p90": 0.9183142559833507
+          },
+          "feature_count": 45,
+          "horizon_days": 14,
+          "interval_width": {
+            "interval_50_mean": null,
+            "interval_80_mean": null
+          },
+          "metric_scope": "historical_out_of_sample",
+          "model_mae": 0.04291845472686102,
+          "model_r2": null,
+          "model_rmse": null,
+          "model_version": "v3",
+          "n_matched_baseline": 1922,
+          "n_train": 29045,
+          "n_validation": 1922,
+          "quantiles": [
+            0.1,
+            0.25,
+            0.5,
+            0.75,
+            0.9
+          ],
+          "relative_mae_improvement": 0.36839101402747076,
+          "straddle_baseline_mae": 0.06795098815887918,
+          "trained_at": "2026-10-16T03:10:20.099446+00:00"
+        },
+        {
+          "baseline_label": "Historical move",
+          "baseline_mae": 0.05777600044333976,
+          "cohort": "optionless",
+          "coverage": {
+            "interval_50": 0.49715544136538814,
+            "interval_80": 0.7828959442099468,
+            "p10": 0.13415305560653332,
+            "p25": 0.3129014498073041,
+            "p50": 0.5766195632226097,
+            "p75": 0.8098733712607818,
+            "p90": 0.9168654799045697
+          },
+          "feature_count": 45,
+          "horizon_days": 15,
+          "interval_width": {
+            "interval_50_mean": null,
+            "interval_80_mean": null
+          },
+          "metric_scope": "historical_out_of_sample",
+          "model_mae": 0.0520907414688343,
+          "model_r2": null,
+          "model_rmse": null,
+          "model_version": "v3",
+          "n_matched_baseline": 4893,
+          "n_train": 25339,
+          "n_validation": 5449,
+          "quantiles": [
+            0.1,
+            0.25,
+            0.5,
+            0.75,
+            0.9
+          ],
+          "relative_mae_improvement": 0.09840174001107826,
+          "straddle_baseline_mae": 0.05777600044333976,
+          "trained_at": "2026-10-16T03:11:31.719826+00:00"
+        },
+        {
+          "baseline_label": "Market straddle",
+          "baseline_mae": 0.06890976112445522,
+          "cohort": "strict_options",
+          "coverage": {
+            "interval_50": 0.4732739420935412,
+            "interval_80": 0.7583518930957683,
+            "p10": 0.15367483296213807,
+            "p25": 0.3234966592427617,
+            "p50": 0.5723830734966593,
+            "p75": 0.7967706013363028,
+            "p90": 0.9120267260579065
+          },
+          "feature_count": 45,
+          "horizon_days": 15,
+          "interval_width": {
+            "interval_50_mean": null,
+            "interval_80_mean": null
+          },
+          "metric_scope": "historical_out_of_sample",
+          "model_mae": 0.0430953972981369,
+          "model_r2": null,
+          "model_rmse": null,
+          "model_version": "v3",
+          "n_matched_baseline": 1796,
+          "n_train": 25339,
+          "n_validation": 1796,
+          "quantiles": [
+            0.1,
+            0.25,
+            0.5,
+            0.75,
+            0.9
+          ],
+          "relative_mae_improvement": 0.37461113498414267,
+          "straddle_baseline_mae": 0.06890976112445522,
+          "trained_at": "2026-10-16T03:11:31.719826+00:00"
+        },
+        {
+          "baseline_label": "Market straddle",
+          "baseline_mae": 0.07090885737570927,
+          "cohort": "strict_options",
+          "coverage": {
+            "interval_50": 0.45959970348406226,
+            "interval_80": 0.7464788732394366,
+            "p10": 0.15122312824314307,
+            "p25": 0.3224610822831727,
+            "p50": 0.5693106004447739,
+            "p75": 0.782060785767235,
+            "p90": 0.8977020014825797
+          },
+          "feature_count": 45,
+          "horizon_days": 16,
+          "interval_width": {
+            "interval_50_mean": null,
+            "interval_80_mean": null
+          },
+          "metric_scope": "historical_out_of_sample",
+          "model_mae": 0.04447386866766844,
+          "model_r2": null,
+          "model_rmse": null,
+          "model_version": "v3",
+          "n_matched_baseline": 1349,
+          "n_train": 18254,
+          "n_validation": 1349,
+          "quantiles": [
+            0.1,
+            0.25,
+            0.5,
+            0.75,
+            0.9
+          ],
+          "relative_mae_improvement": 0.3728023506002295,
+          "straddle_baseline_mae": 0.07090885737570927,
+          "trained_at": "2026-10-16T03:12:37.755286+00:00"
+        },
+        {
+          "baseline_label": "Market straddle",
+          "baseline_mae": 0.07314911149101572,
+          "cohort": "strict_options",
+          "coverage": {
+            "interval_50": 0.4632183908045977,
+            "interval_80": 0.7402298850574712,
+            "p10": 0.1425287356321839,
+            "p25": 0.30919540229885056,
+            "p50": 0.5471264367816092,
+            "p75": 0.7724137931034483,
+            "p90": 0.8827586206896552
+          },
+          "feature_count": 45,
+          "horizon_days": 17,
+          "interval_width": {
+            "interval_50_mean": null,
+            "interval_80_mean": null
+          },
+          "metric_scope": "historical_out_of_sample",
+          "model_mae": 0.04427001317674031,
+          "model_r2": null,
+          "model_rmse": null,
+          "model_version": "v3",
+          "n_matched_baseline": 870,
+          "n_train": 13134,
+          "n_validation": 870,
+          "quantiles": [
+            0.1,
+            0.25,
+            0.5,
+            0.75,
+            0.9
+          ],
+          "relative_mae_improvement": 0.39479766364383506,
+          "straddle_baseline_mae": 0.07314911149101572,
+          "trained_at": "2026-10-16T03:13:25.467755+00:00"
+        },
+        {
+          "baseline_label": "Historical move",
+          "baseline_mae": 0.06139094416800306,
+          "cohort": "optionless",
+          "coverage": {
+            "interval_50": 0.485453034081463,
+            "interval_80": 0.7826267664172901,
+            "p10": 0.12427265170407314,
+            "p25": 0.31463009143807147,
+            "p50": 0.5743973399833749,
+            "p75": 0.8000831255195345,
+            "p90": 0.9068994181213632
+          },
+          "feature_count": 45,
+          "horizon_days": 18,
+          "interval_width": {
+            "interval_50_mean": null,
+            "interval_80_mean": null
+          },
+          "metric_scope": "historical_out_of_sample",
+          "model_mae": 0.05574127585784682,
+          "model_r2": null,
+          "model_rmse": null,
+          "model_version": "v3",
+          "n_matched_baseline": 2122,
+          "n_train": 10666,
+          "n_validation": 2406,
+          "quantiles": [
+            0.1,
+            0.25,
+            0.5,
+            0.75,
+            0.9
+          ],
+          "relative_mae_improvement": 0.09202771494595852,
+          "straddle_baseline_mae": 0.06139094416800306,
+          "trained_at": "2026-10-16T03:13:56.706485+00:00"
+        },
+        {
+          "baseline_label": "Market straddle",
+          "baseline_mae": 0.07353657490147177,
+          "cohort": "strict_options",
+          "coverage": {
+            "interval_50": 0.48006134969325154,
+            "interval_80": 0.7929447852760736,
+            "p10": 0.1334355828220859,
+            "p25": 0.3220858895705521,
+            "p50": 0.5782208588957055,
+            "p75": 0.8021472392638037,
+            "p90": 0.9263803680981595
+          },
+          "feature_count": 45,
+          "horizon_days": 18,
+          "interval_width": {
+            "interval_50_mean": null,
+            "interval_80_mean": null
+          },
+          "metric_scope": "historical_out_of_sample",
+          "model_mae": 0.040850612651024236,
+          "model_r2": null,
+          "model_rmse": null,
+          "model_version": "v3",
+          "n_matched_baseline": 652,
+          "n_train": 10666,
+          "n_validation": 652,
+          "quantiles": [
+            0.1,
+            0.25,
+            0.5,
+            0.75,
+            0.9
+          ],
+          "relative_mae_improvement": 0.4444857853964769,
+          "straddle_baseline_mae": 0.07353657490147177,
+          "trained_at": "2026-10-16T03:13:56.706485+00:00"
+        },
+        {
+          "baseline_label": "Historical move",
+          "baseline_mae": 0.059483616447699096,
+          "cohort": "optionless",
+          "coverage": {
+            "interval_50": 0.4824730886006072,
+            "interval_80": 0.7855368479160917,
+            "p10": 0.12696660226331768,
+            "p25": 0.31189621860336736,
+            "p50": 0.5705216671266906,
+            "p75": 0.7943693072039746,
+            "p90": 0.9125034501794094
+          },
+          "feature_count": 45,
+          "horizon_days": 19,
+          "interval_width": {
+            "interval_50_mean": null,
+            "interval_80_mean": null
+          },
+          "metric_scope": "historical_out_of_sample",
+          "model_mae": 0.054331687372703205,
+          "model_r2": null,
+          "model_rmse": null,
+          "model_version": "v3",
+          "n_matched_baseline": 3294,
+          "n_train": 17691,
+          "n_validation": 3623,
+          "quantiles": [
+            0.1,
+            0.25,
+            0.5,
+            0.75,
+            0.9
+          ],
+          "relative_mae_improvement": 0.08661089191720073,
+          "straddle_baseline_mae": 0.059483616447699096,
+          "trained_at": "2026-10-16T03:14:38.327907+00:00"
+        },
+        {
+          "baseline_label": "Historical move",
+          "baseline_mae": 0.059600711315566234,
+          "cohort": "optionless",
+          "coverage": {
+            "interval_50": 0.4911660777385159,
+            "interval_80": 0.7890459363957597,
+            "p10": 0.12614840989399292,
+            "p25": 0.30901060070671377,
+            "p50": 0.572791519434629,
+            "p75": 0.8001766784452297,
+            "p90": 0.9151943462897526
+          },
+          "feature_count": 45,
+          "horizon_days": 20,
+          "interval_width": {
+            "interval_50_mean": null,
+            "interval_80_mean": null
+          },
+          "metric_scope": "historical_out_of_sample",
+          "model_mae": 0.0538577660711567,
+          "model_r2": null,
+          "model_rmse": null,
+          "model_version": "v3",
+          "n_matched_baseline": 5145,
+          "n_train": 27204,
+          "n_validation": 5660,
+          "quantiles": [
+            0.1,
+            0.25,
+            0.5,
+            0.75,
+            0.9
+          ],
+          "relative_mae_improvement": 0.09635699168089662,
+          "straddle_baseline_mae": 0.059600711315566234,
+          "trained_at": "2026-10-16T03:15:49.074018+00:00"
+        },
+        {
+          "baseline_label": "Market straddle",
+          "baseline_mae": 0.0755169520035729,
+          "cohort": "strict_options",
+          "coverage": {
+            "interval_50": 0.4642857142857143,
+            "interval_80": 0.7559523809523809,
+            "p10": 0.14404761904761904,
+            "p25": 0.32142857142857145,
+            "p50": 0.5732142857142857,
+            "p75": 0.7857142857142857,
+            "p90": 0.9
+          },
+          "feature_count": 45,
+          "horizon_days": 20,
+          "interval_width": {
+            "interval_50_mean": null,
+            "interval_80_mean": null
+          },
+          "metric_scope": "historical_out_of_sample",
+          "model_mae": 0.04489305422823591,
+          "model_r2": null,
+          "model_rmse": null,
+          "model_version": "v3",
+          "n_matched_baseline": 1680,
+          "n_train": 27204,
+          "n_validation": 1680,
+          "quantiles": [
+            0.1,
+            0.25,
+            0.5,
+            0.75,
+            0.9
+          ],
+          "relative_mae_improvement": 0.4055234879433176,
+          "straddle_baseline_mae": 0.0755169520035729,
+          "trained_at": "2026-10-16T03:15:49.074018+00:00"
+        },
+        {
+          "baseline_label": "Market straddle",
+          "baseline_mae": 0.07603738610844493,
+          "cohort": "strict_options",
+          "coverage": {
+            "interval_50": 0.459007551240561,
+            "interval_80": 0.7588996763754046,
+            "p10": 0.14347357065803668,
+            "p25": 0.3209277238403452,
+            "p50": 0.564185544768069,
+            "p75": 0.7799352750809061,
+            "p90": 0.9023732470334412
           },
           "feature_count": 45,
           "horizon_days": 21,
           "interval_width": {
-            "interval_50_mean": 0.07442233983245654,
-            "interval_80_mean": 0.1359937306110941
+            "interval_50_mean": null,
+            "interval_80_mean": null
           },
-          "model_mae": 0.04568588370453592,
-          "model_r2": 0.08647747715621146,
-          "model_rmse": 0.0684634233612318,
+          "metric_scope": "historical_out_of_sample",
+          "model_mae": 0.04371299137261609,
+          "model_r2": null,
+          "model_rmse": null,
           "model_version": "v3",
-          "n_train": 7531,
-          "n_validation": 2549,
+          "n_matched_baseline": 1854,
+          "n_train": 28132,
+          "n_validation": 1854,
           "quantiles": [
             0.1,
             0.25,
@@ -293,136 +1421,688 @@
             0.75,
             0.9
           ],
-          "relative_mae_improvement": 0.3772377663257429,
-          "straddle_baseline_mae": 0.07336007425336656,
-          "trained_at": "2026-08-30T17:43:14.461853"
+          "relative_mae_improvement": 0.4251118612852842,
+          "straddle_baseline_mae": 0.07603738610844493,
+          "trained_at": "2026-10-16T03:17:12.766332+00:00"
+        },
+        {
+          "baseline_label": "Historical move",
+          "baseline_mae": 0.057513516542502814,
+          "cohort": "optionless",
+          "coverage": {
+            "interval_50": 0.4887558940877766,
+            "interval_80": 0.7914399709829525,
+            "p10": 0.1305767138193689,
+            "p25": 0.31610446137105547,
+            "p50": 0.5792528110264781,
+            "p75": 0.804860355458832,
+            "p90": 0.92183532825535
+          },
+          "feature_count": 45,
+          "horizon_days": 22,
+          "interval_width": {
+            "interval_50_mean": null,
+            "interval_80_mean": null
+          },
+          "metric_scope": "historical_out_of_sample",
+          "model_mae": 0.0517855554210135,
+          "model_r2": null,
+          "model_rmse": null,
+          "model_version": "v3",
+          "n_matched_baseline": 4959,
+          "n_train": 24210,
+          "n_validation": 5514,
+          "quantiles": [
+            0.1,
+            0.25,
+            0.5,
+            0.75,
+            0.9
+          ],
+          "relative_mae_improvement": 0.0995933037281127,
+          "straddle_baseline_mae": 0.057513516542502814,
+          "trained_at": "2026-10-16T03:18:23.932867+00:00"
+        },
+        {
+          "baseline_label": "Historical move",
+          "baseline_mae": 0.05749964165098366,
+          "cohort": "optionless",
+          "coverage": {
+            "interval_50": 0.5034157832744405,
+            "interval_80": 0.7945818610129565,
+            "p10": 0.1305064782096584,
+            "p25": 0.3036513545347468,
+            "p50": 0.5750294464075383,
+            "p75": 0.806831566548881,
+            "p90": 0.9248527679623086
+          },
+          "feature_count": 45,
+          "horizon_days": 23,
+          "interval_width": {
+            "interval_50_mean": null,
+            "interval_80_mean": null
+          },
+          "metric_scope": "historical_out_of_sample",
+          "model_mae": 0.05160078069885039,
+          "model_r2": null,
+          "model_rmse": null,
+          "model_version": "v3",
+          "n_matched_baseline": 3813,
+          "n_train": 17217,
+          "n_validation": 4245,
+          "quantiles": [
+            0.1,
+            0.25,
+            0.5,
+            0.75,
+            0.9
+          ],
+          "relative_mae_improvement": 0.10258952547806621,
+          "straddle_baseline_mae": 0.05749964165098366,
+          "trained_at": "2026-10-16T03:19:39.238319+00:00"
+        },
+        {
+          "baseline_label": "Market straddle",
+          "baseline_mae": 0.07667840674006218,
+          "cohort": "strict_options",
+          "coverage": {
+            "interval_50": 0.46484375,
+            "interval_80": 0.74296875,
+            "p10": 0.1578125,
+            "p25": 0.30625,
+            "p50": 0.5515625,
+            "p75": 0.77109375,
+            "p90": 0.90078125
+          },
+          "feature_count": 45,
+          "horizon_days": 23,
+          "interval_width": {
+            "interval_50_mean": null,
+            "interval_80_mean": null
+          },
+          "metric_scope": "historical_out_of_sample",
+          "model_mae": 0.04380337750881871,
+          "model_r2": null,
+          "model_rmse": null,
+          "model_version": "v3",
+          "n_matched_baseline": 1280,
+          "n_train": 17217,
+          "n_validation": 1280,
+          "quantiles": [
+            0.1,
+            0.25,
+            0.5,
+            0.75,
+            0.9
+          ],
+          "relative_mae_improvement": 0.4287390756916608,
+          "straddle_baseline_mae": 0.07667840674006218,
+          "trained_at": "2026-10-16T03:19:39.238319+00:00"
+        },
+        {
+          "baseline_label": "Market straddle",
+          "baseline_mae": 0.07884483834498014,
+          "cohort": "strict_options",
+          "coverage": {
+            "interval_50": 0.4719387755102041,
+            "interval_80": 0.7614795918367347,
+            "p10": 0.1326530612244898,
+            "p25": 0.2971938775510204,
+            "p50": 0.548469387755102,
+            "p75": 0.7691326530612245,
+            "p90": 0.8941326530612245
+          },
+          "feature_count": 45,
+          "horizon_days": 24,
+          "interval_width": {
+            "interval_50_mean": null,
+            "interval_80_mean": null
+          },
+          "metric_scope": "historical_out_of_sample",
+          "model_mae": 0.0447364248380207,
+          "model_r2": null,
+          "model_rmse": null,
+          "model_version": "v3",
+          "n_matched_baseline": 784,
+          "n_train": 12423,
+          "n_validation": 784,
+          "quantiles": [
+            0.1,
+            0.25,
+            0.5,
+            0.75,
+            0.9
+          ],
+          "relative_mae_improvement": 0.4326017304737241,
+          "straddle_baseline_mae": 0.07884483834498014,
+          "trained_at": "2026-10-16T03:20:23.946764+00:00"
+        },
+        {
+          "baseline_label": "Market straddle",
+          "baseline_mae": 0.07892083298552172,
+          "cohort": "strict_options",
+          "coverage": {
+            "interval_50": 0.4927536231884058,
+            "interval_80": 0.7898550724637681,
+            "p10": 0.1286231884057971,
+            "p25": 0.3061594202898551,
+            "p50": 0.5688405797101449,
+            "p75": 0.7989130434782609,
+            "p90": 0.9184782608695652
+          },
+          "feature_count": 45,
+          "horizon_days": 25,
+          "interval_width": {
+            "interval_50_mean": null,
+            "interval_80_mean": null
+          },
+          "metric_scope": "historical_out_of_sample",
+          "model_mae": 0.0418871621410542,
+          "model_r2": null,
+          "model_rmse": null,
+          "model_version": "v3",
+          "n_matched_baseline": 552,
+          "n_train": 10086,
+          "n_validation": 552,
+          "quantiles": [
+            0.1,
+            0.25,
+            0.5,
+            0.75,
+            0.9
+          ],
+          "relative_mae_improvement": 0.46925088653412295,
+          "straddle_baseline_mae": 0.07892083298552172,
+          "trained_at": "2026-10-16T03:20:55.480751+00:00"
         }
       ],
-      "model_bundle_sha256": "dde44654919e5137f30790cc468d4f33e4adb3dc658eeab3a5638a85e0515537",
-      "model_validation_receipt_id": "sha256:a54477264da37f540a6b8c2ad62134f73f8800808db2519ec3fdb60cbeefc47b",
-      "receipt_id": "sha256:cfa4276a0294bb58cda74ddacd1fd7e308d5065a31aa69412002ecd1819e57e8",
+      "model_bundle_sha256": "b8ac16d8b000b8492ee7b34f13818de979608c06099bb3bdf63e72bedd94a9d2",
+      "model_validation_receipt_id": "sha256:2c0e4e60974ba29b9ee340f465612d79a4e450844ec7f66c84df6279074cc7ca",
+      "receipt_id": "sha256:04c180e00c6d829fb18e4d554f406c8e645e19d1c3cc35c7d050857271071a8b",
       "schema": "quantiv.model-evaluation-receipt.v1",
-      "source_revision": "2b3f22178885bb1a1170a64e314152646fa80ecb",
-      "training_bundle_sha256": "2fbe7c209a4ab62947e892e1171f63bb8c6f92a7d68ed2628906a65edef27f1e",
+      "serving_capabilities": {
+        "1": [
+          "optionless"
+        ],
+        "10": [
+          "strict_options"
+        ],
+        "11": [
+          "optionless"
+        ],
+        "12": [
+          "optionless"
+        ],
+        "13": [
+          "optionless"
+        ],
+        "14": [
+          "optionless",
+          "strict_options"
+        ],
+        "15": [
+          "optionless",
+          "strict_options"
+        ],
+        "16": [
+          "strict_options"
+        ],
+        "17": [
+          "strict_options"
+        ],
+        "18": [
+          "optionless",
+          "strict_options"
+        ],
+        "19": [
+          "optionless"
+        ],
+        "2": [
+          "optionless",
+          "strict_options"
+        ],
+        "20": [
+          "optionless",
+          "strict_options"
+        ],
+        "21": [
+          "strict_options"
+        ],
+        "22": [
+          "optionless"
+        ],
+        "23": [
+          "optionless",
+          "strict_options"
+        ],
+        "24": [
+          "strict_options"
+        ],
+        "25": [
+          "strict_options"
+        ],
+        "3": [
+          "strict_options"
+        ],
+        "4": [
+          "optionless"
+        ],
+        "5": [
+          "optionless"
+        ],
+        "6": [
+          "optionless"
+        ],
+        "7": [
+          "optionless",
+          "strict_options"
+        ]
+      },
+      "source_bundle_id": "629386dcbf2736b8868df166bd54c5a656c197a34c55d1d7be44b5b9bc12c2ff",
+      "source_revision": "77784f190092be6df333ee75eb5c643d7e9d8150",
+      "training_bundle_sha256": "1388e136fe4838fcd467d3c3a6eda4bb4a989c83b8ef451d6960cb04fe5e3820",
       "walk_forward": [
         {
-          "baseline_straddle_mae": 0.05977346642741948,
+          "baseline_straddle_mae": 0.05674233135869076,
+          "evaluation_scope": "development",
           "fold_count": 4,
           "folds_beating_baseline": 4,
           "horizon_days": 1,
-          "improvement_vs_straddle": 0.26755077362817214,
+          "improvement_vs_straddle": 0.14561709891754626,
           "method": "expanding_purged_walk_forward",
-          "model_mae": 0.043781029242325825,
+          "model_mae": 0.0484796776804201,
           "purge_days": 5,
           "requested_folds": 4,
           "status": "passed",
           "test_days": 60,
-          "validation_rows": 2819,
-          "worst_fold_ratio": 0.798560721774099
+          "validation_rows": 7855,
+          "worst_fold_ratio": 0.8851638477491248
         },
         {
-          "baseline_straddle_mae": 0.05982081833797205,
+          "baseline_straddle_mae": 0.056681044558978246,
+          "evaluation_scope": "development",
           "fold_count": 4,
           "folds_beating_baseline": 4,
           "horizon_days": 2,
-          "improvement_vs_straddle": 0.275728374867958,
+          "improvement_vs_straddle": 0.14007024020353342,
           "method": "expanding_purged_walk_forward",
-          "model_mae": 0.04332652131437168,
+          "model_mae": 0.048741717032614984,
           "purge_days": 5,
           "requested_folds": 4,
           "status": "passed",
           "test_days": 60,
-          "validation_rows": 2154,
-          "worst_fold_ratio": 0.8015559534606794
+          "validation_rows": 5819,
+          "worst_fold_ratio": 0.9403951422003546
         },
         {
-          "baseline_straddle_mae": 0.06061096843851698,
+          "baseline_straddle_mae": 0.058526438147887126,
+          "evaluation_scope": "development",
           "fold_count": 4,
           "folds_beating_baseline": 4,
           "horizon_days": 3,
-          "improvement_vs_straddle": 0.26445814137914136,
+          "improvement_vs_straddle": 0.14193759101630976,
           "method": "expanding_purged_walk_forward",
-          "model_mae": 0.044581904378076985,
+          "model_mae": 0.05021933650641097,
           "purge_days": 5,
           "requested_folds": 4,
           "status": "passed",
           "test_days": 60,
-          "validation_rows": 1414,
-          "worst_fold_ratio": 0.7974974160429331
+          "validation_rows": 4179,
+          "worst_fold_ratio": 0.9428704253337878
         },
         {
-          "baseline_straddle_mae": 0.062392669944548985,
+          "baseline_straddle_mae": 0.05870714647285166,
+          "evaluation_scope": "development",
+          "fold_count": 4,
+          "folds_beating_baseline": 4,
+          "horizon_days": 4,
+          "improvement_vs_straddle": 0.15421054627797537,
+          "method": "expanding_purged_walk_forward",
+          "model_mae": 0.04965388534485209,
+          "purge_days": 5,
+          "requested_folds": 4,
+          "status": "passed",
+          "test_days": 60,
+          "validation_rows": 3438,
+          "worst_fold_ratio": 0.8855253907484908
+        },
+        {
+          "baseline_straddle_mae": 0.057458998850441714,
+          "evaluation_scope": "development",
+          "fold_count": 4,
+          "folds_beating_baseline": 4,
+          "horizon_days": 5,
+          "improvement_vs_straddle": 0.13918651565771112,
+          "method": "expanding_purged_walk_forward",
+          "model_mae": 0.049461481007268306,
+          "purge_days": 5,
+          "requested_folds": 4,
+          "status": "passed",
+          "test_days": 60,
+          "validation_rows": 5683,
+          "worst_fold_ratio": 0.8867352621856207
+        },
+        {
+          "baseline_straddle_mae": 0.05776696728774957,
+          "evaluation_scope": "development",
+          "fold_count": 4,
+          "folds_beating_baseline": 4,
+          "horizon_days": 6,
+          "improvement_vs_straddle": 0.14636793710737084,
+          "method": "expanding_purged_walk_forward",
+          "model_mae": 0.04931173545289269,
+          "purge_days": 5,
+          "requested_folds": 4,
+          "status": "passed",
+          "test_days": 60,
+          "validation_rows": 8596,
+          "worst_fold_ratio": 0.8907960642168843
+        },
+        {
+          "baseline_straddle_mae": 0.057466384429645835,
+          "evaluation_scope": "development",
           "fold_count": 4,
           "folds_beating_baseline": 4,
           "horizon_days": 7,
-          "improvement_vs_straddle": 0.2607352731542567,
+          "improvement_vs_straddle": 0.1446187114716484,
           "method": "expanding_purged_walk_forward",
-          "model_mae": 0.046124700103733624,
+          "model_mae": 0.04915566996049606,
           "purge_days": 5,
           "requested_folds": 4,
           "status": "passed",
           "test_days": 60,
-          "validation_rows": 3038,
-          "worst_fold_ratio": 0.8074354446794463
+          "validation_rows": 8858,
+          "worst_fold_ratio": 0.8847815303489239
         },
         {
-          "baseline_straddle_mae": 0.06390694817327838,
+          "baseline_straddle_mae": 0.0582213954777943,
+          "evaluation_scope": "development",
+          "fold_count": 4,
+          "folds_beating_baseline": 4,
+          "horizon_days": 10,
+          "improvement_vs_straddle": 0.1374479564626505,
+          "method": "expanding_purged_walk_forward",
+          "model_mae": 0.05021898364696767,
+          "purge_days": 5,
+          "requested_folds": 4,
+          "status": "passed",
+          "test_days": 60,
+          "validation_rows": 4024,
+          "worst_fold_ratio": 0.9417500105227018
+        },
+        {
+          "baseline_straddle_mae": 0.058983642393836015,
+          "evaluation_scope": "development",
+          "fold_count": 4,
+          "folds_beating_baseline": 4,
+          "horizon_days": 11,
+          "improvement_vs_straddle": 0.15410678277565226,
+          "method": "expanding_purged_walk_forward",
+          "model_mae": 0.049893863028132375,
+          "purge_days": 5,
+          "requested_folds": 4,
+          "status": "passed",
+          "test_days": 60,
+          "validation_rows": 3398,
+          "worst_fold_ratio": 0.8939387133181306
+        },
+        {
+          "baseline_straddle_mae": 0.05800764907080486,
+          "evaluation_scope": "development",
+          "fold_count": 4,
+          "folds_beating_baseline": 4,
+          "horizon_days": 12,
+          "improvement_vs_straddle": 0.14592342403615188,
+          "method": "expanding_purged_walk_forward",
+          "model_mae": 0.049542974298105516,
+          "purge_days": 5,
+          "requested_folds": 4,
+          "status": "passed",
+          "test_days": 60,
+          "validation_rows": 5663,
+          "worst_fold_ratio": 0.8910235737919604
+        },
+        {
+          "baseline_straddle_mae": 0.057830986998828646,
+          "evaluation_scope": "development",
+          "fold_count": 4,
+          "folds_beating_baseline": 4,
+          "horizon_days": 13,
+          "improvement_vs_straddle": 0.14564010591717058,
+          "method": "expanding_purged_walk_forward",
+          "model_mae": 0.04940847592702473,
+          "purge_days": 5,
+          "requested_folds": 4,
+          "status": "passed",
+          "test_days": 60,
+          "validation_rows": 8585,
+          "worst_fold_ratio": 0.8851229926873091
+        },
+        {
+          "baseline_straddle_mae": 0.057880884587928415,
+          "evaluation_scope": "development",
           "fold_count": 4,
           "folds_beating_baseline": 4,
           "horizon_days": 14,
-          "improvement_vs_straddle": 0.30874554525867504,
+          "improvement_vs_straddle": 0.15007591264162,
           "method": "expanding_purged_walk_forward",
-          "model_mae": 0.044175962613701665,
+          "model_mae": 0.04919435800889078,
           "purge_days": 5,
           "requested_folds": 4,
           "status": "passed",
           "test_days": 60,
-          "validation_rows": 2942,
-          "worst_fold_ratio": 0.7665075166932126
+          "validation_rows": 8872,
+          "worst_fold_ratio": 0.8834248758951827
         },
         {
-          "baseline_straddle_mae": 0.07098679029094594,
+          "baseline_straddle_mae": 0.057391075124946254,
+          "evaluation_scope": "development",
+          "fold_count": 4,
+          "folds_beating_baseline": 4,
+          "horizon_days": 15,
+          "improvement_vs_straddle": 0.15567221614109195,
+          "method": "expanding_purged_walk_forward",
+          "model_mae": 0.048456879273525974,
+          "purge_days": 5,
+          "requested_folds": 4,
+          "status": "passed",
+          "test_days": 60,
+          "validation_rows": 7817,
+          "worst_fold_ratio": 0.8797267461037697
+        },
+        {
+          "baseline_straddle_mae": 0.05709959569691944,
+          "evaluation_scope": "development",
+          "fold_count": 4,
+          "folds_beating_baseline": 4,
+          "horizon_days": 16,
+          "improvement_vs_straddle": 0.1456306604621601,
+          "method": "expanding_purged_walk_forward",
+          "model_mae": 0.04878414386345475,
+          "purge_days": 5,
+          "requested_folds": 4,
+          "status": "passed",
+          "test_days": 60,
+          "validation_rows": 5749,
+          "worst_fold_ratio": 0.880908411640339
+        },
+        {
+          "baseline_straddle_mae": 0.05964600999950758,
+          "evaluation_scope": "development",
+          "fold_count": 4,
+          "folds_beating_baseline": 4,
+          "horizon_days": 17,
+          "improvement_vs_straddle": 0.15291254468587123,
+          "method": "expanding_purged_walk_forward",
+          "model_mae": 0.050525386830123954,
+          "purge_days": 5,
+          "requested_folds": 4,
+          "status": "passed",
+          "test_days": 60,
+          "validation_rows": 4153,
+          "worst_fold_ratio": 0.9060114251213537
+        },
+        {
+          "baseline_straddle_mae": 0.05963585649023841,
+          "evaluation_scope": "development",
+          "fold_count": 4,
+          "folds_beating_baseline": 4,
+          "horizon_days": 18,
+          "improvement_vs_straddle": 0.16859434502973625,
+          "method": "expanding_purged_walk_forward",
+          "model_mae": 0.049581588324979324,
+          "purge_days": 5,
+          "requested_folds": 4,
+          "status": "passed",
+          "test_days": 60,
+          "validation_rows": 3424,
+          "worst_fold_ratio": 0.8984492167082784
+        },
+        {
+          "baseline_straddle_mae": 0.05903854011823085,
+          "evaluation_scope": "development",
+          "fold_count": 4,
+          "folds_beating_baseline": 4,
+          "horizon_days": 19,
+          "improvement_vs_straddle": 0.1589133427457261,
+          "method": "expanding_purged_walk_forward",
+          "model_mae": 0.04965652835721513,
+          "purge_days": 5,
+          "requested_folds": 4,
+          "status": "passed",
+          "test_days": 60,
+          "validation_rows": 5661,
+          "worst_fold_ratio": 0.8878404515808582
+        },
+        {
+          "baseline_straddle_mae": 0.05915863631307716,
+          "evaluation_scope": "development",
+          "fold_count": 4,
+          "folds_beating_baseline": 4,
+          "horizon_days": 20,
+          "improvement_vs_straddle": 0.15966887631065907,
+          "method": "expanding_purged_walk_forward",
+          "model_mae": 0.04971284332889718,
+          "purge_days": 5,
+          "requested_folds": 4,
+          "status": "passed",
+          "test_days": 60,
+          "validation_rows": 8579,
+          "worst_fold_ratio": 0.8798258695130956
+        },
+        {
+          "baseline_straddle_mae": 0.05904930034422197,
+          "evaluation_scope": "development",
           "fold_count": 4,
           "folds_beating_baseline": 4,
           "horizon_days": 21,
-          "improvement_vs_straddle": 0.36426429119713233,
+          "improvement_vs_straddle": 0.16431531808898148,
           "method": "expanding_purged_walk_forward",
-          "model_mae": 0.045128837441255044,
+          "model_mae": 0.04934659577522933,
           "purge_days": 5,
           "requested_folds": 4,
           "status": "passed",
           "test_days": 60,
-          "validation_rows": 2867,
-          "worst_fold_ratio": 0.733600924677533
+          "validation_rows": 8840,
+          "worst_fold_ratio": 0.8806513517687669
+        },
+        {
+          "baseline_straddle_mae": 0.05837218349273896,
+          "evaluation_scope": "development",
+          "fold_count": 4,
+          "folds_beating_baseline": 4,
+          "horizon_days": 22,
+          "improvement_vs_straddle": 0.16929231955910506,
+          "method": "expanding_purged_walk_forward",
+          "model_mae": 0.04849022115152348,
+          "purge_days": 5,
+          "requested_folds": 4,
+          "status": "passed",
+          "test_days": 60,
+          "validation_rows": 7815,
+          "worst_fold_ratio": 0.8699523790983718
+        },
+        {
+          "baseline_straddle_mae": 0.057998590911446886,
+          "evaluation_scope": "development",
+          "fold_count": 4,
+          "folds_beating_baseline": 4,
+          "horizon_days": 23,
+          "improvement_vs_straddle": 0.1629479532267072,
+          "method": "expanding_purged_walk_forward",
+          "model_mae": 0.048547839232393517,
+          "purge_days": 5,
+          "requested_folds": 4,
+          "status": "passed",
+          "test_days": 60,
+          "validation_rows": 5803,
+          "worst_fold_ratio": 0.8758832832622665
+        },
+        {
+          "baseline_straddle_mae": 0.059934985542459004,
+          "evaluation_scope": "development",
+          "fold_count": 4,
+          "folds_beating_baseline": 4,
+          "horizon_days": 24,
+          "improvement_vs_straddle": 0.15694368172627138,
+          "method": "expanding_purged_walk_forward",
+          "model_mae": 0.05052856824721464,
+          "purge_days": 5,
+          "requested_folds": 4,
+          "status": "passed",
+          "test_days": 60,
+          "validation_rows": 4085,
+          "worst_fold_ratio": 0.9247240959973536
+        },
+        {
+          "baseline_straddle_mae": 0.061154152518507685,
+          "evaluation_scope": "development",
+          "fold_count": 4,
+          "folds_beating_baseline": 4,
+          "horizon_days": 25,
+          "improvement_vs_straddle": 0.16947684188858814,
+          "method": "expanding_purged_walk_forward",
+          "model_mae": 0.05078993988129795,
+          "purge_days": 5,
+          "requested_folds": 4,
+          "status": "passed",
+          "test_days": 60,
+          "validation_rows": 3264,
+          "worst_fold_ratio": 0.9027164234512829
         }
       ]
     },
     "status": "verified"
   },
-  "generated_at": "2026-10-15T21:20:36.354082+00:00",
+  "generated_at": "2026-10-16T07:20:26.610706+00:00",
   "horizons": [
     {
+      "baseline_label": "Historical move",
+      "baseline_mae": 0.05773682132039139,
+      "cohort": "optionless",
       "coverage": {
-        "interval_50": 0.48656606551343395,
-        "interval_80": 0.7964666912035333,
-        "p10": 0.10268678689731321,
-        "p25": 0.27677585572322416,
-        "p50": 0.5299963194700037,
-        "p75": 0.7633419212366581,
-        "p90": 0.8991534781008466
+        "interval_50": 0.48518111964873767,
+        "interval_80": 0.783205268935236,
+        "p10": 0.13172338090010977,
+        "p25": 0.3102817416758141,
+        "p50": 0.5735455543358946,
+        "p75": 0.7954628613245518,
+        "p90": 0.9149286498353457
       },
       "feature_count": 45,
       "horizon_days": 1,
       "interval_width": {
-        "interval_50_mean": 0.07532579056847942,
-        "interval_80_mean": 0.14141775025219905
+        "interval_50_mean": null,
+        "interval_80_mean": null
       },
-      "model_mae": 0.044159224751165016,
-      "model_r2": 0.1159767073479403,
-      "model_rmse": 0.06439306001074137,
+      "metric_scope": "historical_out_of_sample",
+      "model_mae": 0.05168738128125703,
+      "model_r2": null,
+      "model_rmse": null,
       "model_version": "v3",
-      "n_train": 7961,
-      "n_validation": 2717,
+      "n_matched_baseline": 4917,
+      "n_train": 26023,
+      "n_validation": 5466,
       "quantiles": [
         0.1,
         0.25,
@@ -430,32 +2110,37 @@
         0.75,
         0.9
       ],
-      "relative_mae_improvement": 0.26643696747083245,
-      "straddle_baseline_mae": 0.06019826898707464,
-      "trained_at": "2026-08-30T17:42:10.571288"
+      "relative_mae_improvement": 0.10477611861527658,
+      "straddle_baseline_mae": 0.05773682132039139,
+      "trained_at": "2026-10-16T02:54:23.768245+00:00"
     },
     {
+      "baseline_label": "Historical move",
+      "baseline_mae": 0.05760336144855015,
+      "cohort": "optionless",
       "coverage": {
-        "interval_50": 0.4853683148335015,
-        "interval_80": 0.7946518668012109,
-        "p10": 0.0958627648839556,
-        "p25": 0.2749747729566095,
-        "p50": 0.5221997981836529,
-        "p75": 0.760343087790111,
-        "p90": 0.8905146316851665
+        "interval_50": 0.5015757575757576,
+        "interval_80": 0.7830303030303031,
+        "p10": 0.13624242424242425,
+        "p25": 0.30933333333333335,
+        "p50": 0.5718787878787879,
+        "p75": 0.8109090909090909,
+        "p90": 0.9192727272727272
       },
       "feature_count": 45,
       "horizon_days": 2,
       "interval_width": {
-        "interval_50_mean": 0.07301588694006782,
-        "interval_80_mean": 0.13510030639802253
+        "interval_50_mean": null,
+        "interval_80_mean": null
       },
-      "model_mae": 0.044373845834330586,
-      "model_r2": 0.09550221479018195,
-      "model_rmse": 0.06580575747834921,
+      "metric_scope": "historical_out_of_sample",
+      "model_mae": 0.05136541557700659,
+      "model_r2": null,
+      "model_rmse": null,
       "model_version": "v3",
-      "n_train": 5780,
-      "n_validation": 1982,
+      "n_matched_baseline": 3699,
+      "n_train": 18836,
+      "n_validation": 4125,
       "quantiles": [
         0.1,
         0.25,
@@ -463,32 +2148,75 @@
         0.75,
         0.9
       ],
-      "relative_mae_improvement": 0.2752704873479973,
-      "straddle_baseline_mae": 0.06122814796371873,
-      "trained_at": "2026-08-30T17:42:24.028872"
+      "relative_mae_improvement": 0.10829135166209225,
+      "straddle_baseline_mae": 0.05760336144855015,
+      "trained_at": "2026-10-16T02:55:50.035024+00:00"
     },
     {
+      "baseline_label": "Market straddle",
+      "baseline_mae": 0.0627083015063242,
+      "cohort": "strict_options",
       "coverage": {
-        "interval_50": 0.46153846153846156,
-        "interval_80": 0.7866004962779156,
-        "p10": 0.11228287841191067,
-        "p25": 0.31389578163771714,
-        "p50": 0.5403225806451613,
-        "p75": 0.7754342431761787,
-        "p90": 0.8988833746898263
+        "interval_50": 0.4826568265682657,
+        "interval_80": 0.7284132841328413,
+        "p10": 0.17047970479704797,
+        "p25": 0.3077490774907749,
+        "p50": 0.5712177121771218,
+        "p75": 0.7904059040590405,
+        "p90": 0.8988929889298893
+      },
+      "feature_count": 45,
+      "horizon_days": 2,
+      "interval_width": {
+        "interval_50_mean": null,
+        "interval_80_mean": null
+      },
+      "metric_scope": "historical_out_of_sample",
+      "model_mae": 0.04311834158638107,
+      "model_r2": null,
+      "model_rmse": null,
+      "model_version": "v3",
+      "n_matched_baseline": 1355,
+      "n_train": 18836,
+      "n_validation": 1355,
+      "quantiles": [
+        0.1,
+        0.25,
+        0.5,
+        0.75,
+        0.9
+      ],
+      "relative_mae_improvement": 0.31239819050062223,
+      "straddle_baseline_mae": 0.0627083015063242,
+      "trained_at": "2026-10-16T02:55:50.035024+00:00"
+    },
+    {
+      "baseline_label": "Market straddle",
+      "baseline_mae": 0.06259107719725943,
+      "cohort": "strict_options",
+      "coverage": {
+        "interval_50": 0.4715447154471545,
+        "interval_80": 0.743321718931475,
+        "p10": 0.148664343786295,
+        "p25": 0.31126596980255516,
+        "p50": 0.5737514518002322,
+        "p75": 0.7828106852497096,
+        "p90": 0.89198606271777
       },
       "feature_count": 45,
       "horizon_days": 3,
       "interval_width": {
-        "interval_50_mean": 0.07466605642760021,
-        "interval_80_mean": 0.13733628973851433
+        "interval_50_mean": null,
+        "interval_80_mean": null
       },
-      "model_mae": 0.044490369629784914,
-      "model_r2": 0.13592252198718346,
-      "model_rmse": 0.06752530692175036,
+      "metric_scope": "historical_out_of_sample",
+      "model_mae": 0.0425441477794308,
+      "model_r2": null,
+      "model_rmse": null,
       "model_version": "v3",
-      "n_train": 4669,
-      "n_validation": 1612,
+      "n_matched_baseline": 861,
+      "n_train": 13577,
+      "n_validation": 861,
       "quantiles": [
         0.1,
         0.25,
@@ -496,32 +2224,151 @@
         0.75,
         0.9
       ],
-      "relative_mae_improvement": 0.26914007234085835,
-      "straddle_baseline_mae": 0.060874003274857785,
-      "trained_at": "2026-08-30T17:42:33.095621"
+      "relative_mae_improvement": 0.32028414137448946,
+      "straddle_baseline_mae": 0.06259107719725943,
+      "trained_at": "2026-10-16T02:56:29.240545+00:00"
     },
     {
+      "baseline_label": "Historical move",
+      "baseline_mae": 0.06003842814919881,
+      "cohort": "optionless",
       "coverage": {
-        "interval_50": 0.49147516679021497,
-        "interval_80": 0.7742772424017791,
-        "p10": 0.12083024462564863,
-        "p25": 0.28687916975537436,
-        "p50": 0.536693847294292,
-        "p75": 0.7783543365455893,
-        "p90": 0.8951074870274277
+        "interval_50": 0.4970437524635396,
+        "interval_80": 0.7836026803310997,
+        "p10": 0.12534489554592038,
+        "p25": 0.3054789121009066,
+        "p50": 0.5668111943240047,
+        "p75": 0.8025226645644462,
+        "p90": 0.9089475758770201
+      },
+      "feature_count": 45,
+      "horizon_days": 4,
+      "interval_width": {
+        "interval_50_mean": null,
+        "interval_80_mean": null
+      },
+      "metric_scope": "historical_out_of_sample",
+      "model_mae": 0.054461462701629784,
+      "model_r2": null,
+      "model_rmse": null,
+      "model_version": "v3",
+      "n_matched_baseline": 2250,
+      "n_train": 11631,
+      "n_validation": 2537,
+      "quantiles": [
+        0.1,
+        0.25,
+        0.5,
+        0.75,
+        0.9
+      ],
+      "relative_mae_improvement": 0.09288993099069753,
+      "straddle_baseline_mae": 0.06003842814919881,
+      "trained_at": "2026-10-16T02:57:05.145112+00:00"
+    },
+    {
+      "baseline_label": "Historical move",
+      "baseline_mae": 0.058095022055892974,
+      "cohort": "optionless",
+      "coverage": {
+        "interval_50": 0.4997397188964081,
+        "interval_80": 0.7766788131181677,
+        "p10": 0.13092139510671524,
+        "p25": 0.29385736595523165,
+        "p50": 0.5611660593440916,
+        "p75": 0.7935970848516398,
+        "p90": 0.9076002082248829
+      },
+      "feature_count": 45,
+      "horizon_days": 5,
+      "interval_width": {
+        "interval_50_mean": null,
+        "interval_80_mean": null
+      },
+      "metric_scope": "historical_out_of_sample",
+      "model_mae": 0.053048014808946393,
+      "model_r2": null,
+      "model_rmse": null,
+      "model_version": "v3",
+      "n_matched_baseline": 3501,
+      "n_train": 18989,
+      "n_validation": 3842,
+      "quantiles": [
+        0.1,
+        0.25,
+        0.5,
+        0.75,
+        0.9
+      ],
+      "relative_mae_improvement": 0.08687503796953333,
+      "straddle_baseline_mae": 0.058095022055892974,
+      "trained_at": "2026-10-16T02:58:20.126502+00:00"
+    },
+    {
+      "baseline_label": "Historical move",
+      "baseline_mae": 0.058947366705283076,
+      "cohort": "optionless",
+      "coverage": {
+        "interval_50": 0.4943249195324411,
+        "interval_80": 0.784855158394037,
+        "p10": 0.1316279857699475,
+        "p25": 0.3101812637641877,
+        "p50": 0.5739454514653566,
+        "p75": 0.8045061832966288,
+        "p90": 0.9164831441639845
+      },
+      "feature_count": 45,
+      "horizon_days": 6,
+      "interval_width": {
+        "interval_50_mean": null,
+        "interval_80_mean": null
+      },
+      "metric_scope": "historical_out_of_sample",
+      "model_mae": 0.053459054468152474,
+      "model_r2": null,
+      "model_rmse": null,
+      "model_version": "v3",
+      "n_matched_baseline": 5366,
+      "n_train": 28433,
+      "n_validation": 5903,
+      "quantiles": [
+        0.1,
+        0.25,
+        0.5,
+        0.75,
+        0.9
+      ],
+      "relative_mae_improvement": 0.09310529958989189,
+      "straddle_baseline_mae": 0.058947366705283076,
+      "trained_at": "2026-10-16T03:00:02.851451+00:00"
+    },
+    {
+      "baseline_label": "Historical move",
+      "baseline_mae": 0.05873420664806907,
+      "cohort": "optionless",
+      "coverage": {
+        "interval_50": 0.5049615877080665,
+        "interval_80": 0.7962548015364916,
+        "p10": 0.12483994878361075,
+        "p25": 0.30873879641485275,
+        "p50": 0.573943661971831,
+        "p75": 0.8137003841229193,
+        "p90": 0.9210947503201025
       },
       "feature_count": 45,
       "horizon_days": 7,
       "interval_width": {
-        "interval_50_mean": 0.07963124145096621,
-        "interval_80_mean": 0.1375577173019996
+        "interval_50_mean": null,
+        "interval_80_mean": null
       },
-      "model_mae": 0.04541132683245346,
-      "model_r2": 0.09658732027061412,
-      "model_rmse": 0.0675842783416685,
+      "metric_scope": "historical_out_of_sample",
+      "model_mae": 0.05284534019301179,
+      "model_r2": null,
+      "model_rmse": null,
       "model_version": "v3",
-      "n_train": 7911,
-      "n_validation": 2698,
+      "n_matched_baseline": 5622,
+      "n_train": 29311,
+      "n_validation": 6248,
       "quantiles": [
         0.1,
         0.25,
@@ -529,32 +2376,227 @@
         0.75,
         0.9
       ],
-      "relative_mae_improvement": 0.2957932433014726,
-      "straddle_baseline_mae": 0.06448578688076144,
-      "trained_at": "2026-08-30T17:42:45.764660"
+      "relative_mae_improvement": 0.10026297776256554,
+      "straddle_baseline_mae": 0.05873420664806907,
+      "trained_at": "2026-10-16T03:02:13.282895+00:00"
     },
     {
+      "baseline_label": "Market straddle",
+      "baseline_mae": 0.06650078419495664,
+      "cohort": "strict_options",
       "coverage": {
-        "interval_50": 0.49212893553223386,
-        "interval_80": 0.7837331334332833,
-        "p10": 0.106071964017991,
-        "p25": 0.27511244377811095,
-        "p50": 0.5224887556221889,
-        "p75": 0.7672413793103449,
-        "p90": 0.8898050974512743
+        "interval_50": 0.47923156801661476,
+        "interval_80": 0.7559709241952233,
+        "p10": 0.15680166147455868,
+        "p25": 0.3291796469366563,
+        "p50": 0.5763239875389408,
+        "p75": 0.8084112149532711,
+        "p90": 0.9127725856697819
+      },
+      "feature_count": 45,
+      "horizon_days": 7,
+      "interval_width": {
+        "interval_50_mean": null,
+        "interval_80_mean": null
+      },
+      "metric_scope": "historical_out_of_sample",
+      "model_mae": 0.04343762034000869,
+      "model_r2": null,
+      "model_rmse": null,
+      "model_version": "v3",
+      "n_matched_baseline": 1926,
+      "n_train": 29311,
+      "n_validation": 1926,
+      "quantiles": [
+        0.1,
+        0.25,
+        0.5,
+        0.75,
+        0.9
+      ],
+      "relative_mae_improvement": 0.3468104043304957,
+      "straddle_baseline_mae": 0.06650078419495664,
+      "trained_at": "2026-10-16T03:02:13.282895+00:00"
+    },
+    {
+      "baseline_label": "Market straddle",
+      "baseline_mae": 0.06714521867325736,
+      "cohort": "strict_options",
+      "coverage": {
+        "interval_50": 0.46674182638105977,
+        "interval_80": 0.7643742953776775,
+        "p10": 0.15107102593010147,
+        "p25": 0.3201803833145434,
+        "p50": 0.5704622322435174,
+        "p75": 0.7869222096956031,
+        "p90": 0.915445321307779
+      },
+      "feature_count": 45,
+      "horizon_days": 10,
+      "interval_width": {
+        "interval_50_mean": null,
+        "interval_80_mean": null
+      },
+      "metric_scope": "historical_out_of_sample",
+      "model_mae": 0.04328001605349977,
+      "model_r2": null,
+      "model_rmse": null,
+      "model_version": "v3",
+      "n_matched_baseline": 887,
+      "n_train": 13251,
+      "n_validation": 887,
+      "quantiles": [
+        0.1,
+        0.25,
+        0.5,
+        0.75,
+        0.9
+      ],
+      "relative_mae_improvement": 0.35542668698259283,
+      "straddle_baseline_mae": 0.06714521867325736,
+      "trained_at": "2026-10-16T03:05:43.134753+00:00"
+    },
+    {
+      "baseline_label": "Historical move",
+      "baseline_mae": 0.059983297226924054,
+      "cohort": "optionless",
+      "coverage": {
+        "interval_50": 0.49206349206349204,
+        "interval_80": 0.7871387871387872,
+        "p10": 0.12657712657712658,
+        "p25": 0.31868131868131866,
+        "p50": 0.5791615791615792,
+        "p75": 0.8107448107448108,
+        "p90": 0.9137159137159138
+      },
+      "feature_count": 45,
+      "horizon_days": 11,
+      "interval_width": {
+        "interval_50_mean": null,
+        "interval_80_mean": null
+      },
+      "metric_scope": "historical_out_of_sample",
+      "model_mae": 0.054826564778787855,
+      "model_r2": null,
+      "model_rmse": null,
+      "model_version": "v3",
+      "n_matched_baseline": 2165,
+      "n_train": 11012,
+      "n_validation": 2457,
+      "quantiles": [
+        0.1,
+        0.25,
+        0.5,
+        0.75,
+        0.9
+      ],
+      "relative_mae_improvement": 0.08596947294557111,
+      "straddle_baseline_mae": 0.059983297226924054,
+      "trained_at": "2026-10-16T03:06:22.516991+00:00"
+    },
+    {
+      "baseline_label": "Historical move",
+      "baseline_mae": 0.058428484272312765,
+      "cohort": "optionless",
+      "coverage": {
+        "interval_50": 0.49503622216259724,
+        "interval_80": 0.7880332707271264,
+        "p10": 0.12503353903944192,
+        "p25": 0.3058760397102227,
+        "p50": 0.5661389857794473,
+        "p75": 0.8006439495572847,
+        "p90": 0.912798497451033
+      },
+      "feature_count": 45,
+      "horizon_days": 12,
+      "interval_width": {
+        "interval_50_mean": null,
+        "interval_80_mean": null
+      },
+      "metric_scope": "historical_out_of_sample",
+      "model_mae": 0.05305198655644859,
+      "model_r2": null,
+      "model_rmse": null,
+      "model_version": "v3",
+      "n_matched_baseline": 3390,
+      "n_train": 17956,
+      "n_validation": 3727,
+      "quantiles": [
+        0.1,
+        0.25,
+        0.5,
+        0.75,
+        0.9
+      ],
+      "relative_mae_improvement": 0.0920184355768392,
+      "straddle_baseline_mae": 0.058428484272312765,
+      "trained_at": "2026-10-16T03:07:37.178658+00:00"
+    },
+    {
+      "baseline_label": "Historical move",
+      "baseline_mae": 0.05913779194212162,
+      "cohort": "optionless",
+      "coverage": {
+        "interval_50": 0.4941257774706289,
+        "interval_80": 0.7914651002073255,
+        "p10": 0.12664132688320665,
+        "p25": 0.30787836903939186,
+        "p50": 0.5691085003455425,
+        "p75": 0.8020041465100207,
+        "p90": 0.9181064270905321
+      },
+      "feature_count": 45,
+      "horizon_days": 13,
+      "interval_width": {
+        "interval_50_mean": null,
+        "interval_80_mean": null
+      },
+      "metric_scope": "historical_out_of_sample",
+      "model_mae": 0.05342757618009458,
+      "model_r2": null,
+      "model_rmse": null,
+      "model_version": "v3",
+      "n_matched_baseline": 5245,
+      "n_train": 28013,
+      "n_validation": 5788,
+      "quantiles": [
+        0.1,
+        0.25,
+        0.5,
+        0.75,
+        0.9
+      ],
+      "relative_mae_improvement": 0.09655781141804631,
+      "straddle_baseline_mae": 0.05913779194212162,
+      "trained_at": "2026-10-16T03:08:57.211695+00:00"
+    },
+    {
+      "baseline_label": "Historical move",
+      "baseline_mae": 0.05870801316103943,
+      "cohort": "optionless",
+      "coverage": {
+        "interval_50": 0.49768037114061753,
+        "interval_80": 0.7891537354023356,
+        "p10": 0.12877939529675253,
+        "p25": 0.3098704207326828,
+        "p50": 0.5746280595104784,
+        "p75": 0.8073908174692049,
+        "p90": 0.9177731562949928
       },
       "feature_count": 45,
       "horizon_days": 14,
       "interval_width": {
-        "interval_50_mean": 0.07428982979256715,
-        "interval_80_mean": 0.13472480913104082
+        "interval_50_mean": null,
+        "interval_80_mean": null
       },
-      "model_mae": 0.04434979706580183,
-      "model_r2": 0.0912997090174631,
-      "model_rmse": 0.0656408705238556,
+      "metric_scope": "historical_out_of_sample",
+      "model_mae": 0.052933154330943546,
+      "model_r2": null,
+      "model_rmse": null,
       "model_version": "v3",
-      "n_train": 7734,
-      "n_validation": 2668,
+      "n_matched_baseline": 5613,
+      "n_train": 29045,
+      "n_validation": 6251,
       "quantiles": [
         0.1,
         0.25,
@@ -562,32 +2604,417 @@
         0.75,
         0.9
       ],
-      "relative_mae_improvement": 0.32158447844029536,
-      "straddle_baseline_mae": 0.06537261553780471,
-      "trained_at": "2026-08-30T17:43:00.506011"
+      "relative_mae_improvement": 0.09836576847278267,
+      "straddle_baseline_mae": 0.05870801316103943,
+      "trained_at": "2026-10-16T03:10:20.099446+00:00"
     },
     {
+      "baseline_label": "Market straddle",
+      "baseline_mae": 0.06795098815887918,
+      "cohort": "strict_options",
       "coverage": {
-        "interval_50": 0.48528834837191054,
-        "interval_80": 0.7791290702236171,
-        "p10": 0.1114162416633974,
-        "p25": 0.2801098469988231,
-        "p50": 0.52138093369949,
-        "p75": 0.7653981953707336,
-        "p90": 0.8905453118870145
+        "interval_50": 0.4802289281997919,
+        "interval_80": 0.7695109261186265,
+        "p10": 0.14880332986472425,
+        "p25": 0.31997918834547345,
+        "p50": 0.568678459937565,
+        "p75": 0.8002081165452654,
+        "p90": 0.9183142559833507
+      },
+      "feature_count": 45,
+      "horizon_days": 14,
+      "interval_width": {
+        "interval_50_mean": null,
+        "interval_80_mean": null
+      },
+      "metric_scope": "historical_out_of_sample",
+      "model_mae": 0.04291845472686102,
+      "model_r2": null,
+      "model_rmse": null,
+      "model_version": "v3",
+      "n_matched_baseline": 1922,
+      "n_train": 29045,
+      "n_validation": 1922,
+      "quantiles": [
+        0.1,
+        0.25,
+        0.5,
+        0.75,
+        0.9
+      ],
+      "relative_mae_improvement": 0.36839101402747076,
+      "straddle_baseline_mae": 0.06795098815887918,
+      "trained_at": "2026-10-16T03:10:20.099446+00:00"
+    },
+    {
+      "baseline_label": "Historical move",
+      "baseline_mae": 0.05777600044333976,
+      "cohort": "optionless",
+      "coverage": {
+        "interval_50": 0.49715544136538814,
+        "interval_80": 0.7828959442099468,
+        "p10": 0.13415305560653332,
+        "p25": 0.3129014498073041,
+        "p50": 0.5766195632226097,
+        "p75": 0.8098733712607818,
+        "p90": 0.9168654799045697
+      },
+      "feature_count": 45,
+      "horizon_days": 15,
+      "interval_width": {
+        "interval_50_mean": null,
+        "interval_80_mean": null
+      },
+      "metric_scope": "historical_out_of_sample",
+      "model_mae": 0.0520907414688343,
+      "model_r2": null,
+      "model_rmse": null,
+      "model_version": "v3",
+      "n_matched_baseline": 4893,
+      "n_train": 25339,
+      "n_validation": 5449,
+      "quantiles": [
+        0.1,
+        0.25,
+        0.5,
+        0.75,
+        0.9
+      ],
+      "relative_mae_improvement": 0.09840174001107826,
+      "straddle_baseline_mae": 0.05777600044333976,
+      "trained_at": "2026-10-16T03:11:31.719826+00:00"
+    },
+    {
+      "baseline_label": "Market straddle",
+      "baseline_mae": 0.06890976112445522,
+      "cohort": "strict_options",
+      "coverage": {
+        "interval_50": 0.4732739420935412,
+        "interval_80": 0.7583518930957683,
+        "p10": 0.15367483296213807,
+        "p25": 0.3234966592427617,
+        "p50": 0.5723830734966593,
+        "p75": 0.7967706013363028,
+        "p90": 0.9120267260579065
+      },
+      "feature_count": 45,
+      "horizon_days": 15,
+      "interval_width": {
+        "interval_50_mean": null,
+        "interval_80_mean": null
+      },
+      "metric_scope": "historical_out_of_sample",
+      "model_mae": 0.0430953972981369,
+      "model_r2": null,
+      "model_rmse": null,
+      "model_version": "v3",
+      "n_matched_baseline": 1796,
+      "n_train": 25339,
+      "n_validation": 1796,
+      "quantiles": [
+        0.1,
+        0.25,
+        0.5,
+        0.75,
+        0.9
+      ],
+      "relative_mae_improvement": 0.37461113498414267,
+      "straddle_baseline_mae": 0.06890976112445522,
+      "trained_at": "2026-10-16T03:11:31.719826+00:00"
+    },
+    {
+      "baseline_label": "Market straddle",
+      "baseline_mae": 0.07090885737570927,
+      "cohort": "strict_options",
+      "coverage": {
+        "interval_50": 0.45959970348406226,
+        "interval_80": 0.7464788732394366,
+        "p10": 0.15122312824314307,
+        "p25": 0.3224610822831727,
+        "p50": 0.5693106004447739,
+        "p75": 0.782060785767235,
+        "p90": 0.8977020014825797
+      },
+      "feature_count": 45,
+      "horizon_days": 16,
+      "interval_width": {
+        "interval_50_mean": null,
+        "interval_80_mean": null
+      },
+      "metric_scope": "historical_out_of_sample",
+      "model_mae": 0.04447386866766844,
+      "model_r2": null,
+      "model_rmse": null,
+      "model_version": "v3",
+      "n_matched_baseline": 1349,
+      "n_train": 18254,
+      "n_validation": 1349,
+      "quantiles": [
+        0.1,
+        0.25,
+        0.5,
+        0.75,
+        0.9
+      ],
+      "relative_mae_improvement": 0.3728023506002295,
+      "straddle_baseline_mae": 0.07090885737570927,
+      "trained_at": "2026-10-16T03:12:37.755286+00:00"
+    },
+    {
+      "baseline_label": "Market straddle",
+      "baseline_mae": 0.07314911149101572,
+      "cohort": "strict_options",
+      "coverage": {
+        "interval_50": 0.4632183908045977,
+        "interval_80": 0.7402298850574712,
+        "p10": 0.1425287356321839,
+        "p25": 0.30919540229885056,
+        "p50": 0.5471264367816092,
+        "p75": 0.7724137931034483,
+        "p90": 0.8827586206896552
+      },
+      "feature_count": 45,
+      "horizon_days": 17,
+      "interval_width": {
+        "interval_50_mean": null,
+        "interval_80_mean": null
+      },
+      "metric_scope": "historical_out_of_sample",
+      "model_mae": 0.04427001317674031,
+      "model_r2": null,
+      "model_rmse": null,
+      "model_version": "v3",
+      "n_matched_baseline": 870,
+      "n_train": 13134,
+      "n_validation": 870,
+      "quantiles": [
+        0.1,
+        0.25,
+        0.5,
+        0.75,
+        0.9
+      ],
+      "relative_mae_improvement": 0.39479766364383506,
+      "straddle_baseline_mae": 0.07314911149101572,
+      "trained_at": "2026-10-16T03:13:25.467755+00:00"
+    },
+    {
+      "baseline_label": "Historical move",
+      "baseline_mae": 0.06139094416800306,
+      "cohort": "optionless",
+      "coverage": {
+        "interval_50": 0.485453034081463,
+        "interval_80": 0.7826267664172901,
+        "p10": 0.12427265170407314,
+        "p25": 0.31463009143807147,
+        "p50": 0.5743973399833749,
+        "p75": 0.8000831255195345,
+        "p90": 0.9068994181213632
+      },
+      "feature_count": 45,
+      "horizon_days": 18,
+      "interval_width": {
+        "interval_50_mean": null,
+        "interval_80_mean": null
+      },
+      "metric_scope": "historical_out_of_sample",
+      "model_mae": 0.05574127585784682,
+      "model_r2": null,
+      "model_rmse": null,
+      "model_version": "v3",
+      "n_matched_baseline": 2122,
+      "n_train": 10666,
+      "n_validation": 2406,
+      "quantiles": [
+        0.1,
+        0.25,
+        0.5,
+        0.75,
+        0.9
+      ],
+      "relative_mae_improvement": 0.09202771494595852,
+      "straddle_baseline_mae": 0.06139094416800306,
+      "trained_at": "2026-10-16T03:13:56.706485+00:00"
+    },
+    {
+      "baseline_label": "Market straddle",
+      "baseline_mae": 0.07353657490147177,
+      "cohort": "strict_options",
+      "coverage": {
+        "interval_50": 0.48006134969325154,
+        "interval_80": 0.7929447852760736,
+        "p10": 0.1334355828220859,
+        "p25": 0.3220858895705521,
+        "p50": 0.5782208588957055,
+        "p75": 0.8021472392638037,
+        "p90": 0.9263803680981595
+      },
+      "feature_count": 45,
+      "horizon_days": 18,
+      "interval_width": {
+        "interval_50_mean": null,
+        "interval_80_mean": null
+      },
+      "metric_scope": "historical_out_of_sample",
+      "model_mae": 0.040850612651024236,
+      "model_r2": null,
+      "model_rmse": null,
+      "model_version": "v3",
+      "n_matched_baseline": 652,
+      "n_train": 10666,
+      "n_validation": 652,
+      "quantiles": [
+        0.1,
+        0.25,
+        0.5,
+        0.75,
+        0.9
+      ],
+      "relative_mae_improvement": 0.4444857853964769,
+      "straddle_baseline_mae": 0.07353657490147177,
+      "trained_at": "2026-10-16T03:13:56.706485+00:00"
+    },
+    {
+      "baseline_label": "Historical move",
+      "baseline_mae": 0.059483616447699096,
+      "cohort": "optionless",
+      "coverage": {
+        "interval_50": 0.4824730886006072,
+        "interval_80": 0.7855368479160917,
+        "p10": 0.12696660226331768,
+        "p25": 0.31189621860336736,
+        "p50": 0.5705216671266906,
+        "p75": 0.7943693072039746,
+        "p90": 0.9125034501794094
+      },
+      "feature_count": 45,
+      "horizon_days": 19,
+      "interval_width": {
+        "interval_50_mean": null,
+        "interval_80_mean": null
+      },
+      "metric_scope": "historical_out_of_sample",
+      "model_mae": 0.054331687372703205,
+      "model_r2": null,
+      "model_rmse": null,
+      "model_version": "v3",
+      "n_matched_baseline": 3294,
+      "n_train": 17691,
+      "n_validation": 3623,
+      "quantiles": [
+        0.1,
+        0.25,
+        0.5,
+        0.75,
+        0.9
+      ],
+      "relative_mae_improvement": 0.08661089191720073,
+      "straddle_baseline_mae": 0.059483616447699096,
+      "trained_at": "2026-10-16T03:14:38.327907+00:00"
+    },
+    {
+      "baseline_label": "Historical move",
+      "baseline_mae": 0.059600711315566234,
+      "cohort": "optionless",
+      "coverage": {
+        "interval_50": 0.4911660777385159,
+        "interval_80": 0.7890459363957597,
+        "p10": 0.12614840989399292,
+        "p25": 0.30901060070671377,
+        "p50": 0.572791519434629,
+        "p75": 0.8001766784452297,
+        "p90": 0.9151943462897526
+      },
+      "feature_count": 45,
+      "horizon_days": 20,
+      "interval_width": {
+        "interval_50_mean": null,
+        "interval_80_mean": null
+      },
+      "metric_scope": "historical_out_of_sample",
+      "model_mae": 0.0538577660711567,
+      "model_r2": null,
+      "model_rmse": null,
+      "model_version": "v3",
+      "n_matched_baseline": 5145,
+      "n_train": 27204,
+      "n_validation": 5660,
+      "quantiles": [
+        0.1,
+        0.25,
+        0.5,
+        0.75,
+        0.9
+      ],
+      "relative_mae_improvement": 0.09635699168089662,
+      "straddle_baseline_mae": 0.059600711315566234,
+      "trained_at": "2026-10-16T03:15:49.074018+00:00"
+    },
+    {
+      "baseline_label": "Market straddle",
+      "baseline_mae": 0.0755169520035729,
+      "cohort": "strict_options",
+      "coverage": {
+        "interval_50": 0.4642857142857143,
+        "interval_80": 0.7559523809523809,
+        "p10": 0.14404761904761904,
+        "p25": 0.32142857142857145,
+        "p50": 0.5732142857142857,
+        "p75": 0.7857142857142857,
+        "p90": 0.9
+      },
+      "feature_count": 45,
+      "horizon_days": 20,
+      "interval_width": {
+        "interval_50_mean": null,
+        "interval_80_mean": null
+      },
+      "metric_scope": "historical_out_of_sample",
+      "model_mae": 0.04489305422823591,
+      "model_r2": null,
+      "model_rmse": null,
+      "model_version": "v3",
+      "n_matched_baseline": 1680,
+      "n_train": 27204,
+      "n_validation": 1680,
+      "quantiles": [
+        0.1,
+        0.25,
+        0.5,
+        0.75,
+        0.9
+      ],
+      "relative_mae_improvement": 0.4055234879433176,
+      "straddle_baseline_mae": 0.0755169520035729,
+      "trained_at": "2026-10-16T03:15:49.074018+00:00"
+    },
+    {
+      "baseline_label": "Market straddle",
+      "baseline_mae": 0.07603738610844493,
+      "cohort": "strict_options",
+      "coverage": {
+        "interval_50": 0.459007551240561,
+        "interval_80": 0.7588996763754046,
+        "p10": 0.14347357065803668,
+        "p25": 0.3209277238403452,
+        "p50": 0.564185544768069,
+        "p75": 0.7799352750809061,
+        "p90": 0.9023732470334412
       },
       "feature_count": 45,
       "horizon_days": 21,
       "interval_width": {
-        "interval_50_mean": 0.07442233983245654,
-        "interval_80_mean": 0.1359937306110941
+        "interval_50_mean": null,
+        "interval_80_mean": null
       },
-      "model_mae": 0.04568588370453592,
-      "model_r2": 0.08647747715621146,
-      "model_rmse": 0.0684634233612318,
+      "metric_scope": "historical_out_of_sample",
+      "model_mae": 0.04371299137261609,
+      "model_r2": null,
+      "model_rmse": null,
       "model_version": "v3",
-      "n_train": 7531,
-      "n_validation": 2549,
+      "n_matched_baseline": 1854,
+      "n_train": 28132,
+      "n_validation": 1854,
       "quantiles": [
         0.1,
         0.25,
@@ -595,225 +3022,1071 @@
         0.75,
         0.9
       ],
-      "relative_mae_improvement": 0.3772377663257429,
-      "straddle_baseline_mae": 0.07336007425336656,
-      "trained_at": "2026-08-30T17:43:14.461853"
+      "relative_mae_improvement": 0.4251118612852842,
+      "straddle_baseline_mae": 0.07603738610844493,
+      "trained_at": "2026-10-16T03:17:12.766332+00:00"
+    },
+    {
+      "baseline_label": "Historical move",
+      "baseline_mae": 0.057513516542502814,
+      "cohort": "optionless",
+      "coverage": {
+        "interval_50": 0.4887558940877766,
+        "interval_80": 0.7914399709829525,
+        "p10": 0.1305767138193689,
+        "p25": 0.31610446137105547,
+        "p50": 0.5792528110264781,
+        "p75": 0.804860355458832,
+        "p90": 0.92183532825535
+      },
+      "feature_count": 45,
+      "horizon_days": 22,
+      "interval_width": {
+        "interval_50_mean": null,
+        "interval_80_mean": null
+      },
+      "metric_scope": "historical_out_of_sample",
+      "model_mae": 0.0517855554210135,
+      "model_r2": null,
+      "model_rmse": null,
+      "model_version": "v3",
+      "n_matched_baseline": 4959,
+      "n_train": 24210,
+      "n_validation": 5514,
+      "quantiles": [
+        0.1,
+        0.25,
+        0.5,
+        0.75,
+        0.9
+      ],
+      "relative_mae_improvement": 0.0995933037281127,
+      "straddle_baseline_mae": 0.057513516542502814,
+      "trained_at": "2026-10-16T03:18:23.932867+00:00"
+    },
+    {
+      "baseline_label": "Historical move",
+      "baseline_mae": 0.05749964165098366,
+      "cohort": "optionless",
+      "coverage": {
+        "interval_50": 0.5034157832744405,
+        "interval_80": 0.7945818610129565,
+        "p10": 0.1305064782096584,
+        "p25": 0.3036513545347468,
+        "p50": 0.5750294464075383,
+        "p75": 0.806831566548881,
+        "p90": 0.9248527679623086
+      },
+      "feature_count": 45,
+      "horizon_days": 23,
+      "interval_width": {
+        "interval_50_mean": null,
+        "interval_80_mean": null
+      },
+      "metric_scope": "historical_out_of_sample",
+      "model_mae": 0.05160078069885039,
+      "model_r2": null,
+      "model_rmse": null,
+      "model_version": "v3",
+      "n_matched_baseline": 3813,
+      "n_train": 17217,
+      "n_validation": 4245,
+      "quantiles": [
+        0.1,
+        0.25,
+        0.5,
+        0.75,
+        0.9
+      ],
+      "relative_mae_improvement": 0.10258952547806621,
+      "straddle_baseline_mae": 0.05749964165098366,
+      "trained_at": "2026-10-16T03:19:39.238319+00:00"
+    },
+    {
+      "baseline_label": "Market straddle",
+      "baseline_mae": 0.07667840674006218,
+      "cohort": "strict_options",
+      "coverage": {
+        "interval_50": 0.46484375,
+        "interval_80": 0.74296875,
+        "p10": 0.1578125,
+        "p25": 0.30625,
+        "p50": 0.5515625,
+        "p75": 0.77109375,
+        "p90": 0.90078125
+      },
+      "feature_count": 45,
+      "horizon_days": 23,
+      "interval_width": {
+        "interval_50_mean": null,
+        "interval_80_mean": null
+      },
+      "metric_scope": "historical_out_of_sample",
+      "model_mae": 0.04380337750881871,
+      "model_r2": null,
+      "model_rmse": null,
+      "model_version": "v3",
+      "n_matched_baseline": 1280,
+      "n_train": 17217,
+      "n_validation": 1280,
+      "quantiles": [
+        0.1,
+        0.25,
+        0.5,
+        0.75,
+        0.9
+      ],
+      "relative_mae_improvement": 0.4287390756916608,
+      "straddle_baseline_mae": 0.07667840674006218,
+      "trained_at": "2026-10-16T03:19:39.238319+00:00"
+    },
+    {
+      "baseline_label": "Market straddle",
+      "baseline_mae": 0.07884483834498014,
+      "cohort": "strict_options",
+      "coverage": {
+        "interval_50": 0.4719387755102041,
+        "interval_80": 0.7614795918367347,
+        "p10": 0.1326530612244898,
+        "p25": 0.2971938775510204,
+        "p50": 0.548469387755102,
+        "p75": 0.7691326530612245,
+        "p90": 0.8941326530612245
+      },
+      "feature_count": 45,
+      "horizon_days": 24,
+      "interval_width": {
+        "interval_50_mean": null,
+        "interval_80_mean": null
+      },
+      "metric_scope": "historical_out_of_sample",
+      "model_mae": 0.0447364248380207,
+      "model_r2": null,
+      "model_rmse": null,
+      "model_version": "v3",
+      "n_matched_baseline": 784,
+      "n_train": 12423,
+      "n_validation": 784,
+      "quantiles": [
+        0.1,
+        0.25,
+        0.5,
+        0.75,
+        0.9
+      ],
+      "relative_mae_improvement": 0.4326017304737241,
+      "straddle_baseline_mae": 0.07884483834498014,
+      "trained_at": "2026-10-16T03:20:23.946764+00:00"
+    },
+    {
+      "baseline_label": "Market straddle",
+      "baseline_mae": 0.07892083298552172,
+      "cohort": "strict_options",
+      "coverage": {
+        "interval_50": 0.4927536231884058,
+        "interval_80": 0.7898550724637681,
+        "p10": 0.1286231884057971,
+        "p25": 0.3061594202898551,
+        "p50": 0.5688405797101449,
+        "p75": 0.7989130434782609,
+        "p90": 0.9184782608695652
+      },
+      "feature_count": 45,
+      "horizon_days": 25,
+      "interval_width": {
+        "interval_50_mean": null,
+        "interval_80_mean": null
+      },
+      "metric_scope": "historical_out_of_sample",
+      "model_mae": 0.0418871621410542,
+      "model_r2": null,
+      "model_rmse": null,
+      "model_version": "v3",
+      "n_matched_baseline": 552,
+      "n_train": 10086,
+      "n_validation": 552,
+      "quantiles": [
+        0.1,
+        0.25,
+        0.5,
+        0.75,
+        0.9
+      ],
+      "relative_mae_improvement": 0.46925088653412295,
+      "straddle_baseline_mae": 0.07892083298552172,
+      "trained_at": "2026-10-16T03:20:55.480751+00:00"
     }
   ],
   "model_source": {
-    "artifact_sha256": "f11c540e5081eac72c882c4e69e13d479698bd74c9d71f7b5e74cd140c6fa8a7",
-    "bundle_id": "4d1ab76dc3401072f1c9a809c71aa76d0c905e5117f7d98d31928219a79a8b78",
+    "artifact_sha256": "3370619ce27fdd1806adfedef31ab955553291eda043b9a5227df6f28e9aa8ce",
+    "bundle_id": "d14dc7f2aa6b175956922eb6266b8523742add962668b7d6b8833cc2c869dd1b",
     "kind": "signed_champion",
-    "model_validation_receipt_id": "sha256:a54477264da37f540a6b8c2ad62134f73f8800808db2519ec3fdb60cbeefc47b",
-    "source_revision": "2b3f22178885bb1a1170a64e314152646fa80ecb",
+    "model_validation_receipt_id": "sha256:2c0e4e60974ba29b9ee340f465612d79a4e450844ec7f66c84df6279074cc7ca",
+    "source_revision": "77784f190092be6df333ee75eb5c643d7e9d8150",
     "verification_status": "verified"
   },
   "schema": "quantiv.public-model-validation.v1",
   "summary": {
-    "max_relative_mae_improvement": 0.3772377663257429,
-    "min_relative_mae_improvement": 0.26643696747083245,
+    "matched_baseline_row_observations": 83762,
+    "max_relative_mae_improvement": 0.46925088653412295,
+    "metric_rows": 30,
+    "min_relative_mae_improvement": 0.08596947294557111,
     "supported_horizons": [
       1,
       2,
       3,
+      4,
+      5,
+      6,
       7,
+      10,
+      11,
+      12,
+      13,
       14,
-      21
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25
     ],
-    "validation_row_observations": 14226,
+    "validation_row_observations": 91009,
+    "weighted_baseline_mae": 0.06123402556436438,
     "weighted_coverage": {
-      "interval_50": 0.4853085899058063,
-      "interval_80": 0.7853929424996485,
-      "p10": 0.10846337691550682,
-      "p25": 0.2829326585125826,
-      "p50": 0.5283987065935611,
-      "p75": 0.7682412484183888,
-      "p90": 0.8938563194151553
+      "interval_50": 0.4901822896636596,
+      "interval_80": 0.7812963553055192,
+      "p10": 0.13306376292454591,
+      "p25": 0.31088134140579504,
+      "p50": 0.5717456515289696,
+      "p75": 0.8010196793723697,
+      "p90": 0.9143051786087091
     },
-    "weighted_model_mae": 0.04477339996233323,
-    "weighted_relative_mae_improvement": 0.30648603597695834,
-    "weighted_straddle_mae": 0.06456019962828846
+    "weighted_model_mae": 0.050952783728568415,
+    "weighted_relative_mae_improvement": 0.16790079928665036,
+    "weighted_straddle_mae": 0.06123402556436438
   },
   "validation_protocol": {
-    "baseline": "market straddle expected move",
+    "baseline": "matched cohort benchmarks",
     "chronological_holdout": true,
     "decision_scope": "end_of_day_research",
+    "evaluation_scope": "historical_out_of_sample",
+    "historical_admission": {
+      "admission_id": "sha256:36751a510678c1c256832b5530ebc662a53d8f0907dde3a594851fc86c15e7fe",
+      "admitted_cohorts": {
+        "1": [
+          "optionless"
+        ],
+        "10": [
+          "strict_options"
+        ],
+        "11": [
+          "optionless"
+        ],
+        "12": [
+          "optionless"
+        ],
+        "13": [
+          "optionless"
+        ],
+        "14": [
+          "optionless",
+          "strict_options"
+        ],
+        "15": [
+          "optionless",
+          "strict_options"
+        ],
+        "16": [
+          "strict_options"
+        ],
+        "17": [
+          "strict_options"
+        ],
+        "18": [
+          "optionless",
+          "strict_options"
+        ],
+        "19": [
+          "optionless"
+        ],
+        "2": [
+          "optionless",
+          "strict_options"
+        ],
+        "20": [
+          "optionless",
+          "strict_options"
+        ],
+        "21": [
+          "strict_options"
+        ],
+        "22": [
+          "optionless"
+        ],
+        "23": [
+          "optionless",
+          "strict_options"
+        ],
+        "24": [
+          "strict_options"
+        ],
+        "25": [
+          "strict_options"
+        ],
+        "3": [
+          "strict_options"
+        ],
+        "4": [
+          "optionless"
+        ],
+        "5": [
+          "optionless"
+        ],
+        "6": [
+          "optionless"
+        ],
+        "7": [
+          "optionless",
+          "strict_options"
+        ]
+      },
+      "global_temporal_boundary": {
+        "calendar_end": "2026-10-14T00:00:00",
+        "calendar_start": "2026-04-18T00:00:00",
+        "first_test_snapshot": "2026-03-26T00:00:00",
+        "rule": "all_requested_heads_development_labels_strictly_before_earliest_reserved_snapshot",
+        "selection_label_cutoff": "2026-03-26T00:00:00"
+      },
+      "limitations": [
+        "The exact candidate excludes reserved labels from fitting, selection, early stopping and quantile calibration.",
+        "Complete point-in-time calendar revision history and historical provider delivery timestamps are not established.",
+        "Prior model-family exposure to this history is not established; this is not a claim of globally untouched history.",
+        "Metrics describe admitted historical head/cohort cells; aggregate summaries do not establish aggregate statistical significance or live trading performance."
+      ],
+      "panel_id": "sha256:c48c61e803f3b5b5565d84a0b913580dd100af3fe80f5145e48fd012c8bb2b33",
+      "policy": {
+        "aggregate_significance_claim": false,
+        "bootstrap_draws": 5000,
+        "bootstrap_seed": 17,
+        "coverage_tolerance": 0.08,
+        "diagnostic_blocks": 3,
+        "familywise_alpha": 0.05,
+        "maximum_block_mae_ratio": 1.5,
+        "maximum_raw_crossing_rate": 0.2,
+        "maximum_raw_negative_rate": 0.05,
+        "method": "sealed_temporal_exact_artifact_test",
+        "minimum_block_rows": 30,
+        "minimum_events": 200,
+        "minimum_matched_baseline_rows": 200,
+        "multiplicity": "bonferroni_over_all_development_declared_horizon_cohort_cells",
+        "requires_conservative_clustered_ci_upper_below_zero": true,
+        "version": "quantiv.historical-exact-artifact-policy.v1"
+      },
+      "protocol": {
+        "calendar_vintage_status": "complete_point_in_time_revision_history_not_established",
+        "candidate_attempts_per_reservation": 1,
+        "global_untouched_history_claim": false,
+        "historical_model_family_exposure_status": "not_established",
+        "historical_provider_delivery_timestamps": "not_retained",
+        "historical_source_availability": "reconstructed_end_of_day_market_observations",
+        "method": "sealed_temporal_exact_artifact_test",
+        "scope": "current_exact_candidate_excludes_reserved_labels_from_fit_and_selection",
+        "selection_test_labels_used": false,
+        "test_labels_used_for_early_stopping": false,
+        "test_labels_used_for_hyperparameter_tuning": false,
+        "test_labels_used_for_quantile_calibration": false
+      },
+      "reservation_id": "sha256:fd05c255ceb02f9f11ed352e6c62404c0cb7919bf137171ba82de4959d09669a",
+      "serving_bundle_id": "d14dc7f2aa6b175956922eb6266b8523742add962668b7d6b8833cc2c869dd1b",
+      "source_bundle_id": "629386dcbf2736b8868df166bd54c5a656c197a34c55d1d7be44b5b9bc12c2ff"
+    },
     "holdout_splits": [
       {
+        "evaluation_scope": "development",
         "horizon_days": 1,
         "purge_days": 5,
-        "rows_purged": 31,
-        "rows_total": 10709,
-        "rows_train": 7961,
-        "rows_validation": 2717,
-        "train_end": "2026-01-22",
-        "train_start": "2023-01-05",
-        "validation_end": "2026-08-27",
-        "validation_start": "2026-01-28"
+        "rows_purged": 39,
+        "rows_total": 34750,
+        "rows_train": 26023,
+        "rows_validation": 8688,
+        "train_end": "2025-05-21",
+        "train_start": "2023-04-14",
+        "validation_end": "2026-03-25",
+        "validation_start": "2025-05-23"
       },
       {
+        "evaluation_scope": "development",
         "horizon_days": 2,
         "purge_days": 5,
-        "rows_purged": 13,
-        "rows_total": 7775,
-        "rows_train": 5780,
-        "rows_validation": 1982,
-        "train_end": "2026-01-29",
-        "train_start": "2023-01-06",
-        "validation_end": "2026-08-27",
-        "validation_start": "2026-02-04"
+        "rows_purged": 0,
+        "rows_total": 25125,
+        "rows_train": 18836,
+        "rows_validation": 6289,
+        "train_end": "2025-07-11",
+        "train_start": "2023-04-19",
+        "validation_end": "2026-03-25",
+        "validation_start": "2025-07-16"
       },
       {
+        "evaluation_scope": "development",
         "horizon_days": 3,
         "purge_days": 5,
-        "rows_purged": 121,
-        "rows_total": 6402,
-        "rows_train": 4669,
-        "rows_validation": 1612,
-        "train_end": "2025-10-24",
-        "train_start": "2023-01-05",
-        "validation_end": "2026-08-27",
-        "validation_start": "2025-10-31"
+        "rows_purged": 4,
+        "rows_total": 18112,
+        "rows_train": 13577,
+        "rows_validation": 4531,
+        "train_end": "2025-07-11",
+        "train_start": "2023-04-17",
+        "validation_end": "2026-03-23",
+        "validation_start": "2025-07-17"
       },
       {
+        "evaluation_scope": "development",
+        "horizon_days": 4,
+        "purge_days": 5,
+        "rows_purged": 187,
+        "rows_total": 15787,
+        "rows_train": 11631,
+        "rows_validation": 3969,
+        "train_end": "2025-05-06",
+        "train_start": "2023-04-17",
+        "validation_end": "2026-03-24",
+        "validation_start": "2025-05-13"
+      },
+      {
+        "evaluation_scope": "development",
+        "horizon_days": 5,
+        "purge_days": 5,
+        "rows_purged": 274,
+        "rows_total": 25752,
+        "rows_train": 18989,
+        "rows_validation": 6489,
+        "train_end": "2025-05-07",
+        "train_start": "2023-04-18",
+        "validation_end": "2026-03-25",
+        "validation_start": "2025-05-14"
+      },
+      {
+        "evaluation_scope": "development",
+        "horizon_days": 6,
+        "purge_days": 5,
+        "rows_purged": 56,
+        "rows_total": 37997,
+        "rows_train": 28433,
+        "rows_validation": 9508,
+        "train_end": "2025-05-21",
+        "train_start": "2023-04-19",
+        "validation_end": "2026-03-25",
+        "validation_start": "2025-05-28"
+      },
+      {
+        "evaluation_scope": "development",
         "horizon_days": 7,
         "purge_days": 5,
-        "rows_purged": 129,
-        "rows_total": 10738,
-        "rows_train": 7911,
-        "rows_validation": 2698,
-        "train_end": "2026-01-30",
-        "train_start": "2023-01-09",
-        "validation_end": "2026-08-27",
-        "validation_start": "2026-02-05"
+        "rows_purged": 245,
+        "rows_total": 39444,
+        "rows_train": 29311,
+        "rows_validation": 9888,
+        "train_end": "2025-05-14",
+        "train_start": "2023-04-20",
+        "validation_end": "2026-03-25",
+        "validation_start": "2025-05-22"
       },
       {
+        "evaluation_scope": "development",
+        "horizon_days": 10,
+        "purge_days": 5,
+        "rows_purged": 56,
+        "rows_total": 17746,
+        "rows_train": 13251,
+        "rows_validation": 4439,
+        "train_end": "2025-05-22",
+        "train_start": "2023-04-24",
+        "validation_end": "2026-03-23",
+        "validation_start": "2025-06-02"
+      },
+      {
+        "evaluation_scope": "development",
+        "horizon_days": 11,
+        "purge_days": 5,
+        "rows_purged": 625,
+        "rows_total": 15557,
+        "rows_train": 11012,
+        "rows_validation": 3920,
+        "train_end": "2025-04-28",
+        "train_start": "2023-04-24",
+        "validation_end": "2026-03-24",
+        "validation_start": "2025-05-13"
+      },
+      {
+        "evaluation_scope": "development",
+        "horizon_days": 12,
+        "purge_days": 5,
+        "rows_purged": 1041,
+        "rows_total": 25444,
+        "rows_train": 17956,
+        "rows_validation": 6447,
+        "train_end": "2025-04-29",
+        "train_start": "2023-04-25",
+        "validation_end": "2026-03-25",
+        "validation_start": "2025-05-14"
+      },
+      {
+        "evaluation_scope": "development",
+        "horizon_days": 13,
+        "purge_days": 5,
+        "rows_purged": 150,
+        "rows_total": 37555,
+        "rows_train": 28013,
+        "rows_validation": 9392,
+        "train_end": "2025-05-21",
+        "train_start": "2023-04-26",
+        "validation_end": "2026-03-25",
+        "validation_start": "2025-06-04"
+      },
+      {
+        "evaluation_scope": "development",
         "horizon_days": 14,
         "purge_days": 5,
-        "rows_purged": 80,
-        "rows_total": 10482,
-        "rows_train": 7734,
-        "rows_validation": 2668,
-        "train_end": "2026-01-29",
-        "train_start": "2023-01-18",
-        "validation_end": "2026-08-27",
-        "validation_start": "2026-02-04"
+        "rows_purged": 207,
+        "rows_total": 39013,
+        "rows_train": 29045,
+        "rows_validation": 9761,
+        "train_end": "2025-05-19",
+        "train_start": "2023-04-27",
+        "validation_end": "2026-03-25",
+        "validation_start": "2025-06-03"
       },
       {
+        "evaluation_scope": "development",
+        "horizon_days": 15,
+        "purge_days": 5,
+        "rows_purged": 77,
+        "rows_total": 33897,
+        "rows_train": 25339,
+        "rows_validation": 8481,
+        "train_end": "2025-05-30",
+        "train_start": "2023-04-28",
+        "validation_end": "2026-03-25",
+        "validation_start": "2025-06-17"
+      },
+      {
+        "evaluation_scope": "development",
+        "horizon_days": 16,
+        "purge_days": 5,
+        "rows_purged": 77,
+        "rows_total": 24482,
+        "rows_train": 18254,
+        "rows_validation": 6151,
+        "train_end": "2025-07-02",
+        "train_start": "2023-05-03",
+        "validation_end": "2026-03-25",
+        "validation_start": "2025-07-23"
+      },
+      {
+        "evaluation_scope": "development",
+        "horizon_days": 17,
+        "purge_days": 5,
+        "rows_purged": 52,
+        "rows_total": 17617,
+        "rows_train": 13134,
+        "rows_validation": 4431,
+        "train_end": "2025-06-30",
+        "train_start": "2023-05-01",
+        "validation_end": "2026-03-23",
+        "validation_start": "2025-07-24"
+      },
+      {
+        "evaluation_scope": "development",
+        "horizon_days": 18,
+        "purge_days": 5,
+        "rows_purged": 613,
+        "rows_total": 15171,
+        "rows_train": 10666,
+        "rows_validation": 3892,
+        "train_end": "2025-04-22",
+        "train_start": "2023-05-01",
+        "validation_end": "2026-03-24",
+        "validation_start": "2025-05-13"
+      },
+      {
+        "evaluation_scope": "development",
+        "horizon_days": 19,
+        "purge_days": 5,
+        "rows_purged": 835,
+        "rows_total": 24713,
+        "rows_train": 17691,
+        "rows_validation": 6187,
+        "train_end": "2025-04-30",
+        "train_start": "2023-05-02",
+        "validation_end": "2026-03-25",
+        "validation_start": "2025-05-21"
+      },
+      {
+        "evaluation_scope": "development",
+        "horizon_days": 20,
+        "purge_days": 5,
+        "rows_purged": 51,
+        "rows_total": 36359,
+        "rows_train": 27204,
+        "rows_validation": 9104,
+        "train_end": "2025-06-24",
+        "train_start": "2023-05-03",
+        "validation_end": "2026-03-25",
+        "validation_start": "2025-07-15"
+      },
+      {
+        "evaluation_scope": "development",
         "horizon_days": 21,
         "purge_days": 5,
-        "rows_purged": 103,
-        "rows_total": 10183,
-        "rows_train": 7531,
-        "rows_validation": 2549,
-        "train_end": "2026-01-30",
-        "train_start": "2023-01-23",
-        "validation_end": "2026-08-27",
-        "validation_start": "2026-02-05"
+        "rows_purged": 97,
+        "rows_total": 37679,
+        "rows_train": 28132,
+        "rows_validation": 9450,
+        "train_end": "2025-06-27",
+        "train_start": "2023-05-04",
+        "validation_end": "2026-03-25",
+        "validation_start": "2025-07-21"
+      },
+      {
+        "evaluation_scope": "development",
+        "horizon_days": 22,
+        "purge_days": 5,
+        "rows_purged": 169,
+        "rows_total": 32641,
+        "rows_train": 24210,
+        "rows_validation": 8262,
+        "train_end": "2025-06-27",
+        "train_start": "2023-05-05",
+        "validation_end": "2026-03-25",
+        "validation_start": "2025-07-23"
+      },
+      {
+        "evaluation_scope": "development",
+        "horizon_days": 23,
+        "purge_days": 5,
+        "rows_purged": 371,
+        "rows_total": 23498,
+        "rows_train": 17217,
+        "rows_validation": 5910,
+        "train_end": "2025-07-02",
+        "train_start": "2023-05-10",
+        "validation_end": "2026-03-25",
+        "validation_start": "2025-07-30"
+      },
+      {
+        "evaluation_scope": "development",
+        "horizon_days": 24,
+        "purge_days": 5,
+        "rows_purged": 85,
+        "rows_total": 16866,
+        "rows_train": 12423,
+        "rows_validation": 4358,
+        "train_end": "2025-06-27",
+        "train_start": "2023-05-08",
+        "validation_end": "2026-03-23",
+        "validation_start": "2025-07-24"
+      },
+      {
+        "evaluation_scope": "development",
+        "horizon_days": 25,
+        "purge_days": 5,
+        "rows_purged": 817,
+        "rows_total": 14724,
+        "rows_train": 10086,
+        "rows_validation": 3821,
+        "train_end": "2025-04-15",
+        "train_start": "2023-05-08",
+        "validation_end": "2026-03-24",
+        "validation_start": "2025-05-12"
       }
     ],
     "live_trading_eligible": false,
     "promotion_controls": [
-      "point and interval validation",
-      "quantile calibration",
-      "straddle-baseline comparison",
-      "common-holdout champion comparison",
-      "upcoming-event shadow scoring",
-      "feature-drift checks"
+      "signed exact-candidate historical admission",
+      "matched cohort benchmark comparison",
+      "familywise clustered error-difference confidence intervals",
+      "reserved-label exclusion and chronological block checks",
+      "quantile calibration and feature-drift checks"
     ],
     "target": "absolute earnings move magnitude",
     "walk_forward": {
+      "evaluation_scope": "development",
       "expanding_windows": 4,
       "horizons": [
         {
-          "baseline_straddle_mae": 0.05977346642741948,
+          "baseline_straddle_mae": 0.05674233135869076,
+          "evaluation_scope": "development",
           "fold_count": 4,
           "folds_beating_baseline": 4,
           "horizon_days": 1,
-          "improvement_vs_straddle": 0.26755077362817214,
+          "improvement_vs_straddle": 0.14561709891754626,
           "method": "expanding_purged_walk_forward",
-          "model_mae": 0.043781029242325825,
+          "model_mae": 0.0484796776804201,
           "purge_days": 5,
           "requested_folds": 4,
           "status": "passed",
           "test_days": 60,
-          "validation_rows": 2819,
-          "worst_fold_ratio": 0.798560721774099
+          "validation_rows": 7855,
+          "worst_fold_ratio": 0.8851638477491248
         },
         {
-          "baseline_straddle_mae": 0.05982081833797205,
+          "baseline_straddle_mae": 0.056681044558978246,
+          "evaluation_scope": "development",
           "fold_count": 4,
           "folds_beating_baseline": 4,
           "horizon_days": 2,
-          "improvement_vs_straddle": 0.275728374867958,
+          "improvement_vs_straddle": 0.14007024020353342,
           "method": "expanding_purged_walk_forward",
-          "model_mae": 0.04332652131437168,
+          "model_mae": 0.048741717032614984,
           "purge_days": 5,
           "requested_folds": 4,
           "status": "passed",
           "test_days": 60,
-          "validation_rows": 2154,
-          "worst_fold_ratio": 0.8015559534606794
+          "validation_rows": 5819,
+          "worst_fold_ratio": 0.9403951422003546
         },
         {
-          "baseline_straddle_mae": 0.06061096843851698,
+          "baseline_straddle_mae": 0.058526438147887126,
+          "evaluation_scope": "development",
           "fold_count": 4,
           "folds_beating_baseline": 4,
           "horizon_days": 3,
-          "improvement_vs_straddle": 0.26445814137914136,
+          "improvement_vs_straddle": 0.14193759101630976,
           "method": "expanding_purged_walk_forward",
-          "model_mae": 0.044581904378076985,
+          "model_mae": 0.05021933650641097,
           "purge_days": 5,
           "requested_folds": 4,
           "status": "passed",
           "test_days": 60,
-          "validation_rows": 1414,
-          "worst_fold_ratio": 0.7974974160429331
+          "validation_rows": 4179,
+          "worst_fold_ratio": 0.9428704253337878
         },
         {
-          "baseline_straddle_mae": 0.062392669944548985,
+          "baseline_straddle_mae": 0.05870714647285166,
+          "evaluation_scope": "development",
+          "fold_count": 4,
+          "folds_beating_baseline": 4,
+          "horizon_days": 4,
+          "improvement_vs_straddle": 0.15421054627797537,
+          "method": "expanding_purged_walk_forward",
+          "model_mae": 0.04965388534485209,
+          "purge_days": 5,
+          "requested_folds": 4,
+          "status": "passed",
+          "test_days": 60,
+          "validation_rows": 3438,
+          "worst_fold_ratio": 0.8855253907484908
+        },
+        {
+          "baseline_straddle_mae": 0.057458998850441714,
+          "evaluation_scope": "development",
+          "fold_count": 4,
+          "folds_beating_baseline": 4,
+          "horizon_days": 5,
+          "improvement_vs_straddle": 0.13918651565771112,
+          "method": "expanding_purged_walk_forward",
+          "model_mae": 0.049461481007268306,
+          "purge_days": 5,
+          "requested_folds": 4,
+          "status": "passed",
+          "test_days": 60,
+          "validation_rows": 5683,
+          "worst_fold_ratio": 0.8867352621856207
+        },
+        {
+          "baseline_straddle_mae": 0.05776696728774957,
+          "evaluation_scope": "development",
+          "fold_count": 4,
+          "folds_beating_baseline": 4,
+          "horizon_days": 6,
+          "improvement_vs_straddle": 0.14636793710737084,
+          "method": "expanding_purged_walk_forward",
+          "model_mae": 0.04931173545289269,
+          "purge_days": 5,
+          "requested_folds": 4,
+          "status": "passed",
+          "test_days": 60,
+          "validation_rows": 8596,
+          "worst_fold_ratio": 0.8907960642168843
+        },
+        {
+          "baseline_straddle_mae": 0.057466384429645835,
+          "evaluation_scope": "development",
           "fold_count": 4,
           "folds_beating_baseline": 4,
           "horizon_days": 7,
-          "improvement_vs_straddle": 0.2607352731542567,
+          "improvement_vs_straddle": 0.1446187114716484,
           "method": "expanding_purged_walk_forward",
-          "model_mae": 0.046124700103733624,
+          "model_mae": 0.04915566996049606,
           "purge_days": 5,
           "requested_folds": 4,
           "status": "passed",
           "test_days": 60,
-          "validation_rows": 3038,
-          "worst_fold_ratio": 0.8074354446794463
+          "validation_rows": 8858,
+          "worst_fold_ratio": 0.8847815303489239
         },
         {
-          "baseline_straddle_mae": 0.06390694817327838,
+          "baseline_straddle_mae": 0.0582213954777943,
+          "evaluation_scope": "development",
+          "fold_count": 4,
+          "folds_beating_baseline": 4,
+          "horizon_days": 10,
+          "improvement_vs_straddle": 0.1374479564626505,
+          "method": "expanding_purged_walk_forward",
+          "model_mae": 0.05021898364696767,
+          "purge_days": 5,
+          "requested_folds": 4,
+          "status": "passed",
+          "test_days": 60,
+          "validation_rows": 4024,
+          "worst_fold_ratio": 0.9417500105227018
+        },
+        {
+          "baseline_straddle_mae": 0.058983642393836015,
+          "evaluation_scope": "development",
+          "fold_count": 4,
+          "folds_beating_baseline": 4,
+          "horizon_days": 11,
+          "improvement_vs_straddle": 0.15410678277565226,
+          "method": "expanding_purged_walk_forward",
+          "model_mae": 0.049893863028132375,
+          "purge_days": 5,
+          "requested_folds": 4,
+          "status": "passed",
+          "test_days": 60,
+          "validation_rows": 3398,
+          "worst_fold_ratio": 0.8939387133181306
+        },
+        {
+          "baseline_straddle_mae": 0.05800764907080486,
+          "evaluation_scope": "development",
+          "fold_count": 4,
+          "folds_beating_baseline": 4,
+          "horizon_days": 12,
+          "improvement_vs_straddle": 0.14592342403615188,
+          "method": "expanding_purged_walk_forward",
+          "model_mae": 0.049542974298105516,
+          "purge_days": 5,
+          "requested_folds": 4,
+          "status": "passed",
+          "test_days": 60,
+          "validation_rows": 5663,
+          "worst_fold_ratio": 0.8910235737919604
+        },
+        {
+          "baseline_straddle_mae": 0.057830986998828646,
+          "evaluation_scope": "development",
+          "fold_count": 4,
+          "folds_beating_baseline": 4,
+          "horizon_days": 13,
+          "improvement_vs_straddle": 0.14564010591717058,
+          "method": "expanding_purged_walk_forward",
+          "model_mae": 0.04940847592702473,
+          "purge_days": 5,
+          "requested_folds": 4,
+          "status": "passed",
+          "test_days": 60,
+          "validation_rows": 8585,
+          "worst_fold_ratio": 0.8851229926873091
+        },
+        {
+          "baseline_straddle_mae": 0.057880884587928415,
+          "evaluation_scope": "development",
           "fold_count": 4,
           "folds_beating_baseline": 4,
           "horizon_days": 14,
-          "improvement_vs_straddle": 0.30874554525867504,
+          "improvement_vs_straddle": 0.15007591264162,
           "method": "expanding_purged_walk_forward",
-          "model_mae": 0.044175962613701665,
+          "model_mae": 0.04919435800889078,
           "purge_days": 5,
           "requested_folds": 4,
           "status": "passed",
           "test_days": 60,
-          "validation_rows": 2942,
-          "worst_fold_ratio": 0.7665075166932126
+          "validation_rows": 8872,
+          "worst_fold_ratio": 0.8834248758951827
         },
         {
-          "baseline_straddle_mae": 0.07098679029094594,
+          "baseline_straddle_mae": 0.057391075124946254,
+          "evaluation_scope": "development",
+          "fold_count": 4,
+          "folds_beating_baseline": 4,
+          "horizon_days": 15,
+          "improvement_vs_straddle": 0.15567221614109195,
+          "method": "expanding_purged_walk_forward",
+          "model_mae": 0.048456879273525974,
+          "purge_days": 5,
+          "requested_folds": 4,
+          "status": "passed",
+          "test_days": 60,
+          "validation_rows": 7817,
+          "worst_fold_ratio": 0.8797267461037697
+        },
+        {
+          "baseline_straddle_mae": 0.05709959569691944,
+          "evaluation_scope": "development",
+          "fold_count": 4,
+          "folds_beating_baseline": 4,
+          "horizon_days": 16,
+          "improvement_vs_straddle": 0.1456306604621601,
+          "method": "expanding_purged_walk_forward",
+          "model_mae": 0.04878414386345475,
+          "purge_days": 5,
+          "requested_folds": 4,
+          "status": "passed",
+          "test_days": 60,
+          "validation_rows": 5749,
+          "worst_fold_ratio": 0.880908411640339
+        },
+        {
+          "baseline_straddle_mae": 0.05964600999950758,
+          "evaluation_scope": "development",
+          "fold_count": 4,
+          "folds_beating_baseline": 4,
+          "horizon_days": 17,
+          "improvement_vs_straddle": 0.15291254468587123,
+          "method": "expanding_purged_walk_forward",
+          "model_mae": 0.050525386830123954,
+          "purge_days": 5,
+          "requested_folds": 4,
+          "status": "passed",
+          "test_days": 60,
+          "validation_rows": 4153,
+          "worst_fold_ratio": 0.9060114251213537
+        },
+        {
+          "baseline_straddle_mae": 0.05963585649023841,
+          "evaluation_scope": "development",
+          "fold_count": 4,
+          "folds_beating_baseline": 4,
+          "horizon_days": 18,
+          "improvement_vs_straddle": 0.16859434502973625,
+          "method": "expanding_purged_walk_forward",
+          "model_mae": 0.049581588324979324,
+          "purge_days": 5,
+          "requested_folds": 4,
+          "status": "passed",
+          "test_days": 60,
+          "validation_rows": 3424,
+          "worst_fold_ratio": 0.8984492167082784
+        },
+        {
+          "baseline_straddle_mae": 0.05903854011823085,
+          "evaluation_scope": "development",
+          "fold_count": 4,
+          "folds_beating_baseline": 4,
+          "horizon_days": 19,
+          "improvement_vs_straddle": 0.1589133427457261,
+          "method": "expanding_purged_walk_forward",
+          "model_mae": 0.04965652835721513,
+          "purge_days": 5,
+          "requested_folds": 4,
+          "status": "passed",
+          "test_days": 60,
+          "validation_rows": 5661,
+          "worst_fold_ratio": 0.8878404515808582
+        },
+        {
+          "baseline_straddle_mae": 0.05915863631307716,
+          "evaluation_scope": "development",
+          "fold_count": 4,
+          "folds_beating_baseline": 4,
+          "horizon_days": 20,
+          "improvement_vs_straddle": 0.15966887631065907,
+          "method": "expanding_purged_walk_forward",
+          "model_mae": 0.04971284332889718,
+          "purge_days": 5,
+          "requested_folds": 4,
+          "status": "passed",
+          "test_days": 60,
+          "validation_rows": 8579,
+          "worst_fold_ratio": 0.8798258695130956
+        },
+        {
+          "baseline_straddle_mae": 0.05904930034422197,
+          "evaluation_scope": "development",
           "fold_count": 4,
           "folds_beating_baseline": 4,
           "horizon_days": 21,
-          "improvement_vs_straddle": 0.36426429119713233,
+          "improvement_vs_straddle": 0.16431531808898148,
           "method": "expanding_purged_walk_forward",
-          "model_mae": 0.045128837441255044,
+          "model_mae": 0.04934659577522933,
           "purge_days": 5,
           "requested_folds": 4,
           "status": "passed",
           "test_days": 60,
-          "validation_rows": 2867,
-          "worst_fold_ratio": 0.733600924677533
+          "validation_rows": 8840,
+          "worst_fold_ratio": 0.8806513517687669
+        },
+        {
+          "baseline_straddle_mae": 0.05837218349273896,
+          "evaluation_scope": "development",
+          "fold_count": 4,
+          "folds_beating_baseline": 4,
+          "horizon_days": 22,
+          "improvement_vs_straddle": 0.16929231955910506,
+          "method": "expanding_purged_walk_forward",
+          "model_mae": 0.04849022115152348,
+          "purge_days": 5,
+          "requested_folds": 4,
+          "status": "passed",
+          "test_days": 60,
+          "validation_rows": 7815,
+          "worst_fold_ratio": 0.8699523790983718
+        },
+        {
+          "baseline_straddle_mae": 0.057998590911446886,
+          "evaluation_scope": "development",
+          "fold_count": 4,
+          "folds_beating_baseline": 4,
+          "horizon_days": 23,
+          "improvement_vs_straddle": 0.1629479532267072,
+          "method": "expanding_purged_walk_forward",
+          "model_mae": 0.048547839232393517,
+          "purge_days": 5,
+          "requested_folds": 4,
+          "status": "passed",
+          "test_days": 60,
+          "validation_rows": 5803,
+          "worst_fold_ratio": 0.8758832832622665
+        },
+        {
+          "baseline_straddle_mae": 0.059934985542459004,
+          "evaluation_scope": "development",
+          "fold_count": 4,
+          "folds_beating_baseline": 4,
+          "horizon_days": 24,
+          "improvement_vs_straddle": 0.15694368172627138,
+          "method": "expanding_purged_walk_forward",
+          "model_mae": 0.05052856824721464,
+          "purge_days": 5,
+          "requested_folds": 4,
+          "status": "passed",
+          "test_days": 60,
+          "validation_rows": 4085,
+          "worst_fold_ratio": 0.9247240959973536
+        },
+        {
+          "baseline_straddle_mae": 0.061154152518507685,
+          "evaluation_scope": "development",
+          "fold_count": 4,
+          "folds_beating_baseline": 4,
+          "horizon_days": 25,
+          "improvement_vs_straddle": 0.16947684188858814,
+          "method": "expanding_purged_walk_forward",
+          "model_mae": 0.05078993988129795,
+          "purge_days": 5,
+          "requested_folds": 4,
+          "status": "passed",
+          "test_days": 60,
+          "validation_rows": 3264,
+          "worst_fold_ratio": 0.9027164234512829
         }
       ],
       "method": "expanding_purged_walk_forward",
