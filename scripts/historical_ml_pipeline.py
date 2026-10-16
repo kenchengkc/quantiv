@@ -60,6 +60,8 @@ def prepare_data(data: Path):
     _python("scripts/sync_dolthub.py", "--ohlcv")
     _python("scripts/sync_dolthub.py", "--corporate-actions", "--end-date",
             latest_completed_us_market_session().isoformat())
+    _python("scripts/sync_dolthub.py", "--volhist")
+    _python("scripts/sync_vix.py")
     _python("scripts/data_release.py", "build", "--data-dir", data)
     _python("scripts/verify_historical_training_gate.py", "--data-dir", data,
             "--report", data / "validation/historical_training_admission.json")
