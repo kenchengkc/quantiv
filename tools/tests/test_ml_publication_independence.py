@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from datetime import date
 
+import pytest
+
 import frontend_data.payloads as payloads
 
 
@@ -118,3 +120,37 @@ def test_ml_for_different_earnings_date_is_not_reused(monkeypatch):
     assert "em_ml_pct" not in event
     assert "model_horizon" not in event
     assert "ml_snapshot_date" not in event
+
+
+@pytest.mark.parametrize("matching_ml", [True, False])
+def test_new_optionless_event_requires_exact_ml_but_no_current_options(monkeypatch, matching_ml):
+    event_day = date(2099, 9, 23)
+    event_key = ("NEW", event_day.isoformat())
+    row = ("NEW", event_day, "amc", "Q3", None, None, None, None, None)
+    monkeypatch.setattr(payloads, "compute_em_math", lambda *_a, **_kw: pytest.fail("held upcoming options must not be queried"))
+    monkeypatch.setattr(payloads, "screener_extras", lambda *_a, **_kw: {})
+    forecast_key = event_key if matching_ml else ("NEW", "2099-09-22")
+    events = payloads.build_week_events(
+        _Conn([row]), as_of_date=date(2099, 9, 9),
+        week_start=event_day, week_end=event_day,
+        ml_lookup={forecast_key: _forecast(date(2099, 9, 9))},
+        require_ml=False, canonical={event_key}, published={}, options_available=False,
+    )
+    assert len(events) == int(matching_ml)
+    if matching_ml:
+        assert events[0]["em_ml_pct"] == 0.085007
+        assert events[0]["model_horizon"] == 14
+        assert events[0]["ml_snapshot_date"] == "2099-09-09"
+        assert events[0]["em_straddle_pct"] is None
+
+
+def test_retained_calendar_event_does_not_query_held_current_options(monkeypatch):
+    event_day = date(2099, 9, 23)
+    key = ("RETAINED", event_day.isoformat())
+    monkeypatch.setattr(payloads, "compute_em_math", lambda *_a, **_kw: pytest.fail("held upcoming options must not be queried"))
+    monkeypatch.setattr(payloads, "screener_extras", lambda *_a, **_kw: {})
+    events = payloads.build_week_events(
+        _Conn([]), as_of_date=date(2099, 9, 9), week_start=event_day, week_end=event_day,
+        ml_lookup={key: _forecast(date(2099, 9, 9))}, published={key: "amc"}, options_available=False,
+    )
+    assert len(events) == 1 and events[0]["em_ml_pct"] == 0.085007
