@@ -28,6 +28,7 @@ env:
   R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
   R2_PULL_EARNINGS: '1'
   R2_HISTORICAL_TRAINING: '1'
+  PYTHONUNBUFFERED: '1'
 
 jobs:
   prepare-data:
@@ -118,7 +119,8 @@ jobs:
       ((needs.fit.result == 'success' && needs.fit.outputs.bundle_id != '') ||
        (needs.fit.result == 'skipped' && inputs.candidate_bundle_id != ''))
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    # Activation includes scoring, monitoring and the full frontend corpus.
+    timeout-minutes: 180
     concurrency:
       group: daily-data-refresh-execution
       cancel-in-progress: false

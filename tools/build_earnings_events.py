@@ -291,6 +291,23 @@ def infer_unknown_timings(conn: duckdb.DuckDBPyConnection) -> None:
     for source, n in breakdown:
         print(f"    {source}: {n:,}")
 
+def materialize_frontend_queries(conn: duckdb.DuckDBPyConnection) -> None:
+    """Reuse exact source rows for repeated ticker queries within one build.
+
+    Temporary tables belong to this connection and disappear when it closes;
+    the next build reconstructs them from its verified inputs. Keep duplicates,
+    nulls and all dates so downstream eligibility and label checks are unchanged.
+    """
+    for view, ordering in (
+        ("v_ohlcv", "act_symbol, date"),
+        ("v_eligible_straddles", "ticker, as_of_date, expiry_date"),
+    ):
+        table = f"_frontend_cache_{view}"
+        print(f"  Caching {view} for this build connection", flush=True)
+        conn.execute(f"CREATE OR REPLACE TEMP TABLE {table} AS SELECT * FROM {view} ORDER BY {ordering}")
+        conn.execute(f"CREATE OR REPLACE VIEW {view} AS SELECT * FROM {table}")
+
+
 def create_duckdb_views(conn: duckdb.DuckDBPyConnection, data_dir: Path):
     """Create DuckDB views for options_chain and volatility_history."""
 
@@ -605,14 +622,7 @@ def create_duckdb_views(conn: duckdb.DuckDBPyConnection, data_dir: Path):
     
     print("✅ Created v_options_chain, v_atm_strikes, and v_eligible_straddles views")
     
-    # Test the views
-    options_count = conn.execute("SELECT COUNT(*) FROM v_options_chain").fetchone()[0]
-    atm_count = conn.execute("SELECT COUNT(*) FROM v_atm_strikes").fetchone()[0]
-    straddle_count = conn.execute("SELECT COUNT(*) FROM v_eligible_straddles").fetchone()[0]
-    
-    print(f"📊 v_options_chain: {options_count:,} records")
-    print(f"📊 v_atm_strikes: {atm_count:,} records")
-    print(f"📊 v_eligible_straddles: {straddle_count:,} records")
+    materialize_frontend_queries(conn)
 
 def main():
     # Setup paths
