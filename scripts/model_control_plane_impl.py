@@ -185,6 +185,24 @@ def _retain_candidate(args: argparse.Namespace) -> dict[str, Any]:
         if verify_bundle_dir(durable_bundle)["bundle_id"] != incoming:
             raise ValueError("durable candidate bundle and incoming record disagree")
     pointer, registry = _control_state(args.models_root)
+    if manifest.get("historical_admission") and incoming == pointer.get("champion_bundle_id"):
+        previous = pointer.get("previous_bundle_id")
+        if not registry or registry.get("previous_bundle_id") != previous or previous == incoming:
+            raise ValueError("historical retry requires consistent distinct rollback control")
+        # A published champion may still need serving activation/import. Do not
+        # register it as its own challenger or replace its original promotion.
+        return {
+            "schema": "quantiv.model-decision.v1", "status": "passed",
+            "action": "resume_champion", "resuming_champion": True,
+            "candidate_bundle_id": incoming, "challenger_bundle_id": incoming,
+            "champion_bundle_id": incoming, "previous_bundle_id": previous,
+            "evaluation_bundle_dir": str(record["bundle_dir"]),
+            "evaluation_manifest": str(args.candidate_manifest),
+            "evaluation_evidence_dir": str(args.models_root / "candidates" / incoming),
+            "horizons": list(manifest["horizons"]), "promoted": False,
+            "production_forecast": None,
+            "reasons": ["existing champion requires current evidence before handoff retry"],
+        }
     frozen = registry.get("challenger_bundle_id")
     migration_reason = None
     if frozen and manifest.get("historical_admission") and frozen != incoming:
@@ -393,6 +411,7 @@ def decide(args: argparse.Namespace) -> int:
     horizons = [int(h) for h in manifest["horizons"]]
     champion_id = retained["champion_bundle_id"]
     champion_dir = args.models_root / "bundles" / champion_id if champion_id else None
+    resuming_champion = retained.get("resuming_champion", False)
     gate = _activation_gate(args)
     reasons = []
     drift = comparison = shadow = prospective = historical = None
@@ -433,7 +452,7 @@ def decide(args: argparse.Namespace) -> int:
                 historical = verify_historical_candidate(args.models_root, candidate_dir)
                 if historical["status"] != "passed":
                     reasons.append("historical admission evidence did not pass")
-            if champion_dir is not None:
+            if champion_dir is not None and not resuming_champion:
                 contract = retained.get("admission_contract")
                 expanded = contract and any(value != "incumbent"
                     for cohorts in contract["comparators"].values() for value in cohorts.values())
@@ -481,7 +500,7 @@ def decide(args: argparse.Namespace) -> int:
                     "bootstrap requires independent paired activation evidence"
                 )
     promoted = not reasons
-    action = "promote" if promoted else "retain_champion"
+    action = ("resume_champion" if resuming_champion else "promote") if promoted else "retain_champion"
     if promoted:
         # Reconciliation/freshness may have changed during scoring and evaluation.
         gate = _activation_gate(args)
@@ -523,6 +542,7 @@ def decide(args: argparse.Namespace) -> int:
         production_forecast = _promote_forecast(
             args.candidate_forecast, args.production_forecast_dir
         )
+    if promoted and not resuming_champion:
         _atomic_json(
             args.models_root / "control" / "champion.json",
             create_signed_control_pointer(
@@ -547,7 +567,7 @@ def decide(args: argparse.Namespace) -> int:
         "activation_gate": gate,
         "champion_bundle_id": candidate_id if promoted else champion_id,
         "previous_bundle_id": champion_id
-        if promoted
+        if promoted and not resuming_champion
         else retained["previous_bundle_id"],
         "challenger_bundle_id": None if promoted or rejected_evidence else candidate_id,
         "challenger_rejected": rejected_evidence is not None,
