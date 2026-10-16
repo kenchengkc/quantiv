@@ -8,6 +8,11 @@ on:
         type: string
         required: false
         default: ''
+      refresh_calendar:
+        description: "Recover upcoming issuer dates and sessions before rescoring; existing model admission remains unchanged."
+        type: boolean
+        required: false
+        default: false
 
 concurrency:
   group: historical-model-admission
@@ -38,7 +43,18 @@ jobs:
       - name: Pull verified source and runtime state
         run: bash scripts/r2_pull.sh
       - name: Refresh genuine prices, corporate actions and market context
-        run: python scripts/historical_ml_pipeline.py prepare-data
+        env:
+          REFRESH_CALENDAR: ${{ inputs.refresh_calendar }}
+          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+          FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
+          ALPHAVANTAGE_API_KEY: ${{ secrets.ALPHAVANTAGE_API_KEY }}
+          TWELVEDATA_API_KEY: ${{ secrets.TWELVEDATA_API_KEY }}
+        run: |
+          args=()
+          if [ "$REFRESH_CALENDAR" = "true" ]; then
+            args+=(--refresh-calendar)
+          fi
+          python scripts/historical_ml_pipeline.py prepare-data "${args[@]}"
       - name: Retain source verification and honest freshness holds
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -116,6 +132,19 @@ jobs:
       - uses: ./.github/actions/setup-historical-ml
       - name: Pull latest verified activation inputs
         run: bash scripts/r2_pull.sh
+      - name: Restore recovered calendar reference
+        if: inputs.refresh_calendar
+        run: |
+          set -euo pipefail
+          REMOTE="r2:$R2_BUCKET/calendar-reference"
+          mkdir -p data/calendar_reference
+          rclone copyto "$REMOTE/current.json" data/calendar_reference/current.json
+          RELEASE_REL=$(jq -er .release data/calendar_reference/current.json)
+          RECEIPT_REL=$(jq -er .receipt data/calendar_reference/current.json)
+          rclone copyto "$REMOTE/$RELEASE_REL" "data/calendar_reference/$RELEASE_REL"
+          rclone copyto "$REMOTE/$RECEIPT_REL" "data/calendar_reference/$RECEIPT_REL"
+          python scripts/calendar_reference.py verify
+          python scripts/calendar_reference.py project
       - name: Admit only passing scopes with current freshness and drift
         env:
           CANDIDATE_BUNDLE_ID: ${{ inputs.candidate_bundle_id || needs.fit.outputs.bundle_id }}

@@ -52,8 +52,20 @@ def publish_reservation_registry(registry: Path, remote: str):
     _run("rclone", "check", str(registry), destination, "--one-way", "--download")
 
 
-def prepare_data(data: Path):
+def prepare_data(data: Path, *, refresh_calendar: bool = False):
     from market_sessions import latest_completed_us_market_session
+
+    environment = dict(os.environ)
+    if refresh_calendar:
+        environment["REFRESH_STARTED_AT"] = datetime.now(timezone.utc).isoformat()
+        _python("scripts/sync_dolthub.py", "--earnings")
+        _python("scripts/reconcile_earnings_calendar.py", "--days-ahead", "60",
+                "--announcement-days-ahead", "35", "--announcement-max-symbols", "1200",
+                "--twelvedata-max-symbols", "80", "--alpha-news-max", "20",
+                "--report", data / "validation/earnings_calendar_reconciliation.json")
+        _python("scripts/apply_earnings_overrides.py", "--allow-missing")
+        _python("scripts/apply_ticker_lifecycle.py")
+        _python("scripts/check_earnings_calendar_integrity.py", "--require-baseline")
 
     # This job shares the daily execution lock; neither fitting nor evaluation
     # holds that lock while the normal refresh needs it.
@@ -68,7 +80,7 @@ def prepare_data(data: Path):
     _python("scripts/setup_duckdb_from_parquet.py")
     _python("scripts/build_data_reconciliation.py", "--max-lag-days", "5", "--days-ahead", "21",
             "--report", data / "validation/data_reconciliation.json")
-    _run("bash", "scripts/r2_push.sh", "--skip-forecasts")
+    _run("bash", "scripts/r2_push.sh", "--skip-forecasts", env=environment)
 
 
 def fit(data: Path, revision: str):
@@ -262,10 +274,11 @@ def main():
     parser.add_argument("phase", choices=("prepare-data", "fit", "activate"))
     parser.add_argument("--source-revision", default=os.environ.get("GITHUB_SHA", "local"))
     parser.add_argument("--bundle-id")
+    parser.add_argument("--refresh-calendar", action="store_true")
     args = parser.parse_args()
     data = Path(os.environ.get("DATA_DIR", ROOT / "data")).resolve()
     if args.phase == "prepare-data":
-        prepare_data(data)
+        prepare_data(data, refresh_calendar=args.refresh_calendar)
     elif args.phase == "fit":
         fit(data, args.source_revision)
     else:
