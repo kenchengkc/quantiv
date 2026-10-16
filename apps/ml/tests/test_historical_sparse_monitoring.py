@@ -133,7 +133,7 @@ def test_sparse_historical_admission_preserves_current_contract_holds(bundle_fac
     _, bundle, _ = bundle_factory()
     rows = _current(bundle)
     if mutation == "stale":
-        rows["snapshot_date"] = "2026-10-14"
+        rows["snapshot_date"] = "2026-10-13"
     elif mutation == "protocol":
         rows["feature_protocol"] = "quantiv.earnings-legacy.v1"
     elif mutation == "corrupt":

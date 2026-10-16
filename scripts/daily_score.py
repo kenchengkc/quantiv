@@ -56,11 +56,11 @@ from ml.model_protocol import (  # noqa: E402
 )
 from ml.causal_features import build_causal_features  # noqa: E402
 from ml.serving_capabilities import allowed_cohorts  # noqa: E402
-from ml.source_coverage import filter_source_covered_snapshots  # noqa: E402
+from ml.source_coverage import filter_source_covered_snapshots, forecast_snapshot_sessions  # noqa: E402
 try:  # noqa: E402 - standalone script path setup
-    from market_sessions import EASTERN, latest_completed_us_market_session
+    from market_sessions import EASTERN
 except ModuleNotFoundError:
-    from scripts.market_sessions import EASTERN, latest_completed_us_market_session
+    from scripts.market_sessions import EASTERN
 try:  # noqa: E402 - standalone script path setup
     from event_forecast_ledger import (
         annotate_forecasts,
@@ -166,17 +166,19 @@ def get_upcoming_features(
     feature_protocol: str = FEATURE_PROTOCOL_LEGACY,
     now: datetime | None = None,
 ) -> pd.DataFrame:
-    """Build this bundle's live features from the latest completed market session.
-
-    Historical feature rows belong to training or an already observed ledger;
-    rescoring them today cannot make them current publication evidence.
-    """
+    """Use the newest available completed price session within one-session grace."""
     protocol = resolve_feature_protocol({"feature_protocol": feature_protocol})
     current = now or datetime.now(timezone.utc)
     if current.tzinfo is None:
         raise ValueError("live scoring requires a timezone-aware current time")
     today = current.astimezone(EASTERN).date()
-    snapshot_date = latest_completed_us_market_session(current)
+    sessions = forecast_snapshot_sessions(current)
+    snapshot_date = conn.execute(
+        "SELECT MAX(CAST(date AS DATE)) FROM v_ohlcv "
+        "WHERE CAST(date AS DATE) IN (?, ?)", list(sessions),
+    ).fetchone()[0]
+    if snapshot_date is None:
+        return pd.DataFrame()
     if protocol == FEATURE_PROTOCOL_CAUSAL:
         features = build_causal_features(
             conn, start_date=today, end_date=today + timedelta(days=days_ahead),
@@ -189,6 +191,14 @@ def get_upcoming_features(
         features = _get_legacy_upcoming_features(
             conn, days_ahead, today=today, snapshot_date=snapshot_date,
         )
+    if not features.empty:
+        try:
+            from event_forecast_ledger import event_cutoffs
+        except ModuleNotFoundError:
+            from scripts.event_forecast_ledger import event_cutoffs
+        eligible = [current < event_cutoffs(pd.Timestamp(row.earnings_date).date(), row.timing)[1]
+                    for row in features.itertuples()]
+        features = features.loc[eligible].reset_index(drop=True)
     persisted = bool(not features.empty and any(
         row[2] for row in conn.execute("PRAGMA database_list").fetchall()
     ))

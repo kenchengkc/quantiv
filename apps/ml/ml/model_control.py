@@ -425,11 +425,8 @@ def compare_on_common_holdout(
 
 
 def prospective_snapshot_mask(frame: pd.DataFrame) -> pd.Series:
-    """A snapshot is prospective only while it is the latest completed session."""
-    try:
-        from market_sessions import latest_completed_us_market_session
-    except ModuleNotFoundError:
-        from scripts.market_sessions import latest_completed_us_market_session
+    """Require bounded source age at both actual scoring and recording times."""
+    from ml.source_coverage import forecast_snapshot_sessions
     result = pd.Series(False, index=frame.index)
     if "recorded_at" not in frame or "snapshot_date" not in frame:
         return result
@@ -440,10 +437,11 @@ def prospective_snapshot_mask(frame: pd.DataFrame) -> pd.Series:
     snapshots = pd.to_datetime(frame["snapshot_date"], errors="coerce").dt.date
     for times in (recorded, scored):
         sessions = {
-            stamp: latest_completed_us_market_session(stamp.to_pydatetime())
+            stamp: forecast_snapshot_sessions(stamp.to_pydatetime())
             for stamp in times.dropna().unique()
         }
-        valid = times.map(sessions) == snapshots
+        valid = pd.Series([snapshot in sessions.get(stamp, ())
+                           for snapshot, stamp in zip(snapshots, times)], index=frame.index)
         result = valid if times is recorded else result & valid
     return result
 

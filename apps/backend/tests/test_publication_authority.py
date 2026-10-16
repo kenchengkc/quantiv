@@ -40,16 +40,16 @@ def publication(tmp_path, monkeypatch):
     ledger.write_bytes(b"retained authenticated ledger")
     report_path = tmp_path / "latest_monitoring.json"
 
-    def publish(*, bundle_id="a" * 64, events=("A|2026-10-21",), snapshot="2026-10-14", **changes):
+    def publish(*, bundle_id="a" * 64, events=("A|2026-10-21",), snapshot="2026-10-14", horizon=7, **changes):
         bindings = [forecast_snapshot_id({"act_symbol": event.split("|")[0], "earnings_date": event.split("|")[1],
-            "snapshot_date": snapshot, "model_horizon": 7, "model_bundle_id": bundle_id,
+            "snapshot_date": snapshot, "model_horizon": horizon, "model_bundle_id": bundle_id,
             "scored_at": NOW, "spot_price": 100., "feature_vector": {"log_spot": 4.6}}) for event in events]
         report = {"schema": "quantiv.model-monitoring.v1", "status": "passed" if events else "failed",
                   "monitored_at": NOW.isoformat(), "snapshot_date": snapshot,
                   "champion_bundle_id": bundle_id, "current_data_release_id": "c" * 64,
                   "publication_eligibility": {"schema": "quantiv.event-forecast-eligibility.v1",
                                               "eligible_event_keys": list(events), "eligible_snapshot_ids": bindings,
-                                              "eligible_snapshot_bindings": {f"{event}|7": binding for event, binding in zip(events, bindings)}}, **changes}
+                                              "eligible_snapshot_bindings": {f"{event}|{horizon}": binding for event, binding in zip(events, bindings)}}, **changes}
         report_path.write_text(json.dumps(report))
         receipt = create_signed_monitor_receipt(ledger_path=ledger, report_path=report_path,
             snapshot_date=snapshot, private_key=private)
@@ -82,7 +82,7 @@ def test_current_authority_rejects_missing_tampered_stale_or_mismatched_evidence
     elif mutation == "report":
         objects["models/monitoring/latest_monitoring.json"] += b" "
     elif mutation == "stale":
-        publish(snapshot="2026-10-13")
+        publish(snapshot="2026-10-12")
     elif mutation == "source":
         objects["control/current_data_release.json"] = json.dumps({
             "release_id": "d" * 64, "manifest": f"control/releases/{'d' * 64}.json"}).encode()
@@ -94,6 +94,17 @@ def test_current_authority_rejects_missing_tampered_stale_or_mismatched_evidence
         authority.load_current_authority("a" * 64, now=NOW)
 
 
+def test_authority_accepts_one_session_grace_without_redating_or_wrong_head(publication):
+    _, publish = publication
+    publish(snapshot="2026-10-13", events=("A|2026-10-20",))
+    current = authority.load_current_authority("a" * 64, now=NOW)
+    assert current.snapshot_date == date(2026, 10, 13)
+    assert current.allows("A", 7, date(2026, 10, 20))
+    assert not current.allows("A", 6, date(2026, 10, 20))
+    with pytest.raises(ModelBundleError):
+        authority.load_current_authority("a" * 64, now=datetime(2026, 10, 15, 20, tzinfo=timezone.utc))
+
+
 def test_rollback_requires_a_fresh_monitor_for_the_restored_bundle(publication):
     _, publish = publication
     with pytest.raises(ModelBundleError):
@@ -102,6 +113,17 @@ def test_rollback_requires_a_fresh_monitor_for_the_restored_bundle(publication):
     current = authority.load_current_authority("b" * 64, now=NOW)
     assert current.allows("A", 7, date(2026, 10, 21))
     assert not current.accepts_snapshot("A", 7, {"snapshot_date": "2026-10-13", "earnings_date": "2026-10-21"})
+
+
+def test_grace_cannot_serve_an_event_from_a_previous_calendar_day(publication):
+    _, publish = publication
+    publish(events=("A|2026-10-15",), horizon=1)
+    current = authority.load_current_authority("a" * 64, now=NOW)
+    assert current.allows("A", 1, date(2026, 10, 15))
+    next_day = authority.load_current_authority("a" * 64,
+        now=datetime(2026, 10, 16, 4, tzinfo=timezone.utc))
+    assert next_day.snapshot_date == date(2026, 10, 14)
+    assert not next_day.allows("A", 1, date(2026, 10, 15))
 
 
 def test_same_session_old_neon_vector_is_not_new_publication_evidence(publication):
