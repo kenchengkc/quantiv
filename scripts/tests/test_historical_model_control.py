@@ -273,6 +273,7 @@ def test_historical_pipeline_retry_reaches_remaining_handoff_without_repromotion
 
     plane, args, originals = promoted_historical_candidate
     handed_off = []
+    monkeypatch.setattr(pipeline, "prepare_publication_inputs", lambda *_: handed_off.append("verify-inputs"))
     monkeypatch.setattr(bundles, "verify_bundle_dir", plane.verify_bundle_dir)
 
     def option(values, name):
@@ -309,5 +310,5 @@ def test_historical_pipeline_retry_reaches_remaining_handoff_without_repromotion
     monkeypatch.setattr(pipeline, "validate_selected_publication",
                         lambda *args: handed_off.append("validate-publication"))
     pipeline.activate(args.models_root.parent, "b" * 64)
-    assert handed_off == ["activate", "import", "monitor", "validate-publication", "publish-monitor"]
+    assert handed_off == ["verify-inputs", "activate", "import", "monitor", "validate-publication", "publish-monitor"]
     assert {path: path.read_bytes() for path in originals} == originals

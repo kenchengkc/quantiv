@@ -14,7 +14,7 @@ import sys
 from datetime import datetime, timezone
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path[:0] = [str(ROOT / "apps/ml"), str(ROOT / "scripts")]
+sys.path[:0] = [str(ROOT / "apps/ml"), str(ROOT / "scripts"), str(ROOT / "tools")]
 
 
 def _run(*args: str, env: dict | None = None, check: bool = True, **kwargs):
@@ -157,6 +157,28 @@ def fit(data: Path, revision: str):
     _write(data / "validation/historical_fit.json", result)
 
 
+def prepare_publication_inputs(data: Path):
+    """Verify saved options evidence without changing the published source."""
+    from datetime import date
+    from data_release import verify_release
+    from forecast_activation_gate import _reconciliation
+    from frontend_data.options_policy import options_display_available
+    from options_snapshot_resilience import (
+        _option_partitions, _published_options_date, finalize_snapshot, verify_fallback,
+    )
+
+    verify_release(data)
+    _reconciliation(data, datetime.now(timezone.utc), 36)
+    published = _published_options_date(data)
+    if not published or max(_option_partitions(data), default=None) != published:
+        raise RuntimeError("publication options differ from the immutable published source")
+    manifest = data / "validation/data_reconciliation.json"
+    result = finalize_snapshot(manifest_path=manifest, data_dir=data, sync_outcome="not_requested")
+    if result.state == "fallback":
+        verify_fallback(manifest_path=manifest, data_dir=data)
+    return options_display_available(data, as_of_date=date.fromisoformat(published), verify_fallback=True)
+
+
 def validate_selected_publication(data: Path, bundle: Path, candidate: Path):
     """Bind frontend validation evidence to the signed monitor's exact subset."""
     from model_publication import verify_publication
@@ -173,6 +195,7 @@ def activate(data: Path, bundle_id: str):
     from ml.model_bundle import verify_bundle_dir
 
     bundle_id = _bundle_id(bundle_id)
+    prepare_publication_inputs(data)
     remote = f"r2:{os.environ.get('R2_BUCKET') or 'quantiv-data'}"
     bundle = data / "models/bundles" / bundle_id
     _run("rclone", "copy", f"{remote}/models/bundles/{bundle_id}", str(bundle))
