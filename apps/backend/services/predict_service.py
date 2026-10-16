@@ -35,6 +35,7 @@ from ml.model_protocol import (
     bundle_feature_protocol, feature_protocol, target_protocol,
 )
 from ml.quantiles import rearrange_quantile_mapping
+from ml.serving_capabilities import allowed_cohorts
 
 logger = logging.getLogger(__name__)
 
@@ -84,6 +85,7 @@ class _ModelBundle:
     bundle_id: Optional[str] = None
     feature_protocol: str = LEGACY_FEATURE_PROTOCOL
     supported_cohorts: tuple[str, ...] = ()
+    serving_capabilities_enforced: bool = False
 
 
 _BUNDLE_CACHE: Dict[int, _ModelBundle] = {}
@@ -152,8 +154,10 @@ def _load_bundle_from_dir(models_dir: Path, horizon: int) -> Optional[_ModelBund
     protocol = feature_protocol(metadata)
     target_protocol(metadata)
     bundle_id = None
+    manifest = None
     if (models_dir / "manifest.json").exists():
-        bundle_id = verify_bundle_dir(models_dir)["bundle_id"]
+        manifest = verify_bundle_dir(models_dir)
+        bundle_id = manifest["bundle_id"]
     estimator = load_native_model(point_path)
     feature_names = list(estimator.feature_name())
     if not feature_names:
@@ -181,7 +185,8 @@ def _load_bundle_from_dir(models_dir: Path, horizon: int) -> Optional[_ModelBund
         val_mae=float(metadata["val_mae"]) if metadata.get("val_mae") is not None else None,
         bundle_id=bundle_id,
         feature_protocol=protocol,
-        supported_cohorts=tuple(metadata.get("supported_cohorts") or []),
+        supported_cohorts=allowed_cohorts(manifest, horizon, metadata),
+        serving_capabilities_enforced=bool(manifest is not None and "serving_capabilities" in manifest),
     )
 
 
@@ -203,6 +208,7 @@ def validate_models_dir(models_dir: Path) -> List[Dict[str, Any]]:
                 "feature_count": len(bundle.feature_names),
                 "quantile_model_count": len(bundle.quantile_estimators),
                 "feature_schema_hash": bundle.feature_schema_hash,
+                "supported_cohorts": list(bundle.supported_cohorts),
             }
         )
     return verified
@@ -385,7 +391,7 @@ def predict(
         return None
     if bundle.bundle_id is not None and snapshot_bundle_id != bundle.bundle_id:
         return None
-    if bundle.feature_protocol == CAUSAL_FEATURE_PROTOCOL:
+    if bundle.serving_capabilities_enforced or bundle.feature_protocol == CAUSAL_FEATURE_PROTOCOL:
         try:
             straddle = float(feature_vector.get("straddle_pct") or 0.)
             timing_bmo = float(feature_vector.get("timing_bmo") or 0.)
@@ -393,7 +399,10 @@ def predict(
         except (TypeError, ValueError):
             return None
         cohort = "strict_options" if math.isfinite(straddle) and straddle > 0 else "optionless"
-        if cohort not in bundle.supported_cohorts or (timing_bmo, timing_amc) not in {(1., 0.), (0., 1.)}:
+        if cohort not in bundle.supported_cohorts:
+            return None
+        if (bundle.feature_protocol == CAUSAL_FEATURE_PROTOCOL
+                and (timing_bmo, timing_amc) not in {(1., 0.), (0., 1.)}):
             return None
 
     # Pick the spot we'll report and substitute. None → use whatever

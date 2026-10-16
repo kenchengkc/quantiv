@@ -269,3 +269,23 @@ def test_signed_manifest_rejects_invalid_or_unsupported_head_declarations(horizo
     core["horizons"] = horizons
     with pytest.raises(ModelBundleError, match="horizon"):
         verify_bundle_manifest(_sign(core, private), public_key=public)
+
+
+def test_signed_manifest_cannot_add_capabilities_without_bound_admission():
+    from ml.model_bundle import _bundle_core, _sign, verify_bundle_manifest
+    private, public = _keys()
+    core = _bundle_core(artifacts=[], receipt_id="sha256:" + "a" * 64,
+        horizons=[1], source_revision="test", created_at="2026-10-15")
+    core["serving_capabilities"] = {"1": ["optionless"]}
+    with pytest.raises(ModelBundleError, match="admission"):
+        verify_bundle_manifest(_sign(core, private), public_key=public)
+
+
+def test_malformed_capability_container_fails_as_a_bundle_trust_error():
+    from ml.model_bundle import _bundle_core, _sign, verify_bundle_manifest
+    private, public = _keys()
+    core = _bundle_core(artifacts=[], receipt_id="sha256:" + "a" * 64,
+        horizons=[1], source_revision="test", created_at="2026-10-15")
+    core.update(serving_capabilities=[0], historical_admission={})
+    with pytest.raises(ModelBundleError):
+        verify_bundle_manifest(_sign(core, private), public_key=public)

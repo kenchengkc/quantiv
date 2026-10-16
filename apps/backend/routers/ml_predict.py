@@ -16,6 +16,7 @@ Caching:
 from __future__ import annotations
 
 import json
+import asyncio
 import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
@@ -42,6 +43,7 @@ from models import (
     MLStatusResponse,
 )
 from services import predict_service
+from services.publication_authority import PublicationAuthority, load_current_authority
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -86,7 +88,7 @@ def _active_bundle_id(horizon: int) -> str | None:
     return bundle.bundle_id if bundle is not None else None
 
 
-def _cache_key(req: MLPredictRequest, *, bundle_id: str | None = None) -> str:
+def _cache_key(req: MLPredictRequest, *, bundle_id: str | None = None, publication_id: str | None = None) -> str:
     """Stable cache key. Spot is rounded to 1 decimal so trivial flicker
     in the latest stock tick doesn't blow the cache to bits; 0.1 = ~10bp on a $100
     name, well below the noise floor of an EM prediction."""
@@ -94,7 +96,15 @@ def _cache_key(req: MLPredictRequest, *, bundle_id: str | None = None) -> str:
     earn = req.earnings_date.isoformat() if req.earnings_date else "auto"
     if bundle_id is None:
         bundle_id = _active_bundle_id(req.horizon_days)
-    return f"ml:pred:{bundle_id or 'unbound'}:{req.symbol.upper()}:{req.horizon_days}:{spot_bucket}:{earn}"
+    key = f"ml:pred:{bundle_id or 'unbound'}:{req.symbol.upper()}:{req.horizon_days}:{spot_bucket}:{earn}"
+    return f"{key}:{publication_id}" if publication_id else key
+
+
+async def _publication_authority(bundle_id: str) -> PublicationAuthority:
+    try:
+        return await asyncio.to_thread(load_current_authority, bundle_id)
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="Current forecast publication authority is unavailable") from exc
 
 
 async def _cached_get(key: str) -> Optional[Dict[str, Any]]:
@@ -148,13 +158,20 @@ async def _predict_response(req: MLPredictRequest) -> MLPredictResponse:
         bundle_id = _active_bundle_id(req.horizon_days)
         if bundle_id is None:
             raise HTTPException(status_code=503, detail=f"No signed model loaded for horizon T-{req.horizon_days}")
-        cache_key = _cache_key(req, bundle_id=bundle_id)
+        authority = await _publication_authority(bundle_id)
+        if not authority.allows(req.symbol, req.horizon_days, req.earnings_date):
+            raise HTTPException(status_code=404, detail="ML forecast is unavailable for this event")
+        cache_key = _cache_key(req, bundle_id=bundle_id, publication_id=authority.cache_identity)
         hit = await _cached_get(cache_key)
         if _active_bundle_id(req.horizon_days) != bundle_id:
             continue
+        if (await _publication_authority(bundle_id)).cache_identity != authority.cache_identity:
+            continue
         # Older entries may have been placed under the wrong key during an
         # activation race. Only explicitly identity-bound entries are reusable.
-        if isinstance(hit, dict) and hit.get("model_bundle_id") == bundle_id:
+        if (isinstance(hit, dict) and hit.get("model_bundle_id") == bundle_id
+                and authority.accepts_cached(req.symbol, req.horizon_days, hit)):
+            hit.pop("_snapshot_id", None)
             hit["source"] = "cached"
             hit["inference_mode"] = (
                 "spot_updated_snapshot"
@@ -179,6 +196,8 @@ async def _predict_response(req: MLPredictRequest) -> MLPredictResponse:
                     "The nightly batch may not have scored this symbol recently."
                 ),
             )
+        if not authority.accepts_snapshot(req.symbol, req.horizon_days, snapshot):
+            raise HTTPException(status_code=404, detail="No current admitted feature snapshot is available for this event")
         inference_bundle_id = snapshot.get("model_bundle_id")
         if inference_bundle_id != bundle_id:
             raise HTTPException(status_code=503, detail="Feature snapshot does not match the active model")
@@ -223,10 +242,13 @@ async def _predict_response(req: MLPredictRequest) -> MLPredictResponse:
             feature_schema_hash=result.feature_schema_hash,
         )
         await _cached_set(
-            _cache_key(req, bundle_id=inference_bundle_id),
-            {**response.model_dump(mode="json"), "model_bundle_id": inference_bundle_id},
+            _cache_key(req, bundle_id=inference_bundle_id, publication_id=authority.cache_identity),
+            {**response.model_dump(mode="json"), "model_bundle_id": inference_bundle_id,
+             "_snapshot_id": authority.snapshot_identity(req.symbol, req.horizon_days, snapshot)},
         )
         if _active_bundle_id(req.horizon_days) != inference_bundle_id:
+            continue
+        if (await _publication_authority(bundle_id)).cache_identity != authority.cache_identity:
             continue
         return response
 

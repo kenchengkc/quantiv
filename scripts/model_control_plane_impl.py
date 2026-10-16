@@ -47,6 +47,7 @@ from ml.pipeline_validation import (  # noqa: E402
 )
 from ml.model_artifact import sha256_file  # noqa: E402
 from ml.model_protocol import feature_protocol, target_protocol  # noqa: E402
+from historical_candidate_evidence import verify_historical_candidate  # noqa: E402
 
 
 def _atomic_json(path: Path, payload: dict[str, Any]) -> None:
@@ -133,8 +134,11 @@ def _has_complete_candidate_evidence(
 
     root = models_root / "candidates" / bundle_id
     try:
-        payload = verify_candidate_evidence(root, bundle_id)
         bundle = verify_bundle_dir(models_root / "bundles" / bundle_id)
+        if bundle.get("historical_admission"):
+            verify_historical_candidate(models_root, models_root / "bundles" / bundle_id)
+            return True
+        payload = verify_candidate_evidence(root, bundle_id)
         verify_candidate_bindings(root, bundle)
         observed = {row["path"] for row in payload["members"]}
         required = {
@@ -183,6 +187,11 @@ def _retain_candidate(args: argparse.Namespace) -> dict[str, Any]:
     pointer, registry = _control_state(args.models_root)
     frozen = registry.get("challenger_bundle_id")
     migration_reason = None
+    if frozen and manifest.get("historical_admission") and frozen != incoming:
+        # This explicit historical route has its own sealed evidence. Keep the
+        # previous candidate's immutable archive and registry history intact.
+        migration_reason = "candidate qualified through sealed historical admission"
+        frozen = None
     if frozen:
         old_dir = args.models_root / "bundles" / str(frozen)
         old = verify_bundle_dir(old_dir)
@@ -386,7 +395,7 @@ def decide(args: argparse.Namespace) -> int:
     champion_dir = args.models_root / "bundles" / champion_id if champion_id else None
     gate = _activation_gate(args)
     reasons = []
-    drift = comparison = shadow = prospective = None
+    drift = comparison = shadow = prospective = historical = None
     forecast_validation = None
     candidate_forecasts = None
     if gate["status"] != "passed":
@@ -420,27 +429,25 @@ def decide(args: argparse.Namespace) -> int:
             )
             if drift["status"] not in {"passed", "warning"}:
                 reasons.append(f"candidate cohort drift evidence is {drift['status']}")
+            if manifest.get("historical_admission"):
+                historical = verify_historical_candidate(args.models_root, candidate_dir)
+                if historical["status"] != "passed":
+                    reasons.append("historical admission evidence did not pass")
             if champion_dir is not None:
                 contract = retained.get("admission_contract")
                 expanded = contract and any(value != "incumbent"
                     for cohorts in contract["comparators"].values() for value in cohorts.values())
-                comparison = ({"status": "insufficient_data", "issues": ["expanded coverage requires predeclared future evidence"]}
-                    if expanded else compare_on_common_holdout(
-                        candidate_dir, champion_dir, args.training_dir, horizons=horizons))
-                prospective = _prospective_comparison(
-                    args,
-                    candidate_dir,
-                    champion_dir,
-                    horizons,
-                    candidate_id=candidate_id,
-                    champion_id=champion_id,
-                    contract=contract,
-                )
-                evidence = (
-                    comparison if comparison["status"] == "passed" else prospective
-                )
-                if evidence["status"] != "passed":
-                    reasons.extend(evidence["issues"])
+                if historical is None:
+                    comparison = ({"status": "insufficient_data", "issues": ["expanded coverage requires predeclared future evidence"]}
+                        if expanded else compare_on_common_holdout(
+                            candidate_dir, champion_dir, args.training_dir, horizons=horizons))
+                    prospective = _prospective_comparison(
+                        args, candidate_dir, champion_dir, horizons,
+                        candidate_id=candidate_id, champion_id=champion_id, contract=contract,
+                    )
+                    evidence = comparison if comparison["status"] == "passed" else prospective
+                    if evidence["status"] != "passed":
+                        reasons.extend(evidence["issues"])
                 champion_path = getattr(args, "champion_forecast", None)
                 champion_forecasts = (
                     pd.read_parquet(champion_path)
@@ -469,7 +476,7 @@ def decide(args: argparse.Namespace) -> int:
                     )
                     if shadow["status"] != "passed":
                         reasons.extend(shadow["issues"])
-            else:
+            elif historical is None:
                 reasons.append(
                     "bootstrap requires independent paired activation evidence"
                 )
@@ -487,6 +494,11 @@ def decide(args: argparse.Namespace) -> int:
         "evaluated_at": datetime.now(timezone.utc).isoformat(),
         "reasons": reasons,
     }
+    if historical is not None:
+        summary["historical_admission"] = {
+            "admission_id": historical["admission_id"],
+            "admitted_cohorts": historical["admitted_cohorts"],
+        }
     production_forecast = None
     rejected_evidence = None
     if (not promoted and gate["status"] == "passed" and forecast_validation
@@ -546,6 +558,7 @@ def decide(args: argparse.Namespace) -> int:
         "candidate_forecast_validation": forecast_validation,
         "common_holdout": comparison,
         "prospective_evidence": prospective,
+        "historical_evidence": historical,
         "shadow_scoring": shadow,
         "feature_drift": drift,
     }
@@ -761,6 +774,10 @@ def monitor(args: argparse.Namespace) -> int:
         "monitored_at": monitored_at.isoformat(),
         "snapshot_date": snapshot_date,
         "champion_bundle_id": champion_id,
+        "current_data_release_id": (
+            _read_json(data_dir / "control/current_data_release.json").get("release_id")
+            if (data_dir / "control/current_data_release.json").is_file() else None
+        ),
         "forecast_path": str(forecast_path),
         "forecast_sha256": sha256_file(forecast_path),
         "forecast_rows": len(forecasts),

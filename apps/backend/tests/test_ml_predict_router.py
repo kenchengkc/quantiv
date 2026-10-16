@@ -23,6 +23,16 @@ from models import (  # noqa: E402
 from routers import ml_predict  # noqa: E402
 
 
+@pytest.fixture(autouse=True)
+def _isolated_publication_authority(monkeypatch):
+    """These route math/race tests inject source authority independently of R2."""
+    async def admitted(_bundle_id):
+        return SimpleNamespace(cache_identity=None, allows=lambda *args: True,
+                               accepts_snapshot=lambda *args: True, accepts_cached=lambda *args: True,
+                               snapshot_identity=lambda *args: "isolated-snapshot")
+    monkeypatch.setattr(ml_predict, "_publication_authority", admitted)
+
+
 def test_prediction_cache_key_changes_when_active_bundle_changes(monkeypatch):
     req = MLPredictRequest(symbol="A", horizon_days=7)
     monkeypatch.setattr(ml_predict.predict_service, "get_bundle", lambda _: SimpleNamespace(bundle_id="a" * 64))

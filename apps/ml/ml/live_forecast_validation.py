@@ -36,6 +36,9 @@ from ml.pipeline_validation import (
     ValidationIssue,
     validate_forecast_artifact,
 )
+from ml.model_bundle import verify_bundle_dir
+from ml.model_protocol import CAUSAL_FEATURE_PROTOCOL, feature_protocol, target_protocol
+from ml.serving_capabilities import assert_forecast_capability
 
 
 STRICT_OPTION_EVIDENCE_COLUMNS = (
@@ -129,6 +132,7 @@ def _validate_ml_only_rows(
     max_age_days: int,
     now: datetime | None,
     max_point_median_gap: float,
+    manifest: dict[str, Any] | None = None,
 ) -> tuple[list[ValidationIssue], dict[str, Any]]:
     issues: list[ValidationIssue] = []
     if frame.empty:
@@ -299,6 +303,18 @@ def _validate_ml_only_rows(
             if not list(metadata.get("feature_cols") or []):
                 raise ValueError("model metadata has no feature_cols schema")
             metadata_by_horizon[horizon] = metadata
+            if manifest is not None or feature_protocol(metadata) == CAUSAL_FEATURE_PROTOCOL:
+                try:
+                    assert_forecast_capability(manifest, horizon, metadata, "optionless")
+                except ValueError as exc:
+                    _issue(issues, artifact, "forecast_serving_capability", str(exc))
+            if feature_protocol(metadata) == CAUSAL_FEATURE_PROTOCOL:
+                rows = frame.loc[horizon_values.eq(horizon)]
+                if (not {"feature_protocol", "target_protocol"}.issubset(rows.columns)
+                        or not rows["feature_protocol"].eq(feature_protocol(metadata)).all()
+                        or not rows["target_protocol"].eq(target_protocol(metadata)).all()):
+                    _issue(issues, artifact, "forecast_protocol_mismatch",
+                           "ML-only vectors are not bound to the admitted model protocol")
         except Exception as exc:
             _issue(
                 issues,
@@ -318,6 +334,15 @@ def _validate_ml_only_rows(
             invalid_vectors += 1
             continue
         metadata = metadata_by_horizon.get(horizon)
+        if metadata and feature_protocol(metadata) == CAUSAL_FEATURE_PROTOCOL:
+            timing = str(row.get("timing") or "").strip().lower()
+            expected_timing = {"bmo": (1., 0.), "amc": (0., 1.)}.get(timing)
+            if expected_timing is None or (vector.get("timing_bmo"), vector.get("timing_amc")) != expected_timing:
+                _issue(issues, artifact, "forecast_timing_contract",
+                       "ML-only vector lacks matching verified event timing")
+            if any(vector.get(key) is not None for key in ("atm_iv", "dte", "em_iv_pct", "straddle_pct")):
+                _issue(issues, artifact, "optionless_quote_evidence",
+                       "ML-only vector contains quote-dependent model inputs")
         expected_features = list(metadata.get("feature_cols") or []) if metadata else []
         if expected_features and not set(expected_features).issubset(vector):
             schema_mismatches += 1
@@ -452,9 +477,11 @@ def validate_live_forecast_artifact(
             f"forecast snapshot must reference exactly one model bundle; found {bundle_ids}",
         )
     manifest_path = models_dir / "manifest.json"
+    manifest = None
     if manifest_path.exists() and len(bundle_ids) == 1:
         try:
-            manifest_bundle_id = str(_load_json_object(manifest_path)["bundle_id"])
+            manifest = verify_bundle_dir(models_dir)
+            manifest_bundle_id = str(manifest["bundle_id"])
             if bundle_ids[0] != manifest_bundle_id:
                 raise ValueError(
                     f"forecast references {bundle_ids[0]} but models_dir is {manifest_bundle_id}"
@@ -495,6 +522,7 @@ def validate_live_forecast_artifact(
         max_age_days=max_age_days,
         now=now,
         max_point_median_gap=max_point_median_gap,
+        manifest=manifest,
     )
     issues.extend(ml_only_issues)
 

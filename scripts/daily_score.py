@@ -55,6 +55,8 @@ from ml.model_protocol import (  # noqa: E402
     target_protocol,
 )
 from ml.causal_features import build_causal_features  # noqa: E402
+from ml.serving_capabilities import allowed_cohorts  # noqa: E402
+from ml.source_coverage import filter_source_covered_snapshots  # noqa: E402
 try:  # noqa: E402 - standalone script path setup
     from market_sessions import EASTERN, latest_completed_us_market_session
 except ModuleNotFoundError:
@@ -129,6 +131,7 @@ def load_models(models_dir: Path) -> Dict[int, dict]:
             "residual_std": meta.get("residual_std", 0.03),
             "quantile_models": {},
             "bundle_id": bundle_id,
+            "manifest": manifest,
         }
 
         quantiles = meta.get("quantiles", [0.10, 0.25, 0.50, 0.75, 0.90])
@@ -179,12 +182,17 @@ def get_upcoming_features(
             conn, start_date=today, end_date=today + timedelta(days=days_ahead),
             as_of_date=snapshot_date,
         )
-        return features.loc[
+        features = features.loc[
             pd.to_datetime(features["snapshot_date"]).dt.date.eq(snapshot_date)
         ].reset_index(drop=True)
-    return _get_legacy_upcoming_features(
-        conn, days_ahead, today=today, snapshot_date=snapshot_date,
-    )
+    else:
+        features = _get_legacy_upcoming_features(
+            conn, days_ahead, today=today, snapshot_date=snapshot_date,
+        )
+    persisted = bool(not features.empty and any(
+        row[2] for row in conn.execute("PRAGMA database_list").fetchall()
+    ))
+    return filter_source_covered_snapshots(conn, features, require_coverage=persisted)
 
 
 def get_bundle_upcoming_features(
@@ -575,7 +583,7 @@ def score(df: pd.DataFrame, models: Dict[int, dict]) -> pd.DataFrame:
         # Legacy bundles without an explicit cohort declaration are strict-only,
         # matching the signed monitoring contract rather than emitting rows that
         # their champion has never represented.
-        supported = set(metadata.get("supported_cohorts", ["strict_options"]))
+        supported = set(allowed_cohorts(m.get("manifest"), horizon, metadata))
         hdf = hdf.loc[hdf["__cohort"].isin(supported)].copy()
         if hdf.empty:
             continue

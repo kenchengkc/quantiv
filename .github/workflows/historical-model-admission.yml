@@ -1,0 +1,142 @@
+name: Historical model admission
+
+on:
+  workflow_dispatch:
+    inputs:
+      candidate_bundle_id:
+        description: "Optional exact already-qualified bundle to retry activation with fresh inputs; skips fitting and reserved outcomes."
+        type: string
+        required: false
+        default: ''
+
+concurrency:
+  group: historical-model-admission
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  R2_BUCKET: ${{ secrets.R2_BUCKET || 'quantiv-data' }}
+  R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+  R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+  R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+  R2_PULL_EARNINGS: '1'
+  R2_HISTORICAL_TRAINING: '1'
+
+jobs:
+  prepare-data:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    concurrency:
+      group: daily-data-refresh-execution
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup-historical-ml
+      - name: Pull verified source and runtime state
+        run: bash scripts/r2_pull.sh
+      - name: Refresh genuine price and corporate-action sources
+        run: python scripts/historical_ml_pipeline.py prepare-data
+      - name: Retain source verification and honest freshness holds
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: historical-source-controls
+          path: data/validation/*.json
+          if-no-files-found: ignore
+          retention-days: 365
+
+  fit:
+    needs: prepare-data
+    if: inputs.candidate_bundle_id == ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    concurrency:
+      group: weekly-model-retrain
+      cancel-in-progress: false
+    outputs:
+      bundle_id: ${{ steps.fit.outputs.bundle_id }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup-historical-ml
+      - name: Pull verified historical inputs and durable test reservations
+        run: bash scripts/r2_pull.sh
+      - name: Fit once and evaluate sealed historical outcomes
+        id: fit
+        env:
+          MODEL_BUNDLE_SIGNING_KEY: ${{ secrets.MODEL_BUNDLE_SIGNING_KEY }}
+          OMP_NUM_THREADS: '4'
+          OMP_THREAD_LIMIT: '4'
+          DUCKDB_MEMORY_LIMIT: '4GB'
+          DUCKDB_THREADS: '4'
+        run: |
+          set -euo pipefail
+          python scripts/historical_ml_pipeline.py fit --source-revision "$GITHUB_SHA"
+          echo "bundle_id=$(jq -r '.bundle_id // empty' data/validation/historical_fit.json)" >> "$GITHUB_OUTPUT"
+          cat data/validation/historical_fit.json >> "$GITHUB_STEP_SUMMARY"
+      - name: Retain exact historical admission and development evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: historical-admission-evidence
+          path: |
+            data/validation/historical_*.json
+            data/historical_admission/sealed/*.json
+            data/historical_admission/workspace/validation/*.json
+            data/models/historical_reservations/**
+            data/models/historical_admissions/**
+          if-no-files-found: ignore
+          retention-days: 365
+
+  activate:
+    needs: [prepare-data, fit]
+    if: >-
+      !cancelled() && needs.prepare-data.result == 'success' &&
+      ((needs.fit.result == 'success' && needs.fit.outputs.bundle_id != '') ||
+       (needs.fit.result == 'skipped' && inputs.candidate_bundle_id != ''))
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    concurrency:
+      group: daily-data-refresh-execution
+      cancel-in-progress: false
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-historical-ml
+      - name: Pull latest verified activation inputs
+        run: bash scripts/r2_pull.sh
+      - name: Admit only passing scopes with current freshness and drift
+        env:
+          CANDIDATE_BUNDLE_ID: ${{ inputs.candidate_bundle_id || needs.fit.outputs.bundle_id }}
+          MODEL_BUNDLE_SIGNING_KEY: ${{ secrets.MODEL_BUNDLE_SIGNING_KEY }}
+          RAILWAY_BACKEND_URL: ${{ secrets.RAILWAY_BACKEND_URL }}
+          ADMIN_API_KEY: ${{ secrets.ADMIN_API_KEY }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: python scripts/historical_ml_pipeline.py activate --bundle-id "$CANDIDATE_BUNDLE_ID"
+      - name: Commit generated publication
+        run: |
+          set -euo pipefail
+          git config --local user.email "action@github.com"
+          git config --local user.name "Quantiv publication bot"
+          git add apps/frontend/public apps/frontend/lib/popular.ts
+          if ! git diff --staged --quiet; then
+            git commit -m "publish historically admitted ML forecasts"
+            bash scripts/git_push_with_retry.sh origin main
+          fi
+      - name: Retain exact activation, monitoring and rollback controls
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: historical-activation-controls
+          path: |
+            data/validation/historical_*.json
+            data/models/control/*.json
+            data/models/monitoring/latest*.json
+          if-no-files-found: ignore
+          retention-days: 365

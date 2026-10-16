@@ -15,6 +15,7 @@ import pandas as pd
 from ml.model_artifact import load_native_model, point_model_name, quantile_model_name
 from ml.model_bundle import DAILY_HORIZONS, verify_bundle_dir
 from ml.model_protocol import CAUSAL_FEATURE_PROTOCOL, feature_protocol, target_protocol
+from ml.serving_capabilities import allowed_cohorts
 from ml.provider_signal_policy import (
     DEFAULT_POLICY_PATH,
     ProviderSignalPolicyError,
@@ -890,9 +891,11 @@ def validate_forecast_artifact(
             f"forecast snapshot must reference exactly one model bundle; found {bundle_ids}",
         )
     manifest_path = models_dir / "manifest.json"
+    manifest = None
     if manifest_path.exists() and len(bundle_ids) == 1:
         try:
-            manifest_bundle_id = str(_load_json(manifest_path)["bundle_id"])
+            manifest = verify_bundle_dir(models_dir)
+            manifest_bundle_id = str(manifest["bundle_id"])
             if bundle_ids[0] != manifest_bundle_id:
                 raise ValueError(
                     f"forecast references {bundle_ids[0]} but models_dir is {manifest_bundle_id}"
@@ -915,14 +918,18 @@ def validate_forecast_artifact(
             metadata = _load_json(models_dir / f"metadata_T{int(horizon)}.json")
             protocol = feature_protocol(metadata)
             expected_target = target_protocol(metadata)
+            rows = frame.loc[frame["model_horizon"] == horizon]
+            baseline = pd.to_numeric(rows["em_math_pct"], errors="coerce")
+            cohorts = np.where(np.isfinite(baseline) & (baseline > 0), "strict_options", "optionless")
+            if manifest is not None or protocol == CAUSAL_FEATURE_PROTOCOL:
+                try:
+                    if not set(cohorts).issubset(allowed_cohorts(manifest, int(horizon), metadata)):
+                        raise ValueError("forecast contains head/cohort combinations not admitted for serving")
+                except ValueError as exc:
+                    _issue(issues, "forecasts", forecast_path, "forecast_serving_capability", str(exc))
             if protocol == CAUSAL_FEATURE_PROTOCOL:
-                rows = frame.loc[frame["model_horizon"] == horizon]
                 if not {"feature_protocol", "target_protocol"} <= set(rows) or not rows["feature_protocol"].eq(protocol).all() or not rows["target_protocol"].eq(expected_target).all():
                     raise ValueError("forecast vectors are not bound to the model protocol")
-                baseline = pd.to_numeric(rows["em_math_pct"], errors="coerce")
-                cohorts = np.where(np.isfinite(baseline) & (baseline > 0), "strict_options", "optionless")
-                if not set(cohorts) <= set(metadata.get("supported_cohorts", [])):
-                    raise ValueError("forecast contains unsupported serving cohorts")
                 optionless_rows.loc[rows.index] = baseline.isna()
         except (ValueError, KeyError, OSError, TypeError) as exc:
             _issue(issues, "forecasts", forecast_path, "forecast_protocol_mismatch", str(exc))

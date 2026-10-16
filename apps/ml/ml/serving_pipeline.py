@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """
-ML Serving Pipeline - Combines Math Baseline + ML Predictions
-Generates live expected move forecasts with confidence bands
+Retired exploratory correction pipeline.
+Live forecasts use scripts/daily_score.py and authenticated snapshot inference.
 """
-from pathlib import Path
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 import pandas as pd
 import numpy as np
 import duckdb
@@ -14,24 +13,22 @@ import json
 
 from ml.model_artifact import load_native_model, point_model_name
 from ml.model_bundle import DEFAULT_HORIZONS, verify_bundle_dir
+from ml.model_protocol import CAUSAL_FEATURE_PROTOCOL, feature_protocol
+from ml.serving_capabilities import allowed_cohorts
+from ml.source_coverage import completed_market_session, filter_source_covered_snapshots
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class MLServingPipeline:
-    """Serving pipeline for ML-enhanced expected move predictions"""
+    """Retained legacy helpers; public construction is intentionally disabled."""
     
     def __init__(self, data_dir: str = "data", models_dir: str = "models"):
-        self.data_dir = Path(data_dir)
-        self.models_dir = Path(models_dir)
-        self.conn = None
-        self.models = {}
-        self.bias_curves = {}
-        
-        self._setup_duckdb()
-        self._load_models()
-        self._load_bias_curves()
+        raise RuntimeError(
+            "The legacy correction pipeline is retired; use scripts/daily_score.py "
+            "with verified source controls and authenticated snapshot inference."
+        )
     
     def _setup_duckdb(self):
         """Initialize DuckDB connection with views matching actual Parquet schema.
@@ -99,8 +96,9 @@ class MLServingPipeline:
     
     def _load_models(self):
         """Load trained ML models"""
-        horizons = (verify_bundle_dir(self.models_dir)["horizons"]
-                    if (self.models_dir / "manifest.json").exists() else DEFAULT_HORIZONS)
+        self._manifest = (verify_bundle_dir(self.models_dir)
+                          if (self.models_dir / "manifest.json").exists() else None)
+        horizons = self._manifest["horizons"] if self._manifest else DEFAULT_HORIZONS
         
         for horizon in horizons:
             model_path = self.models_dir / point_model_name(horizon)
@@ -108,9 +106,13 @@ class MLServingPipeline:
             if model_path.exists():
                 try:
                     model = load_native_model(model_path)
+                    metadata_path = self.models_dir / f"metadata_T{horizon}.json"
+                    metadata = json.loads(metadata_path.read_text()) if metadata_path.exists() else {}
+                    allowed_cohorts(self._manifest, horizon, metadata)
                     self.models[horizon] = {
                         "model": model,
                         "feature_names": list(model.feature_name()),
+                        "metadata": metadata,
                     }
                     logger.info(f"Loaded T-{horizon} model")
                 except Exception as e:
@@ -338,26 +340,54 @@ class MLServingPipeline:
 
         return features
     
-    def predict_ml_correction(self, symbol: str, lead_time_days: int) -> Dict[str, float]:
+    def predict_ml_correction(self, symbol: str, lead_time_days: int) -> Dict[str, Any]:
         """Get ML correction factor for math baseline"""
         
         # Find closest model horizon
         available_horizons = list(self.models.keys())
+        manifest = getattr(self, "_manifest", None)
+        if manifest is not None and (lead_time_days not in available_horizons or lead_time_days not in manifest["horizons"]):
+            return {"error": "No admitted model for the exact forecast horizon"}
         if not available_horizons:
             return {'correction_factor': 1.0, 'confidence': 0.0}
         
         closest_horizon = min(available_horizons, key=lambda x: abs(x - lead_time_days))
         model_data = self.models[closest_horizon]
+        if manifest is not None:
+            metadata = model_data.get("metadata") or {}
+            # This entry point reconstructs legacy option features. Causal
+            # native heads use the canonical batch/snapshot scoring paths.
+            if feature_protocol(metadata) == CAUSAL_FEATURE_PROTOCOL:
+                return {"error": "Causal models require their canonical feature snapshot"}
+            if "strict_options" not in allowed_cohorts(manifest, closest_horizon, metadata):
+                return {"error": "Strict option forecasts are not admitted for this model head"}
+        connection = getattr(self, "conn", None)
+        if connection is not None:
+            try:
+                snapshot = connection.execute("SELECT MAX(quote_date) FROM options_paired WHERE act_symbol = ?",
+                    [symbol.upper()]).fetchone()[0]
+                rows = pd.DataFrame({"act_symbol": [symbol.upper()], "snapshot_date": [snapshot]})
+                if (snapshot != completed_market_session(datetime.now(timezone.utc))
+                        or filter_source_covered_snapshots(connection, rows, require_coverage=True).empty):
+                    return {"error": "Current verified source coverage is unavailable for this issuer"}
+            except (ValueError, duckdb.Error):
+                return {"error": "Current verified source coverage is unavailable for this issuer"}
+        elif manifest is not None:
+            return {"error": "Current verified source coverage is unavailable for this issuer"}
         
         # Extract features
         features_df = self.extract_ml_features(symbol, lead_time_days)
         
         if features_df is None:
+            if manifest is not None:
+                return {"error": "No feature snapshot for the admitted model head"}
             return {'correction_factor': 1.0, 'confidence': 0.0}
         
         try:
             # Ensure all required features are present
             model_features = model_data['feature_names']
+            if manifest is not None and not set(model_features).issubset(features_df.columns):
+                return {"error": "Feature snapshot differs from the admitted model schema"}
             for feature in model_features:
                 if feature not in features_df.columns:
                     features_df[feature] = 0  # Default value
@@ -387,6 +417,8 @@ class MLServingPipeline:
             
         except Exception as e:
             logger.error(f"ML prediction failed for {symbol}: {e}")
+            if manifest is not None:
+                return {"error": "Admitted model inference failed"}
             return {'correction_factor': 1.0, 'confidence': 0.0}
     
     def generate_forecast(self, symbol: str, earnings_date: str, 
@@ -405,6 +437,8 @@ class MLServingPipeline:
         
         # ML correction
         ml_correction = self.predict_ml_correction(symbol, lead_time_days)
+        if "error" in ml_correction:
+            return {"symbol": symbol, "earnings_date": earnings_date, "error": ml_correction["error"]}
         
         # Combined prediction
         em_math = math_baseline['em_math']

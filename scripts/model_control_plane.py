@@ -48,6 +48,12 @@ def _set_option(name: str, value: str) -> None:
 def _resolve_registered_candidate() -> None:
     """Bind receipt verification and scoring to the same verified frozen bundle."""
     models_root = Path(str(_option("--models-root", str(REPO_ROOT / "data/models"))))
+    incoming_path = _option("--candidate-manifest")
+    if incoming_path:
+        incoming = json.loads(Path(incoming_path).read_text())
+        incoming_bundle = _impl.verify_bundle_dir(Path(incoming["bundle_dir"]))
+        if incoming_bundle.get("historical_admission"):
+            return  # The exact historically tested candidate has a separate admission route.
     _, registry = _impl._control_state(models_root)
     frozen = registry.get("challenger_bundle_id")
     if not frozen:
@@ -85,6 +91,16 @@ def _validate_decision_evidence() -> dict:
     candidate_path = Path(str(_option("--candidate-manifest")))
     candidate = json.loads(candidate_path.read_text())
     bundle_id = str(candidate.get("bundle_id") or "")
+    bundle = _impl.verify_bundle_dir(Path(candidate["bundle_dir"]))
+    if bundle.get("historical_admission"):
+        models_root = Path(str(_option("--models-root", str(REPO_ROOT / "data/models"))))
+        historical = _impl.verify_historical_candidate(models_root, Path(candidate["bundle_dir"]))
+        return {**historical["source_promotion_evidence"], "historical_admission": {
+            "admission_id": historical["admission_id"],
+            "source_bundle_id": historical["bundle_id"],
+            "serving_bundle_id": bundle_id,
+            "admitted_cohorts": historical["admitted_cohorts"],
+        }}
     training_dir = Path(
         str(_option("--training-dir", str(REPO_ROOT / "data" / "ml_training")))
     )

@@ -675,6 +675,16 @@ def _monitor_fixture(tmp_path, monkeypatch):
             **{f"p{q:02d}": q / 1000 for q in (10, 25, 50, 75, 90)},
         }
     ).to_parquet(forecast)
+    # Ledger migration and rolling-drift fixtures provide verified source scope
+    # at the coverage boundary; receipt reconstruction is tested separately.
+    import event_forecast_eligibility as eligibility
+
+    current = pd.read_parquet(forecast)
+    coverage = {
+        row.act_symbol: ("2019-01-01", str(row.snapshot_date)[:10])
+        for row in current.itertuples()
+    }
+    monkeypatch.setattr(eligibility, "_current_source_coverage", lambda _bundle: coverage)
     return argparse.Namespace(
         models_root=root, forecast_dir=forecast_dir, forecast_path=forecast
     )

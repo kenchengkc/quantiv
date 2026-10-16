@@ -170,6 +170,18 @@ jobs:
             --activation-receipt data/validation/rollback_serving_activation.json \
             --receipt data/validation/rollback_forecast_import.json
 
+      - name: Refresh signed automatic rollback forecast authority
+        id: rollback-authority
+        if: steps.rollback-apply.outputs.rolled_back == 'true'
+        env:
+          MODEL_BUNDLE_SIGNING_KEY: ${{ secrets.MODEL_BUNDLE_SIGNING_KEY }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+        run: |
+          FORECAST_PATH=$(jq -er .production_forecast data/validation/rollback_applied.json)
+          python scripts/model_publication.py snapshot
+          python scripts/model_publication.py monitor --forecast-path "$FORECAST_PATH"
+          bash scripts/r2_push.sh --monitoring-only
+
       - name: Upload independent rollback handoff evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -441,6 +453,18 @@ jobs:
             --expected-model-bundle-id "$EXPECTED_BUNDLE_ID" \
             --activation-receipt data/validation/serving_activation.json \
             --receipt data/validation/forecast_import.json
+
+      - name: Refresh signed promoted forecast authority
+        id: promotion-authority
+        if: steps.sync-railway-models.outputs.synced == 'true'
+        env:
+          MODEL_BUNDLE_SIGNING_KEY: ${{ secrets.MODEL_BUNDLE_SIGNING_KEY }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+        run: |
+          FORECAST_PATH=$(jq -er .production_forecast data/validation/model_decision.json)
+          python scripts/model_publication.py snapshot
+          python scripts/model_publication.py monitor --forecast-path "$FORECAST_PATH"
+          bash scripts/r2_push.sh --monitoring-only
 
       - name: Persist retained candidate control and outcome evidence
         env:

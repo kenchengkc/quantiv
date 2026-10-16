@@ -71,7 +71,7 @@ def test_unknown_feature_semantics_rejected_before_native_loading(tmp_path, monk
         service._load_bundle_from_dir(tmp_path, 1)
 
 
-def _signed_serving_models(tmp_path, monkeypatch, horizons=(7,)):
+def _signed_serving_models(tmp_path, monkeypatch, horizons=(7,), cohorts=("strict_options",)):
     models = tmp_path / "source"
     models.mkdir()
     features = ["log_spot", "straddle_pct", "timing_bmo", "timing_amc"]
@@ -83,7 +83,7 @@ def _signed_serving_models(tmp_path, monkeypatch, horizons=(7,)):
             save_native_model(estimator, models / f"lgbm_T{horizon}{suffix}.txt")
         (models / f"metadata_T{horizon}.json").write_text(json.dumps({
             "feature_cols": features, "feature_protocol": "quantiv.earnings-causal.v2",
-            "target_protocol": "quantiv.session-reaction.v2", "supported_cohorts": ["strict_options"],
+            "target_protocol": "quantiv.session-reaction.v2", "supported_cohorts": list(cohorts),
         }))
     private = Ed25519PrivateKey.generate()
     private_pem = private.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption())
@@ -174,6 +174,21 @@ def test_signed_prediction_rejects_cross_bundle_and_unsupported_cohort(tmp_path,
     assert service.predict(**kwargs, snapshot_bundle_id=active_id) is None
     vector.update({"straddle_pct": .05, "timing_bmo": 0.})
     assert service.predict(**kwargs, snapshot_bundle_id=active_id) is None
+
+
+def test_prediction_withholds_metadata_supported_cohort_outside_signed_capability(tmp_path, monkeypatch):
+    service = _import()
+    active_id = _signed_serving_models(tmp_path, monkeypatch, cohorts=("strict_options", "optionless"))
+    verify = service.verify_bundle_dir
+    monkeypatch.setattr(service, "verify_bundle_dir", lambda directory: {
+        **verify(directory), "serving_capabilities": {"7": ["optionless"]},
+    })
+    vector = {"log_spot": 4.6, "straddle_pct": .05, "timing_bmo": 1., "timing_amc": 0.}
+    kwargs = {"feature_vector": vector, "snapshot_date": date.today(), "horizon": 7,
+              "spot_override": 100., "snapshot_bundle_id": active_id}
+    assert service.predict(**kwargs) is None
+    vector["straddle_pct"] = None
+    assert service.predict(**kwargs) is not None
 
 
 def _synthetic_feature_vector(feature_names):

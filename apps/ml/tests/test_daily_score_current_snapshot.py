@@ -77,6 +77,24 @@ def test_live_features_use_only_latest_completed_session(market_clock, protocol)
 
 
 @pytest.mark.parametrize("protocol", PROTOCOLS)
+def test_live_features_withhold_issuers_without_snapshot_action_coverage(market_clock, protocol):
+    with _connection() as conn:
+        conn.execute("""CREATE TABLE v_corporate_action_coverage AS SELECT 'COVERED' AS act_symbol,
+            DATE '2020-01-01' AS window_start, DATE '2026-10-07' AS window_end""")
+        features = daily_score.get_upcoming_features(conn, 21, feature_protocol=protocol)
+        assert features["act_symbol"].tolist() == ["COVERED"]
+        conn.execute("UPDATE v_corporate_action_coverage SET window_end = DATE '2026-10-06'")
+        assert daily_score.get_upcoming_features(conn, 21, feature_protocol=protocol).empty
+
+
+def test_file_backed_legacy_scoring_cannot_assume_missing_action_coverage(tmp_path, market_clock):
+    with _connection() as conn:
+        database = str(tmp_path / "source.duckdb").replace("'", "''")
+        conn.execute(f"ATTACH '{database}' AS persisted")
+        assert daily_score.get_upcoming_features(conn, 21, feature_protocol=FEATURE_PROTOCOL_LEGACY).empty
+
+
+@pytest.mark.parametrize("protocol", PROTOCOLS)
 def test_missing_current_price_does_not_fall_back_or_use_future_price(market_clock, protocol):
     with _connection(with_current_price=False) as conn:
         features = daily_score.get_upcoming_features(conn, 21, feature_protocol=protocol)

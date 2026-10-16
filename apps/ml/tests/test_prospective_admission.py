@@ -78,6 +78,36 @@ def test_new_optionless_head_can_qualify_against_predeclared_baseline(tmp_path):
     assert report["horizons"]["4"]["cohorts"]["optionless"]["rows"] == 200
 
 
+def test_declared_comparators_use_both_authenticated_capability_maps(tmp_path, monkeypatch):
+    from ml import prospective_admission as admission
+    candidate, champion, _, _, _ = fixture(tmp_path)
+    metadata = {"supported_cohorts": ["strict_options", "optionless"]}
+    for directory in (candidate, champion):
+        (directory / "metadata_T4.json").write_text(json.dumps(metadata))
+    monkeypatch.setattr(admission, "verify_bundle_dir", lambda directory: {
+        "bundle_id": directory.name, "horizons": [4],
+        "serving_capabilities": {"4": ["strict_options"] if directory == candidate else ["optionless"]},
+    })
+    contract = admission.declare_admission(candidate, champion, started_at="2026-07-01T20:00:00Z")
+    assert contract["comparators"] == {"4": {"strict_options": "straddle"}}
+
+
+def test_evaluation_contract_covers_admitted_cohorts_without_overclaim(tmp_path, monkeypatch):
+    from ml import prospective_admission as admission
+    candidate, champion, rows, labels, contract = fixture(tmp_path)
+    metadata_path = candidate / "metadata_T4.json"
+    metadata = json.loads(metadata_path.read_text())
+    metadata["supported_cohorts"] = ["strict_options", "optionless"]
+    metadata_path.write_text(json.dumps(metadata))
+    (candidate / "manifest.json").write_text("{}")
+    monkeypatch.setattr(admission, "verify_bundle_dir", lambda directory: {
+        "bundle_id": "candidate", "horizons": [4], "serving_capabilities": {"4": ["optionless"]},
+    })
+    report = admission.evaluate_admission(rows, labels, candidate, champion, contract,
+        now=datetime(2026, 7, 8, tzinfo=timezone.utc))
+    assert report["status"] == "passed"
+
+
 @pytest.mark.parametrize(
     "mutate",
     [

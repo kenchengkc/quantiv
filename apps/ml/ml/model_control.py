@@ -14,6 +14,7 @@ from sklearn.metrics import mean_absolute_error
 
 from ml.model_artifact import load_native_model, point_model_name, quantile_model_name
 from ml.model_bundle import DEFAULT_HORIZONS, DEFAULT_QUANTILES, verify_bundle_dir
+from ml.serving_capabilities import allowed_cohorts
 from ml.quantiles import rearrange_quantile_array
 from ml.model_protocol import feature_protocol, target_protocol, SESSION_TARGET_PROTOCOL, LEGACY_FEATURE_PROTOCOL, LEGACY_TARGET_PROTOCOL
 
@@ -305,7 +306,7 @@ def compare_on_common_holdout(
     max_calibration_regression: float = 0.05,
 ) -> dict[str, Any]:
     """Compare only mutually unexposed prediction snapshots with matching protocols."""
-    verify_bundle_dir(candidate_dir)
+    candidate_manifest = verify_bundle_dir(candidate_dir)
     verify_bundle_dir(champion_dir)
     report: dict[str, Any] = {
         "status": "passed",
@@ -388,7 +389,7 @@ def compare_on_common_holdout(
                     baseline,
                     historical,
                     cohorts,
-                    supported_cohorts=cm.get("supported_cohorts", ["strict_options"]),
+                    supported_cohorts=allowed_cohorts(candidate_manifest, horizon, cm),
                     max_mae_regression=max_mae_regression,
                     max_calibration_regression=max_calibration_regression,
                 )
@@ -481,6 +482,7 @@ def compare_prospective_outcomes(
 ) -> dict[str, Any]:
     """Evaluate frozen forecasts against the common desired session-reaction target."""
     cm, hm = _metadata(candidate_dir, horizon), _metadata(champion_dir, horizon)
+    candidate_manifest = verify_bundle_dir(candidate_dir) if (candidate_dir / "manifest.json").exists() else None
     ce, he = selection_exposure_end(cm), selection_exposure_end(hm)
     empty = {
         "status": "insufficient_data",
@@ -569,7 +571,7 @@ def compare_prospective_outcomes(
         baseline,
         historical,
         cohorts,
-        supported_cohorts=cm.get("supported_cohorts", ["strict_options"]),
+        supported_cohorts=allowed_cohorts(candidate_manifest, horizon, cm),
         min_rows=min_rows,
     )
     report["evaluation_target_protocol"] = SESSION_TARGET_PROTOCOL
@@ -757,6 +759,7 @@ def cohort_drift_report(
     }
     enough = False
     sparse = False
+    manifest = verify_bundle_dir(bundle_dir) if (bundle_dir / "manifest.json").exists() else None
     for horizon in horizons:
         metadata = _metadata(bundle_dir, horizon)
         references = metadata.get("cohort_reference") or {
@@ -772,7 +775,7 @@ def cohort_drift_report(
             if not len(selected):
                 parts[name] = {"status": "insufficient_data", "rows": 0}
                 continue
-            supported = metadata.get("supported_cohorts", ["strict_options"])
+            supported = allowed_cohorts(manifest, horizon, metadata)
             if (
                 name not in supported
                 or not reference

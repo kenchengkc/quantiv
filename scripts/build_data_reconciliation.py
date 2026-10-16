@@ -769,6 +769,7 @@ def _corporate_actions(
         }
     )
     symbols = [symbol for symbol in symbols if symbol]
+    quarantined_symbols = []
     if payload.get("schema") == "quantiv.corporate-action-ingestion.v2":
         from verify_historical_training_gate import verify_historical_corporate_actions
         from data_release import MUTABLE_PARQUET_ALIASES
@@ -780,13 +781,14 @@ def _corporate_actions(
                     for item in (data_dir / "parquet").rglob("*.parquet")} - MUTABLE_PARQUET_ALIASES
         try:
             evidence = verify_historical_corporate_actions(data_dir, declared)
-            if not set(symbols) <= set(evidence["covered_symbols"]):
+            quarantined_symbols = evidence.get("quarantined_symbols", [])
+            if not set(symbols) <= set(evidence["covered_symbols"]) | set(quarantined_symbols):
                 errors.append("corporate-action receipt omits active latest options symbols")
             symbols = evidence["covered_symbols"]
         except RuntimeError as exc:
             errors.append(str(exc))
     symbol_digest = hashlib.sha256("\n".join(symbols).encode()).hexdigest()
-    universe = payload.get("universe") or {}
+    universe = payload.get("coverage_universe", payload.get("universe")) or {}
     if receipt_int(universe.get("symbols"), "corporate-action universe count") != len(symbols):
         errors.append("corporate-action universe row count does not match authenticated sources")
     if universe.get("symbols_sha256") != symbol_digest:
@@ -926,6 +928,9 @@ def _corporate_actions(
         "query_start": payload.get("query_start"),
         "query_end": payload.get("query_end"),
         "universe_symbols": len(symbols),
+        "quarantined_symbols": quarantined_symbols,
+        "coverage_warnings": (["Invalid provider actions withhold complete issuer coverage"]
+                              if quarantined_symbols else []),
         "universe_sha256": symbol_digest,
         "datasets": dataset_summary,
         "split_event_window_crossings": split_crossings,
