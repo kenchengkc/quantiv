@@ -16,7 +16,7 @@ function coverageSnapshot(): ControlSnapshot {
     ...retained, status: 'advisory', publication_eligible: true,
     data: { ...retained.data, status: 'passed', event_coverage_pct: .5,
       expected_events: 100, covered_events: 50, missing_events: 50, source_session_lag: 0 },
-    model: { ...retained.model, status: 'passed' }, exceptions: [],
+    model: { ...retained.model, status: 'passed', publication_status: 'eligible' }, exceptions: [],
   };
 }
 
