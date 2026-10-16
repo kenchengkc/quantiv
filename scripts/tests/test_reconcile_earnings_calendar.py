@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import date
 
 import pandas as pd
+import pytest
 
 from reconcile_earnings_calendar import (
     _clean_text,
@@ -730,3 +731,88 @@ def test_confirmed_event_with_unknown_session_stays_in_announcement_lookup_budge
     )
 
     assert symbols == ["BBB"]
+
+
+@pytest.mark.parametrize("month", ["Oct", "Oct.", "October"])
+def test_abbreviated_event_date_beats_release_dateline(month: str) -> None:
+    text = (
+        "September 29, 2026. Example Company announces its earnings schedule. "
+        f"Results will be released {month} 27 before the New York Stock Exchange opens. "
+        "An investor conference call follows at 8:30 a.m. ET."
+    )
+    assert extract_earnings_announcement(text, published_on=date(2026, 9, 29)) == {
+        "date": "2026-10-27", "timing": "bmo",
+    }
+
+
+@pytest.mark.parametrize("clock", ["1:01 p.m. Pacific Time", "1:01 p.m. PT", "3:01 p.m. Central Time", "4:01 p.m. ET"])
+def test_explicit_release_clock_converts_to_eastern_before_classifying(clock: str) -> None:
+    text = (
+        "Example Company will post financial results on October 20, 2026, "
+        f"at {clock}. A conference call will follow at 5:00 p.m. ET."
+    )
+    assert extract_earnings_announcement(text, published_on=date(2026, 9, 14)) == {
+        "date": "2026-10-20", "timing": "amc",
+    }
+
+
+def test_pacific_morning_release_during_eastern_session_is_not_bmo() -> None:
+    assert extract_earnings_announcement(
+        "Example Company will release earnings October 20, 2026 at 8:00 a.m. Pacific Time.",
+        published_on=date(2026, 9, 14),
+    ) == {"date": "2026-10-20", "timing": "unknown"}
+
+
+@pytest.mark.parametrize("text", [
+    "Example Company will release earnings on October 20, 2026. "
+    "The results will be discussed at 8:00 a.m. ET during a conference call.",
+    "Example Company will report earnings on October 20, 2026. "
+    "Management will discuss the earnings release at 8:00 a.m. ET during a conference call.",
+    "Example Company will release earnings on October 20, 2026 and discuss the results "
+    "at 8:00 a.m. ET during a conference call.",
+])
+def test_results_discussion_clock_is_not_an_earnings_release_clock(text: str) -> None:
+    assert extract_earnings_announcement(
+        text,
+        published_on=date(2026, 9, 14),
+    ) == {"date": "2026-10-20", "timing": "unknown"}
+
+
+@pytest.mark.parametrize("day, clock", [
+    ("October 20, 2026", "8:30 a.m. Eastern Standard Time"),
+    ("December 20, 2026", "4:30 p.m. Eastern Daylight Time"),
+])
+def test_explicit_standard_or_daylight_zone_is_not_seasonal(day: str, clock: str) -> None:
+    assert extract_earnings_announcement(
+        f"Example Company will release earnings on {day} at {clock}.",
+        published_on=date(2026, 9, 14),
+    )["timing"] == "unknown"
+
+
+def test_announced_date_with_unknown_session_is_still_looked_up() -> None:
+    current = pd.DataFrame([{"act_symbol": "AAA", "date": date(2026, 10, 20)}])
+    assert _candidate_symbols(
+        current, current, [], start=date(2026, 10, 16), end=date(2026, 11, 6),
+        preliminary_decisions={"AAA": {"date": "2026-10-20", "timing": "unknown",
+                                      "reason": "direct_announcement"}},
+    ) == ["AAA"]
+
+
+def test_expanded_news_recovery_keeps_press_release_requests_bounded(monkeypatch) -> None:
+    import reconcile_earnings_calendar as module
+    transports = {"finnhub": [], "twelvedata": [], "alphavantage": []}
+    for provider in transports:
+        def fetch(symbol, *, _provider=provider, **kwargs):
+            transports[_provider].append(symbol)
+            return [{"provider": _provider, "date": "2026-10-20", "timing": "amc"}], {"status": "ok"}
+        monkeypatch.setattr(module, f"fetch_{provider}_announcements", fetch)
+    evidence, status = module._collect_announcements(
+        ["AAA", "BBB", "CCC"], today=date(2026, 10, 16), finnhub_key=None,
+        twelvedata_key=None, alphavantage_key=None, finnhub_delay=0,
+        twelvedata_delay=0, alphavantage_delay=0, alpha_news_max=1,
+        twelvedata_max_symbols=2,
+    )
+    assert transports == {"finnhub": ["AAA", "BBB", "CCC"],
+                          "twelvedata": ["AAA", "BBB"], "alphavantage": ["AAA"]}
+    assert {row["provider"] for row in evidence["CCC"]} == {"finnhub"}
+    assert set(status["twelvedata_press_releases"]) == {"AAA", "BBB"}

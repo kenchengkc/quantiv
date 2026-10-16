@@ -29,6 +29,7 @@ from collections import Counter, defaultdict
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 import requests
@@ -69,14 +70,17 @@ MONTHS = {
         start=1,
     )
 }
-MONTH_PATTERN = "|".join(name.title() for name in MONTHS)
+MONTHS.update({name[:3]: number for name, number in list(MONTHS.items())})
+MONTHS["sept"] = 9
+MONTH_PATTERN = "|".join(sorted(MONTHS, key=len, reverse=True))
 DATE_RE = re.compile(
-    rf"\b({MONTH_PATTERN})\s+(\d{{1,2}})(?:st|nd|rd|th)?(?:,?\s+(20\d{{2}}))?\b",
+    rf"\b({MONTH_PATTERN})\.?\s+(\d{{1,2}})(?:st|nd|rd|th)?(?:,?\s+(20\d{{2}}))?\b",
     re.IGNORECASE,
 )
 TIME_RE = re.compile(
     r"\b(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)\s*"
-    r"(?:ET|EST|EDT|CT|CST|CDT|PT|PST|PDT)?\b",
+    r"(?P<zone>(?:Eastern|Central|Mountain|Pacific)(?:\s+(?:Standard|Daylight))?\s+Time|"
+    r"EST|EDT|CST|CDT|MST|MDT|PST|PDT|ET|CT|MT|PT)?(?!\w)",
     re.IGNORECASE,
 )
 EARNINGS_TERMS = (
@@ -281,7 +285,7 @@ def extract_fiscal_identity(text: str) -> dict[str, Any]:
 
     return {}
 
-def _session_from_text(text: str) -> str:
+def _session_from_text(text: str, *, report_day: date) -> str:
     lower = text.lower()
     if any(
         term in lower
@@ -289,6 +293,8 @@ def _session_from_text(text: str) -> str:
             "before market open",
             "before the market opens",
             "before markets open",
+            "before the new york stock exchange opens",
+            "before the nyse opens",
             "prior to market open",
             "prior to the market open",
             "pre-market",
@@ -331,19 +337,46 @@ def _session_from_text(text: str) -> str:
             flags=re.S,
         )
     )
-    if mentions_call and not release_linked_to_call:
-        return "unknown"
-
     times: list[int] = []
     for match in TIME_RE.finditer(text):
+        # A call time alone is not the release time. An explicit release clock
+        # in its own sentence remains useful when a later sentence mentions a call.
+        prefix = re.split(r"[.!?;]\s+(?=[A-Z])", text[:match.start()])[-1].lower()
+        release_clock = bool(re.search(
+            r"\b(?:post|release|issue|publish|report|announce)(?:s|d|ed)?\b", prefix,
+        )) and bool(re.search(r"\b(?:results|earnings|release|materials)\b", prefix))
+        suffix = re.split(r"[.!?;]", text[match.end():], maxsplit=1)[0].lower()
+        call_clock = bool(re.search(r"\b(?:call|conference|webcast|interview)\b", prefix + " " + suffix))
+        if mentions_call and not release_linked_to_call and (not release_clock or call_clock):
+            continue
+        zone = (match.group("zone") or "").lower()
+        if not zone:
+            continue
         hour = int(match.group(1))
         minute = int(match.group(2) or 0)
+        if not 1 <= hour <= 12 or not 0 <= minute <= 59:
+            continue
         meridiem = match.group(3).lower().replace(".", "")
         if hour == 12:
             hour = 0
         if meridiem == "pm":
             hour += 12
-        times.append(hour * 60 + minute)
+        offsets = {"est": -5, "edt": -4, "cst": -6, "cdt": -5,
+                   "mst": -7, "mdt": -6, "pst": -8, "pdt": -7}
+        if "standard" in zone:
+            zone = zone[0] + "st"
+        elif "daylight" in zone:
+            zone = zone[0] + "dt"
+        if zone in offsets:
+            source_zone = timezone(timedelta(hours=offsets[zone]))
+        else:
+            region = {"e": "New_York", "c": "Chicago", "m": "Denver", "p": "Los_Angeles"}[zone[0]]
+            source_zone = ZoneInfo(f"America/{region}")
+        clock = datetime(report_day.year, report_day.month, report_day.day, hour, minute,
+                         tzinfo=source_zone).astimezone(ZoneInfo("America/New_York"))
+        if clock.date() != report_day:
+            continue
+        times.append(clock.hour * 60 + clock.minute)
     if any(minutes < 9 * 60 + 30 for minutes in times):
         return "bmo"
     if any(minutes >= 16 * 60 for minutes in times):
@@ -413,9 +446,9 @@ def extract_earnings_announcement(
     if score < 6:
         return None
 
-    timing = _session_from_text(context)
+    timing = _session_from_text(context, report_day=candidate)
     if timing == "unknown":
-        timing = _session_from_text(cleaned)
+        timing = _session_from_text(cleaned, report_day=candidate)
     return {"date": candidate.isoformat(), "timing": timing}
 
 
@@ -1500,7 +1533,7 @@ def _candidate_symbols(
         conflicts = bool(
             chosen and any(candidate != chosen for candidate in external_dates(decision))
         )
-        if reason == "baseline_confirmed":
+        if reason in {"baseline_confirmed", "official_announcement", "direct_announcement"}:
             return conflicts or normalize_timing(decision.get("timing")) == "unknown"
         return reason not in {"no_candidate", "official_announcement", "direct_announcement"}
 
@@ -1551,6 +1584,7 @@ def _collect_announcements(
     twelvedata_delay: float,
     alphavantage_delay: float,
     alpha_news_max: int,
+    twelvedata_max_symbols: int = 80,
     company_names: dict[str, str] | None = None,
 ) -> tuple[dict[str, list[Announcement]], dict[str, Any]]:
     evidence: dict[str, list[Announcement]] = defaultdict(list)
@@ -1572,7 +1606,8 @@ def _collect_announcements(
         if index + 1 < len(symbols) and finnhub_key:
             time.sleep(finnhub_delay)
 
-    for index, symbol in enumerate(symbols):
+    press_symbols = symbols[:twelvedata_max_symbols]
+    for index, symbol in enumerate(press_symbols):
         rows, meta = fetch_twelvedata_announcements(
             symbol,
             today=today,
@@ -1581,7 +1616,7 @@ def _collect_announcements(
         )
         evidence[symbol].extend(rows)
         status["twelvedata_press_releases"][symbol] = meta
-        if index + 1 < len(symbols) and twelvedata_key:
+        if index + 1 < len(press_symbols) and twelvedata_key:
             time.sleep(twelvedata_delay)
 
     # `symbols` is already risk-ranked by _candidate_symbols. Keep the
@@ -1620,6 +1655,7 @@ def main() -> int:
     parser.add_argument("--alphavantage-delay", type=float, default=1.1)
     parser.add_argument("--alpha-news-max", type=int, default=20)
     parser.add_argument("--announcement-max-symbols", type=int, default=80)
+    parser.add_argument("--twelvedata-max-symbols", type=int, default=80)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
@@ -1631,6 +1667,8 @@ def main() -> int:
         parser.error("--alpha-news-max cannot be negative")
     if args.announcement_max_symbols < 1:
         parser.error("--announcement-max-symbols must be positive")
+    if args.twelvedata_max_symbols < 0:
+        parser.error("--twelvedata-max-symbols cannot be negative")
 
     today = et_today()
     end = today + timedelta(days=args.days_ahead)
@@ -1708,6 +1746,7 @@ def main() -> int:
         twelvedata_delay=args.twelvedata_delay,
         alphavantage_delay=args.alphavantage_delay,
         alpha_news_max=args.alpha_news_max,
+        twelvedata_max_symbols=args.twelvedata_max_symbols,
         company_names=company_names,
     )
 

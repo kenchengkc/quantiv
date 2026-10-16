@@ -26,6 +26,40 @@ def test_source_coverage_end_stays_on_completed_us_session_after_utc_midnight(tm
     assert ("scripts/sync_dolthub.py", "--corporate-actions", "--end-date", "2026-10-15") in calls
 
 
+def test_calendar_recovery_freezes_corrected_events_before_source_publication(tmp_path, monkeypatch):
+    events = []
+    def python(script, *args, **kwargs):
+        if script == "scripts/reconcile_earnings_calendar.py":
+            assert "1200" in args
+            (tmp_path / "earnings_calendar.csv").write_text("act_symbol,date,timing\nAAA,2026-10-20,amc\n")
+        if script == "scripts/data_release.py":
+            assert "AAA,2026-10-20,amc" in (tmp_path / "earnings_calendar.csv").read_text()
+        events.append(script)
+    def run(*args, **kwargs):
+        if args[1] == "scripts/r2_push.sh":
+            assert kwargs["env"]["REFRESH_STARTED_AT"]
+        events.append(args[1])
+    monkeypatch.setattr(pipeline, "_python", python)
+    monkeypatch.setattr(pipeline, "_run", run)
+    pipeline.prepare_data(tmp_path, refresh_calendar=True)
+    assert events.index("scripts/check_earnings_calendar_integrity.py") < events.index("scripts/data_release.py")
+    assert events.index("scripts/data_release.py") < events.index("scripts/r2_push.sh")
+
+
+def test_failed_calendar_recovery_cannot_publish_source(tmp_path, monkeypatch):
+    published = []
+    def python(script, *args, **kwargs):
+        if script == "scripts/reconcile_earnings_calendar.py":
+            raise subprocess.CalledProcessError(1, [script])
+        if script == "scripts/data_release.py":
+            published.append("freeze")
+    monkeypatch.setattr(pipeline, "_python", python)
+    monkeypatch.setattr(pipeline, "_run", lambda *args, **kwargs: published.append("upload"))
+    with pytest.raises(subprocess.CalledProcessError):
+        pipeline.prepare_data(tmp_path, refresh_calendar=True)
+    assert published == []
+
+
 def test_source_freeze_has_provider_current_market_context(tmp_path, monkeypatch):
     import duckdb
     import pandas as pd
