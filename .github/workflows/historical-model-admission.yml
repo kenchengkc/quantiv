@@ -83,8 +83,10 @@ jobs:
           name: historical-admission-evidence
           path: |
             data/validation/historical_*.json
-            data/historical_admission/sealed/*.json
+            data/historical_admission/sealed/**
             data/historical_admission/workspace/validation/*.json
+            data/historical_admission/workspace/ml_training/**
+            data/historical_admission/workspace/models/**
             data/models/historical_reservations/**
             data/models/historical_admissions/**
           if-no-files-found: ignore

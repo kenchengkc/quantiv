@@ -76,7 +76,7 @@ def _fit_fixture(tmp_path, monkeypatch):
 def test_exact_candidate_commit_is_durable_before_test_outcomes_are_read(tmp_path, monkeypatch):
     events = _fit_fixture(tmp_path, monkeypatch)
     pipeline.fit(tmp_path, "reviewed")
-    assert events == ["reserve", "persist", "fit", "package", "claim", "persist", "evaluate", "archive"]
+    assert events == ["reserve", "persist", "fit", "package", "archive", "claim", "persist", "evaluate"]
     assert json.loads((tmp_path / "validation/historical_fit.json").read_text())["status"] == "failed"
 
 
@@ -96,6 +96,21 @@ def test_failed_remote_precommit_prevents_fitting_or_test_evaluation(tmp_path, m
     assert "evaluate" not in events
     if publication == 1:
         assert "fit" not in events
+
+
+def test_failed_candidate_archive_prevents_claim_and_reserved_outcome_reads(tmp_path, monkeypatch):
+    import archive_model_candidate
+
+    events = _fit_fixture(tmp_path, monkeypatch)
+
+    def fail(**kwargs):
+        raise RuntimeError("candidate archive unavailable")
+
+    monkeypatch.setattr(archive_model_candidate, "archive_candidate", fail)
+    with pytest.raises(RuntimeError, match="candidate archive unavailable"):
+        pipeline.fit(tmp_path, "reviewed")
+    assert "claim" not in events
+    assert "evaluate" not in events
 
 
 def test_reservation_remote_failure_stops_before_training(tmp_path, monkeypatch):

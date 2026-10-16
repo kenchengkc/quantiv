@@ -124,15 +124,8 @@ def fit(data: Path, revision: str):
     record = json.loads((data / "validation/historical_source_bundle.json").read_text())
     source = Path(record["bundle_dir"])
     admission_dir = data / "models/historical_admissions" / source.name
-    claim_historical_candidate(source, reservation, registry)
-    # A durable exact-artifact claim must precede the first test prediction.
-    publish_reservation_registry(registry, remote)
-    receipt_path, receipt = evaluate_historical_admission(
-        bundle_dir=source, reservation_path=reservation,
-        model_receipt=json.loads((models / "receipts/latest_models.json").read_text()),
-        training_dir=workspace / "ml_training", output_dir=admission_dir,
-        reservation_registry=registry)
-    # Source and development receipts remain independently inspectable even when no cell passes.
+    # Retain the exact fitted candidate before any reserved outcome is read.
+    # An interrupted evaluation must be able to recover these same weights.
     (workspace / "validation").mkdir(parents=True, exist_ok=True)
     shutil.copy2(data / "validation/historical_training_admission.json", workspace / "validation/historical_training_admission.json")
     shutil.copytree(data / "validation/promotion", workspace / "validation/promotion", dirs_exist_ok=True)
@@ -141,6 +134,14 @@ def fit(data: Path, revision: str):
             shutil.copy2(data / name, workspace / name)
     evidence = prepare_candidate_evidence(bundle_dir=source, data_dir=workspace)
     archive_candidate(bundle_dir=source, remote=remote, evidence_dir=evidence)
+    claim_historical_candidate(source, reservation, registry)
+    # A durable exact-artifact claim must precede the first test prediction.
+    publish_reservation_registry(registry, remote)
+    receipt_path, receipt = evaluate_historical_admission(
+        bundle_dir=source, reservation_path=reservation,
+        model_receipt=json.loads((models / "receipts/latest_models.json").read_text()),
+        training_dir=workspace / "ml_training", output_dir=admission_dir,
+        reservation_registry=registry)
     _run("rclone", "copy", str(admission_dir), f"{remote}/models/historical_admissions/{source.name}", "--immutable")
     _run("rclone", "check", str(admission_dir), f"{remote}/models/historical_admissions/{source.name}", "--one-way", "--download")
     result = {"status": receipt["status"], "source_bundle_id": source.name,
