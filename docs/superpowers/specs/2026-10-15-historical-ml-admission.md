@@ -26,6 +26,8 @@ Quarantine issuers with invalid provider action records using retained raw query
 
 The API verifies the current signed monitor and data-release identity before using a cache or database snapshot. Signed eligibility binds the exact canonical feature vector, spot, scoring timestamp, model, event, snapshot and lead. A same-day source correction or failed database import therefore revokes older inputs. Rollback refreshes monitoring after exact activation/import when current source checks pass.
 
+For independently admitted historical head/cohort cells, fewer than 100 current feature vectors makes covariate stability statistically underpowered and is reported as a monitoring warning. Preserve actual sample counts and `covariate_status=insufficient_data`; historical qualification establishes model quality, not current distribution stability. This exception requires the authenticated historical capability and at least 200 development reference rows. Normally observed features that are entirely missing remain a hard hold even below the usual missingness sample minimum. Current freshness, source coverage, protocol, corruption and native checks remain binding. Legacy bundles retain their existing sampling gate.
+
 Run backtests before promotion, archive evidence regardless of outcome, and publish only when both historical qualification and current operational gates pass. If data remain stale or every cell fails, report that result explicitly and preserve the serving hold.
 
 The manual historical-admission workflow separates source preparation, fitting and activation. Long fitting does not hold the daily-refresh execution lock. An exact retained qualified bundle can retry activation without refitting or consuming its historical test again.

@@ -221,7 +221,8 @@ def test_preparation_rejects_target_protocol_sidecar_mismatch(tmp_path):
             horizons=[7], min_development_rows=100, as_of="2025-01-01")
 
 
-def _candidate(tmp_path, monkeypatch, horizons=(7,), selected_horizons=None, source_report=None):
+def _candidate(tmp_path, monkeypatch, horizons=(7,), selected_horizons=None, source_report=None,
+               metadata_overrides=None):
     import lightgbm as lgb
     from ml.evidence_receipt import build_evidence_receipt
     from ml.model_artifact import save_native_model
@@ -266,6 +267,7 @@ def _candidate(tmp_path, monkeypatch, horizons=(7,), selected_horizons=None, sou
                 "final_fit": {"rows": len(dev), "row_digest": training_row_digest(dev),
                               "label_available_end": exposure},
                 "selection_exposure": {"through_date": exposure, "row_digest": training_row_digest(dev)}}
+        meta.update(metadata_overrides or {})
         (models / f"metadata_T{horizon}.json").write_text(json.dumps(meta))
     selected_horizons = horizons if selected_horizons is None else selected_horizons
     report = {"status": "passed", "issues": [], "stages": {"models": {"horizons": list(selected_horizons)}}}

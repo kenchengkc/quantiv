@@ -26,6 +26,7 @@
 - A single passing cohort cannot authorize another cohort or undeclared head.
 - Stale current inputs must hold activation even when historical metrics pass.
 - Legacy rollback bundles must remain readable and retain their original identity.
+- Sparse current PSI must remain an honest warning only for signed, historically admitted scopes with adequate development reference evidence. Deterministic missing-feature, source, freshness and corruption failures must still hold; legacy sampling behavior stays unchanged.
 
 ## Task 1: Sealed historical evaluation
 
