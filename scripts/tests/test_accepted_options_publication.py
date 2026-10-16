@@ -438,12 +438,15 @@ def test_sparse_fresh_options_publish_only_valid_current_champion_events(accepte
     selected = Path(policy["eligible_forecast_path"])
     assert set(pd.read_parquet(selected)["act_symbol"]) == set(store["symbols"])
     receipt_dir = data / "forecasts/receipts"
-    monkeypatch.setattr("sys.argv", [
-        "validate_ml_pipeline.py", "forecasts", "--data-dir", str(data),
-        "--forecast-path", str(selected), "--report", str(data / "validation/daily_forecasts.json"),
-        "--publish-receipt-dir", str(receipt_dir),
-    ])
-    assert validate_ml_pipeline.main() == 0
+    import historical_ml_pipeline as historical_pipeline
+
+    def validate(script, *args):
+        assert script == "scripts/validate_ml_pipeline.py"
+        monkeypatch.setattr("sys.argv", [script, *map(str, args)])
+        assert validate_ml_pipeline.main() == 0
+
+    monkeypatch.setattr(historical_pipeline, "_python", validate)
+    historical_pipeline.validate_selected_publication(data, store["bundle"], candidate)
     receipt_path = receipt_dir / "latest_forecasts.json"
     public_dir = data / "public"
     monkeypatch.setattr(frontend_shared, "PUBLIC_DIR", public_dir)

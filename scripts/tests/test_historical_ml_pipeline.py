@@ -208,6 +208,7 @@ def test_held_activation_retains_candidate_without_external_activation(tmp_path,
     import ml.model_bundle as bundles
 
     candidate, source = "a" * 64, "b" * 64
+    monkeypatch.setattr(pipeline, "prepare_publication_inputs", lambda *_: False)
     monkeypatch.setattr(bundles, "verify_bundle_dir", lambda _: {
         "bundle_id": candidate, "receipt_id": "receipt", "historical_admission": {
             "source_manifest": {"bundle_id": source}}})
@@ -233,3 +234,89 @@ def test_held_activation_retains_candidate_without_external_activation(tmp_path,
 def test_candidate_identity_cannot_escape_storage(value):
     with pytest.raises(ValueError, match="identity"):
         pipeline._bundle_id(value)
+
+
+def test_historical_publication_validates_exact_signed_monitor_subset(tmp_path, monkeypatch):
+    import model_publication
+
+    candidate = tmp_path / "forecasts/candidate.parquet"
+    selected = tmp_path / "forecasts/eligible/selected.parquet"
+    bundle = tmp_path / "models/bundles" / ("a" * 64)
+    calls = []
+
+    def verify(data, *, forecast_path):
+        assert data == tmp_path and forecast_path == candidate
+        return {"can_publish_ml": True, "state": "partial", "eligible_forecast_path": str(selected)}
+
+    monkeypatch.setattr(model_publication, "verify_publication", verify)
+    monkeypatch.setattr(pipeline, "_python", lambda *args: calls.append(args))
+    pipeline.validate_selected_publication(tmp_path, bundle, candidate)
+    assert len(calls) == 1
+    call = calls[0]
+    assert call[:2] == ("scripts/validate_ml_pipeline.py", "forecasts")
+    assert call[call.index("--forecast-path") + 1] == selected
+    assert call[call.index("--models-dir") + 1] == bundle
+    assert call[call.index("--publish-receipt-dir") + 1] == tmp_path / "forecasts/receipts"
+
+
+def test_held_historical_publication_does_not_issue_an_eligible_receipt(tmp_path, monkeypatch):
+    import model_publication
+
+    monkeypatch.setattr(model_publication, "verify_publication", lambda *a, **kw: {"can_publish_ml": False})
+    calls = []
+    monkeypatch.setattr(pipeline, "_python", lambda *args: calls.append(args))
+    pipeline.validate_selected_publication(tmp_path, tmp_path / "bundle", tmp_path / "candidate.parquet")
+    assert calls == []
+
+
+@pytest.mark.parametrize("failure", [None, "non_options", "tampered_source", "unpublished_source", "old_report", "old_accepted_report"])
+def test_saved_options_publication_revalidates_without_enabling_stale_quotes(tmp_path, failure):
+    import hashlib
+    from data_release import build_release
+    from frontend_data.options_policy import options_display_available
+
+    source = tmp_path / "parquet/options_chain/year=2026/month=09/2026-09-30.parquet"
+    source.parent.mkdir(parents=True)
+    source.write_bytes(b"published immutable options")
+    build_release(tmp_path)
+    report = {
+        "schema": "quantiv.data-reconciliation.v2",
+        "quality": {"decision_safe": False, "critical_exceptions": 1},
+        "exceptions": [{"severity": "critical", "code": "ohlcv_stale" if failure == "non_options" else "options_stale"}],
+        "source_reconciliation": {"source_date": "2026-09-30"},
+        "quote_quality": {"source_date": "2026-09-30"},
+        "datasets": {},
+    }
+    if failure == "old_accepted_report":
+        report["quality"] = {"decision_safe": True, "critical_exceptions": 0}
+        report["exceptions"] = []
+    report["manifest_id"] = "sha256:" + hashlib.sha256(json.dumps(
+        report, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    report["generated_at"] = datetime.now(timezone.utc).isoformat()
+    if failure in {"old_report", "old_accepted_report"}:
+        report["generated_at"] = "2020-01-01T00:00:00+00:00"
+    manifest = tmp_path / "validation/data_reconciliation.json"
+    manifest.parent.mkdir(parents=True, exist_ok=True)
+    manifest.write_text(json.dumps(report))
+    before = manifest.read_bytes()
+    if failure == "tampered_source":
+        source.write_bytes(b"changed")
+    extra = source.with_name("2026-10-01.parquet")
+    if failure == "unpublished_source":
+        extra.write_bytes(b"unpublished source")
+    if failure:
+        with pytest.raises(RuntimeError):
+            pipeline.prepare_publication_inputs(tmp_path)
+        if failure == "unpublished_source":
+            assert extra.read_bytes() == b"unpublished source"
+        assert manifest.read_bytes() == before
+        return
+    pipeline.prepare_publication_inputs(tmp_path)
+    assert options_display_available(tmp_path, as_of_date=date(2026, 9, 30), verify_fallback=True) is False
+    status = json.loads((tmp_path / "validation/options_snapshot_status.json").read_text())
+    assert status["policy"]["scoring_allowed"] is False
+    assert status["policy"]["thresholds_changed"] is False
+    assert status["active_source_date"] == "2026-09-30"
+    assert status["fallback_manifest_id"] == report["manifest_id"]
+    assert manifest.read_bytes() == before
+    assert source.read_bytes() == b"published immutable options"
