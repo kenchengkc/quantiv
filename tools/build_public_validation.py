@@ -224,12 +224,20 @@ def _model_source(
         manifest = verify_bundle_dir(candidate)
         if manifest.get("bundle_id") != champion_id:
             raise ModelBundleError("champion pointer and signed bundle manifest disagree")
+        # Derived serving bundles retain A's immutable validation receipt. B's
+        # signature verification already proves its admitted subset and H binding.
+        receipt_manifest = (manifest["historical_admission"]["source_manifest"]
+                            if manifest.get("historical_admission") else manifest)
         try:
-            manifest_horizons = sorted(int(value) for value in manifest.get("horizons") or [])
+            manifest_horizons = sorted(int(value) for value in receipt_manifest.get("horizons") or [])
         except (TypeError, ValueError) as exc:
             raise ModelBundleError("signed champion has invalid horizon declarations") from exc
 
-        receipt_path = _immutable_model_receipt_path(models_root, manifest)
+        receipt_path = (
+            models_root / "candidates" / receipt_manifest["bundle_id"] / "model_validation_receipt.json"
+            if manifest.get("historical_admission")
+            else _immutable_model_receipt_path(models_root, manifest)
+        )
         try:
             receipt = verify_evidence_receipt(
                 _read_required(receipt_path, "immutable model validation receipt"),
@@ -258,7 +266,7 @@ def _model_source(
             raise ModelBundleError("model validation receipt has no training bundle digest")
         if not isinstance(model_bundle.get("sha256"), str):
             raise ModelBundleError("model validation receipt has no model bundle digest")
-        _verify_receipt_model_members(model_bundle, manifest)
+        _verify_receipt_model_members(model_bundle, receipt_manifest)
         return candidate, "signed_champion", champion_id, dict(manifest), receipt
 
     baked = repo_root / "apps" / "ml" / "models"
@@ -306,6 +314,53 @@ def _horizon_row(metadata: dict[str, Any], horizon: int) -> dict[str, Any]:
         ],
         "model_version": metadata.get("version"),
         "trained_at": metadata.get("trained_at"),
+    }
+
+
+def _historical_rows(metadata: Mapping[str, Any], horizon: int, admission: Mapping[str, Any]) -> list[dict[str, Any]]:
+    if _int(metadata.get("horizon")) != horizon:
+        raise ModelBundleError(f"historical metadata declares another horizon: {horizon}")
+    rows = []
+    for cohort in sorted(admission["admitted_cohorts"][str(horizon)]):
+        cell = admission["horizons"][str(horizon)]["cohorts"][cohort]
+        if cell["status"] != "passed":
+            raise ModelBundleError("historical public metrics require a passed admitted cell")
+        coverage = cell["coverage"]
+        rows.append({
+            "horizon_days": horizon, "cohort": cohort,
+            "metric_scope": "historical_out_of_sample",
+            "n_train": _int(metadata.get("n_train")),
+            "n_validation": cell["rows"], "n_matched_baseline": cell["baseline_rows"],
+            "model_mae": cell["model_mae"], "baseline_mae": cell["baseline_mae"],
+            "straddle_baseline_mae": cell["baseline_mae"],
+            "baseline_label": "Market straddle" if cohort == "strict_options" else "Historical move",
+            "relative_mae_improvement": 1.0 - cell["model_mae"] / cell["baseline_mae"],
+            "model_rmse": None, "model_r2": None,
+            "coverage": {**{f"p{q}": coverage[f"q{q}_coverage"] for q in (10, 25, 50, 75, 90)},
+                         "interval_50": coverage["coverage_50"], "interval_80": coverage["coverage_80"]},
+            "interval_width": {"interval_50_mean": None, "interval_80_mean": None},
+            "feature_count": len(metadata.get("feature_cols") or []),
+            "quantiles": [.1, .25, .5, .75, .9],
+            "model_version": metadata.get("version"), "trained_at": metadata.get("trained_at"),
+        })
+    return rows
+
+
+def _public_historical_admission(manifest: Mapping[str, Any]) -> dict[str, Any]:
+    receipt = manifest["historical_admission"]["receipt"]
+    return {
+        "admission_id": receipt["admission_id"],
+        "source_bundle_id": receipt["bundle_id"], "serving_bundle_id": manifest["bundle_id"],
+        "reservation_id": receipt["reservation_id"], "panel_id": receipt["panel_id"],
+        "admitted_cohorts": manifest["serving_capabilities"],
+        "protocol": receipt["protocol"], "policy": receipt["policy"],
+        "global_temporal_boundary": receipt["global_temporal_boundary"],
+        "limitations": [
+            "The exact candidate excludes reserved labels from fitting, selection, early stopping and quantile calibration.",
+            "Complete point-in-time calendar revision history and historical provider delivery timestamps are not established.",
+            "Prior model-family exposure to this history is not established; this is not a claim of globally untouched history.",
+            "Metrics describe admitted historical head/cohort cells; aggregate summaries do not establish aggregate statistical significance or live trading performance.",
+        ],
     }
 
 
@@ -390,11 +445,11 @@ def _verified_protocol(
     return holdouts, walk_forwards, summary
 
 
-def _weighted(rows: list[dict[str, Any]], field: str) -> float | None:
+def _weighted(rows: list[dict[str, Any]], field: str, weight_field: str = "n_validation") -> float | None:
     pairs = [
-        (row.get(field), row.get("n_validation"))
+        (row.get(field), row.get(weight_field))
         for row in rows
-        if _number(row.get(field)) is not None and _int(row.get("n_validation"))
+        if _number(row.get(field)) is not None and _int(row.get(weight_field))
     ]
     if not pairs:
         return None
@@ -448,6 +503,13 @@ def _evaluation_receipt(
         "walk_forward": walk_forwards,
         "metrics": rows,
     }
+    if manifest.get("historical_admission"):
+        historical = _public_historical_admission(manifest)
+        core.update(evaluation_scope="historical_out_of_sample",
+                    source_bundle_id=historical["source_bundle_id"],
+                    historical_admission_id=historical["admission_id"],
+                    serving_capabilities=manifest["serving_capabilities"],
+                    historical_admission=historical)
     canonical = json.dumps(
         core, sort_keys=True, separators=(",", ":"), default=str
     ).encode()
@@ -460,6 +522,7 @@ def _evaluation_receipt(
 def build_validation(repo_root: Path, *, generated_at: str | None = None) -> dict[str, Any]:
     metadata_dir, source_kind, bundle_id, manifest, model_receipt = _model_source(repo_root)
     horizons = list(manifest["horizons"]) if manifest else list(HORIZONS)
+    historical = manifest["historical_admission"]["receipt"] if manifest and manifest.get("historical_admission") else None
     rows: list[dict[str, Any]] = []
     metadata_by_horizon: dict[int, dict[str, Any]] = {}
     for horizon in horizons:
@@ -468,10 +531,14 @@ def build_validation(repo_root: Path, *, generated_at: str | None = None) -> dic
         if not metadata:
             raise FileNotFoundError(f"missing model validation metadata: {path}")
         metadata_by_horizon[horizon] = metadata
-        rows.append(_horizon_row(metadata, horizon))
+        if historical:
+            rows.extend(_historical_rows(metadata, horizon, historical))
+        else:
+            rows.append(_horizon_row(metadata, horizon))
 
-    weighted_model = _weighted(rows, "model_mae")
-    weighted_baseline = _weighted(rows, "straddle_baseline_mae")
+    weight_field = "n_matched_baseline" if historical else "n_validation"
+    weighted_model = _weighted(rows, "model_mae", weight_field)
+    weighted_baseline = _weighted(rows, "straddle_baseline_mae", weight_field)
     improvements = [float(row["relative_mae_improvement"]) for row in rows]
 
     forecast = _read(
@@ -502,6 +569,10 @@ def build_validation(repo_root: Path, *, generated_at: str | None = None) -> dic
         holdout_splits, walk_forwards, walk_forward_summary = _verified_protocol(
             metadata_by_horizon
         )
+        if historical:
+            for row in [*holdout_splits, *walk_forwards]:
+                row["evaluation_scope"] = "development"
+            walk_forward_summary["evaluation_scope"] = "development"
         evaluation_receipt = _evaluation_receipt(
             manifest=manifest,
             model_receipt=model_receipt,
@@ -562,6 +633,8 @@ def build_validation(repo_root: Path, *, generated_at: str | None = None) -> dic
             "receipt": evaluation_receipt,
         },
         "summary": {
+            **({"metric_rows": len(rows), "weighted_baseline_mae": weighted_baseline,
+                "matched_baseline_row_observations": sum(row["n_matched_baseline"] for row in rows)} if historical else {}),
             "supported_horizons": horizons,
             "validation_row_observations": sum(
                 int(row["n_validation"]) for row in rows
@@ -590,14 +663,22 @@ def build_validation(repo_root: Path, *, generated_at: str | None = None) -> dic
         },
         "horizons": rows,
         "validation_protocol": {
+            **({"evaluation_scope": "historical_out_of_sample",
+                "historical_admission": _public_historical_admission(manifest)} if historical else {}),
             "target": "absolute earnings move magnitude",
-            "baseline": "market straddle expected move",
+            "baseline": "matched cohort benchmarks" if historical else "market straddle expected move",
             "chronological_holdout": (
                 bool(holdout_splits) if source_kind == "signed_champion" else True
             ),
             "holdout_splits": holdout_splits,
             "walk_forward": walk_forward_summary,
             "promotion_controls": [
+                "signed exact-candidate historical admission",
+                "matched cohort benchmark comparison",
+                "familywise clustered error-difference confidence intervals",
+                "reserved-label exclusion and chronological block checks",
+                "quantile calibration and feature-drift checks",
+            ] if historical else [
                 "point and interval validation",
                 "quantile calibration",
                 "straddle-baseline comparison",

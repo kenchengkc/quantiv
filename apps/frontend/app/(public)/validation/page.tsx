@@ -22,10 +22,15 @@ type Status =
 
 type HorizonValidation = {
   horizon_days: number;
+  cohort?: 'strict_options' | 'optionless';
+  metric_scope?: string;
   n_train: number | null;
   n_validation: number;
+  n_matched_baseline?: number;
   model_mae: number;
-  straddle_baseline_mae: number;
+  straddle_baseline_mae: number | null;
+  baseline_mae?: number | null;
+  baseline_label?: string;
   relative_mae_improvement: number;
   model_rmse: number | null;
   model_r2: number | null;
@@ -52,9 +57,13 @@ type ValidationArtifact = {
     artifact_sha256: string | null;
   };
   summary: {
+    supported_horizons?: number[];
+    metric_rows?: number;
     validation_row_observations: number;
+    matched_baseline_row_observations?: number;
     weighted_model_mae: number | null;
     weighted_straddle_mae: number | null;
+    weighted_baseline_mae?: number | null;
     weighted_relative_mae_improvement: number | null;
     min_relative_mae_improvement: number | null;
     max_relative_mae_improvement: number | null;
@@ -64,11 +73,29 @@ type ValidationArtifact = {
   validation_protocol: {
     target: string;
     baseline: string;
+    evaluation_scope?: string;
     chronological_holdout: boolean;
     walk_forward: {
       expanding_windows: number;
       validation_window_days: number;
       purge_days: number;
+      evaluation_scope?: string;
+    };
+    historical_admission?: {
+      admission_id: string;
+      source_bundle_id: string;
+      serving_bundle_id: string;
+      reservation_id: string;
+      panel_id: string;
+      admitted_cohorts: Record<string, string[]>;
+      protocol: { method?: string };
+      global_temporal_boundary: {
+        calendar_start: string;
+        calendar_end: string;
+        first_test_snapshot: string;
+        selection_label_cutoff: string;
+      };
+      limitations: string[];
     };
     promotion_controls: string[];
     decision_scope: string;
@@ -323,6 +350,15 @@ function MiniFact({
 }
 
 export default function ValidationPage() {
+  const historical =
+    validation.validation_protocol.evaluation_scope ===
+    'historical_out_of_sample';
+  const admission = validation.validation_protocol.historical_admission;
+  const boundary = admission?.global_temporal_boundary;
+  const supportedHorizons = new Set(
+    validation.summary.supported_horizons ??
+      validation.horizons.map((row) => row.horizon_days),
+  );
   const sourceIsFallback = validation.model_source.kind !== 'signed_champion';
   const modelBundle = forecast.artifact_bundles.find(
     (item) => item.name === 'model_bundle',
@@ -333,7 +369,12 @@ export default function ValidationPage() {
   const weighted = validation.summary.weighted_coverage;
   const improvement = validation.summary.weighted_relative_mae_improvement;
   const modelMae = validation.summary.weighted_model_mae;
-  const baselineMae = validation.summary.weighted_straddle_mae;
+  const baselineMae = historical
+    ? validation.summary.weighted_baseline_mae
+    : validation.summary.weighted_straddle_mae;
+  const baselineLabel = historical
+    ? 'Matched cohort benchmarks'
+    : 'Market straddle';
 
   return (
     <main className={styles.page}>
@@ -341,9 +382,10 @@ export default function ValidationPage() {
         <div className={styles.kicker}>Model · data · evidence</div>
         <h1 className="qv-m-h1">Research validation</h1>
         <p className={styles.heroCopy}>
-          See whether Quantiv forecasts beat the market baseline, how well the
-          uncertainty estimates are calibrated, and whether the latest research
-          state is publishable.
+          See whether Quantiv forecasts beat{' '}
+          {historical ? 'matched benchmarks' : 'the market baseline'}, how well
+          the uncertainty estimates are calibrated, and whether the latest
+          research state is publishable.
         </p>
         <div className={styles.heroMeta}>
           <span>Assessment</span>
@@ -367,7 +409,11 @@ export default function ValidationPage() {
       <section className={styles.section} aria-labelledby="model-performance">
         <SectionTitle
           kicker="Performance"
-          description="The same holdout observations are scored by both Quantiv and the market-implied straddle baseline."
+          description={
+            historical
+              ? 'Historical out-of-sample results compare each admitted cohort with its matched benchmark on the same observations.'
+              : 'The same holdout observations are scored by both Quantiv and the market-implied straddle baseline.'
+          }
         >
           <span id="model-performance">Does the model add information?</span>
         </SectionTitle>
@@ -377,16 +423,32 @@ export default function ValidationPage() {
             <span className={styles.eyebrow}>Weighted error reduction</span>
             <div className={styles.heroNumber}>{pct(improvement, 1)}</div>
             <p>
-              Lower mean absolute error than the straddle baseline across the
-              supported research horizons.
+              Lower mean absolute error than{' '}
+              {historical
+                ? 'matched cohort benchmarks'
+                : 'the straddle baseline'}{' '}
+              across the
+              {historical
+                ? ' admitted horizon/cohort pairs.'
+                : ' supported research horizons.'}
             </p>
             <div className={styles.rangeLine}>
-              Every horizon improves · {pct(validation.summary.min_relative_mae_improvement)}
-              –{pct(validation.summary.max_relative_mae_improvement)}
+              {historical
+                ? 'Admitted cohort improvement'
+                : 'Every horizon improves'}{' '}
+              · {pct(validation.summary.min_relative_mae_improvement)}–
+              {pct(validation.summary.max_relative_mae_improvement)}
             </div>
           </div>
 
-          <div className={styles.errorCompare} aria-label="Model versus straddle error">
+          <div
+            className={styles.errorCompare}
+            aria-label={
+              historical
+                ? 'Model versus matched benchmark error'
+                : 'Model versus straddle error'
+            }
+          >
             <div className={styles.errorRow}>
               <div>
                 <span>Quantiv model</span>
@@ -411,7 +473,7 @@ export default function ValidationPage() {
             </div>
             <div className={styles.errorRow}>
               <div>
-                <span>Market straddle</span>
+                <span>{baselineLabel}</span>
                 <strong className="mono tnum">{pct(baselineMae, 2)}</strong>
               </div>
               <div className={styles.errorTrack}>
@@ -422,8 +484,20 @@ export default function ValidationPage() {
               <strong className="mono tnum">
                 {count(validation.summary.validation_row_observations)}
               </strong>
-              <span>holdout row-observations across {validation.horizons.length} horizon models</span>
+              <span>
+                holdout row-observations across {supportedHorizons.size} horizon
+                models
+              </span>
             </div>
+            {historical ? (
+              <p className={styles.detailNote}>
+                {count(validation.summary.matched_baseline_row_observations)}{' '}
+                matched benchmark row-observations across{' '}
+                {count(validation.horizons.length)} admitted horizon/cohort
+                pairs. Calibration uses all holdout rows; MAE uses matched rows.
+                Events can appear at multiple horizons.
+              </p>
+            ) : null}
           </div>
         </div>
 
@@ -435,9 +509,16 @@ export default function ValidationPage() {
                 <tr>
                   {[
                     'Horizon',
-                    'Rows',
+                    ...(historical
+                      ? [
+                          'Cohort',
+                          'Calibration rows',
+                          'Matched rows',
+                          'Benchmark',
+                        ]
+                      : ['Rows']),
                     'Model MAE',
-                    'Straddle MAE',
+                    historical ? 'Benchmark MAE' : 'Straddle MAE',
                     'Improvement',
                     '50% interval',
                     '80% interval',
@@ -448,26 +529,53 @@ export default function ValidationPage() {
               </thead>
               <tbody>
                 {validation.horizons.map((row) => (
-                  <tr key={row.horizon_days}>
+                  <tr key={`${row.horizon_days}:${row.cohort ?? 'legacy'}`}>
                     <td>T-{row.horizon_days}</td>
+                    {historical ? (
+                      <td>
+                        {row.cohort === 'strict_options'
+                          ? 'Strict options'
+                          : 'Optionless'}
+                      </td>
+                    ) : null}
                     <td className="mono tnum">{count(row.n_validation)}</td>
+                    {historical ? (
+                      <>
+                        <td className="mono tnum">
+                          {count(row.n_matched_baseline)}
+                        </td>
+                        <td>{row.baseline_label}</td>
+                      </>
+                    ) : null}
                     <td className="mono tnum">{pct(row.model_mae, 2)}</td>
                     <td className="mono tnum">
-                      {pct(row.straddle_baseline_mae, 2)}
+                      {pct(
+                        historical
+                          ? row.baseline_mae
+                          : row.straddle_baseline_mae,
+                        2,
+                      )}
                     </td>
                     <td className="mono tnum" style={{ color: 'var(--up)' }}>
                       {pct(row.relative_mae_improvement, 1)}
                     </td>
-                    <td className="mono tnum">{pct(row.coverage.interval_50, 1)}</td>
-                    <td className="mono tnum">{pct(row.coverage.interval_80, 1)}</td>
+                    <td className="mono tnum">
+                      {pct(row.coverage.interval_50, 1)}
+                    </td>
+                    <td className="mono tnum">
+                      {pct(row.coverage.interval_80, 1)}
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
           <p className={styles.detailNote}>
-            MAE is absolute stock-move error. This is predictive validation,
-            not a trading-P&amp;L claim.
+            MAE is absolute stock-move error. This is predictive validation, not
+            a trading-P&amp;L claim.
+            {historical
+              ? ' Historical moves are a benchmark only; future forecasts have no historical-median fallback.'
+              : ''}
           </p>
         </details>
       </section>
@@ -511,7 +619,10 @@ export default function ValidationPage() {
 
         <ValidationPublication control={control} forecast={forecast} />
 
-        <div className={styles.evidenceStrip} aria-label="Published forecast evidence counts">
+        <div
+          className={styles.evidenceStrip}
+          aria-label="Published forecast evidence counts"
+        >
           <MiniFact
             label="Controls checked"
             value={count(forecast.controls.evaluated)}
@@ -523,7 +634,10 @@ export default function ValidationPage() {
               forecast.controls.exceptions > 0 ? 'var(--down)' : 'var(--up)'
             }
           />
-          <MiniFact label="Forecast rows" value={count(forecast.coverage.rows)} />
+          <MiniFact
+            label="Forecast rows"
+            value={count(forecast.coverage.rows)}
+          />
           <MiniFact label="Events" value={count(forecast.coverage.events)} />
         </div>
 
@@ -612,9 +726,7 @@ export default function ValidationPage() {
               {control.exceptions.map((item) => (
                 <div key={item.code} className={styles.exception}>
                   <StatusPill status={item.severity} />
-                  <span>
-                    {controlExceptionExplanation(item, control.data)}
-                  </span>
+                  <span>{controlExceptionExplanation(item, control.data)}</span>
                   {item.code !== 'option_quote_quality_below_limit' &&
                   item.count != null ? (
                     <span className="mono tnum">{count(item.count)}</span>
@@ -623,8 +735,8 @@ export default function ValidationPage() {
               ))}
             </div>
             <p>
-              These gates affect the next research release. They do not rewrite a
-              previously validated forecast receipt.
+              These gates affect the next research release. They do not rewrite
+              a previously validated forecast receipt.
             </p>
           </div>
         ) : null}
@@ -643,20 +755,45 @@ export default function ValidationPage() {
             <span className={styles.stepNumber}>01</span>
             <h3>Separate past from future</h3>
             <p>
-              {validation.validation_protocol.walk_forward.expanding_windows}{' '}
-              expanding walk-forward windows with a{' '}
-              {validation.validation_protocol.walk_forward.validation_window_days}
-              d validation window and{' '}
-              {validation.validation_protocol.walk_forward.purge_days}d purge.
+              {historical ? (
+                <>
+                  Development labels fall strictly before{' '}
+                  {boundary?.selection_label_cutoff.slice(0, 10) ??
+                    'the earliest reserved snapshot'}
+                  . Reserved earnings events run from{' '}
+                  {boundary?.calendar_start.slice(0, 10) ?? 'unavailable'}{' '}
+                  through {boundary?.calendar_end.slice(0, 10) ?? 'unavailable'}
+                  .
+                </>
+              ) : (
+                <>
+                  {
+                    validation.validation_protocol.walk_forward
+                      .expanding_windows
+                  }{' '}
+                  expanding walk-forward windows with a{' '}
+                  {
+                    validation.validation_protocol.walk_forward
+                      .validation_window_days
+                  }
+                  d validation window and{' '}
+                  {validation.validation_protocol.walk_forward.purge_days}d
+                  purge.
+                </>
+              )}
             </p>
           </article>
           <article>
             <span className={styles.stepNumber}>02</span>
-            <h3>Beat the same market baseline</h3>
+            <h3>
+              {historical
+                ? 'Beat matched benchmarks'
+                : 'Beat the same market baseline'}
+            </h3>
             <p>
-              Every candidate is compared on the same observations against the
-              straddle baseline, while point error and interval calibration are
-              checked together.
+              {historical
+                ? 'Strict-options results use the market straddle; optionless results use a historical-move benchmark. Each admitted pair passes point-error, calibration and statistical controls on reserved observations.'
+                : 'Every candidate is compared on the same observations against the straddle baseline, while point error and interval calibration are checked together.'}
             </p>
           </article>
           <article>
@@ -664,8 +801,8 @@ export default function ValidationPage() {
             <h3>Verify before publication</h3>
             <p>
               Bundle identity, feature schema, shadow scoring, drift controls
-              and rollback evidence all stay tied to the model that produced
-              the stored forecasts.
+              and rollback evidence all stay tied to the model that produced the
+              stored forecasts.
             </p>
           </article>
         </div>
@@ -691,7 +828,8 @@ export default function ValidationPage() {
               [
                 'Model artifact',
                 shortHash(
-                  validation.model_source.artifact_sha256 ?? modelBundle?.sha256,
+                  validation.model_source.artifact_sha256 ??
+                    modelBundle?.sha256,
                 ),
                 modelBundle?.producer ?? 'model trainer',
               ],
@@ -714,6 +852,41 @@ export default function ValidationPage() {
                   control.publication_eligible ? 'eligible' : 'blocked'
                 }`,
               ],
+              ...(historical && admission
+                ? [
+                    [
+                      'Evaluation scope',
+                      'Historical out-of-sample',
+                      admission.protocol.method ??
+                        'signed historical admission',
+                    ],
+                    [
+                      'Admission receipt',
+                      shortHash(admission.admission_id),
+                      'signed model and cohort admission',
+                    ],
+                    [
+                      'Source bundle',
+                      shortHash(admission.source_bundle_id),
+                      'frozen before reserved evaluation',
+                    ],
+                    [
+                      'Serving bundle',
+                      shortHash(admission.serving_bundle_id),
+                      `${supportedHorizons.size} horizons · ${validation.horizons.length} admitted horizon/cohort pairs`,
+                    ],
+                    [
+                      'Reserved panel',
+                      shortHash(admission.panel_id),
+                      `Reservation ${shortHash(admission.reservation_id)}`,
+                    ],
+                    [
+                      'Reserved event window',
+                      `${boundary?.calendar_start.slice(0, 10)} – ${boundary?.calendar_end.slice(0, 10)}`,
+                      `Earliest snapshot ${boundary?.first_test_snapshot.slice(0, 10)}`,
+                    ],
+                  ]
+                : []),
             ].map(([label, value, detail]) => (
               <div key={label} className={styles.lineage}>
                 <span>{label}</span>
@@ -722,6 +895,37 @@ export default function ValidationPage() {
               </div>
             ))}
           </div>
+
+          {historical && admission ? (
+            <div className={styles.scopeCallout}>
+              <div>
+                <span className={styles.eyebrow}>Development checks</span>
+                <p>
+                  {
+                    validation.validation_protocol.walk_forward
+                      .expanding_windows
+                  }{' '}
+                  expanding walk-forward windows with{' '}
+                  {
+                    validation.validation_protocol.walk_forward
+                      .validation_window_days
+                  }
+                  d validation windows and a{' '}
+                  {validation.validation_protocol.walk_forward.purge_days}d
+                  purge are development evidence. They select the model before
+                  the reserved historical evaluation and are separate from the
+                  results above.
+                </p>
+                <p>
+                  Admission proves exclusion of reserved labels from this
+                  candidate’s fitting and selection.
+                  {admission.limitations.map((limitation) => (
+                    <span key={limitation}> {limitation}</span>
+                  ))}
+                </p>
+              </div>
+            </div>
+          ) : null}
 
           <div className={styles.scopeCallout}>
             <div>
