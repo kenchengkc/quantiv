@@ -5,6 +5,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from lightgbm import LGBMRegressor
@@ -488,6 +489,33 @@ def test_common_holdout_excludes_both_models_selection_exposure(tmp_path, monkey
     assert report["status"] == "insufficient_data"
     assert report["horizons"]["1"]["rows"] == 150
     assert report["horizons"]["1"]["excluded_exposed_rows"] == 150
+
+
+@pytest.mark.parametrize("reference_missing,current_missing,want", [
+    (0.8, 0.2, "warning"),
+    (0.2, 0.8, "critical"),
+])
+def test_missingness_direction_distinguishes_improved_coverage_from_lost_inputs(
+    tmp_path, reference_missing, current_missing, want,
+):
+    bundle = tmp_path / "bundle"
+    bundle.mkdir()
+    references = {name: {"missing_rate": reference_missing, "cuts": [0.5],
+                         "probabilities": [0.5, 0.5]} for name in ("a", "b", "c")}
+    (bundle / "metadata_T1.json").write_text(json.dumps({"feature_reference": references}))
+    frame = pd.DataFrame({
+        "model_horizon": [1] * 200,
+        "feature_vector": [json.dumps({name: None if i < int(current_missing * 200) else i % 2
+                                       for name in references}) for i in range(200)],
+    })
+    result = feature_drift_report(frame, bundle, horizons=[1])
+    assert result["status"] == want
+    assert result["corruption_status"] == ("critical" if want == "critical" else "passed")
+    assert result["covariate_status"] == "warning"
+    for feature in result["horizons"]["1"]["features"].values():
+        assert feature["missing_rate"] == current_missing
+        assert feature["training_missing_rate"] == reference_missing
+        assert feature["status"] == want
 
 
 def test_psi_seasonality_is_diagnostic_and_missing_feature_corruption_holds(tmp_path):
