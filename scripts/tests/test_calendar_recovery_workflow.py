@@ -27,10 +27,13 @@ def test_calendar_recovery_verifies_saved_release_before_repair_and_monitoring_b
     commands = [s.get('run', '') for s in steps]
     def locate(text):
         return next(i for i, c in enumerate(commands) if text in c)
-    assert locate('verify_refresh_recovery.py') < locate('reconcile_earnings_calendar.py') < locate('daily_score.py') < locate('model_publication.py monitor') < locate('build_frontend_data.py')
+    assert locate('verify_refresh_recovery.py') < locate('provider_market_hours.py --admit') < locate('reconcile_earnings_calendar.py') < locate('daily_score.py') < locate('model_publication.py monitor') < locate('build_frontend_data.py')
     repair = steps[locate('reconcile_earnings_calendar.py')]
     assert repair['if'] == "inputs.refresh_mode == 'calendar-only-recovery'"
     assert repair['env']['PROVIDER_FREE_RECOVERY'] == '0'
+    assert repair['shell'] == 'python3 scripts/provider_market_hours.py --run-shell {0}'
+    assert 'r2_push.sh' not in repair['run']
+    assert 'r2_push_calendar_reference.sh' in repair['run']
     assert '--earnings' in repair['run']
     assert '--ohlcv' not in repair['run'] and '--corporate-actions' not in repair['run']
     assert 'check_earnings_calendar_integrity.py --require-baseline' in repair['run']

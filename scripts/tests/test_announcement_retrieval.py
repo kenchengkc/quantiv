@@ -96,3 +96,32 @@ def test_total_news_budget_reserves_one_request_per_symbol(monkeypatch):
         finnhub_delay=0, twelvedata_delay=0, alphavantage_delay=0,
         alpha_news_max=0, twelvedata_max_symbols=0, finnhub_max_requests=5)
     assert budgets == [3, 1, 1]
+
+
+@pytest.mark.parametrize('detail', [
+    'Management will host a conference call to discuss the earnings release after market close.',
+    'Its quarterly earnings release will be discussed in an after market close webcast.',
+])
+def test_discussion_of_release_is_not_a_release_action(detail):
+    result = calendar.extract_earnings_announcement('Example will release financial results on October 27, 2026. ' + detail, published_on=date(2026, 10, 1))
+    assert result['timing'] == 'unknown'
+
+
+def test_session_before_release_verb_is_supported():
+    result = calendar.extract_earnings_announcement('Before market open on October 27, 2026, Example will release third quarter financial results.', published_on=date(2026, 10, 1))
+    assert result == {'date': '2026-10-27', 'timing': 'bmo'}
+
+
+def test_request_budget_counts_physical_rate_limited_calls(monkeypatch):
+    calls = []
+    class Limited:
+        status_code = 429
+        ok = False
+        text = 'rate limited'
+    def get(*args, **kwargs):
+        calls.append(args)
+        return Limited()
+    monkeypatch.setattr(calendar.requests, 'get', get)
+    monkeypatch.setattr(calendar.time, 'sleep', lambda _: None)
+    _, meta = calendar.fetch_finnhub_announcements('META', today=date(2026,10,17), key='test', max_requests=1)
+    assert len(calls) == meta['requests'] == 1

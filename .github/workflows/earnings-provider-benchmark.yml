@@ -15,6 +15,9 @@ jobs:
   benchmark:
     runs-on: ubuntu-latest
     timeout-minutes: 120
+    concurrency:
+      group: daily-data-refresh-execution
+      cancel-in-progress: false
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -73,7 +76,12 @@ jobs:
             --output-dir /tmp/earnings-benchmark/announcements
           cat /tmp/earnings-benchmark/announcements/summary.md
 
+      - name: Reserve provider capacity for reporting audit
+        if: inputs.mode == 'reporting-gaps'
+        run: python scripts/provider_market_hours.py --admit
+
       - name: Audit live unknown reporting sessions
+        shell: python3 scripts/provider_market_hours.py --run-shell {0}
         if: inputs.mode == 'reporting-gaps'
         env:
           FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}

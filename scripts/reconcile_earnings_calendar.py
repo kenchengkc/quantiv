@@ -301,9 +301,18 @@ def _session_from_text(text: str, *, report_day: date) -> str:
     for session, patterns in session_patterns.items():
         for match in re.finditer("|".join(patterns), text, flags=re.I):
             prefix = re.split(r"[.!?;]\s+(?=[A-Z])", text[:match.end()])[-1].lower()
-            releases = list(re.finditer(r"\b(?:post|release|issue|publish|report|announce)(?:s|d|ed)?\b", prefix))
-            calls = list(re.finditer(r"\b(?:call|conference|webcast|interview)\b", prefix))
-            if releases and (not calls or releases[-1].start() > calls[-1].start()):
+            suffix = re.split(r"[.!?;]\s+(?=[A-Z])", text[match.end():], maxsplit=1)[0].lower()
+            # Require an action, not the noun "earnings release" in a sentence
+            # describing its discussion. Support "Before market open ... will
+            # release" as well as the usual action-before-session wording.
+            action = r"\b(?:(?:will|to)\s+(?:\w+\s+){0,2}(?:post|release|issue|publish|report|announce)|issued|released|published|posted|reports|announces)\b"
+            releases = list(re.finditer(action, prefix))
+            calls = list(re.finditer(r"\b(?:call|conference|webcast|interview|discuss|discussed)\b", prefix))
+            before = releases and (not calls or releases[-1].start() > calls[-1].start())
+            following = re.search(action, suffix)
+            after = following and not calls and not re.search(
+                r"\b(?:call|conference|webcast|interview|discuss|discussed)\b", suffix[:following.start()])
+            if before or after:
                 found.add(session)
     if len(found) == 1:
         return found.pop()
@@ -1047,7 +1056,7 @@ def fetch_finnhub_announcements(
         status, payload, error = _request_json(
             "https://finnhub.io/api/v1/company-news",
             params={"symbol": symbol, "from": start.isoformat(),
-                    "to": end.isoformat(), "token": key}, secret=key,
+                    "to": end.isoformat(), "token": key}, secret=key, retries=0,
         )
         rows = payload if isinstance(payload, list) else []
         windows.append({"from": start.isoformat(), "to": end.isoformat(),
