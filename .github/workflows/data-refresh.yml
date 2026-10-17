@@ -12,6 +12,11 @@ on:
         type: choice
         options: [normal, provider-free-recovery, options-only-recovery, calendar-only-recovery]
         default: normal
+      calendar_symbols:
+        description: "Optional uppercase tickers separated by spaces for calendar-only announcement repair; blank checks all candidates."
+        type: string
+        required: false
+        default: ""
       recovery_release_id:
         description: "Exact saved data-release id required for either recovery mode."
         type: string
@@ -679,6 +684,7 @@ jobs:
         if: inputs.refresh_mode == 'calendar-only-recovery'
         shell: python3 scripts/provider_market_hours.py --run-shell {0}
         env:
+          CALENDAR_SYMBOLS: ${{ inputs.calendar_symbols }}
           PROVIDER_FREE_RECOVERY: '0'
           FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
           FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
@@ -688,7 +694,15 @@ jobs:
         run: |
           set -euo pipefail
           python scripts/sync_dolthub.py --earnings
-          python -u scripts/reconcile_earnings_calendar.py --days-ahead 60 --announcement-days-ahead 35
+          set --
+          if [ -n "$CALENDAR_SYMBOLS" ]; then
+            read -r -a SYMBOLS <<< "$CALENDAR_SYMBOLS"
+            for SYMBOL in "${SYMBOLS[@]}"; do
+              [[ "$SYMBOL" =~ ^[A-Z][A-Z0-9.-]{0,9}$ ]] || { echo "Invalid calendar ticker" >&2; exit 2; }
+            done
+            set -- --symbols "${SYMBOLS[@]}"
+          fi
+          python -u scripts/reconcile_earnings_calendar.py --days-ahead 60 --announcement-days-ahead 35 "$@"
           python scripts/apply_earnings_overrides.py --allow-missing
           python scripts/apply_ticker_lifecycle.py
           python scripts/check_earnings_calendar_integrity.py --require-baseline
