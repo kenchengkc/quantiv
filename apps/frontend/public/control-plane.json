@@ -1,106 +1,92 @@
 {
   "data": {
-    "contract_rejection_rate": 0.403109,
-    "contracts": 96562,
+    "contract_rejection_rate": 0.601462,
+    "contracts": 141136,
     "corporate_action_rows": 62424,
     "corporate_action_status": "enforced",
-    "covered_events": 799,
-    "decision_group_rejection_rate": 0.369376,
-    "decision_groups": 1267,
+    "covered_events": 805,
+    "decision_group_rejection_rate": 0.365142,
+    "decision_groups": 1268,
     "decision_scope": "end_of_day_research",
-    "display_forecast_coverage_pct": 0.21919673247106874,
-    "display_forecast_covered_events": 322,
-    "display_forecast_events": 1469,
+    "display_forecast_coverage_pct": 0.22936972059779076,
+    "display_forecast_covered_events": 353,
+    "display_forecast_events": 1539,
     "display_forecast_method_mix": {
       "historical": 0,
       "historical_prior": 0,
-      "ml": 322,
-      "ml_unavailable": 1147,
+      "ml": 353,
+      "ml_unavailable": 1186,
       "options_indicative": 0,
       "options_math": 0
     },
     "duplicate_rows": 0,
-    "eligible_contracts": 57637,
-    "eligible_decision_groups": 799,
-    "event_coverage_pct": 0.630624,
-    "expected_events": 1267,
-    "expected_source_date": "2026-10-15",
+    "eligible_contracts": 56248,
+    "eligible_decision_groups": 805,
+    "event_coverage_pct": 0.634858,
+    "expected_events": 1268,
+    "expected_source_date": "2026-10-16",
     "live_trading_eligible": false,
-    "missing_events": 468,
-    "pair_rejection_rate": 0.855554,
-    "quarantine_records": 80232,
+    "missing_events": 463,
+    "pair_rejection_rate": 0.902321,
+    "quarantine_records": 148563,
     "quarantine_status": "enforced",
-    "quote_quality_errors": [
-      "latest source date 2026-09-30 is 11 market session(s) behind expected 2026-10-15"
-    ],
+    "quote_quality_errors": [],
     "replay_status": "verified",
-    "source_date": "2026-09-30",
-    "source_session_lag": 11,
-    "status": "failed"
+    "source_date": "2026-10-15",
+    "source_session_lag": 1,
+    "status": "advisory"
   },
   "exceptions": [
     {
-      "code": "options_stale",
-      "count": 16,
-      "severity": "critical",
-      "summary": "options exceeds its freshness limit"
-    },
-    {
       "code": "upcoming_events_outside_option_universe",
-      "count": 2826,
+      "count": 2768,
       "severity": "warning",
       "summary": "Calendar events fall outside the current options decision universe"
     },
     {
       "code": "upcoming_events_without_option_chain",
-      "count": 468,
+      "count": 463,
       "severity": "warning",
       "summary": "In-universe earnings events have no decision-eligible option chain"
     },
     {
       "code": "event_quote_coverage_below_limit",
-      "count": 468,
+      "count": 463,
       "severity": "warning",
       "summary": "Aggregate option coverage is below the model activation limit; individually eligible events may publish"
     },
     {
       "code": "forecast_horizon_coverage_below_limit",
-      "count": 105,
+      "count": 470,
       "severity": "warning",
       "summary": "One or more model horizons lack sufficient eligible option coverage"
     },
     {
-      "code": "option_quote_quality_below_limit",
-      "count": 468,
-      "severity": "critical",
-      "summary": "Option evidence on the scoped earnings decision surface exceeds the publication limit"
-    },
-    {
-      "code": "retired_source_symbols_quarantined",
-      "count": 4,
+      "code": "option_chain_diagnostics_above_limit",
+      "count": 3335,
       "severity": "warning",
-      "summary": "Latest source quotes for retired symbols are excluded from the decision universe"
+      "summary": "Chain-wide option diagnostics exceed their limits outside the scoped earnings decision surface"
     }
   ],
-  "generated_at": "2026-10-16T12:14:35.648573+00:00",
+  "generated_at": "2026-10-17T07:41:22.980027+00:00",
   "model": {
     "challenger_present": false,
     "champion_active": true,
-    "critical_features": 48,
+    "critical_features": 92,
     "drift_status": "warning",
     "fallback_bundle_available": true,
     "hard_missing_features": null,
-    "monitored_at": "2026-10-16T10:39:39.261351+00:00",
+    "monitored_at": "2026-10-17T07:06:37.779334+00:00",
     "outcome_common_rows": 0,
     "outcome_evaluated_at": "2026-10-11T18:30:15.529323+00:00",
     "outcome_evaluations": 5,
     "outcome_minimum_rows": 30,
     "outcome_status": "insufficient_data",
     "publication_coverage": {
-      "candidate_events": 638,
-      "candidate_rows": 638,
-      "eligible_events": 638,
-      "eligible_rows": 638,
+      "candidate_events": 553,
+      "candidate_rows": 553,
+      "eligible_events": 553,
+      "eligible_rows": 553,
       "held_events": 0,
       "held_rows": 0
     },
@@ -112,18 +98,18 @@
       "champion_evidence",
       "previous"
     ],
-    "snapshot_date": "2026-10-15",
+    "snapshot_date": "2026-10-16",
     "status": "passed",
     "warning_features": 0
   },
-  "publication_eligible": false,
+  "publication_eligible": true,
   "release": {
-    "artifact_promotion_status": "unavailable",
-    "data_r2_status": "unavailable",
-    "forecast_r2_status": "unavailable",
-    "frontend_payload_status": "unavailable",
-    "neon_import_status": "unavailable"
+    "artifact_promotion_status": "passed",
+    "data_r2_status": "passed",
+    "forecast_r2_status": "passed",
+    "frontend_payload_status": "passed",
+    "neon_import_status": "passed"
   },
   "schema": "quantiv.control-plane.v2",
-  "status": "failed"
+  "status": "advisory"
 }

@@ -1,24 +1,51 @@
 {
   "symbol": "COCO",
-  "as_of_date": "2026-09-30",
-  "spot_price": 57.255,
+  "as_of_date": "2026-10-15",
+  "spot_price": 55.0,
   "expected_move": {
     "earnings_date": "2026-11-04",
+    "expiration": "2026-11-20",
+    "dte": 36,
+    "lead_time_days": 20,
+    "atm_strike": 55.0,
+    "atm_iv": 0.588588,
+    "straddle_abs": 8.7,
+    "straddle_pct": 0.158182,
+    "iv_pct": 0.184849,
+    "skew_atm": -0.0333,
+    "term_slope": null,
+    "total_vega": 0.1335,
+    "em_method": "ml_unavailable",
     "display_forecast_pct": null,
     "display_forecast_method": "ml_unavailable",
-    "display_forecast_as_of": "2026-09-30",
+    "display_forecast_as_of": "2026-10-15",
     "ml_status": "unavailable_model",
-    "options_status": "unavailable",
+    "options_status": "decision_eligible",
     "fallback_reason": null,
     "historical_event_count": null,
     "timing": "unknown",
     "ml_publication_status": "held",
-    "ml_publication_reason": "no_eligible_current_forecast",
-    "em_method": "ml_unavailable",
-    "options_publication_status": "held",
-    "options_publication_source_date": "2026-09-30"
+    "ml_publication_reason": "no_eligible_current_forecast"
   },
-  "straddle_features": [],
+  "straddle_features": [
+    {
+      "expiration": "2026-11-20",
+      "dte": 36,
+      "atm_strike": 55.0,
+      "atm_iv": 0.58855,
+      "atm_call_iv": 0.5958,
+      "atm_put_iv": 0.5813,
+      "straddle_mid": 8.7,
+      "em_straddle": 8.7,
+      "em_straddle_pct": 0.158182,
+      "em_iv": 10.166018,
+      "em_iv_pct": 0.184837,
+      "call_delta": 0.6504,
+      "call_gamma": 0.0335,
+      "call_vega": 0.0671,
+      "call_theta": -0.0526
+    }
+  ],
   "earnings_history": [
     {
       "date": "2026-11-04",
@@ -49,13 +76,10 @@
       "ml_publication_reason": "no_eligible_current_forecast",
       "display_forecast_pct": null,
       "display_forecast_method": "ml_unavailable",
-      "display_forecast_as_of": "2026-09-30",
+      "display_forecast_as_of": "2026-10-15",
       "em_method": "ml_unavailable",
       "fallback_reason": null,
-      "options_status": "unavailable",
-      "historical_event_count": null,
-      "options_publication_status": "held",
-      "options_publication_source_date": "2026-09-30"
+      "options_status": "unavailable"
     },
     {
       "date": "2026-07-23",
@@ -349,13 +373,13 @@
   ],
   "next_earnings": "2026-11-04",
   "vol_regime": {
-    "iv_current": 0.5562,
-    "iv_rank": 0.454825,
+    "iv_current": 0.5865,
+    "iv_rank": 0.532598,
     "iv_year_high": 0.7686,
     "iv_year_low": 0.379,
-    "hv_current": 0.4311,
-    "hv_rank": 0.185278,
-    "iv_mom_week": -0.001,
+    "hv_current": 0.5204,
+    "hv_rank": 0.333666,
+    "iv_mom_week": -0.0352,
     "iv_mom_month": null
   },
   "next_earnings_timing": "unknown"

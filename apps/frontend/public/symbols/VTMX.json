@@ -1,38 +1,20 @@
 {
   "symbol": "VTMX",
-  "as_of_date": "2026-09-30",
-  "spot_price": 32.18,
+  "as_of_date": "2026-10-15",
+  "spot_price": 34.68,
   "expected_move": {
     "earnings_date": "2026-10-22",
-    "em_ml_pct": 0.031684,
-    "em_ml_abs": 1.098793,
-    "model_horizon": 7,
-    "ml_snapshot_date": "2026-10-15",
-    "forecast_id": "b3df6d64ff903e39f50d7016869c51d27f05cfbdec0b4e953ad6f8e0a47b61a4",
-    "forecast_model_bundle_id": "d14dc7f2aa6b175956922eb6266b8523742add962668b7d6b8833cc2c869dd1b",
-    "forecast_scored_at": "2026-10-16T10:23:24.935251+00:00",
-    "forecast_feature_cutoff_at": "2026-10-22T19:55:00+00:00",
-    "forecast_prediction_deadline_at": "2026-10-22T19:55:00+00:00",
-    "forecast_feature_snapshot_at": "2026-10-15T20:00:00+00:00",
-    "forecast_feature_hash": "6bf33682946d5538d717e719be6a37466736620a142eacf0df97160a7026ca03",
-    "forecast_frozen_eligible": true,
-    "p10": 0.005488,
-    "p25": 0.015195,
-    "p50": 0.031978,
-    "p75": 0.060455,
-    "p90": 0.088195,
-    "em_method": "ml_lightgbm",
-    "display_forecast_pct": 0.031684,
-    "display_forecast_method": "ml",
+    "display_forecast_pct": null,
+    "display_forecast_method": "ml_unavailable",
     "display_forecast_as_of": "2026-10-15",
-    "ml_status": "available",
+    "ml_status": "unavailable_model",
     "options_status": "unavailable",
     "fallback_reason": null,
     "historical_event_count": null,
-    "timing": "after_market_close",
-    "ml_publication_status": "eligible",
-    "options_publication_status": "held",
-    "options_publication_source_date": "2026-09-30"
+    "timing": "unknown",
+    "ml_publication_status": "held",
+    "ml_publication_reason": "no_eligible_current_forecast",
+    "em_method": "ml_unavailable"
   },
   "straddle_features": [],
   "earnings_history": [
@@ -65,13 +47,10 @@
       "ml_publication_reason": "no_eligible_current_forecast",
       "display_forecast_pct": null,
       "display_forecast_method": "ml_unavailable",
-      "display_forecast_as_of": "2026-09-30",
+      "display_forecast_as_of": "2026-10-15",
       "em_method": "ml_unavailable",
       "fallback_reason": null,
-      "options_status": "unavailable",
-      "historical_event_count": null,
-      "options_publication_status": "held",
-      "options_publication_source_date": "2026-09-30"
+      "options_status": "unavailable"
     },
     {
       "date": "2026-07-22",
@@ -351,5 +330,5 @@
   ],
   "next_earnings": "2026-10-22",
   "vol_regime": null,
-  "next_earnings_timing": "after_market_close"
+  "next_earnings_timing": "unknown"
 }
