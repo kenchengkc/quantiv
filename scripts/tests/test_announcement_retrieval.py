@@ -125,3 +125,19 @@ def test_request_budget_counts_physical_rate_limited_calls(monkeypatch):
     monkeypatch.setattr(calendar.time, 'sleep', lambda _: None)
     _, meta = calendar.fetch_finnhub_announcements('META', today=date(2026,10,17), key='test', max_requests=1)
     assert len(calls) == meta['requests'] == 1
+
+
+def test_session_between_release_and_following_call_belongs_to_call():
+    text = 'Example will release financial results on October 27, 2026 and, after market close, host a conference call to discuss the results.'
+    assert calendar.extract_earnings_announcement(text, published_on=date(2026,10,1))['timing'] == 'unknown'
+
+
+@pytest.mark.parametrize(('verb','phrase','timing'), [('announced','before market open','bmo'), ('reported','after market close','amc')])
+def test_passive_release_actions(verb, phrase, timing):
+    text = f'Example financial results will be {verb} on October 27, 2026 {phrase}.'
+    assert calendar.extract_earnings_announcement(text, published_on=date(2026,10,1))['timing'] == timing
+
+
+def test_next_day_morning_call_does_not_bound_release_session():
+    text = 'Example will release financial results on October 27, 2026. Results will be available prior to the conference call on October 28 at 8:00 a.m. ET.'
+    assert calendar.extract_earnings_announcement(text, published_on=date(2026,10,1))['timing'] == 'unknown'

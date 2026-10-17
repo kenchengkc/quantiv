@@ -302,10 +302,16 @@ def _session_from_text(text: str, *, report_day: date) -> str:
         for match in re.finditer("|".join(patterns), text, flags=re.I):
             prefix = re.split(r"[.!?;]\s+(?=[A-Z])", text[:match.end()])[-1].lower()
             suffix = re.split(r"[.!?;]\s+(?=[A-Z])", text[match.end():], maxsplit=1)[0].lower()
+            # A conjunction before the session starts a new clause: "release
+            # results and, after close, host a call" does not time the release.
+            if re.search(r"\band\s*,?\s*$", prefix):
+                prefix = ""
+            if re.match(r"[\s,]*(?:host|hold|conduct)\b", suffix):
+                continue
             # Require an action, not the noun "earnings release" in a sentence
             # describing its discussion. Support "Before market open ... will
             # release" as well as the usual action-before-session wording.
-            action = r"\b(?:(?:will|to)\s+(?:\w+\s+){0,2}(?:post|release|issue|publish|report|announce)|issued|released|published|posted|reports|announces)\b"
+            action = r"\b(?:(?:will|to)\s+(?:\w+\s+){0,2}(?:post|release|issue|publish|report|announce)|issued|released|published|posted|reported|announced|reports|announces)\b"
             releases = list(re.finditer(action, prefix))
             calls = list(re.finditer(r"\b(?:call|conference|webcast|interview|discuss|discussed)\b", prefix))
             before = releases and (not calls or releases[-1].start() > calls[-1].start())
@@ -321,21 +327,6 @@ def _session_from_text(text: str, *, report_day: date) -> str:
 
     lower = text.lower()
     mentions_call = bool(re.search(r"\b(?:call|conference|webcast|interview)\b", lower))
-    release_linked_to_call = bool(
-        re.search(
-            r"(?:results|earnings|release|materials).{0,80}"
-            r"(?:issued|released|published|available).{0,40}"
-            r"(?:before|prior to).{0,40}(?:call|conference)",
-            lower,
-            flags=re.S,
-        )
-        or re.search(
-            r"(?:issued|released|published|available).{0,80}"
-            r"(?:before|prior to).{0,40}(?:call|conference)",
-            lower,
-            flags=re.S,
-        )
-    )
     times: list[int] = []
     for match in TIME_RE.finditer(text):
         # A call time alone is not the release time. An explicit release clock
@@ -345,7 +336,16 @@ def _session_from_text(text: str, *, report_day: date) -> str:
             r"\b(?:post|release|issue|publish|report|announce)(?:s|d|ed)?\b", prefix,
         )) and bool(re.search(r"\b(?:results|earnings|release|materials)\b", prefix))
         suffix = re.split(r"[.!?;]", text[match.end():], maxsplit=1)[0].lower()
-        call_clock = bool(re.search(r"\b(?:call|conference|webcast|interview)\b", prefix + " " + suffix))
+        clause = prefix + " " + suffix
+        call_clock = bool(re.search(r"\b(?:call|conference|webcast|interview)\b", clause))
+        release_linked_to_call = bool(re.search(
+            r"(?:issued|released|published|available).{0,80}(?:before|prior to).{0,40}(?:call|conference)",
+            clause,
+        ))
+        if call_clock and release_linked_to_call:
+            call_dates = [_candidate_date(item, report_day) for item in DATE_RE.finditer(clause)]
+            if any(day != report_day for day in call_dates if day is not None):
+                continue
         if mentions_call and not release_linked_to_call and (not release_clock or call_clock):
             continue
         zone = (match.group("zone") or "").lower()
