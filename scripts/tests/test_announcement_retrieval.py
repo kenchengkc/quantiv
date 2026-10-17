@@ -147,3 +147,27 @@ def test_next_day_morning_call_does_not_bound_release_session():
 def test_conjunction_separates_release_from_later_call(call):
     text = f'Example will release financial results on October 27, 2026 and, after market close, {call}.'
     assert calendar.extract_earnings_announcement(text, published_on=date(2026,10,1))['timing'] == 'unknown'
+
+
+@pytest.mark.parametrize(('symbol','name','headline'), [
+    ('T','AT&T','AT&T to Release Third-Quarter 2026 Earnings'),
+    ('IBM','International Business Machines','IBM to Announce Third-Quarter 2026 Results'),
+    ('MMM','3M','3M Announces Upcoming Quarterly Earnings Call'),
+    ('GE','General Electric','GE Aerospace to Announce Third Quarter 2026 Results'),
+])
+def test_short_or_branded_issuer_names_are_not_discarded(symbol, name, headline):
+    assert calendar.headline_mentions_company(headline, symbol, name)
+
+
+def test_incidental_ticker_word_does_not_identify_issuer():
+    assert not calendar.headline_mentions_company('Apple to announce AI results', 'AI', 'C3.ai')
+    assert not calendar.headline_mentions_company('AI firms to announce quarterly results', 'AI', 'C3.ai')
+    assert not calendar.headline_mentions_company('ALL companies to announce quarterly results', 'ALL', 'Allstate')
+    assert not calendar.headline_mentions_company('GEAR to announce results', 'GE', 'General Electric')
+
+
+@pytest.mark.parametrize('brand', ['GE HealthCare', 'GE Vernova'])
+def test_ge_peer_brands_cannot_supply_aerospace_release(brand):
+    article = {'headline': f'{brand} to Announce Third Quarter 2026 Results',
+               'summary': 'Financial results will be released before market open on October 27, 2026.'}
+    assert not calendar.finnhub_article_mentions_company(article, 'GE', 'General Electric')

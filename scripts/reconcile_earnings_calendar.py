@@ -989,6 +989,17 @@ def headline_mentions_company(
     if not name:
         return False
 
+    # Preserve short/punctuated issuer names (AT&T, 3M) before token filtering.
+    if re.search(rf"(?<!\w){re.escape(name)}(?!\w)", headline, flags=re.I):
+        return True
+    # These established issuer names differ from the legacy legal-name file.
+    # Keep aliases explicit: a generic GE prefix also matches GE HealthCare and
+    # GE Vernova, which are different public issuers.
+    aliases = {"IBM": ("IBM",), "GE": ("GE Aerospace",)}
+    if any(re.match(rf"^{re.escape(alias)}(?![A-Za-z0-9])", headline)
+           for alias in aliases.get(target, ())):
+        return True
+
     headline_words = {
         token.lower()
         for token in re.findall(r"[A-Za-z0-9]+", headline)
@@ -1721,6 +1732,7 @@ def main() -> int:
     parser.add_argument("--alpha-news-max", type=int, default=20)
     parser.add_argument("--announcement-max-symbols", type=int, default=2000)
     parser.add_argument("--twelvedata-max-symbols", type=int, default=80)
+    parser.add_argument("--symbols", nargs="+", help="Limit announcement lookups to these tickers")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
@@ -1734,6 +1746,9 @@ def main() -> int:
         parser.error("--announcement-max-symbols must be positive")
     if args.twelvedata_max_symbols < 0:
         parser.error("--twelvedata-max-symbols cannot be negative")
+
+    if args.symbols and any(not re.fullmatch(r"[A-Z][A-Z0-9.-]{0,9}", symbol) for symbol in args.symbols):
+        parser.error("--symbols requires uppercase ticker symbols")
 
     today = et_today()
     end = today + timedelta(days=args.days_ahead)
@@ -1800,6 +1815,9 @@ def main() -> int:
         max_symbols=args.announcement_max_symbols,
         preliminary_decisions=preliminary_report["decisions"],
     )
+    if args.symbols:
+        requested = set(args.symbols)
+        symbols = [symbol for symbol in symbols if symbol in requested]
     company_names = load_company_names()
     announcements, announcement_status = _collect_announcements(
         symbols,
