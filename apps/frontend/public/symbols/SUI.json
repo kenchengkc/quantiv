@@ -3,10 +3,10 @@
   "as_of_date": "2026-10-15",
   "spot_price": 120.0,
   "expected_move": {
-    "earnings_date": "2026-11-04",
+    "earnings_date": "2026-10-27",
     "expiration": "2026-11-20",
     "dte": 36,
-    "lead_time_days": 20,
+    "lead_time_days": 12,
     "atm_strike": 120.0,
     "atm_iv": 0.233151,
     "straddle_abs": 7.425,
@@ -23,7 +23,7 @@
     "options_status": "decision_eligible",
     "fallback_reason": null,
     "historical_event_count": null,
-    "timing": "after_market_close",
+    "timing": "unknown",
     "ml_publication_status": "held",
     "ml_publication_reason": "no_eligible_current_forecast"
   },
@@ -357,7 +357,7 @@
       "realized_label_source": "ohlcv_session_close"
     }
   ],
-  "next_earnings": "2026-11-04",
+  "next_earnings": "2026-10-27",
   "vol_regime": {
     "iv_current": 0.2634,
     "iv_rank": 0.474194,
@@ -368,5 +368,5 @@
     "iv_mom_week": 0.0075,
     "iv_mom_month": null
   },
-  "next_earnings_timing": "after_market_close"
+  "next_earnings_timing": "unknown"
 }
