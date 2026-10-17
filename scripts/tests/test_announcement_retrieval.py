@@ -141,3 +141,9 @@ def test_passive_release_actions(verb, phrase, timing):
 def test_next_day_morning_call_does_not_bound_release_session():
     text = 'Example will release financial results on October 27, 2026. Results will be available prior to the conference call on October 28 at 8:00 a.m. ET.'
     assert calendar.extract_earnings_announcement(text, published_on=date(2026,10,1))['timing'] == 'unknown'
+
+
+@pytest.mark.parametrize('call', ['will host a conference call', 'management will host a conference call'])
+def test_conjunction_separates_release_from_later_call(call):
+    text = f'Example will release financial results on October 27, 2026 and, after market close, {call}.'
+    assert calendar.extract_earnings_announcement(text, published_on=date(2026,10,1))['timing'] == 'unknown'

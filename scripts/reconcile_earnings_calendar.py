@@ -304,7 +304,7 @@ def _session_from_text(text: str, *, report_day: date) -> str:
             suffix = re.split(r"[.!?;]\s+(?=[A-Z])", text[match.end():], maxsplit=1)[0].lower()
             # A conjunction before the session starts a new clause: "release
             # results and, after close, host a call" does not time the release.
-            if re.search(r"\band\s*,?\s*$", prefix):
+            if re.search(r"\band\s*,?\s*$", text[:match.start()].lower()):
                 prefix = ""
             if re.match(r"[\s,]*(?:host|hold|conduct)\b", suffix):
                 continue
