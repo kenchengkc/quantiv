@@ -992,11 +992,12 @@ def headline_mentions_company(
     # Preserve short/punctuated issuer names (AT&T, 3M) before token filtering.
     if re.search(rf"(?<!\w){re.escape(name)}(?!\w)", headline, flags=re.I):
         return True
-    # Accept established initials at the headline start (IBM, GE Aerospace),
-    # not arbitrary ticker-shaped words such as AI or ALL in other headlines.
-    initials = "".join(word[0] for word in re.findall(r"[A-Za-z0-9]+", name)
-                       if word.lower() not in {"the", "inc", "incorporated", "corp", "corporation", "company", "co", "plc", "ltd"}).upper()
-    if len(target) >= 2 and target == initials and re.match(rf"^{re.escape(target)}(?![A-Za-z0-9])", headline):
+    # These established issuer names differ from the legacy legal-name file.
+    # Keep aliases explicit: a generic GE prefix also matches GE HealthCare and
+    # GE Vernova, which are different public issuers.
+    aliases = {"IBM": ("IBM",), "GE": ("GE Aerospace",)}
+    if any(re.match(rf"^{re.escape(alias)}(?![A-Za-z0-9])", headline)
+           for alias in aliases.get(target, ())):
         return True
 
     headline_words = {

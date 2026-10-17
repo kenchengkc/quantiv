@@ -164,3 +164,10 @@ def test_incidental_ticker_word_does_not_identify_issuer():
     assert not calendar.headline_mentions_company('AI firms to announce quarterly results', 'AI', 'C3.ai')
     assert not calendar.headline_mentions_company('ALL companies to announce quarterly results', 'ALL', 'Allstate')
     assert not calendar.headline_mentions_company('GEAR to announce results', 'GE', 'General Electric')
+
+
+@pytest.mark.parametrize('brand', ['GE HealthCare', 'GE Vernova'])
+def test_ge_peer_brands_cannot_supply_aerospace_release(brand):
+    article = {'headline': f'{brand} to Announce Third Quarter 2026 Results',
+               'summary': 'Financial results will be released before market open on October 27, 2026.'}
+    assert not calendar.finnhub_article_mentions_company(article, 'GE', 'General Electric')
