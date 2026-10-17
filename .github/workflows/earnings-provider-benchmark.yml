@@ -2,6 +2,11 @@ name: Earnings provider benchmark
 
 on:
   workflow_dispatch:
+    inputs:
+      mode:
+        type: choice
+        options: [providers, reporting-gaps]
+        default: providers
 
 permissions:
   contents: read
@@ -9,7 +14,10 @@ permissions:
 jobs:
   benchmark:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 120
+    concurrency:
+      group: daily-data-refresh-execution
+      cancel-in-progress: false
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -31,6 +39,7 @@ jobs:
           pytest scripts/tests/test_benchmark_earnings_announcements.py -q
 
       - name: Call structured earnings APIs
+        if: inputs.mode != 'reporting-gaps'
         env:
           FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
           FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
@@ -51,6 +60,7 @@ jobs:
           cat /tmp/earnings-benchmark/structured/summary.md
 
       - name: Call announcement and news APIs
+        if: inputs.mode != 'reporting-gaps'
         env:
           FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
           TWELVEDATA_API_KEY: ${{ secrets.TWELVEDATA_API_KEY }}
@@ -65,6 +75,17 @@ jobs:
           python scripts/benchmark_earnings_announcements.py \
             --output-dir /tmp/earnings-benchmark/announcements
           cat /tmp/earnings-benchmark/announcements/summary.md
+
+      - name: Reserve provider capacity for reporting audit
+        if: inputs.mode == 'reporting-gaps'
+        run: python scripts/provider_market_hours.py --admit
+
+      - name: Audit live unknown reporting sessions
+        shell: python3 scripts/provider_market_hours.py --run-shell {0}
+        if: inputs.mode == 'reporting-gaps'
+        env:
+          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+        run: python -u scripts/audit_reporting_time_gaps.py --output /tmp/earnings-benchmark/reporting-gaps.json
 
       - name: Upload sanitized benchmarks
         if: always()

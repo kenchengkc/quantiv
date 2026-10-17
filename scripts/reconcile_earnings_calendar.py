@@ -286,57 +286,47 @@ def extract_fiscal_identity(text: str) -> dict[str, Any]:
     return {}
 
 def _session_from_text(text: str, *, report_day: date) -> str:
-    lower = text.lower()
-    if any(
-        term in lower
-        for term in (
-            "before market open",
-            "before the market opens",
-            "before markets open",
-            "before the new york stock exchange opens",
-            "before the nyse opens",
-            "prior to market open",
-            "prior to the market open",
-            "pre-market",
-            "premarket",
-            "issued that morning",
-            "released that morning",
-            "release that morning",
-        )
-    ):
-        return "bmo"
-    if any(
-        term in lower
-        for term in (
-            "after market close",
-            "after the market closes",
-            "following market close",
-            "following the market close",
-            "following the close",
-            "after the close",
-            "post-market",
-            "postmarket",
-        )
-    ):
-        return "amc"
+    # Only release language may supply a session; a later call has a different
+    # timestamp and can even occur on the following day.
+    market = r"(?:the\s+)?(?:(?:u\.?s\.?|us)\s+)?(?:financial\s+|stock\s+)?(?:markets?|nyse|nasdaq(?:\s+global(?:\s+select)?\s+market)?|new york stock exchange)"
+    session_patterns = {
+        "bmo": [rf"(?:before|prior to)\s+{market}\s+opens?",
+                rf"(?:before|prior to)\s+(?:the\s+)?opening(?:\s+of trading)?\s+(?:of|on)\s+{market}",
+                r"pre-market|premarket|(?:issued|released|release) that morning"],
+        "amc": [rf"(?:after|following)\s+{market}\s+closes?",
+                r"(?:after|following) (?:the )?close(?: of (?:regular )?(?:stock )?market trading)?",
+                r"post-market|postmarket"],
+    }
+    found = set()
+    for session, patterns in session_patterns.items():
+        for match in re.finditer("|".join(patterns), text, flags=re.I):
+            prefix = re.split(r"[.!?;]\s+(?=[A-Z])", text[:match.end()])[-1].lower()
+            suffix = re.split(r"[.!?;]\s+(?=[A-Z])", text[match.end():], maxsplit=1)[0].lower()
+            # A conjunction before the session starts a new clause: "release
+            # results and, after close, host a call" does not time the release.
+            if re.search(r"\band\s*,?\s*$", text[:match.start()].lower()):
+                prefix = ""
+            if re.match(r"[\s,]*(?:host|hold|conduct)\b", suffix):
+                continue
+            # Require an action, not the noun "earnings release" in a sentence
+            # describing its discussion. Support "Before market open ... will
+            # release" as well as the usual action-before-session wording.
+            action = r"\b(?:(?:will|to)\s+(?:\w+\s+){0,2}(?:post|release|issue|publish|report|announce)|issued|released|published|posted|reported|announced|reports|announces)\b"
+            releases = list(re.finditer(action, prefix))
+            calls = list(re.finditer(r"\b(?:call|conference|webcast|interview|discuss|discussed)\b", prefix))
+            before = releases and (not calls or releases[-1].start() > calls[-1].start())
+            following = re.search(action, suffix)
+            after = following and not calls and not re.search(
+                r"\b(?:call|conference|webcast|interview|discuss|discussed)\b", suffix[:following.start()])
+            if before or after:
+                found.add(session)
+    if len(found) == 1:
+        return found.pop()
+    if len(found) > 1:
+        return "unknown"
 
     lower = text.lower()
-    mentions_call = "call" in lower or "conference" in lower
-    release_linked_to_call = bool(
-        re.search(
-            r"(?:results|earnings|release|materials).{0,80}"
-            r"(?:issued|released|published|available).{0,40}"
-            r"(?:before|prior to).{0,40}(?:call|conference)",
-            lower,
-            flags=re.S,
-        )
-        or re.search(
-            r"(?:issued|released|published|available).{0,80}"
-            r"(?:before|prior to).{0,40}(?:call|conference)",
-            lower,
-            flags=re.S,
-        )
-    )
+    mentions_call = bool(re.search(r"\b(?:call|conference|webcast|interview)\b", lower))
     times: list[int] = []
     for match in TIME_RE.finditer(text):
         # A call time alone is not the release time. An explicit release clock
@@ -346,7 +336,16 @@ def _session_from_text(text: str, *, report_day: date) -> str:
             r"\b(?:post|release|issue|publish|report|announce)(?:s|d|ed)?\b", prefix,
         )) and bool(re.search(r"\b(?:results|earnings|release|materials)\b", prefix))
         suffix = re.split(r"[.!?;]", text[match.end():], maxsplit=1)[0].lower()
-        call_clock = bool(re.search(r"\b(?:call|conference|webcast|interview)\b", prefix + " " + suffix))
+        clause = prefix + " " + suffix
+        call_clock = bool(re.search(r"\b(?:call|conference|webcast|interview)\b", clause))
+        release_linked_to_call = bool(re.search(
+            r"(?:issued|released|published|available).{0,80}(?:before|prior to).{0,40}(?:call|conference)",
+            clause,
+        ))
+        if call_clock and release_linked_to_call:
+            call_dates = [_candidate_date(item, report_day) for item in DATE_RE.finditer(clause)]
+            if any(day != report_day for day in call_dates if day is not None):
+                continue
         if mentions_call and not release_linked_to_call and (not release_clock or call_clock):
             continue
         zone = (match.group("zone") or "").lower()
@@ -376,7 +375,12 @@ def _session_from_text(text: str, *, report_day: date) -> str:
                          tzinfo=source_zone).astimezone(ZoneInfo("America/New_York"))
         if clock.date() != report_day:
             continue
-        times.append(clock.hour * 60 + clock.minute)
+        minutes = clock.hour * 60 + clock.minute
+        # "Before a 5pm call" does not prove after-close release. The bound is
+        # sufficient only when the call itself is before the market opens.
+        if call_clock and release_linked_to_call and minutes >= 9 * 60 + 30:
+            continue
+        times.append(minutes)
     if any(minutes < 9 * 60 + 30 for minutes in times):
         return "bmo"
     if any(minutes >= 16 * 60 for minutes in times):
@@ -978,7 +982,7 @@ def headline_mentions_company(
     if not target or not headline:
         return False
 
-    if re.search(rf"(?i)(?:\\$|\\()\\s*{re.escape(target)}\\s*\\)?\\b", headline):
+    if re.search(rf"(?i)(?:\$|\()\s*{re.escape(target)}\s*\)?\b", headline):
         return True
 
     name = _clean_text(company_name or "")
@@ -997,7 +1001,14 @@ def headline_mentions_company(
     ]
     if not company_tokens:
         return False
-    return any(token in headline_words for token in company_tokens)
+    # A shared generic word (American, Capital, Financial, etc.) is not an
+    # issuer identity. The first distinctive name token allows familiar short
+    # forms such as Meta, while ambiguous first tokens require the full name.
+    ambiguous = {"american", "national", "first", "united", "general", "global",
+                 "capital", "financial", "bank", "ares", "blackrock"}
+    if company_tokens[0] in ambiguous:
+        return all(token in headline_words for token in company_tokens)
+    return company_tokens[0] in headline_words
 
 
 def finnhub_article_mentions_company(
@@ -1006,6 +1017,10 @@ def finnhub_article_mentions_company(
     company_name: str | None,
 ) -> bool:
     """Related-ticker tags alone are insufficient evidence for Finnhub news."""
+    issuer = re.search(r"\b(?:NASDAQ|NYSE)(?:\s+(?:GS|GM|CM|American))?\s*[:：]\s*([A-Z][A-Z0-9.-]*)",
+                       str(article.get("summary") or ""), flags=re.I)
+    if issuer and issuer.group(1).upper() != symbol.strip().upper():
+        return False
     return headline_mentions_company(
         str(article.get("headline") or article.get("title") or ""),
         symbol,
@@ -1019,43 +1034,83 @@ def fetch_finnhub_announcements(
     today: date,
     key: str | None,
     company_name: str | None = None,
+    max_requests: int = 12,
+    request_delay: float = 1.05,
 ) -> tuple[list[Announcement], dict[str, Any]]:
     if not key:
         return [], {"status": "missing_key"}
-    status, payload, error = _request_json(
-        "https://finnhub.io/api/v1/company-news",
-        params={
-            "symbol": symbol,
-            "from": (today - timedelta(days=120)).isoformat(),
-            "to": today.isoformat(),
-            "token": key,
-        },
-        secret=key,
-    )
-    if payload is None:
-        return [], {"status": "error", "http_status": status, "error": error}
-    rows = payload if isinstance(payload, list) else []
+    if max_requests < 1:
+        raise ValueError("max_requests must be positive")
+    start = today - timedelta(days=120)
+    end = today
     evidence: list[Announcement] = []
-    for row in rows:
-        if not isinstance(row, dict):
-            continue
-        if not finnhub_article_mentions_company(row, symbol, company_name):
-            continue
-        item = _announcement_from_article(
-            provider="finnhub_company_news",
-            title=str(row.get("headline") or ""),
-            body=str(row.get("summary") or ""),
-            published_on=_parse_iso_day(row.get("datetime")),
-            official=False,
-            url=row.get("url"),
+    seen: set[str] = set()
+    windows: list[dict[str, Any]] = []
+    truncated_days: list[str] = []
+    complete = False
+    error = None
+    status = 0
+    for attempt in range(max_requests):
+        if attempt:
+            time.sleep(request_delay)
+        status, payload, error = _request_json(
+            "https://finnhub.io/api/v1/company-news",
+            params={"symbol": symbol, "from": start.isoformat(),
+                    "to": end.isoformat(), "token": key}, secret=key, retries=0,
         )
-        if item:
-            evidence.append(item)
+        rows = payload if isinstance(payload, list) else []
+        windows.append({"from": start.isoformat(), "to": end.isoformat(),
+                        "articles": len(rows), "http_status": status})
+        if not isinstance(payload, list):
+            error = error or "unexpected_response_shape"
+            break
+        days = []
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            published = _parse_iso_day(row.get("datetime"))
+            if published is None or not start <= published <= end:
+                continue
+            days.append(published)
+            identity = str(row.get("id") or row.get("url") or
+                           (row.get("datetime"), row.get("headline")))
+            if identity in seen:
+                continue
+            seen.add(identity)
+            if not finnhub_article_mentions_company(row, symbol, company_name):
+                continue
+            item = _announcement_from_article(
+                provider="finnhub_company_news", title=str(row.get("headline") or ""),
+                body=str(row.get("summary") or ""), published_on=published,
+                official=False, url=row.get("url"),
+            )
+            if item:
+                evidence.append(item)
+        # The observed provider cap is soft (244-250 rows). Treat 200+ as
+        # potentially truncated, overlap the oldest day, then deduplicate.
+        if len(rows) < 200:
+            complete = not truncated_days
+            break
+        if any(row["date"] >= today.isoformat() and row["timing"] in {"bmo", "amc"}
+               for row in evidence):
+            break
+        if not days:
+            error = "capped_page_without_valid_dates"
+            break
+        oldest = min(days)
+        if oldest == end:
+            truncated_days.append(oldest.isoformat())
+            end = oldest - timedelta(days=1)
+        else:
+            end = oldest
+        if end < start:
+            complete = not truncated_days
+            break
     return evidence, {
-        "status": "ok",
-        "http_status": status,
-        "articles": len(rows),
-        "evidence": len(evidence),
+        "status": "partial" if error else "ok", "http_status": status,
+        "error": error, "articles": len(seen), "evidence": len(evidence),
+        "requests": len(windows), "coverage_complete": complete,
+        "truncated_days": truncated_days, "windows": windows,
     }
 
 
@@ -1585,6 +1640,7 @@ def _collect_announcements(
     alphavantage_delay: float,
     alpha_news_max: int,
     twelvedata_max_symbols: int = 80,
+    finnhub_max_requests: int = 3000,
     company_names: dict[str, str] | None = None,
 ) -> tuple[dict[str, list[Announcement]], dict[str, Any]]:
     evidence: dict[str, list[Announcement]] = defaultdict(list)
@@ -1594,13 +1650,22 @@ def _collect_announcements(
         "alphavantage_news": {},
     }
 
+    if finnhub_max_requests < len(symbols):
+        raise ValueError("news budget must cover one request per candidate")
+    remaining = finnhub_max_requests
     for index, symbol in enumerate(symbols):
+        # Every candidate gets a first page before extra work may consume its
+        # share. High-volume names cannot starve later reporting dates.
+        budget = min(12, remaining - (len(symbols) - index - 1))
         rows, meta = fetch_finnhub_announcements(
             symbol,
             today=today,
             key=finnhub_key,
             company_name=(company_names or {}).get(symbol),
+            max_requests=budget,
+            request_delay=finnhub_delay,
         )
+        remaining -= meta.get("requests", 0)
         evidence[symbol].extend(rows)
         status["finnhub_company_news"][symbol] = meta
         if index + 1 < len(symbols) and finnhub_key:
@@ -1654,7 +1719,7 @@ def main() -> int:
     parser.add_argument("--twelvedata-delay", type=float, default=8.0)
     parser.add_argument("--alphavantage-delay", type=float, default=1.1)
     parser.add_argument("--alpha-news-max", type=int, default=20)
-    parser.add_argument("--announcement-max-symbols", type=int, default=80)
+    parser.add_argument("--announcement-max-symbols", type=int, default=2000)
     parser.add_argument("--twelvedata-max-symbols", type=int, default=80)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()

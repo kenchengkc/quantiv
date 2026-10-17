@@ -42,10 +42,14 @@ def test_recovery_job_has_no_market_data_provider_steps() -> None:
     assert recovery["env"]["PROVIDER_FREE_RECOVERY"] == "1"
     assert "--run-shell {0}" not in str(recovery.get("defaults", {}))
 
-    commands = "\n".join(
-        str(step.get("run", ""))
-        for step in recovery["steps"]
-    )
+    # The provider-free mode must skip the separately authorized calendar
+    # repair step. Its exact condition is part of the execution boundary.
+    repair = [step for step in recovery["steps"]
+              if step.get("env", {}).get("PROVIDER_FREE_RECOVERY") == "0"]
+    assert len(repair) == 1
+    assert repair[0]["if"] == "inputs.refresh_mode == 'calendar-only-recovery'"
+    provider_free_steps = [step for step in recovery["steps"] if step not in repair]
+    commands = "\n".join(str(step.get("run", "")) for step in provider_free_steps)
     forbidden = (
         "sync_dolthub.py",
         "sync_fmp_earnings.py",
@@ -68,7 +72,7 @@ def test_recovery_job_has_no_market_data_provider_steps() -> None:
         "MASSIVE_API_KEY",
         "ALPACA_API_KEY",
     }
-    for step in recovery["steps"]:
+    for step in provider_free_steps:
         assert provider_keys.isdisjoint(step.get("env", {}).keys())
 
     assert "scripts/verify_refresh_recovery.py" in commands

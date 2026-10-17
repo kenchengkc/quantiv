@@ -10,7 +10,7 @@ on:
       refresh_mode:
         description: "Normal refresh, saved-data publication recovery, or bounded DoltHub options catch-up."
         type: choice
-        options: [normal, provider-free-recovery, options-only-recovery]
+        options: [normal, provider-free-recovery, options-only-recovery, calendar-only-recovery]
         default: normal
       recovery_release_id:
         description: "Exact saved data-release id required for either recovery mode."
@@ -42,7 +42,7 @@ permissions:
 
 jobs:
   claim:
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.refresh_mode != 'provider-free-recovery' && inputs.refresh_mode != 'options-only-recovery' }}
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.refresh_mode != 'provider-free-recovery' && inputs.refresh_mode != 'options-only-recovery' && inputs.refresh_mode != 'calendar-only-recovery' }}
     runs-on: ubuntu-latest
     concurrency:
       group: daily-data-refresh-claim
@@ -581,7 +581,7 @@ jobs:
           retention-days: 30
 
   recovery:
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.refresh_mode == 'provider-free-recovery' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && (inputs.refresh_mode == 'provider-free-recovery' || inputs.refresh_mode == 'calendar-only-recovery') }}
     runs-on: ubuntu-latest
     concurrency:
       group: daily-data-refresh-execution
@@ -670,6 +670,51 @@ jobs:
       - name: Gate — verify exact recovery release
         run: |
           bash scripts/run_provider_free.sh             python scripts/verify_refresh_recovery.py               --data-dir data               --expected-release-id "${{ inputs.recovery_release_id }}"               --expected-manifest-id "${{ inputs.recovery_manifest_id }}"
+
+      - name: Reserve provider capacity for calendar recovery
+        if: inputs.refresh_mode == 'calendar-only-recovery'
+        run: python scripts/provider_market_hours.py --admit
+
+      - name: Repair reporting-time evidence from calendar providers
+        if: inputs.refresh_mode == 'calendar-only-recovery'
+        shell: python3 scripts/provider_market_hours.py --run-shell {0}
+        env:
+          PROVIDER_FREE_RECOVERY: '0'
+          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+          FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
+          ALPHAVANTAGE_API_KEY: ${{ secrets.ALPHAVANTAGE_API_KEY }}
+          TWELVEDATA_API_KEY: ${{ secrets.TWELVEDATA_API_KEY }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+        run: |
+          set -euo pipefail
+          python scripts/sync_dolthub.py --earnings
+          python -u scripts/reconcile_earnings_calendar.py --days-ahead 60 --announcement-days-ahead 35
+          python scripts/apply_earnings_overrides.py --allow-missing
+          python scripts/apply_ticker_lifecycle.py
+          python scripts/check_earnings_calendar_integrity.py --require-baseline
+          python scripts/setup_duckdb_from_parquet.py
+          python scripts/build_data_reconciliation.py --max-lag-days 5 --days-ahead 21 --report data/validation/data_reconciliation.json
+          PYTHONPATH=apps/ml:scripts:tools python -c 'from pathlib import Path; from historical_ml_pipeline import prepare_publication_inputs; prepare_publication_inputs(Path("data"))'
+          python scripts/data_release.py verify --data-dir data
+          python scripts/calendar_reference.py build --not-before "$REFRESH_STARTED_AT" --source-revision "$(git rev-parse HEAD)"
+          python scripts/calendar_reference.py verify
+          rclone copyto data/earnings_calendar.csv "r2:${R2_BUCKET:-quantiv-data}/earnings_calendar.csv"
+          rclone copyto data/earnings_calendar.parquet "r2:${R2_BUCKET:-quantiv-data}/earnings_calendar.parquet"
+          rclone copyto data/validation/data_reconciliation.json "r2:${R2_BUCKET:-quantiv-data}/validation/data_reconciliation.json"
+          rclone copyto data/validation/options_snapshot_status.json "r2:${R2_BUCKET:-quantiv-data}/validation/options_snapshot_status.json"
+          bash scripts/r2_push_calendar_reference.sh
+
+      - name: Upload repaired reporting-time evidence
+        if: always() && inputs.refresh_mode == 'calendar-only-recovery'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: calendar-recovery-evidence
+          path: |
+            data/validation/earnings_calendar_reconciliation.json
+            data/validation/data_reconciliation.json
+            data/calendar_reference/current.json
+          if-no-files-found: error
+          retention-days: 30
 
       - name: Rebuild DuckDB views from saved data
         run: bash scripts/run_provider_free.sh python scripts/setup_duckdb_from_parquet.py
