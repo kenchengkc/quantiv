@@ -1631,6 +1631,7 @@ def _collect_announcements(
     alphavantage_delay: float,
     alpha_news_max: int,
     twelvedata_max_symbols: int = 80,
+    finnhub_max_requests: int = 3000,
     company_names: dict[str, str] | None = None,
 ) -> tuple[dict[str, list[Announcement]], dict[str, Any]]:
     evidence: dict[str, list[Announcement]] = defaultdict(list)
@@ -1640,13 +1641,22 @@ def _collect_announcements(
         "alphavantage_news": {},
     }
 
+    if finnhub_max_requests < len(symbols):
+        raise ValueError("news budget must cover one request per candidate")
+    remaining = finnhub_max_requests
     for index, symbol in enumerate(symbols):
+        # Every candidate gets a first page before extra work may consume its
+        # share. High-volume names cannot starve later reporting dates.
+        budget = min(12, remaining - (len(symbols) - index - 1))
         rows, meta = fetch_finnhub_announcements(
             symbol,
             today=today,
             key=finnhub_key,
             company_name=(company_names or {}).get(symbol),
+            max_requests=budget,
+            request_delay=finnhub_delay,
         )
+        remaining -= meta.get("requests", 0)
         evidence[symbol].extend(rows)
         status["finnhub_company_news"][symbol] = meta
         if index + 1 < len(symbols) and finnhub_key:
@@ -1700,7 +1710,7 @@ def main() -> int:
     parser.add_argument("--twelvedata-delay", type=float, default=8.0)
     parser.add_argument("--alphavantage-delay", type=float, default=1.1)
     parser.add_argument("--alpha-news-max", type=int, default=20)
-    parser.add_argument("--announcement-max-symbols", type=int, default=80)
+    parser.add_argument("--announcement-max-symbols", type=int, default=2000)
     parser.add_argument("--twelvedata-max-symbols", type=int, default=80)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()

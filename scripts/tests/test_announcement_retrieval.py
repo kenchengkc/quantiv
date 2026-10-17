@@ -83,3 +83,16 @@ def test_call_or_webcast_cannot_supply_release_session(detail):
 def test_generic_company_word_is_not_issuer_identity():
     assert not calendar.headline_mentions_company('American Electric Power to Report Third-Quarter Earnings', 'AXP', 'American Express Company')
     assert calendar.headline_mentions_company('Example (MSFT) to Report Earnings', 'MSFT', None)
+
+
+def test_total_news_budget_reserves_one_request_per_symbol(monkeypatch):
+    budgets = []
+    def fetch(symbol, **kwargs):
+        budgets.append(kwargs['max_requests'])
+        return [], {'status': 'ok', 'requests': kwargs['max_requests']}
+    monkeypatch.setattr(calendar, 'fetch_finnhub_announcements', fetch)
+    calendar._collect_announcements(['AAA', 'BBB', 'CCC'], today=date(2026,10,17),
+        finnhub_key='test', twelvedata_key=None, alphavantage_key=None,
+        finnhub_delay=0, twelvedata_delay=0, alphavantage_delay=0,
+        alpha_news_max=0, twelvedata_max_symbols=0, finnhub_max_requests=5)
+    assert budgets == [3, 1, 1]
