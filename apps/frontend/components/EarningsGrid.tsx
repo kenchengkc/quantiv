@@ -417,7 +417,7 @@ function TickerRow({
           {movePct != null ? (
             <>
               ±{(movePct * 100).toFixed(1)}
-              <span style={{ fontSize: 9, color: 'currentColor', opacity: 0.72, marginLeft: 1 }}>%</span>
+              <span style={{ fontSize: 9, color: 'currentColor', marginLeft: 1 }}>%</span>
             </>
           ) : (
             <span style={{ fontSize: 11, color: 'var(--ink-4)' }}>{'—'}</span>
