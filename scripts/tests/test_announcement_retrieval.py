@@ -258,6 +258,9 @@ def test_conjunction_separates_release_from_later_call(call):
 @pytest.mark.parametrize('detail', [
     'The conference call and release materials will be discussed at 8:00 a.m. ET.',
     'Management will discuss the conference call and release schedule at 8:00 a.m. ET.',
+    'Management will host a conference call and will release a replay at 4:05 p.m. ET.',
+    'Management will host a conference call at 11:00 a.m. ET and will release a transcript at 4:05 p.m. ET.',
+    'Management will discuss the earnings release at 8:00 a.m. ET and will host a conference call at 11:00 a.m. ET.',
 ])
 def test_release_noun_phrase_cannot_discard_discussion_context(detail):
     text = f'Example will release results on October 29, 2026. {detail}'
