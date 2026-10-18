@@ -165,8 +165,9 @@ def get_upcoming_features(
     *,
     feature_protocol: str = FEATURE_PROTOCOL_LEGACY,
     now: datetime | None = None,
+    include_previous_session: bool = False,
 ) -> pd.DataFrame:
-    """Use the newest available completed price session within one-session grace."""
+    """Build completed-session inputs within the existing one-session grace."""
     protocol = resolve_feature_protocol({"feature_protocol": feature_protocol})
     current = now or datetime.now(timezone.utc)
     if current.tzinfo is None:
@@ -179,18 +180,24 @@ def get_upcoming_features(
     ).fetchone()[0]
     if snapshot_date is None:
         return pd.DataFrame()
+    snapshot_dates = (
+        [session for session in sessions if session <= snapshot_date]
+        if include_previous_session else [snapshot_date]
+    )
     if protocol == FEATURE_PROTOCOL_CAUSAL:
         features = build_causal_features(
             conn, start_date=today, end_date=today + timedelta(days=days_ahead),
             as_of_date=snapshot_date,
         )
         features = features.loc[
-            pd.to_datetime(features["snapshot_date"]).dt.date.eq(snapshot_date)
+            pd.to_datetime(features["snapshot_date"]).dt.date.isin(snapshot_dates)
         ].reset_index(drop=True)
     else:
-        features = _get_legacy_upcoming_features(
-            conn, days_ahead, today=today, snapshot_date=snapshot_date,
-        )
+        frames = [_get_legacy_upcoming_features(
+            conn, days_ahead, today=today, snapshot_date=session,
+        ) for session in snapshot_dates]
+        populated = [frame for frame in frames if not frame.empty]
+        features = pd.concat(populated, ignore_index=True) if populated else frames[0]
     if not features.empty:
         try:
             from event_forecast_ledger import event_cutoffs
@@ -226,7 +233,7 @@ def score_upcoming_models(
     conn: duckdb.DuckDBPyConnection, models: Dict[int, dict], days_ahead: int,
     *, now: datetime | None = None,
 ) -> pd.DataFrame:
-    """Construct each protocol once and score each head on its own inputs."""
+    """Prefer the newest admitted exact head within one-session source grace."""
     results = []
     current = now or datetime.now(timezone.utc)
     protocols = {resolve_feature_protocol(entry.get("metadata") or {})
@@ -236,12 +243,21 @@ def score_upcoming_models(
                    if resolve_feature_protocol(entry.get("metadata") or {}) == protocol}
         frame = get_upcoming_features(
             conn, days_ahead, feature_protocol=protocol, now=current,
+            include_previous_session=True,
         )
         if not frame.empty:
             result = score(frame, entries)
             if not result.empty:
                 results.append(result)
-    return pd.concat(results, ignore_index=True) if results else pd.DataFrame()
+    if not results:
+        return pd.DataFrame()
+    forecasts = pd.concat(results, ignore_index=True)
+    # Score each observation with its actual lead and cohort before selecting.
+    # An older source can fill a coverage gap only while the unchanged freshness
+    # policy permits it; it never replaces an admitted newer observation.
+    return (forecasts.sort_values("snapshot_date", ascending=False, kind="stable")
+            .drop_duplicates(["act_symbol", "earnings_date"], keep="first")
+            .reset_index(drop=True))
 
 
 def get_bundle_forecasts(
