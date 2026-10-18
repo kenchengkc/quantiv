@@ -922,15 +922,21 @@ def _announcement_from_article(
     if any(term in f" {_clean_text(title).lower()} " for term in HOST_TITLE_ACTIONS):
         # Hosting a call does not establish when earnings are released. These
         # titles are useful only when the body separately announces results.
-        release_action = re.search(
-            r"\b(?:will|to)\s+(?:(?:be|also|publicly|electronically|formally)\s+){0,2}"
-            r"(?:release|issue|publish|post|report|announce)(?:d|ed)?\b", _clean_text(body), re.I,
-        )
-        availability = re.search(
-            r"\b(?:financial results|results|earnings release|earnings|materials)\b"
-            r"[^.!?]{0,120}\bwill be\s+(?:made\s+)?available\b", _clean_text(body), re.I,
-        )
-        if not release_action and not availability:
+        release_object = r"\b(?:financial results|results|earnings release|earnings(?!\s+(?:call|conference|webcast)))\b"
+        action = r"\b(?:will|to)\s+(?:(?:also|publicly|electronically|formally)\s+){0,2}(?:release|issue|publish|post|report|announce)\b"
+        nonrelease = r"\b(?:call|conference|webcast|replay|discussion|discuss)\b"
+        statements = re.split(r"[.!?;]\s+(?=[A-Z])", _clean_text(body))
+        release_statement = False
+        for statement in statements:
+            active = re.search(action + r"(?P<object>[^.!?]{0,120}?)" + release_object, statement, re.I)
+            passive = re.search(release_object + r"(?P<object>[^.!?]{0,120}?)"
+                                r"\bwill be\s+(?:made\s+)?(?:available|released|issued|published|posted|reported|announced)\b",
+                                statement, re.I)
+            if active and not re.search(nonrelease, active.group("object"), re.I):
+                release_statement = True
+            if passive and not re.search(nonrelease, statement[:passive.end()], re.I):
+                release_statement = True
+        if not release_statement:
             return None
     parsed = extract_earnings_announcement(
         f"{title}. {body}",

@@ -84,10 +84,14 @@ def test_host_or_planned_webcast_announcement_keeps_explicit_release_evidence(ti
     'Example Plans Live Audio Webcast of Third Quarter 2026 Earnings Conference Call',
 ])
 @pytest.mark.parametrize('history', ['', 'Example reported its last quarterly results on July 21, 2026. '])
-def test_host_announcement_without_release_statement_cannot_move_earnings_date(title, history):
+@pytest.mark.parametrize('replay', [
+    '', ' A replay of the earnings conference call will be available on the investor website.',
+    ' Example will post a replay of the webcast following the call.',
+])
+def test_host_announcement_without_release_statement_cannot_move_earnings_date(title, history, replay):
     assert calendar._announcement_from_article(
         provider='finnhub_company_news', title=title,
-        body=history + 'The conference call will take place on October 21, 2026 at 7:00 a.m. ET.',
+        body=history + 'The conference call will take place on October 21, 2026 at 7:00 a.m. ET.' + replay,
         published_on=date(2026, 10, 1), official=False, url='https://example.com/earnings',
     ) is None
 
