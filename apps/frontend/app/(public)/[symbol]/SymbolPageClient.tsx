@@ -737,7 +737,7 @@ export default function SymbolPage({
     earningsDate,
   );
   const staticDisplayPct = compatDisplayForecast.pct;
-  // Upcoming heroes use eligible ML or an explicit unavailable state.
+  // Upcoming heroes use the ranked ML, IV, straddle, and historical estimate.
   // Reported events retain their frozen forecast history.
   // Spot-updated ML remains a separate interactive comparison and does not
   // rewrite the frozen static research snapshot.

@@ -1171,7 +1171,8 @@ export default function WatchlistPage() {
                       color: useLiveMl
                         ? 'var(--accent)'
                         : staticDisplay.method === 'options_math' ||
-                            staticDisplay.method === 'options_indicative'
+                            staticDisplay.method === 'options_indicative' ||
+                            staticDisplay.method === 'straddle_implied'
                           ? 'var(--brand-blue-1)'
                           : 'var(--ink-4)',
                       visibility: moveLabel ? 'visible' : 'hidden',

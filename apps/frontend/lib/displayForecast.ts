@@ -3,6 +3,7 @@ export type DisplayForecastMethod =
   | 'ml_unavailable'
   | 'options_math'
   | 'options_indicative'
+  | 'straddle_implied'
   | 'historical'
   | 'historical_prior';
 
@@ -61,10 +62,12 @@ export function displayForecastLabel(method: DisplayForecastMethod | null | unde
     case 'ml':
       return 'ML forecast';
     case 'ml_unavailable':
-      return 'ML unavailable';
+      return 'Forecast unavailable';
     case 'options_math':
     case 'options_indicative':
       return 'IV forecast';
+    case 'straddle_implied':
+      return 'Straddle implied';
     case 'historical':
       return 'Historical median';
     case 'historical_prior':
@@ -79,6 +82,7 @@ export function displayForecastClass(method: DisplayForecastMethod | null | unde
     case 'ml':
       return 'qv-forecast qv-forecast--ml';
     case 'options_math':
+    case 'straddle_implied':
       return 'qv-forecast qv-forecast--options';
     case 'options_indicative':
       return 'qv-forecast qv-forecast--indicative';
@@ -94,7 +98,7 @@ export function displayForecastClass(method: DisplayForecastMethod | null | unde
 export function isOptionsDisplayForecast(
   method: DisplayForecastMethod | null | undefined,
 ): boolean {
-  return method === 'options_math' || method === 'options_indicative';
+  return method === 'options_math' || method === 'options_indicative' || method === 'straddle_implied';
 }
 
 export function isHistoricalDisplayForecast(
@@ -107,7 +111,7 @@ export function finiteDisplayForecast(value: number | null | undefined): number 
   return value != null && Number.isFinite(value) && value > 0 ? value : null;
 }
 
-/** Resolve an upcoming ML headline while retaining reported-history compatibility. */
+/** Resolve ML, IV, straddle, then history without reviving held model/option inputs. */
 export function resolveDisplayForecastCompat(
   fields: LegacyDisplayForecastFields | null | undefined,
   historicalFallbackPct: number | null | undefined = null,
@@ -117,15 +121,7 @@ export function resolveDisplayForecastCompat(
   const today = MARKET_DATE_FORMAT.format(new Date());
   const hasActual = [fields?.eps_actual, fields?.revenue_actual, fields?.actual, fields?.realized_move_pct]
     .some((value) => value != null && Number.isFinite(value));
-  if (fields?.display_forecast_method === 'ml_unavailable') return { pct: null, method: 'ml_unavailable' };
-  if (eventDate && eventDate >= today && !hasActual) {
-    const ml = fields?.ml_publication_status === 'eligible' &&
-      (fields.ml_status == null || fields.ml_status === 'available')
-      ? finiteDisplayForecast(fields.em_ml_pct) ??
-        (fields.display_forecast_method === 'ml' ? finiteDisplayForecast(fields.display_forecast_pct) : null)
-      : null;
-    return ml != null ? { pct: ml, method: 'ml' } : { pct: null, method: 'ml_unavailable' };
-  }
+  const upcoming = Boolean(eventDate && eventDate >= today && !hasActual);
   const explicitHistorical = finiteDisplayForecast(historicalFallbackPct);
   if (!fields) {
     return explicitHistorical != null
@@ -133,7 +129,15 @@ export function resolveDisplayForecastCompat(
       : { pct: null, method: null };
   }
 
-  const mlHeld = fields.ml_publication_status === 'held';
+  const mlHeld = fields.ml_publication_status === 'held' ||
+    fields.display_forecast_method === 'ml_unavailable' ||
+    (upcoming && (fields.ml_publication_status !== 'eligible' ||
+      (fields.ml_status != null && fields.ml_status !== 'available')));
+  if (!upcoming && fields.display_forecast_method === 'ml_unavailable') {
+    return { pct: null, method: 'ml_unavailable' };
+  }
+  const optionsHeld = (!eventDate || upcoming) &&
+    (fields.options_publication_status === 'held' || fields.options_status === 'unavailable');
   const ml = mlHeld ? null : finiteDisplayForecast(fields.em_ml_pct);
   if (ml != null) return { pct: ml, method: 'ml' };
 
@@ -157,20 +161,24 @@ export function resolveDisplayForecastCompat(
     return { pct: canonical, method: fields.display_forecast_method };
   }
 
-  const iv =
-    finiteDisplayForecast(fields.em_iv_pct) ??
-    finiteDisplayForecast(fields.iv_pct);
+  const iv = optionsHeld ? null :
+    finiteDisplayForecast(fields.em_iv_pct) ?? finiteDisplayForecast(fields.iv_pct);
   if (iv != null) return { pct: iv, method: 'options_math' };
 
-  const straddle =
-    finiteDisplayForecast(fields.em_straddle_pct) ??
-    finiteDisplayForecast(fields.straddle_pct);
-  if (straddle != null) return { pct: straddle, method: 'options_math' };
+  if (!optionsHeld && canonical != null &&
+    (fields.display_forecast_method === 'options_math' || fields.display_forecast_method === 'options_indicative')) {
+    return { pct: canonical, method: fields.display_forecast_method };
+  }
+
+  const straddle = optionsHeld ? null :
+    finiteDisplayForecast(fields.em_straddle_pct) ?? finiteDisplayForecast(fields.straddle_pct);
+  if (straddle != null) return { pct: straddle, method: 'straddle_implied' };
 
   if (
-    canonical != null &&
+    !optionsHeld && canonical != null &&
     (fields.display_forecast_method === 'options_math' ||
-      fields.display_forecast_method === 'options_indicative')
+      fields.display_forecast_method === 'options_indicative' ||
+      fields.display_forecast_method === 'straddle_implied')
   ) {
     return { pct: canonical, method: fields.display_forecast_method };
   }
@@ -181,16 +189,15 @@ export function resolveDisplayForecastCompat(
       fields.display_forecast_method === 'historical_prior')
       ? canonical
       : null;
-  const historical =
-    explicitHistorical ??
-    canonicalHistorical ??
-    finiteDisplayForecast(fields.hist_move_med_4q) ??
-    finiteDisplayForecast(fields.hist_move_avg_4q);
+  const sourceHistorical = canonicalHistorical ?? finiteDisplayForecast(fields.hist_move_med_4q);
+  const historical = upcoming
+    ? sourceHistorical ?? ('hist_move_med_4q' in fields ? null : explicitHistorical)
+    : explicitHistorical ?? sourceHistorical ?? finiteDisplayForecast(fields.hist_move_avg_4q);
   if (historical != null) {
     return {
       pct: historical,
       method:
-        explicitHistorical != null
+        explicitHistorical != null && (!upcoming || sourceHistorical == null)
           ? 'historical'
           : canonicalHistorical != null
             ? fields.display_forecast_method ?? 'historical'
@@ -198,13 +205,14 @@ export function resolveDisplayForecastCompat(
     };
   }
 
-  if (canonical != null) {
+  if (canonical != null && !(optionsHeld && isOptionsDisplayForecast(fields.display_forecast_method))) {
     return {
       pct: canonical,
       method: fields.display_forecast_method ?? null,
     };
   }
 
-  return { pct: null, method: mlHeld && fields.display_forecast_method === 'ml'
-    ? null : fields.display_forecast_method ?? null };
+  return { pct: null, method: upcoming || fields.display_forecast_method === 'ml_unavailable'
+    ? 'ml_unavailable' : mlHeld && fields.display_forecast_method === 'ml'
+      ? null : fields.display_forecast_method ?? null };
 }

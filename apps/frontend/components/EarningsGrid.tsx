@@ -120,13 +120,14 @@ function fmtMovePct(v: number | null | undefined, digits = 1) {
 
 function legacyForecastMethod(ev: EarningsEvent): DisplayForecastMethod | null {
   if (ev.ml_publication_status !== 'held' && ev.em_ml_pct != null) return 'ml';
-  if (ev.em_iv_pct != null || ev.em_straddle_pct != null) return 'options_math';
+  if (ev.em_iv_pct != null) return 'options_math';
+  if (ev.em_straddle_pct != null) return 'straddle_implied';
   return null;
 }
 
 function forecastClass(method: DisplayForecastMethod | null): string {
   if (method === 'ml') return `${forecastStyles.base} ${forecastStyles.ml}`;
-  if (method === 'options_math') return `${forecastStyles.base} ${forecastStyles.options}`;
+  if ((method === 'options_math' || method === 'straddle_implied')) return `${forecastStyles.base} ${forecastStyles.options}`;
   if (method === 'options_indicative') return `${forecastStyles.base} ${forecastStyles.indicative}`;
   if (method === 'historical') return `${forecastStyles.base} ${forecastStyles.historical}`;
   if (method === 'historical_prior') return `${forecastStyles.base} ${forecastStyles.prior}`;
@@ -419,7 +420,7 @@ function TickerRow({
               <span style={{ fontSize: 9, color: 'currentColor', opacity: 0.72, marginLeft: 1 }}>%</span>
             </>
           ) : (
-            <span style={{ fontSize: 11, color: 'var(--ink-4)' }}>{method === 'ml_unavailable' ? 'ML unavailable' : '—'}</span>
+            <span style={{ fontSize: 11, color: 'var(--ink-4)' }}>{'—'}</span>
           )}
         </div>
         {bandLo != null && bandHi != null && (

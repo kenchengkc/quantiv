@@ -135,7 +135,7 @@ export interface SymbolDetail {
     p75?: number | null;
     p90?: number | null;
     display_forecast_pct?: number | null;
-    display_forecast_method?: 'ml' | 'ml_unavailable' | 'options_math' | 'options_indicative' | 'historical' | 'historical_prior' | null;
+    display_forecast_method?: 'ml' | 'ml_unavailable' | 'options_math' | 'options_indicative' | 'straddle_implied' | 'historical' | 'historical_prior' | null;
     display_forecast_as_of?: string | null;
     forecast_frozen?: boolean;
     forecast_id?: string | null;

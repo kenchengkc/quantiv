@@ -50,7 +50,7 @@ describe('display forecast helpers', () => {
     });
     expect(resolveDisplayForecastCompat({ em_ml_pct: null, em_straddle_pct: 0.11 })).toEqual({
       pct: 0.11,
-      method: 'options_math',
+      method: 'straddle_implied',
     });
     expect(resolveDisplayForecastCompat({ em_ml_pct: null, straddle_pct: 0.09, iv_pct: 0.10 })).toEqual({
       pct: 0.10,
@@ -127,19 +127,19 @@ describe('display forecast helpers', () => {
         .toEqual({ pct: 0.12, method: 'ml' });
       expect(resolveDisplayForecastCompat({
         ...fields, options_publication_source_date: '2026-09-15',
-      }, 0.06)).toEqual({ pct: 0.20, method: 'options_math' });
+      }, 0.06)).toEqual({ pct: 0.06, method: 'historical' });
     },
   );
 });
 
 
-describe('upcoming ML headline contract', () => {
+describe('upcoming ranked forecast contract', () => {
   it.each(['historical', 'historical_prior', 'options_math', 'options_indicative'] as const)(
-    'does not resurrect %s from upcoming legacy payloads', (method) => {
+    'uses independent IV ahead of %s when ML is unavailable', (method) => {
       expect(resolveDisplayForecastCompat({
         earnings_date: '2099-10-21', display_forecast_method: method,
         display_forecast_pct: 0.08, em_iv_pct: 0.12, hist_move_med_4q: 0.09,
-      }, 0.10)).toEqual({ pct: null, method: 'ml_unavailable' });
+      }, 0.10)).toEqual({ pct: 0.12, method: 'options_math' });
     },
   );
   it('requires eligible ML publication on upcoming rows', () => {
@@ -150,14 +150,14 @@ describe('upcoming ML headline contract', () => {
     expect(resolveDisplayForecastCompat({
       earnings_date: '2099-10-21', em_ml_pct: 0.07,
       ml_publication_status: 'held', em_iv_pct: 0.12,
-    })).toEqual({ pct: null, method: 'ml_unavailable' });
+    })).toEqual({ pct: 0.12, method: 'options_math' });
     expect(resolveDisplayForecastCompat({
       earnings_date: '2099-10-21', em_ml_pct: 0.07,
     })).toEqual({ pct: null, method: 'ml_unavailable' });
   });
-  it('does not use symbol history when an upcoming hero has no expected-move row', () => {
+  it('uses historical median when an upcoming hero has no model or options', () => {
     expect(resolveDisplayForecastCompat({}, 0.09, '2099-10-21'))
-      .toEqual({ pct: null, method: 'ml_unavailable' });
+      .toEqual({ pct: 0.09, method: 'historical' });
   });
   it('preserves a reported forecast even when actual EPS is zero', () => {
     expect(resolveDisplayForecastCompat({
@@ -166,7 +166,7 @@ describe('upcoming ML headline contract', () => {
     })).toEqual({ pct: 0.08, method: 'historical' });
   });
   it('labels the unavailable state explicitly', () => {
-    expect(displayForecastLabel('ml_unavailable')).toBe('ML unavailable');
+    expect(displayForecastLabel('ml_unavailable')).toBe('Forecast unavailable');
   });
 });
 
@@ -176,4 +176,29 @@ it('preserves explicit unavailable publication even beside stale eligible raw ML
     display_forecast_method: 'ml_unavailable', display_forecast_pct: null,
     em_ml_pct: 0.07, ml_publication_status: 'eligible',
   })).toEqual({ pct: null, method: 'ml_unavailable' });
+});
+
+it('uses the ranked future fallbacks with accurate source labels', () => {
+  const fields = { earnings_date: '2099-10-21', display_forecast_method: 'ml_unavailable',
+    ml_publication_status: 'held', em_ml_pct: .5, em_iv_pct: .09,
+    em_straddle_pct: .08, hist_move_med_4q: .04 } as const;
+  expect(resolveDisplayForecastCompat(fields)).toEqual({ pct: .09, method: 'options_math' });
+  expect(resolveDisplayForecastCompat({ ...fields, em_iv_pct: null }))
+    .toEqual({ pct: .08, method: 'straddle_implied' });
+  expect(resolveDisplayForecastCompat({ ...fields, options_publication_status: 'held' }))
+    .toEqual({ pct: .04, method: 'historical' });
+  expect(displayForecastLabel('straddle_implied')).toBe('Straddle implied');
+});
+
+it('keeps available IV ahead of straddle and source history ahead of later compact outcomes', () => {
+  expect(resolveDisplayForecastCompat({ earnings_date: '2099-10-21',
+    display_forecast_method: 'options_indicative', display_forecast_pct: .09,
+    options_status: 'indicative', straddle_pct: .08,
+  })).toEqual({ pct: .09, method: 'options_indicative' });
+  expect(resolveDisplayForecastCompat({ earnings_date: '2099-10-21',
+    hist_move_med_4q: .04, options_status: 'unavailable', iv_pct: .9,
+  }, .15)).toEqual({ pct: .04, method: 'historical' });
+  expect(resolveDisplayForecastCompat({ earnings_date: '2099-10-21',
+    hist_move_med_4q: null,
+  }, .15).pct).toBeNull();
 });

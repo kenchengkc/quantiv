@@ -236,8 +236,8 @@ def test_builder_rebuilds_all_surfaces_from_verified_stale_fallback(tmp_path, mo
         if payload.get('expected_move'):
             nodes.append(payload['expected_move'])
         for node in nodes:
-            assert node['display_forecast_method'] == 'ml_unavailable'
-            assert node['display_forecast_pct'] is None
+            assert node['display_forecast_method'] == 'historical'
+            assert node['display_forecast_pct'] == pytest.approx(.055)
             assert node['options_status'] == 'unavailable'
             assert node.get('em_iv_pct') is None
             assert node.get('iv_pct') is None

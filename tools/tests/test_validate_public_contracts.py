@@ -562,28 +562,28 @@ def test_source_level_research_history_rejects_future_retired_earnings_source(
 
 
 @pytest.mark.parametrize("method", ["historical", "historical_prior", "options_math", "options_indicative"])
-def test_upcoming_signature_cannot_resolve_independent_context_as_a_headline(method):
+def test_upcoming_signature_prefers_iv_over_independent_history(method):
     assert contracts._resolved_forecast_signature({
         "earnings_date": "2099-10-21", "display_forecast_pct": 0.08,
         "display_forecast_method": method, "em_iv_pct": 0.12,
         "hist_move_med_4q": 0.09,
-    }, historical_fallback=0.10) is None
+    }, historical_fallback=0.10) == ("options_math", 0.12)
 
 
 def test_upcoming_signature_requires_eligible_ml_and_preserves_reported_history():
     event = {"earnings_date": "2099-10-21", "em_ml_pct": 0.07,
              "display_forecast_pct": 0.08, "display_forecast_method": "historical"}
-    assert contracts._resolved_forecast_signature({**event, "ml_publication_status": "held"}) is None
+    assert contracts._resolved_forecast_signature({**event, "ml_publication_status": "held"}) == ("historical", 0.08)
     assert contracts._resolved_forecast_signature({**event, "ml_publication_status": "eligible"}) == ("ml", 0.07)
     assert contracts._resolved_forecast_signature({**event, "em_ml_pct": None, "eps_actual": 0}) == ("historical", 0.08)
 
 
-def test_upcoming_symbol_signature_never_reconstructs_headline_from_history():
+def test_upcoming_symbol_signature_uses_prior_historical_median():
     symbol = {"expected_move": {}, "earnings_history": [
         {"date": "2026-07-16", "actual": 0.09},
         {"date": "2026-04-16", "actual": -0.07},
     ]}
-    assert contracts._symbol_page_signature(symbol, "2099-10-21")[0] is None
+    assert contracts._symbol_page_signature(symbol, "2099-10-21")[0] == ("historical", 0.08)
 
 
 @pytest.mark.parametrize("mutation", [

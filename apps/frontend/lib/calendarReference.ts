@@ -46,7 +46,7 @@ const KNOWN_SESSIONS = new Set(['bmo', 'amc', 'dmh']);
 
 type LegacyForecastOverlay = {
   display_forecast_pct?: number | null;
-  display_forecast_method?: 'ml' | 'ml_unavailable' | 'options_math' | 'options_indicative' | 'historical' | 'historical_prior' | null;
+  display_forecast_method?: 'ml' | 'ml_unavailable' | 'options_math' | 'options_indicative' | 'straddle_implied' | 'historical' | 'historical_prior' | null;
   em_ml_pct?: number | null;
   em_straddle_pct?: number | null;
   em_iv_pct?: number | null;
@@ -58,7 +58,7 @@ function historicalCompatPct(event: LegacyForecastOverlay | null | undefined): n
   if (!event) return null;
   const resolved = resolveDisplayForecastCompat({
     hist_move_med_4q: event.hist_move_med_4q,
-    hist_move_avg_4q: event.hist_move_avg_4q,
+
   });
   return resolved.method === 'historical' ? resolved.pct : null;
 }
@@ -113,8 +113,8 @@ function addDays(iso: string, days: number): string {
  * both sides are still unknown.
  *
  * A revised ticker/date or a conflicting known session rejects old model
- * metrics. Upcoming rows require eligible ML and otherwise remain explicitly
- * unavailable. Retained reported rows keep their historical compatibility
+ * metrics. Compatible rows use ML, IV, straddle, then historical estimates.
+ * Retained reported rows keep their historical compatibility
  * estimates while older research releases are still readable.
  *
  * The reference is authoritative only inside its declared publication window.
@@ -172,22 +172,12 @@ export function mergeCalendarReference<
         const compatForecast = resolveDisplayForecastCompat(
           researchMatch as TEvent & LegacyForecastOverlay,
         );
-        // Retained releases may predate the current headline contract.
-        // Suppress upcoming fallback values and retain reported compatibility.
-        const displayCompat =
-          compatForecast.method === 'ml_unavailable'
-            ? { display_forecast_pct: null, display_forecast_method: 'ml_unavailable' as const }
-            : compatForecast.method === 'historical' && compatForecast.pct != null
-            ? {
-                display_forecast_pct: compatForecast.pct,
-                display_forecast_method: 'historical' as const,
-              }
-            : compatForecast.pct == null && legacyHistoricalPrior != null
-              ? {
-                  display_forecast_pct: legacyHistoricalPrior,
-                  display_forecast_method: 'historical_prior' as const,
-                }
-              : {};
+        const displayCompat = compatForecast.pct != null
+          ? compatForecast.method === 'ml' ? {}
+            : { display_forecast_pct: compatForecast.pct, display_forecast_method: compatForecast.method }
+          : event.earnings_date < localTodayIso() && legacyHistoricalPrior != null
+            ? { display_forecast_pct: legacyHistoricalPrior, display_forecast_method: 'historical_prior' as const }
+            : {};
         return {
           ...researchMatch,
           ...displayCompat,
@@ -204,19 +194,16 @@ export function mergeCalendarReference<
         };
       }
 
-      // A revised identity cannot inherit a stale forecast. Upcoming events
-      // stay unavailable; reported rows retain legacy historical compatibility.
+      // A revised identity cannot inherit ML/options tied to a different event.
+      // Its historical context remains usable as a labeled fallback.
       const tickerHistoricalPct = legacyHistoryByTicker.get(event.ticker) ?? null;
-      const upcomingUnavailable = resolveDisplayForecastCompat({}, null, event.earnings_date).method === 'ml_unavailable';
       const fallbackDisplay =
-        upcomingUnavailable
-          ? { display_forecast_pct: null, display_forecast_method: 'ml_unavailable' as const }
-          : tickerHistoricalPct != null
+        tickerHistoricalPct != null
           ? {
               display_forecast_pct: tickerHistoricalPct,
               display_forecast_method: 'historical' as const,
             }
-          : legacyHistoricalPrior != null
+          : event.earnings_date < localTodayIso() && legacyHistoricalPrior != null
             ? {
                 display_forecast_pct: legacyHistoricalPrior,
                 display_forecast_method: 'historical_prior' as const,

@@ -24,6 +24,7 @@ DISPLAY_FORECAST_METHODS = {
     "ml_unavailable",
     "options_math",
     "options_indicative",
+    "straddle_implied",
     "historical",
     "historical_prior",
 }
@@ -180,24 +181,24 @@ def _resolved_forecast_signature(
         and math.isfinite(fields[key])
         for key in ("eps_actual", "revenue_actual", "actual", "realized_move_pct")
     )
-    if fields.get("display_forecast_method") == "ml_unavailable":
-        return None
-    if event_date >= today and not reported:
-        if fields.get("ml_publication_status") != "eligible" or fields.get("ml_status") not in {None, "available"}:
-            return None
-        ml = _positive_optional(fields.get("em_ml_pct"))
-        if ml is None and fields.get("display_forecast_method") == "ml":
-            ml = _positive_optional(fields.get("display_forecast_pct"))
-        return ("ml", ml) if ml is not None else None
+    upcoming = bool(event_date and event_date >= today and not reported)
     explicit_historical = _positive_optional(historical_fallback)
     if not payload:
         return ("historical", explicit_historical) if explicit_historical else None
 
-    ml = None if payload.get("ml_publication_status") == "held" else _positive_optional(payload.get("em_ml_pct"))
+    ml_held = (payload.get("ml_publication_status") == "held"
+               or payload.get("display_forecast_method") == "ml_unavailable"
+               or upcoming and (payload.get("ml_publication_status") != "eligible"
+                                or payload.get("ml_status") not in {None, "available"}))
+    if not upcoming and payload.get("display_forecast_method") == "ml_unavailable":
+        return None
+    options_held = (not event_date or upcoming) and (
+        payload.get("options_publication_status") == "held" or payload.get("options_status") == "unavailable")
+    ml = None if ml_held else _positive_optional(payload.get("em_ml_pct"))
     if ml is not None:
         return ("ml", ml)
 
-    canonical = _positive_optional(payload.get("display_forecast_pct"))
+    canonical = None if ml_held and payload.get("display_forecast_method") == "ml" else _positive_optional(payload.get("display_forecast_pct"))
     canonical_method = payload.get("display_forecast_method")
     if canonical is not None and canonical_method == "ml" and payload.get("ml_publication_status") != "held":
         return ("ml", canonical)
@@ -214,21 +215,23 @@ def _resolved_forecast_signature(
     ):
         return (str(canonical_method), canonical)
 
-    iv = _positive_optional(payload.get("em_iv_pct"))
-    if iv is None:
+    iv = None if options_held else _positive_optional(payload.get("em_iv_pct"))
+    if iv is None and not options_held:
         iv = _positive_optional(payload.get("iv_pct"))
     if iv is not None:
         return ("options_math", iv)
 
-    straddle = _positive_optional(payload.get("em_straddle_pct"))
-    if straddle is None:
+    if not options_held and canonical is not None and canonical_method in {"options_math", "options_indicative"}:
+        return (str(canonical_method), canonical)
+
+    straddle = None if options_held else _positive_optional(payload.get("em_straddle_pct"))
+    if straddle is None and not options_held:
         straddle = _positive_optional(payload.get("straddle_pct"))
     if straddle is not None:
-        return ("options_math", straddle)
+        return ("straddle_implied", straddle)
 
-    if canonical is not None and canonical_method in {
-        "options_math",
-        "options_indicative",
+    if not options_held and canonical is not None and canonical_method in {
+        "options_math", "options_indicative", "straddle_implied",
     }:
         return (str(canonical_method), canonical)
 
@@ -238,23 +241,21 @@ def _resolved_forecast_signature(
         and canonical_method in {"historical", "historical_prior"}
         else None
     )
-    historical = (
-        explicit_historical
-        or canonical_historical
-        or _positive_optional(payload.get("hist_move_med_4q"))
-        or _positive_optional(payload.get("hist_move_avg_4q"))
-    )
+    source_historical = canonical_historical or _positive_optional(payload.get("hist_move_med_4q"))
+    historical = (source_historical or (None if "hist_move_med_4q" in payload else explicit_historical)
+                  if upcoming else explicit_historical or source_historical
+                  or _positive_optional(payload.get("hist_move_avg_4q")))
     if historical is not None:
         method = (
             "historical"
-            if explicit_historical is not None
+            if explicit_historical is not None and (not upcoming or source_historical is None)
             else str(canonical_method or "historical")
             if canonical_historical is not None
             else "historical"
         )
         return (method, historical)
 
-    if canonical is not None:
+    if canonical is not None and not (options_held and canonical_method in {"options_math", "options_indicative", "straddle_implied"}):
         return (str(canonical_method), canonical) if canonical_method else None
     return None
 

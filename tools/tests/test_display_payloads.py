@@ -103,7 +103,7 @@ def test_display_status_excludes_event_day_from_upcoming_coverage(frozen_method)
     assert status["with_display_forecast"] == 1
     assert status["coverage_pct"] == 1.0
     assert status["method_mix"] == {
-        "ml": 1, "ml_unavailable": 0, "options_math": 0, "options_indicative": 0,
+        "ml": 1, "ml_unavailable": 0, "options_math": 0, "options_indicative": 0, "straddle_implied": 0,
         "historical": 0, "historical_prior": 0,
     }
 
@@ -410,11 +410,11 @@ def test_held_options_enrichment_clears_legacy_inputs_and_passes_display_contrac
     assert event["em_straddle_pct"] is None
     assert event["em_straddle_abs"] is None
     assert event["atm_iv"] is None
-    assert event["em_method"] == "ml_unavailable"
-    assert event["display_forecast_method"] == "ml_unavailable"
-    assert event["display_forecast_pct"] is None
+    assert event["em_method"] == "historical"
+    assert event["display_forecast_method"] == "historical"
+    assert event["display_forecast_pct"] == pytest.approx(.04)
     assert event["options_status"] == "unavailable"
-    assert event["fallback_reason"] is None
+    assert event["fallback_reason"] == "options_held"
     validate_upcoming_display_forecasts(
         [("A", date(2026, 9, 23), "bmo")],
         {date(2026, 9, 21): _payload(event)},
@@ -484,8 +484,8 @@ def test_held_options_projection_suppresses_retained_surfaces_without_resurrecti
 
     for relative in ("weekly.json", "screener.json", "weeks/2026-09-21.json", "weeks/retained.json"):
         events = json.loads((tmp_path / relative).read_text())["events"]
-        assert events[0]["display_forecast_method"] == ("ml_unavailable" if publication_held else "ml")
-        assert events[0]["display_forecast_pct"] == (None if publication_held else pytest.approx(0.06))
+        assert events[0]["display_forecast_method"] == ("historical" if publication_held else "ml")
+        assert events[0]["display_forecast_pct"] == pytest.approx(0.04 if publication_held else 0.06)
         assert events[0]["em_iv_pct"] is None
         assert events[0]["em_straddle_pct"] is None
         assert events[0]["options_status"] == "unavailable"
@@ -497,7 +497,7 @@ def test_held_options_projection_suppresses_retained_surfaces_without_resurrecti
     assert rebuilt["expected_move"]["iv_pct"] is None
     assert rebuilt["expected_move"]["straddle_pct"] is None
     assert rebuilt["as_of_date"] == "2026-09-16"
-    assert rebuilt["expected_move"]["display_forecast_method"] == ("ml_unavailable" if publication_held else "ml")
+    assert rebuilt["expected_move"]["display_forecast_method"] == ("historical" if publication_held else "ml")
     assert rebuilt["earnings_history"][0]["implied"] is None
     assert rebuilt["earnings_history"][0]["implied_atm_iv"] is None
     assert rebuilt["earnings_history"][0]["implied_dte"] is None
@@ -539,11 +539,12 @@ def test_ml_hold_publishes_unavailable_without_reusing_mismatched_context(tmp_pa
     for path, key in ((tmp_path / "weekly.json", "events"), (tmp_path / "symbols/A.json", "expected_move")):
         payload = json.loads(path.read_text())[key]
         node = payload[0] if isinstance(payload, list) else payload
-        assert node["display_forecast_method"] == "ml_unavailable"
-        assert node["display_forecast_pct"] is None
+        valid = key == "events" and mutation != "option_method"
+        assert node["display_forecast_method"] == ("historical" if valid else "ml_unavailable")
+        assert node["display_forecast_pct"] == (0.04 if valid else None)
 
 
-def test_ml_hold_keeps_ml_unavailable_when_new_compact_history_arrives(tmp_path):
+def test_ml_hold_preserves_pre_cutoff_prior_when_new_compact_history_arrives(tmp_path):
     from frontend_data.forecast_artifacts import withhold_upcoming_ml
 
     conn = _history_conn()
@@ -574,17 +575,17 @@ def test_ml_hold_keeps_ml_unavailable_when_new_compact_history_arrives(tmp_path)
         publication_held=True,
     )
     projected = json.loads((tmp_path / "symbols/A.json").read_text())["expected_move"]
-    assert projected["display_forecast_method"] == "ml_unavailable"
-    assert projected["display_forecast_pct"] is None
+    assert projected["display_forecast_method"] == "historical_prior"
+    assert projected["display_forecast_pct"] == pytest.approx(.09)
 
     withhold_upcoming_ml(tmp_path, today=date(2026, 9, 21))
 
     rebuilt = json.loads((tmp_path / "weekly.json").read_text())["events"][0]
-    assert rebuilt["display_forecast_method"] == "ml_unavailable"
-    assert rebuilt["display_forecast_pct"] is None
+    assert rebuilt["display_forecast_method"] == "historical_prior"
+    assert rebuilt["display_forecast_pct"] == pytest.approx(.09)
     assert rebuilt["display_forecast_as_of"] == "2026-09-16"
-    assert rebuilt["historical_event_count"] is None
-    assert rebuilt["fallback_reason"] is None
+    assert rebuilt["historical_event_count"] == 1
+    assert rebuilt["fallback_reason"] == "insufficient_ticker_history"
     assert rebuilt["options_status"] == "unavailable"
 
 
@@ -603,7 +604,7 @@ def test_python_display_compatibility_keeps_validated_held_cutoff_ahead_of_legac
     assert _resolved_forecast_signature({**fields, "em_ml_pct": 0.12}) == ("ml", 0.12)
     assert _resolved_forecast_signature({
         **fields, "options_publication_source_date": "2026-09-15",
-    }, historical_fallback=0.06) == ("options_math", 0.20)
+    }, historical_fallback=0.06) == ("historical", 0.06)
 
 
 @pytest.mark.parametrize("method,count", [("historical", 4), ("historical_prior", 1)])

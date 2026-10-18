@@ -1970,7 +1970,7 @@ export default function EarningsScreener() {
                 style={{ padding: '16px 14px' }}
               >
                 {ev.display_forecast_method === 'ml_unavailable'
-                  ? <span style={{ fontSize: 11, color: 'var(--ink-4)' }}>ML unavailable</span>
+                  ? <span style={{ fontSize: 11, color: 'var(--ink-4)' }}>—</span>
                   : <MoveBar value={ev.display_forecast_pct} max={maxDisplayForecast} />}
               </td>
               <td className="mono tnum" style={{ textAlign: 'right', padding: '16px 14px', color: 'var(--ink-2)' }}>
