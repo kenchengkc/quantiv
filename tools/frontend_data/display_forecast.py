@@ -30,6 +30,7 @@ DisplayMethod = Literal[
     "ml_unavailable",
     "options_math",
     "options_indicative",
+    "straddle_implied",
     "historical",
     "historical_prior",
 ]
@@ -723,16 +724,16 @@ def resolve_display_forecast(
             ),
         )
 
-    if strict_pct is not None:
+    if strict_iv is not None:
         return DisplayForecast(
-            pct=strict_pct,
+            pct=strict_iv,
             method="options_math",
             as_of=as_of_date.isoformat(),
             ml_status=ml_status,
             options_status="decision_eligible",
             fallback_reason=None,
             selected_options_details={
-                "estimator": "atm_iv" if strict_iv is not None else "straddle_mid",
+                "estimator": "atm_iv",
                 "expiry_date": (strict_options or {}).get("expiry_date"),
                 "dte": (strict_options or {}).get("dte"),
                 "atm_iv": (strict_options or {}).get("atm_iv"),
@@ -778,6 +779,24 @@ def resolve_display_forecast(
                 selected_options_details=details,
             )
 
+    if strict_straddle is not None:
+        return DisplayForecast(
+            pct=strict_straddle,
+            method="straddle_implied",
+            as_of=as_of_date.isoformat(),
+            ml_status=ml_status,
+            options_status="decision_eligible",
+            fallback_reason=None,
+            selected_options_details={
+                "estimator": "straddle_mid",
+                "expiry_date": (strict_options or {}).get("expiry_date"),
+                "dte": (strict_options or {}).get("dte"),
+                "atm_iv": (strict_options or {}).get("atm_iv"),
+                "atm_strike": (strict_options or {}).get("atm_strike"),
+                "straddle_price": (strict_options or {}).get("straddle_price"),
+            },
+        )
+
     if indicative_pair is not None:
         spot = _finite_positive(indicative_pair.get("estimated_spot"))
         straddle = _finite_positive(indicative_pair.get("straddle_mid"))
@@ -789,7 +808,7 @@ def resolve_display_forecast(
             details.setdefault("estimator", "straddle_mid")
             return DisplayForecast(
                 pct=float(pct),
-                method="options_indicative",
+                method="straddle_implied",
                 as_of=as_of_date.isoformat(),
                 ml_status=ml_status,
                 options_status="indicative",
@@ -847,22 +866,22 @@ def resolve_upcoming_display_forecast(
     strict_options: dict[str, Any] | None = None,
     options_available: bool = True,
 ) -> DisplayForecast:
-    """Publish an ML headline or an explicit unavailable state for an unreported event."""
-    ml = ml_forecast or {}
-    if ml.get("ml_publication_status") != "held" and _finite_positive(ml.get("em_ml_pct")) is not None:
+    """Use the display hierarchy while keeping held ML out of the headline."""
+    ml = dict(ml_forecast or {})
+    if ml.get("ml_publication_status") == "held":
+        ml.pop("em_ml_pct", None)
+        ml["ml_status"] = "unavailable_model"
+    try:
         return resolve_display_forecast(
             conn, ticker=ticker, earnings_date=earnings_date, timing=timing,
             as_of_date=as_of_date, ml_forecast=ml,
             strict_options=strict_options, options_available=options_available,
         )
-    strict = strict_options or {}
-    has_options = options_available and any(
-        _finite_positive(strict.get(key)) is not None
-        for key in ("em_baseline_iv", "em_baseline_straddle", "straddle_pct")
-    )
-    return DisplayForecast(
-        pct=None, method="ml_unavailable", as_of=as_of_date.isoformat(),
-        ml_status=_missing_ml_status(ml),
-        options_status="decision_eligible" if has_options else "unavailable",
-        fallback_reason=None,
-    )
+    except DisplayForecastError as exc:
+        if not str(exc).startswith("no finite display forecast"):
+            raise
+        return DisplayForecast(
+            pct=None, method="ml_unavailable", as_of=as_of_date.isoformat(),
+            ml_status=_missing_ml_status(ml), options_status="unavailable",
+            fallback_reason=None,
+        )

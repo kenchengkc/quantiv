@@ -177,7 +177,7 @@ def test_strict_straddle_is_used_when_iv_and_ml_are_missing():
             "straddle_price": 9.72,
         },
     )
-    assert result.method == "options_math"
+    assert result.method == "straddle_implied"
     assert result.pct == 0.081
     assert result.options_status == "decision_eligible"
     assert result.ml_status == "unavailable_inputs"
@@ -231,7 +231,7 @@ def test_payx_like_pair_becomes_indicative():
     conn = _conn()
     _pair(conn)
     result = _resolve(conn)
-    assert result.method == "options_indicative"
+    assert result.method == "straddle_implied"
     assert result.options_status == "indicative"
     assert result.fallback_reason == "quote_quality"
     assert result.selected_options_details is not None
@@ -259,7 +259,7 @@ def test_indicative_expected_move_uses_eod_spot_not_atm_strike():
 
     result = _resolve(conn)
 
-    assert result.method == "options_indicative"
+    assert result.method == "straddle_implied"
     assert result.pct == pytest.approx(0.10)
     assert result.selected_options_details is not None
     assert result.selected_options_details["estimated_spot"] == pytest.approx(100.0)
@@ -293,7 +293,7 @@ def test_indicative_selection_advances_to_next_spanning_expiry():
 
     result = _resolve(conn)
 
-    assert result.method == "options_indicative"
+    assert result.method == "straddle_implied"
     assert result.selected_options_details is not None
     assert result.selected_options_details["expiry_date"] == second_expiry.isoformat()
 
@@ -414,7 +414,7 @@ def test_amc_same_day_expiry_rejected_but_bmo_same_day_expiry_allowed():
     bmo = _resolve(conn, timing="bmo")
     amc = _resolve(conn, timing="amc")
 
-    assert bmo.method == "options_indicative"
+    assert bmo.method == "straddle_implied"
     assert amc.method == "historical"
     assert amc.fallback_reason == "no_event_expiry"
 
@@ -423,7 +423,7 @@ def test_missing_deltas_fall_back_to_strike_proximity():
     conn = _conn()
     _pair(conn, call_delta=None, put_delta=None)
     result = _resolve(conn)
-    assert result.method == "options_indicative"
+    assert result.method == "straddle_implied"
     assert result.selected_options_details is not None
     assert result.selected_options_details["atm_delta_distance"] is None
 
@@ -584,3 +584,100 @@ def test_nonfinite_reaction_is_excluded_before_history_count_and_median():
     assert result.historical_event_count == 2
     assert prior["median_abs_move"] == pytest.approx(0.04)
     assert prior["event_count"] == 2
+
+
+def test_upcoming_missing_ml_uses_iv_then_straddle_then_verified_history():
+    from frontend_data.display_forecast import resolve_upcoming_display_forecast
+    conn = _conn()
+    _history(conn, 'PAYX', [0.03, 0.05])
+    kwargs = dict(ticker='PAYX', earnings_date=EVENT, timing='bmo',
+                  as_of_date=AS_OF, ml_forecast=None)
+    iv = resolve_upcoming_display_forecast(conn, **kwargs, strict_options={
+        'em_baseline_iv': .09, 'em_baseline_straddle': .08})
+    assert (iv.pct, iv.method) == (.09, 'options_math')
+    straddle = resolve_upcoming_display_forecast(conn, **kwargs,
+        strict_options={'em_baseline_straddle': .08})
+    assert (straddle.pct, straddle.method) == (.08, 'straddle_implied')
+    history = resolve_upcoming_display_forecast(conn, **kwargs, options_available=False)
+    assert history.method == 'historical'
+    assert history.pct == pytest.approx(.04)
+    assert history.as_of == AS_OF.isoformat()
+    assert history.ml_status != 'available'
+
+
+def test_upcoming_held_ml_cannot_displace_independent_iv_forecast():
+    from frontend_data.display_forecast import resolve_upcoming_display_forecast
+    conn = _conn()
+    result = resolve_upcoming_display_forecast(conn, ticker='PAYX', earnings_date=EVENT,
+        timing='bmo', as_of_date=AS_OF, ml_forecast={'em_ml_pct': .5,
+        'ml_publication_status': 'held'}, strict_options={'em_baseline_iv': .09})
+    assert (result.pct, result.method) == (.09, 'options_math')
+    assert result.ml_status != 'available'
+
+
+def test_retained_stale_options_are_not_redated_as_current(tmp_path):
+    import json
+    from frontend_data.forecast_artifacts import withhold_upcoming_ml
+    conn = _conn()
+    _history(conn, 'PAYX', [.03, .05])
+    path = tmp_path / 'weekly.json'
+    path.write_text(json.dumps({'events': [{
+        'ticker': 'PAYX', 'earnings_date': EVENT.isoformat(), 'timing': 'bmo',
+        'as_of_date': '2026-09-01', 'em_iv_pct': .9,
+        'display_forecast_method': 'ml', 'em_ml_pct': .8,
+    }]}))
+    withhold_upcoming_ml(tmp_path, today=AS_OF, conn=conn, as_of_date=AS_OF,
+                         eligible_forecast_ids=set())
+    result = json.loads(path.read_text())['events'][0]
+    assert result['display_forecast_method'] == 'historical'
+    assert result['display_forecast_pct'] == pytest.approx(.04)
+    assert result['display_forecast_as_of'] == AS_OF.isoformat()
+
+
+def test_event_day_ml_hold_does_not_create_a_new_option_forecast(tmp_path):
+    import json
+    from frontend_data.forecast_artifacts import withhold_upcoming_ml
+    conn = _conn()
+    path = tmp_path / 'weekly.json'
+    path.write_text(json.dumps({'events': [{
+        'ticker': 'PAYX', 'earnings_date': AS_OF.isoformat(), 'timing': 'bmo',
+        'as_of_date': AS_OF.isoformat(), 'em_iv_pct': .9,
+        'options_status': 'decision_eligible',
+        'display_forecast_method': 'ml', 'em_ml_pct': .8,
+    }]}))
+    withhold_upcoming_ml(tmp_path, today=AS_OF, conn=conn, as_of_date=AS_OF,
+                         eligible_forecast_ids=set())
+    result = json.loads(path.read_text())['events'][0]
+    assert result['display_forecast_method'] == 'ml_unavailable'
+    assert result['display_forecast_pct'] is None
+
+    assert result['em_iv_pct'] is None
+    assert result['options_status'] == 'unavailable'
+    from tools.validate_public_contracts import _resolved_forecast_signature
+    assert _resolved_forecast_signature(result) is None
+
+
+def test_current_indicative_iv_beats_straddle_and_stale_retained_iv(tmp_path):
+    import json
+    from frontend_data.forecast_artifacts import withhold_upcoming_ml
+    from tools.validate_public_contracts import _resolved_forecast_signature
+    conn = _conn()
+    _pair(conn)
+    conn.execute('ALTER TABLE v_options ADD COLUMN iv DOUBLE DEFAULT .4')
+    expected = .4 * ((EXPIRY - AS_OF).days / 365) ** .5
+    result = _resolve(conn, strict_options={'em_baseline_straddle': .08})
+    assert result.method == 'options_indicative'
+    assert result.pct == pytest.approx(expected)
+    path = tmp_path / 'weekly.json'
+    path.write_text(json.dumps({'events': [{
+        'ticker': 'PAYX', 'earnings_date': EVENT.isoformat(), 'timing': 'bmo',
+        'as_of_date': '2026-09-01', 'em_iv_pct': .9,
+        'display_forecast_method': 'ml', 'em_ml_pct': .8,
+    }]}))
+    withhold_upcoming_ml(tmp_path, today=AS_OF, conn=conn, as_of_date=AS_OF,
+                         eligible_forecast_ids=set())
+    event = json.loads(path.read_text())['events'][0]
+    assert event['em_iv_pct'] is None
+    assert event['display_forecast_method'] == 'options_indicative'
+    assert event['display_forecast_pct'] == pytest.approx(expected)
+    assert _resolved_forecast_signature(event) == ('options_indicative', event['display_forecast_pct'])

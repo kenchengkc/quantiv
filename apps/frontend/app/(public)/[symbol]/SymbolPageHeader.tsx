@@ -820,6 +820,8 @@ export function DetailHero({
   const forecastSource =
     emMethod === 'ml'
       ? 'via ML forecast'
+      : emMethod === 'straddle_implied'
+        ? 'via straddle implied'
       : emMethod === 'options_math' || emMethod === 'options_indicative'
         ? 'via IV forecast'
         : emMethod === 'historical'

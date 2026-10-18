@@ -27,12 +27,12 @@ def _event(**fields):
     }
 
 
-def test_upcoming_without_ml_is_explicitly_unavailable_and_retains_historical_context():
+def test_upcoming_without_ml_uses_iv_and_retains_historical_context():
     event = _event()
     with duckdb.connect() as conn:
         enrich_upcoming_event(conn, event, as_of_date=TODAY, today=TODAY)
-    assert event["display_forecast_pct"] is None
-    assert event["display_forecast_method"] == "ml_unavailable"
+    assert event["display_forecast_pct"] == 0.12
+    assert event["display_forecast_method"] == "options_math"
     assert event["ml_status"] == "unavailable_inputs"
     assert event["hist_move_med_4q"] == 0.08
     assert event["hist_move_avg_4q"] == 0.09
@@ -47,14 +47,14 @@ def test_upcoming_held_ml_cannot_reappear_from_raw_or_canonical_values():
                    display_forecast_pct=0.07, ml_publication_status="held")
     with duckdb.connect() as conn:
         enrich_upcoming_event(conn, event, as_of_date=TODAY, today=TODAY)
-    assert event["display_forecast_method"] == "ml_unavailable"
-    assert event["display_forecast_pct"] is None
+    assert event["display_forecast_method"] == "options_math"
+    assert event["display_forecast_pct"] == 0.12
 
 
 @pytest.mark.parametrize("method", ["historical", "historical_prior", "options_math", "options_indicative"])
-def test_upcoming_validation_rejects_non_ml_headlines(method):
+def test_upcoming_validation_rejects_fallbacks_without_provenance(method):
     event = _event(display_forecast_method=method)
-    with pytest.raises(DisplayForecastError, match="upcoming headline"):
+    with pytest.raises(DisplayForecastError, match="missing display_forecast_as_of"):
         validate_upcoming_display_forecasts(
             [("TEST", date(2026, 10, 21), "bmo")],
             {date(2026, 10, 19): {"events": [event]}}, today=TODAY,

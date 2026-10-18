@@ -98,7 +98,7 @@ describe('screener research query', () => {
     expect(result.map((row) => row.ticker)).toEqual(['MSFT', 'AAPL']);
   });
 
-  it('excludes upcoming historical context and subthreshold ML from big movers', () => {
+  it('includes large historical fallbacks while excluding subthreshold ML', () => {
     const displayDriven: ResearchScreenerEvent[] = [
       {
         ...rows[0],
@@ -121,10 +121,10 @@ describe('screener research query', () => {
       new URLSearchParams('preset=big_movers&sort=straddle&dir=desc'),
     );
 
-    expect(applyScreenerResearchQuery(displayDriven, query).map((row) => row.ticker)).toEqual([]);
+    expect(applyScreenerResearchQuery(displayDriven, query).map((row) => row.ticker)).toEqual(['HIST']);
   });
 
-  it('admits eligible legacy ML while excluding upcoming legacy options from big movers', () => {
+  it('admits eligible ML and large option fallbacks into big movers', () => {
     const legacyRows: ResearchScreenerEvent[] = [
       {
         ...rows[0],
@@ -148,7 +148,7 @@ describe('screener research query', () => {
     );
 
     expect(applyScreenerResearchQuery(legacyRows, query).map((row) => row.ticker)).toEqual([
-      'LEGACYML',
+      'LEGACYML', 'LEGACYOPT',
     ]);
   });
 

@@ -60,5 +60,5 @@ def test_missing_ml_preserves_explicit_unavailability_reason(status: str) -> Non
         policy=POLICY,
     )
 
-    assert result.method == "options_math"
+    assert result.method == "straddle_implied"
     assert result.ml_status == status

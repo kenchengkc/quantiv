@@ -43,7 +43,7 @@ describe('calendar legacy display forecast compatibility', () => {
           timing: 'after_market_close',
           em_ml_pct: 0.0767,
           em_straddle_pct: 0.1312,
-          hist_move_avg_4q: 0.056849,
+          hist_move_med_4q: 0.056849,
         },
       ]),
       '2026-09-21',
@@ -72,7 +72,7 @@ describe('calendar legacy display forecast compatibility', () => {
           ticker: 'BBB',
           earnings_date: '2026-09-24',
           timing: 'amc',
-          hist_move_avg_4q: 0.08,
+          hist_move_med_4q: 0.08,
         },
       ]),
       '2026-09-21',
@@ -89,7 +89,7 @@ describe('calendar legacy display forecast compatibility', () => {
 });
 
 
-it('keeps a revised upcoming date ML-unavailable without synthesizing a historical prior', () => {
+it('uses same-ticker historical median for a revised upcoming date', () => {
   const merged = mergeCalendarReference({
     ...reference([{ ticker: 'TEST', earnings_date: '2099-09-22', timing: 'bmo' }]),
     window: { start: '2099-09-21', end: '2099-09-25' },
@@ -98,6 +98,6 @@ it('keeps a revised upcoming date ML-unavailable without synthesizing a historic
     em_ml_pct: 0.07, hist_move_med_4q: 0.08,
   }]), '2099-09-21');
   expect(merged.events[0]).toMatchObject({
-    display_forecast_pct: null, display_forecast_method: 'ml_unavailable',
+    display_forecast_pct: 0.08, display_forecast_method: 'historical',
   });
 });

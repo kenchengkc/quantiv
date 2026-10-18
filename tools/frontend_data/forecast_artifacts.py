@@ -270,6 +270,7 @@ def withhold_upcoming_ml(
     held_event_reasons: dict[str, str] | None = None,
     align_components: bool = True,
     reported_event_keys: set[str] | None = None,
+    conn=None, as_of_date: date | None = None, options_available: bool = True,
 ) -> None:
     """Apply current event eligibility to retained files, preserving reported rows."""
     paths = [public_dir / 'weekly.json', public_dir / 'screener.json',
@@ -335,11 +336,52 @@ def withhold_upcoming_ml(
             node['ml_publication_status'] = 'held'
             node['ml_publication_reason'] = (held_event_reasons or {}).get(
                 event_key, 'feature_drift' if eligible_forecast_ids is None else 'no_eligible_current_forecast')
-            node.update(display_forecast_pct=None, display_forecast_method='ml_unavailable',
-                        display_forecast_as_of=node.get('as_of_date') or payload.get('as_of_date')
-                        or (payload.get('metadata') or {}).get('as_of_date') or today.isoformat(),
-                        em_method='ml_unavailable', fallback_reason=None)
-            node.setdefault('options_status', 'unavailable')
+            method = node.get('display_forecast_method')
+            independent = method in {'options_math', 'options_indicative', 'straddle_implied',
+                                     'historical', 'historical_prior'}
+            if independent:
+                from .display_payloads import _validate_display_provenance
+                errors = []
+                _validate_display_provenance(node, identity=event_key, errors=errors)
+                source_date = (node.get('options_publication_source_date')
+                               if node.get('options_publication_status') == 'held'
+                               else node.get('as_of_date') or payload.get('as_of_date')
+                               or (payload.get('metadata') or {}).get('as_of_date'))
+                if (not errors and source_date and node.get('display_forecast_as_of') == source_date
+                        and source_date < str(event_date)[:10]
+                        and (method in {'historical', 'historical_prior'}
+                             or options_available and node.get('options_publication_status') != 'held'
+                             and (as_of_date is None or source_date == as_of_date.isoformat()))):
+                    node['em_method'] = method
+                    continue
+            if conn is not None and as_of_date is not None and date.fromisoformat(str(event_date)[:10]) > today:
+                from .display_forecast import resolve_upcoming_display_forecast
+                from .display_payloads import _clear_held_option_inputs, _strict_options_from_event
+                source_iso = (node.get('as_of_date') or payload.get('as_of_date')
+                              or (payload.get('metadata') or {}).get('as_of_date'))
+                # Retained option values may only represent the build cutoff.
+                # Re-query current evidence when the row came from an older release.
+                if source_iso != as_of_date.isoformat():
+                    _clear_held_option_inputs(node)
+                strict_options = _strict_options_from_event(node)
+                result = resolve_upcoming_display_forecast(
+                    conn, ticker=symbol, earnings_date=date.fromisoformat(str(event_date)[:10]),
+                    timing=node.get('timing'), as_of_date=as_of_date,
+                    ml_forecast={'ml_status': 'unavailable_model'},
+                    strict_options=strict_options,
+                    options_available=options_available and node.get('options_publication_status') != 'held',
+                )
+                node.update(result.public_fields())
+                node['em_method'] = result.method
+            else:
+                from .display_payloads import _clear_held_option_inputs
+                _clear_held_option_inputs(node)
+                node['options_status'] = 'unavailable'
+                node.update(display_forecast_pct=None, display_forecast_method='ml_unavailable',
+                            display_forecast_as_of=node.get('as_of_date') or payload.get('as_of_date')
+                            or (payload.get('metadata') or {}).get('as_of_date') or today.isoformat(),
+                            em_method='ml_unavailable', fallback_reason=None)
+                node.setdefault('options_status', 'unavailable')
         if changed:
             path.write_text(json.dumps(payload, indent=2) + '\n')
 

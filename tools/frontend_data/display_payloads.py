@@ -31,6 +31,7 @@ DISPLAY_METHODS = {
     "ml_unavailable",
     "options_math",
     "options_indicative",
+    "straddle_implied",
     "historical",
     "historical_prior",
 }
@@ -219,7 +220,7 @@ def _validate_display_provenance(
     if method in {"historical", "historical_prior"} and ml_status == "available":
         errors.append(f"{identity}: historical fallback with available ML status")
 
-    if method == "options_math":
+    if method == "options_math" or method == "straddle_implied" and options_status == "decision_eligible":
         if options_status != "decision_eligible":
             errors.append(
                 f"{identity}: strict options method without decision-eligible options"
@@ -228,7 +229,7 @@ def _validate_display_provenance(
             errors.append(
                 f"{identity}: strict options method must not carry a fallback reason"
             )
-    elif method == "options_indicative":
+    elif method in {"options_indicative", "straddle_implied"}:
         if options_status != "indicative":
             errors.append(
                 f"{identity}: indicative options method without indicative options status"
@@ -358,8 +359,6 @@ def validate_upcoming_display_forecasts(
         if event is None:
             errors.append(f"{identity}: missing week row")
             continue
-        if event.get("display_forecast_method") not in {"ml", "ml_unavailable"}:
-            errors.append(f"{identity}: upcoming headline must be ML or ML unavailable")
         _validate_display_provenance(event, identity=identity, errors=errors)
     if errors:
         raise DisplayForecastError(
@@ -406,7 +405,7 @@ def build_display_forecast_status(
                                else "non_market_session_event"})
     mix = Counter(str(event.get("display_forecast_method")) for event in selected)
     covered = sum(
-        event.get("display_forecast_method") == "ml"
+        event.get("display_forecast_method") != "ml_unavailable"
         and _finite_positive(event.get("display_forecast_pct")) is not None
         for event in selected
     )
@@ -437,6 +436,7 @@ def display_fields_from_event(event: dict[str, Any] | None) -> dict[str, Any]:
             "options_status",
             "fallback_reason",
             "historical_event_count",
+            "hist_move_med_4q",
             "options_publication_status",
             "options_publication_source_date",
         )

@@ -190,7 +190,7 @@ def main():
         print(f"❌ {exc}", file=sys.stderr)
         sys.exit(2)
     if not options_available:
-        print('Options publication held: upcoming forecasts require eligible ML or remain unavailable')
+        print('Options publication held: upcoming forecasts use eligible ML or verified historical estimates')
     if age_days > 1:
         print(f"⚠ Options chain is {age_days} days old (as_of={as_of_date})")
 
@@ -560,7 +560,8 @@ def main():
             withhold_upcoming_ml(PUBLIC_DIR, today=today, eligible_forecast_ids=eligible_ids,
                                  eligible_event_keys=eligible_event_keys,
                                  held_event_reasons=held_event_reasons, align_components=False,
-                                 reported_event_keys=reported_event_keys)
+                                 reported_event_keys=reported_event_keys, conn=conn,
+                                 as_of_date=as_of_date, options_available=options_available)
         # Include retained symbols/weeks outside the rebuilt calendar. Clear
         # legacy option fields before the ML hold compatibility resolver runs.
         suppress_held_options(PUBLIC_DIR, conn=conn, as_of_date=as_of_date,
@@ -569,7 +570,8 @@ def main():
         withhold_upcoming_ml(PUBLIC_DIR, today=today, eligible_forecast_ids=eligible_ids,
                              eligible_event_keys=eligible_event_keys,
                              held_event_reasons=held_event_reasons,
-                             reported_event_keys=reported_event_keys)
+                             reported_event_keys=reported_event_keys, conn=conn,
+                             as_of_date=as_of_date, options_available=options_available)
 
     # Report the final cleaned publication, including retained-file holds.
     if publication_held or eligible_ids is not None or not options_available:
