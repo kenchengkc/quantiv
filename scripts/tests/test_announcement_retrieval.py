@@ -213,10 +213,57 @@ def test_next_day_morning_call_does_not_bound_release_session():
     assert calendar.extract_earnings_announcement(text, published_on=date(2026,10,1))['timing'] == 'unknown'
 
 
+def test_release_clock_before_call_in_same_sentence():
+    text = (
+        'Acadian Asset Management Inc. will announce its financial and operating results '
+        'for the third quarter ended September 30, 2026, on Thursday, October 29, 2026. '
+        'The Company will announce its results through a press release and related slide '
+        'presentation at 7:30 a.m. Eastern Time and will hold a conference call and '
+        'simultaneous webcast to discuss the results at 11:00 a.m. Eastern Time.'
+    )
+    assert calendar.extract_earnings_announcement(text, published_on=date(2026, 10, 14)) == {
+        'date': '2026-10-29', 'timing': 'bmo',
+    }
+
+
+@pytest.mark.parametrize('conjunction', ['and will', 'and the company will', 'while management will'])
+def test_separate_release_and_call_clock_clauses(conjunction):
+    text = (
+        'Example will host a conference call at 8:00 a.m. ET '
+        f'{conjunction} release earnings on October 29, 2026 at 4:05 p.m. ET.'
+    )
+    assert calendar.extract_earnings_announcement(text, published_on=date(2026, 10, 14)) == {
+        'date': '2026-10-29', 'timing': 'amc',
+    }
+
+
+@pytest.mark.parametrize('detail', [
+    'and will hold a conference call at 8:00 a.m. ET',
+    'and related slides for its conference call at 8:00 a.m. ET',
+    'and will host a webcast at 4:05 p.m. ET',
+])
+def test_call_clock_after_untimed_release_stays_unknown(detail):
+    text = f'Example will release results on October 29, 2026 {detail}.'
+    assert calendar.extract_earnings_announcement(text, published_on=date(2026, 10, 14)) == {
+        'date': '2026-10-29', 'timing': 'unknown',
+    }
+
+
 @pytest.mark.parametrize('call', ['will host a conference call', 'management will host a conference call'])
 def test_conjunction_separates_release_from_later_call(call):
     text = f'Example will release financial results on October 27, 2026 and, after market close, {call}.'
     assert calendar.extract_earnings_announcement(text, published_on=date(2026,10,1))['timing'] == 'unknown'
+
+
+@pytest.mark.parametrize('detail', [
+    'The conference call and release materials will be discussed at 8:00 a.m. ET.',
+    'Management will discuss the conference call and release schedule at 8:00 a.m. ET.',
+])
+def test_release_noun_phrase_cannot_discard_discussion_context(detail):
+    text = f'Example will release results on October 29, 2026. {detail}'
+    assert calendar.extract_earnings_announcement(text, published_on=date(2026, 10, 14)) == {
+        'date': '2026-10-29', 'timing': 'unknown',
+    }
 
 
 @pytest.mark.parametrize(('symbol','name','headline'), [

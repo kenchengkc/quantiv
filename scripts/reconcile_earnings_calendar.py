@@ -330,15 +330,25 @@ def _session_from_text(text: str, *, report_day: date) -> str:
 
     lower = text.lower()
     mentions_call = bool(re.search(r"\b(?:call|conference|webcast|interview)\b", lower))
+    clock_clause = re.compile(
+        r"\b(?:and|while|but)\s+(?=(?:(?:the\s+)?(?:company|management|it)\s+)?"
+        r"will\s+(?:hold|host|conduct|post|release|issue|publish|report|announce)\b)",
+        re.I,
+    )
     times: list[int] = []
     for match in TIME_RE.finditer(text):
         # A call time alone is not the release time. An explicit release clock
         # in its own sentence remains useful when a later sentence mentions a call.
         prefix = re.split(r"[.!?;]\s+(?=[A-Z])", text[:match.start()])[-1].lower()
+        # Distinct release and call clauses may share a sentence. Keep each
+        # clock tied to its own action, retaining conjunctions in noun phrases
+        # such as "press release and related slides".
+        prefix = clock_clause.split(prefix)[-1]
         release_clock = bool(re.search(
             r"\b(?:post|release|issue|publish|report|announce)(?:s|d|ed)?\b", prefix,
         )) and bool(re.search(r"\b(?:results|earnings|release|materials)\b", prefix))
         suffix = re.split(r"[.!?;]", text[match.end():], maxsplit=1)[0].lower()
+        suffix = clock_clause.split(suffix, maxsplit=1)[0]
         clause = prefix + " " + suffix
         call_clock = bool(re.search(r"\b(?:call|conference|webcast|interview)\b", clause))
         release_linked_to_call = bool(re.search(
