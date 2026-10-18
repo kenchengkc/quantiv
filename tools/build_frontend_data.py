@@ -22,6 +22,7 @@ sys.path.append(str(Path(__file__).parent))
 sys.path.append(str(Path(__file__).resolve().parent.parent / "apps" / "ml"))
 sys.path.append(str(Path(__file__).resolve().parent.parent / "scripts"))
 from build_earnings_events import build_earnings_events_table, create_duckdb_views
+from align_forecast_context import align_forecast_context
 from event_forecast_ledger import record_publications
 from frontend_data.display_payloads import (
     build_display_forecast_status,
@@ -572,6 +573,10 @@ def main():
                              held_event_reasons=held_event_reasons,
                              reported_event_keys=reported_event_keys, conn=conn,
                              as_of_date=as_of_date, options_available=options_available)
+
+    # The producer and publisher must commit/render the same point-in-time
+    # historical fallback, including symbols retained from earlier builds.
+    align_forecast_context(PUBLIC_DIR, today=today)
 
     # Report the final cleaned publication, including retained-file holds.
     if publication_held or eligible_ids is not None or not options_available:

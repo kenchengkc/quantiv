@@ -26,6 +26,76 @@ def test_truncated_feed_recovers_older_announcement_without_duplicate_votes(monk
     assert meta['requests'] == 2
 
 
+@pytest.mark.parametrize('period', [
+    'quarter ended', 'quarter ending', 'fiscal year ended', 'six months ended',
+    'quarter ending on Wednesday,',
+])
+def test_fiscal_period_end_cannot_replace_announced_release_date(period):
+    text = (
+        f'Example schedules earnings. Example will release results for the {period} '
+        'September 30, 2026, after the close of trading on October 19, 2026. '
+        'A conference call follows on October 20, 2026 at 9:00 a.m. ET.'
+    )
+    assert calendar.extract_earnings_announcement(text, published_on=date(2026, 9, 22)) == {
+        'date': '2026-10-19', 'timing': 'amc',
+    }
+
+
+def test_fiscal_period_date_alone_does_not_invent_a_release_date():
+    text = ('Example schedules its earnings release for the quarter ending '
+            'September 30, 2026. The announcement date will be provided later.')
+    assert calendar.extract_earnings_announcement(text, published_on=date(2026, 9, 22)) is None
+
+
+def test_before_market_shorthand_is_release_session():
+    text = ('Example will release its third quarter 2026 earnings before market on '
+            'November 2, 2026. Management will conduct a call at 11:00 a.m. ET.')
+    assert calendar.extract_earnings_announcement(text, published_on=date(2026, 10, 13)) == {
+        'date': '2026-11-02', 'timing': 'bmo',
+    }
+
+
+def test_before_market_close_is_not_a_before_open_release():
+    text = 'Example will release earnings before market close on November 2, 2026.'
+    assert calendar.extract_earnings_announcement(text, published_on=date(2026, 10, 13)) == {
+        'date': '2026-11-02', 'timing': 'unknown',
+    }
+
+
+@pytest.mark.parametrize('title', [
+    'Example to Host Third Quarter 2026 Earnings Call',
+    'Example Will Host Third Quarter 2026 Earnings Call',
+    'Example Plans Live Audio Webcast of Third Quarter 2026 Earnings Conference Call',
+])
+def test_host_or_planned_webcast_announcement_keeps_explicit_release_evidence(title):
+    result = calendar._announcement_from_article(
+        provider='finnhub_company_news', title=title,
+        body=('Example will issue financial results on October 21, 2026 at 7:00 a.m. ET. '
+              'The conference call follows at 9:00 a.m. ET.'),
+        published_on=date(2026, 10, 1), official=False, url='https://example.com/earnings',
+    )
+    assert result is not None
+    assert (result['date'], result['timing']) == ('2026-10-21', 'bmo')
+
+
+@pytest.mark.parametrize('title', [
+    'Example to Host Third Quarter 2026 Earnings Call',
+    'Example Will Host Third Quarter 2026 Earnings Call',
+    'Example Plans Live Audio Webcast of Third Quarter 2026 Earnings Conference Call',
+])
+@pytest.mark.parametrize('history', ['', 'Example reported its last quarterly results on July 21, 2026. '])
+@pytest.mark.parametrize('replay', [
+    '', ' A replay of the earnings conference call will be available on the investor website.',
+    ' Example will post a replay of the webcast following the call.',
+])
+def test_host_announcement_without_release_statement_cannot_move_earnings_date(title, history, replay):
+    assert calendar._announcement_from_article(
+        provider='finnhub_company_news', title=title,
+        body=history + 'The conference call will take place on October 21, 2026 at 7:00 a.m. ET.' + replay,
+        published_on=date(2026, 10, 1), official=False, url='https://example.com/earnings',
+    ) is None
+
+
 def test_capped_single_day_and_request_budget_are_reported_incomplete(monkeypatch):
     def transport(url, *, params, **kwargs):
         return 200, [article(params['to'], identity=i) for i in range(250)], None

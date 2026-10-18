@@ -156,7 +156,7 @@ def _live_rows(forecast_path: Path, data_dir: Path, current: datetime) -> tuple[
 
 
 def _shared_sources(data_dir: Path, members: dict, historical: dict, frame: pd.DataFrame,
-                    manifest: dict, expected: str) -> dict:
+                    manifest: dict, expected: str, release_source_date: str) -> dict:
     controls, mappings, duplicates = (manifest.get(name) for name in
                                      ("pipeline_controls", "symbol_mappings", "duplicates"))
     if (not isinstance(controls, dict)
@@ -178,7 +178,7 @@ def _shared_sources(data_dir: Path, members: dict, historical: dict, frame: pd.D
         if (not isinstance(dataset, dict) or dataset.get("status") != "passed"
                 or type(dataset.get("rows")) is not int or dataset["rows"] <= 0):
             raise RuntimeError(f"current {name} source contract has not passed")
-    if datasets["ohlcv"].get("max_date") != expected:
+    if datasets["ohlcv"].get("max_date") != release_source_date:
         raise RuntimeError("reconciliation OHLCV source is not the latest completed market session")
     actions = historical["corporate_actions"]
     symbols = set(frame["act_symbol"].astype(str))
@@ -209,7 +209,7 @@ def _shared_sources(data_dir: Path, members: dict, historical: dict, frame: pd.D
             "WHERE CAST(date AS DATE) = CAST(? AS DATE) AND act_symbol IN (SELECT UNNEST(?))",
             [paths, expected, sorted(symbols)],
         ).df()
-    if str(maximum) != expected or rows != datasets["ohlcv"]["rows"]:
+    if str(maximum) != release_source_date or rows != datasets["ohlcv"]["rows"]:
         raise RuntimeError("actual immutable OHLCV prices contradict the current source contract")
     if prices["act_symbol"].duplicated().any() or set(prices["act_symbol"]) != symbols:
         raise RuntimeError("every actual forecast symbol requires one latest-session OHLCV price")
@@ -223,7 +223,7 @@ def _shared_sources(data_dir: Path, members: dict, historical: dict, frame: pd.D
 
 
 def _strict_options(data_dir: Path, members: dict, manifest: dict, expected: str,
-                    frame: pd.DataFrame) -> dict:
+                    frame: pd.DataFrame, allowed_source_dates: tuple[str, ...]) -> dict:
     try:
         from verify_retrain_data_gate import _active_options_date
         from sync_dolthub import _content_digest
@@ -231,14 +231,21 @@ def _strict_options(data_dir: Path, members: dict, manifest: dict, expected: str
         from scripts.verify_retrain_data_gate import _active_options_date
         from scripts.sync_dolthub import _content_digest
     active = _active_options_date(data_dir)
-    if active != expected:
+    if active not in allowed_source_dates or expected not in allowed_source_dates or expected > active:
         raise RuntimeError("published options release is not the latest completed market session: "
                            f"active={active}, expected={expected}")
     source, quote = manifest["source_reconciliation"], manifest["quote_quality"]
-    if (source.get("source_date") != expected or quote.get("source_date") != expected
+    if (source.get("source_date") != active or quote.get("source_date") != active
             or source.get("status") != "passed" or source.get("errors")
             or quote.get("status") not in {"passed", "degraded"} or quote.get("errors")):
         raise RuntimeError("strict option rows require current passed options source and quote evidence")
+    active_evidence = None
+    if expected != active:
+        # Keep the current reconciliation binding intact, then independently
+        # verify the older immutable partition used by these exact rows.
+        active_evidence = _strict_options(
+            data_dir, members, manifest, active, frame.iloc[:0], allowed_source_dates,
+        )
     relative = f"parquet/options_chain/year={expected[:4]}/month={expected[5:7]}/{expected}.parquet"
     member = members.get(relative)
     ingestion_path = data_dir / f"control/ingestion/options/{expected}.json"
@@ -258,7 +265,10 @@ def _strict_options(data_dir: Path, members: dict, manifest: dict, expected: str
             or ingestion["source_capabilities"].get("timestamp_precision") != "date"
             or source.get("source_capabilities") != ingestion["source_capabilities"]
             or ingestion.get("expected_rows") != rows or ingestion.get("received_rows") != rows
-            or rows <= 0 or source.get("partition_sha256") != member["sha256"]
+            or rows <= 0):
+        raise RuntimeError("strict option rows lack verified current immutable options source proof")
+    if expected == active and (
+            source.get("partition_sha256") != member["sha256"]
             or source.get("content_sha256") != content or source.get("replay_equivalence") != "verified"
             or any(source.get(key) != rows for key in ("expected_rows", "received_rows", "duckdb_rows"))):
         raise RuntimeError("strict option rows lack verified current immutable options source proof")
@@ -307,9 +317,12 @@ def _strict_options(data_dir: Path, members: dict, manifest: dict, expected: str
                 or not math.isclose(float(row["em_math_pct"]), float(row["straddle_mid"]) / float(row["atm_strike"]),
                                     rel_tol=1e-6, abs_tol=1e-8)):
             raise RuntimeError("strict forecast IV or straddle baseline contradicts its immutable source pair")
-    return {"status": "passed", "source_date": expected, "rows": rows,
-            "partition": relative, "sha256": member["sha256"],
-            "ingestion_receipt_sha256": hashlib.sha256(ingestion_path.read_bytes()).hexdigest()}
+    evidence = {"status": "passed", "source_date": expected, "rows": rows,
+                "partition": relative, "sha256": member["sha256"],
+                "ingestion_receipt_sha256": hashlib.sha256(ingestion_path.read_bytes()).hexdigest()}
+    if active_evidence is not None:
+        evidence["active_source"] = active_evidence
+    return evidence
 
 
 def _canonical_source_pairs(partition: Path, relative: str, frame: pd.DataFrame) -> set[tuple]:
@@ -324,6 +337,8 @@ def _canonical_source_pairs(partition: Path, relative: str, frame: pd.DataFrame)
     except ModuleNotFoundError:
         from scripts.setup_duckdb_from_parquet import setup_views
     symbols = sorted(set(frame.loc[frame["em_math_pct"].notna(), "act_symbol"]))
+    if not symbols:
+        return set()
     with tempfile.TemporaryDirectory(prefix="quantiv-activation-source-") as directory:
         root = Path(directory)
         selected = root / relative
@@ -370,24 +385,40 @@ def verify_forecast_activation_gate(*, data_dir: Path, forecast_path: Path,
         historical, members = _immutable_sources(data_dir)
         sessions = forecast_snapshot_sessions(current)
         snapshots = pd.to_datetime(frame["snapshot_date"]).dt.date
-        if snapshots.nunique() != 1 or snapshots.iloc[0] not in sessions:
-            raise RuntimeError("actual forecasts require one source session within one-session grace")
-        snapshot = snapshots.iloc[0]
+        if not snapshots.isin(sessions).all():
+            raise RuntimeError("every actual forecast source must be within one-session grace")
+        snapshot = snapshots.max()
         expected = sessions[0].isoformat()
         source_date = snapshot.isoformat()
-        prices = _shared_sources(data_dir, members, historical, frame, manifest, source_date)
+        release_source_date = manifest["datasets"].get("ohlcv", {}).get("max_date")
+        if release_source_date not in {session.isoformat() for session in sessions}:
+            raise RuntimeError("reconciliation OHLCV source is outside one-session grace")
+        session_evidence = {}
+        for actual_snapshot in sorted(set(snapshots)):
+            selected = frame.loc[snapshots.eq(actual_snapshot)]
+            actual_date = actual_snapshot.isoformat()
+            evidence = {"ohlcv": _shared_sources(
+                data_dir, members, historical, selected, manifest, actual_date, release_source_date,
+            )}
+            if selected["em_math_pct"].notna().any():
+                evidence["options"] = _strict_options(
+                    data_dir, members, manifest, actual_date, selected,
+                    tuple(session.isoformat() for session in sessions),
+                )
+            session_evidence[actual_date] = evidence
         sources = {"data_release": {key: historical[key] for key in ("release_id", "files", "bytes")},
-                   "ohlcv": prices, "corporate_actions": historical["corporate_actions"],
-                   "earnings_calendar": historical["calendar_source"]}
-        if "strict_options" in cohorts:
-            sources["options"] = _strict_options(data_dir, members, manifest, source_date, frame)
+                   **session_evidence[source_date], "corporate_actions": historical["corporate_actions"],
+                   "earnings_calendar": historical["calendar_source"], "sessions": session_evidence}
+        option_dates = [day for day, evidence in session_evidence.items() if "options" in evidence]
+        if option_dates:
+            sources["options"] = session_evidence[max(option_dates)]["options"]
         advisory = {str(item["code"]) for item in manifest["exceptions"]
                     if item.get("code") in _OPTIONS_ONLY_CODES}
         advisory.update(set(codes) & (allowed | _AGGREGATE_CODES))
         return {"status": "passed", "manifest_id": manifest["manifest_id"],
                 "model_bundle_id": bundle["bundle_id"], "cohorts": cohorts,
                 "snapshot_date": source_date, "source_date": source_date,
-                "source_session_lag": sessions.index(snapshot),
+                "source_session_lag": max(sessions.index(value) for value in snapshots),
                 "expected_source_date": expected, "generated_at": manifest["generated_at"],
                 "age_hours": round(age, 3), "source_evidence": sources,
                 "forecast_validation": validation, "advisory_codes": sorted(advisory)}

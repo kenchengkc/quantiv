@@ -115,6 +115,7 @@ PAST_TERMS = (
     "beats estimates",
     "misses estimates",
 )
+HOST_TITLE_ACTIONS = (" to host ", " will host ", " plans live audio webcast ")
 DIRECT_TITLE_ACTIONS = (
     " to announce ",
     " to report ",
@@ -126,6 +127,7 @@ DIRECT_TITLE_ACTIONS = (
     " will announce ",
     " will report ",
     " will release ",
+    *HOST_TITLE_ACTIONS,
 )
 DIRECT_TITLE_RESULTS = (
     "earnings",
@@ -292,6 +294,7 @@ def _session_from_text(text: str, *, report_day: date) -> str:
     session_patterns = {
         "bmo": [rf"(?:before|prior to)\s+{market}\s+opens?",
                 rf"(?:before|prior to)\s+(?:the\s+)?opening(?:\s+of trading)?\s+(?:of|on)\s+{market}",
+                r"\bbefore\s+(?:the\s+)?market(?=\s+on\b|[.,;]|$)",
                 r"pre-market|premarket|(?:issued|released|release) that morning"],
         "amc": [rf"(?:after|following)\s+{market}\s+closes?",
                 r"(?:after|following) (?:the )?close(?: of (?:regular )?(?:stock )?market trading)?",
@@ -417,6 +420,13 @@ def extract_earnings_announcement(
 
     candidates: list[tuple[int, date, str]] = []
     for match in DATE_RE.finditer(cleaned):
+        # A future fiscal period end is not a future earnings release. These
+        # dates often share a sentence with the release date and otherwise win
+        # the contextual-score tie merely because they occur earlier.
+        if re.search(r"\b(?:quarter|year|period|months?)\s+end(?:ed|ing|s)?\s+(?:on\s+)?"
+                     r"(?:(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),?\s+)?$",
+                     cleaned[max(0, match.start() - 80):match.start()], re.I):
+            continue
         candidate = _candidate_date(match, published_on)
         if candidate is None or candidate < published_on:
             continue
@@ -909,6 +919,25 @@ def _announcement_from_article(
 ) -> Announcement | None:
     if published_on is None or not is_direct_earnings_announcement_title(title):
         return None
+    if any(term in f" {_clean_text(title).lower()} " for term in HOST_TITLE_ACTIONS):
+        # Hosting a call does not establish when earnings are released. These
+        # titles are useful only when the body separately announces results.
+        release_object = r"\b(?:financial results|results|earnings release|earnings(?!\s+(?:call|conference|webcast)))\b"
+        action = r"\b(?:will|to)\s+(?:(?:also|publicly|electronically|formally)\s+){0,2}(?:release|issue|publish|post|report|announce)\b"
+        nonrelease = r"\b(?:call|conference|webcast|replay|discussion|discuss)\b"
+        statements = re.split(r"[.!?;]\s+(?=[A-Z])", _clean_text(body))
+        release_statement = False
+        for statement in statements:
+            active = re.search(action + r"(?P<object>[^.!?]{0,120}?)" + release_object, statement, re.I)
+            passive = re.search(release_object + r"(?P<object>[^.!?]{0,120}?)"
+                                r"\bwill be\s+(?:made\s+)?(?:available|released|issued|published|posted|reported|announced)\b",
+                                statement, re.I)
+            if active and not re.search(nonrelease, active.group("object"), re.I):
+                release_statement = True
+            if passive and not re.search(nonrelease, statement[:passive.end()], re.I):
+                release_statement = True
+        if not release_statement:
+            return None
     parsed = extract_earnings_announcement(
         f"{title}. {body}",
         published_on=published_on,

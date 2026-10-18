@@ -427,6 +427,63 @@ def test_actual_forecast_admission_accepts_verified_one_session_grace(scoped_rel
     assert result["source_evidence"]["ohlcv"]["source_date"] == "2026-09-03"
 
 
+def _add_prior_session_forecast(release, prior=None):
+    from scripts.data_release import build_release
+
+    current = pd.read_parquet(release["forecast"])
+    prior = current.copy() if prior is None else prior.copy()
+    prior["snapshot_date"] = "2026-09-03"
+    prior["model_horizon"] = 5
+    prior["spot_price"] = 80.
+    prior["em_ml_abs"] = 5.6
+    pd.DataFrame([*current.to_dict("records"), *prior.to_dict("records")]).to_parquet(release["forecast"], index=False)
+    prices = pd.read_parquet(release["prices"])
+    pd.concat([prices, prices.assign(date="2026-09-03", close=80.)], ignore_index=True).to_parquet(release["prices"], index=False)
+    manifest = json.loads(release["manifest_path"].read_text())
+    manifest["datasets"]["ohlcv"]["rows"] = 2
+    _save_scoped_manifest(release, manifest)
+    build_release(release["data_dir"])
+
+
+def test_actual_forecasts_accept_each_verified_source_within_one_session_grace(scoped_release):
+    _add_prior_session_forecast(scoped_release)
+
+    result = _scoped_gate(scoped_release)
+
+    assert result["status"] == "passed"
+    assert result["snapshot_date"] == result["source_date"] == "2026-09-04"
+    assert result["source_session_lag"] == 1
+    assert result["source_evidence"]["ohlcv"]["source_date"] == "2026-09-04"
+    sessions = result["source_evidence"]["sessions"]
+    assert set(sessions) == {"2026-09-03", "2026-09-04"}
+    assert all(value["ohlcv"]["forecast_symbols"] == 1 for value in sessions.values())
+    assert result["forecast_validation"]["rows"] == 2
+
+
+@pytest.mark.parametrize("mutation", ["prior_price", "missing_prior_price", "old_snapshot"])
+def test_mixed_snapshots_keep_each_price_identity_and_freshness_check(scoped_release, mutation):
+    from scripts.data_release import build_release
+
+    _add_prior_session_forecast(scoped_release)
+    if mutation == "old_snapshot":
+        frame = pd.read_parquet(scoped_release["forecast"])
+        frame.loc[1, ["snapshot_date", "earnings_date"]] = ["2026-09-02", "2026-09-07"]
+        frame.to_parquet(scoped_release["forecast"], index=False)
+    else:
+        prices = pd.read_parquet(scoped_release["prices"])
+        if mutation == "prior_price":
+            prices.loc[prices["date"].eq("2026-09-03"), "close"] = 100.
+        else:
+            prices = prices.loc[prices["date"].eq("2026-09-04")]
+            manifest = json.loads(scoped_release["manifest_path"].read_text())
+            manifest["datasets"]["ohlcv"]["rows"] = 1
+            _save_scoped_manifest(scoped_release, manifest)
+        prices.to_parquet(scoped_release["prices"], index=False)
+        build_release(scoped_release["data_dir"])
+    with pytest.raises(RuntimeError, match="(snapshot|price|OHLCV)"):
+        _scoped_gate(scoped_release)
+
+
 def test_optionless_scoping_does_not_change_legacy_global_gate(scoped_release):
     with pytest.raises(RuntimeError, match="held by reconciliation"):
         verify_retrain_data_gate(data_dir=scoped_release["data_dir"], now=scoped_release["now"])
@@ -623,6 +680,99 @@ def test_actual_strict_rows_with_current_source_can_pass_sparse_aggregate_covera
     assert result["source_evidence"]["options"]["source_date"] == "2026-09-04"
     assert result["cohorts"] == (["optionless", "strict_options"] if mixed else ["strict_options"])
     assert "event_quote_coverage_below_limit" in result["advisory_codes"]
+
+
+def _prior_options(release, monkeypatch):
+    from datetime import date
+    from scripts import sync_dolthub
+    from scripts.data_release import build_release
+
+    monkeypatch.setenv("DATA_DIR", str(release["data_dir"]))
+    root = release["data_dir"] / "parquet/options_chain"
+    options = pd.read_parquet(root / "year=2026/month=09/2026-09-04.parquet")
+    day = date(2026, 9, 3)
+    options["date"] = day
+    sync_dolthub.write_date(options, root)
+    path = root / "year=2026/month=09/2026-09-03.parquet"
+    sync_dolthub._write_ingestion_manifest(day, pd.read_parquet(path), root)
+    build_release(release["data_dir"])
+
+
+def _mixed_strict_snapshots(release, monkeypatch, *, current_strict):
+    original = pd.read_parquet(release["forecast"])
+    _strict_forecast(release)
+    prior = pd.read_parquet(release["forecast"])
+    vector = json.loads(prior.iloc[0]["feature_vector"])
+    vector["dte"] = 8.
+    vector["em_iv_pct"] = .5 * (8. / 365.) ** .5
+    prior["feature_vector"] = json.dumps(vector)
+    if not current_strict:
+        original.to_parquet(release["forecast"], index=False)
+    _current_options(release, monkeypatch)
+    _add_prior_session_forecast(release, prior)
+    _prior_options(release, monkeypatch)
+
+
+@pytest.mark.parametrize("current_strict", [False, True])
+def test_prior_strict_snapshot_uses_its_own_verified_options_partition(scoped_release, monkeypatch, current_strict):
+    _mixed_strict_snapshots(scoped_release, monkeypatch, current_strict=current_strict)
+
+    result = _scoped_gate(scoped_release)
+
+    assert result["status"] == "passed"
+    assert result["snapshot_date"] == "2026-09-04"
+    assert result["source_session_lag"] == 1
+    sessions = result["source_evidence"]["sessions"]
+    assert sessions["2026-09-03"]["options"]["source_date"] == "2026-09-03"
+    assert sessions["2026-09-03"]["options"]["partition"].endswith("2026-09-03.parquet")
+    assert ("options" in sessions["2026-09-04"]) is current_strict
+
+
+@pytest.mark.parametrize("mutation", ["missing_prior_receipt", "prior_hash", "prior_digest", "prior_capabilities", "current_report_hash", "prior_quote"])
+def test_prior_strict_snapshot_retains_immutable_options_proof(scoped_release, monkeypatch, mutation):
+    _mixed_strict_snapshots(scoped_release, monkeypatch, current_strict=False)
+    receipt = scoped_release["data_dir"] / "control/ingestion/options/2026-09-03.json"
+    if mutation == "missing_prior_receipt":
+        receipt.unlink()
+    elif mutation in {"prior_hash", "prior_digest", "prior_capabilities"}:
+        payload = json.loads(receipt.read_text())
+        if mutation == "prior_capabilities":
+            payload["source_capabilities"]["option_volume"] = True
+        else:
+            payload["partition_sha256" if mutation == "prior_hash" else "persisted_content_sha256"] = "0" * 64
+        receipt.write_text(json.dumps(payload))
+    elif mutation == "current_report_hash":
+        manifest = json.loads(scoped_release["manifest_path"].read_text())
+        manifest["source_reconciliation"]["partition_sha256"] = "0" * 64
+        _save_scoped_manifest(scoped_release, manifest)
+    else:
+        from scripts import sync_dolthub
+        from scripts.data_release import build_release
+        from datetime import date
+
+        root = scoped_release["data_dir"] / "parquet/options_chain"
+        path = root / "year=2026/month=09/2026-09-03.parquet"
+        options = pd.read_parquet(path)
+        options["bid"] = 2.8
+        options.to_parquet(path, index=False)
+        sync_dolthub._write_ingestion_manifest(date(2026, 9, 3), options, root)
+        build_release(scoped_release["data_dir"])
+    with pytest.raises(RuntimeError):
+        _scoped_gate(scoped_release)
+
+
+def test_current_strict_and_prior_optionless_verify_each_source_independently(scoped_release, monkeypatch):
+    prior = pd.read_parquet(scoped_release["forecast"])
+    _strict_forecast(scoped_release)
+    _current_options(scoped_release, monkeypatch)
+    _add_prior_session_forecast(scoped_release, prior)
+
+    result = _scoped_gate(scoped_release)
+
+    assert result["status"] == "passed"
+    assert set(result["cohorts"]) == {"strict_options", "optionless"}
+    assert result["source_evidence"]["options"]["source_date"] == "2026-09-04"
+    assert "options" not in result["source_evidence"]["sessions"]["2026-09-03"]
 
 
 @pytest.mark.parametrize("mutation", ["missing_receipt", "receipt_hash", "report_hash", "row_quality", "replay_digest", "source_capabilities"])

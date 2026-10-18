@@ -116,6 +116,86 @@ def test_one_session_grace_preserves_snapshot_features_and_exact_head(market_clo
 
 
 @pytest.mark.parametrize("protocol", PROTOCOLS)
+def test_prior_session_recovers_only_events_without_an_admitted_current_head(market_clock, protocol):
+    from ml.model_control import prospective_snapshot_mask
+
+    model = _native_model(protocol, supported=("strict_options", "optionless"))
+    manifest = {"horizons": [7, 8], "serving_capabilities": {
+        "7": ["strict_options"], "8": ["optionless"],
+    }}
+    models = {horizon: {**model, "manifest": manifest} for horizon in (7, 8)}
+    with _connection() as conn:
+        conn.execute("DELETE FROM v_straddle_features")
+        conn.execute("INSERT INTO prices_input SELECT act_symbol, DATE '2026-10-06', 80. FROM prices_input WHERE date=DATE '2026-09-30'")
+        forecasts = daily_score.score_upcoming_models(conn, models, 21)
+
+    assert set(forecasts["act_symbol"]) == {"COVERED", "OFF_HEAD"}
+    assert not forecasts.duplicated(["act_symbol", "earnings_date"]).any()
+    recovered = forecasts.set_index("act_symbol").loc["COVERED"]
+    assert str(recovered["snapshot_date"])[:10] == "2026-10-06"
+    assert recovered["model_horizon"] == 8
+    assert recovered["spot_price"] == 80.
+    assert recovered["__cohort"] == "optionless"
+    current = forecasts.set_index("act_symbol").loc["OFF_HEAD"]
+    assert str(current["snapshot_date"])[:10] == "2026-10-07"
+    assert current["model_horizon"] == 8
+    assert current["spot_price"] == 100.
+    assert pd.to_datetime(forecasts["scored_at"], utc=True).eq(pd.Timestamp(NOW)).all()
+    forecasts["recorded_at"] = NOW.isoformat()
+    assert prospective_snapshot_mask(forecasts).all()
+
+
+@pytest.mark.parametrize("protocol", PROTOCOLS)
+def test_newest_admitted_score_wins_over_an_admitted_prior_session(market_clock, protocol):
+    model = _native_model(protocol)
+    with _connection() as conn:
+        conn.execute("INSERT INTO prices_input SELECT act_symbol, DATE '2026-10-06', 80. FROM prices_input WHERE date=DATE '2026-09-30'")
+        conn.execute("""INSERT INTO v_straddle_features SELECT * REPLACE (
+            DATE '2026-10-06' AS date, 2. AS straddle_mid, 2. AS em_straddle)
+            FROM v_straddle_features""")
+        forecasts = daily_score.score_upcoming_models(conn, {7: model, 8: model}, 21)
+
+    assert forecasts["act_symbol"].tolist() == ["COVERED"]
+    current = forecasts.iloc[0]
+    assert str(current["snapshot_date"])[:10] == "2026-10-07"
+    assert current["model_horizon"] == 7
+    assert current["spot_price"] == 100.
+    assert json.loads(current["feature_vector"])["straddle_pct"] == .1
+
+
+@pytest.mark.parametrize("protocol", PROTOCOLS)
+@pytest.mark.parametrize("blocker", ["unadmitted_cohort", "source_coverage", "too_old", "deadline"])
+def test_prior_session_cannot_bypass_forecast_guards(market_clock, protocol, blocker):
+    model = _native_model(protocol, supported=("strict_options", "optionless"))
+    horizon = 9 if blocker == "too_old" else 2 if blocker == "deadline" else 8
+    cohorts = ["strict_options"] if blocker == "unadmitted_cohort" else ["optionless"]
+    model["manifest"] = {"horizons": [horizon], "serving_capabilities": {str(horizon): cohorts}}
+    with _connection() as conn:
+        conn.execute("DELETE FROM v_earnings WHERE act_symbol='OFF_HEAD'")
+        conn.execute("DELETE FROM v_straddle_features")
+        conn.execute("INSERT INTO prices_input SELECT act_symbol, DATE '2026-10-06', 80. FROM prices_input WHERE date=DATE '2026-09-30'")
+        conn.execute("INSERT INTO prices_input SELECT act_symbol, DATE '2026-10-05', 70. FROM prices_input WHERE date=DATE '2026-09-30'")
+        if blocker == "source_coverage":
+            conn.execute("""CREATE TABLE v_corporate_action_coverage AS SELECT 'COVERED' AS act_symbol,
+                DATE '2026-10-07' AS window_start, DATE '2026-10-07' AS window_end""")
+        elif blocker == "deadline":
+            conn.execute("UPDATE v_earnings SET date=DATE '2026-10-08'")
+        forecasts = daily_score.score_upcoming_models(conn, {horizon: model}, 21)
+
+    assert forecasts.empty
+
+
+def test_prior_session_preserves_causal_reporting_time_requirement(market_clock):
+    model = _native_model(FEATURE_PROTOCOL_CAUSAL, supported=("optionless",))
+    with _connection() as conn:
+        conn.execute("DELETE FROM v_straddle_features")
+        conn.execute("UPDATE v_earnings SET timing='unknown'")
+        conn.execute("INSERT INTO prices_input SELECT act_symbol, DATE '2026-10-06', 80. FROM prices_input WHERE date=DATE '2026-09-30'")
+        forecasts = daily_score.score_upcoming_models(conn, {8: model}, 21)
+    assert forecasts.empty
+
+
+@pytest.mark.parametrize("protocol", PROTOCOLS)
 def test_live_scoring_excludes_events_past_prediction_deadline(market_clock, protocol):
     model = _native_model(protocol, supported=("strict_options", "optionless"))
     with _connection() as conn:
