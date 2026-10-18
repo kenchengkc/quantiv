@@ -3,35 +3,19 @@
   "as_of_date": "2026-10-16",
   "spot_price": 7.8,
   "expected_move": {
-    "earnings_date": "2026-11-05",
-    "em_ml_pct": 0.046943,
-    "em_ml_abs": 0.366158,
-    "model_horizon": 20,
-    "ml_snapshot_date": "2026-10-16",
-    "forecast_id": "b2f443e429da6ec1985d71d6c29220240962deec7570d3f7d671f3724844e71b",
-    "forecast_model_bundle_id": "d14dc7f2aa6b175956922eb6266b8523742add962668b7d6b8833cc2c869dd1b",
-    "forecast_scored_at": "2026-10-18T07:48:44.353872+00:00",
-    "forecast_feature_cutoff_at": "2026-11-05T20:55:00+00:00",
-    "forecast_prediction_deadline_at": "2026-11-05T20:55:00+00:00",
-    "forecast_feature_snapshot_at": "2026-10-16T20:00:00+00:00",
-    "forecast_feature_hash": "4546930ef8818eab3b4d02bc7d2029ccdcb20217af54dd9bda0ffad8a692d9ce",
-    "forecast_frozen_eligible": true,
-    "p10": 0.006695,
-    "p25": 0.021959,
-    "p50": 0.049506,
-    "p75": 0.08084,
-    "p90": 0.130726,
-    "em_method": "ml_lightgbm",
-    "display_forecast_pct": 0.046943,
-    "display_forecast_method": "ml",
+    "earnings_date": "2026-11-04",
+    "display_forecast_pct": 0.031982942430703654,
+    "display_forecast_method": "historical",
     "display_forecast_as_of": "2026-10-16",
-    "ml_status": "available",
+    "ml_status": "unavailable_model",
     "options_status": "unavailable",
-    "fallback_reason": null,
-    "historical_event_count": null,
-    "timing": "after_market_close",
-    "ml_publication_status": "eligible",
-    "hist_move_med_4q": 0.031983
+    "fallback_reason": "no_event_expiry",
+    "historical_event_count": 3,
+    "hist_move_med_4q": 0.031983,
+    "timing": "unknown",
+    "ml_publication_status": "held",
+    "ml_publication_reason": "no_eligible_current_forecast",
+    "em_method": "historical"
   },
   "straddle_features": [],
   "earnings_history": [
@@ -62,12 +46,13 @@
       "ml_status": "unavailable_model",
       "ml_publication_status": "held",
       "ml_publication_reason": "no_eligible_current_forecast",
-      "display_forecast_pct": null,
-      "display_forecast_method": "ml_unavailable",
+      "display_forecast_pct": 0.031982942430703654,
+      "display_forecast_method": "historical",
       "display_forecast_as_of": "2026-10-16",
-      "em_method": "ml_unavailable",
-      "fallback_reason": null,
-      "options_status": "unavailable"
+      "options_status": "unavailable",
+      "fallback_reason": "no_event_expiry",
+      "historical_event_count": 3,
+      "em_method": "historical"
     },
     {
       "date": "2026-08-06",
@@ -145,7 +130,7 @@
       "realized_label_source": "ohlcv_session_close"
     }
   ],
-  "next_earnings": "2026-11-05",
+  "next_earnings": "2026-11-04",
   "vol_regime": null,
-  "next_earnings_timing": "after_market_close"
+  "next_earnings_timing": "unknown"
 }

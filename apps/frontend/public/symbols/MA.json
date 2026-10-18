@@ -3,10 +3,10 @@
   "as_of_date": "2026-10-16",
   "spot_price": 625.0,
   "expected_move": {
-    "earnings_date": "2026-10-28",
+    "earnings_date": "2026-10-29",
     "expiration": "2026-10-30",
     "dte": 14,
-    "lead_time_days": 12,
+    "lead_time_days": 13,
     "atm_strike": 625.0,
     "atm_iv": 0.297999,
     "straddle_abs": 29.4,
@@ -15,18 +15,18 @@
     "skew_atm": -0.032424,
     "term_slope": -0.046737,
     "total_vega": 0.9729,
-    "em_method": "ml_unavailable",
-    "display_forecast_pct": null,
-    "display_forecast_method": "ml_unavailable",
+    "em_method": "options_math",
+    "display_forecast_pct": 0.058362,
+    "display_forecast_method": "options_math",
     "display_forecast_as_of": "2026-10-16",
     "ml_status": "unavailable_model",
     "options_status": "decision_eligible",
     "fallback_reason": null,
     "historical_event_count": null,
+    "hist_move_med_4q": 0.033691,
     "timing": "unknown",
     "ml_publication_status": "held",
-    "ml_publication_reason": "no_eligible_current_forecast",
-    "hist_move_med_4q": 0.033691
+    "ml_publication_reason": "no_eligible_current_forecast"
   },
   "straddle_features": [
     {
@@ -83,7 +83,7 @@
   ],
   "earnings_history": [
     {
-      "date": "2026-10-28",
+      "date": "2026-10-29",
       "timing": "before_market_open",
       "q": "Q3 26",
       "fiscal_year": 2026,
@@ -109,12 +109,13 @@
       "ml_status": "unavailable_model",
       "ml_publication_status": "held",
       "ml_publication_reason": "no_eligible_current_forecast",
-      "display_forecast_pct": null,
-      "display_forecast_method": "ml_unavailable",
+      "display_forecast_pct": 0.04761750510187555,
+      "display_forecast_method": "straddle_implied",
       "display_forecast_as_of": "2026-10-16",
-      "em_method": "ml_unavailable",
-      "fallback_reason": null,
-      "options_status": "unavailable"
+      "options_status": "indicative",
+      "fallback_reason": "quote_quality",
+      "historical_event_count": null,
+      "em_method": "straddle_implied"
     },
     {
       "date": "2026-07-30",
@@ -469,7 +470,7 @@
       "forecast_frozen": true
     }
   ],
-  "next_earnings": "2026-10-28",
+  "next_earnings": "2026-10-29",
   "vol_regime": {
     "iv_current": 0.2489,
     "iv_rank": 0.530779,

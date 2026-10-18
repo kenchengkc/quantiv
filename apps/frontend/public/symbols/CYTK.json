@@ -4,18 +4,18 @@
   "spot_price": 61.95,
   "expected_move": {
     "earnings_date": "2026-11-03",
-    "display_forecast_pct": null,
-    "display_forecast_method": "ml_unavailable",
+    "display_forecast_pct": 0.1271186440677966,
+    "display_forecast_method": "straddle_implied",
     "display_forecast_as_of": "2026-10-16",
     "ml_status": "unavailable_model",
-    "options_status": "unavailable",
-    "fallback_reason": null,
+    "options_status": "indicative",
+    "fallback_reason": "quote_quality",
     "historical_event_count": null,
+    "hist_move_med_4q": 0.042921,
     "timing": "unknown",
     "ml_publication_status": "held",
     "ml_publication_reason": "no_eligible_current_forecast",
-    "em_method": "ml_unavailable",
-    "hist_move_med_4q": 0.042921
+    "em_method": "straddle_implied"
   },
   "straddle_features": [],
   "earnings_history": [
@@ -46,12 +46,13 @@
       "ml_status": "unavailable_model",
       "ml_publication_status": "held",
       "ml_publication_reason": "no_eligible_current_forecast",
-      "display_forecast_pct": null,
-      "display_forecast_method": "ml_unavailable",
+      "display_forecast_pct": 0.1271186440677966,
+      "display_forecast_method": "straddle_implied",
       "display_forecast_as_of": "2026-10-16",
-      "em_method": "ml_unavailable",
-      "fallback_reason": null,
-      "options_status": "unavailable"
+      "options_status": "indicative",
+      "fallback_reason": "quote_quality",
+      "historical_event_count": null,
+      "em_method": "straddle_implied"
     },
     {
       "date": "2026-08-06",

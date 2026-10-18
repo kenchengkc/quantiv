@@ -15,18 +15,18 @@
     "skew_atm": -0.035562,
     "term_slope": -0.077564,
     "total_vega": 0.3188,
-    "em_method": "ml_unavailable",
-    "display_forecast_pct": null,
-    "display_forecast_method": "ml_unavailable",
+    "em_method": "options_math",
+    "display_forecast_pct": 0.071308,
+    "display_forecast_method": "options_math",
     "display_forecast_as_of": "2026-10-16",
     "ml_status": "unavailable_model",
     "options_status": "decision_eligible",
     "fallback_reason": null,
     "historical_event_count": null,
-    "timing": "unknown",
+    "hist_move_med_4q": 0.035815,
+    "timing": "bmo",
     "ml_publication_status": "held",
-    "ml_publication_reason": "no_eligible_current_forecast",
-    "hist_move_med_4q": 0.035815
+    "ml_publication_reason": "no_eligible_current_forecast"
   },
   "straddle_features": [
     {
@@ -109,12 +109,13 @@
       "ml_status": "unavailable_model",
       "ml_publication_status": "held",
       "ml_publication_reason": "no_eligible_current_forecast",
-      "display_forecast_pct": null,
-      "display_forecast_method": "ml_unavailable",
+      "display_forecast_pct": 0.0567738791423002,
+      "display_forecast_method": "straddle_implied",
       "display_forecast_as_of": "2026-10-16",
-      "em_method": "ml_unavailable",
-      "fallback_reason": null,
-      "options_status": "unavailable"
+      "options_status": "indicative",
+      "fallback_reason": "quote_quality",
+      "historical_event_count": null,
+      "em_method": "straddle_implied"
     },
     {
       "date": "2026-07-22",
@@ -480,5 +481,5 @@
     "iv_mom_week": 0.0369,
     "iv_mom_month": null
   },
-  "next_earnings_timing": "unknown"
+  "next_earnings_timing": "bmo"
 }
