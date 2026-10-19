@@ -3,7 +3,7 @@
   "as_of_date": "2026-10-16",
   "spot_price": 88.0,
   "expected_move": {
-    "earnings_date": "2026-10-28",
+    "earnings_date": "2026-11-09",
     "display_forecast_pct": 0.10221590909090911,
     "display_forecast_method": "straddle_implied",
     "display_forecast_as_of": "2026-10-16",
@@ -11,16 +11,16 @@
     "options_status": "indicative",
     "fallback_reason": "quote_quality",
     "historical_event_count": null,
-    "timing": "unknown",
+    "hist_move_med_4q": 0.063317,
+    "timing": "amc",
     "ml_publication_status": "held",
     "ml_publication_reason": "no_eligible_current_forecast",
-    "em_method": "straddle_implied",
-    "hist_move_med_4q": 0.063317
+    "em_method": "straddle_implied"
   },
   "straddle_features": [],
   "earnings_history": [
     {
-      "date": "2026-10-28",
+      "date": "2026-11-09",
       "timing": "after_market_close",
       "q": "Q3 26",
       "fiscal_year": 2026,
@@ -49,10 +49,10 @@
       "display_forecast_pct": 0.10221590909090911,
       "display_forecast_method": "straddle_implied",
       "display_forecast_as_of": "2026-10-16",
-      "em_method": "straddle_implied",
-      "fallback_reason": "quote_quality",
       "options_status": "indicative",
-      "historical_event_count": null
+      "fallback_reason": "quote_quality",
+      "historical_event_count": null,
+      "em_method": "straddle_implied"
     },
     {
       "date": "2026-08-06",
@@ -337,7 +337,7 @@
       "realized_label_source": "ohlcv_session_close"
     }
   ],
-  "next_earnings": "2026-10-28",
+  "next_earnings": "2026-11-09",
   "vol_regime": {
     "iv_current": 0.3371,
     "iv_rank": 0.387599,
@@ -348,5 +348,5 @@
     "iv_mom_week": -0.0879,
     "iv_mom_month": null
   },
-  "next_earnings_timing": "unknown"
+  "next_earnings_timing": "amc"
 }
