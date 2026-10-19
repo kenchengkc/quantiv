@@ -8,6 +8,7 @@ import json
 import math
 import re
 from datetime import date, datetime
+from decimal import Decimal
 from zoneinfo import ZoneInfo
 from pathlib import Path
 from typing import Any, Callable
@@ -378,6 +379,20 @@ def _symbol_page_signature(
     )
 
 
+def _forecast_values_close(left: float, right: float) -> bool:
+    """Apply the existing 1e-6 tolerances to serialized decimal values.
+
+    Binary subtraction can put a one-unit difference in six-decimal JSON just
+    outside the inclusive boundary (for example 0.115667 versus 0.115666).
+    Decimal comparison preserves that boundary without increasing tolerance.
+    """
+    if not math.isfinite(left) or not math.isfinite(right):
+        return False
+    a, b = Decimal(str(left)), Decimal(str(right))
+    tolerance = Decimal("0.000001")
+    return abs(a - b) <= max(tolerance, tolerance * max(abs(a), abs(b)))
+
+
 def validate_forecast_surface_parity() -> None:
     """Require the calendar to render the exact ticker-page forecast hierarchy."""
 
@@ -477,11 +492,9 @@ def validate_forecast_surface_parity() -> None:
         if calendar_signature is not None and symbol_signature is not None:
             if (
                 calendar_signature[0] != symbol_signature[0]
-                or not math.isclose(
+                or not _forecast_values_close(
                     calendar_signature[1],
                     symbol_signature[1],
-                    rel_tol=1e-6,
-                    abs_tol=1e-6,
                 )
             ):
                 raise ContractError(
@@ -502,11 +515,9 @@ def validate_forecast_surface_parity() -> None:
             if expected_value is None:
                 continue
             calendar_value = _positive_optional(calendar_event.get(field))
-            if calendar_value is None or not math.isclose(
+            if calendar_value is None or not _forecast_values_close(
                 calendar_value,
                 expected_value,
-                rel_tol=1e-6,
-                abs_tol=1e-6,
             ):
                 raise ContractError(
                     f"calendar hover component mismatch for {ticker} {event_date} "

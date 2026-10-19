@@ -165,6 +165,48 @@ def test_forecast_surface_parity_accepts_same_ml_headline(
     contracts.validate_forecast_surface_parity()
 
 
+@pytest.mark.parametrize("component_only", [False, True], ids=["headline", "hover"])
+@pytest.mark.parametrize(
+    ("calendar_iv", "accepted"),
+    [(0.115667, True), (0.1156670001, False), (0.115668, False)],
+)
+def test_forecast_surface_parity_decimal_tolerance_boundary(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    component_only: bool, calendar_iv: float, accepted: bool,
+) -> None:
+    # The failed ISRG refresh compared 0.115667 to 0.115666. Their decimal
+    # difference is exactly the existing 1e-6 tolerance, although subtracting
+    # their binary floats yields 1.000000000001e-6.
+    public = tmp_path / "public"
+    ml = {"em_ml_pct": 0.07} if component_only else {}
+    _write_forecast_surface_fixture(
+        public,
+        calendar_forecast={**ml, "em_iv_pct": calendar_iv},
+        symbol_forecast={**ml, "iv_pct": 0.115666},
+    )
+    monkeypatch.setattr(contracts, "PUBLIC", public)
+
+    if accepted:
+        contracts.validate_forecast_surface_parity()
+    else:
+        with pytest.raises(contracts.ContractError, match="mismatch"):
+            contracts.validate_forecast_surface_parity()
+
+
+def test_forecast_surface_parity_still_rejects_different_methods_at_equal_values(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    public = tmp_path / "public"
+    _write_forecast_surface_fixture(
+        public,
+        calendar_forecast={"em_iv_pct": 0.115666},
+        symbol_forecast={"em_ml_pct": 0.115666},
+    )
+    monkeypatch.setattr(contracts, "PUBLIC", public)
+    with pytest.raises(contracts.ContractError, match="resolved headline mismatch"):
+        contracts.validate_forecast_surface_parity()
+
+
 
 
 def test_forecast_surface_parity_resolves_legacy_symbol_iv(
