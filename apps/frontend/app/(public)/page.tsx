@@ -6,6 +6,7 @@ import {
   type CalendarReference,
 } from '@/lib/calendarReference';
 import { readPublicJson } from '@/lib/researchSnapshot.server';
+import { readCalendarTypicalRanges } from '@/lib/calendarTypicalRange.server';
 
 export const metadata: Metadata = {
   title: {
@@ -29,11 +30,16 @@ function weeklyPublication(): WeeklyData {
 }
 
 export default function Home() {
+  const initialData = weeklyPublication();
+  const calendar = readPublicJson<CalendarReference>('calendar-reference.json');
+  const typicalRanges = readCalendarTypicalRanges([
+    ...(calendar?.events ?? []), ...initialData.events,
+  ], initialData);
   return (
     <>
       <Splash />
       <div className="qv-m-pad" style={{ maxWidth: 1240, margin: '0 auto', padding: '0 28px 60px' }}>
-        <EarningsGrid initialData={weeklyPublication()} />
+        <EarningsGrid initialData={initialData} typicalRanges={typicalRanges} />
       </div>
     </>
   );
