@@ -43,6 +43,7 @@ import {
   type DisplayForecastMethod,
 } from '@/lib/displayForecast';
 import forecastStyles from './DisplayForecast.module.css';
+import type { CalendarTypicalRanges, HistoricalTypicalRange } from '@/lib/calendarTypicalRange';
 import sp500Constituents from '../../../lib/data/sp500-constituents.json';
 
 const SP500_SET: Set<string> = new Set(
@@ -60,6 +61,7 @@ interface EarningsEvent extends DisplayForecastFields {
   hist_move_avg_4q?: number | null;
   p25?: number | null;
   p75?: number | null;
+  historicalTypicalRange?: HistoricalTypicalRange | null;
   realized_move_pct?: number | null;
 }
 
@@ -125,15 +127,6 @@ function legacyForecastMethod(ev: EarningsEvent): DisplayForecastMethod | null {
   return null;
 }
 
-function forecastClass(method: DisplayForecastMethod | null): string {
-  if (method === 'ml') return `${forecastStyles.base} ${forecastStyles.ml}`;
-  if ((method === 'options_math' || method === 'straddle_implied')) return `${forecastStyles.base} ${forecastStyles.options}`;
-  if (method === 'options_indicative') return `${forecastStyles.base} ${forecastStyles.indicative}`;
-  if (method === 'historical') return `${forecastStyles.base} ${forecastStyles.historical}`;
-  if (method === 'historical_prior') return `${forecastStyles.base} ${forecastStyles.prior}`;
-  return forecastStyles.base;
-}
-
 function TooltipLine({ label, value, muted = false, marginTop = 0 }: { label: string; value: string; muted?: boolean; marginTop?: number }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginTop }}>
@@ -156,6 +149,7 @@ function ExpectedMoveHover({
   method,
   bandLo,
   bandHi,
+  historicalRangeCount,
   children,
 }: {
   movePct: number | null;
@@ -167,6 +161,7 @@ function ExpectedMoveHover({
   method: DisplayForecastMethod | null;
   bandLo: number | null | undefined;
   bandHi: number | null | undefined;
+  historicalRangeCount?: number;
   children: React.ReactNode;
 }) {
   const [show, setShow] = useState(false);
@@ -187,7 +182,7 @@ function ExpectedMoveHover({
   const mlLine = fmtMovePct(mlPct);
   const historicalLine = fmtMovePct(historicalPct);
   const bandLine =
-    method === 'ml' && bandLo != null && bandHi != null
+    bandLo != null && bandHi != null
       ? `${fmtMovePct(bandLo)}–${fmtMovePct(bandHi)}`
       : null;
   const hasTooltip = moveLine != null;
@@ -272,7 +267,7 @@ function ExpectedMoveHover({
             <TooltipLine label="ML forecast" value={mlHeld ? 'Held for this event' : 'Unavailable'} muted marginTop={4} />
           )}
           {bandLine != null && (
-            <TooltipLine label="Typical" value={bandLine} marginTop={4} />
+            <TooltipLine label={method === 'ml' ? 'Typical' : `Historical typical (${historicalRangeCount} reports)`} value={bandLine} marginTop={4} />
           )}
         </div>
       )}
@@ -299,8 +294,13 @@ function TickerRow({
       : null);
   const method = resolvedForecast.method ?? legacyForecastMethod(ev);
   const movePct = resolvedForecast.pct;
-  const bandLo = method === 'ml' ? ev.p25 : null;
-  const bandHi = method === 'ml' ? ev.p75 : null;
+  const range = method === 'ml' ? null : ev.historicalTypicalRange;
+  const rawLo = method === 'ml' ? ev.p25 : range?.low;
+  const rawHi = method === 'ml' ? ev.p75 : range?.high;
+  const validBand = movePct != null && rawLo != null && rawHi != null &&
+    Number.isFinite(rawLo) && Number.isFinite(rawHi) && rawLo >= 0 && rawHi >= rawLo;
+  const bandLo = validBand ? rawLo : null;
+  const bandHi = validBand ? rawHi : null;
   const realizedFromBackfill =
     live?.realizedDate && live.realizedDate === ev.earnings_date
       ? live.realizedMovePct ?? null
@@ -412,8 +412,9 @@ function TickerRow({
         method={method}
         bandLo={bandLo}
         bandHi={bandHi}
+        historicalRangeCount={range?.count}
       >
-        <div className={`serif tnum ${forecastClass(method)}`}>
+        <div className={`serif tnum ${forecastStyles.base}`}>
           {movePct != null ? (
             <>
               ±{(movePct * 100).toFixed(1)}
@@ -854,10 +855,12 @@ export default function EarningsGrid({
   initialOffset = 0,
   initialFilter = 'popular',
   initialData = null,
+  typicalRanges = {},
 }: {
   initialOffset?: number;
   initialFilter?: Filter;
   initialData?: WeeklyData | null;
+  typicalRanges?: CalendarTypicalRanges;
 }) {
   useEnsureCompanyNames();
 
@@ -1205,8 +1208,12 @@ export default function EarningsGrid({
       list = list.filter((e) => (resolveDisplayForecastCompat(e).pct ?? 0) >= 0.10);
     }
     if (search) list = list.filter((e) => e.ticker.startsWith(search));
-    return list;
-  }, [data, filter, search]);
+    return list.map((event) => {
+      const range = typicalRanges[`${event.ticker}|${event.earnings_date}`];
+      const asOf = event.display_forecast_as_of ?? data.metadata.as_of_date;
+      return { ...event, historicalTypicalRange: range?.asOf === asOf ? range : null };
+    });
+  }, [data, filter, search, typicalRanges]);
 
   const allTickerKey = useMemo(() => {
     if (!data) return '';
