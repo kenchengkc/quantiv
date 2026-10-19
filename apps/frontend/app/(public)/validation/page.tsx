@@ -1,5 +1,4 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import styles from './page.module.css';
 import { ValidationPublication } from '@/components/ValidationPublication';
 import { controlExceptionExplanation } from '@/lib/publicationPresentation';
@@ -8,7 +7,7 @@ import { requirePublicJson } from '@/lib/researchSnapshot.server';
 export const metadata: Metadata = {
   title: 'Research Validation',
   description:
-    'Audit Quantiv model performance, calibration, production controls, data quality, and evidence lineage.',
+    'Audit Quantiv model performance, calibration, production controls, and data quality.',
 };
 
 type Status =
@@ -214,14 +213,6 @@ function dateLabel(value: string | null | undefined): string {
   });
 }
 
-function shortHash(value: string | null | undefined): string {
-  if (!value) return 'Unavailable';
-  const clean = value.replace(/^sha256:/, '');
-  return clean.length > 18
-    ? `${clean.slice(0, 10)}…${clean.slice(-8)}`
-    : clean;
-}
-
 function tone(status: Status | boolean): { label: string; color: string } {
   if (
     status === true ||
@@ -360,12 +351,6 @@ export default function ValidationPage() {
       validation.horizons.map((row) => row.horizon_days),
   );
   const sourceIsFallback = validation.model_source.kind !== 'signed_champion';
-  const modelBundle = forecast.artifact_bundles.find(
-    (item) => item.name === 'model_bundle',
-  );
-  const forecastBundle = forecast.artifact_bundles.find(
-    (item) => item.name === 'forecast_snapshot',
-  );
   const weighted = validation.summary.weighted_coverage;
   const improvement = validation.summary.weighted_relative_mae_improvement;
   const modelMae = validation.summary.weighted_model_mae;
@@ -745,7 +730,7 @@ export default function ValidationPage() {
       <section className={styles.section} aria-labelledby="method">
         <SectionTitle
           kicker="Method"
-          description="The validation process can be reduced to three checks. Technical controls remain available in the audit trail below."
+          description="The validation process can be reduced to three checks."
         >
           <span id="method">How the result is earned</span>
         </SectionTitle>
@@ -808,140 +793,6 @@ export default function ValidationPage() {
         </div>
       </section>
 
-      <details className={styles.auditPanel}>
-        <summary>
-          <span>
-            <span className={styles.kicker}>Technical audit trail</span>
-            <strong>Evidence behind this page</strong>
-          </span>
-          <span aria-hidden>+</span>
-        </summary>
-
-        <div className={styles.auditBody}>
-          <div className={styles.lineageList}>
-            {[
-              [
-                'Forecast receipt',
-                shortHash(forecast.receipt_id),
-                forecast.receipt_file,
-              ],
-              [
-                'Model artifact',
-                shortHash(
-                  validation.model_source.artifact_sha256 ??
-                    modelBundle?.sha256,
-                ),
-                modelBundle?.producer ?? 'model trainer',
-              ],
-              [
-                'Forecast artifact',
-                shortHash(forecastBundle?.sha256),
-                forecastBundle?.producer ?? 'daily scoring',
-              ],
-              [
-                'Active bundle',
-                shortHash(validation.model_source.bundle_id),
-                validation.model_source.kind === 'signed_champion'
-                  ? 'signed champion'
-                  : 'preview fallback',
-              ],
-              [
-                'Control snapshot',
-                dateLabel(control.generated_at),
-                `${control.data.decision_scope ?? 'end_of_day_research'} · publication ${
-                  control.publication_eligible ? 'eligible' : 'blocked'
-                }`,
-              ],
-              ...(historical && admission
-                ? [
-                    [
-                      'Evaluation scope',
-                      'Historical out-of-sample',
-                      admission.protocol.method ??
-                        'signed historical admission',
-                    ],
-                    [
-                      'Admission receipt',
-                      shortHash(admission.admission_id),
-                      'signed model and cohort admission',
-                    ],
-                    [
-                      'Source bundle',
-                      shortHash(admission.source_bundle_id),
-                      'frozen before reserved evaluation',
-                    ],
-                    [
-                      'Serving bundle',
-                      shortHash(admission.serving_bundle_id),
-                      `${supportedHorizons.size} horizons · ${validation.horizons.length} admitted horizon/cohort pairs`,
-                    ],
-                    [
-                      'Reserved panel',
-                      shortHash(admission.panel_id),
-                      `Reservation ${shortHash(admission.reservation_id)}`,
-                    ],
-                    [
-                      'Reserved event window',
-                      `${boundary?.calendar_start.slice(0, 10)} – ${boundary?.calendar_end.slice(0, 10)}`,
-                      `Earliest snapshot ${boundary?.first_test_snapshot.slice(0, 10)}`,
-                    ],
-                  ]
-                : []),
-            ].map(([label, value, detail]) => (
-              <div key={label} className={styles.lineage}>
-                <span>{label}</span>
-                <strong className="mono">{value}</strong>
-                <span>{detail}</span>
-              </div>
-            ))}
-          </div>
-
-          {historical && admission ? (
-            <div className={styles.scopeCallout}>
-              <div>
-                <span className={styles.eyebrow}>Development checks</span>
-                <p>
-                  {
-                    validation.validation_protocol.walk_forward
-                      .expanding_windows
-                  }{' '}
-                  expanding walk-forward windows with{' '}
-                  {
-                    validation.validation_protocol.walk_forward
-                      .validation_window_days
-                  }
-                  d validation windows and a{' '}
-                  {validation.validation_protocol.walk_forward.purge_days}d
-                  purge are development evidence. They select the model before
-                  the reserved historical evaluation and are separate from the
-                  results above.
-                </p>
-                <p>
-                  Admission proves exclusion of reserved labels from this
-                  candidate’s fitting and selection.
-                  {admission.limitations.map((limitation) => (
-                    <span key={limitation}> {limitation}</span>
-                  ))}
-                </p>
-              </div>
-            </div>
-          ) : null}
-
-          <div className={styles.scopeCallout}>
-            <div>
-              <span className={styles.eyebrow}>Decision scope</span>
-              <p>
-                Quantiv outputs are end-of-day research evidence. Live stock
-                prices may update spot-derived inputs, but options, IV, Greeks
-                and other snapshot features remain frozen. The validation page
-                does not present executable option quotes or live-trading
-                signals.
-              </p>
-            </div>
-            <Link href="/about">Read methodology →</Link>
-          </div>
-        </div>
-      </details>
     </main>
   );
 }

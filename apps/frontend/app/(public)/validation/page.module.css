@@ -231,8 +231,7 @@
   font-weight: 500;
 }
 
-.detailPanel,
-.auditPanel {
+.detailPanel {
   margin-top: 14px;
   border: 1px solid var(--line);
   border-radius: 14px;
@@ -240,14 +239,12 @@
   background: var(--bg);
 }
 
-.detailPanel > summary,
-.auditPanel > summary {
+.detailPanel > summary {
   cursor: pointer;
   list-style: none;
 }
 
-.detailPanel > summary::-webkit-details-marker,
-.auditPanel > summary::-webkit-details-marker {
+.detailPanel > summary::-webkit-details-marker {
   display: none;
 }
 
@@ -570,93 +567,6 @@
   line-height: 1.65;
 }
 
-.auditPanel {
-  margin-top: 58px;
-}
-
-.auditPanel > summary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-  padding: 18px;
-}
-
-.auditPanel > summary > span:first-child {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-}
-
-.auditPanel > summary strong {
-  font-size: 17px;
-  font-weight: 500;
-}
-
-.auditPanel > summary > span:last-child {
-  color: var(--ink-3);
-  font-family: var(--font-jetbrains-mono), monospace;
-  font-size: 20px;
-}
-
-.auditPanel[open] > summary > span:last-child {
-  transform: rotate(45deg);
-}
-
-.auditBody {
-  border-top: 1px solid var(--line);
-}
-
-.lineageList {
-  padding: 0 18px;
-}
-
-.lineage {
-  display: grid;
-  grid-template-columns: 160px minmax(0, 1fr) minmax(220px, 0.8fr);
-  gap: 16px;
-  align-items: center;
-  padding: 13px 0;
-  border-bottom: 1px solid var(--line);
-  font-size: 11px;
-  overflow-wrap: anywhere;
-}
-
-.lineage > span {
-  color: var(--ink-3);
-}
-
-.lineage strong {
-  color: var(--ink);
-  font-size: 10.5px;
-  font-weight: 500;
-}
-
-.scopeCallout {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 24px;
-  padding: 18px;
-  background: var(--bg-2);
-}
-
-.scopeCallout p {
-  max-width: 760px;
-  margin: 8px 0 0;
-  color: var(--ink-3);
-  font-size: 11.5px;
-  line-height: 1.6;
-}
-
-.scopeCallout a {
-  flex: 0 0 auto;
-  margin-top: 14px;
-  color: var(--accent);
-  font-size: 11px;
-  white-space: nowrap;
-}
-
 @media (max-width: 900px) {
   .performanceHero,
   .operationsGrid {
@@ -691,14 +601,6 @@
   .methodGrid h3 {
     margin-top: 14px;
   }
-
-  .lineage {
-    grid-template-columns: 140px minmax(0, 1fr);
-  }
-
-  .lineage > span:last-child {
-    grid-column: 2;
-  }
 }
 
 @media (max-width: 640px) {
@@ -723,8 +625,7 @@
   }
 
   .previewNote,
-  .secondaryCalibration,
-  .scopeCallout {
+  .secondaryCalibration {
     align-items: flex-start;
     flex-direction: column;
   }
@@ -798,14 +699,5 @@
 
   .exception .statusPill {
     width: fit-content;
-  }
-
-  .lineage {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 5px;
-  }
-
-  .lineage > span:last-child {
-    grid-column: auto;
   }
 }

@@ -25,13 +25,6 @@ test('research validation presents a clear evidence hierarchy', async ({ page })
   });
   await expect(horizonDetails).not.toHaveAttribute('open', '');
 
-  const audit = page.locator('details').filter({
-    has: page.getByText('Evidence behind this page', { exact: true }),
-  });
-  await expect(audit).not.toHaveAttribute('open', '');
-  await audit.locator('summary').click();
-  await expect(page.getByText(/end-of-day research evidence/i)).toBeVisible();
-
   await expect(
     page.getByRole('heading', { name: 'Published forecast evidence' }),
   ).toHaveCount(0);
