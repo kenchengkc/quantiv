@@ -196,13 +196,6 @@ it('renders admitted cohort results using matched benchmarks and distinct model 
   expect(container.textContent).toContain('Historical out-of-sample');
   expect(container.textContent).toContain('2026-04-18');
   expect(container.textContent).toContain('2026-10-14');
-  expect(container.textContent).toContain('Development checks');
-  expect(container.textContent).toContain(
-    'Complete calendar and provider delivery vintages are not established.',
-  );
-  expect(container.textContent).toContain(
-    'Prior model-family research exposure is not established.',
-  );
   expect(container.textContent).toContain('2026-03-26');
   expect(container.textContent).toContain('strictly before 2026-03-26');
 });

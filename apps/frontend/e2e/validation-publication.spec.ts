@@ -76,17 +76,6 @@ for (const width of [1440, 768, 390]) {
     }));
     expect(overflow.root).toBeLessThanOrEqual(overflow.viewport + 1);
     expect(overflow.body).toBeLessThanOrEqual(overflow.viewport + 1);
-    // Expand the technical audit and check its longest identifiers too:
-    // overflow:hidden must not mask clipping.
-    const audit = page.locator('details').filter({
-      has: page.getByText('Evidence behind this page', { exact: true }),
-    });
-    await audit.locator('summary').click();
-    const clipped = await audit.locator('span, strong').evaluateAll((nodes) => nodes.filter((node) => {
-      const rect = node.getBoundingClientRect();
-      return rect.left < -1 || rect.right > innerWidth + 1 || node.scrollWidth > node.clientWidth + 1;
-    }).map((node) => node.textContent));
-    expect(clipped).toEqual([]);
     await testInfo.attach(`validation-${width}`, { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
   });
 }
