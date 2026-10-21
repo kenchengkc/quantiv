@@ -76,7 +76,7 @@ def compute_atm_straddle_pct(conn: duckdb.DuckDBPyConnection, ticker: str, as_of
         SELECT estimated_spot, atm_strike,
                call_mid, put_mid, call_iv, put_iv,
                call_delta, put_delta, call_vega, put_vega,
-               straddle_mid, straddle_pct, straddle_relative_spread
+               straddle_mid, straddle_pct, straddle_relative_spread, atm_iv
         FROM v_eligible_straddles
         WHERE ticker = ? AND as_of_date = ? AND expiry_date = ?
         LIMIT 1
@@ -100,13 +100,11 @@ def compute_atm_straddle_pct(conn: duckdb.DuckDBPyConnection, ticker: str, as_of
         straddle_price,
         straddle_pct,
         straddle_spread,
+        avg_iv,
     ) = pair
-    
-    # Average IV (vega-weighted if possible)
-    if call_vega and put_vega and (call_vega + put_vega) > 0:
-        avg_iv = (call_iv * call_vega + put_iv * put_vega) / (call_vega + put_vega)
-    else:
-        avg_iv = (call_iv + put_iv) / 2.0
+
+    # The eligible-pair view owns IV weighting for both current headlines and
+    # historical evidence, so independent publication paths cannot diverge.
     
     # Days to expiry
     days_to_expiry = (expiry_date - as_of_date).days
