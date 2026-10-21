@@ -6,9 +6,14 @@ from pathlib import Path
 
 import duckdb
 import pandas as pd
+import pytest
 
 from build_earnings_events import create_duckdb_views
-from frontend_data.payloads import _historical_option_evidence, build_symbol_detail
+from frontend_data.payloads import (
+    _historical_option_evidence,
+    build_symbol_detail,
+    enrich_reported_event_forecasts,
+)
 from math_baseline import _is_pre_event_observation
 
 
@@ -104,6 +109,63 @@ def _option(
         "option_volume": option_volume,
         "open_interest": open_interest,
     }
+
+
+@pytest.mark.parametrize(
+    ("call_vega", "put_vega", "expected_iv_move"),
+    [(0.0655, 0.0646, 0.138533), (0.1, 0.1, 0.138524),
+     (0.0, 0.0646, 0.138524), (None, 0.0646, 0.138524)],
+    ids=["INTC-unequal-vegas", "equal-vegas", "zero-vega", "missing-vega"],
+)
+def test_event_day_calendar_and_symbol_use_the_same_option_iv(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    call_vega: float | None, put_vega: float | None, expected_iv_move: float,
+) -> None:
+    # The October 21 refresh mixed an arithmetic historical IV with a
+    # vega-weighted current IV for this exact saved INTC pair.
+    snapshot, event_day = date(2026, 10, 19), date(2026, 10, 21)
+    rows = []
+    for side, bid, ask, delta, iv, vega in [
+        ("Call", 5.15, 5.25, 0.5298, 0.8056, call_vega),
+        ("Put", 5.35, 5.45, -0.4991, 0.7903, put_vega),
+    ]:
+        row = _option("INTC", side, bid=bid, ask=ask, delta=delta)
+        row.update(date=snapshot, expiration=date(2026, 10, 30), strike=94.0,
+                   vol=iv, vega=vega, quote_timestamp=None)
+        rows.append(row)
+    partition = tmp_path / "data/parquet/options_chain/year=2026/month=10/quotes.parquet"
+    partition.parent.mkdir(parents=True)
+    pd.DataFrame(rows).to_parquet(partition, index=False)
+
+    event = {"ticker": "INTC", "earnings_date": event_day.isoformat(), "timing": "amc"}
+    with duckdb.connect() as conn:
+        create_duckdb_views(conn, tmp_path / "data")
+        conn.execute("""CREATE TABLE earnings_events (
+            ticker VARCHAR, earnings_dt DATE, timing VARCHAR,
+            fiscal_year INTEGER, fiscal_q VARCHAR, eps_actual DOUBLE,
+            eps_estimate DOUBLE, revenue_actual DOUBLE, revenue_estimate DOUBLE,
+            source VARCHAR)""")
+        conn.execute("INSERT INTO earnings_events VALUES ('INTC', ?, 'amc', 2026, 'Q3', NULL, NULL, NULL, NULL, 'test')", [event_day])
+        enrich_reported_event_forecasts(conn, [event], today=event_day, archive={})
+        symbol = build_symbol_detail(conn, "INTC", snapshot, event_day)
+
+    assert symbol["expected_move"]["iv_pct"] == expected_iv_move
+    assert event["em_iv_pct"] == expected_iv_move
+    assert event["as_of_date"] == snapshot.isoformat()
+    assert symbol["as_of_date"] == snapshot.isoformat()
+    assert event["expiry_date"] == symbol["expected_move"]["expiration"] == "2026-10-30"
+
+    # Exercise the same publication gate that stopped the real refresh.
+    import validate_public_contracts as contracts
+    public = tmp_path / "public"
+    (public / "weeks").mkdir(parents=True)
+    (public / "symbols").mkdir()
+    (public / "weeks/2026-10-19.json").write_text(json.dumps({
+        "metadata": {"as_of_date": snapshot.isoformat()}, "events": [event],
+    }))
+    (public / "symbols/INTC.json").write_text(json.dumps(symbol))
+    monkeypatch.setattr(contracts, "PUBLIC", public)
+    contracts.validate_forecast_surface_parity()
 
 
 def test_historical_evidence_reuses_cached_pairs_and_filters_unrelated_symbols(

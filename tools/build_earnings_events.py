@@ -610,7 +610,16 @@ def create_duckdb_views(conn: duckdb.DuckDBPyConnection, data_dir: Path):
             strike AS estimated_spot,
             strike AS atm_strike,
             straddle_mid / NULLIF(strike, 0) AS straddle_pct,
-            (call_iv + put_iv) / 2.0 AS atm_iv,
+            -- Current headlines and historical evidence must use the same IV.
+            -- Preserve the current baseline's vega weighting when usable;
+            -- missing or unusable weights fall back to the arithmetic mean.
+            CASE
+                WHEN call_vega > 0 AND put_vega > 0
+                    AND isfinite(call_vega) AND isfinite(put_vega)
+                THEN (call_iv * call_vega + put_iv * put_vega)
+                    / (call_vega + put_vega)
+                ELSE (call_iv + put_iv) / 2.0
+            END AS atm_iv,
             'decision_eligible_eod'::VARCHAR AS quote_quality_status,
             ROW_NUMBER() OVER (
                 PARTITION BY ticker, as_of_date, expiry_date
