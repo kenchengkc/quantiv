@@ -1,42 +1,41 @@
 {
   "schema": "quantiv.dashboard-evidence.v1",
-  "receipt_id": "sha256:ed29db62e3bf8de24cbbcba8ee717342e6bbeebb95c3a13b3a78d59c2578ff76",
-  "receipt_file": "forecasts_2026-10-20.ed29db62e3bf.receipt.json",
-  "validated_at": "2026-10-20T07:29:34.349007+00:00",
+  "receipt_id": "sha256:8b7783fbe15f56e86258355a451bcbb07300e9b067285f209dca763a8c2a7e0c",
+  "receipt_file": "forecasts_2026-10-21.8b7783fbe15f.receipt.json",
+  "validated_at": "2026-10-21T10:11:11.186436+00:00",
   "quality": {
     "status": "passed",
     "issue_count": 0,
     "issue_codes": []
   },
   "coverage": {
-    "rows": 890,
-    "symbols": 872,
-    "events": 890,
+    "rows": 823,
+    "symbols": 812,
+    "events": 823,
     "horizons": [
       1,
       2,
       4,
       6,
       7,
+      10,
       11,
-      12,
       13,
       14,
       15,
+      17,
       18,
-      19,
       20,
-      22,
-      24
+      22
     ]
   },
   "observation_window": {
-    "earnings_max": "2026-11-10",
-    "earnings_min": "2026-10-20",
-    "scored_at_max": "2026-10-20T07:12:44.192742+00:00",
-    "scored_at_min": "2026-10-20T07:12:43.154001+00:00",
-    "snapshot_max": "2026-10-19",
-    "snapshot_min": "2026-10-16"
+    "earnings_max": "2026-11-11",
+    "earnings_min": "2026-10-21",
+    "scored_at_max": "2026-10-21T09:54:00.090573+00:00",
+    "scored_at_min": "2026-10-21T09:53:59.269315+00:00",
+    "snapshot_max": "2026-10-20",
+    "snapshot_min": "2026-10-19"
   },
   "controls": {
     "evaluated": 13,
@@ -52,8 +51,8 @@
       "ml_only_point_outside_band": 0,
       "ml_only_quantile_crossings": 0,
       "non_finite_ml_rows": 0,
-      "optionless_ml_rows": 852,
-      "strict_option_rows": 38,
+      "optionless_ml_rows": 736,
+      "strict_option_rows": 87,
       "strict_reconciliation": {
         "absolute_move_mismatches": 0,
         "blank_symbols": 0,
@@ -70,7 +69,7 @@
         "invalid_quote_quality_labels": 0,
         "iv_formula_mismatches": 0,
         "leg_mid_mismatches": 0,
-        "max_point_median_gap": 0.009866633780130751,
+        "max_point_median_gap": 0.011774798933357256,
         "non_finite_values": 0,
         "out_of_range_move_rows": 0,
         "point_outside_band": 0,
@@ -86,16 +85,16 @@
     {
       "name": "model_bundle",
       "producer": "apps/ml/model_trainer.py",
-      "member_count": 105,
-      "bytes": 51738775,
-      "sha256": "f0a56228f5572f1c3b9a372da31ab255712ddebbc3c38abbe7c6b723a93427e9"
+      "member_count": 98,
+      "bytes": 50997163,
+      "sha256": "f7aba8891dbfeac4fbcf0078304c237fa9d5969422991c88e5eda9c9c77a1347"
     },
     {
       "name": "forecast_snapshot",
       "producer": "scripts/daily_score.py",
       "member_count": 1,
-      "bytes": 683945,
-      "sha256": "a1cc2596ea4ce52f19f5d7e8395464c63f969ceb4e2b960d6562601a6a9189eb"
+      "bytes": 655615,
+      "sha256": "7e16c11c628d6736c42839cd6fc7f13baa35690bd7bbe6c38d94ba16d3c2c7b3"
     }
   ]
 }

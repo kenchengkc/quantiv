@@ -1,21 +1,20 @@
 {
   "symbol": "UBSI",
-  "as_of_date": "2026-10-16",
-  "spot_price": 46.69,
+  "as_of_date": "2026-10-19",
+  "spot_price": 46.33,
   "expected_move": {
     "earnings_date": "2026-10-21",
-    "display_forecast_pct": 0.04879011046817472,
-    "display_forecast_method": "historical_prior",
-    "display_forecast_as_of": "2026-10-16",
-    "ml_status": "unavailable_model",
-    "options_status": "unavailable",
-    "fallback_reason": "insufficient_ticker_history",
-    "historical_event_count": 1,
     "hist_move_med_4q": 0.009593,
     "timing": "unknown",
+    "ml_status": "unavailable_model",
     "ml_publication_status": "held",
     "ml_publication_reason": "no_eligible_current_forecast",
-    "em_method": "historical_prior"
+    "options_status": "unavailable",
+    "display_forecast_pct": null,
+    "display_forecast_method": "ml_unavailable",
+    "display_forecast_as_of": "2026-10-19",
+    "em_method": "ml_unavailable",
+    "fallback_reason": null
   },
   "straddle_features": [],
   "earnings_history": [
@@ -46,13 +45,12 @@
       "ml_status": "unavailable_model",
       "ml_publication_status": "held",
       "ml_publication_reason": "no_eligible_current_forecast",
-      "display_forecast_pct": 0.04879011046817472,
-      "display_forecast_method": "historical_prior",
-      "display_forecast_as_of": "2026-10-16",
       "options_status": "unavailable",
-      "fallback_reason": "insufficient_ticker_history",
-      "historical_event_count": 1,
-      "em_method": "historical_prior"
+      "display_forecast_pct": null,
+      "display_forecast_method": "ml_unavailable",
+      "display_forecast_as_of": "2026-10-19",
+      "em_method": "ml_unavailable",
+      "fallback_reason": null
     },
     {
       "date": "2026-07-23",
@@ -332,13 +330,13 @@
   ],
   "next_earnings": "2026-10-21",
   "vol_regime": {
-    "iv_current": 0.311,
-    "iv_rank": 0.513502,
-    "iv_year_high": 0.4281,
-    "iv_year_low": 0.1874,
-    "hv_current": 0.1404,
-    "hv_rank": 0.08782,
-    "iv_mom_week": -0.0099,
+    "iv_current": null,
+    "iv_rank": null,
+    "iv_year_high": null,
+    "iv_year_low": null,
+    "hv_current": 0.1408,
+    "hv_rank": 0.089911,
+    "iv_mom_week": null,
     "iv_mom_month": null
   },
   "next_earnings_timing": "unknown"

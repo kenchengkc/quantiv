@@ -1,10 +1,10 @@
 {
   "symbol": "NPB",
-  "as_of_date": "2026-10-16",
-  "spot_price": 15.52,
+  "as_of_date": "2026-10-19",
+  "spot_price": 15.32,
   "expected_move": {
     "earnings_date": "2026-10-20",
-    "timing": "after_market_close",
+    "timing": "amc",
     "em_ml_pct": 0.037452,
     "em_ml_abs": 0.573758,
     "model_horizon": 1,
@@ -23,15 +23,14 @@
     "forecast_frozen": true,
     "forecast_id": "84fed1720bc4a06b32be28b85f4dc2627c3cd93f707cda58e3f1e8af76987593",
     "forecast_model_bundle_id": "d14dc7f2aa6b175956922eb6266b8523742add962668b7d6b8833cc2c869dd1b",
+    "ml_publication_status": "eligible",
     "forecast_scored_at": "2026-10-20T07:12:43.154001+00:00",
+    "forecast_published_at": "2026-10-20T08:10:20.036672+00:00",
     "forecast_feature_cutoff_at": "2026-10-20T19:55:00+00:00",
     "forecast_prediction_deadline_at": "2026-10-20T19:55:00+00:00",
     "forecast_feature_snapshot_at": "2026-10-19T20:00:00+00:00",
     "forecast_feature_hash": "69e0514b1c65f7325aad2b5125163342844cfbcd6b2765a325c5d21a4b333620",
-    "forecast_frozen_eligible": true,
-    "ml_publication_status": "eligible",
-    "fallback_reason": null,
-    "hist_move_med_4q": 0.028343
+    "forecast_frozen_eligible": true
   },
   "straddle_features": [],
   "earnings_history": [
@@ -66,6 +65,7 @@
       "forecast_id": "84fed1720bc4a06b32be28b85f4dc2627c3cd93f707cda58e3f1e8af76987593",
       "forecast_model_bundle_id": "d14dc7f2aa6b175956922eb6266b8523742add962668b7d6b8833cc2c869dd1b",
       "forecast_scored_at": "2026-10-20T07:12:43.154001+00:00",
+      "forecast_published_at": "2026-10-20T08:10:20.036672+00:00",
       "forecast_feature_cutoff_at": "2026-10-20T19:55:00+00:00",
       "forecast_prediction_deadline_at": "2026-10-20T19:55:00+00:00",
       "forecast_feature_snapshot_at": "2026-10-19T20:00:00+00:00",
@@ -83,8 +83,7 @@
       "options_status": "unavailable",
       "fallback_reason": null,
       "forecast_frozen": true,
-      "ml_publication_status": "eligible",
-      "em_method": "ml_lightgbm"
+      "ml_publication_status": "eligible"
     },
     {
       "date": "2026-07-21",
