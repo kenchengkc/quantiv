@@ -9,6 +9,7 @@ reported events survive a rebuild while upcoming ones stay fail-closed.
 from __future__ import annotations
 
 from datetime import date
+import json
 
 import pytest
 
@@ -62,6 +63,77 @@ def test_event_reporting_today_is_retained():
     merged = preserve_reported_events([], prior, date(2026, 9, 11))
 
     assert [e["ticker"] for e in merged] == ["KR"]
+
+
+def _banr_forecasts():
+    prior = _event(
+        "BANR", "2026-10-21", timing="amc", em_ml_pct=0.019621,
+        display_forecast_pct=0.019621, display_forecast_method="ml",
+        ml_snapshot_date="2026-10-19", model_horizon=2,
+        forecast_id="prior-two-day", forecast_feature_hash="prior-features",
+        forecast_frozen_eligible=True, p10=0.01, p90=0.04,
+    )
+    fresh = _event(
+        "BANR", "2026-10-21", timing="amc", em_ml_pct=0.023732,
+        display_forecast_pct=0.023732, display_forecast_method="ml",
+        ml_snapshot_date="2026-10-20", model_horizon=1,
+        forecast_id="current-one-day", forecast_feature_hash="current-features",
+        forecast_frozen_eligible=True, p10=0.015, p90=0.05,
+    )
+    return prior, fresh
+
+
+def test_same_day_unreported_refresh_keeps_current_admitted_forecast(tmp_path, monkeypatch):
+    from frontend_data.forecast_artifacts import withhold_upcoming_ml
+    import validate_public_contracts as contracts
+
+    prior, fresh = _banr_forecasts()
+    events = preserve_reported_events([fresh], [prior], date(2026, 10, 21))
+    (tmp_path / "weeks").mkdir()
+    (tmp_path / "symbols").mkdir()
+    week = tmp_path / "weeks/2026-10-19.json"
+    week.write_text(json.dumps({"metadata": {"as_of_date": "2026-10-20"}, "events": events}))
+    (tmp_path / "symbols/BANR.json").write_text(json.dumps({
+        "symbol": "BANR", "as_of_date": "2026-10-20", "expected_move": fresh,
+        "earnings_history": [], "straddle_features": [],
+    }))
+    withhold_upcoming_ml(tmp_path, today=date(2026, 10, 21),
+        eligible_forecast_ids={fresh["forecast_id"]},
+        eligible_event_keys={"BANR|2026-10-21"})
+    monkeypatch.setattr(contracts, "PUBLIC", tmp_path)
+    contracts.validate_forecast_surface_parity()
+    published = json.loads(week.read_text())["events"][0]
+    for key in ("em_ml_pct", "forecast_id", "forecast_feature_hash", "ml_snapshot_date", "model_horizon", "p10", "p90"):
+        assert published[key] == fresh[key]
+
+
+@pytest.mark.parametrize("reported_in", ["fresh", "prior", "other_surface", "past"])
+def test_reported_refresh_preserves_forecast_identity_with_value(reported_in):
+    prior, fresh = _banr_forecasts()
+    if reported_in == "fresh":
+        fresh["eps_actual"] = 0.0
+    elif reported_in == "prior":
+        prior["revenue_actual"] = 123.0
+    fresh["realized_move_pct"] = -0.03
+    fresh["forecast_published_at"] = "2026-10-21T10:00:00Z"
+    today = date(2026, 10, 22) if reported_in == "past" else date(2026, 10, 21)
+    kwargs = {"reported_event_keys": {"BANR|2026-10-21"}} if reported_in == "other_surface" else {}
+    event = preserve_reported_events([fresh], [prior], today, **kwargs)[0]
+    for key in ("em_ml_pct", "forecast_id", "forecast_feature_hash", "ml_snapshot_date", "model_horizon", "p10", "p90"):
+        assert event[key] == prior[key]
+    assert "forecast_published_at" not in event
+    assert event["realized_move_pct"] == -0.03
+
+
+def test_reported_legacy_forecast_does_not_inherit_fresh_admission_identity():
+    prior, fresh = _banr_forecasts()
+    for key in list(prior):
+        if key.startswith("forecast_"):
+            prior.pop(key)
+    event = preserve_reported_events([fresh], [prior], date(2026, 10, 22))[0]
+    assert event["em_ml_pct"] == prior["em_ml_pct"]
+    assert "forecast_id" not in event
+    assert "forecast_frozen_eligible" not in event
 
 
 def test_fresh_rows_win_over_retained_rows():

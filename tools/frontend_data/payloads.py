@@ -18,7 +18,7 @@ from fiscal_calendar import (
 )
 from math_baseline import compute_em_math
 
-from .forecast_artifacts import ml_fields, provider_event_fields
+from .forecast_artifacts import has_reported_actuals, ml_fields, provider_event_fields
 from .shared import WEEK_OFFSETS, jsonable
 from .realized_moves import reaction_label_lookup, timing_bucket
 
@@ -1389,6 +1389,8 @@ def preserve_reported_events(
     prior_events: list[dict],
     today: date,
     canonical: set[tuple[str, str]] | None = None,
+    *,
+    reported_event_keys: set[str] | None = None,
 ) -> list[dict]:
     """Carry the last pre-event forecast forward while refreshing outcomes.
 
@@ -1397,6 +1399,10 @@ def preserve_reported_events(
     once the event reports they must remain the last published pre-event values,
     because recomputing them after the print either fails or leaks post-event
     information into a supposedly point-in-time forecast.
+
+    Same-day events remain current until actuals confirm reporting. Preserve
+    forecast values and their identity together; an old value must never inherit
+    a newly admitted forecast's ID or evidence.
     """
     forecast_fields = {
         "as_of_date",
@@ -1427,7 +1433,10 @@ def preserve_reported_events(
         "display_forecast_method",
         "display_forecast_as_of",
         "ml_status",
+        "ml_publication_status",
         "options_status",
+        "options_publication_status",
+        "options_source_date",
         "fallback_reason",
         "historical_event_count",
     }
@@ -1444,14 +1453,27 @@ def preserve_reported_events(
         key = (event["ticker"], event["earnings_date"])
         fresh_keys.add(key)
         prior = prior_by_key.get(key)
-        if prior is None or event["earnings_date"] > cutoff:
+        reported = event["earnings_date"] < cutoff or (
+            event["earnings_date"] == cutoff
+            and (
+                has_reported_actuals(event)
+                or has_reported_actuals(prior or {})
+                or f"{key[0].upper()}|{key[1]}" in (reported_event_keys or ())
+            )
+        )
+        if prior is None or not reported:
             merged_fresh.append(event)
             continue
 
         merged = {**prior, **event}
-        for field in forecast_fields:
-            if prior.get(field) is not None:
+        evidence_fields = forecast_fields | {
+            field for field in merged if field.startswith("forecast_")
+        }
+        for field in evidence_fields:
+            if field in prior:
                 merged[field] = prior[field]
+            else:
+                merged.pop(field, None)
         merged_fresh.append(merged)
 
     retained = [

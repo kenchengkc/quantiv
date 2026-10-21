@@ -295,7 +295,8 @@ def main():
                 try:
                     prior = json.loads(wk_path.read_text())
                     merged = preserve_reported_events(
-                        events, prior.get("events", []), today, canonical_keys
+                        events, prior.get("events", []), today, canonical_keys,
+                        reported_event_keys=reported_event_keys,
                     )
                     if len(merged) > len(events):
                         print(
