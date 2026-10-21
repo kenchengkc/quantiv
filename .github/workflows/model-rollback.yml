@@ -98,7 +98,7 @@ jobs:
       - name: Rescore signed previous bundle
         run: |
           python scripts/setup_duckdb_from_parquet.py
-          python scripts/daily_score.py --days-ahead 21 \
+          python scripts/daily_score.py \
             --models-dir "data/models/bundles/$ROLLBACK_TARGET" \
             --output-path data/validation/provenance-recovery/forecast.parquet
 

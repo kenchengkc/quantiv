@@ -307,6 +307,13 @@ def build_release(
         "deduplicated_event_count": len(dropped),
         "universe_id": universe_id,
     }
+    return _write_release(release, receipt_core, output_dir)
+
+
+def _write_release(
+    release: dict[str, Any], receipt_core: dict[str, Any], output_dir: Path,
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+    release_id = release["release_id"]
     receipt_id = _canonical_id(receipt_core)
     receipt = {"receipt_id": receipt_id, **receipt_core}
     pointer = {
@@ -328,6 +335,47 @@ def build_release(
     _atomic_json(receipt_path, receipt)
     _atomic_json(output_dir / "current.json", pointer)
     return release, receipt, pointer
+
+
+def refresh_universe(
+    *, calendar: Path = DEFAULT_CALENDAR, symbols_dir: Path = DEFAULT_SYMBOLS_DIR,
+    output_dir: Path = DEFAULT_OUTPUT_DIR,
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+    """Bind the final symbol set to the exact already-verified calendar source.
+
+    Frontend generation can add symbols after the independent calendar release
+    was built. Reuse that source's original observation and window; this is a
+    membership update, never new provider evidence or a freshness extension.
+    """
+    prior_release, prior_receipt, prior_pointer = verify_release(output_dir)
+    if not calendar.is_file() or _sha256_file(calendar) != prior_receipt["source_file"]["sha256"]:
+        raise RuntimeError("calendar source hash differs from the verified reference receipt")
+    if prior_receipt.get("integrity", {}).get("status") != "passed":
+        raise RuntimeError("calendar source integrity must have passed before universe refresh")
+    symbols, universe_id = load_universe(symbols_dir)
+    if universe_id == prior_release["universe"]["id"]:
+        return prior_release, prior_receipt, prior_pointer
+    events, dropped = load_events(
+        calendar, set(symbols), date.fromisoformat(prior_release["window"]["start"]),
+        date.fromisoformat(prior_release["window"]["end"]),
+    )
+    if not events:
+        raise RuntimeError("calendar reference has no events in the retained calendar window")
+    release_core = {
+        "schema": RELEASE_SCHEMA,
+        "universe": {**prior_release["universe"], "id": universe_id, "size": len(symbols)},
+        "window": prior_release["window"],
+        "events": events,
+    }
+    release_id = _canonical_id(release_core)
+    receipt_core = {
+        **{key: value for key, value in prior_receipt.items() if key != "receipt_id"},
+        "release_id": release_id,
+        "event_count": len(events),
+        "deduplicated_event_count": len(dropped),
+        "universe_id": universe_id,
+    }
+    return _write_release({"release_id": release_id, **release_core}, receipt_core, output_dir)
 
 
 def verify_release(output_dir: Path = DEFAULT_OUTPUT_DIR) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
@@ -398,6 +446,11 @@ def main() -> int:
     build.add_argument("--source-revision", default=None)
     build.add_argument("--not-before", required=True)
 
+    refresh = sub.add_parser("refresh-universe")
+    refresh.add_argument("--calendar", type=Path, default=DEFAULT_CALENDAR)
+    refresh.add_argument("--symbols-dir", type=Path, default=DEFAULT_SYMBOLS_DIR)
+    refresh.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
+
     verify = sub.add_parser("verify")
     verify.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
 
@@ -421,6 +474,15 @@ def main() -> int:
         print(
             f"calendar reference {release['release_id']} — {len(release['events'])} events; "
             f"receipt {receipt['receipt_id']}; observed {receipt['observed_at']}"
+        )
+        return 0
+    if args.command == "refresh-universe":
+        release, receipt, _ = refresh_universe(
+            calendar=args.calendar, symbols_dir=args.symbols_dir, output_dir=args.output_dir,
+        )
+        print(
+            f"calendar universe {release['universe']['size']} symbols — "
+            f"{len(release['events'])} events; retained observation {receipt['observed_at']}"
         )
         return 0
     if args.command == "verify":

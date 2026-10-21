@@ -4,6 +4,8 @@ import csv
 from datetime import date, datetime, timedelta, timezone
 import json
 from pathlib import Path
+import subprocess
+import sys
 
 import pytest
 
@@ -124,6 +126,47 @@ def test_reference_collapses_revisions_using_existing_rule(tmp_path: Path) -> No
     assert by_ticker["BBB"]["timing"] == "amc"
     assert by_ticker["CCC"]["earnings_date"] == (monday + timedelta(days=3)).isoformat()
     assert len(dropped) == 2
+
+
+def _refresh_universe(paths: dict[str, Path]) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        [sys.executable, str(Path(__file__).resolve().parents[1] / "calendar_reference.py"),
+         "refresh-universe", "--calendar", str(paths["calendar"]),
+         "--symbols-dir", str(paths["symbols"]), "--output-dir", str(paths["output"])],
+        capture_output=True, text=True,
+    )
+
+
+def test_final_symbol_universe_uses_retained_source_evidence(tmp_path: Path) -> None:
+    paths = _fixture(tmp_path, date(2026, 9, 9))
+    prior_release, prior_receipt, prior_pointer = _build(paths, date(2026, 9, 9))
+    (paths["symbols"] / "ZZZ.json").write_text("{}\n")
+    # A provider-free rebuild cannot claim a new calendar observation.
+    paths["metadata"].unlink()
+    result = _refresh_universe(paths)
+    assert result.returncode == 0, result.stderr
+    release, receipt, pointer = verify_release(paths["output"])
+    assert {event["ticker"] for event in release["events"]} == {"AAA", "BBB", "CCC", "ZZZ"}
+    assert release["window"] == prior_release["window"]
+    for field in ("source_file", "source_evidence", "observed_at", "source_revision", "integrity"):
+        assert receipt[field] == prior_receipt[field]
+    assert pointer["release_id"] != prior_pointer["release_id"]
+    assert (paths["output"] / prior_pointer["release"]).is_file()
+    assert (paths["output"] / prior_pointer["receipt"]).is_file()
+    assert _refresh_universe(paths).returncode == 0
+    assert verify_release(paths["output"])[2] == pointer
+
+
+def test_universe_refresh_rejects_changed_calendar_without_replacing_pointer(tmp_path: Path) -> None:
+    paths = _fixture(tmp_path, date(2026, 9, 9))
+    _, _, pointer = _build(paths, date(2026, 9, 9))
+    (paths["symbols"] / "ZZZ.json").write_text("{}\n")
+    with paths["calendar"].open("a") as handle:
+        handle.write("\n")
+    result = _refresh_universe(paths)
+    assert result.returncode != 0
+    assert "calendar source hash" in result.stderr
+    assert verify_release(paths["output"])[2] == pointer
 
 
 def test_build_is_content_addressed_and_excludes_outside_universe(tmp_path: Path) -> None:

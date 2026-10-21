@@ -503,13 +503,27 @@ def _distinct_votes(votes: list[Vote]) -> list[Vote]:
 
 
 def _latest_announcement(rows: list[Announcement]) -> Announcement:
-    return max(
+    latest = max(
         rows,
         key=lambda row: (
             str(row.get("published_on") or ""),
             str(row.get("provider") or ""),
         ),
     )
+    # Publication dates have day precision. A summary without a session must
+    # not hide an explicit session from the same day's announcement for the
+    # same event. Never carry a session across a newer revision or date change.
+    contemporaneous = [row for row in rows
+                       if row.get("date") == latest.get("date")
+                       and row.get("published_on") == latest.get("published_on")]
+    explicit = [row for row in contemporaneous
+                if normalize_timing(row.get("timing")) != "unknown"]
+    sessions = {normalize_timing(row.get("timing")) for row in explicit}
+    if len(sessions) > 1:
+        return {**latest, "timing": "unknown", "timing_conflict": True}
+    if explicit:
+        return max(explicit, key=lambda row: str(row.get("provider") or ""))
+    return latest
 
 
 def alpha_article_mentions_symbol(
@@ -693,6 +707,7 @@ def choose_canonical_event(
 
     if (
         timing == "unknown"
+        and not (announcement or {}).get("timing_conflict")
         and baseline_confirmed
         and baseline
         and baseline.get("date") == chosen_date
@@ -821,25 +836,59 @@ def fetch_finnhub_calendar(
     start: date,
     end: date,
     key: str | None,
+    *,
+    max_requests: int = 32,
+    request_delay: float = 1.05,
 ) -> tuple[list[Vote], dict[str, Any]]:
     if not key:
         return [], {"status": "missing_key"}
-    status, payload, error = _request_json(
-        "https://finnhub.io/api/v1/calendar/earnings",
-        params={"from": start.isoformat(), "to": end.isoformat(), "token": key},
-        secret=key,
-    )
-    if payload is None:
-        return [], {"status": "error", "http_status": status, "error": error}
-    rows = payload.get("earningsCalendar") if isinstance(payload, dict) else []
-    votes = [
-        vote
-        for row in rows or []
-        if isinstance(row, dict)
-        for vote in [_vote("finnhub_calendar", row.get("symbol"), row.get("date"), row.get("hour"))]
-        if vote is not None and start <= date.fromisoformat(vote["date"]) <= end
-    ]
-    return votes, {"status": "ok", "http_status": status, "rows": len(votes)}
+    if end < start or max_requests < 1:
+        raise ValueError("calendar window and request budget must be positive")
+    # The provider silently caps a response at 1,500 rows. Split saturated
+    # windows until every leaf is complete; never treat a capped day as complete.
+    pending = [(start, end)]
+    votes_by_key: dict[tuple[str, str, str], Vote] = {}
+    incomplete: list[dict[str, Any]] = []
+    requests_made = 0
+    http_status = None
+    while pending:
+        window_start, window_end = pending.pop()
+        window = {"from": window_start.isoformat(), "to": window_end.isoformat()}
+        if requests_made >= max_requests:
+            incomplete.append({**window, "reason": "request_budget_exhausted"})
+            continue
+        if requests_made:
+            time.sleep(request_delay)
+        http_status, payload, error = _request_json(
+            "https://finnhub.io/api/v1/calendar/earnings",
+            params={**window, "token": key},
+            secret=key,
+            retries=0,
+        )
+        requests_made += 1
+        rows = payload.get("earningsCalendar") if isinstance(payload, dict) else None
+        if not isinstance(rows, list):
+            incomplete.append({**window, "reason": error or "unexpected_response_shape",
+                               "http_status": http_status})
+            continue
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            vote = _vote("finnhub_calendar", row.get("symbol"), row.get("date"), row.get("hour"))
+            if vote and vote["symbol"] and window_start <= date.fromisoformat(vote["date"]) <= window_end:
+                votes_by_key[(vote["symbol"], vote["date"], vote["timing"])] = vote
+        if len(rows) >= 1500:
+            if window_start == window_end:
+                incomplete.append({**window, "reason": "single_day_row_cap"})
+            else:
+                middle = window_start + (window_end - window_start) // 2
+                pending.extend([(middle + timedelta(days=1), window_end), (window_start, middle)])
+    votes = list(votes_by_key.values())
+    return votes, {
+        "status": ("partial" if votes else "error") if incomplete else "ok",
+        "http_status": http_status, "rows": len(votes), "requests": requests_made,
+        "coverage_complete": not incomplete, "incomplete_windows": incomplete,
+    }
 
 
 def fetch_alphavantage_calendar(
@@ -893,7 +942,8 @@ def fetch_fmp_calendar(
         return [], {"status": "missing_key"}
     status, payload, error = _request_json(
         "https://financialmodelingprep.com/stable/earnings-calendar",
-        params={"apikey": key},
+        params={"apikey": key, "from": start.isoformat(), "to": end.isoformat(),
+                "includeReportTimes": "true"},
         secret=key,
     )
     if payload is None:
@@ -1702,6 +1752,7 @@ def _collect_announcements(
     twelvedata_max_symbols: int = 80,
     finnhub_max_requests: int = 3000,
     company_names: dict[str, str] | None = None,
+    candidate_dates: dict[str, str] | None = None,
 ) -> tuple[dict[str, list[Announcement]], dict[str, Any]]:
     evidence: dict[str, list[Announcement]] = defaultdict(list)
     status: dict[str, Any] = {
@@ -1731,7 +1782,23 @@ def _collect_announcements(
         if index + 1 < len(symbols) and finnhub_key:
             time.sleep(finnhub_delay)
 
-    press_symbols = symbols[:twelvedata_max_symbols]
+    def unresolved_symbols() -> list[str]:
+        pending = []
+        for index, symbol in enumerate(symbols):
+            chosen, _ = _announcement_decision(evidence[symbol], as_of=today)
+            expected_date = (candidate_dates or {}).get(symbol)
+            same_event = not expected_date or chosen and chosen["date"] == expected_date
+            if chosen and same_event and normalize_timing(chosen.get("timing")) in {"bmo", "amc"}:
+                continue
+            # Full press releases can fill a truncated summary's missing
+            # session. Prefer the nearest announced event, then retain the
+            # original calendar risk order for names without direct evidence.
+            announced_date = (str(chosen["date"]) if chosen
+                              else expected_date or date.max.isoformat())
+            pending.append((announced_date, index, symbol))
+        return [symbol for _, _, symbol in sorted(pending)]
+
+    press_symbols = unresolved_symbols()[:twelvedata_max_symbols]
     for index, symbol in enumerate(press_symbols):
         rows, meta = fetch_twelvedata_announcements(
             symbol,
@@ -1744,10 +1811,9 @@ def _collect_announcements(
         if index + 1 < len(press_symbols) and twelvedata_key:
             time.sleep(twelvedata_delay)
 
-    # `symbols` is already risk-ranked by _candidate_symbols. Keep the
-    # expensive Alpha subset in that same order instead of re-ranking confirmed
-    # or merely sticky names back ahead of unresolved conflicts.
-    alpha_symbols = symbols[:alpha_news_max]
+    # Reassess after press releases so resolved names do not consume another
+    # provider's budget.
+    alpha_symbols = unresolved_symbols()[:alpha_news_max]
     for index, symbol in enumerate(alpha_symbols):
         rows, meta = fetch_alphavantage_announcements(
             symbol,
@@ -1880,6 +1946,9 @@ def main() -> int:
         alpha_news_max=args.alpha_news_max,
         twelvedata_max_symbols=args.twelvedata_max_symbols,
         company_names=company_names,
+        candidate_dates={symbol: decision["date"]
+                         for symbol, decision in preliminary_report["decisions"].items()
+                         if decision.get("date")},
     )
 
     reconciled, reconciliation = reconcile_calendar(

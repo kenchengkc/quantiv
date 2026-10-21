@@ -219,7 +219,7 @@ def activate(data: Path, bundle_id: str):
     _write(candidate, {"bundle_id": bundle_id, "bundle_dir": str(bundle), "receipt_id": manifest["receipt_id"]})
     _python("scripts/setup_duckdb_from_parquet.py")
     forecast = data / "validation/historical_candidate_forecasts.parquet"
-    _python("scripts/daily_score.py", "--days-ahead", "21", "--models-dir", bundle, "--output-path", forecast)
+    _python("scripts/daily_score.py", "--models-dir", bundle, "--output-path", forecast)
     champion_forecast = data / "validation/historical_champion_forecasts.parquet"
     pointer = data / "models/control/champion.json"
     champion_args = []
@@ -227,7 +227,7 @@ def activate(data: Path, bundle_id: str):
         from ml.model_bundle import verify_control_pointer
 
         champion_id = _bundle_id(verify_control_pointer(json.loads(pointer.read_text()))["champion_bundle_id"])
-        _python("scripts/daily_score.py", "--days-ahead", "21",
+        _python("scripts/daily_score.py",
                 "--models-dir", data / "models/bundles" / champion_id,
                 "--output-path", champion_forecast)
         champion_args = ["--champion-forecast", champion_forecast]

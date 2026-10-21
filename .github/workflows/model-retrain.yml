@@ -111,7 +111,6 @@ jobs:
         run: |
           ROLLBACK_BUNDLE_ID=$(jq -er .champion_bundle_id data/validation/rollback_decision.json)
           python scripts/daily_score.py \
-            --days-ahead 21 \
             --models-dir "data/models/bundles/$ROLLBACK_BUNDLE_ID" \
             --output-path data/validation/rollback_forecasts.parquet
 
@@ -299,7 +298,6 @@ jobs:
         id: shadow-score
         run: |
           python scripts/daily_score.py \
-            --days-ahead 21 \
             --models-dir "${{ steps.register-candidate.outputs.bundle_dir }}" \
             --output-path data/validation/candidate_forecasts.parquet
           ROWS=$(python -c "import pandas as pd; print(len(pd.read_parquet('data/validation/candidate_forecasts.parquet')))")
@@ -307,7 +305,6 @@ jobs:
           if [ -f data/models/control/champion.json ]; then
             CHAMPION_ID=$(jq -r .champion_bundle_id data/models/control/champion.json)
             python scripts/daily_score.py \
-              --days-ahead 21 \
               --models-dir "data/models/bundles/$CHAMPION_ID" \
               --output-path data/validation/champion_forecasts.parquet
           fi

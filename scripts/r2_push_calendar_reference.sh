@@ -10,6 +10,7 @@ PREFIX="${CALENDAR_REFERENCE_PREFIX:-calendar-reference}"
 PYTHON_BIN="${PYTHON_BIN:-python}"
 SOURCE_REVISION="${CALENDAR_REFERENCE_SOURCE_REVISION:-}"
 NOT_BEFORE="${CALENDAR_REFERENCE_NOT_BEFORE:-${REFRESH_STARTED_AT:-}}"
+MODE="${1:-build}"
 
 if [ -z "$SOURCE_REVISION" ]; then
   SOURCE_REVISION="$(git rev-parse HEAD 2>/dev/null || true)"
@@ -17,15 +18,24 @@ fi
 if [ -z "$SOURCE_REVISION" ]; then
   SOURCE_REVISION="local"
 fi
-if [ -z "$NOT_BEFORE" ]; then
-  echo "CALENDAR_REFERENCE_NOT_BEFORE or REFRESH_STARTED_AT is required" >&2
-  exit 2
-fi
-
-"$PYTHON_BIN" scripts/calendar_reference.py build \
-  --output-dir "$STAGE_DIR" \
-  --source-revision "$SOURCE_REVISION" \
-  --not-before "$NOT_BEFORE"
+case "$MODE" in
+  --refresh-universe)
+    # Final symbol files can grow during scoring/frontend generation. Rebind
+    # only the exact previously verified source; preserve its observation time.
+    "$PYTHON_BIN" scripts/calendar_reference.py refresh-universe --output-dir "$STAGE_DIR"
+    ;;
+  build)
+    if [ -z "$NOT_BEFORE" ]; then
+      echo "CALENDAR_REFERENCE_NOT_BEFORE or REFRESH_STARTED_AT is required" >&2
+      exit 2
+    fi
+    "$PYTHON_BIN" scripts/calendar_reference.py build \
+      --output-dir "$STAGE_DIR" \
+      --source-revision "$SOURCE_REVISION" \
+      --not-before "$NOT_BEFORE"
+    ;;
+  *) echo "Usage: r2_push_calendar_reference.sh [--refresh-universe]" >&2; exit 2 ;;
+esac
 "$PYTHON_BIN" scripts/calendar_reference.py verify --output-dir "$STAGE_DIR"
 
 RELEASE_ID=$(jq -er .release_id "$STAGE_DIR/current.json")

@@ -31,8 +31,11 @@ import sys
 
 args = sys.argv[1:]
 command = args[1]
+import os
+with open(os.environ['PYTHON_LOG'], 'a') as handle:
+    handle.write(command + '\\n')
 out = Path(args[args.index('--output-dir') + 1])
-if command == 'build':
+if command in {'build', 'refresh-universe'}:
     (out / 'releases').mkdir(parents=True, exist_ok=True)
     (out / 'receipts').mkdir(parents=True, exist_ok=True)
     (out / 'releases/release-1.json').write_text('{\"release_id\":\"release-1\"}\\n')
@@ -92,7 +95,7 @@ with open(os.environ['RCLONE_LOG'], 'a') as handle:
     return bin_dir, remote, log
 
 
-def _run(tmp_path: Path, *, corrupt: bool = False) -> subprocess.CompletedProcess[str]:
+def _run(tmp_path: Path, *, corrupt: bool = False, refresh_universe: bool = False) -> subprocess.CompletedProcess[str]:
     bin_dir, remote, log = _fake_tools(tmp_path)
     env = os.environ.copy()
     env.update(
@@ -106,12 +109,16 @@ def _run(tmp_path: Path, *, corrupt: bool = False) -> subprocess.CompletedProces
             "CALENDAR_REFERENCE_PREFIX": "calendar-reference",
             "FAKE_R2_ROOT": str(remote),
             "RCLONE_LOG": str(log),
+            "PYTHON_LOG": str(tmp_path / "python.log"),
         }
     )
     if corrupt:
         env["FAKE_R2_CORRUPT_RELEASE_READBACK"] = "1"
+    if refresh_universe:
+        env.pop("CALENDAR_REFERENCE_NOT_BEFORE")
+        env.pop("REFRESH_STARTED_AT", None)
     return subprocess.run(
-        ["bash", str(SCRIPT)],
+        ["bash", str(SCRIPT), *(["--refresh-universe"] if refresh_universe else [])],
         cwd=REPO_ROOT,
         env=env,
         text=True,
@@ -148,3 +155,22 @@ def test_r2_calendar_pointer_is_not_promoted_when_readback_is_corrupt(
     result = _run(tmp_path, corrupt=True)
     assert result.returncode != 0
     assert not (tmp_path / "remote" / "calendar-reference" / "current.json").exists()
+
+
+def test_universe_only_publication_does_not_request_new_source_observation(tmp_path: Path) -> None:
+    result = _run(tmp_path, refresh_universe=True)
+    assert result.returncode == 0, result.stdout
+    assert (tmp_path / "python.log").read_text().splitlines() == ["refresh-universe", "verify", "project"]
+    operations = [json.loads(line) for line in (tmp_path / "rclone.jsonl").read_text().splitlines()]
+    assert "--immutable" in operations[0]["args"]
+    assert operations[4]["dst"].endswith("calendar-reference/current.json")
+
+
+def test_universe_publication_keeps_pointer_when_readback_fails(tmp_path: Path) -> None:
+    pointer = tmp_path / "remote" / "calendar-reference" / "current.json"
+    pointer.parent.mkdir(parents=True)
+    pointer.write_text('{"release_id":"prior-verified-release"}\n')
+    prior_bytes = pointer.read_bytes()
+    result = _run(tmp_path, refresh_universe=True, corrupt=True)
+    assert result.returncode != 0
+    assert pointer.read_bytes() == prior_bytes

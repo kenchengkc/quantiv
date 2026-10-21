@@ -400,6 +400,52 @@ def test_default_daily_score_covers_the_twenty_first_upcoming_day(market_clock, 
     assert pd.read_parquet(values["forecast_path"])["act_symbol"].tolist() == ["TAIL"]
 
 
+@pytest.mark.parametrize("protocol", PROTOCOLS)
+@pytest.mark.parametrize("explicit_days", [None, 21])
+def test_default_scoring_window_covers_loaded_heads_without_expanding_admission(
+    tmp_path, monkeypatch, protocol, explicit_days,
+):
+    class October21(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            current = datetime(2026, 10, 21, 9, tzinfo=timezone.utc)
+            return current.astimezone(tz) if tz else current.replace(tzinfo=None)
+
+    monkeypatch.setattr(daily_score, "datetime", October21)
+    connection = _connection()
+    events = [("MISSING_HEAD", "2026-11-11"), ("MBGL", "2026-11-12"),
+              ("OFF_COHORT", "2026-11-13"),
+              ("LAST_HEAD", "2026-11-14"), ("BEYOND_HEADS", "2026-11-15"),
+              ("STALE", "2026-11-12")]
+    connection.executemany("INSERT INTO v_earnings VALUES (?, ?, 'bmo')", events)
+    connection.executemany("INSERT INTO prices_input VALUES (?, ?, 100.)", [
+        (symbol, "2026-10-16" if symbol == "STALE" else "2026-10-20")
+        for symbol, _ in events
+    ])
+    model = _native_model(protocol, supported=("strict_options", "optionless"))
+    model["manifest"] = {"horizons": [23, 24, 25], "serving_capabilities": {
+        "23": ["optionless"], "24": ["strict_options"], "25": ["optionless"],
+    }}
+    candidate = tmp_path / "candidate.parquet"
+    arguments = ["daily_score.py", "--models-dir", str(tmp_path / "models"),
+                 "--output-path", str(candidate)]
+    if explicit_days is not None:
+        arguments += ["--days-ahead", str(explicit_days)]
+    monkeypatch.setattr("sys.argv", arguments)
+    monkeypatch.setattr(daily_score, "get_data_dir", lambda: tmp_path)
+    monkeypatch.setattr(daily_score, "load_models", lambda _: {h: model for h in (23, 24, 25)})
+    monkeypatch.setattr(daily_score.duckdb, "connect", lambda *args, **kwargs: connection)
+
+    daily_score.main()
+
+    result = pd.read_parquet(candidate)
+    if explicit_days is not None:
+        assert result.empty
+    else:
+        assert dict(zip(result.act_symbol, result.model_horizon)) == {"MBGL": 23, "LAST_HEAD": 25}
+        assert set(result.snapshot_date.dt.date.astype(str)) == {"2026-10-20"}
+
+
 def test_alternate_serving_pipeline_loads_exact_signed_daily_heads(signed_daily_models):
     from ml.serving_pipeline import MLServingPipeline
     pipeline = MLServingPipeline.__new__(MLServingPipeline)
