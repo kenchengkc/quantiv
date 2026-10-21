@@ -5,7 +5,7 @@ Writes a best-guess expected move plus high/low bands to Parquet and DuckDB.
 
 Usage:
   python scripts/daily_score.py
-  python scripts/daily_score.py --days-ahead 21
+  python scripts/daily_score.py --days-ahead 3
 """
 
 import argparse
@@ -230,12 +230,20 @@ def get_bundle_upcoming_features(
 
 
 def score_upcoming_models(
-    conn: duckdb.DuckDBPyConnection, models: Dict[int, dict], days_ahead: int,
+    conn: duckdb.DuckDBPyConnection, models: Dict[int, dict], days_ahead: int | None = None,
     *, now: datetime | None = None,
 ) -> pd.DataFrame:
     """Prefer the newest admitted exact head within one-session source grace."""
     results = []
     current = now or datetime.now(timezone.utc)
+    if not models:
+        return pd.DataFrame()
+    if days_ahead is None:
+        # Model horizons are calendar days from the source snapshot. Cover all
+        # loaded heads without extending that horizon from the scoring date.
+        latest_session = forecast_snapshot_sessions(current)[0]
+        last_event = latest_session + timedelta(days=max(models))
+        days_ahead = max(0, (last_event - current.astimezone(EASTERN).date()).days)
     protocols = {resolve_feature_protocol(entry.get("metadata") or {})
                  for entry in models.values()}
     for protocol in sorted(protocols):
@@ -920,7 +928,10 @@ def main():
     parser = argparse.ArgumentParser(
         description="Score upcoming earnings with trained models"
     )
-    parser.add_argument("--days-ahead", type=int, default=21)
+    parser.add_argument(
+        "--days-ahead", type=int, default=None,
+        help="Limit event dates from today; defaults to the loaded bundle's latest model horizon.",
+    )
     parser.add_argument("--models-dir", type=Path, default=None)
     parser.add_argument("--github-output", type=Path)
     parser.add_argument(

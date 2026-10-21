@@ -40,6 +40,18 @@ def test_event_freeze_empty_batch_still_records_a_signed_hold():
 ROOT = Path(__file__).resolve().parents[2]
 
 
+@pytest.mark.parametrize("workflow_name", ["data-refresh.yml", "model-retrain.yml", "model-rollback.yml"])
+def test_full_window_scoring_uses_the_loaded_bundle_horizons(workflow_name):
+    jobs = yaml.safe_load((ROOT / ".github/workflows" / workflow_name).read_text())["jobs"]
+    commands = [step["run"] for job in jobs.values() for step in job.get("steps", [])
+                if "scripts/daily_score.py" in step.get("run", "")]
+    assert commands
+    for command in commands:
+        for invocation in command.replace("\\\n", " ").splitlines():
+            if "scripts/daily_score.py" in invocation:
+                assert "--days-ahead" not in invocation
+
+
 def test_refresh_and_recovery_hold_only_ml_writes():
     jobs = yaml.safe_load((ROOT / '.github/workflows/data-refresh.yml').read_text())['jobs']
     for job_name in ('refresh', 'recovery'):

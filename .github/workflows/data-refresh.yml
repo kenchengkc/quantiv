@@ -316,7 +316,7 @@ jobs:
         id: scoring
         run: |
           python scripts/model_publication.py snapshot
-          python scripts/daily_score.py --days-ahead 21 --github-output "$GITHUB_OUTPUT"
+          python scripts/daily_score.py --github-output "$GITHUB_OUTPUT"
 
       - name: Monitor champion, shadows, and feature drift
         if: steps.options_gate.outputs.can_refresh == 'true'
@@ -743,7 +743,7 @@ jobs:
         id: scoring
         run: |
           bash scripts/run_provider_free.sh python scripts/model_publication.py snapshot
-          bash scripts/run_provider_free.sh python scripts/daily_score.py --days-ahead 21 --github-output "$GITHUB_OUTPUT"
+          bash scripts/run_provider_free.sh python scripts/daily_score.py --github-output "$GITHUB_OUTPUT"
 
       - name: Monitor champion and feature drift from saved inputs
         id: model_publication
