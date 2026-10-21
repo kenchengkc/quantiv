@@ -404,6 +404,12 @@ jobs:
           TWELVEDATA_SHARE_PROVIDER_LEDGER: "1"
         run: python -u tools/build_frontend_data.py --verify-model-publication
 
+      - name: Publish calendar for the final frontend symbol universe
+        if: steps.options_gate.outputs.can_refresh == 'true'
+        env:
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+        run: bash scripts/r2_push_calendar_reference.sh --refresh-universe
+
       - name: Restore frozen forecasts for reported events
         if: steps.options_gate.outputs.can_refresh == 'true'
         run: python scripts/restore_reported_forecasts.py --apply
@@ -805,6 +811,11 @@ jobs:
         env:
           MODEL_PUBLICATION_FORECAST_PATH: ${{ steps.scoring.outputs.forecast_path }}
         run: bash scripts/run_provider_free.sh python -u tools/build_frontend_data.py --verify-model-publication
+
+      - name: Publish calendar for the recovered frontend symbol universe
+        env:
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+        run: bash scripts/run_provider_free.sh bash scripts/r2_push_calendar_reference.sh --refresh-universe
 
       - name: Restore frozen forecasts for reported events
         run: bash scripts/run_provider_free.sh python scripts/restore_reported_forecasts.py --apply

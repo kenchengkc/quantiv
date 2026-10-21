@@ -61,6 +61,17 @@ def test_skip_forecasts_path_publishes_only_timestamped_daily_calendar() -> None
     assert "$SHELL" not in skip_block
 
 
+def test_final_calendar_universe_follows_symbol_generation_and_precedes_contract_gate() -> None:
+    workflow = yaml.safe_load((ROOT / ".github/workflows/data-refresh.yml").read_text())
+    for job in ("refresh", "recovery"):
+        steps = workflow["jobs"][job]["steps"]
+        commands = [step.get("run", "") for step in steps]
+        frontend = next(i for i, command in enumerate(commands) if "tools/build_frontend_data.py" in command)
+        final_reference = next((i for i, command in enumerate(commands) if "r2_push_calendar_reference.sh --refresh-universe" in command), -1)
+        contract_gate = next(i for i, command in enumerate(commands) if "tools/validate_public_contracts.py" in command)
+        assert frontend < final_reference < contract_gate
+
+
 
 def test_earnings_reconciliation_runs_after_provider_calendar_mutations() -> None:
     workflow = yaml.safe_load((ROOT / ".github/workflows/data-refresh.yml").read_text())
