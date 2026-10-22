@@ -1,12 +1,12 @@
 {
   "symbol": "NVST",
-  "as_of_date": "2026-10-19",
-  "spot_price": 22.61,
+  "as_of_date": "2026-10-20",
+  "spot_price": 25.0,
   "expected_move": {
     "earnings_date": "2026-11-04",
     "display_forecast_pct": 0.07317860410539634,
     "display_forecast_method": "historical",
-    "display_forecast_as_of": "2026-10-19",
+    "display_forecast_as_of": "2026-10-20",
     "ml_status": "unavailable_model",
     "options_status": "unavailable",
     "fallback_reason": "quote_quality",
@@ -17,7 +17,25 @@
     "ml_publication_reason": "no_eligible_current_forecast",
     "em_method": "historical"
   },
-  "straddle_features": [],
+  "straddle_features": [
+    {
+      "expiration": "2026-12-18",
+      "dte": 59,
+      "atm_strike": 25.0,
+      "atm_iv": 0.5095,
+      "atm_call_iv": 0.5095,
+      "atm_put_iv": 0.5095,
+      "straddle_mid": 3.725,
+      "em_straddle": 3.725,
+      "em_straddle_pct": 0.149,
+      "em_iv": 5.121106,
+      "em_iv_pct": 0.204844,
+      "call_delta": 0.3842,
+      "call_gamma": 0.081,
+      "call_vega": 0.0352,
+      "call_theta": -0.0156
+    }
+  ],
   "earnings_history": [
     {
       "date": "2026-11-04",
@@ -48,7 +66,7 @@
       "ml_publication_reason": "no_eligible_current_forecast",
       "display_forecast_pct": 0.07317860410539634,
       "display_forecast_method": "historical",
-      "display_forecast_as_of": "2026-10-19",
+      "display_forecast_as_of": "2026-10-20",
       "options_status": "unavailable",
       "fallback_reason": "quote_quality",
       "historical_event_count": 4,
@@ -402,13 +420,13 @@
   ],
   "next_earnings": "2026-11-04",
   "vol_regime": {
-    "iv_current": 0.3781,
-    "iv_rank": 0.160311,
+    "iv_current": 0.388,
+    "iv_rank": 0.174557,
     "iv_year_high": 0.9616,
     "iv_year_low": 0.2667,
-    "hv_current": 0.2853,
-    "hv_rank": 0.044683,
-    "iv_mom_week": -0.1648,
+    "hv_current": 0.2902,
+    "hv_rank": 0.058541,
+    "iv_mom_week": -0.129,
     "iv_mom_month": null
   },
   "next_earnings_timing": "unknown"

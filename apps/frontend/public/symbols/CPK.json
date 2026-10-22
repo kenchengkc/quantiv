@@ -1,12 +1,12 @@
 {
   "symbol": "CPK",
-  "as_of_date": "2026-10-19",
-  "spot_price": 128.93,
+  "as_of_date": "2026-10-20",
+  "spot_price": 130.0,
   "expected_move": {
     "earnings_date": "2026-11-04",
     "display_forecast_pct": 0.006978436720107006,
     "display_forecast_method": "historical",
-    "display_forecast_as_of": "2026-10-19",
+    "display_forecast_as_of": "2026-10-20",
     "ml_status": "unavailable_model",
     "options_status": "unavailable",
     "fallback_reason": "quote_quality",
@@ -17,7 +17,25 @@
     "ml_publication_reason": "no_eligible_current_forecast",
     "em_method": "historical"
   },
-  "straddle_features": [],
+  "straddle_features": [
+    {
+      "expiration": "2026-12-18",
+      "dte": 59,
+      "atm_strike": 130.0,
+      "atm_iv": 0.228749,
+      "atm_call_iv": 0.2315,
+      "atm_put_iv": 0.226,
+      "straddle_mid": 9.55,
+      "em_straddle": 9.55,
+      "em_straddle_pct": 0.073462,
+      "em_iv": 11.955914,
+      "em_iv_pct": 0.091969,
+      "call_delta": 0.539,
+      "call_gamma": 0.0326,
+      "call_vega": 0.2071,
+      "call_theta": -0.0441
+    }
+  ],
   "earnings_history": [
     {
       "date": "2026-11-04",
@@ -48,7 +66,7 @@
       "ml_publication_reason": "no_eligible_current_forecast",
       "display_forecast_pct": 0.006978436720107006,
       "display_forecast_method": "historical",
-      "display_forecast_as_of": "2026-10-19",
+      "display_forecast_as_of": "2026-10-20",
       "options_status": "unavailable",
       "fallback_reason": "quote_quality",
       "historical_event_count": 4,
@@ -353,13 +371,13 @@
   ],
   "next_earnings": "2026-11-04",
   "vol_regime": {
-    "iv_current": 0.26,
-    "iv_rank": 0.601075,
+    "iv_current": 0.2976,
+    "iv_rank": 0.853593,
     "iv_year_high": 0.3194,
     "iv_year_low": 0.1705,
-    "hv_current": 0.1892,
-    "hv_rank": 0.398251,
-    "iv_mom_week": 0.0674,
+    "hv_current": 0.1916,
+    "hv_rank": 0.417329,
+    "iv_mom_week": 0.0695,
     "iv_mom_month": null
   },
   "next_earnings_timing": "unknown"

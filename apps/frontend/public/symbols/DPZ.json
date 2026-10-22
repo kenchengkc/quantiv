@@ -1,7 +1,7 @@
 {
   "symbol": "DPZ",
-  "as_of_date": "2026-10-19",
-  "spot_price": 300.0,
+  "as_of_date": "2026-10-20",
+  "spot_price": 320.0,
   "expected_move": {
     "earnings_date": "2026-10-13",
     "timing": "bmo",
@@ -42,38 +42,21 @@
   },
   "straddle_features": [
     {
-      "expiration": "2026-11-20",
-      "dte": 32,
-      "atm_strike": 300.0,
-      "atm_iv": 0.331056,
-      "atm_call_iv": 0.3356,
-      "atm_put_iv": 0.3265,
-      "straddle_mid": 23.795,
-      "em_straddle": 23.795,
-      "em_straddle_pct": 0.079317,
-      "em_iv": 29.407075,
-      "em_iv_pct": 0.098024,
-      "call_delta": 0.5518,
-      "call_gamma": 0.0132,
-      "call_vega": 0.3546,
-      "call_theta": -0.221
-    },
-    {
       "expiration": "2026-12-18",
-      "dte": 60,
-      "atm_strike": 300.0,
-      "atm_iv": 0.3403,
-      "atm_call_iv": 0.3407,
-      "atm_put_iv": 0.3399,
-      "straddle_mid": 33.05,
-      "em_straddle": 33.05,
-      "em_straddle_pct": 0.110167,
-      "em_iv": 41.391617,
-      "em_iv_pct": 0.137972,
-      "call_delta": 0.5389,
-      "call_gamma": 0.0095,
-      "call_vega": 0.4828,
-      "call_theta": -0.1462
+      "dte": 59,
+      "atm_strike": 320.0,
+      "atm_iv": 0.321503,
+      "atm_call_iv": 0.3201,
+      "atm_put_iv": 0.3229,
+      "straddle_mid": 32.75,
+      "em_straddle": 32.75,
+      "em_straddle_pct": 0.102344,
+      "em_iv": 41.363285,
+      "em_iv_pct": 0.12926,
+      "call_delta": 0.4887,
+      "call_gamma": 0.0097,
+      "call_vega": 0.5042,
+      "call_theta": -0.1368
     }
   ],
   "earnings_history": [
@@ -482,13 +465,13 @@
   ],
   "next_earnings": "2026-10-13",
   "vol_regime": {
-    "iv_current": 0.3217,
-    "iv_rank": 0.395143,
+    "iv_current": 0.3247,
+    "iv_rank": 0.408389,
     "iv_year_high": 0.4587,
     "iv_year_low": 0.2322,
-    "hv_current": 0.3266,
-    "hv_rank": 0.443735,
-    "iv_mom_week": -0.0665,
+    "hv_current": 0.3426,
+    "hv_rank": 0.522359,
+    "iv_mom_week": 0.0152,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"

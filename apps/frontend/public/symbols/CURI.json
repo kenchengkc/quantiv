@@ -1,16 +1,16 @@
 {
   "symbol": "CURI",
-  "as_of_date": "2026-10-19",
-  "spot_price": 2.6,
+  "as_of_date": "2026-10-20",
+  "spot_price": 2.79,
   "expected_move": {
     "earnings_date": "2026-11-11",
     "em_ml_pct": 0.118742,
     "em_ml_abs": 0.33129,
     "model_horizon": 22,
     "ml_snapshot_date": "2026-10-20",
-    "forecast_id": "762d48689a29a322124f8f53f714556640e6d882a909ace463778384c85a942e",
+    "forecast_id": "16ca8a70230a54f0463daff438c448911684420ce1b79196b51239d43516a0b2",
     "forecast_model_bundle_id": "d14dc7f2aa6b175956922eb6266b8523742add962668b7d6b8833cc2c869dd1b",
-    "forecast_scored_at": "2026-10-21T09:54:00.090573+00:00",
+    "forecast_scored_at": "2026-10-22T07:24:40.595583+00:00",
     "forecast_feature_cutoff_at": "2026-11-11T20:55:00+00:00",
     "forecast_prediction_deadline_at": "2026-11-11T20:55:00+00:00",
     "forecast_feature_snapshot_at": "2026-10-20T20:00:00+00:00",
@@ -30,13 +30,13 @@
     "fallback_reason": null,
     "historical_event_count": null,
     "hist_move_med_4q": 0.217125,
-    "timing": "after_market_close",
+    "timing": "amc",
     "ml_publication_status": "eligible"
   },
   "straddle_features": [],
   "earnings_history": [
     {
-      "date": "2026-11-10",
+      "date": "2026-11-11",
       "timing": "after_market_close",
       "q": "Q3 26",
       "fiscal_year": 2026,
@@ -64,7 +64,7 @@
       "ml_publication_reason": "no_eligible_current_forecast",
       "display_forecast_pct": 0.21712494052069886,
       "display_forecast_method": "historical",
-      "display_forecast_as_of": "2026-10-19",
+      "display_forecast_as_of": "2026-10-20",
       "options_status": "unavailable",
       "fallback_reason": "no_event_expiry",
       "historical_event_count": 4,
@@ -348,5 +348,5 @@
   ],
   "next_earnings": "2026-11-11",
   "vol_regime": null,
-  "next_earnings_timing": "after_market_close"
+  "next_earnings_timing": "amc"
 }

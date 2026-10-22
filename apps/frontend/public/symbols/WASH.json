@@ -1,7 +1,7 @@
 {
   "symbol": "WASH",
-  "as_of_date": "2026-10-19",
-  "spot_price": 36.59,
+  "as_of_date": "2026-10-20",
+  "spot_price": 38.11,
   "expected_move": {
     "earnings_date": "2026-10-19",
     "timing": "amc",
@@ -37,11 +37,11 @@
   "earnings_history": [
     {
       "date": "2026-10-19",
-      "timing": "after_market_close",
+      "timing": "amc",
       "q": "Q3 26",
       "fiscal_year": 2026,
       "fiscal_q": "Q3",
-      "actual": null,
+      "actual": 0.041541,
       "implied": null,
       "implied_as_of": null,
       "implied_expiration": null,
@@ -57,8 +57,8 @@
       "revenue_actual": null,
       "revenue_estimate": 44280240.0,
       "rev_surprise_pct": null,
-      "realized_target_protocol": null,
-      "realized_label_source": null,
+      "realized_target_protocol": "quantiv.session-reaction.v2",
+      "realized_label_source": "ohlcv_session_close",
       "em_ml_pct": 0.052841,
       "em_ml_abs": 1.958834,
       "model_horizon": 4,
@@ -84,8 +84,8 @@
       "options_status": "unavailable",
       "fallback_reason": null,
       "forecast_frozen": true,
-      "ml_publication_reason": "no_eligible_current_forecast",
-      "ml_publication_status": "held"
+      "ml_publication_status": "held",
+      "ml_publication_reason": "no_eligible_current_forecast"
     },
     {
       "date": "2026-07-20",

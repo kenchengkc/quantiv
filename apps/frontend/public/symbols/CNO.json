@@ -1,12 +1,12 @@
 {
   "symbol": "CNO",
-  "as_of_date": "2026-10-19",
-  "spot_price": 54.07,
+  "as_of_date": "2026-10-20",
+  "spot_price": 55.0,
   "expected_move": {
     "earnings_date": "2026-10-29",
     "display_forecast_pct": 0.036678723791172096,
     "display_forecast_method": "historical",
-    "display_forecast_as_of": "2026-10-19",
+    "display_forecast_as_of": "2026-10-20",
     "ml_status": "unavailable_model",
     "options_status": "unavailable",
     "fallback_reason": "quote_quality",
@@ -17,7 +17,25 @@
     "ml_publication_reason": "no_eligible_current_forecast",
     "em_method": "historical"
   },
-  "straddle_features": [],
+  "straddle_features": [
+    {
+      "expiration": "2026-12-18",
+      "dte": 59,
+      "atm_strike": 55.0,
+      "atm_iv": 0.4022,
+      "atm_call_iv": 0.463,
+      "atm_put_iv": 0.3414,
+      "straddle_mid": 4.325,
+      "em_straddle": 4.325,
+      "em_straddle_pct": 0.078636,
+      "em_iv": 8.893738,
+      "em_iv_pct": 0.161704,
+      "call_delta": 0.5487,
+      "call_gamma": 0.0388,
+      "call_vega": 0.0874,
+      "call_theta": -0.0377
+    }
+  ],
   "earnings_history": [
     {
       "date": "2026-10-29",
@@ -48,7 +66,7 @@
       "ml_publication_reason": "no_eligible_current_forecast",
       "display_forecast_pct": 0.036678723791172096,
       "display_forecast_method": "historical",
-      "display_forecast_as_of": "2026-10-19",
+      "display_forecast_as_of": "2026-10-20",
       "options_status": "unavailable",
       "fallback_reason": "quote_quality",
       "historical_event_count": 4,
@@ -353,13 +371,13 @@
   ],
   "next_earnings": "2026-10-29",
   "vol_regime": {
-    "iv_current": 0.2751,
-    "iv_rank": 0.564051,
+    "iv_current": 0.2438,
+    "iv_rank": 0.40557,
     "iv_year_high": 0.3612,
     "iv_year_low": 0.1637,
-    "hv_current": 0.1593,
-    "hv_rank": 0.118598,
-    "iv_mom_week": 0.0248,
+    "hv_current": 0.145,
+    "hv_rank": 0.041509,
+    "iv_mom_week": -0.0043,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

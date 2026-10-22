@@ -1,26 +1,33 @@
 {
   "symbol": "TCBI",
-  "as_of_date": "2026-10-19",
-  "spot_price": 90.33,
+  "as_of_date": "2026-10-20",
+  "spot_price": 91.06,
   "expected_move": {
     "earnings_date": "2026-10-21",
-    "display_forecast_pct": null,
-    "display_forecast_method": "ml_unavailable",
-    "display_forecast_as_of": "2026-10-19",
-    "ml_status": "unavailable_model",
-    "options_status": "unavailable",
-    "fallback_reason": null,
-    "hist_move_med_4q": 0.020249,
-    "timing": "unknown",
+    "timing": "amc",
+    "expiration": "2026-11-20",
+    "dte": 37,
+    "lead_time_days": 7,
+    "atm_strike": 90.0,
+    "atm_iv": 0.327997,
+    "straddle_abs": 7.525,
+    "straddle_pct": 0.083611,
+    "iv_pct": 0.10443,
+    "em_method": "options_math",
+    "display_forecast_pct": 0.10443,
+    "display_forecast_method": "options_math",
+    "display_forecast_as_of": "2026-10-14",
+    "ml_status": "unavailable_event",
+    "options_status": "decision_eligible",
+    "forecast_frozen": true,
     "ml_publication_status": "held",
-    "ml_publication_reason": "no_eligible_current_forecast",
-    "em_method": "ml_unavailable"
+    "ml_publication_reason": "no_eligible_current_forecast"
   },
   "straddle_features": [],
   "earnings_history": [
     {
       "date": "2026-10-21",
-      "timing": "before_market_open",
+      "timing": "after_market_close",
       "q": "Q3 26",
       "fiscal_year": 2026,
       "fiscal_q": "Q3",
@@ -42,15 +49,12 @@
       "rev_surprise_pct": null,
       "realized_target_protocol": null,
       "realized_label_source": null,
-      "ml_status": "unavailable_model",
+      "display_forecast_method": "options_math",
       "ml_publication_status": "held",
+      "display_forecast_as_of": "2026-10-14",
       "ml_publication_reason": "no_eligible_current_forecast",
-      "options_status": "unavailable",
-      "display_forecast_pct": null,
-      "display_forecast_method": "ml_unavailable",
-      "display_forecast_as_of": "2026-10-19",
-      "em_method": "ml_unavailable",
-      "fallback_reason": null
+      "display_forecast_pct": 0.10443,
+      "forecast_frozen": true
     },
     {
       "date": "2026-07-22",
@@ -365,14 +369,14 @@
   ],
   "next_earnings": "2026-10-21",
   "vol_regime": {
-    "iv_current": 0.3967,
-    "iv_rank": 0.573235,
+    "iv_current": 0.3451,
+    "iv_rank": 0.3483,
     "iv_year_high": 0.4946,
     "iv_year_low": 0.2652,
-    "hv_current": 0.1878,
-    "hv_rank": 0.190527,
-    "iv_mom_week": 0.051,
+    "hv_current": 0.1893,
+    "hv_rank": 0.195829,
+    "iv_mom_week": -0.0331,
     "iv_mom_month": null
   },
-  "next_earnings_timing": "unknown"
+  "next_earnings_timing": "amc"
 }
