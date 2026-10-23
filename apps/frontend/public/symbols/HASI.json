@@ -1,21 +1,21 @@
 {
   "symbol": "HASI",
-  "as_of_date": "2026-10-20",
-  "spot_price": 35.67,
+  "as_of_date": "2026-10-21",
+  "spot_price": 36.48,
   "expected_move": {
     "earnings_date": "2026-11-05",
-    "display_forecast_pct": 0.08590878941351365,
-    "display_forecast_method": "historical",
-    "display_forecast_as_of": "2026-10-20",
+    "display_forecast_pct": 0.08840460526315791,
+    "display_forecast_method": "straddle_implied",
+    "display_forecast_as_of": "2026-10-21",
     "ml_status": "unavailable_model",
-    "options_status": "unavailable",
+    "options_status": "indicative",
     "fallback_reason": "quote_quality",
-    "historical_event_count": 4,
+    "historical_event_count": null,
     "hist_move_med_4q": 0.085909,
     "timing": "unknown",
     "ml_publication_status": "held",
     "ml_publication_reason": "no_eligible_current_forecast",
-    "em_method": "historical"
+    "em_method": "straddle_implied"
   },
   "straddle_features": [],
   "earnings_history": [
@@ -46,13 +46,13 @@
       "ml_status": "unavailable_model",
       "ml_publication_status": "held",
       "ml_publication_reason": "no_eligible_current_forecast",
-      "display_forecast_pct": 0.08590878941351365,
-      "display_forecast_method": "historical",
-      "display_forecast_as_of": "2026-10-20",
-      "options_status": "unavailable",
+      "display_forecast_pct": 0.08840460526315791,
+      "display_forecast_method": "straddle_implied",
+      "display_forecast_as_of": "2026-10-21",
+      "options_status": "indicative",
       "fallback_reason": "quote_quality",
-      "historical_event_count": 4,
-      "em_method": "historical"
+      "historical_event_count": null,
+      "em_method": "straddle_implied"
     },
     {
       "date": "2026-08-06",
@@ -409,13 +409,13 @@
   ],
   "next_earnings": "2026-11-05",
   "vol_regime": {
-    "iv_current": 0.3504,
-    "iv_rank": 0.326396,
+    "iv_current": 0.3391,
+    "iv_rank": 0.295455,
     "iv_year_high": 0.5964,
     "iv_year_low": 0.2312,
-    "hv_current": 0.1969,
-    "hv_rank": 0.071429,
-    "iv_mom_week": -0.0114,
+    "hv_current": 0.1995,
+    "hv_rank": 0.082892,
+    "iv_mom_week": -0.0263,
     "iv_mom_month": null
   },
   "next_earnings_timing": "unknown"

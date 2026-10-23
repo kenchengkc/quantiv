@@ -1,10 +1,10 @@
 {
   "symbol": "VTMX",
-  "as_of_date": "2026-10-20",
-  "spot_price": 36.72,
+  "as_of_date": "2026-10-21",
+  "spot_price": 36.2,
   "expected_move": {
     "earnings_date": "2026-10-22",
-    "timing": "after_market_close",
+    "timing": "amc",
     "em_ml_pct": 0.031869,
     "em_ml_abs": 1.153657,
     "model_horizon": 1,
@@ -20,18 +20,18 @@
     "display_forecast_as_of": "2026-10-21",
     "ml_status": "available",
     "options_status": "unavailable",
+    "hist_move_med_4q": 0.036374,
     "forecast_frozen": true,
     "forecast_id": "b2ad1b0a5c68e654c6eb6ed4dc0d889443cdace0e7ec1b12c7fb64ec2566adc2",
     "forecast_model_bundle_id": "d14dc7f2aa6b175956922eb6266b8523742add962668b7d6b8833cc2c869dd1b",
+    "ml_publication_status": "eligible",
     "forecast_scored_at": "2026-10-22T07:24:39.900020+00:00",
+    "forecast_published_at": "2026-10-22T08:28:37.059335+00:00",
     "forecast_feature_cutoff_at": "2026-10-22T19:55:00+00:00",
     "forecast_prediction_deadline_at": "2026-10-22T19:55:00+00:00",
     "forecast_feature_snapshot_at": "2026-10-21T20:00:00+00:00",
     "forecast_feature_hash": "b6b84f88b3b679609fa777aa1cdf6fde864d8befa20f1e62029b95ce7972655a",
-    "forecast_frozen_eligible": true,
-    "ml_publication_status": "eligible",
-    "fallback_reason": null,
-    "hist_move_med_4q": 0.036374
+    "forecast_frozen_eligible": true
   },
   "straddle_features": [],
   "earnings_history": [
@@ -66,6 +66,7 @@
       "forecast_id": "b2ad1b0a5c68e654c6eb6ed4dc0d889443cdace0e7ec1b12c7fb64ec2566adc2",
       "forecast_model_bundle_id": "d14dc7f2aa6b175956922eb6266b8523742add962668b7d6b8833cc2c869dd1b",
       "forecast_scored_at": "2026-10-22T07:24:39.900020+00:00",
+      "forecast_published_at": "2026-10-22T08:28:37.059335+00:00",
       "forecast_feature_cutoff_at": "2026-10-22T19:55:00+00:00",
       "forecast_prediction_deadline_at": "2026-10-22T19:55:00+00:00",
       "forecast_feature_snapshot_at": "2026-10-21T20:00:00+00:00",
@@ -83,8 +84,7 @@
       "options_status": "unavailable",
       "fallback_reason": null,
       "forecast_frozen": true,
-      "ml_publication_status": "eligible",
-      "em_method": "ml_lightgbm"
+      "ml_publication_status": "eligible"
     },
     {
       "date": "2026-07-22",

@@ -1,12 +1,12 @@
 {
   "symbol": "SLAB",
-  "as_of_date": "2026-10-20",
-  "spot_price": 220.0,
+  "as_of_date": "2026-10-21",
+  "spot_price": 221.71,
   "expected_move": {
     "earnings_date": "2026-11-02",
     "display_forecast_pct": 0.008612872219068257,
     "display_forecast_method": "historical",
-    "display_forecast_as_of": "2026-10-20",
+    "display_forecast_as_of": "2026-10-21",
     "ml_status": "unavailable_model",
     "options_status": "unavailable",
     "fallback_reason": "quote_quality",
@@ -17,25 +17,7 @@
     "ml_publication_reason": "no_eligible_current_forecast",
     "em_method": "historical"
   },
-  "straddle_features": [
-    {
-      "expiration": "2026-12-18",
-      "dte": 59,
-      "atm_strike": 220.0,
-      "atm_iv": 0.146702,
-      "atm_call_iv": 0.1458,
-      "atm_put_iv": 0.1476,
-      "straddle_mid": 5.22,
-      "em_straddle": 5.22,
-      "em_straddle_pct": 0.023727,
-      "em_iv": 12.975929,
-      "em_iv_pct": 0.058981,
-      "call_delta": 0.5657,
-      "call_gamma": 0.0302,
-      "call_vega": 0.3484,
-      "call_theta": -0.0493
-    }
-  ],
+  "straddle_features": [],
   "earnings_history": [
     {
       "date": "2026-11-02",
@@ -66,7 +48,7 @@
       "ml_publication_reason": "no_eligible_current_forecast",
       "display_forecast_pct": 0.008612872219068257,
       "display_forecast_method": "historical",
-      "display_forecast_as_of": "2026-10-20",
+      "display_forecast_as_of": "2026-10-21",
       "options_status": "unavailable",
       "fallback_reason": "quote_quality",
       "historical_event_count": 4,
@@ -399,13 +381,13 @@
   ],
   "next_earnings": "2026-11-02",
   "vol_regime": {
-    "iv_current": 0.0579,
-    "iv_rank": 0.029164,
+    "iv_current": 0.043,
+    "iv_rank": 0.001834,
     "iv_year_high": 0.5872,
     "iv_year_low": 0.042,
-    "hv_current": 0.0383,
-    "hv_rank": 0.006067,
-    "iv_mom_week": -0.039,
+    "hv_current": 0.0389,
+    "hv_rank": 0.00658,
+    "iv_mom_week": -0.0511,
     "iv_mom_month": null
   },
   "next_earnings_timing": "unknown"

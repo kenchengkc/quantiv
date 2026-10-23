@@ -1,10 +1,10 @@
 {
   "symbol": "KRC",
-  "as_of_date": "2026-10-20",
-  "spot_price": 34.82,
+  "as_of_date": "2026-10-21",
+  "spot_price": 34.43,
   "expected_move": {
     "earnings_date": "2026-10-22",
-    "timing": "after_market_close",
+    "timing": "amc",
     "em_ml_pct": 0.030641,
     "em_ml_abs": 1.054969,
     "model_horizon": 1,
@@ -20,18 +20,18 @@
     "display_forecast_as_of": "2026-10-21",
     "ml_status": "available",
     "options_status": "unavailable",
+    "hist_move_med_4q": 0.028189,
     "forecast_frozen": true,
     "forecast_id": "5f9c9055d3e8d3a85c5f3a29e85125709f7e387c91827a66d4a635e0ddec668e",
     "forecast_model_bundle_id": "d14dc7f2aa6b175956922eb6266b8523742add962668b7d6b8833cc2c869dd1b",
+    "ml_publication_status": "eligible",
     "forecast_scored_at": "2026-10-22T07:24:39.900020+00:00",
+    "forecast_published_at": "2026-10-22T08:28:37.059335+00:00",
     "forecast_feature_cutoff_at": "2026-10-22T19:55:00+00:00",
     "forecast_prediction_deadline_at": "2026-10-22T19:55:00+00:00",
     "forecast_feature_snapshot_at": "2026-10-21T20:00:00+00:00",
     "forecast_feature_hash": "091d9d8f8b88f3b3536c13b8475507b20ebd98e81f7b417c6cb9b73ebde91461",
-    "forecast_frozen_eligible": true,
-    "ml_publication_status": "eligible",
-    "fallback_reason": null,
-    "hist_move_med_4q": 0.028189
+    "forecast_frozen_eligible": true
   },
   "straddle_features": [],
   "earnings_history": [
@@ -66,6 +66,7 @@
       "forecast_id": "5f9c9055d3e8d3a85c5f3a29e85125709f7e387c91827a66d4a635e0ddec668e",
       "forecast_model_bundle_id": "d14dc7f2aa6b175956922eb6266b8523742add962668b7d6b8833cc2c869dd1b",
       "forecast_scored_at": "2026-10-22T07:24:39.900020+00:00",
+      "forecast_published_at": "2026-10-22T08:28:37.059335+00:00",
       "forecast_feature_cutoff_at": "2026-10-22T19:55:00+00:00",
       "forecast_prediction_deadline_at": "2026-10-22T19:55:00+00:00",
       "forecast_feature_snapshot_at": "2026-10-21T20:00:00+00:00",
@@ -83,8 +84,7 @@
       "options_status": "unavailable",
       "fallback_reason": null,
       "forecast_frozen": true,
-      "ml_publication_status": "eligible",
-      "em_method": "ml_lightgbm"
+      "ml_publication_status": "eligible"
     },
     {
       "date": "2026-07-27",
@@ -392,13 +392,13 @@
   ],
   "next_earnings": "2026-10-22",
   "vol_regime": {
-    "iv_current": 0.3863,
-    "iv_rank": 0.399395,
+    "iv_current": 0.3683,
+    "iv_rank": 0.338932,
     "iv_year_high": 0.5651,
     "iv_year_low": 0.2674,
-    "hv_current": 0.2579,
-    "hv_rank": 0.351744,
-    "iv_mom_week": 0.0564,
+    "hv_current": 0.2503,
+    "hv_rank": 0.324128,
+    "iv_mom_week": 0.0053,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

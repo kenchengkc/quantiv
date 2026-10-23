@@ -1,7 +1,7 @@
 {
   "symbol": "ORRF",
-  "as_of_date": "2026-10-20",
-  "spot_price": 42.1,
+  "as_of_date": "2026-10-21",
+  "spot_price": 42.89,
   "expected_move": {
     "earnings_date": "2026-10-20",
     "timing": "amc",
@@ -21,6 +21,7 @@
     "ml_status": "available",
     "options_status": "unavailable",
     "historical_event_count": 4,
+    "hist_move_med_4q": 0.042529,
     "forecast_frozen": true,
     "forecast_id": "f3a12bebbffb6bb4cc8dd9c8b28c55f9a513d297ba87cbca8a9af0105a3533cd",
     "forecast_model_bundle_id": "d14dc7f2aa6b175956922eb6266b8523742add962668b7d6b8833cc2c869dd1b",
@@ -38,11 +39,11 @@
   "earnings_history": [
     {
       "date": "2026-10-20",
-      "timing": "after_market_close",
+      "timing": "amc",
       "q": "Q3 26",
       "fiscal_year": 2026,
       "fiscal_q": "Q3",
-      "actual": null,
+      "actual": 0.018765,
       "implied": null,
       "implied_as_of": null,
       "implied_expiration": null,
@@ -58,8 +59,8 @@
       "revenue_actual": null,
       "revenue_estimate": 53626500.0,
       "rev_surprise_pct": null,
-      "realized_target_protocol": null,
-      "realized_label_source": null,
+      "realized_target_protocol": "quantiv.session-reaction.v2",
+      "realized_label_source": "ohlcv_session_close",
       "em_ml_pct": 0.031474,
       "em_ml_abs": 1.292628,
       "model_horizon": 6,

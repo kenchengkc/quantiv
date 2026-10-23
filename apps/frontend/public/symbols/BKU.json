@@ -1,7 +1,7 @@
 {
   "symbol": "BKU",
-  "as_of_date": "2026-10-20",
-  "spot_price": 42.32,
+  "as_of_date": "2026-10-21",
+  "spot_price": 42.08,
   "expected_move": {
     "earnings_date": "2026-10-21",
     "timing": "bmo",
@@ -20,6 +20,7 @@
     "display_forecast_as_of": "2026-10-19",
     "ml_status": "available",
     "options_status": "unavailable",
+    "hist_move_med_4q": 0.01654,
     "forecast_frozen": true,
     "forecast_id": "02768c443e94434537192ad8ba710df9a6ae6b77e8417281a130473768700a55",
     "forecast_model_bundle_id": "d14dc7f2aa6b175956922eb6266b8523742add962668b7d6b8833cc2c869dd1b",
@@ -37,11 +38,11 @@
   "earnings_history": [
     {
       "date": "2026-10-21",
-      "timing": "before_market_open",
+      "timing": "bmo",
       "q": "Q3 26",
       "fiscal_year": 2026,
       "fiscal_q": "Q3",
-      "actual": null,
+      "actual": -0.005671,
       "implied": null,
       "implied_as_of": null,
       "implied_expiration": null,
@@ -57,8 +58,8 @@
       "revenue_actual": null,
       "revenue_estimate": null,
       "rev_surprise_pct": null,
-      "realized_target_protocol": null,
-      "realized_label_source": null,
+      "realized_target_protocol": "quantiv.session-reaction.v2",
+      "realized_label_source": "ohlcv_session_close",
       "em_ml_pct": 0.022854,
       "em_ml_abs": 0.94411,
       "model_horizon": 2,
@@ -446,13 +447,13 @@
   ],
   "next_earnings": "2026-10-21",
   "vol_regime": {
-    "iv_current": 0.2853,
-    "iv_rank": 0.13005,
+    "iv_current": 0.2953,
+    "iv_rank": 0.151653,
     "iv_year_high": 0.688,
     "iv_year_low": 0.2251,
-    "hv_current": 0.1733,
-    "hv_rank": 0.090093,
-    "iv_mom_week": -0.1413,
+    "hv_current": 0.1728,
+    "hv_rank": 0.088299,
+    "iv_mom_week": -0.0304,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"

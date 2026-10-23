@@ -1,20 +1,20 @@
 {
   "symbol": "ABSI",
-  "as_of_date": "2026-10-20",
-  "spot_price": 9.07,
+  "as_of_date": "2026-10-21",
+  "spot_price": 10.04,
   "expected_move": {
     "earnings_date": "2026-11-12",
     "em_ml_pct": 0.067404,
     "em_ml_abs": 0.676734,
     "model_horizon": 22,
     "ml_snapshot_date": "2026-10-21",
-    "forecast_id": "c0a029c6fc5d06265ad8079d0d30c0245bf99e09253dc40bb5adb36d3c791d5d",
+    "forecast_id": "d93f2182a6cb3a0ff44ba9851bdb57091fb11141d01177d19a9ceb0c83ce2157",
     "forecast_model_bundle_id": "d14dc7f2aa6b175956922eb6266b8523742add962668b7d6b8833cc2c869dd1b",
-    "forecast_scored_at": "2026-10-22T07:24:40.595583+00:00",
+    "forecast_scored_at": "2026-10-23T15:25:00.939473+00:00",
     "forecast_feature_cutoff_at": "2026-11-11T21:00:00+00:00",
     "forecast_prediction_deadline_at": "2026-11-12T05:00:00+00:00",
     "forecast_feature_snapshot_at": "2026-10-21T20:00:00+00:00",
-    "forecast_feature_hash": "4f7a011eca864f83520bf46381ca8f19186d97f3be21bda7033bc4ca3a99f4d0",
+    "forecast_feature_hash": "fe4ac5df71059f35e5eb42acc518e040e75803c1320e24a4f5e1ea04b463f1f3",
     "forecast_frozen_eligible": true,
     "p10": 0.017805,
     "p25": 0.034476,
@@ -30,14 +30,14 @@
     "fallback_reason": null,
     "historical_event_count": null,
     "hist_move_med_4q": 0.027994,
-    "timing": "before_market_open",
+    "timing": "bmo",
     "ml_publication_status": "eligible"
   },
   "straddle_features": [],
   "earnings_history": [
     {
-      "date": "2026-11-10",
-      "timing": "after_market_close",
+      "date": "2026-11-12",
+      "timing": "before_market_open",
       "q": "Q3 26",
       "fiscal_year": 2026,
       "fiscal_q": "Q3",
@@ -64,7 +64,7 @@
       "ml_publication_reason": "no_eligible_current_forecast",
       "display_forecast_pct": 0.0279936443738264,
       "display_forecast_method": "historical",
-      "display_forecast_as_of": "2026-10-20",
+      "display_forecast_as_of": "2026-10-21",
       "options_status": "unavailable",
       "fallback_reason": "no_event_expiry",
       "historical_event_count": 4,
@@ -348,5 +348,5 @@
   ],
   "next_earnings": "2026-11-12",
   "vol_regime": null,
-  "next_earnings_timing": "before_market_open"
+  "next_earnings_timing": "bmo"
 }

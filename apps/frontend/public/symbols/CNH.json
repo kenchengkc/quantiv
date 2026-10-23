@@ -1,12 +1,12 @@
 {
   "symbol": "CNH",
-  "as_of_date": "2026-10-20",
-  "spot_price": 12.5,
+  "as_of_date": "2026-10-21",
+  "spot_price": 11.52,
   "expected_move": {
     "earnings_date": "2026-11-09",
     "display_forecast_pct": 0.051782187313398675,
     "display_forecast_method": "historical",
-    "display_forecast_as_of": "2026-10-20",
+    "display_forecast_as_of": "2026-10-21",
     "ml_status": "unavailable_model",
     "options_status": "unavailable",
     "fallback_reason": "quote_quality",
@@ -17,25 +17,7 @@
     "ml_publication_reason": "no_eligible_current_forecast",
     "em_method": "historical"
   },
-  "straddle_features": [
-    {
-      "expiration": "2026-12-18",
-      "dte": 59,
-      "atm_strike": 12.5,
-      "atm_iv": 0.4964,
-      "atm_call_iv": 0.4964,
-      "atm_put_iv": 0.4964,
-      "straddle_mid": 2.05,
-      "em_straddle": 2.05,
-      "em_straddle_pct": 0.164,
-      "em_iv": 2.494717,
-      "em_iv_pct": 0.199577,
-      "call_delta": 0.3562,
-      "call_gamma": 0.16,
-      "call_vega": 0.0171,
-      "call_theta": -0.0064
-    }
-  ],
+  "straddle_features": [],
   "earnings_history": [
     {
       "date": "2026-11-09",
@@ -66,7 +48,7 @@
       "ml_publication_reason": "no_eligible_current_forecast",
       "display_forecast_pct": 0.051782187313398675,
       "display_forecast_method": "historical",
-      "display_forecast_as_of": "2026-10-20",
+      "display_forecast_as_of": "2026-10-21",
       "options_status": "unavailable",
       "fallback_reason": "quote_quality",
       "historical_event_count": 4,
@@ -356,13 +338,13 @@
   ],
   "next_earnings": "2026-11-09",
   "vol_regime": {
-    "iv_current": 0.4941,
-    "iv_rank": 0.450139,
+    "iv_current": 0.508,
+    "iv_rank": 0.479821,
     "iv_year_high": 0.7516,
     "iv_year_low": 0.2833,
-    "hv_current": 0.4274,
-    "hv_rank": 0.358193,
-    "iv_mom_week": -0.0045,
+    "hv_current": 0.4197,
+    "hv_rank": 0.331232,
+    "iv_mom_week": -0.0081,
     "iv_mom_month": null
   },
   "next_earnings_timing": "unknown"

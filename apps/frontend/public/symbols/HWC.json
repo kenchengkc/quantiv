@@ -1,7 +1,7 @@
 {
   "symbol": "HWC",
-  "as_of_date": "2026-10-20",
-  "spot_price": 74.13,
+  "as_of_date": "2026-10-21",
+  "spot_price": 72.3,
   "expected_move": {
     "earnings_date": "2026-10-20",
     "timing": "amc",
@@ -21,6 +21,7 @@
     "ml_status": "available",
     "options_status": "unavailable",
     "historical_event_count": 4,
+    "hist_move_med_4q": 0.020304,
     "forecast_frozen": true,
     "forecast_id": "a016a177973a36d151e543d0c9bb6ebd72473a459f17e8867bb6ea693c560740",
     "forecast_model_bundle_id": "4d1ab76dc3401072f1c9a809c71aa76d0c905e5117f7d98d31928219a79a8b78",
@@ -37,11 +38,11 @@
   "earnings_history": [
     {
       "date": "2026-10-20",
-      "timing": "after_market_close",
+      "timing": "amc",
       "q": "Q3 26",
       "fiscal_year": 2026,
       "fiscal_q": "Q3",
-      "actual": null,
+      "actual": -0.024686,
       "implied": null,
       "implied_as_of": null,
       "implied_expiration": null,
@@ -57,8 +58,8 @@
       "revenue_actual": null,
       "revenue_estimate": 426535554.0,
       "rev_surprise_pct": null,
-      "realized_target_protocol": null,
-      "realized_label_source": null,
+      "realized_target_protocol": "quantiv.session-reaction.v2",
+      "realized_label_source": "ohlcv_session_close",
       "em_ml_pct": 0.029176,
       "em_ml_abs": 2.106482,
       "model_horizon": 21,
@@ -378,13 +379,13 @@
   ],
   "next_earnings": "2026-10-20",
   "vol_regime": {
-    "iv_current": 0.2791,
-    "iv_rank": 0.275988,
+    "iv_current": 0.2894,
+    "iv_rank": 0.338602,
     "iv_year_high": 0.3982,
     "iv_year_low": 0.2337,
-    "hv_current": 0.1642,
-    "hv_rank": 0.074661,
-    "iv_mom_week": -0.0465,
+    "hv_current": 0.1792,
+    "hv_rank": 0.159502,
+    "iv_mom_week": 0.0218,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

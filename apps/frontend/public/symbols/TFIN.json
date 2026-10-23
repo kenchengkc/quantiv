@@ -1,6 +1,6 @@
 {
   "symbol": "TFIN",
-  "as_of_date": "2026-10-20",
+  "as_of_date": "2026-10-21",
   "spot_price": 65.0,
   "expected_move": {
     "earnings_date": "2026-10-21",
@@ -19,6 +19,7 @@
     "display_forecast_as_of": "2026-10-20",
     "ml_status": "unavailable_event",
     "options_status": "decision_eligible",
+    "hist_move_med_4q": 0.043791,
     "forecast_frozen": true,
     "ml_publication_status": "held",
     "ml_publication_reason": "no_eligible_current_forecast"
@@ -26,20 +27,20 @@
   "straddle_features": [
     {
       "expiration": "2026-11-20",
-      "dte": 31,
+      "dte": 30,
       "atm_strike": 65.0,
-      "atm_iv": 0.401582,
-      "atm_call_iv": 0.4065,
-      "atm_put_iv": 0.3967,
-      "straddle_mid": 6.32,
-      "em_straddle": 6.32,
-      "em_straddle_pct": 0.097231,
-      "em_iv": 7.607155,
-      "em_iv_pct": 0.117033,
-      "call_delta": 0.3792,
-      "call_gamma": 0.0515,
-      "call_vega": 0.0688,
-      "call_theta": -0.0453
+      "atm_iv": 0.426493,
+      "atm_call_iv": 0.4106,
+      "atm_put_iv": 0.4422,
+      "straddle_mid": 6.6,
+      "em_straddle": 6.6,
+      "em_straddle_pct": 0.101538,
+      "em_iv": 7.947662,
+      "em_iv_pct": 0.122272,
+      "call_delta": 0.3785,
+      "call_gamma": 0.0521,
+      "call_vega": 0.0676,
+      "call_theta": -0.0491
     }
   ],
   "earnings_history": [
@@ -448,13 +449,13 @@
   ],
   "next_earnings": "2026-10-21",
   "vol_regime": {
-    "iv_current": 0.4121,
-    "iv_rank": 0.102989,
+    "iv_current": 0.4436,
+    "iv_rank": 0.175402,
     "iv_year_high": 0.8023,
     "iv_year_low": 0.3673,
-    "hv_current": 0.2058,
-    "hv_rank": 0.029013,
-    "iv_mom_week": -0.0605,
+    "hv_current": 0.1763,
+    "hv_rank": 0.0,
+    "iv_mom_week": -0.0193,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

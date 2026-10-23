@@ -1,6 +1,6 @@
 {
   "symbol": "JBHT",
-  "as_of_date": "2026-10-20",
+  "as_of_date": "2026-10-21",
   "spot_price": 230.0,
   "expected_move": {
     "earnings_date": "2026-10-15",
@@ -20,6 +20,7 @@
     "ml_status": "unavailable_event",
     "options_status": "decision_eligible",
     "historical_event_count": 4,
+    "hist_move_med_4q": 0.071611,
     "forecast_frozen": true,
     "ml_publication_status": "held",
     "ml_publication_reason": "no_eligible_current_forecast"
@@ -27,37 +28,37 @@
   "straddle_features": [
     {
       "expiration": "2026-11-20",
-      "dte": 31,
+      "dte": 30,
       "atm_strike": 230.0,
-      "atm_iv": 0.311863,
-      "atm_call_iv": 0.307,
-      "atm_put_iv": 0.3167,
-      "straddle_mid": 16.745,
-      "em_straddle": 16.745,
-      "em_straddle_pct": 0.072804,
-      "em_iv": 20.903842,
-      "em_iv_pct": 0.090886,
-      "call_delta": 0.4485,
-      "call_gamma": 0.0194,
-      "call_vega": 0.2604,
-      "call_theta": -0.1298
+      "atm_iv": 0.3227,
+      "atm_call_iv": 0.3243,
+      "atm_put_iv": 0.3211,
+      "straddle_mid": 17.0,
+      "em_straddle": 17.0,
+      "em_straddle_pct": 0.073913,
+      "em_iv": 21.27852,
+      "em_iv_pct": 0.092515,
+      "call_delta": 0.5117,
+      "call_gamma": 0.0187,
+      "call_vega": 0.2617,
+      "call_theta": -0.1576
     },
     {
       "expiration": "2026-12-18",
-      "dte": 59,
+      "dte": 58,
       "atm_strike": 230.0,
-      "atm_iv": 0.318354,
-      "atm_call_iv": 0.3201,
-      "atm_put_iv": 0.3166,
-      "straddle_mid": 23.395,
-      "em_straddle": 23.395,
-      "em_straddle_pct": 0.101717,
-      "em_iv": 29.438649,
-      "em_iv_pct": 0.127994,
-      "call_delta": 0.4921,
+      "atm_iv": 0.317201,
+      "atm_call_iv": 0.319,
+      "atm_put_iv": 0.3154,
+      "straddle_mid": 23.2,
+      "em_straddle": 23.2,
+      "em_straddle_pct": 0.10087,
+      "em_iv": 29.08238,
+      "em_iv_pct": 0.126445,
+      "call_delta": 0.5286,
       "call_gamma": 0.0136,
-      "call_vega": 0.3626,
-      "call_theta": -0.1069
+      "call_vega": 0.3629,
+      "call_theta": -0.1132
     }
   ],
   "earnings_history": [
@@ -450,13 +451,13 @@
   ],
   "next_earnings": "2026-10-15",
   "vol_regime": {
-    "iv_current": 0.3252,
-    "iv_rank": 0.273923,
+    "iv_current": 0.3213,
+    "iv_rank": 0.258373,
     "iv_year_high": 0.5073,
     "iv_year_low": 0.2565,
-    "hv_current": 0.4821,
-    "hv_rank": 0.834915,
-    "iv_mom_week": -0.0614,
+    "hv_current": 0.4807,
+    "hv_rank": 0.829137,
+    "iv_mom_week": -0.0816,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"
