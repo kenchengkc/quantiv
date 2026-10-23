@@ -745,6 +745,9 @@ def _symbol_expected_move(event: dict) -> dict:
         "options_status": event.get("options_status"),
         "fallback_reason": event.get("fallback_reason"),
         "historical_event_count": event.get("historical_event_count"),
+        # A retained ML publication hold can make this the rendered headline.
+        # Compact symbol history may not contain enough rows to reconstruct it.
+        "hist_move_med_4q": event.get("hist_move_med_4q"),
         "forecast_frozen": True,
         "forecast_id": event.get("forecast_id"),
         "forecast_model_bundle_id": event.get("forecast_model_bundle_id"),

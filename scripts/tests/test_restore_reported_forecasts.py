@@ -469,6 +469,64 @@ def test_refresh_and_ci_validate_real_publication_before_commit():
                for job in ci["jobs"].values() for step in job["steps"])
 
 
+def test_restoration_preserves_historical_fallback_when_frozen_ml_is_held(tmp_path, monkeypatch):
+    import sys
+    import validate_public_contracts as contracts
+
+    symbols, weeks = tmp_path / "symbols", tmp_path / "weeks"
+    symbols.mkdir()
+    weeks.mkdir()
+    key = ("ZGN", "2026-10-22")
+    current = _event(
+        *key, as_of_date="2026-10-20", hist_move_med_4q=0.007166,
+        ml_publication_status="held", ml_publication_reason="no_eligible_current_forecast",
+        display_forecast_method="ml_unavailable", display_forecast_pct=None,
+    )
+    week = weeks / "2026-10-19.json"
+    week.write_text(json.dumps({
+        "metadata": {"as_of_date": "2026-10-21"},
+        "window": {"start": "2026-10-19", "end": "2026-10-23"},
+        "events": [current],
+    }))
+    symbol_path = symbols / "ZGN.json"
+    symbol_path.write_text(json.dumps({
+        "symbol": "ZGN", "next_earnings": key[1], "expected_move": current,
+        # The compact history cannot independently reconstruct this fallback.
+        "earnings_history": [{"date": "2026-09-03", "actual": 0.007166}],
+    }))
+    historical = _event(
+        *key, em_ml_pct=0.033826, ml_snapshot_date="2026-09-30",
+        forecast_frozen_eligible=True, hist_move_med_4q=0.007166,
+    )
+    monkeypatch.setattr(restore, "PUBLIC_DIR", tmp_path)
+    monkeypatch.setattr(restore, "SYMBOLS_DIR", symbols)
+    monkeypatch.setattr(restore, "WEEKS_DIR", weeks)
+    monkeypatch.setattr(restore, "_history", lambda _path: ["prior"])
+    monkeypatch.setattr(restore, "_bundle_at", lambda *_: {"events": [historical]})
+    monkeypatch.setattr(restore, "_commit_at", lambda _: None)
+    monkeypatch.setattr(restore, "_load_reference_membership", lambda: (
+        {key}, {"start": "2026-10-19", "end": "2026-10-23"},
+    ))
+    monkeypatch.setattr(restore, "_republish_manifest_and_screener", lambda: None)
+    monkeypatch.setattr(contracts, "PUBLIC", tmp_path)
+    monkeypatch.setattr(sys, "argv", ["restore", "--apply", "--today", "2026-10-23"])
+
+    assert restore.main() == 0
+    restored = json.loads(symbol_path.read_text())
+    calendar = json.loads(week.read_text())["events"][0]
+    assert restored["expected_move"]["ml_publication_status"] == "held"
+    assert restored["expected_move"]["ml_publication_reason"] == "no_eligible_current_forecast"
+    assert restored["expected_move"]["hist_move_med_4q"] == 0.007166
+    assert contracts._symbol_page_signature(restored, key[1])[0] == ("historical", 0.007166)
+    assert contracts._resolved_forecast_signature(calendar) == ("historical", 0.007166)
+    original_symbol = symbol_path.read_bytes()
+    assert restore.main() == 0
+    assert symbol_path.read_bytes() == original_symbol
+    assert contracts._resolved_forecast_signature(
+        json.loads(week.read_text())["events"][0],
+    ) == ("historical", 0.007166)
+
+
 @pytest.mark.parametrize('status', ['held', 'eligible', None])
 def test_new_policy_same_day_unreported_forecasts_are_not_replaced(tmp_path, monkeypatch, status):
     path = tmp_path / 'week.json'
