@@ -1,6 +1,6 @@
 {
   "symbol": "TFC",
-  "as_of_date": "2026-10-21",
+  "as_of_date": "2026-10-22",
   "spot_price": 47.5,
   "expected_move": {
     "earnings_date": "2026-10-16",
@@ -46,20 +46,37 @@
   "straddle_features": [
     {
       "expiration": "2026-11-20",
-      "dte": 30,
+      "dte": 29,
       "atm_strike": 47.5,
-      "atm_iv": 0.2514,
-      "atm_call_iv": 0.2519,
-      "atm_put_iv": 0.2509,
-      "straddle_mid": 2.725,
-      "em_straddle": 2.725,
-      "em_straddle_pct": 0.057368,
-      "em_iv": 3.423515,
-      "em_iv_pct": 0.072074,
-      "call_delta": 0.5129,
-      "call_gamma": 0.1147,
-      "call_vega": 0.0541,
-      "call_theta": -0.0189
+      "atm_iv": 0.262345,
+      "atm_call_iv": 0.2651,
+      "atm_put_iv": 0.2596,
+      "straddle_mid": 2.85,
+      "em_straddle": 2.85,
+      "em_straddle_pct": 0.06,
+      "em_iv": 3.512519,
+      "em_iv_pct": 0.073948,
+      "call_delta": 0.5726,
+      "call_gamma": 0.1069,
+      "call_vega": 0.0528,
+      "call_theta": -0.0171
+    },
+    {
+      "expiration": "2026-12-18",
+      "dte": 57,
+      "atm_strike": 47.5,
+      "atm_iv": 0.24875,
+      "atm_call_iv": 0.2548,
+      "atm_put_iv": 0.2427,
+      "straddle_mid": 3.75,
+      "em_straddle": 3.75,
+      "em_straddle_pct": 0.078947,
+      "em_iv": 4.669256,
+      "em_iv_pct": 0.0983,
+      "call_delta": 0.5588,
+      "call_gamma": 0.0795,
+      "call_vega": 0.0742,
+      "call_theta": -0.0128
     }
   ],
   "earnings_history": [
@@ -463,13 +480,13 @@
   ],
   "next_earnings": "2026-10-16",
   "vol_regime": {
-    "iv_current": 0.2425,
-    "iv_rank": 0.199365,
+    "iv_current": 0.2439,
+    "iv_rank": 0.206769,
     "iv_year_high": 0.3939,
     "iv_year_low": 0.2048,
-    "hv_current": 0.2153,
-    "hv_rank": 0.324452,
-    "iv_mom_week": -0.0472,
+    "hv_current": 0.2198,
+    "hv_rank": 0.351095,
+    "iv_mom_week": -0.0497,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"

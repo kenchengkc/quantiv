@@ -1,6 +1,6 @@
 {
   "symbol": "APPF",
-  "as_of_date": "2026-10-21",
+  "as_of_date": "2026-10-22",
   "spot_price": 220.0,
   "expected_move": {
     "earnings_date": "2026-10-22",
@@ -44,37 +44,37 @@
   "straddle_features": [
     {
       "expiration": "2026-11-20",
-      "dte": 30,
+      "dte": 29,
       "atm_strike": 220.0,
-      "atm_iv": 0.719648,
-      "atm_call_iv": 0.7215,
-      "atm_put_iv": 0.7178,
-      "straddle_mid": 35.895,
-      "em_straddle": 35.895,
-      "em_straddle_pct": 0.163159,
-      "em_iv": 45.389675,
-      "em_iv_pct": 0.206317,
-      "call_delta": 0.5117,
-      "call_gamma": 0.0088,
-      "call_vega": 0.2472,
-      "call_theta": -0.2905
+      "atm_iv": 0.648703,
+      "atm_call_iv": 0.6461,
+      "atm_put_iv": 0.6513,
+      "straddle_mid": 31.85,
+      "em_straddle": 31.85,
+      "em_straddle_pct": 0.144773,
+      "em_iv": 40.227337,
+      "em_iv_pct": 0.182852,
+      "call_delta": 0.5062,
+      "call_gamma": 0.01,
+      "call_vega": 0.2434,
+      "call_theta": -0.267
     },
     {
       "expiration": "2026-12-18",
-      "dte": 58,
+      "dte": 57,
       "atm_strike": 220.0,
-      "atm_iv": 0.597149,
-      "atm_call_iv": 0.5977,
-      "atm_put_iv": 0.5966,
-      "straddle_mid": 41.35,
-      "em_straddle": 41.35,
-      "em_straddle_pct": 0.187955,
-      "em_iv": 52.368879,
-      "em_iv_pct": 0.23804,
-      "call_delta": 0.5296,
-      "call_gamma": 0.0076,
-      "call_vega": 0.3432,
-      "call_theta": -0.1809
+      "atm_iv": 0.571449,
+      "atm_call_iv": 0.573,
+      "atm_put_iv": 0.5699,
+      "straddle_mid": 39.25,
+      "em_straddle": 39.25,
+      "em_straddle_pct": 0.178409,
+      "em_iv": 49.681063,
+      "em_iv_pct": 0.225823,
+      "call_delta": 0.5275,
+      "call_gamma": 0.008,
+      "call_vega": 0.3406,
+      "call_theta": -0.1754
     }
   ],
   "earnings_history": [
@@ -470,13 +470,13 @@
   ],
   "next_earnings": "2026-10-22",
   "vol_regime": {
-    "iv_current": 0.7131,
-    "iv_rank": 0.94158,
+    "iv_current": 0.6405,
+    "iv_rank": 0.769868,
     "iv_year_high": 0.7378,
     "iv_year_low": 0.315,
     "hv_current": 0.4333,
     "hv_rank": 0.48777,
-    "iv_mom_week": 0.1192,
+    "iv_mom_week": -0.0199,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

@@ -1,7 +1,7 @@
 {
   "symbol": "ZGN",
-  "as_of_date": "2026-10-21",
-  "spot_price": 12.92,
+  "as_of_date": "2026-10-22",
+  "spot_price": 13.85,
   "expected_move": {
     "earnings_date": "2026-10-22",
     "timing": "bmo",
@@ -38,11 +38,11 @@
   "earnings_history": [
     {
       "date": "2026-10-22",
-      "timing": "before_market_open",
+      "timing": "bmo",
       "q": "Q3 26",
       "fiscal_year": 2026,
       "fiscal_q": "Q3",
-      "actual": null,
+      "actual": 0.071981,
       "implied": null,
       "implied_as_of": null,
       "implied_expiration": null,
@@ -58,8 +58,8 @@
       "revenue_actual": null,
       "revenue_estimate": null,
       "rev_surprise_pct": null,
-      "realized_target_protocol": null,
-      "realized_label_source": null,
+      "realized_target_protocol": "quantiv.session-reaction.v2",
+      "realized_label_source": "ohlcv_session_close",
       "em_ml_pct": 0.033826,
       "em_ml_abs": 0.451583,
       "model_horizon": 7,

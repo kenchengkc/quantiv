@@ -1,12 +1,12 @@
 {
   "symbol": "NVST",
-  "as_of_date": "2026-10-21",
-  "spot_price": 25.0,
+  "as_of_date": "2026-10-22",
+  "spot_price": 23.97,
   "expected_move": {
     "earnings_date": "2026-11-04",
     "display_forecast_pct": 0.07317860410539634,
     "display_forecast_method": "historical",
-    "display_forecast_as_of": "2026-10-21",
+    "display_forecast_as_of": "2026-10-22",
     "ml_status": "unavailable_model",
     "options_status": "unavailable",
     "fallback_reason": "quote_quality",
@@ -17,25 +17,7 @@
     "ml_publication_reason": "no_eligible_current_forecast",
     "em_method": "historical"
   },
-  "straddle_features": [
-    {
-      "expiration": "2026-12-18",
-      "dte": 58,
-      "atm_strike": 25.0,
-      "atm_iv": 0.5098,
-      "atm_call_iv": 0.5098,
-      "atm_put_iv": 0.5098,
-      "straddle_mid": 3.75,
-      "em_straddle": 3.75,
-      "em_straddle_pct": 0.15,
-      "em_iv": 5.080511,
-      "em_iv_pct": 0.20322,
-      "call_delta": 0.3788,
-      "call_gamma": 0.08,
-      "call_vega": 0.0348,
-      "call_theta": -0.0143
-    }
-  ],
+  "straddle_features": [],
   "earnings_history": [
     {
       "date": "2026-11-04",
@@ -66,7 +48,7 @@
       "ml_publication_reason": "no_eligible_current_forecast",
       "display_forecast_pct": 0.07317860410539634,
       "display_forecast_method": "historical",
-      "display_forecast_as_of": "2026-10-21",
+      "display_forecast_as_of": "2026-10-22",
       "options_status": "unavailable",
       "fallback_reason": "quote_quality",
       "historical_event_count": 4,
@@ -420,13 +402,13 @@
   ],
   "next_earnings": "2026-11-04",
   "vol_regime": {
-    "iv_current": 0.359,
-    "iv_rank": 0.132825,
+    "iv_current": 0.369,
+    "iv_rank": 0.147215,
     "iv_year_high": 0.9616,
     "iv_year_low": 0.2667,
-    "hv_current": 0.2918,
-    "hv_rank": 0.063066,
-    "iv_mom_week": -0.0207,
+    "hv_current": 0.3066,
+    "hv_rank": 0.104921,
+    "iv_mom_week": -0.0147,
     "iv_mom_month": null
   },
   "next_earnings_timing": "unknown"

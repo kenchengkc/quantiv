@@ -1,16 +1,16 @@
 {
   "symbol": "UDR",
-  "as_of_date": "2026-10-21",
-  "spot_price": 35.04,
+  "as_of_date": "2026-10-22",
+  "spot_price": 36.18,
   "expected_move": {
     "earnings_date": "2026-11-02",
     "em_ml_pct": 0.023459,
     "em_ml_abs": 0.848744,
     "model_horizon": 11,
     "ml_snapshot_date": "2026-10-22",
-    "forecast_id": "8534c68ce3481f5eb20fd1aaa7a51c8ef6dfff9f9ce12c0513332e7af240aee7",
+    "forecast_id": "514131a35858196c8bba77dc7b2df8176df5596b2d8304b6307913d520c2b684",
     "forecast_model_bundle_id": "d14dc7f2aa6b175956922eb6266b8523742add962668b7d6b8833cc2c869dd1b",
-    "forecast_scored_at": "2026-10-23T15:25:00.406514+00:00",
+    "forecast_scored_at": "2026-10-24T07:36:15.346301+00:00",
     "forecast_feature_cutoff_at": "2026-11-02T20:55:00+00:00",
     "forecast_prediction_deadline_at": "2026-11-02T20:55:00+00:00",
     "forecast_feature_snapshot_at": "2026-10-22T20:00:00+00:00",
@@ -64,9 +64,9 @@
       "ml_publication_reason": "no_eligible_current_forecast",
       "display_forecast_pct": 0.005926676784953899,
       "display_forecast_method": "historical",
-      "display_forecast_as_of": "2026-10-21",
+      "display_forecast_as_of": "2026-10-22",
       "options_status": "unavailable",
-      "fallback_reason": "quote_quality",
+      "fallback_reason": "no_event_expiry",
       "historical_event_count": 4,
       "em_method": "historical"
     },
@@ -361,15 +361,6 @@
     }
   ],
   "next_earnings": "2026-11-02",
-  "vol_regime": {
-    "iv_current": 0.1982,
-    "iv_rank": 0.032462,
-    "iv_year_high": 0.4277,
-    "iv_year_low": 0.1905,
-    "hv_current": 0.1592,
-    "hv_rank": 0.213978,
-    "iv_mom_week": -0.021,
-    "iv_mom_month": null
-  },
+  "vol_regime": null,
   "next_earnings_timing": "amc"
 }
