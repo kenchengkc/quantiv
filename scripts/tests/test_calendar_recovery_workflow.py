@@ -32,7 +32,10 @@ def test_calendar_recovery_verifies_saved_release_before_repair_and_monitoring_b
     assert repair['if'] == "inputs.refresh_mode == 'calendar-only-recovery'"
     assert repair['env']['PROVIDER_FREE_RECOVERY'] == '0'
     assert repair['shell'] == 'python3 scripts/provider_market_hours.py --run-shell {0}'
-    assert 'r2_push.sh' not in repair['run']
+    # Lookup cursors may survive downstream failure, but provider repair must
+    # never promote prices, options, forecasts or model state through this path.
+    state_uploads = [line.strip() for line in repair['run'].splitlines() if 'r2_push.sh' in line]
+    assert state_uploads == ['bash scripts/r2_push.sh --runtime-state-only']
     assert 'r2_push_calendar_reference.sh' in repair['run']
     assert '--earnings' in repair['run']
     assert '--ohlcv' not in repair['run'] and '--corporate-actions' not in repair['run']

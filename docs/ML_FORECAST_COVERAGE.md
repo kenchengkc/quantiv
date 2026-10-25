@@ -1,10 +1,14 @@
 # Upcoming ML forecast coverage
 
-Upcoming, unreported events display an eligible signed ML forecast or **ML unavailable**. Historical move statistics remain useful context and evaluation benchmarks; they do not supply the headline forecast. Previously reported forecasts retain their original publication history.
+Upcoming, unreported events prefer an eligible signed ML forecast, then the IV forecast, straddle implied move, and historical median. The fallback's method remains distinct from ML admission. Previously reported forecasts retain their original publication history.
 
 The calendar export covers the next 21 calendar days, including the fourth upcoming week and weekend endpoints. New training uses exact daily lead heads T1 through T25: the latest completed market session can precede today by four calendar days under the verified session calendar. Consumers load the exact horizon set from the signed manifest, so older six-head bundles remain usable for rollback. Missing heads never select a nearby model or interpolate predictions.
 
 Live scoring selects the newest available verified price session from the latest completed session and its immediate trading-session predecessor. The one-session grace counts exchange sessions, including holidays and early closes. Every feature remains anchored to that actual snapshot, and the model lead is earnings date minus snapshot date. The date is preserved in forecast artifacts, signed monitoring, API responses and the public forecast's as-of field. Two-session-old inputs, unfinished-session inputs and events past their prediction deadline remain held. Grace never substitutes a nearby model when the exact lead is outside the signed bundle.
+
+Calendar reconciliation supplements truncated company-news summaries with complete issuer press releases from FinancialContent and PRNewswire. Only matching issuer announcements with a publication date and explicit release-session evidence can establish timing; a conference-call time alone cannot. The sanitized decision report retains source URLs, dates and sessions, never article bodies. Confirmed timing survives subsequent runs only for the same event date.
+
+Unresolved public and TwelveData lookups retain their last attempt in verified runtime state, keyed by provider, ticker and exact event date. Bounded lookup queues prefer never-checked and oldest-checked events, so the same unsuccessful tickers cannot repeatedly consume the full budget. Lookup progress is saved before downstream forecast and frontend work. Source failures leave freshness, monitoring, rollback and fallback selection unchanged.
 
 ## Verified optionless inputs and outcomes
 

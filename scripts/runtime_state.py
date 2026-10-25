@@ -31,6 +31,7 @@ STATE_FILES = (
     "popular_changes.jsonl",
     "fmp_earnings_metadata.json",
     "fmp_earnings_backfill_state.json",
+    "calendar_announcement_state.json",
     "delisting_watch.json",
 )
 

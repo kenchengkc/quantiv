@@ -215,6 +215,11 @@ jobs:
           if-no-files-found: ignore
           retention-days: 30
 
+      - name: Preserve calendar lookup progress
+        env:
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+        run: bash scripts/r2_push.sh --runtime-state-only
+
       - name: Apply manual earnings overrides
         run: python scripts/apply_earnings_overrides.py --allow-missing
 
@@ -709,6 +714,7 @@ jobs:
             set -- --symbols "${SYMBOLS[@]}"
           fi
           python -u scripts/reconcile_earnings_calendar.py --days-ahead 60 --announcement-days-ahead 35 "$@"
+          bash scripts/r2_push.sh --runtime-state-only
           python scripts/apply_earnings_overrides.py --allow-missing
           python scripts/apply_ticker_lifecycle.py
           python scripts/check_earnings_calendar_integrity.py --require-baseline

@@ -34,6 +34,8 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 import requests
 
+import calendar_announcement_state as announcement_state
+
 from sync_finnhub_earnings import (
     OUTPUT_COLUMNS,
     default_data_dir,
@@ -124,6 +126,7 @@ DIRECT_TITLE_ACTIONS = (
     " announces ",
     " schedules ",
     " scheduled ",
+    " sets date ",
     " will announce ",
     " will report ",
     " will release ",
@@ -211,7 +214,7 @@ def is_direct_earnings_announcement_title(title: str) -> bool:
     if any(term in text for term in DIRECT_TITLE_RESULTS):
         return True
     quarter_context = re.search(
-        r"\b(?:first|second|third|fourth)\s+quarter\b|\bq[1-4]\b",
+        r"\b(?:first|second|third|fourth)[\s-]+quarter\b|\bq[1-4]\b",
         text,
         flags=re.IGNORECASE,
     )
@@ -287,7 +290,80 @@ def extract_fiscal_identity(text: str) -> dict[str, Any]:
 
     return {}
 
-def _session_from_text(text: str, *, report_day: date) -> str:
+
+def _session_dates_match(text: str, *, report_day: date) -> bool:
+    # A dateline before the announcement and the fiscal period being reported
+    # are not event dates. Every other date in the timing clause must agree.
+    parts = re.split(r"\s(?:—|--)\s", text, maxsplit=1)
+    dateline = DATE_RE.search(parts[0]) if len(parts) == 2 else None
+    if (
+        dateline
+        and re.fullmatch(r"(?:[a-z][a-z .'-]*,\s*)*", parts[0][:dateline.start()], re.I)
+        and re.fullmatch(r"\s*(?:/PRNewswire/\s*)?", parts[0][dateline.end():], re.I)
+    ):
+        text = parts[1]
+    for item in DATE_RE.finditer(text):
+        if re.search(
+            r"\b(?:quarter|year|period|months?)\s+end(?:ed|ing|s)?\s+(?:on\s+)?"
+            r"(?:(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),?\s+)?$",
+            text[max(0, item.start() - 80):item.start()], re.I,
+        ):
+            continue
+        if _candidate_date(item, report_day) != report_day:
+            return False
+    return True
+
+
+def _cross_sentence_release_call_clock(text: str, *, report_day: date) -> int | None:
+    """Locate one explicitly bounded call clock across three adjacent sentences."""
+    clocks = list(TIME_RE.finditer(text))
+    if len(clocks) != 1:
+        return None
+    clock = clocks[0]
+    # Mask the complete clock so "a.m. Eastern Time" is not a sentence break.
+    marked = text[:clock.start()] + "release_call_clock" + text[clock.end():]
+    sentences = re.split(r"[.!?;]\s+(?=[A-Z])", marked)
+    for index in range(1, len(sentences) - 1):
+        if not re.fullmatch(
+            r"\s*(?:the|this) call will (?:begin|start) at release_call_clock\s*",
+            sentences[index], re.I,
+        ):
+            continue
+        call, release = sentences[index - 1], sentences[index + 1]
+        if re.search(r"\b(?:replay|transcript|recording)\b", call + " " + release, re.I):
+            continue
+        if re.search(
+            r"\b(?:evening|night|afternoon|yesterday|tomorrow)\b|"
+            r"\b(?:previous|prior|preceding|following|next)\s+(?:business\s+)?(?:day|morning)\b|"
+            r"\bdays?\s+(?:before|prior to)\b",
+            release, re.I,
+        ):
+            continue
+        action = re.search(
+            r"\bwill\s+(?:host|hold|conduct)\s+(?:(?:a|an|the|its)\s+)?"
+            r"(?:earnings\s+)?(?:conference\s+)?call\b", call, re.I,
+        )
+        if action is None:
+            continue
+        call_dates = {_candidate_date(item, report_day)
+                      for item in DATE_RE.finditer(call[action.end():])}
+        if call_dates != {report_day}:
+            continue
+        if any(_candidate_date(item, report_day) != report_day for item in DATE_RE.finditer(release)):
+            continue
+        if re.search(
+            r"\bwill\s+(?:release|issue|publish|post|report|announce)\b.{0,120}"
+            r"\b(?:financial results|results|earnings (?:report|release))\b.{0,80}"
+            r"\b(?:before|prior to)\s+the\s+(?:conference\s+)?call\b",
+            release, re.I,
+        ):
+            return clock.start()
+    return None
+
+
+def _session_from_text(
+    text: str, *, report_day: date, allow_cross_sentence: bool = True,
+) -> str:
     # Only release language may supply a session; a later call has a different
     # timestamp and can even occur on the following day.
     market = r"(?:the\s+)?(?:(?:u\.?s\.?|us)\s+)?(?:financial\s+|stock\s+)?(?:markets?|nyse|nasdaq(?:\s+global(?:\s+select)?\s+market)?|new york stock exchange)"
@@ -305,6 +381,8 @@ def _session_from_text(text: str, *, report_day: date) -> str:
         for match in re.finditer("|".join(patterns), text, flags=re.I):
             prefix = re.split(r"[.!?;]\s+(?=[A-Z])", text[:match.end()])[-1].lower()
             suffix = re.split(r"[.!?;]\s+(?=[A-Z])", text[match.end():], maxsplit=1)[0].lower()
+            if not _session_dates_match(prefix + suffix, report_day=report_day):
+                continue
             # A conjunction before the session starts a new clause: "release
             # results and, after close, host a call" does not time the release.
             if re.search(r"\band\s*,?\s*$", text[:match.start()].lower()):
@@ -319,8 +397,22 @@ def _session_from_text(text: str, *, report_day: date) -> str:
             calls = list(re.finditer(r"\b(?:call|conference|webcast|interview|discuss|discussed)\b", prefix))
             before = releases and (not calls or releases[-1].start() > calls[-1].start())
             following = re.search(action, suffix)
+            before_action = suffix[:following.start()] if following else ""
+            if following and re.match(
+                r"\s+(?:(?:its|the|a|copy|of)\s+){0,5}"
+                r"(?:financial results|results|(?:earnings\s+)?press release|earnings release)\b",
+                suffix[following.end():],
+            ):
+                # "After close and prior to the conference call, ... will issue
+                # the earnings release" explicitly times publication. Removing
+                # only the subordinate bound keeps call-hosting clauses excluded.
+                before_action = re.sub(
+                    r"\b(?:before|prior to)\s+the\s+(?:conference\s+)?call\b",
+                    "",
+                    before_action,
+                )
             after = following and not calls and not re.search(
-                r"\b(?:call|conference|webcast|interview|discuss|discussed)\b", suffix[:following.start()])
+                r"\b(?:call|conference|webcast|interview|discuss|discussed)\b", before_action)
             if before or after:
                 found.add(session)
     if len(found) == 1:
@@ -345,6 +437,10 @@ def _session_from_text(text: str, *, report_day: date) -> str:
         r"(?:released|issued|published|posted|reported|announced|available)\b",
         re.I,
     )
+    bounded_call_clock = (
+        _cross_sentence_release_call_clock(text, report_day=report_day)
+        if allow_cross_sentence else None
+    )
     times: list[int] = []
     for match in TIME_RE.finditer(text):
         # A call time alone is not the release time. An explicit release clock
@@ -357,14 +453,16 @@ def _session_from_text(text: str, *, report_day: date) -> str:
         if re.search(r"\b(?:replay|transcript|recording)\b", prefix):
             continue
         release_clock = bool(release_clock_action.search(prefix))
-        suffix = re.split(r"[.!?;]", text[match.end():], maxsplit=1)[0].lower()
+        suffix = re.split(r"[.!?;]\s+(?=[A-Z])", text[match.end():], maxsplit=1)[0].lower()
         suffix = clock_clause.split(suffix, maxsplit=1)[0]
         clause = prefix + " " + suffix
+        if not _session_dates_match(clause, report_day=report_day):
+            continue
         call_clock = bool(re.search(r"\b(?:call|conference|webcast|interview)\b", clause))
         release_linked_to_call = bool(re.search(
             r"(?:issued|released|published|available).{0,80}(?:before|prior to).{0,40}(?:call|conference)",
             clause,
-        ))
+        )) or match.start() == bounded_call_clock
         if call_clock and release_linked_to_call:
             call_dates = [_candidate_date(item, report_day) for item in DATE_RE.finditer(clause)]
             if any(day != report_day for day in call_dates if day is not None):
@@ -438,7 +536,7 @@ def extract_earnings_announcement(
     if not any(term in lower for term in EARNINGS_TERMS):
         return None
 
-    candidates: list[tuple[int, date, str]] = []
+    candidates: list[tuple[int, date, int, int]] = []
     for match in DATE_RE.finditer(cleaned):
         # A future fiscal period end is not a future earnings release. These
         # dates often share a sentence with the release date and otherwise win
@@ -471,16 +569,26 @@ def extract_earnings_announcement(
             # naming the actual future earnings date. Keep same-day events valid,
             # but do not let the dateline win a tie against a future event.
             score -= 2
-        candidates.append((score, candidate, context))
+        candidates.append((score, candidate, start, end))
 
     if not candidates:
         return None
     candidates.sort(key=lambda item: (-item[0], item[1]))
-    score, candidate, context = candidates[0]
+    score, candidate, start, end = candidates[0]
     if score < 6:
         return None
 
-    timing = _session_from_text(context, report_day=candidate)
+    # Keep complete sentences for timing: a fixed-length excerpt can retain a
+    # session but cut off the different event date that disqualifies it.
+    boundaries = list(re.finditer(r"[.!?;]\s+(?=[A-Z])", cleaned[:start]))
+    start = boundaries[-1].end() if boundaries else 0
+    boundary = re.search(r"[.!?;]\s+(?=[A-Z])", cleaned[end:])
+    end = end + boundary.end() if boundary else len(cleaned)
+    context = cleaned[start:end]
+
+    # A cross-sentence bound needs the whole article to establish that its call
+    # clock is unique; a date excerpt may hide a later conflicting clock.
+    timing = _session_from_text(context, report_day=candidate, allow_cross_sentence=False)
     if timing == "unknown":
         timing = _session_from_text(cleaned, report_day=candidate)
     return {"date": candidate.isoformat(), "timing": timing}
@@ -1287,6 +1395,30 @@ def fetch_twelvedata_announcements(
     }
 
 
+def fetch_public_announcements(
+    symbol: str, *, today: date, company_name: str | None = None,
+) -> tuple[list[Announcement], dict[str, Any]]:
+    # Imported lazily so the transport module can reuse the existing strict
+    # title, issuer, date and release-session parser without an import cycle.
+    from earnings_press_releases import fetch_public_announcements as fetch
+
+    rows, meta = fetch(symbol, today=today, company_name=company_name)
+    chosen, _ = _announcement_decision(rows, as_of=today)
+    if meta.get("http_status") in {403, 429} or chosen and normalize_timing(chosen.get("timing")) in {"bmo", "amc"}:
+        return rows, meta
+
+    from earnings_prnewswire import fetch_prnewswire_announcements
+
+    additional, other = fetch_prnewswire_announcements(symbol, today=today, company_name=company_name)
+    return rows + additional, {
+        "status": other.get("status", "error") if other.get("status") != "ok" else meta.get("status", "ok"),
+        "http_status": other.get("http_status"),
+        "requests": meta.get("requests", 0) + other.get("requests", 0),
+        "evidence": len(rows) + len(additional),
+        "sources": {"financialcontent": meta, "prnewswire": other},
+    }
+
+
 def fetch_alphavantage_announcements(
     symbol: str,
     *,
@@ -1368,6 +1500,8 @@ def _row_vote(row: pd.Series | dict[str, Any], provider: str) -> Vote:
                 "override",
                 "twelvedata_press_release",
                 "finnhub_company_news",
+                "financialcontent_press_release",
+                "prnewswire_press_release",
                 "alphavantage_news",
             }
         )
@@ -1753,12 +1887,16 @@ def _collect_announcements(
     finnhub_max_requests: int = 3000,
     company_names: dict[str, str] | None = None,
     candidate_dates: dict[str, str] | None = None,
+    public_max_symbols: int = 0,
+    public_delay: float = 1.0,
+    lookup_state: dict[str, Any] | None = None,
 ) -> tuple[dict[str, list[Announcement]], dict[str, Any]]:
     evidence: dict[str, list[Announcement]] = defaultdict(list)
     status: dict[str, Any] = {
         "finnhub_company_news": {},
         "twelvedata_press_releases": {},
         "alphavantage_news": {},
+        "public_press_releases": {},
     }
 
     if finnhub_max_requests < len(symbols):
@@ -1798,7 +1936,29 @@ def _collect_announcements(
             pending.append((announced_date, index, symbol))
         return [symbol for _, _, symbol in sorted(pending)]
 
-    press_symbols = unresolved_symbols()[:twelvedata_max_symbols]
+    def prioritized(provider: str) -> list[str]:
+        return announcement_state.prioritize_symbols(
+            unresolved_symbols(), state=lookup_state or {}, provider=provider,
+            candidate_dates=candidate_dates or {},
+        )
+
+    public_symbols = prioritized("public_press_releases")[:public_max_symbols]
+    for index, symbol in enumerate(public_symbols):
+        rows, meta = fetch_public_announcements(
+            symbol, today=today, company_name=(company_names or {}).get(symbol),
+        )
+        evidence[symbol].extend(rows)
+        status["public_press_releases"][symbol] = meta
+        if meta.get("http_status") in {403, 429}:
+            print(f"public announcement lookups stopped: HTTP {meta['http_status']}", flush=True)
+            break
+        if (index + 1) % 50 == 0 or index + 1 == len(public_symbols):
+            print(f"public announcement lookups={index + 1}/{len(public_symbols)}; "
+                  f"unresolved={len(unresolved_symbols())}", flush=True)
+        if index + 1 < len(public_symbols):
+            time.sleep(public_delay)
+
+    press_symbols = prioritized("twelvedata_press_releases")[:twelvedata_max_symbols]
     for index, symbol in enumerate(press_symbols):
         rows, meta = fetch_twelvedata_announcements(
             symbol,
@@ -1847,6 +2007,8 @@ def main() -> int:
     parser.add_argument("--alpha-news-max", type=int, default=20)
     parser.add_argument("--announcement-max-symbols", type=int, default=2000)
     parser.add_argument("--twelvedata-max-symbols", type=int, default=80)
+    parser.add_argument("--public-max-symbols", type=int, default=2000)
+    parser.add_argument("--public-delay", type=float, default=1.0)
     parser.add_argument("--symbols", nargs="+", help="Limit announcement lookups to these tickers")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
@@ -1861,6 +2023,8 @@ def main() -> int:
         parser.error("--announcement-max-symbols must be positive")
     if args.twelvedata_max_symbols < 0:
         parser.error("--twelvedata-max-symbols cannot be negative")
+    if args.public_max_symbols < 0 or args.public_delay < 0:
+        parser.error("public lookup limits and delay cannot be negative")
 
     if args.symbols and any(not re.fullmatch(r"[A-Z][A-Z0-9.-]{0,9}", symbol) for symbol in args.symbols):
         parser.error("--symbols requires uppercase ticker symbols")
@@ -1869,6 +2033,8 @@ def main() -> int:
     end = today + timedelta(days=args.days_ahead)
     announcement_end = today + timedelta(days=args.announcement_days_ahead)
     data_dir = args.data_dir or default_data_dir()
+    state_path = data_dir / "calendar_announcement_state.json"
+    lookup_state = announcement_state.load_state(state_path, today=today)
 
     current_path = data_dir / "earnings_calendar.csv"
     current_df = _load_calendar(current_path)
@@ -1934,6 +2100,9 @@ def main() -> int:
         requested = set(args.symbols)
         symbols = [symbol for symbol in symbols if symbol in requested]
     company_names = load_company_names()
+    candidate_dates = {symbol: decision["date"]
+                       for symbol, decision in preliminary_report["decisions"].items()
+                       if decision.get("date")}
     announcements, announcement_status = _collect_announcements(
         symbols,
         today=today,
@@ -1946,9 +2115,10 @@ def main() -> int:
         alpha_news_max=args.alpha_news_max,
         twelvedata_max_symbols=args.twelvedata_max_symbols,
         company_names=company_names,
-        candidate_dates={symbol: decision["date"]
-                         for symbol, decision in preliminary_report["decisions"].items()
-                         if decision.get("date")},
+        candidate_dates=candidate_dates,
+        public_max_symbols=args.public_max_symbols,
+        public_delay=args.public_delay,
+        lookup_state=lookup_state,
     )
 
     reconciled, reconciliation = reconcile_calendar(
@@ -1997,6 +2167,17 @@ def main() -> int:
         return 0
 
     write_outputs(reconciled, data_dir)
+    observed_at = datetime.now(timezone.utc).isoformat()
+    for provider in ("public_press_releases", "twelvedata_press_releases"):
+        for symbol, meta in announcement_status[provider].items():
+            if not candidate_dates.get(symbol) or meta.get("status") == "missing_key":
+                continue
+            lookup_state = announcement_state.update_state(
+                lookup_state, provider=provider, symbol=symbol,
+                event_date=candidate_dates[symbol], observed_at=observed_at,
+                status=meta.get("status", "unknown"),
+            )
+    announcement_state.write_state(state_path, lookup_state, today=today)
     print(f"wrote {data_dir / 'earnings_calendar.csv'}")
     print(f"wrote {data_dir / 'earnings_calendar.parquet'}")
     print(f"wrote {args.report}")
