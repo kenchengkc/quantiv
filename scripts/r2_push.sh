@@ -119,7 +119,16 @@ push_model_evaluations() {
 push_forecasts() {
   if [ -d "$DATA_DIR/forecasts" ]; then
     rclone sync "$DATA_DIR/forecasts" "$REMOTE/forecasts" \
+      --exclude '/published_snapshots/**' --exclude '/receipts/*.receipt.json' \
       --fast-list --transfers=8 --progress
+    if [ -d "$DATA_DIR/forecasts/published_snapshots" ]; then
+      rclone copy "$DATA_DIR/forecasts/published_snapshots" "$REMOTE/forecasts/published_snapshots" \
+        --immutable --fast-list --transfers=4
+    fi
+    if [ -d "$DATA_DIR/forecasts/receipts" ]; then
+      rclone copy "$DATA_DIR/forecasts/receipts" "$REMOTE/forecasts/receipts" \
+        --include '*.receipt.json' --immutable --fast-list --transfers=4
+    fi
   else
     echo "⚠️  $DATA_DIR/forecasts missing — skipping forecast sync"
   fi
