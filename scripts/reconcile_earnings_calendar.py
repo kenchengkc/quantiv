@@ -81,8 +81,10 @@ DATE_RE = re.compile(
 )
 TIME_RE = re.compile(
     r"\b(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)\s*"
+    r"(?:(?P<zone_open>\()\s*)?"
     r"(?P<zone>(?:Eastern|Central|Mountain|Pacific)(?:\s+(?:Standard|Daylight))?\s+Time|"
-    r"EST|EDT|CST|CDT|MST|MDT|PST|PDT|ET|CT|MT|PT)?(?!\w)",
+    r"EST|EDT|CST|CDT|MST|MDT|PST|PDT|ET|CT|MT|PT)?(?!\w)"
+    r"(?(zone_open)\s*\))",
     re.IGNORECASE,
 )
 EARNINGS_TERMS = (
@@ -299,7 +301,10 @@ def _session_dates_match(text: str, *, report_day: date) -> bool:
     if (
         dateline
         and re.fullmatch(r"(?:[a-z][a-z .'-]*,\s*)*", parts[0][:dateline.start()], re.I)
-        and re.fullmatch(r"\s*(?:/PRNewswire/\s*)?", parts[0][dateline.end():], re.I)
+        and re.fullmatch(
+            r"\s*(?:(?:/PRNewswire/|\(GLOBE NEWSWIRE\))\s*)?",
+            parts[0][dateline.end():], re.I,
+        )
     ):
         text = parts[1]
     for item in DATE_RE.finditer(text):
@@ -312,6 +317,15 @@ def _session_dates_match(text: str, *, report_day: date) -> bool:
         if _candidate_date(item, report_day) != report_day:
             return False
     return True
+
+
+def _call_bound_spans_another_day(text: str) -> bool:
+    return bool(re.search(
+        r"\b(?:evening|night|afternoon|yesterday|tomorrow)\b|"
+        r"\b(?:previous|prior|preceding|following|next)\s+(?:business\s+)?(?:day|morning)\b|"
+        r"\bdays?\s+(?:before|prior to)\b",
+        text, re.I,
+    ))
 
 
 def _cross_sentence_release_call_clock(text: str, *, report_day: date) -> int | None:
@@ -332,12 +346,7 @@ def _cross_sentence_release_call_clock(text: str, *, report_day: date) -> int | 
         call, release = sentences[index - 1], sentences[index + 1]
         if re.search(r"\b(?:replay|transcript|recording)\b", call + " " + release, re.I):
             continue
-        if re.search(
-            r"\b(?:evening|night|afternoon|yesterday|tomorrow)\b|"
-            r"\b(?:previous|prior|preceding|following|next)\s+(?:business\s+)?(?:day|morning)\b|"
-            r"\bdays?\s+(?:before|prior to)\b",
-            release, re.I,
-        ):
+        if _call_bound_spans_another_day(release):
             continue
         action = re.search(
             r"\bwill\s+(?:host|hold|conduct)\s+(?:(?:a|an|the|its)\s+)?"
@@ -424,7 +433,7 @@ def _session_from_text(
     mentions_call = bool(re.search(r"\b(?:call|conference|webcast|interview)\b", lower))
     clock_clause = re.compile(
         r"\b(?:and|while|but)\s+(?=(?:(?:the\s+)?(?:company|management|it)\s+)?"
-        r"will\s+(?:hold|host|conduct)\b)",
+        r"(?:will\s+)?(?:hold|host|conduct)\b)",
         re.I,
     )
     release_object = r"\b(?:results|earnings|press release|materials)\b"
@@ -462,11 +471,13 @@ def _session_from_text(
         release_linked_to_call = bool(re.search(
             r"(?:issued|released|published|available).{0,80}(?:before|prior to).{0,40}(?:call|conference)",
             clause,
-        )) or match.start() == bounded_call_clock
-        if call_clock and release_linked_to_call:
-            call_dates = [_candidate_date(item, report_day) for item in DATE_RE.finditer(clause)]
-            if any(day != report_day for day in call_dates if day is not None):
-                continue
+        )) or (release_clock and bool(re.search(
+            r"\b(?:before|prior to)\s+(?:(?:the\s+)?company[’']s\s+|(?:the|its)\s+)?"
+            r"(?:earnings\s+)?(?:conference\s+)?call\b",
+            clause,
+        ))) or match.start() == bounded_call_clock
+        if call_clock and release_linked_to_call and _call_bound_spans_another_day(clause):
+            continue
         if mentions_call and not release_linked_to_call and (not release_clock or call_clock):
             continue
         zone = (match.group("zone") or "").lower()
@@ -497,16 +508,27 @@ def _session_from_text(
         if clock.date() != report_day:
             continue
         minutes = clock.hour * 60 + clock.minute
+        # A one-sided publication bound only proves a session when the entire
+        # allowed interval is outside trading hours on the stated release day.
+        bound = re.search(
+            r"\b(not\s+)?(before|after|prior to|following|by|no later than|no earlier than|until)\s*"
+            r"(?:(?:about|approximately|around)\s+)?$",
+            prefix,
+        )
+        if bound:
+            upper_bound = bound.group(2) in {"before", "prior to", "by", "no later than", "until"}
+            if bound.group(1):
+                upper_bound = not upper_bound
+            if (upper_bound and minutes >= 9 * 60 + 30) or (not upper_bound and minutes < 16 * 60):
+                continue
         # "Before a 5pm call" does not prove after-close release. The bound is
         # sufficient only when the call itself is before the market opens.
         if call_clock and release_linked_to_call and minutes >= 9 * 60 + 30:
             continue
         times.append(minutes)
-    if any(minutes < 9 * 60 + 30 for minutes in times):
-        return "bmo"
-    if any(minutes >= 16 * 60 for minutes in times):
-        return "amc"
-    return "unknown"
+    sessions = {"bmo" if minutes < 9 * 60 + 30 else "amc"
+                for minutes in times if minutes < 9 * 60 + 30 or minutes >= 16 * 60}
+    return sessions.pop() if len(sessions) == 1 else "unknown"
 
 
 def _candidate_date(match: re.Match[str], published_on: date) -> date | None:
@@ -589,7 +611,7 @@ def extract_earnings_announcement(
     # A cross-sentence bound needs the whole article to establish that its call
     # clock is unique; a date excerpt may hide a later conflicting clock.
     timing = _session_from_text(context, report_day=candidate, allow_cross_sentence=False)
-    if timing == "unknown":
+    if timing == "unknown" or len(TIME_RE.findall(cleaned)) > len(TIME_RE.findall(context)):
         timing = _session_from_text(cleaned, report_day=candidate)
     return {"date": candidate.isoformat(), "timing": timing}
 
