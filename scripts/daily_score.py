@@ -231,7 +231,7 @@ def get_bundle_upcoming_features(
 
 def score_upcoming_models(
     conn: duckdb.DuckDBPyConnection, models: Dict[int, dict], days_ahead: int | None = None,
-    *, now: datetime | None = None,
+    *, now: datetime | None = None, source_features: list[pd.DataFrame] | None = None,
 ) -> pd.DataFrame:
     """Prefer the newest admitted exact head within one-session source grace."""
     results = []
@@ -254,6 +254,8 @@ def score_upcoming_models(
             include_previous_session=True,
         )
         if not frame.empty:
+            if source_features is not None:
+                source_features.append(frame.assign(_retention_feature_protocol=protocol))
             result = score(frame, entries)
             if not result.empty:
                 results.append(result)
@@ -1059,7 +1061,16 @@ def main():
                 WHERE 1=0
             """)
 
-    forecasts = score_upcoming_models(conn, models, args.days_ahead)
+    source_features: list[pd.DataFrame] = []
+    forecasts = score_upcoming_models(conn, models, args.days_ahead, source_features=source_features)
+    if args.output_path is None:
+        from published_forecast_retention import retain_published_forecasts
+        forecasts = retain_published_forecasts(
+            forecasts, data_dir=data_dir, public_dir=REPO_ROOT / "apps/frontend/public",
+            deployment_pointer=REPO_ROOT / "apps/frontend/frontend-release.json",
+            bundle_dir=models_dir, now=datetime.now(timezone.utc), conn=conn,
+            source_features=pd.concat(source_features, ignore_index=True) if source_features else None,
+        )
     conn.close()
     logger.info(f"Generated {len(forecasts)} forecasts")
 

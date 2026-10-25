@@ -725,6 +725,8 @@ def publish_forecast_evidence(*, expected_forecast_path: Path | None = None) -> 
                 raise ValueError('evidence receipt does not match the eligible forecast')
             if (receipt.get('quality') or {}).get('status') != 'passed':
                 raise ValueError('eligible forecast evidence must pass validation')
+            from published_forecast_retention import preserve_published_snapshot
+            preserve_published_snapshot(expected_forecast_path, receipt, forecasts_dir=FORECASTS_DIR)
         evidence = build_dashboard_evidence(receipt)
     except (OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
         public_path.unlink(missing_ok=True)

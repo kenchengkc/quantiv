@@ -204,7 +204,14 @@ fi
 
 # Forecasts from the last run (scoring and the frontend build).
 rclone sync "$REMOTE/forecasts" "$DATA_DIR/forecasts" \
+  --exclude '/published_snapshots/**' --exclude '/receipts/*.receipt.json' \
   --fast-list --transfers=8 --progress 2>/dev/null || true
+# Immutable retention objects are never deleted by a partial forecast checkout.
+# Fourteen days exceeds the admitted two-session source window.
+rclone copy "$REMOTE/forecasts/published_snapshots" "$DATA_DIR/forecasts/published_snapshots" \
+  --immutable --max-age 14d --fast-list --transfers=4 2>/dev/null || true
+rclone copy "$REMOTE/forecasts/receipts" "$DATA_DIR/forecasts/receipts" \
+  --include '*.receipt.json' --immutable --max-age 14d --fast-list --transfers=4 2>/dev/null || true
 
 # Weekly/manual retraining additionally restores the latest reconciliation
 # decision. Historical training checks immutable sources separately; every
