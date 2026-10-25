@@ -1,7 +1,7 @@
 {
   "symbol": "SRCE",
-  "as_of_date": "2026-10-22",
-  "spot_price": 87.18,
+  "as_of_date": "2026-10-23",
+  "spot_price": 87.29,
   "expected_move": {
     "earnings_date": "2026-10-22",
     "timing": "amc",
@@ -38,11 +38,11 @@
   "earnings_history": [
     {
       "date": "2026-10-22",
-      "timing": "after_market_close",
+      "timing": "amc",
       "q": "Q3 26",
       "fiscal_year": 2026,
       "fiscal_q": "Q3",
-      "actual": null,
+      "actual": 0.001262,
       "implied": null,
       "implied_as_of": null,
       "implied_expiration": null,
@@ -58,8 +58,8 @@
       "revenue_actual": null,
       "revenue_estimate": 120687930.0,
       "rev_surprise_pct": null,
-      "realized_target_protocol": null,
-      "realized_label_source": null,
+      "realized_target_protocol": "quantiv.session-reaction.v2",
+      "realized_label_source": "ohlcv_session_close",
       "em_ml_pct": 0.024573,
       "em_ml_abs": 2.102976,
       "model_horizon": 7,

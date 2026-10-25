@@ -1,16 +1,16 @@
 {
   "symbol": "PFG",
-  "as_of_date": "2026-10-22",
-  "spot_price": 110.11,
+  "as_of_date": "2026-10-23",
+  "spot_price": 108.565,
   "expected_move": {
     "earnings_date": "2026-10-26",
     "em_ml_pct": 0.023133,
     "em_ml_abs": 2.54712,
     "model_horizon": 4,
     "ml_snapshot_date": "2026-10-22",
-    "forecast_id": "9134f557d1e2c3f679e0f1d83dd48fa1784b7e17e7689cebc929393901646beb",
+    "forecast_id": "c958cd8311be157bd1844f7bfa44bc79ed233f03942b96fadecd8a837548eb1b",
     "forecast_model_bundle_id": "d14dc7f2aa6b175956922eb6266b8523742add962668b7d6b8833cc2c869dd1b",
-    "forecast_scored_at": "2026-10-25T08:59:56.778474+00:00",
+    "forecast_scored_at": "2026-10-25T20:36:37.835652+00:00",
     "forecast_feature_cutoff_at": "2026-10-26T19:55:00+00:00",
     "forecast_prediction_deadline_at": "2026-10-26T19:55:00+00:00",
     "forecast_feature_snapshot_at": "2026-10-22T20:00:00+00:00",
@@ -62,13 +62,13 @@
       "ml_status": "unavailable_model",
       "ml_publication_status": "held",
       "ml_publication_reason": "no_eligible_current_forecast",
-      "display_forecast_pct": 0.024641602278064223,
-      "display_forecast_method": "historical",
-      "display_forecast_as_of": "2026-10-22",
-      "options_status": "unavailable",
+      "display_forecast_pct": 0.07253718970202183,
+      "display_forecast_method": "straddle_implied",
+      "display_forecast_as_of": "2026-10-23",
+      "options_status": "indicative",
       "fallback_reason": "quote_quality",
-      "historical_event_count": 4,
-      "em_method": "historical"
+      "historical_event_count": null,
+      "em_method": "straddle_implied"
     },
     {
       "date": "2026-07-27",
@@ -404,13 +404,13 @@
   ],
   "next_earnings": "2026-10-26",
   "vol_regime": {
-    "iv_current": 0.3159,
-    "iv_rank": 0.442113,
+    "iv_current": 0.3116,
+    "iv_rank": 0.427072,
     "iv_year_high": 0.4754,
     "iv_year_low": 0.1895,
     "hv_current": 0.1808,
     "hv_rank": 0.155504,
-    "iv_mom_week": 0.0142,
+    "iv_mom_week": -0.0245,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

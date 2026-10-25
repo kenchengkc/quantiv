@@ -1,16 +1,16 @@
 {
   "symbol": "LMB",
-  "as_of_date": "2026-10-22",
-  "spot_price": 47.55,
+  "as_of_date": "2026-10-23",
+  "spot_price": 47.57,
   "expected_move": {
     "earnings_date": "2026-11-03",
     "em_ml_pct": 0.108333,
     "em_ml_abs": 5.153399,
     "model_horizon": 11,
     "ml_snapshot_date": "2026-10-23",
-    "forecast_id": "682a38e4c4271b3f8d6eea2bb8a6f0f5452058d7b5325405fbbd4031334dcdd9",
+    "forecast_id": "a8b1369b78ec7209a853c1be159b941d6bcc1a58e20546439a2b742fd4d37046",
     "forecast_model_bundle_id": "d14dc7f2aa6b175956922eb6266b8523742add962668b7d6b8833cc2c869dd1b",
-    "forecast_scored_at": "2026-10-25T08:59:57.105575+00:00",
+    "forecast_scored_at": "2026-10-25T20:36:38.125458+00:00",
     "forecast_feature_cutoff_at": "2026-11-03T20:55:00+00:00",
     "forecast_prediction_deadline_at": "2026-11-03T20:55:00+00:00",
     "forecast_feature_snapshot_at": "2026-10-23T20:00:00+00:00",
@@ -30,13 +30,13 @@
     "fallback_reason": null,
     "historical_event_count": null,
     "hist_move_med_4q": 0.200183,
-    "timing": "after_market_close",
+    "timing": "amc",
     "ml_publication_status": "eligible"
   },
   "straddle_features": [],
   "earnings_history": [
     {
-      "date": "2026-11-02",
+      "date": "2026-11-03",
       "timing": "after_market_close",
       "q": "Q3 26",
       "fiscal_year": 2026,
@@ -64,7 +64,7 @@
       "ml_publication_reason": "no_eligible_current_forecast",
       "display_forecast_pct": 0.20018264314864276,
       "display_forecast_method": "historical",
-      "display_forecast_as_of": "2026-10-22",
+      "display_forecast_as_of": "2026-10-23",
       "options_status": "unavailable",
       "fallback_reason": "no_event_expiry",
       "historical_event_count": 4,
@@ -348,5 +348,5 @@
   ],
   "next_earnings": "2026-11-03",
   "vol_regime": null,
-  "next_earnings_timing": "after_market_close"
+  "next_earnings_timing": "amc"
 }

@@ -1,7 +1,7 @@
 {
   "symbol": "JBHT",
-  "as_of_date": "2026-10-22",
-  "spot_price": 230.0,
+  "as_of_date": "2026-10-23",
+  "spot_price": 220.0,
   "expected_move": {
     "earnings_date": "2026-10-15",
     "timing": "amc",
@@ -27,21 +27,38 @@
   },
   "straddle_features": [
     {
+      "expiration": "2026-11-20",
+      "dte": 28,
+      "atm_strike": 220.0,
+      "atm_iv": 0.331653,
+      "atm_call_iv": 0.3438,
+      "atm_put_iv": 0.3195,
+      "straddle_mid": 17.095,
+      "em_straddle": 17.095,
+      "em_straddle_pct": 0.077705,
+      "em_iv": 20.208713,
+      "em_iv_pct": 0.091858,
+      "call_delta": 0.6346,
+      "call_gamma": 0.0174,
+      "call_vega": 0.2348,
+      "call_theta": -0.1503
+    },
+    {
       "expiration": "2026-12-18",
-      "dte": 57,
+      "dte": 56,
       "atm_strike": 230.0,
-      "atm_iv": 0.3192,
-      "atm_call_iv": 0.3222,
-      "atm_put_iv": 0.3162,
-      "straddle_mid": 23.25,
-      "em_straddle": 23.25,
-      "em_straddle_pct": 0.101087,
-      "em_iv": 29.012308,
-      "em_iv_pct": 0.12614,
-      "call_delta": 0.5514,
-      "call_gamma": 0.0134,
-      "call_vega": 0.3603,
-      "call_theta": -0.1135
+      "atm_iv": 0.326099,
+      "atm_call_iv": 0.3245,
+      "atm_put_iv": 0.3277,
+      "straddle_mid": 23.35,
+      "em_straddle": 23.35,
+      "em_straddle_pct": 0.101522,
+      "em_iv": 29.378147,
+      "em_iv_pct": 0.127731,
+      "call_delta": 0.4805,
+      "call_gamma": 0.0138,
+      "call_vega": 0.3519,
+      "call_theta": -0.1077
     }
   ],
   "earnings_history": [
@@ -434,13 +451,13 @@
   ],
   "next_earnings": "2026-10-15",
   "vol_regime": {
-    "iv_current": 0.3234,
-    "iv_rank": 0.266746,
+    "iv_current": 0.3369,
+    "iv_rank": 0.320574,
     "iv_year_high": 0.5073,
     "iv_year_low": 0.2565,
-    "hv_current": 0.4822,
-    "hv_rank": 0.835328,
-    "iv_mom_week": -0.0735,
+    "hv_current": 0.482,
+    "hv_rank": 0.834503,
+    "iv_mom_week": -0.0013,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

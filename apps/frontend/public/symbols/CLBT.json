@@ -1,16 +1,16 @@
 {
   "symbol": "CLBT",
-  "as_of_date": "2026-10-22",
-  "spot_price": 11.79,
+  "as_of_date": "2026-10-23",
+  "spot_price": 12.1,
   "expected_move": {
     "earnings_date": "2026-11-12",
     "em_ml_pct": 0.086155,
     "em_ml_abs": 1.042471,
     "model_horizon": 20,
     "ml_snapshot_date": "2026-10-23",
-    "forecast_id": "9a63f5bf86a928ddfdd0752a7893dae727480b88aa87cdb0f4a5bd50b611ebe8",
+    "forecast_id": "5f4bc54ea9d85083ba5febf5b0c5a31d746fb13caebbbc78e102e34aa1a30e80",
     "forecast_model_bundle_id": "d14dc7f2aa6b175956922eb6266b8523742add962668b7d6b8833cc2c869dd1b",
-    "forecast_scored_at": "2026-10-25T08:59:57.586636+00:00",
+    "forecast_scored_at": "2026-10-25T20:36:38.513863+00:00",
     "forecast_feature_cutoff_at": "2026-11-11T21:00:00+00:00",
     "forecast_prediction_deadline_at": "2026-11-12T05:00:00+00:00",
     "forecast_feature_snapshot_at": "2026-10-23T20:00:00+00:00",
@@ -30,13 +30,13 @@
     "fallback_reason": null,
     "historical_event_count": null,
     "hist_move_med_4q": 0.145781,
-    "timing": "before_market_open",
+    "timing": "bmo",
     "ml_publication_status": "eligible"
   },
   "straddle_features": [],
   "earnings_history": [
     {
-      "date": "2026-11-10",
+      "date": "2026-11-12",
       "timing": "before_market_open",
       "q": "Q3 26",
       "fiscal_year": 2026,
@@ -64,7 +64,7 @@
       "ml_publication_reason": "no_eligible_current_forecast",
       "display_forecast_pct": 0.1457805699736593,
       "display_forecast_method": "historical",
-      "display_forecast_as_of": "2026-10-22",
+      "display_forecast_as_of": "2026-10-23",
       "options_status": "unavailable",
       "fallback_reason": "no_event_expiry",
       "historical_event_count": 4,
@@ -348,5 +348,5 @@
   ],
   "next_earnings": "2026-11-12",
   "vol_regime": null,
-  "next_earnings_timing": "before_market_open"
+  "next_earnings_timing": "bmo"
 }

@@ -1,7 +1,7 @@
 {
   "symbol": "AZZ",
-  "as_of_date": "2026-10-22",
-  "spot_price": 130.0,
+  "as_of_date": "2026-10-23",
+  "spot_price": 135.0,
   "expected_move": {
     "earnings_date": "2026-10-13",
     "timing": "amc",
@@ -43,38 +43,21 @@
   },
   "straddle_features": [
     {
-      "expiration": "2026-11-20",
-      "dte": 29,
-      "atm_strike": 130.0,
-      "atm_iv": 0.360342,
-      "atm_call_iv": 0.3453,
-      "atm_put_iv": 0.3753,
-      "straddle_mid": 11.0,
-      "em_straddle": 11.0,
-      "em_straddle_pct": 0.084615,
-      "em_iv": 13.204164,
-      "em_iv_pct": 0.10157,
-      "call_delta": 0.6229,
-      "call_gamma": 0.0291,
-      "call_vega": 0.1422,
-      "call_theta": -0.0851
-    },
-    {
       "expiration": "2026-12-18",
-      "dte": 57,
+      "dte": 56,
       "atm_strike": 135.0,
-      "atm_iv": 0.358453,
-      "atm_call_iv": 0.3567,
-      "atm_put_iv": 0.3602,
-      "straddle_mid": 15.15,
-      "em_straddle": 15.15,
-      "em_straddle_pct": 0.112222,
-      "em_iv": 19.123038,
-      "em_iv_pct": 0.141652,
-      "call_delta": 0.5,
-      "call_gamma": 0.0211,
-      "call_vega": 0.2095,
-      "call_theta": -0.0679
+      "atm_iv": 0.372,
+      "atm_call_iv": 0.3704,
+      "atm_put_iv": 0.3736,
+      "straddle_mid": 15.595,
+      "em_straddle": 15.595,
+      "em_straddle_pct": 0.115519,
+      "em_iv": 19.670882,
+      "em_iv_pct": 0.14571,
+      "call_delta": 0.4745,
+      "call_gamma": 0.0206,
+      "call_vega": 0.2054,
+      "call_theta": -0.0681
     }
   ],
   "earnings_history": [
@@ -476,13 +459,13 @@
   ],
   "next_earnings": "2026-10-13",
   "vol_regime": {
-    "iv_current": 0.3734,
-    "iv_rank": 0.568887,
+    "iv_current": 0.3619,
+    "iv_rank": 0.52536,
     "iv_year_high": 0.4873,
     "iv_year_low": 0.2231,
-    "hv_current": 0.2985,
-    "hv_rank": 0.399663,
-    "iv_mom_week": 0.0072,
+    "hv_current": 0.2988,
+    "hv_rank": 0.400927,
+    "iv_mom_week": 0.0025,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

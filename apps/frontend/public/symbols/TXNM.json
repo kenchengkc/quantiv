@@ -1,15 +1,15 @@
 {
   "symbol": "TXNM",
-  "as_of_date": "2026-10-22",
-  "spot_price": 58.73,
+  "as_of_date": "2026-10-23",
+  "spot_price": 58.27,
   "expected_move": {
     "earnings_date": "2026-10-29",
     "display_forecast_pct": 0.0032737107668259213,
     "display_forecast_method": "historical",
-    "display_forecast_as_of": "2026-10-22",
+    "display_forecast_as_of": "2026-10-23",
     "ml_status": "unavailable_model",
     "options_status": "unavailable",
-    "fallback_reason": "no_event_expiry",
+    "fallback_reason": "quote_quality",
     "historical_event_count": 4,
     "hist_move_med_4q": 0.003274,
     "timing": "unknown",
@@ -48,9 +48,9 @@
       "ml_publication_reason": "no_eligible_current_forecast",
       "display_forecast_pct": 0.0032737107668259213,
       "display_forecast_method": "historical",
-      "display_forecast_as_of": "2026-10-22",
+      "display_forecast_as_of": "2026-10-23",
       "options_status": "unavailable",
-      "fallback_reason": "no_event_expiry",
+      "fallback_reason": "quote_quality",
       "historical_event_count": 4,
       "em_method": "historical"
     },
@@ -238,6 +238,15 @@
     }
   ],
   "next_earnings": "2026-10-29",
-  "vol_regime": null,
+  "vol_regime": {
+    "iv_current": null,
+    "iv_rank": null,
+    "iv_year_high": null,
+    "iv_year_low": null,
+    "hv_current": 0.0555,
+    "hv_rank": 0.4,
+    "iv_mom_week": null,
+    "iv_mom_month": null
+  },
   "next_earnings_timing": "unknown"
 }

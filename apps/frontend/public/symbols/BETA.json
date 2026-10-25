@@ -1,16 +1,16 @@
 {
   "symbol": "BETA",
-  "as_of_date": "2026-10-22",
-  "spot_price": 18.6,
+  "as_of_date": "2026-10-23",
+  "spot_price": 19.8,
   "expected_move": {
     "earnings_date": "2026-11-03",
     "em_ml_pct": 0.057056,
     "em_ml_abs": 1.129712,
     "model_horizon": 11,
     "ml_snapshot_date": "2026-10-23",
-    "forecast_id": "6de059897f83bb4b8a3673e5f49290c1e307fc6541c39a27107d862126f4de07",
+    "forecast_id": "32acef90e15194b9b4e2653f686813594196dfb592ab213b91406a1086a0f4f6",
     "forecast_model_bundle_id": "d14dc7f2aa6b175956922eb6266b8523742add962668b7d6b8833cc2c869dd1b",
-    "forecast_scored_at": "2026-10-25T08:59:57.105575+00:00",
+    "forecast_scored_at": "2026-10-25T20:36:38.125458+00:00",
     "forecast_feature_cutoff_at": "2026-11-02T21:00:00+00:00",
     "forecast_prediction_deadline_at": "2026-11-03T05:00:00+00:00",
     "forecast_feature_snapshot_at": "2026-10-23T20:00:00+00:00",
@@ -30,7 +30,7 @@
     "fallback_reason": null,
     "historical_event_count": null,
     "hist_move_med_4q": 0.02938,
-    "timing": "before_market_open",
+    "timing": "bmo",
     "ml_publication_status": "eligible"
   },
   "straddle_features": [],
@@ -64,7 +64,7 @@
       "ml_publication_reason": "no_eligible_current_forecast",
       "display_forecast_pct": 0.02938027655705261,
       "display_forecast_method": "historical",
-      "display_forecast_as_of": "2026-10-22",
+      "display_forecast_as_of": "2026-10-23",
       "options_status": "unavailable",
       "fallback_reason": "no_event_expiry",
       "historical_event_count": 4,
@@ -173,5 +173,5 @@
   ],
   "next_earnings": "2026-11-03",
   "vol_regime": null,
-  "next_earnings_timing": "before_market_open"
+  "next_earnings_timing": "bmo"
 }

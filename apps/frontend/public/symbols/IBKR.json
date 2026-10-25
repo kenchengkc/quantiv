@@ -1,7 +1,7 @@
 {
   "symbol": "IBKR",
-  "as_of_date": "2026-10-22",
-  "spot_price": 80.0,
+  "as_of_date": "2026-10-23",
+  "spot_price": 81.0,
   "expected_move": {
     "earnings_date": "2026-10-15",
     "timing": "amc",
@@ -27,37 +27,20 @@
   "straddle_features": [
     {
       "expiration": "2026-11-20",
-      "dte": 29,
-      "atm_strike": 80.0,
-      "atm_iv": 0.396887,
-      "atm_call_iv": 0.4297,
-      "atm_put_iv": 0.364,
-      "straddle_mid": 7.45,
-      "em_straddle": 7.45,
-      "em_straddle_pct": 0.093125,
-      "em_iv": 8.949725,
-      "em_iv_pct": 0.111872,
-      "call_delta": 0.6132,
-      "call_gamma": 0.0382,
-      "call_vega": 0.0883,
-      "call_theta": -0.0649
-    },
-    {
-      "expiration": "2026-12-18",
-      "dte": 57,
-      "atm_strike": 85.0,
-      "atm_iv": 0.356627,
-      "atm_call_iv": 0.3675,
-      "atm_put_iv": 0.3456,
-      "straddle_mid": 9.6,
-      "em_straddle": 9.6,
-      "em_straddle_pct": 0.112941,
-      "em_iv": 11.979082,
-      "em_iv_pct": 0.14093,
-      "call_delta": 0.4686,
-      "call_gamma": 0.0333,
-      "call_vega": 0.1297,
-      "call_theta": -0.048
+      "dte": 28,
+      "atm_strike": 81.0,
+      "atm_iv": 0.445784,
+      "atm_call_iv": 0.4152,
+      "atm_put_iv": 0.4763,
+      "straddle_mid": 7.95,
+      "em_straddle": 7.95,
+      "em_straddle_pct": 0.098148,
+      "em_iv": 10.00098,
+      "em_iv_pct": 0.123469,
+      "call_delta": 0.4965,
+      "call_gamma": 0.0431,
+      "call_vega": 0.0885,
+      "call_theta": -0.0674
     }
   ],
   "earnings_history": [
@@ -459,13 +442,13 @@
   ],
   "next_earnings": "2026-10-15",
   "vol_regime": {
-    "iv_current": 0.4154,
-    "iv_rank": 0.42931,
+    "iv_current": 0.4668,
+    "iv_rank": 0.619048,
     "iv_year_high": 0.57,
     "iv_year_low": 0.2991,
-    "hv_current": 0.3433,
-    "hv_rank": 0.205756,
-    "iv_mom_week": -0.007,
+    "hv_current": 0.3409,
+    "hv_rank": 0.191059,
+    "iv_mom_week": 0.1065,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

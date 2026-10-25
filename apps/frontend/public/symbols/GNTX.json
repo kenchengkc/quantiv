@@ -1,7 +1,7 @@
 {
   "symbol": "GNTX",
-  "as_of_date": "2026-10-22",
-  "spot_price": 21.74,
+  "as_of_date": "2026-10-23",
+  "spot_price": 20.66,
   "expected_move": {
     "earnings_date": "2026-10-23",
     "timing": "bmo",
@@ -38,11 +38,11 @@
   "earnings_history": [
     {
       "date": "2026-10-23",
-      "timing": "before_market_open",
+      "timing": "bmo",
       "q": "Q3 26",
       "fiscal_year": 2026,
       "fiscal_q": "Q3",
-      "actual": null,
+      "actual": -0.049678,
       "implied": null,
       "implied_as_of": null,
       "implied_expiration": null,
@@ -58,8 +58,8 @@
       "revenue_actual": null,
       "revenue_estimate": 685359083.0,
       "rev_surprise_pct": null,
-      "realized_target_protocol": null,
-      "realized_label_source": null,
+      "realized_target_protocol": "quantiv.session-reaction.v2",
+      "realized_label_source": "ohlcv_session_close",
       "em_ml_pct": 0.044094,
       "em_ml_abs": 0.925977,
       "model_horizon": 2,
@@ -436,13 +436,13 @@
   ],
   "next_earnings": "2026-10-23",
   "vol_regime": {
-    "iv_current": 0.2983,
-    "iv_rank": 0.091838,
+    "iv_current": 0.2774,
+    "iv_rank": 0.067007,
     "iv_year_high": 1.0627,
     "iv_year_low": 0.221,
-    "hv_current": 0.2053,
-    "hv_rank": 0.249847,
-    "iv_mom_week": -0.069,
+    "hv_current": 0.2494,
+    "hv_rank": 0.520565,
+    "iv_mom_week": -0.2099,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"

@@ -1,15 +1,15 @@
 {
   "symbol": "ACA",
-  "as_of_date": "2026-10-22",
+  "as_of_date": "2026-10-23",
   "spot_price": 149.15,
   "expected_move": {
     "earnings_date": "2026-10-28",
     "display_forecast_pct": 0.059606025015733644,
     "display_forecast_method": "historical",
-    "display_forecast_as_of": "2026-10-22",
+    "display_forecast_as_of": "2026-10-23",
     "ml_status": "unavailable_model",
     "options_status": "unavailable",
-    "fallback_reason": "quote_quality",
+    "fallback_reason": "no_event_expiry",
     "historical_event_count": 4,
     "hist_move_med_4q": 0.059606,
     "timing": "unknown",
@@ -48,9 +48,9 @@
       "ml_publication_reason": "no_eligible_current_forecast",
       "display_forecast_pct": 0.059606025015733644,
       "display_forecast_method": "historical",
-      "display_forecast_as_of": "2026-10-22",
+      "display_forecast_as_of": "2026-10-23",
       "options_status": "unavailable",
-      "fallback_reason": "quote_quality",
+      "fallback_reason": "no_event_expiry",
       "historical_event_count": 4,
       "em_method": "historical"
     },
@@ -373,15 +373,6 @@
     }
   ],
   "next_earnings": "2026-10-28",
-  "vol_regime": {
-    "iv_current": null,
-    "iv_rank": null,
-    "iv_year_high": null,
-    "iv_year_low": null,
-    "hv_current": 0.0391,
-    "hv_rank": 0.027355,
-    "iv_mom_week": null,
-    "iv_mom_month": null
-  },
+  "vol_regime": null,
   "next_earnings_timing": "unknown"
 }

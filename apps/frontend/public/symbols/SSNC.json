@@ -1,7 +1,7 @@
 {
   "symbol": "SSNC",
-  "as_of_date": "2026-10-22",
-  "spot_price": 89.54,
+  "as_of_date": "2026-10-23",
+  "spot_price": 82.96,
   "expected_move": {
     "earnings_date": "2026-10-22",
     "timing": "amc",
@@ -38,11 +38,11 @@
   "earnings_history": [
     {
       "date": "2026-10-22",
-      "timing": "after_market_close",
+      "timing": "amc",
       "q": "Q3 26",
       "fiscal_year": 2026,
       "fiscal_q": "Q3",
-      "actual": null,
+      "actual": -0.073487,
       "implied": null,
       "implied_as_of": null,
       "implied_expiration": null,
@@ -58,8 +58,8 @@
       "revenue_actual": null,
       "revenue_estimate": null,
       "rev_surprise_pct": null,
-      "realized_target_protocol": null,
-      "realized_label_source": null,
+      "realized_target_protocol": "quantiv.session-reaction.v2",
+      "realized_label_source": "ohlcv_session_close",
       "em_ml_pct": 0.036945,
       "em_ml_abs": 3.110374,
       "model_horizon": 7,

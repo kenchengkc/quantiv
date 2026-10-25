@@ -1,12 +1,12 @@
 {
   "symbol": "VIR",
-  "as_of_date": "2026-10-22",
-  "spot_price": 11.0,
+  "as_of_date": "2026-10-23",
+  "spot_price": 10.57,
   "expected_move": {
     "earnings_date": "2026-11-04",
     "display_forecast_pct": 0.07548860814166941,
     "display_forecast_method": "historical",
-    "display_forecast_as_of": "2026-10-22",
+    "display_forecast_as_of": "2026-10-23",
     "ml_status": "unavailable_model",
     "options_status": "unavailable",
     "fallback_reason": "quote_quality",
@@ -17,25 +17,7 @@
     "ml_publication_reason": "no_eligible_current_forecast",
     "em_method": "historical"
   },
-  "straddle_features": [
-    {
-      "expiration": "2026-12-18",
-      "dte": 57,
-      "atm_strike": 11.0,
-      "atm_iv": 0.9995,
-      "atm_call_iv": 0.9967,
-      "atm_put_iv": 1.0023,
-      "straddle_mid": 3.375,
-      "em_straddle": 3.375,
-      "em_straddle_pct": 0.306818,
-      "em_iv": 4.344767,
-      "em_iv_pct": 0.394979,
-      "call_delta": 0.5299,
-      "call_gamma": 0.0967,
-      "call_vega": 0.0163,
-      "call_theta": -0.0147
-    }
-  ],
+  "straddle_features": [],
   "earnings_history": [
     {
       "date": "2026-11-04",
@@ -66,7 +48,7 @@
       "ml_publication_reason": "no_eligible_current_forecast",
       "display_forecast_pct": 0.07548860814166941,
       "display_forecast_method": "historical",
-      "display_forecast_as_of": "2026-10-22",
+      "display_forecast_as_of": "2026-10-23",
       "options_status": "unavailable",
       "fallback_reason": "quote_quality",
       "historical_event_count": 4,
@@ -399,13 +381,13 @@
   ],
   "next_earnings": "2026-11-04",
   "vol_regime": {
-    "iv_current": 0.9052,
-    "iv_rank": 0.351857,
+    "iv_current": 1.0981,
+    "iv_rank": 0.532323,
     "iv_year_high": 1.598,
     "iv_year_low": 0.5291,
-    "hv_current": 0.5214,
-    "hv_rank": 0.217333,
-    "iv_mom_week": -0.0247,
+    "hv_current": 0.5228,
+    "hv_rank": 0.219435,
+    "iv_mom_week": 0.1682,
     "iv_mom_month": null
   },
   "next_earnings_timing": "unknown"

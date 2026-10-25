@@ -1,7 +1,7 @@
 {
   "symbol": "REXR",
-  "as_of_date": "2026-10-22",
-  "spot_price": 35.0,
+  "as_of_date": "2026-10-23",
+  "spot_price": 38.71,
   "expected_move": {
     "earnings_date": "2026-10-22",
     "timing": "amc",
@@ -33,33 +33,15 @@
     "forecast_feature_hash": "fd2977e417623fe9697e6f573e98f613c15273c882d6a0b1d5e9b0c402289aeb",
     "forecast_frozen_eligible": true
   },
-  "straddle_features": [
-    {
-      "expiration": "2026-11-20",
-      "dte": 29,
-      "atm_strike": 35.0,
-      "atm_iv": 0.48,
-      "atm_call_iv": 0.48,
-      "atm_put_iv": 0.48,
-      "straddle_mid": 2.725,
-      "em_straddle": 2.725,
-      "em_straddle_pct": 0.077857,
-      "em_iv": 4.735456,
-      "em_iv_pct": 0.135299,
-      "call_delta": 0.6381,
-      "call_gamma": 0.0762,
-      "call_vega": 0.0383,
-      "call_theta": -0.0336
-    }
-  ],
+  "straddle_features": [],
   "earnings_history": [
     {
       "date": "2026-10-22",
-      "timing": "after_market_close",
+      "timing": "amc",
       "q": "Q3 26",
       "fiscal_year": 2026,
       "fiscal_q": "Q3",
-      "actual": null,
+      "actual": 0.066979,
       "implied": null,
       "implied_as_of": null,
       "implied_expiration": null,
@@ -75,8 +57,8 @@
       "revenue_actual": null,
       "revenue_estimate": 243994200.0,
       "rev_surprise_pct": null,
-      "realized_target_protocol": null,
-      "realized_label_source": null,
+      "realized_target_protocol": "quantiv.session-reaction.v2",
+      "realized_label_source": "ohlcv_session_close",
       "em_ml_pct": 0.043355,
       "em_ml_abs": 1.595467,
       "model_horizon": 1,
@@ -424,13 +406,13 @@
   ],
   "next_earnings": "2026-10-22",
   "vol_regime": {
-    "iv_current": 0.3087,
-    "iv_rank": 0.369302,
+    "iv_current": 0.2418,
+    "iv_rank": 0.131054,
     "iv_year_high": 0.4858,
     "iv_year_low": 0.205,
-    "hv_current": 0.2269,
-    "hv_rank": 0.262712,
-    "iv_mom_week": 0.0064,
+    "hv_current": 0.2852,
+    "hv_rank": 0.509746,
+    "iv_mom_week": -0.0587,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

@@ -1,37 +1,21 @@
 {
   "symbol": "QGEN",
-  "as_of_date": "2026-10-22",
-  "spot_price": 50.22,
+  "as_of_date": "2026-10-23",
+  "spot_price": 50.39,
   "expected_move": {
-    "earnings_date": "2026-11-04",
-    "em_ml_pct": 0.026089,
-    "em_ml_abs": 1.314629,
-    "model_horizon": 12,
-    "ml_snapshot_date": "2026-10-23",
-    "forecast_id": "b32ea610f619287d60b7c0f761e7bd7353741faed9f0d7059776738086822dbb",
-    "forecast_model_bundle_id": "d14dc7f2aa6b175956922eb6266b8523742add962668b7d6b8833cc2c869dd1b",
-    "forecast_scored_at": "2026-10-25T08:59:57.205605+00:00",
-    "forecast_feature_cutoff_at": "2026-11-04T20:55:00+00:00",
-    "forecast_prediction_deadline_at": "2026-11-04T20:55:00+00:00",
-    "forecast_feature_snapshot_at": "2026-10-23T20:00:00+00:00",
-    "forecast_feature_hash": "91980582ba0f0fc1e39c210cb5da3a43f8add9c780bcd32ebaf28b3b1cd70b21",
-    "forecast_frozen_eligible": true,
-    "p10": 0.004976,
-    "p25": 0.008268,
-    "p50": 0.025598,
-    "p75": 0.048572,
-    "p90": 0.092709,
-    "em_method": "ml_lightgbm",
-    "display_forecast_pct": 0.026089,
-    "display_forecast_method": "ml",
+    "earnings_date": "2026-11-02",
+    "display_forecast_pct": 0.0038676402635988705,
+    "display_forecast_method": "historical",
     "display_forecast_as_of": "2026-10-23",
-    "ml_status": "available",
+    "ml_status": "unavailable_model",
     "options_status": "unavailable",
-    "fallback_reason": null,
-    "historical_event_count": null,
+    "fallback_reason": "no_event_expiry",
+    "historical_event_count": 4,
     "hist_move_med_4q": 0.003868,
-    "timing": "after_market_close",
-    "ml_publication_status": "eligible"
+    "timing": "unknown",
+    "ml_publication_status": "held",
+    "ml_publication_reason": "no_eligible_current_forecast",
+    "em_method": "historical"
   },
   "straddle_features": [],
   "earnings_history": [
@@ -64,7 +48,7 @@
       "ml_publication_reason": "no_eligible_current_forecast",
       "display_forecast_pct": 0.0038676402635988705,
       "display_forecast_method": "historical",
-      "display_forecast_as_of": "2026-10-22",
+      "display_forecast_as_of": "2026-10-23",
       "options_status": "unavailable",
       "fallback_reason": "no_event_expiry",
       "historical_event_count": 4,
@@ -346,7 +330,7 @@
       "realized_label_source": "ohlcv_session_close"
     }
   ],
-  "next_earnings": "2026-11-04",
+  "next_earnings": "2026-11-02",
   "vol_regime": null,
-  "next_earnings_timing": "after_market_close"
+  "next_earnings_timing": "unknown"
 }

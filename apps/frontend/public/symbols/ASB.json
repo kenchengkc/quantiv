@@ -1,7 +1,7 @@
 {
   "symbol": "ASB",
-  "as_of_date": "2026-10-22",
-  "spot_price": 29.81,
+  "as_of_date": "2026-10-23",
+  "spot_price": 30.21,
   "expected_move": {
     "earnings_date": "2026-10-22",
     "timing": "amc",
@@ -37,11 +37,11 @@
   "earnings_history": [
     {
       "date": "2026-10-22",
-      "timing": "after_market_close",
+      "timing": "amc",
       "q": "Q3 26",
       "fiscal_year": 2026,
       "fiscal_q": "Q3",
-      "actual": null,
+      "actual": 0.013418,
       "implied": null,
       "implied_as_of": null,
       "implied_expiration": null,
@@ -57,8 +57,8 @@
       "revenue_actual": null,
       "revenue_estimate": 468179187.0,
       "rev_surprise_pct": null,
-      "realized_target_protocol": null,
-      "realized_label_source": null,
+      "realized_target_protocol": "quantiv.session-reaction.v2",
+      "realized_label_source": "ohlcv_session_close",
       "em_ml_pct": 0.020699,
       "em_ml_abs": 0.604002,
       "model_horizon": 1,
@@ -378,13 +378,13 @@
   ],
   "next_earnings": "2026-10-22",
   "vol_regime": {
-    "iv_current": 0.2448,
-    "iv_rank": 0.08538,
+    "iv_current": 0.2419,
+    "iv_rank": 0.081651,
     "iv_year_high": 0.9561,
     "iv_year_low": 0.1784,
-    "hv_current": 0.1762,
-    "hv_rank": 0.069394,
-    "iv_mom_week": -0.0237,
+    "hv_current": 0.1783,
+    "hv_rank": 0.080269,
+    "iv_mom_week": 0.0004,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

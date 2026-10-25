@@ -1,7 +1,7 @@
 {
   "symbol": "RITM",
-  "as_of_date": "2026-10-22",
-  "spot_price": 8.68,
+  "as_of_date": "2026-10-23",
+  "spot_price": 9.39,
   "expected_move": {
     "earnings_date": "2026-10-23",
     "timing": "bmo",
@@ -46,11 +46,11 @@
   "earnings_history": [
     {
       "date": "2026-10-23",
-      "timing": "before_market_open",
+      "timing": "bmo",
       "q": "Q3 26",
       "fiscal_year": 2026,
       "fiscal_q": "Q3",
-      "actual": null,
+      "actual": 0.081797,
       "implied": null,
       "implied_as_of": null,
       "implied_expiration": null,
@@ -66,8 +66,8 @@
       "revenue_actual": null,
       "revenue_estimate": 462501150.0,
       "rev_surprise_pct": null,
-      "realized_target_protocol": null,
-      "realized_label_source": null,
+      "realized_target_protocol": "quantiv.session-reaction.v2",
+      "realized_label_source": "ohlcv_session_close",
       "em_ml_pct": 0.029317,
       "em_ml_abs": 0.250664,
       "model_horizon": 2,
@@ -388,13 +388,13 @@
   ],
   "next_earnings": "2026-10-23",
   "vol_regime": {
-    "iv_current": 0.3051,
-    "iv_rank": 0.594248,
+    "iv_current": 0.2605,
+    "iv_rank": 0.439709,
     "iv_year_high": 0.4222,
     "iv_year_low": 0.1336,
-    "hv_current": 0.2604,
-    "hv_rank": 0.45894,
-    "iv_mom_week": -0.0173,
+    "hv_current": 0.3519,
+    "hv_rank": 0.991846,
+    "iv_mom_week": -0.0571,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"

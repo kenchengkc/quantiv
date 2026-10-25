@@ -1,12 +1,12 @@
 {
   "symbol": "CPK",
-  "as_of_date": "2026-10-22",
+  "as_of_date": "2026-10-23",
   "spot_price": 135.0,
   "expected_move": {
     "earnings_date": "2026-11-04",
     "display_forecast_pct": 0.006978436720107006,
     "display_forecast_method": "historical",
-    "display_forecast_as_of": "2026-10-22",
+    "display_forecast_as_of": "2026-10-23",
     "ml_status": "unavailable_model",
     "options_status": "unavailable",
     "fallback_reason": "quote_quality",
@@ -20,20 +20,20 @@
   "straddle_features": [
     {
       "expiration": "2026-12-18",
-      "dte": 57,
+      "dte": 56,
       "atm_strike": 135.0,
-      "atm_iv": 0.222851,
-      "atm_call_iv": 0.2222,
-      "atm_put_iv": 0.2235,
+      "atm_iv": 0.22465,
+      "atm_call_iv": 0.2247,
+      "atm_put_iv": 0.2246,
       "straddle_mid": 9.45,
       "em_straddle": 9.45,
       "em_straddle_pct": 0.07,
-      "em_iv": 11.888816,
-      "em_iv_pct": 0.088065,
-      "call_delta": 0.499,
-      "call_gamma": 0.0337,
-      "call_vega": 0.2107,
-      "call_theta": -0.0435
+      "em_iv": 11.879214,
+      "em_iv_pct": 0.087994,
+      "call_delta": 0.5053,
+      "call_gamma": 0.0336,
+      "call_vega": 0.2091,
+      "call_theta": -0.045
     }
   ],
   "earnings_history": [
@@ -66,7 +66,7 @@
       "ml_publication_reason": "no_eligible_current_forecast",
       "display_forecast_pct": 0.006978436720107006,
       "display_forecast_method": "historical",
-      "display_forecast_as_of": "2026-10-22",
+      "display_forecast_as_of": "2026-10-23",
       "options_status": "unavailable",
       "fallback_reason": "quote_quality",
       "historical_event_count": 4,
@@ -371,13 +371,13 @@
   ],
   "next_earnings": "2026-11-04",
   "vol_regime": {
-    "iv_current": 0.2455,
-    "iv_rank": 0.503694,
+    "iv_current": 0.2335,
+    "iv_rank": 0.423103,
     "iv_year_high": 0.3194,
     "iv_year_low": 0.1705,
     "hv_current": 0.2053,
     "hv_rank": 0.526232,
-    "iv_mom_week": -0.0302,
+    "iv_mom_week": -0.0122,
     "iv_mom_month": null
   },
   "next_earnings_timing": "unknown"
