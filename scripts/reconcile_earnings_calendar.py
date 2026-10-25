@@ -41,6 +41,7 @@ from sync_finnhub_earnings import (
     default_data_dir,
     et_today,
     fiscal_q_from_date,
+    load_data_backed_symbol_universe,
     load_frontend_symbol_universe,
     normalize_existing,
     write_outputs,
@@ -51,6 +52,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_BASELINE = REPO_ROOT / "data" / "validation" / "earnings_calendar_baseline.csv"
 DEFAULT_REPORT = REPO_ROOT / "data" / "validation" / "earnings_calendar_reconciliation.json"
 TICKER_NAMES_PATH = REPO_ROOT / "apps" / "frontend" / "public" / "ticker-names.json"
+MAX_NEW_ANNOUNCEMENT_SYMBOLS = 100
 
 MONTHS = {
     name.lower(): index
@@ -2161,7 +2163,10 @@ def main() -> int:
     provider_votes.extend(fmp_votes)
 
     frontend_symbols = set(load_frontend_symbol_universe())
-    allowed_symbols = frontend_symbols or None
+    data_symbols, fresh_symbols = load_data_backed_symbol_universe(
+        data_dir, today=today, now=datetime.now(timezone.utc),
+    )
+    allowed_symbols = frontend_symbols | data_symbols
 
     preliminary, preliminary_report = reconcile_calendar(
         current_df,
@@ -2180,17 +2185,28 @@ def main() -> int:
         provider_votes,
         start=today,
         end=announcement_end,
-        allowed_symbols=allowed_symbols,
-        max_symbols=args.announcement_max_symbols,
+        allowed_symbols=frontend_symbols | fresh_symbols,
         preliminary_decisions=preliminary_report["decisions"],
     )
-    if args.symbols:
-        requested = set(args.symbols)
-        symbols = [symbol for symbol in symbols if symbol in requested]
-    company_names = load_company_names()
     candidate_dates = {symbol: decision["date"]
                        for symbol, decision in preliminary_report["decisions"].items()
                        if decision.get("date")}
+    if args.symbols:
+        requested = set(args.symbols)
+        symbols = [symbol for symbol in symbols if symbol in requested]
+    else:
+        # A growing price-backed universe must not starve existing calendar
+        # repairs or add thousands of daily provider calls. Unsearched newcomers
+        # still pass the full safety reconciliation and cannot retain raw timing.
+        published = [symbol for symbol in symbols if symbol in frontend_symbols]
+        newcomers = [symbol for symbol in symbols if symbol not in frontend_symbols]
+        newcomers = announcement_state.prioritize_symbols(
+            newcomers, state=lookup_state, provider="public_press_releases",
+            candidate_dates=candidate_dates,
+        )
+        symbols = published + newcomers[:MAX_NEW_ANNOUNCEMENT_SYMBOLS]
+    symbols = symbols[:args.announcement_max_symbols]
+    company_names = load_company_names()
     announcements, announcement_status = _collect_announcements(
         symbols,
         today=today,
