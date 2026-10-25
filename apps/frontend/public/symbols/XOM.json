@@ -15,18 +15,34 @@
     "skew_atm": -0.026899,
     "term_slope": -0.020355,
     "total_vega": 0.287,
-    "em_method": "options_math",
-    "display_forecast_pct": 0.071591,
-    "display_forecast_method": "options_math",
-    "display_forecast_as_of": "2026-10-22",
-    "ml_status": "unavailable_model",
+    "em_method": "ml_lightgbm",
+    "em_ml_pct": 0.022291,
+    "em_ml_abs": 4.083901,
+    "model_horizon": 7,
+    "ml_snapshot_date": "2026-10-23",
+    "forecast_id": "419fef21a01060e5a6e6d06981a08e1b7f54e8f54672f6233bd8df21124d8d81",
+    "forecast_model_bundle_id": "d14dc7f2aa6b175956922eb6266b8523742add962668b7d6b8833cc2c869dd1b",
+    "forecast_scored_at": "2026-10-25T08:59:57.051054+00:00",
+    "forecast_feature_cutoff_at": "2026-10-29T20:00:00+00:00",
+    "forecast_prediction_deadline_at": "2026-10-30T04:00:00+00:00",
+    "forecast_feature_snapshot_at": "2026-10-23T20:00:00+00:00",
+    "forecast_feature_hash": "2709c1082f5f5de462411e40a856a20b8d83b8add49a8cf29bd4d154a0c6f73f",
+    "forecast_frozen_eligible": true,
+    "p10": 0.005122,
+    "p25": 0.011707,
+    "p50": 0.022867,
+    "p75": 0.034873,
+    "p90": 0.054128,
+    "display_forecast_pct": 0.022291,
+    "display_forecast_method": "ml",
+    "display_forecast_as_of": "2026-10-23",
+    "ml_status": "available",
     "options_status": "decision_eligible",
     "fallback_reason": null,
     "historical_event_count": null,
     "hist_move_med_4q": 0.008041,
-    "timing": "unknown",
-    "ml_publication_status": "held",
-    "ml_publication_reason": "no_eligible_current_forecast"
+    "timing": "bmo",
+    "ml_publication_status": "eligible"
   },
   "straddle_features": [
     {
@@ -498,5 +514,5 @@
     "iv_mom_week": 0.0099,
     "iv_mom_month": null
   },
-  "next_earnings_timing": "unknown"
+  "next_earnings_timing": "bmo"
 }

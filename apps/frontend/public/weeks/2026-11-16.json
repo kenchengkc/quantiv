@@ -1,7 +1,7 @@
 {
   "metadata": {
     "version": "v4_multi_week",
-    "generated_at": "2026-10-24T08:15:30.405400",
+    "generated_at": "2026-10-25T09:45:15.559158",
     "as_of_date": "2026-10-22",
     "method": "ATM straddle + IV baseline",
     "offset": 3
@@ -206,9 +206,9 @@
       "correction_factor": 0.455404,
       "model_horizon": 25,
       "ml_snapshot_date": "2026-10-22",
-      "forecast_id": "c512dbb344cfecfad829aa896627c5f8012689105ef2c5cb8356d49aaa302960",
+      "forecast_id": "179358e3a77c377a935419e7a2b87ffd77d99ee2cfca5da06ad6ad7c76c058d8",
       "forecast_model_bundle_id": "d14dc7f2aa6b175956922eb6266b8523742add962668b7d6b8833cc2c869dd1b",
-      "forecast_scored_at": "2026-10-24T07:36:15.915315+00:00",
+      "forecast_scored_at": "2026-10-25T08:59:57.808509+00:00",
       "forecast_feature_cutoff_at": "2026-11-13T21:00:00+00:00",
       "forecast_prediction_deadline_at": "2026-11-16T05:00:00+00:00",
       "forecast_feature_snapshot_at": "2026-10-22T20:00:00+00:00",
@@ -1189,6 +1189,46 @@
       "ml_publication_reason": "no_eligible_current_forecast"
     },
     {
+      "ticker": "HP",
+      "earnings_date": "2026-11-19",
+      "timing": "after_market_close",
+      "fiscal_q": "Q4",
+      "eps_actual": null,
+      "eps_estimate": 0.2301,
+      "revenue_actual": null,
+      "revenue_estimate": 1096205310.0,
+      "realized_move_pct": null,
+      "realized_target_protocol": null,
+      "realized_label_source": null,
+      "as_of_date": "2026-10-22",
+      "spot_price": 40.0,
+      "atm_strike": 40.0,
+      "atm_iv": 0.457482,
+      "em_straddle_pct": 0.151875,
+      "em_iv_pct": 0.180786,
+      "em_straddle_abs": 6.075,
+      "expiry_date": "2026-12-18",
+      "days_to_expiry": 57,
+      "lead_time_days": 28,
+      "skew_atm": -0.0443,
+      "term_slope": null,
+      "em_method": "options_math",
+      "confidence": "high",
+      "iv_rank": 0.282461,
+      "hist_move_avg_4q": 0.062086,
+      "hist_move_med_4q": 0.062598,
+      "iv_crush_pct": 0.341977,
+      "display_forecast_pct": 0.180786,
+      "display_forecast_method": "options_math",
+      "display_forecast_as_of": "2026-10-22",
+      "ml_status": "unavailable_model",
+      "options_status": "decision_eligible",
+      "fallback_reason": null,
+      "historical_event_count": null,
+      "ml_publication_status": "held",
+      "ml_publication_reason": "no_eligible_current_forecast"
+    },
+    {
       "ticker": "WMT",
       "earnings_date": "2026-11-19",
       "timing": "before_market_open",
@@ -1390,8 +1430,8 @@
     }
   ],
   "summary": {
-    "total_events": 34,
-    "avg_em_straddle_pct": 0.11026235294117646,
-    "avg_em_iv_pct": 0.1386913529411765
+    "total_events": 35,
+    "avg_em_straddle_pct": 0.1114512857142857,
+    "avg_em_iv_pct": 0.13989405714285716
   }
 }

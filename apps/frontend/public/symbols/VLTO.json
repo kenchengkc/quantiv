@@ -3,24 +3,40 @@
   "as_of_date": "2026-10-22",
   "spot_price": 104.9,
   "expected_move": {
-    "earnings_date": "2026-10-30",
-    "display_forecast_pct": 0.07316491897044804,
-    "display_forecast_method": "straddle_implied",
-    "display_forecast_as_of": "2026-10-22",
-    "ml_status": "unavailable_model",
-    "options_status": "indicative",
-    "fallback_reason": "quote_quality",
+    "earnings_date": "2026-10-29",
+    "em_ml_pct": 0.021731,
+    "em_ml_abs": 2.267191,
+    "model_horizon": 6,
+    "ml_snapshot_date": "2026-10-23",
+    "forecast_id": "dd7bf1e70d07fbb71752f4220f9e067baca8937a61e49deb5d207bd2a382d84e",
+    "forecast_model_bundle_id": "d14dc7f2aa6b175956922eb6266b8523742add962668b7d6b8833cc2c869dd1b",
+    "forecast_scored_at": "2026-10-25T08:59:56.960164+00:00",
+    "forecast_feature_cutoff_at": "2026-10-29T19:55:00+00:00",
+    "forecast_prediction_deadline_at": "2026-10-29T19:55:00+00:00",
+    "forecast_feature_snapshot_at": "2026-10-23T20:00:00+00:00",
+    "forecast_feature_hash": "fb98498b246b5c398ad3d973b066ae9ba9b28fe925a151e5f33a72d771aaaf03",
+    "forecast_frozen_eligible": true,
+    "p10": 0.004011,
+    "p25": 0.009237,
+    "p50": 0.021631,
+    "p75": 0.03908,
+    "p90": 0.04994,
+    "em_method": "ml_lightgbm",
+    "display_forecast_pct": 0.021731,
+    "display_forecast_method": "ml",
+    "display_forecast_as_of": "2026-10-23",
+    "ml_status": "available",
+    "options_status": "unavailable",
+    "fallback_reason": null,
     "historical_event_count": null,
     "hist_move_med_4q": 0.004669,
-    "timing": "unknown",
-    "ml_publication_status": "held",
-    "ml_publication_reason": "no_eligible_current_forecast",
-    "em_method": "straddle_implied"
+    "timing": "amc",
+    "ml_publication_status": "eligible"
   },
   "straddle_features": [],
   "earnings_history": [
     {
-      "date": "2026-10-30",
+      "date": "2026-10-29",
       "timing": "after_market_close",
       "q": "Q3 26",
       "fiscal_year": 2026,
@@ -393,7 +409,7 @@
       "realized_label_source": "ohlcv_session_close"
     }
   ],
-  "next_earnings": "2026-10-30",
+  "next_earnings": "2026-10-29",
   "vol_regime": {
     "iv_current": 0.2823,
     "iv_rank": 0.415358,
@@ -404,5 +420,5 @@
     "iv_mom_week": -0.0062,
     "iv_mom_month": null
   },
-  "next_earnings_timing": "unknown"
+  "next_earnings_timing": "amc"
 }

@@ -1,37 +1,30 @@
 {
-  "deduplicated_event_count": 107,
-  "event_count": 1840,
+  "deduplicated_event_count": 390,
+  "event_count": 2099,
   "integrity": {
-    "baseline_sha256": "c77d97b43189d4ae42435dfa320e9037c3878f6ca123a11a2431fb8ef6c05fa4",
+    "baseline_sha256": "df90fe0d3a6a5388c1c3326672707aa349c43509acc824ea6a3ce3d6b12f6635",
     "status": "passed",
-    "stdout_sha256": "346a4bb0f7e31f0a72d29d5b31878d256f1432d966c624640d0f6842dc300635"
+    "stdout_sha256": "91f172d547107fee105e718b712b35e52ddf58b13cda68069006106eba46d913"
   },
-  "observed_at": "2026-10-24T06:41:48Z",
-  "receipt_id": "dd7f96c6dfb58f4d681efb7bba2d19d6bc1465762b6738b03f7e1d1d7e5452c6",
-  "release_id": "ec15dd204b2747cc79ca4b0739e274a02ad4c383cdae03880ed3f68716cd3bed",
+  "observed_at": "2026-10-25T06:46:58.701212Z",
+  "receipt_id": "36ffd4b31b65374472d2ae797768ca4f3fa74ec7938c157fd8c88b97ebddd0a6",
+  "release_id": "a11c4654b8f1210acac46dfeaaa2d6168ddbd246ab5481637c862999b76b7b35",
   "schema": "quantiv.calendar-reference-receipt.v1",
   "source_evidence": [
     {
       "date_max": "2028-10-10",
       "date_min": "2020-01-22",
-      "metadata_sha256": "0529f28c3314e0ef53093e15cbcfb61c38c36277bdb0e89d2d35fb1be57af8f8",
-      "observed_at": "2026-10-24T06:41:38.161619Z",
+      "metadata_sha256": "592d552f6d4da99bd0d102ac2374680d0e069e14fb195ca2957e74b9ef55f06e",
+      "observed_at": "2026-10-25T06:46:58.701212Z",
       "provider": "dolthub",
-      "rows": 129868,
-      "symbols": 7421
-    },
-    {
-      "from": "2026-09-24",
-      "metadata_sha256": "ddd98a1b943c52af0685f7468f7dec1c53f45c8249d83e6fc1fa258fdbe89f13",
-      "observed_at": "2026-10-24T06:41:48Z",
-      "provider": "fmp",
-      "to": "2026-12-23"
+      "rows": 130065,
+      "symbols": 7427
     }
   ],
   "source_file": {
     "path": "data/earnings_calendar.csv",
-    "sha256": "df90fe0d3a6a5388c1c3326672707aa349c43509acc824ea6a3ce3d6b12f6635"
+    "sha256": "5e99a95006ef97bf6f0ba92e5cda2e293afaff00f8ca9f1efd2261d4c2f55f17"
   },
-  "source_revision": "95fe3e35d6294692806c05653733957c5b981ead",
-  "universe_id": "fe17ad378ffe4c2b4e32f6f4aa146a4349a5c61c20681462e43500454ebd411f"
+  "source_revision": "85c3a7411648d2b4297c6ffa858fdeeb0c23ad6e",
+  "universe_id": "97156e89c90c4732e975acdcfa09e91ef6bb7a299530d9f807a937dd2a442483"
 }

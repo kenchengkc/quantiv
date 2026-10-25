@@ -1,17 +1,17 @@
 {
   "schema": "quantiv.dashboard-evidence.v1",
-  "receipt_id": "sha256:a40ea48d5552101d9563dbf74290e45202aa87531e66a53ed10d8ed1069d0430",
-  "receipt_file": "forecasts_2026-10-24.a40ea48d5552.receipt.json",
-  "validated_at": "2026-10-24T07:55:36.381548+00:00",
+  "receipt_id": "sha256:1e035f3770d9236430d964d2ee42baa5f2635522d199092ec8e706972ca6a394",
+  "receipt_file": "forecasts_2026-10-25.1e035f3770d9.receipt.json",
+  "validated_at": "2026-10-25T09:22:59.208472+00:00",
   "quality": {
     "status": "passed",
     "issue_count": 0,
     "issue_codes": []
   },
   "coverage": {
-    "rows": 1027,
-    "symbols": 1011,
-    "events": 1027,
+    "rows": 1484,
+    "symbols": 1421,
+    "events": 1484,
     "horizons": [
       4,
       5,
@@ -31,8 +31,8 @@
   "observation_window": {
     "earnings_max": "2026-11-16",
     "earnings_min": "2026-10-26",
-    "scored_at_max": "2026-10-24T07:36:15.915315+00:00",
-    "scored_at_min": "2026-10-24T07:36:15.055578+00:00",
+    "scored_at_max": "2026-10-25T08:59:57.808509+00:00",
+    "scored_at_min": "2026-10-25T08:59:56.778474+00:00",
     "snapshot_max": "2026-10-23",
     "snapshot_min": "2026-10-22"
   },
@@ -50,7 +50,7 @@
       "ml_only_point_outside_band": 0,
       "ml_only_quantile_crossings": 0,
       "non_finite_ml_rows": 0,
-      "optionless_ml_rows": 1017,
+      "optionless_ml_rows": 1474,
       "strict_option_rows": 10,
       "strict_reconciliation": {
         "absolute_move_mismatches": 0,
@@ -92,8 +92,8 @@
       "name": "forecast_snapshot",
       "producer": "scripts/daily_score.py",
       "member_count": 1,
-      "bytes": 784859,
-      "sha256": "9ccb0615a7483cf157382f72e115e67915b38b76aacc2df83b2f4c2b7cec0ad9"
+      "bytes": 1099740,
+      "sha256": "104f13251cdc230ab5f970e43b871cd91294ef321b01179c592aeabf99bbd41e"
     }
   ]
 }
