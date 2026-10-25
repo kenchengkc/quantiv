@@ -119,7 +119,10 @@ PAST_TERMS = (
     "beats estimates",
     "misses estimates",
 )
-HOST_TITLE_ACTIONS = (" to host ", " will host ", " plans live audio webcast ")
+HOST_TITLE_ACTIONS = (
+    " to host ", " will host ", " plans live audio webcast ",
+    " to webcast ", " conference call to discuss ",
+)
 DIRECT_TITLE_ACTIONS = (
     " to announce ",
     " to report ",
@@ -211,12 +214,19 @@ def is_direct_earnings_announcement_title(title: str) -> bool:
         return False
     if any(term in text for term in DIRECT_TITLE_PROJECTED):
         return False
-    if not any(term in text for term in DIRECT_TITLE_ACTIONS):
+    # A planned earnings release is a scheduling notice; general corporate
+    # plans or an earnings preview are not. Call/discussion titles still need
+    # a separate release statement in the article body before admission.
+    plans_release = bool(re.search(r"\bplans\b[^.!?]{0,100}\b(?:earnings|financial results|results) release\b", text))
+    if (" conference call to discuss " in text
+            and not re.search(r"\b(?:earnings|results)\b", text)):
+        return False
+    if not plans_release and not any(term in text for term in DIRECT_TITLE_ACTIONS):
         return False
     if any(term in text for term in DIRECT_TITLE_RESULTS):
         return True
     quarter_context = re.search(
-        r"\b(?:first|second|third|fourth)[\s-]+quarter\b|\bq[1-4]\b",
+        r"\b(?:first|second|third|fourth)[\s-]+quarter\b|\bq[1-4]\b|\b[1-4]q(?:\d{2}|20\d{2})\b",
         text,
         flags=re.IGNORECASE,
     )
@@ -1119,7 +1129,9 @@ def _announcement_from_article(
 ) -> Announcement | None:
     if published_on is None or not is_direct_earnings_announcement_title(title):
         return None
-    if any(term in f" {_clean_text(title).lower()} " for term in HOST_TITLE_ACTIONS):
+    normalized_title = f" {_clean_text(title).lower()} "
+    if (any(term in normalized_title for term in HOST_TITLE_ACTIONS)
+            or " plans " in normalized_title):
         # Hosting a call does not establish when earnings are released. These
         # titles are useful only when the body separately announces results.
         release_object = r"\b(?:financial results|results|earnings release|earnings(?!\s+(?:call|conference|webcast)))\b"
@@ -1130,7 +1142,8 @@ def _announcement_from_article(
         for statement in statements:
             active = re.search(action + r"(?P<object>[^.!?]{0,120}?)" + release_object, statement, re.I)
             passive = re.search(release_object + r"(?P<object>[^.!?]{0,120}?)"
-                                r"\bwill be\s+(?:made\s+)?(?:available|released|issued|published|posted|reported|announced)\b",
+                                r"\b(?:will be|(?:is|are) scheduled to be)\s+(?:made\s+)?"
+                                r"(?:available|released|issued|published|posted|reported|announced)\b",
                                 statement, re.I)
             if active and not re.search(nonrelease, active.group("object"), re.I):
                 release_statement = True
@@ -1207,14 +1220,16 @@ def headline_mentions_company(
 ) -> bool:
     """Require the target ticker or company identity in an announcement headline."""
     target = symbol.strip().upper()
-    headline = _clean_text(headline)
+    # Internal apostrophes are orthographic variants in issuer names (for
+    # example Hawai‘i/Hawaii and Carter's/Carters), not word boundaries.
+    headline = re.sub(r"(?<=\w)['‘’ʼ](?=\w)", "", _clean_text(headline))
     if not target or not headline:
         return False
 
     if re.search(rf"(?i)(?:\$|\()\s*{re.escape(target)}\s*\)?\b", headline):
         return True
 
-    name = _clean_text(company_name or "")
+    name = re.sub(r"(?<=\w)['‘’ʼ](?=\w)", "", _clean_text(company_name or ""))
     if not name:
         return False
 

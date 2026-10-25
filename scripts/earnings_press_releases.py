@@ -193,6 +193,14 @@ def fetch_public_announcements(
             continue
         metadata = articles[0]
         title = str(metadata.get("headline") or "")
+        if " ".join(title.split()) != expected_title:
+            # Some wire metadata encodes UTF-8 punctuation as Latin-1 while
+            # the listing/body remain correct. Repair only a valid roundtrip;
+            # exact equality with the independently read listing still holds.
+            try:
+                title = title.encode("latin-1").decode("utf-8")
+            except (UnicodeEncodeError, UnicodeDecodeError):
+                continue
         try:
             published = datetime.fromisoformat(str(metadata.get("datePublished") or "").replace("Z", "+00:00")).date()
         except ValueError:
