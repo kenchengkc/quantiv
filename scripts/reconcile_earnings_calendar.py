@@ -79,11 +79,18 @@ DATE_RE = re.compile(
     rf"\b({MONTH_PATTERN})\.?\s+(\d{{1,2}})(?:st|nd|rd|th)?(?:,?\s+(20\d{{2}}))?\b",
     re.IGNORECASE,
 )
+TIME_ZONE_PATTERN = (
+    r"(?:Eastern|Central|Mountain|Pacific)(?:\s+(?:Standard|Daylight))?\s+Time|"
+    r"EST|EDT|CST|CDT|MST|MDT|PST|PDT|ET|CT|MT|PT"
+)
 TIME_RE = re.compile(
-    r"\b(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)\s*"
+    # A clock without AM/PM must include both minutes and a supported zone.
+    # The lookahead prevents ordinary dates/numbers from becoming clock matches.
+    r"(?<![\d:])\b(?=\d{1,2}(?::\d{2})?\s*[ap]\.?m\.?|"
+    rf"\d{{1,2}}:\d{{2}}\s*(?:\(\s*)?(?:{TIME_ZONE_PATTERN})(?!\w))"
+    r"(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)?\s*"
     r"(?:(?P<zone_open>\()\s*)?"
-    r"(?P<zone>(?:Eastern|Central|Mountain|Pacific)(?:\s+(?:Standard|Daylight))?\s+Time|"
-    r"EST|EDT|CST|CDT|MST|MDT|PST|PDT|ET|CT|MT|PT)?(?!\w)"
+    rf"(?P<zone>{TIME_ZONE_PATTERN})?(?!\w)"
     r"(?(zone_open)\s*\))",
     re.IGNORECASE,
 )
@@ -306,17 +313,24 @@ def extract_fiscal_identity(text: str) -> dict[str, Any]:
 def _session_dates_match(text: str, *, report_day: date) -> bool:
     # A dateline before the announcement and the fiscal period being reported
     # are not event dates. Every other date in the timing clause must agree.
-    parts = re.split(r"\s(?:—|--)\s", text, maxsplit=1)
-    dateline = DATE_RE.search(parts[0]) if len(parts) == 2 else None
+    parts = re.split(r"\s(—|–|--)\s", text, maxsplit=1)
+    dateline = DATE_RE.search(parts[0]) if len(parts) == 3 else None
     if (
         dateline
+        # En dashes also delimit date ranges. Require a city prefix for that
+        # spelling, rather than treating a bare/weekday date as a dateline.
+        and (parts[1] != "–" or (
+            bool(parts[0][:dateline.start()].strip())
+            and not re.fullmatch(r"(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),?\s*",
+                                 parts[0][:dateline.start()], re.I)
+        ))
         and re.fullmatch(r"(?:[a-z][a-z .'-]*,\s*)*", parts[0][:dateline.start()], re.I)
         and re.fullmatch(
             r"\s*(?:(?:/PRNewswire/|\(GLOBE NEWSWIRE\))\s*)?",
             parts[0][dateline.end():], re.I,
         )
     ):
-        text = parts[1]
+        text = parts[2]
     for item in DATE_RE.finditer(text):
         if re.search(
             r"\b(?:quarter|year|period|months?)\s+end(?:ed|ing|s)?\s+(?:on\s+)?"
@@ -495,13 +509,18 @@ def _session_from_text(
             continue
         hour = int(match.group(1))
         minute = int(match.group(2) or 0)
-        if not 1 <= hour <= 12 or not 0 <= minute <= 59:
+        meridiem = (match.group(3) or "").lower().replace(".", "")
+        if not 0 <= minute <= 59:
             continue
-        meridiem = match.group(3).lower().replace(".", "")
-        if hour == 12:
-            hour = 0
-        if meridiem == "pm":
-            hour += 12
+        if meridiem:
+            if not 1 <= hour <= 12:
+                continue
+            if hour == 12:
+                hour = 0
+            if meridiem == "pm":
+                hour += 12
+        elif match.group(2) is None or not 0 <= hour <= 23:
+            continue
         offsets = {"est": -5, "edt": -4, "cst": -6, "cdt": -5,
                    "mst": -7, "mdt": -6, "pst": -8, "pdt": -7}
         if "standard" in zone:
@@ -558,6 +577,36 @@ def _candidate_date(match: re.Match[str], published_on: date) -> date | None:
     return candidate
 
 
+def _is_announcement_logistics_date(text: str, match: re.Match[str]) -> bool:
+    """Registration/question-submission dates are not earnings event dates."""
+    prefix = re.split(r"[.!?;]\s+(?=[A-Z])", text[:match.start()])[-1]
+    suffix = re.split(r"[.!?;]\s+(?=[A-Z])", text[match.end():], maxsplit=1)[0]
+    # Coordinated clauses can put registration and release dates in the same
+    # sentence. Keep the candidate's own clause; commas inside dates stay put.
+    clause_boundary = r";\s*|,\s*(?:and|while|but)\s+"
+    prefix = re.split(clause_boundary, prefix, flags=re.I)[-1]
+    suffix = re.split(clause_boundary, suffix, maxsplit=1, flags=re.I)[0]
+    sentence = prefix + match.group() + suffix
+    if not re.search(r"\b(?:registration|register|submit|upvote)\b|\bq&a\s+platform\b", sentence, re.I):
+        return False
+    # Keep an actual results-release date even if its own clause also mentions
+    # registration. Do not borrow release language from neighboring clauses,
+    # as the ordinary date-scoring window can otherwise do.
+    active_release = re.search(
+        r"\b(?:will|to)\s+(?:(?:also|publicly|electronically|formally)\s+){0,2}"
+        r"(?:release|issue|publish|post|report|announce)\b"
+        r"(?P<object>[^.!?;]{0,120}?)\b(?:results|earnings)\b", sentence, re.I,
+    )
+    passive_release = re.search(
+        r"\b(?:results|earnings release)\b(?P<object>[^.!?;]{0,120}?)"
+        r"\b(?:will be|(?:is|are) scheduled to be)\s+(?:made\s+)?"
+        r"(?:available|released|issued|published|posted|reported|announced)\b", sentence, re.I,
+    )
+    nonrelease = r"\b(?:call|conference|webcast|replay|discussion|registration|questions)\b"
+    return not any(release and not re.search(nonrelease, release.group("object"), re.I)
+                   for release in (active_release, passive_release))
+
+
 def extract_earnings_announcement(
     text: str,
     *,
@@ -570,6 +619,8 @@ def extract_earnings_announcement(
 
     candidates: list[tuple[int, date, int, int]] = []
     for match in DATE_RE.finditer(cleaned):
+        if _is_announcement_logistics_date(cleaned, match):
+            continue
         # A future fiscal period end is not a future earnings release. These
         # dates often share a sentence with the release date and otherwise win
         # the contextual-score tie merely because they occur earlier.
