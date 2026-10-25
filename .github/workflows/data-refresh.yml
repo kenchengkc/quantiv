@@ -193,6 +193,9 @@ jobs:
             --max-calls 2000 \
             --allow-missing-key
 
+      - name: Sync OHLCV
+        run: python scripts/sync_dolthub.py --ohlcv
+
       - name: Reconcile near-term earnings calendar
         env:
           FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
@@ -233,9 +236,6 @@ jobs:
 
       - name: Gate — earnings calendar integrity against prior release
         run: python scripts/check_earnings_calendar_integrity.py --require-baseline
-
-      - name: Sync OHLCV
-        run: python scripts/sync_dolthub.py --ohlcv
 
       - name: Sync split and dividend controls
         run: python scripts/sync_dolthub.py --corporate-actions

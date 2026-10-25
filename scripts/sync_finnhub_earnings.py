@@ -18,6 +18,7 @@ from typing import Any, Optional
 from zoneinfo import ZoneInfo
 
 import pandas as pd
+import duckdb
 import pyarrow as pa
 import pyarrow.parquet as pq
 import requests
@@ -393,6 +394,53 @@ def load_frontend_symbol_universe(symbols_dir: Path = FRONTEND_SYMBOLS_DIR) -> l
         if is_us_symbol(path.stem) and not is_delisted(path.stem)
     }
     return sorted(symbol for symbol in symbols if symbol)
+
+
+def load_data_backed_symbol_universe(
+    data_dir: Path, *, today: date, now: datetime,
+) -> tuple[set[str], set[str]]:
+    """Return prospective safety scope and fresh announcement-lookup candidates.
+
+    A ticker need not have a generated page yet to enter optionless scoring.
+    Read recent source partitions directly, before DuckDB/frontend regeneration.
+    The wider safety scope is deliberately conservative; this does not admit
+    forecasts or replace the scorer's exact freshness and model checks.
+    """
+    from market_sessions import is_us_market_session, latest_completed_us_market_session
+
+    start = today - timedelta(days=14)
+    sessions = []
+    day = latest_completed_us_market_session(now)
+    while len(sessions) < 2:
+        if is_us_market_session(day):
+            sessions.append(day)
+        day -= timedelta(days=1)
+    months = {(day.year, day.month) for day in (start + timedelta(days=n) for n in range(15))}
+    safety, fresh = set(), set()
+    with duckdb.connect() as conn:
+        for dataset in ("ohlcv", "options_chain"):
+            paths = [str(path) for year, month in sorted(months)
+                     for path in sorted((data_dir / "parquet" / dataset / f"year={year}"
+                                         / f"month={month:02d}").glob("*.parquet"))]
+            if not paths:
+                continue
+            prices = "AND isfinite(close) AND close > 0" if dataset == "ohlcv" else ""
+            rows = conn.execute(f"""
+                SELECT act_symbol, bool_or(CAST(date AS DATE) IN (?, ?)) AS fresh
+                FROM read_parquet(?, union_by_name=true)
+                WHERE CAST(date AS DATE) BETWEEN ? AND ? {prices}
+                GROUP BY act_symbol
+            """, [*sessions, paths, start, today]).fetchall()
+            for symbol, is_fresh in rows:
+                if not is_us_symbol(symbol) or is_delisted(symbol):
+                    continue
+                canonical = canonical_ticker(symbol)
+                if not canonical or is_delisted(canonical):
+                    continue
+                safety.add(canonical)
+                if is_fresh:
+                    fresh.add(canonical)
+    return safety, fresh
 
 
 def normalize_finnhub(rows: list[dict[str, Any]]) -> pd.DataFrame:
