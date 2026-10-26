@@ -20,6 +20,21 @@ def _command(arguments, *, repo_root=ROOT, env=None, timeout=30):
                           stdout=subprocess.PIPE, stderr=subprocess.PIPE).stdout
 
 
+def _github_api(path: str, *, repo_root: Path = ROOT) -> bytes:
+    command = ["gh", "api", path]
+    try:
+        return _command(command, repo_root=repo_root)
+    except subprocess.CalledProcessError as error:
+        # Newer CLI versions reject ANSI in Actions logs even with stdout piped.
+        # Retry only that known guard for the fixed job-log endpoint. These bytes
+        # are captured for exact-line verification and never printed to a terminal.
+        if (re.fullmatch(rf"repos/{re.escape(REPOSITORY)}/actions/jobs/[1-9][0-9]*/logs", path)
+                and (error.stderr or b"").strip() ==
+                b"the response contains terminal escape sequences; pass --allow-escape-sequences to output it anyway"):
+            return _command([*command, "--allow-escape-sequences"], repo_root=repo_root)
+        raise
+
+
 def _git_pointer(revision: str, repo_root: Path) -> dict:
     if not re.fullmatch(r"[0-9a-f]{40}", revision):
         raise ValueError("invalid historical smoke checkout revision")
@@ -38,7 +53,7 @@ def authenticate_smoke_publication(smoke_run_id: str, *, repo_root: Path = ROOT,
         raise ValueError("historical smoke run ID must be a positive integer")
 
     def get(path):
-        payload = github_get(path) if github_get else _command(["gh", "api", path], repo_root=repo_root)
+        payload = github_get(path) if github_get else _github_api(path, repo_root=repo_root)
         if len(payload) > 4 * 1024 * 1024:
             raise ValueError("historical smoke evidence exceeds bounded response")
         return payload
