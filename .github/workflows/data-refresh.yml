@@ -27,6 +27,11 @@ on:
         type: string
         required: false
         default: ""
+      retention_smoke_run_id:
+        description: "Optional successful production-smoke run proving an earlier live forecast release for recovery."
+        type: string
+        required: false
+        default: ""
       options_target_date:
         description: "Latest completed US market session required for options-only recovery (YYYY-MM-DD)."
         type: string
@@ -615,6 +620,7 @@ jobs:
     timeout-minutes: 360
     permissions:
       contents: write
+      actions: read
     env:
       PROVIDER_FREE_RECOVERY: '1'
     steps:
@@ -677,6 +683,14 @@ jobs:
 
       - name: Verify deployed forecast publication before retention
         run: python scripts/published_forecast_retention.py verify-production
+
+      - name: Verify explicitly requested historical forecast publication
+        if: inputs.retention_smoke_run_id != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          RETENTION_SMOKE_RUN_ID: ${{ inputs.retention_smoke_run_id }}
+        run: python scripts/historical_forecast_publication.py --smoke-run-id "$RETENTION_SMOKE_RUN_ID"
 
       - name: Restore saved reconciliation and calendar evidence
         env:

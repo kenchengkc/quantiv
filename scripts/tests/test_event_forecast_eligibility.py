@@ -17,6 +17,36 @@ from scripts.tests.test_accepted_options_publication import (
 pytest_plugins = ["scripts.tests.test_accepted_options_publication"]
 
 
+def test_filtered_published_rows_verify_positionally_without_rewriting_identity(accepted_options):
+    import event_forecast_eligibility as eligibility
+
+    store = accepted_options
+    frame = daily_score.get_bundle_forecasts(store["conn"], store["bundle"], 21)
+    path = daily_score.save_forecasts(frame, store["data"], output_path=store["data"] / "validation/prior.parquet")
+    horizons = eligibility.verify_bundle_dir(store["bundle"])["horizons"]
+    # Intersecting a published snapshot and its admitted cohort leaves sparse
+    # indexes. Index labels are not part of any forecast's authenticated values.
+    prior = pd.read_parquet(path).iloc[[2, 7, 19]].copy()
+    verified = eligibility.verify_candidate_identity(
+        prior, store["bundle"], store["bundle"].name, horizons,
+        require_admitted_cohorts=True,
+    )
+    pd.testing.assert_frame_equal(verified[prior.columns], prior.reset_index(drop=True), check_exact=True)
+    tampered = prior.copy()
+    tampered.loc[7, "forecast_id"] = "wrong"
+    with pytest.raises(ValueError, match="forecast_id does not match"):
+        eligibility.verify_candidate_identity(tampered, store["bundle"], store["bundle"].name,
+                                              horizons)
+    complete = pd.read_parquet(path)
+    complete.index = range(10, 10 + 2 * len(complete), 2)
+    verified = eligibility.verify_candidate_identity(complete, store["bundle"], store["bundle"].name,
+                                                     horizons, require_admitted_cohorts=True)
+    _, policy, _, _ = _monitor_fixture_rows(store, verified)
+    assert policy["can_publish_ml"] and policy["coverage"]["eligible_rows"] == len(complete)
+    selected = pd.read_parquet(policy["eligible_forecast_path"])
+    pd.testing.assert_frame_equal(selected[complete.columns], complete.reset_index(drop=True), check_exact=True)
+
+
 def test_publication_identity_rejects_unadmitted_cohort(accepted_options, monkeypatch):
     import event_forecast_eligibility as eligibility
     store = accepted_options
