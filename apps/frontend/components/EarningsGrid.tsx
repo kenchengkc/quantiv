@@ -29,7 +29,7 @@ import {
   type LiveQuoteMap,
 } from '@/lib/earningsCalendarCache';
 import { parseHomeSearchParams, type HomeCalendarFilter } from '@/lib/homeSearchParams';
-import { earningsQuoteRequestUrl } from '@/lib/earningsQuoteRequest';
+import { earningsQuoteRequestUrls } from '@/lib/earningsQuoteRequest';
 import {
   calendarCacheKey,
   mergeCalendarReference,
@@ -1055,8 +1055,8 @@ export default function EarningsGrid({
       setQuotesReadyWeek(weekStartIso);
     };
 
-    const quoteRequestUrl = earningsQuoteRequestUrl(symbols);
-    if (quoteRequestUrl === null) {
+    const quoteRequestUrls = earningsQuoteRequestUrls(symbols);
+    if (quoteRequestUrls.length === 0) {
       markQuotesReady();
       return () => {
         cancelled = true;
@@ -1068,56 +1068,64 @@ export default function EarningsGrid({
       initialReadyTimer = setTimeout(markQuotesReady, 3_000);
     }
 
+    type QuoteBatch = {
+      pending?: number;
+      marketOpen?: boolean;
+      quoteRefreshActive?: boolean;
+      data: {
+        symbol: string;
+        price: number | null;
+        change: number | null;
+        changePct: number | null;
+        quoteCloseDate?: string | null;
+        realizedMovePct?: number | null;
+        realizedDate?: string | null;
+      }[];
+    };
     const fetchOnce = async (): Promise<{ pending: number; marketOpen: boolean; quoteRefreshActive: boolean }> => {
-      try {
-        const res = await fetch(quoteRequestUrl, {
-          cache: 'no-store',
-        });
-        if (!res.ok) {
-          return { pending: 0, marketOpen: lastMarketOpen, quoteRefreshActive: lastQuoteRefreshActive };
+      // A busy earnings week exceeds the endpoint's per-request limit. Read
+      // every batch independently so a slow or failed batch cannot hide other quotes.
+      const results = await Promise.all(quoteRequestUrls.map(async (url): Promise<QuoteBatch | null> => {
+        try {
+          const res = await fetch(url, { cache: 'no-store' });
+          if (!res.ok) return null;
+          const json = (await res.json()) as QuoteBatch;
+          if (cancelled || !Array.isArray(json.data)) return null;
+          setLive((prev) => {
+            const next: LiveMap = { ...prev };
+            for (const t of json.data) {
+              if (t.price === null && t.realizedMovePct == null) continue;
+              const prevEntry = next[t.symbol];
+              next[t.symbol] = {
+                change: t.price !== null ? t.change : prevEntry?.change ?? null,
+                changePct: t.price !== null ? t.changePct : prevEntry?.changePct ?? null,
+                // Clear the closing-session marker when a new rolling quote lands.
+                quoteCloseDate: t.price !== null ? t.quoteCloseDate ?? null : prevEntry?.quoteCloseDate ?? null,
+                realizedMovePct: t.realizedMovePct ?? prevEntry?.realizedMovePct ?? null,
+                realizedDate: t.realizedDate ?? prevEntry?.realizedDate ?? null,
+              };
+            }
+            return next;
+          });
+          return json;
+        } catch {
+          return null;
         }
-        const json = (await res.json()) as {
-          pending?: number;
-          marketOpen?: boolean;
-          quoteRefreshActive?: boolean;
-          data: {
-            symbol: string;
-            price: number | null;
-            change: number | null;
-            changePct: number | null;
-            quoteCloseDate?: string | null;
-            realizedMovePct?: number | null;
-            realizedDate?: string | null;
-          }[];
-        };
-        if (cancelled) {
-          return { pending: 0, marketOpen: lastMarketOpen, quoteRefreshActive: lastQuoteRefreshActive };
-        }
-        setLive((prev) => {
-          const next: LiveMap = { ...prev };
-          for (const t of json.data) {
-            if (t.price === null && t.realizedMovePct == null) continue;
-            const prevEntry = next[t.symbol];
-            next[t.symbol] = {
-              change: t.price !== null ? t.change : prevEntry?.change ?? null,
-              changePct: t.price !== null ? t.changePct : prevEntry?.changePct ?? null,
-              // Clear the closing-session marker when a new rolling quote lands.
-              quoteCloseDate: t.price !== null ? t.quoteCloseDate ?? null : prevEntry?.quoteCloseDate ?? null,
-              realizedMovePct: t.realizedMovePct ?? prevEntry?.realizedMovePct ?? null,
-              realizedDate: t.realizedDate ?? prevEntry?.realizedDate ?? null,
-            };
-          }
-          return next;
-        });
-        const open = json.marketOpen ?? true;
-        const refreshOn = json.quoteRefreshActive ?? open;
-        lastMarketOpen = open;
-        lastQuoteRefreshActive = refreshOn;
-        setMarketOpen(open);
-        return { pending: json.pending ?? 0, marketOpen: open, quoteRefreshActive: refreshOn };
-      } catch {
+      }));
+      const batches = results.filter((batch): batch is QuoteBatch => batch !== null);
+      if (cancelled || batches.length === 0) {
         return { pending: 0, marketOpen: lastMarketOpen, quoteRefreshActive: lastQuoteRefreshActive };
       }
+      const open = batches.some((batch) => batch.marketOpen ?? true);
+      const refreshOn = batches.some((batch) => batch.quoteRefreshActive ?? batch.marketOpen ?? true);
+      lastMarketOpen = open;
+      lastQuoteRefreshActive = refreshOn;
+      setMarketOpen(open);
+      return {
+        pending: batches.reduce((total, batch) => total + (batch.pending ?? 0), 0),
+        marketOpen: open,
+        quoteRefreshActive: refreshOn,
+      };
     };
 
     const fastPoll = async (attempt = 0) => {

@@ -19,6 +19,7 @@ import {
   type InterestContext,
 } from '@/lib/quoteInterest';
 import { enrichQuoteTick } from '@/lib/quoteTick';
+import { MAX_QUOTE_BATCH_SYMBOLS } from '@/lib/earningsQuoteRequest';
 import { enforceRateLimit, PUBLIC_RATE_LIMITS } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
@@ -29,7 +30,6 @@ export const revalidate = 0;
 // route serves the shared cache and records which symbols users are viewing
 // so the worker can prioritize them.
 const FRESH_TTL_MS = 60_000;
-const MAX_SYMBOLS = 400;
 const BATCH_PRICE_HEADERS = {
   // Shared quote data is already normalized through Upstash; this tiny edge
   // window only absorbs bursts without letting live prices sit stale for a
@@ -297,7 +297,7 @@ export async function GET(req: NextRequest) {
         .map((s) => s.trim().toUpperCase())
         .filter((s) => /^[A-Z][A-Z.\-]{0,9}$/.test(s)),
     ),
-  ).slice(0, MAX_SYMBOLS);
+  ).slice(0, MAX_QUOTE_BATCH_SYMBOLS);
 
   if (symbols.length === 0) {
     return NextResponse.json(
