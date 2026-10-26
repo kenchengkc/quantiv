@@ -50,7 +50,14 @@ for (const firstBatch of ['success', 'failure', 'delayed']) {
     });
 
     // The Popular view still requests all 401 weekly tickers, just like production.
+    // Wait for hydration and the fixture request before timing the render assertion.
+    const lastQuoteResponse = page.waitForResponse((response) => {
+      const url = new URL(response.url());
+      return url.pathname === '/api/stocks/batch-price' &&
+        url.searchParams.get('symbols') === 'TSLA';
+    });
     await page.goto('/');
+    await lastQuoteResponse;
     const lateRow = page.locator('.qv-calendar-shell a[href="/TSLA"]');
     await expect(lateRow).toContainText('5.0%');
     await expect(lateRow).toContainText('1.23%LIVE');
