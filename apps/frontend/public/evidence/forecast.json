@@ -1,17 +1,17 @@
 {
   "schema": "quantiv.dashboard-evidence.v1",
-  "receipt_id": "sha256:76b356eb0b2bcf62ef1d9de1d8c83fb7ee0ff31e6d6aed18a881d9c2716794c8",
-  "receipt_file": "forecasts_2026-10-25.76b356eb0b2b.receipt.json",
-  "validated_at": "2026-10-25T20:57:50.415029+00:00",
+  "receipt_id": "sha256:848abc0f979591146d56ec2d24e9248b8a146c904b5462f5933ce2df015417b1",
+  "receipt_file": "forecasts_2026-10-26.848abc0f9795.receipt.json",
+  "validated_at": "2026-10-26T09:27:02.831270+00:00",
   "quality": {
     "status": "passed",
     "issue_count": 0,
     "issue_codes": []
   },
   "coverage": {
-    "rows": 1197,
-    "symbols": 1173,
-    "events": 1197,
+    "rows": 1035,
+    "symbols": 1035,
+    "events": 1035,
     "horizons": [
       3,
       4,
@@ -23,7 +23,6 @@
       12,
       13,
       14,
-      15,
       17,
       18,
       19,
@@ -34,8 +33,8 @@
   "observation_window": {
     "earnings_max": "2026-11-16",
     "earnings_min": "2026-10-26",
-    "scored_at_max": "2026-10-25T20:36:38.676877+00:00",
-    "scored_at_min": "2026-10-25T20:36:37.791671+00:00",
+    "scored_at_max": "2026-10-26T09:08:23.363768+00:00",
+    "scored_at_min": "2026-10-25T08:59:56.778474+00:00",
     "snapshot_max": "2026-10-23",
     "snapshot_min": "2026-10-22"
   },
@@ -53,7 +52,7 @@
       "ml_only_point_outside_band": 0,
       "ml_only_quantile_crossings": 0,
       "non_finite_ml_rows": 0,
-      "optionless_ml_rows": 1010,
+      "optionless_ml_rows": 848,
       "strict_option_rows": 187,
       "strict_reconciliation": {
         "absolute_move_mismatches": 0,
@@ -87,16 +86,16 @@
     {
       "name": "model_bundle",
       "producer": "apps/ml/model_trainer.py",
-      "member_count": 112,
-      "bytes": 49153322,
-      "sha256": "c0f429870b29c2e6a082a8a895a9079b5ca61a797a7d4d85625e6995c4c78c57"
+      "member_count": 105,
+      "bytes": 47228442,
+      "sha256": "7c94be95117d2f43e4ffa2efa0f6a7741fa97b7521bb6356ac1ae65597d683e1"
     },
     {
       "name": "forecast_snapshot",
       "producer": "scripts/daily_score.py",
       "member_count": 1,
-      "bytes": 946732,
-      "sha256": "9012ccf7c6ff47092666565d63eb6ca32a44d54b5eaea806e7ca455d9b87d9fe"
+      "bytes": 852360,
+      "sha256": "e653ce026571aae1b38bb2404d626e79963b6fa05921ddddaa703508ce96e1dd"
     }
   ]
 }

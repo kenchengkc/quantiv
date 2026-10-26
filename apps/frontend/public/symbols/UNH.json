@@ -3,43 +3,13 @@
   "as_of_date": "2026-10-23",
   "spot_price": 417.5,
   "expected_move": {
-    "earnings_date": "2026-10-13",
-    "timing": "bmo",
-    "expiration": "2026-10-16",
-    "dte": 16,
-    "lead_time_days": 13,
-    "atm_strike": 370.0,
-    "atm_iv": 0.51475,
-    "straddle_abs": 32.175,
-    "straddle_pct": 0.086959,
-    "iv_pct": 0.107773,
-    "em_ml_pct": 0.047647,
-    "em_ml_abs": 17.864626,
-    "model_horizon": 14,
-    "ml_snapshot_date": "2026-09-29",
-    "p10": 0.008718,
-    "p25": 0.021613,
-    "p50": 0.046379,
-    "p75": 0.075748,
-    "p90": 0.117754,
-    "em_method": "ml_lightgbm",
-    "display_forecast_pct": 0.047647,
-    "display_forecast_method": "ml",
-    "display_forecast_as_of": "2026-09-29",
-    "ml_status": "available",
-    "options_status": "decision_eligible",
-    "historical_event_count": 4,
-    "hist_move_med_4q": 0.040631,
-    "forecast_frozen": true,
-    "forecast_id": "403fb196e10189d28d5961a4fc3e37f2f639ba964d6ee51a2f1746428538c5d9",
-    "forecast_model_bundle_id": "4d1ab76dc3401072f1c9a809c71aa76d0c905e5117f7d98d31928219a79a8b78",
-    "forecast_scored_at": "2026-09-30T06:45:32.872412+00:00",
-    "forecast_published_at": "2026-09-30T08:13:03.456562+00:00",
-    "forecast_feature_cutoff_at": "2026-10-12T20:00:00+00:00",
-    "forecast_prediction_deadline_at": "2026-10-13T04:00:00+00:00",
-    "forecast_feature_snapshot_at": "2026-09-29T20:00:00+00:00",
-    "forecast_feature_hash": "237e886319f22df2582bbbe9a547b164e4e63d6c4e616cce89f0f3658538a5c9",
-    "forecast_frozen_eligible": true
+    "expiration": "2026-11-06",
+    "dte": 14,
+    "atm_strike": 417.5,
+    "atm_iv": 0.2757,
+    "straddle_abs": 18.1,
+    "straddle_pct": 0.043353,
+    "iv_pct": 0.053995
   },
   "straddle_features": [
     {
@@ -515,7 +485,7 @@
       "forecast_frozen": true
     }
   ],
-  "next_earnings": "2026-10-13",
+  "next_earnings": null,
   "vol_regime": {
     "iv_current": 0.2687,
     "iv_rank": 0.070318,
@@ -525,6 +495,5 @@
     "hv_rank": 0.122732,
     "iv_mom_week": -0.0589,
     "iv_mom_month": null
-  },
-  "next_earnings_timing": "bmo"
+  }
 }

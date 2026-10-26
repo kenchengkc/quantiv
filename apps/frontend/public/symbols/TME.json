@@ -1,26 +1,26 @@
 {
   "symbol": "TME",
-  "as_of_date": "2026-10-20",
-  "spot_price": 8.57,
+  "as_of_date": "2026-10-23",
+  "spot_price": 8.51,
   "expected_move": {
-    "earnings_date": "2026-11-12",
+    "earnings_date": "2026-11-17",
+    "display_forecast_pct": 0.10152367043933302,
+    "display_forecast_method": "historical",
+    "display_forecast_as_of": "2026-10-23",
     "ml_status": "unavailable_model",
     "options_status": "unavailable",
     "fallback_reason": "no_event_expiry",
     "historical_event_count": 4,
     "hist_move_med_4q": 0.101524,
-    "timing": "before_market_open",
+    "timing": "bmo",
     "ml_publication_status": "held",
     "ml_publication_reason": "no_eligible_current_forecast",
-    "display_forecast_pct": 0.10152367043933302,
-    "display_forecast_method": "historical",
-    "display_forecast_as_of": "2026-10-23",
     "em_method": "historical"
   },
   "straddle_features": [],
   "earnings_history": [
     {
-      "date": "2026-11-12",
+      "date": "2026-11-17",
       "timing": "before_market_open",
       "q": "Q3 26",
       "fiscal_year": 2026,
@@ -36,21 +36,21 @@
       "implied_atm_iv": null,
       "implied_quality_status": null,
       "eps_actual": null,
-      "eps_estimate": 1.5022,
+      "eps_estimate": null,
       "eps_surprise_pct": null,
       "revenue_actual": null,
-      "revenue_estimate": 9231371518.0,
+      "revenue_estimate": null,
       "rev_surprise_pct": null,
       "realized_target_protocol": null,
       "realized_label_source": null,
       "ml_status": "unavailable_model",
-      "options_status": "unavailable",
-      "fallback_reason": "no_event_expiry",
       "ml_publication_status": "held",
       "ml_publication_reason": "no_eligible_current_forecast",
       "display_forecast_pct": 0.10152367043933302,
       "display_forecast_method": "historical",
       "display_forecast_as_of": "2026-10-23",
+      "options_status": "unavailable",
+      "fallback_reason": "no_event_expiry",
       "historical_event_count": 4,
       "em_method": "historical"
     },
@@ -330,7 +330,7 @@
       "realized_label_source": "ohlcv_session_close"
     }
   ],
-  "next_earnings": "2026-11-12",
+  "next_earnings": "2026-11-17",
   "vol_regime": null,
-  "next_earnings_timing": "before_market_open"
+  "next_earnings_timing": "bmo"
 }
