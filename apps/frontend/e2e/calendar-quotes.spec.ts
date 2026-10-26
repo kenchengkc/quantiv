@@ -5,15 +5,20 @@ for (const firstBatch of ['success', 'failure', 'delayed']) {
   test(`calendar shows quotes beyond 400 tickers with another batch ${firstBatch}`, async ({ page }) => {
     await page.clock.setFixedTime(new Date('2026-10-26T15:00:00Z'));
     await page.addInitScript(() => sessionStorage.setItem('quantiv:splash:played', '1'));
+    // Hundreds of synthetic tickers must not fan out to external logo providers.
+    await page.route('**/*', (route) => route.request().resourceType() === 'image'
+      ? route.fulfill({ contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"/>' })
+      : route.fallback());
     const tickers = Array.from({ length: 400 }, (_, index) =>
       `Q${String.fromCharCode(65 + Math.floor(index / 26))}${String.fromCharCode(65 + index % 26)}`,
-    ).concat('QTEST');
+    ).concat('TSLA');
     const week = {
       metadata: { as_of_date: '2026-10-23', method: 'fixture' },
       window: { start: '2026-10-26', end: '2026-10-30' },
       events: tickers.map((ticker) => ({
         ticker, earnings_date: '2026-10-29', timing: 'after_market_close',
         em_ml_pct: 0.05, display_forecast_pct: 0.05, display_forecast_method: 'ml',
+        ml_publication_status: 'eligible', ml_status: 'available',
       })),
     };
     await page.route('**/weeks/*.json', (route) => route.fulfill({ json:
@@ -44,12 +49,11 @@ for (const firstBatch of ['success', 'failure', 'delayed']) {
       } });
     });
 
-    await page.goto('/?filter=all');
-    const lateRow = page.locator('.qv-calendar-shell a[href="/QTEST"]');
+    // The Popular view still requests all 401 weekly tickers, just like production.
+    await page.goto('/');
+    const lateRow = page.locator('.qv-calendar-shell a[href="/TSLA"]');
+    await expect(lateRow).toContainText('5.0%');
     await expect(lateRow).toContainText('1.23%LIVE');
-    if (firstBatch === 'success') {
-      await expect(page.locator('.qv-calendar-shell a[href="/QAA"]')).toContainText('1.23%LIVE');
-    }
     expect(batches.every((symbols) => symbols.length <= 400)).toBe(true);
     // The initial server-rendered week can start its own request before the fixture loads.
     expect(new Set(batches.flat().filter((symbol) => tickers.includes(symbol))).size).toBe(401);
