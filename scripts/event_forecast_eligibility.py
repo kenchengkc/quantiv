@@ -49,6 +49,9 @@ def _current_source_coverage(bundle_dir: Path) -> dict[str, tuple[str, str]]:
 
 def verify_candidate_identity(frame: pd.DataFrame, bundle_dir: Path, bundle_id: str,
                               horizons: list[int], *, require_admitted_cohorts: bool = False) -> pd.DataFrame:
+    # Annotation emits rows in source order with a RangeIndex. A filtered
+    # publication may have sparse labels; compare its values positionally.
+    frame = frame.reset_index(drop=True)
     missing = sorted(FORECAST_REQUIRED_COLUMNS - set(frame.columns))
     if missing:
         raise ValueError(f"forecast artifact lacks required columns: {missing}")

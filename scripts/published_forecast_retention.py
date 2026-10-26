@@ -44,6 +44,7 @@ def capture_deployed_publication(*, data_dir: Path, public_dir: Path, deployment
     """Read two bounded public files outside provider-free scoring execution."""
     destination = data_dir / ".forecast_retention/publication"
     shutil.rmtree(destination, ignore_errors=True)
+    shutil.rmtree(data_dir / ".forecast_retention/historical", ignore_errors=True)
     members = _verified_public_members(public_dir, deployment_pointer)
 
     def download(name):
@@ -179,11 +180,11 @@ def _check_public_projection(public: dict, row: dict) -> None:
             raise ValueError("published forecast output differs from authenticated row")
 
 
-def load_published_forecasts(*, data_dir: Path, public_dir: Path, deployment_pointer: Path) -> pd.DataFrame:
+def _load_publication_rows(*, data_dir: Path, public_dir: Path, deployment_pointer: Path,
+                           observed_production: Path | None) -> pd.DataFrame:
     """Authenticate exact values and intersect them with actually displayed ML."""
     members = _verified_public_members(public_dir, deployment_pointer)
-    production = data_dir / ".forecast_retention/publication"
-    if (production / PUBLIC_MANIFEST).read_bytes() != (public_dir / PUBLIC_MANIFEST).read_bytes():
+    if observed_production is not None and (observed_production / PUBLIC_MANIFEST).read_bytes() != (public_dir / PUBLIC_MANIFEST).read_bytes():
         raise ValueError("production publication proof does not match the pinned release")
     evidence = _read_public(public_dir, members, "evidence/forecast.json")
     filename = str(evidence.get("receipt_file") or "")
@@ -204,7 +205,7 @@ def load_published_forecasts(*, data_dir: Path, public_dir: Path, deployment_poi
     # The production screener contains the whole published calendar universe.
     # Its bytes were fetched from production, not merely built or uploaded.
     public_screener = _read_public(public_dir, members, "screener.json")
-    if _read_public(production, members, "screener.json") != public_screener:
+    if observed_production is not None and _read_public(observed_production, members, "screener.json") != public_screener:
         raise ValueError("production forecast display proof differs from the verified public corpus")
     for public in _displayed_rows(public_screener):
         identity = public["forecast_id"]
@@ -212,6 +213,23 @@ def load_published_forecasts(*, data_dir: Path, public_dir: Path, deployment_poi
             _check_public_projection(public, rows[identity])
             displayed.add(identity)
     return frame.loc[frame["forecast_id"].isin(displayed)].copy()
+
+
+def load_published_forecasts(*, data_dir: Path, public_dir: Path, deployment_pointer: Path) -> pd.DataFrame:
+    from historical_forecast_publication import historical_publication_paths
+    current = _load_publication_rows(
+        data_dir=data_dir, public_dir=public_dir, deployment_pointer=deployment_pointer,
+        observed_production=data_dir / ".forecast_retention/publication",
+    )
+    historical = historical_publication_paths(data_dir)
+    if historical is None:
+        return current
+    public, pointer = historical
+    prior = _load_publication_rows(data_dir=data_dir, public_dir=public, deployment_pointer=pointer,
+                                   observed_production=None)
+    # Both sources independently authenticate every value. A current displayed
+    # identity takes precedence when it is also present in the historical proof.
+    return pd.concat([current, prior], ignore_index=True).drop_duplicates("forecast_id", keep="first")
 
 
 def retain_published_forecasts(

@@ -15,6 +15,17 @@ time, feature hash and six-decimal output projection. Forecast IDs alone do not
 authenticate outputs. Signed or validated rows that were never displayed cannot
 be retained. Missing, stale-pipeline or altered proof admits no retained rows.
 
+For a recovery whose latest deployment already omitted valid forecasts, an
+explicit `retention_smoke_run_id` may identify one earlier production publication.
+The recovery authenticates the successful smoke run, exact job and verification
+step through GitHub, then checks the actual checkout revision and verified release
+in its job log. That revision must be an ancestor with the same production
+verifier and workflow, and its Git-pinned manifest must match the restored archive.
+The historical proof lives separately from current production readback and is
+cleared on the next capture; every recovery must authenticate it again. It never
+rolls back the frontend or admits unconfirmed calendar sessions. The same full
+receipt, displayed-row projection, freshness, source and monitoring checks apply.
+
 Eligible bytes are preserved at `forecasts/published_snapshots/<sha256>.parquet`.
 R2 uploads use immutable copy, and ordinary forecast sync excludes this prefix
 so another partial checkout cannot delete it. Reads copy only the last 14 days,

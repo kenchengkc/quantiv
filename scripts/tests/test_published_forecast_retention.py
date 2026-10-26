@@ -184,6 +184,35 @@ def test_production_mismatch_clears_previous_readback_proof(proof):
     assert not (args["data_dir"] / ".forecast_retention/publication").exists()
 
 
+def test_verified_historical_publication_recovers_only_previously_displayed_rows(proof, monkeypatch):
+    import historical_forecast_publication as historical
+    args, frame, source, _, _, publish = proof
+    archived = source.parent / "historical-public"
+    shutil.copytree(args["public_dir"], archived)
+    pointer = source.parent / "historical-pointer.json"
+    shutil.copyfile(args["deployment_pointer"], pointer)
+    # The latest deployment legitimately lacks the old forecast. Historical
+    # smoke verification is tested separately; it never impersonates readback.
+    (source / "screener.json").write_text('{"events":[]}')
+    publish()
+    assert retention.load_published_forecasts(**args).empty
+    monkeypatch.setattr(historical, "historical_publication_paths", lambda _: (archived, pointer))
+    actual = retention.load_published_forecasts(**args)
+    pd.testing.assert_frame_equal(actual.reset_index(drop=True), frame.iloc[:1].reset_index(drop=True))
+    (archived / "screener.json").write_text('{"events":[]}')
+    with pytest.raises(ValueError, match="published file has changed"):
+        retention.load_published_forecasts(**args)
+
+
+def test_current_capture_clears_prior_historical_authorization(proof):
+    args, *_, publish = proof
+    historical = args["data_dir"] / ".forecast_retention/historical"
+    historical.mkdir()
+    (historical / "verified-smoke.json").write_text('{}')
+    publish()
+    assert not historical.exists()
+
+
 def test_snapshot_preservation_is_exact_and_collision_safe(proof):
     args, _, _, snapshot, receipt_path, _ = proof
     original = args["data_dir"] / "forecasts/eligible/forecasts_2026-10-25.parquet"
@@ -233,3 +262,8 @@ def test_retention_precedes_monitoring_and_storage_never_sync_deletes_snapshots(
     pull = (root / "scripts/r2_pull.sh").read_text()
     assert "--exclude '/published_snapshots/**'" in push and "--exclude '/published_snapshots/**'" in pull
     assert '--immutable --fast-list --transfers=4' in push
+    steps = workflow["jobs"]["recovery"]["steps"]
+    historical = next(step for step in steps if "historical_forecast_publication.py" in step.get("run", ""))
+    assert historical["if"] == "inputs.retention_smoke_run_id != ''"
+    assert historical["env"]["RETENTION_SMOKE_RUN_ID"] == "${{ inputs.retention_smoke_run_id }}"
+    assert workflow["jobs"]["recovery"]["permissions"]["actions"] == "read"
