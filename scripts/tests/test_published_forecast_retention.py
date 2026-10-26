@@ -213,6 +213,46 @@ def test_current_capture_clears_prior_historical_authorization(proof):
     assert not historical.exists()
 
 
+@pytest.mark.parametrize("duplicate_current", [False, True])
+def test_current_publication_wins_over_historical_rescore_of_same_source(proof, monkeypatch, duplicate_current):
+    import historical_forecast_publication as historical
+    args, frame, source, snapshot, receipt_path, publish = proof
+    archived = source.parent / "historical-public"
+    shutil.copytree(args["public_dir"], archived)
+    pointer = source.parent / "historical-pointer.json"
+    shutil.copyfile(args["deployment_pointer"], pointer)
+    newer = frame.copy()
+    newer.loc[0, "forecast_id"] = "later-scoring-run"
+    newer.loc[0, "scored_at"] = "2026-10-25T10:00:00+00:00"
+    if duplicate_current:
+        newer.loc[1] = newer.loc[0]
+        newer.loc[1, "forecast_id"] = "duplicate-source-different-id"
+    # Independently publish a new receipt/snapshot for the same observed input.
+    eligible = args["data_dir"] / "forecasts/eligible/forecasts_2026-10-25.parquet"
+    newer.to_parquet(eligible, index=False)
+    report = {"status": "passed", "stages": {"forecasts": {"rows": len(newer)}}}
+    report["evidence_receipt"] = build_evidence_receipt(
+        report, scope="forecasts", repo_root=source.parent, data_dir=args["data_dir"],
+        training_dir=source.parent / "training", models_dir=args["data_dir"] / "models",
+        forecast_path=eligible, horizons=[4],
+    )
+    receipt, _ = publish_evidence_receipt(report, receipt_dir=args["data_dir"] / "forecasts/receipts",
+                                         scope="forecasts", forecast_path=eligible)
+    retention.preserve_published_snapshot(eligible, report["evidence_receipt"], forecasts_dir=args["data_dir"] / "forecasts")
+    (source / "evidence/forecast.json").write_text(json.dumps({
+        "receipt_id": report["evidence_receipt"]["receipt_id"], "receipt_file": receipt.name,
+    }))
+    (source / "screener.json").write_text(json.dumps({"events": [projected(newer.iloc[0].to_dict())]}))
+    publish()
+    monkeypatch.setattr(historical, "historical_publication_paths", lambda _: (archived, pointer))
+    if duplicate_current:
+        with pytest.raises(ValueError, match="duplicate serving keys"):
+            retention.load_published_forecasts(**args)
+        return
+    actual = retention.load_published_forecasts(**args)
+    pd.testing.assert_frame_equal(actual.reset_index(drop=True), newer.iloc[:1].reset_index(drop=True))
+
+
 def test_snapshot_preservation_is_exact_and_collision_safe(proof):
     args, _, _, snapshot, receipt_path, _ = proof
     original = args["data_dir"] / "forecasts/eligible/forecasts_2026-10-25.parquet"

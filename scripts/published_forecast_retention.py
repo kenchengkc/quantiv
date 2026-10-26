@@ -180,6 +180,15 @@ def _check_public_projection(public: dict, row: dict) -> None:
             raise ValueError("published forecast output differs from authenticated row")
 
 
+def _serving_keys(frame: pd.DataFrame) -> pd.Series:
+    return pd.Series(list(zip(
+        frame["act_symbol"].astype(str).str.strip().str.upper(),
+        pd.to_datetime(frame["earnings_date"], errors="raise").dt.normalize(),
+        pd.to_datetime(frame["snapshot_date"], errors="raise").dt.normalize(),
+        pd.to_numeric(frame["model_horizon"], errors="raise"),
+    )), index=frame.index, dtype=object)
+
+
 def _load_publication_rows(*, data_dir: Path, public_dir: Path, deployment_pointer: Path,
                            observed_production: Path | None) -> pd.DataFrame:
     """Authenticate exact values and intersect them with actually displayed ML."""
@@ -200,6 +209,8 @@ def _load_publication_rows(*, data_dir: Path, public_dir: Path, deployment_point
     frame = pd.read_parquet(snapshot)
     if "forecast_id" not in frame or frame["forecast_id"].duplicated().any():
         raise ValueError("published snapshot has missing or duplicate forecast identities")
+    if _serving_keys(frame).duplicated().any():
+        raise ValueError("published snapshot contains duplicate serving keys")
     rows = {row["forecast_id"]: row for row in frame.to_dict("records")}
     displayed = set()
     # The production screener contains the whole published calendar universe.
@@ -227,9 +238,11 @@ def load_published_forecasts(*, data_dir: Path, public_dir: Path, deployment_poi
     public, pointer = historical
     prior = _load_publication_rows(data_dir=data_dir, public_dir=public, deployment_pointer=pointer,
                                    observed_production=None)
-    # Both sources independently authenticate every value. A current displayed
-    # identity takes precedence when it is also present in the historical proof.
-    return pd.concat([current, prior], ignore_index=True).drop_duplicates("forecast_id", keep="first")
+    # A rescore has a different forecast_id because scored_at is part of that
+    # identity. Prefer the current publication for overlapping observed sources;
+    # each individual publication has already rejected duplicate serving keys.
+    prior = prior.loc[~_serving_keys(prior).isin(set(_serving_keys(current)))]
+    return pd.concat([current, prior], ignore_index=True)
 
 
 def retain_published_forecasts(
