@@ -81,8 +81,8 @@ test('desktop navigation stays on one line throughout its supported width range'
   }
 });
 
-test('compact navigation replaces the desktop menu before labels can crowd or wrap', async ({ page }, testInfo) => {
-  for (const width of COMPACT_WIDTHS) {
+for (const width of COMPACT_WIDTHS) {
+  test(`compact navigation replaces the desktop menu before labels can crowd or wrap at ${width}px`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width, height: 900 });
     await page.goto('/', { waitUntil: 'domcontentloaded' });
 
@@ -132,8 +132,8 @@ test('compact navigation replaces the desktop menu before labels can crowd or wr
     if (width === 1050 || width === 768 || width === 390) {
       await attachShellScreenshot(page, testInfo, `compact-shell-${width}`);
     }
-  }
-});
+  });
+}
 
 test('public pages keep research audit detail out of the global shell and remain viewport-clean', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 1440, height: 1000 });

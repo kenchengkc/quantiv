@@ -10,6 +10,7 @@ from types import SimpleNamespace
 import pytest
 
 from scripts.historical_forecast_publication import authenticate_smoke_publication
+from scripts import historical_forecast_publication as historical
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -23,6 +24,45 @@ VERIFIERS = (
     "scripts/verify_frontend_publication.mjs",
 )
 POINTER = "apps/frontend/frontend-release.json"
+
+
+def test_captured_job_logs_retry_only_the_cli_escape_sequence_guard(monkeypatch, capsys):
+    calls = []
+    path = f"{BASE}/jobs/{JOB_ID}/logs"
+    def command(arguments, **kwargs):
+        calls.append(arguments)
+        if "--allow-escape-sequences" not in arguments:
+            raise subprocess.CalledProcessError(1, arguments, stderr=(
+                b"the response contains terminal escape sequences; pass --allow-escape-sequences to output it anyway\n"
+            ))
+        return b"ordinary log\x1b[36m with captured ANSI\x1b[0m"
+    monkeypatch.setattr(historical, "_command", command)
+    assert historical._github_api(path) == b"ordinary log\x1b[36m with captured ANSI\x1b[0m"
+    assert calls == [["gh", "api", path], ["gh", "api", path, "--allow-escape-sequences"]]
+    assert capsys.readouterr().out == ""
+
+
+def test_older_cli_captures_logs_without_new_flag(monkeypatch):
+    calls = []
+    monkeypatch.setattr(historical, "_command", lambda arguments, **kwargs: calls.append(arguments) or b"log")
+    path = f"{BASE}/jobs/{JOB_ID}/logs"
+    assert historical._github_api(path) == b"log"
+    assert calls == [["gh", "api", path]]
+
+
+@pytest.mark.parametrize("path,error", [
+    (f"{BASE}/jobs/{JOB_ID}/logs", b"Resource not accessible by integration (HTTP 403)"),
+    (f"{BASE}/runs/{RUN_ID}", b"the response contains terminal escape sequences; pass --allow-escape-sequences to output it anyway"),
+])
+def test_other_api_failures_never_enable_escape_output(monkeypatch, path, error):
+    calls = []
+    def command(arguments, **kwargs):
+        calls.append(arguments)
+        raise subprocess.CalledProcessError(1, arguments, stderr=error)
+    monkeypatch.setattr(historical, "_command", command)
+    with pytest.raises(subprocess.CalledProcessError):
+        historical._github_api(path)
+    assert calls == [["gh", "api", path]]
 
 
 def _git(repo: Path, *args: str) -> str:
