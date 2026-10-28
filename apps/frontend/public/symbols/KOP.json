@@ -1,6 +1,6 @@
 {
   "symbol": "KOP",
-  "as_of_date": "2026-10-23",
+  "as_of_date": "2026-10-26",
   "spot_price": 40.0,
   "expected_move": {
     "earnings_date": "2026-11-06",
@@ -36,20 +36,20 @@
   "straddle_features": [
     {
       "expiration": "2026-12-18",
-      "dte": 56,
+      "dte": 53,
       "atm_strike": 40.0,
-      "atm_iv": 0.4383,
-      "atm_call_iv": 0.4388,
-      "atm_put_iv": 0.4378,
-      "straddle_mid": 5.45,
-      "em_straddle": 5.45,
-      "em_straddle_pct": 0.13625,
-      "em_iv": 6.867183,
-      "em_iv_pct": 0.17168,
-      "call_delta": 0.5354,
-      "call_gamma": 0.0569,
-      "call_vega": 0.0619,
-      "call_theta": -0.0231
+      "atm_iv": 0.44495,
+      "atm_call_iv": 0.4461,
+      "atm_put_iv": 0.4438,
+      "straddle_mid": 5.4,
+      "em_straddle": 5.4,
+      "em_straddle_pct": 0.135,
+      "em_iv": 6.782077,
+      "em_iv_pct": 0.169552,
+      "call_delta": 0.5394,
+      "call_gamma": 0.0584,
+      "call_vega": 0.0603,
+      "call_theta": -0.0271
     }
   ],
   "earnings_history": [
@@ -84,6 +84,7 @@
       "forecast_id": "03a7ba32660d68db5ca504bf6cc4dc3a7b2e81cc901dfe45cc3ecc2126f3f61a",
       "forecast_model_bundle_id": "d14dc7f2aa6b175956922eb6266b8523742add962668b7d6b8833cc2c869dd1b",
       "forecast_scored_at": "2026-10-27T07:37:53.262760+00:00",
+      "forecast_published_at": "2026-10-27T08:54:26.847892+00:00",
       "forecast_feature_cutoff_at": "2026-11-05T21:00:00+00:00",
       "forecast_prediction_deadline_at": "2026-11-06T05:00:00+00:00",
       "forecast_feature_snapshot_at": "2026-10-26T20:00:00+00:00",
@@ -389,13 +390,13 @@
   ],
   "next_earnings": "2026-11-06",
   "vol_regime": {
-    "iv_current": 0.4351,
-    "iv_rank": 0.205906,
+    "iv_current": 0.516,
+    "iv_rank": 0.423087,
     "iv_year_high": 0.7309,
     "iv_year_low": 0.3584,
-    "hv_current": 0.2533,
-    "hv_rank": 0.234648,
-    "iv_mom_week": -0.0208,
+    "hv_current": 0.2534,
+    "hv_rank": 0.234991,
+    "iv_mom_week": 0.0852,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"

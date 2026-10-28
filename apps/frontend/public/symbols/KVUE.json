@@ -1,6 +1,6 @@
 {
   "symbol": "KVUE",
-  "as_of_date": "2026-10-23",
+  "as_of_date": "2026-10-26",
   "spot_price": 20.0,
   "expected_move": {
     "earnings_date": "2026-10-30",
@@ -36,20 +36,20 @@
   "straddle_features": [
     {
       "expiration": "2026-12-18",
-      "dte": 56,
+      "dte": 53,
       "atm_strike": 20.0,
-      "atm_iv": 0.1877,
-      "atm_call_iv": 0.1877,
-      "atm_put_iv": 0.1877,
-      "straddle_mid": 1.275,
-      "em_straddle": 1.275,
-      "em_straddle_pct": 0.06375,
-      "em_iv": 1.470422,
-      "em_iv_pct": 0.073521,
-      "call_delta": 0.4004,
-      "call_gamma": 0.2674,
-      "call_vega": 0.0295,
-      "call_theta": -0.005
+      "atm_iv": 0.2328,
+      "atm_call_iv": 0.2328,
+      "atm_put_iv": 0.2328,
+      "straddle_mid": 1.285,
+      "em_straddle": 1.285,
+      "em_straddle_pct": 0.06425,
+      "em_iv": 1.774208,
+      "em_iv_pct": 0.08871,
+      "call_delta": 0.3195,
+      "call_gamma": 0.2041,
+      "call_vega": 0.0261,
+      "call_theta": -0.0037
     }
   ],
   "earnings_history": [
@@ -84,6 +84,7 @@
       "forecast_id": "54bfeadf4f71413b77d37095c7c217e9e7ff2fff65a271dea1109de7b6700b0c",
       "forecast_model_bundle_id": "d14dc7f2aa6b175956922eb6266b8523742add962668b7d6b8833cc2c869dd1b",
       "forecast_scored_at": "2026-10-27T07:37:51.400882+00:00",
+      "forecast_published_at": "2026-10-27T08:54:26.847892+00:00",
       "forecast_feature_cutoff_at": "2026-10-29T20:00:00+00:00",
       "forecast_prediction_deadline_at": "2026-10-30T04:00:00+00:00",
       "forecast_feature_snapshot_at": "2026-10-26T20:00:00+00:00",
@@ -459,13 +460,13 @@
   ],
   "next_earnings": "2026-10-30",
   "vol_regime": {
-    "iv_current": 0.2132,
-    "iv_rank": 0.156374,
-    "iv_year_high": 0.6804,
+    "iv_current": 0.228,
+    "iv_rank": 0.207023,
+    "iv_year_high": 0.6164,
     "iv_year_low": 0.1266,
-    "hv_current": 0.2267,
-    "hv_rank": 0.512172,
-    "iv_mom_week": -0.0121,
+    "hv_current": 0.2272,
+    "hv_rank": 0.516854,
+    "iv_mom_week": 0.0431,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"

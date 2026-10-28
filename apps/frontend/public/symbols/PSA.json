@@ -1,6 +1,6 @@
 {
   "symbol": "PSA",
-  "as_of_date": "2026-10-23",
+  "as_of_date": "2026-10-26",
   "spot_price": 310.0,
   "expected_move": {
     "earnings_date": "2026-10-26",
@@ -35,7 +35,7 @@
     "forecast_model_bundle_id": "d14dc7f2aa6b175956922eb6266b8523742add962668b7d6b8833cc2c869dd1b",
     "ml_publication_status": "eligible",
     "forecast_scored_at": "2026-10-26T09:08:21.370812+00:00",
-    "forecast_published_at": "2026-10-26T10:17:56+00:00",
+    "forecast_published_at": "2026-10-27T08:54:57+00:00",
     "forecast_feature_cutoff_at": "2026-10-26T19:55:00+00:00",
     "forecast_prediction_deadline_at": "2026-10-26T19:55:00+00:00",
     "forecast_feature_snapshot_at": "2026-10-23T20:00:00+00:00",
@@ -45,37 +45,37 @@
   "straddle_features": [
     {
       "expiration": "2026-11-20",
-      "dte": 28,
+      "dte": 25,
       "atm_strike": 310.0,
-      "atm_iv": 0.261,
+      "atm_iv": 0.260554,
       "atm_call_iv": 0.2617,
-      "atm_put_iv": 0.2603,
-      "straddle_mid": 17.9,
-      "em_straddle": 17.9,
-      "em_straddle_pct": 0.057742,
-      "em_iv": 22.409644,
-      "em_iv_pct": 0.072289,
-      "call_delta": 0.5247,
-      "call_gamma": 0.0177,
-      "call_vega": 0.3415,
-      "call_theta": -0.1718
+      "atm_put_iv": 0.2594,
+      "straddle_mid": 16.9,
+      "em_straddle": 16.9,
+      "em_straddle_pct": 0.054516,
+      "em_iv": 21.138912,
+      "em_iv_pct": 0.06819,
+      "call_delta": 0.4872,
+      "call_gamma": 0.0189,
+      "call_vega": 0.3213,
+      "call_theta": -0.1839
     },
     {
       "expiration": "2026-12-18",
-      "dte": 56,
+      "dte": 53,
       "atm_strike": 310.0,
-      "atm_iv": 0.25665,
-      "atm_call_iv": 0.2566,
-      "atm_put_iv": 0.2567,
-      "straddle_mid": 24.7,
-      "em_straddle": 24.7,
-      "em_straddle_pct": 0.079677,
-      "em_iv": 31.163812,
-      "em_iv_pct": 0.100528,
-      "call_delta": 0.5128,
-      "call_gamma": 0.0127,
-      "call_vega": 0.4806,
-      "call_theta": -0.107
+      "atm_iv": 0.2534,
+      "atm_call_iv": 0.2533,
+      "atm_put_iv": 0.2535,
+      "straddle_mid": 23.75,
+      "em_straddle": 23.75,
+      "em_straddle_pct": 0.076613,
+      "em_iv": 29.933681,
+      "em_iv_pct": 0.09656,
+      "call_delta": 0.4866,
+      "call_gamma": 0.0133,
+      "call_vega": 0.4651,
+      "call_theta": -0.1102
     }
   ],
   "earnings_history": [
@@ -129,7 +129,7 @@
       "fallback_reason": null,
       "forecast_frozen": true,
       "ml_publication_status": "eligible",
-      "forecast_published_at": "2026-10-26T10:17:56+00:00"
+      "forecast_published_at": "2026-10-27T08:54:57+00:00"
     },
     {
       "date": "2026-07-29",
@@ -486,13 +486,13 @@
   ],
   "next_earnings": "2026-10-26",
   "vol_regime": {
-    "iv_current": 0.2594,
-    "iv_rank": 0.555796,
+    "iv_current": 0.2612,
+    "iv_rank": 0.568754,
     "iv_year_high": 0.3211,
     "iv_year_low": 0.1822,
-    "hv_current": 0.2111,
-    "hv_rank": 0.432904,
-    "iv_mom_week": 0.0097,
+    "hv_current": 0.213,
+    "hv_rank": 0.447309,
+    "iv_mom_week": 0.0088,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

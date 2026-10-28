@@ -1,7 +1,7 @@
 {
   "symbol": "FITB",
-  "as_of_date": "2026-10-23",
-  "spot_price": 55.0,
+  "as_of_date": "2026-10-26",
+  "spot_price": 53.1,
   "expected_move": {
     "earnings_date": "2026-10-19",
     "timing": "bmo",
@@ -43,25 +43,7 @@
     "forecast_feature_hash": "5a815c7594d3edfcfd10afc4efab169cbed2a92933035332cacdf3da3b390b3a",
     "forecast_frozen_eligible": true
   },
-  "straddle_features": [
-    {
-      "expiration": "2026-11-20",
-      "dte": 28,
-      "atm_strike": 55.0,
-      "atm_iv": 0.2594,
-      "atm_call_iv": 0.2594,
-      "atm_put_iv": 0.2594,
-      "straddle_mid": 3.475,
-      "em_straddle": 3.475,
-      "em_straddle_pct": 0.063182,
-      "em_iv": 3.95153,
-      "em_iv_pct": 0.071846,
-      "call_delta": 0.3387,
-      "call_gamma": 0.0962,
-      "call_vega": 0.0537,
-      "call_theta": -0.0279
-    }
-  ],
+  "straddle_features": [],
   "earnings_history": [
     {
       "date": "2026-10-19",
@@ -113,8 +95,8 @@
       "options_status": "decision_eligible",
       "fallback_reason": null,
       "forecast_frozen": true,
-      "ml_publication_reason": "no_eligible_current_forecast",
-      "ml_publication_status": "held"
+      "ml_publication_status": "held",
+      "ml_publication_reason": "no_eligible_current_forecast"
     },
     {
       "date": "2026-07-17",
@@ -471,13 +453,13 @@
   ],
   "next_earnings": "2026-10-19",
   "vol_regime": {
-    "iv_current": 0.2845,
-    "iv_rank": 0.35464,
+    "iv_current": 0.2709,
+    "iv_rank": 0.290246,
     "iv_year_high": 0.4208,
     "iv_year_low": 0.2096,
-    "hv_current": 0.2232,
-    "hv_rank": 0.26435,
-    "iv_mom_week": -0.0087,
+    "hv_current": 0.2229,
+    "hv_rank": 0.26284,
+    "iv_mom_week": -0.0119,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"

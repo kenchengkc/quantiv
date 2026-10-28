@@ -1,39 +1,38 @@
 {
   "symbol": "CHDN",
-  "as_of_date": "2026-10-23",
-  "spot_price": 80.0,
+  "as_of_date": "2026-10-26",
+  "spot_price": 90.0,
   "expected_move": {
     "earnings_date": "2026-10-28",
-    "display_forecast_pct": 0.09554520482503284,
-    "display_forecast_method": "straddle_implied",
-    "display_forecast_as_of": "2026-10-23",
+    "display_forecast_pct": 0.153623,
+    "display_forecast_method": "options_math",
+    "display_forecast_as_of": "2026-10-26",
     "ml_status": "unavailable_model",
-    "options_status": "indicative",
-    "fallback_reason": "quote_quality",
-    "historical_event_count": null,
+    "options_status": "decision_eligible",
+    "fallback_reason": null,
     "hist_move_med_4q": 0.071748,
     "timing": "unknown",
     "ml_publication_status": "held",
     "ml_publication_reason": "no_eligible_current_forecast",
-    "em_method": "straddle_implied"
+    "em_method": "options_math"
   },
   "straddle_features": [
     {
       "expiration": "2026-12-18",
-      "dte": 56,
-      "atm_strike": 80.0,
-      "atm_iv": 0.422611,
-      "atm_call_iv": 0.4119,
-      "atm_put_iv": 0.4332,
-      "straddle_mid": 11.225,
-      "em_straddle": 11.225,
-      "em_straddle_pct": 0.140313,
-      "em_iv": 13.242761,
-      "em_iv_pct": 0.165535,
-      "call_delta": 0.6463,
-      "call_gamma": 0.0273,
-      "call_vega": 0.1212,
-      "call_theta": -0.0466
+      "dte": 53,
+      "atm_strike": 90.0,
+      "atm_iv": 0.403149,
+      "atm_call_iv": 0.384,
+      "atm_put_iv": 0.4222,
+      "straddle_mid": 11.7,
+      "em_straddle": 11.7,
+      "em_straddle_pct": 0.13,
+      "em_iv": 13.826102,
+      "em_iv_pct": 0.153623,
+      "call_delta": 0.3362,
+      "call_gamma": 0.0294,
+      "call_vega": 0.1163,
+      "call_theta": -0.0393
     }
   ],
   "earnings_history": [
@@ -64,13 +63,12 @@
       "ml_status": "unavailable_model",
       "ml_publication_status": "held",
       "ml_publication_reason": "no_eligible_current_forecast",
-      "display_forecast_pct": 0.09554520482503284,
-      "display_forecast_method": "straddle_implied",
-      "display_forecast_as_of": "2026-10-23",
-      "options_status": "indicative",
-      "fallback_reason": "quote_quality",
-      "historical_event_count": null,
-      "em_method": "straddle_implied"
+      "options_status": "unavailable",
+      "display_forecast_pct": null,
+      "display_forecast_method": "ml_unavailable",
+      "display_forecast_as_of": "2026-10-26",
+      "em_method": "ml_unavailable",
+      "fallback_reason": null
     },
     {
       "date": "2026-07-29",
@@ -427,13 +425,13 @@
   ],
   "next_earnings": "2026-10-28",
   "vol_regime": {
-    "iv_current": 0.4062,
-    "iv_rank": 0.648463,
+    "iv_current": 0.4591,
+    "iv_rank": 0.86246,
     "iv_year_high": 0.4931,
     "iv_year_low": 0.2459,
     "hv_current": 0.36,
     "hv_rank": 0.309886,
-    "iv_mom_week": -0.0275,
+    "iv_mom_week": -0.0045,
     "iv_mom_month": null
   },
   "next_earnings_timing": "unknown"

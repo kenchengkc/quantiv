@@ -1,12 +1,12 @@
 {
   "symbol": "DTE",
-  "as_of_date": "2026-10-23",
-  "spot_price": 135.0,
+  "as_of_date": "2026-10-26",
+  "spot_price": 131.74,
   "expected_move": {
     "earnings_date": "2026-11-05",
     "display_forecast_pct": 0.00531911948399838,
     "display_forecast_method": "historical",
-    "display_forecast_as_of": "2026-10-23",
+    "display_forecast_as_of": "2026-10-26",
     "ml_status": "unavailable_model",
     "options_status": "unavailable",
     "fallback_reason": "quote_quality",
@@ -17,25 +17,7 @@
     "ml_publication_reason": "no_eligible_current_forecast",
     "em_method": "historical"
   },
-  "straddle_features": [
-    {
-      "expiration": "2026-12-18",
-      "dte": 56,
-      "atm_strike": 135.0,
-      "atm_iv": 0.21004,
-      "atm_call_iv": 0.203,
-      "atm_put_iv": 0.217,
-      "straddle_mid": 9.05,
-      "em_straddle": 9.05,
-      "em_straddle_pct": 0.067037,
-      "em_iv": 11.106666,
-      "em_iv_pct": 0.082272,
-      "call_delta": 0.4033,
-      "call_gamma": 0.0367,
-      "call_vega": 0.1992,
-      "call_theta": -0.0368
-    }
-  ],
+  "straddle_features": [],
   "earnings_history": [
     {
       "date": "2026-11-05",
@@ -66,7 +48,7 @@
       "ml_publication_reason": "no_eligible_current_forecast",
       "display_forecast_pct": 0.00531911948399838,
       "display_forecast_method": "historical",
-      "display_forecast_as_of": "2026-10-23",
+      "display_forecast_as_of": "2026-10-26",
       "options_status": "unavailable",
       "fallback_reason": "quote_quality",
       "historical_event_count": 4,
@@ -427,13 +409,13 @@
   ],
   "next_earnings": "2026-11-05",
   "vol_regime": {
-    "iv_current": 0.2152,
-    "iv_rank": 0.572695,
+    "iv_current": 0.2297,
+    "iv_rank": 0.701241,
     "iv_year_high": 0.2634,
     "iv_year_low": 0.1506,
-    "hv_current": 0.1939,
-    "hv_rank": 0.575968,
-    "iv_mom_week": 0.0122,
+    "hv_current": 0.1912,
+    "hv_rank": 0.549156,
+    "iv_mom_week": 0.0032,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"

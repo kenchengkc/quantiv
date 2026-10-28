@@ -1,7 +1,7 @@
 {
   "symbol": "DORM",
-  "as_of_date": "2026-10-23",
-  "spot_price": 125.24,
+  "as_of_date": "2026-10-26",
+  "spot_price": 125.0,
   "expected_move": {
     "earnings_date": "2026-10-26",
     "timing": "amc",
@@ -34,14 +34,32 @@
     "forecast_model_bundle_id": "d14dc7f2aa6b175956922eb6266b8523742add962668b7d6b8833cc2c869dd1b",
     "ml_publication_status": "eligible",
     "forecast_scored_at": "2026-10-26T09:08:21.424127+00:00",
-    "forecast_published_at": "2026-10-26T10:17:56+00:00",
+    "forecast_published_at": "2026-10-27T08:54:57+00:00",
     "forecast_feature_cutoff_at": "2026-10-26T19:55:00+00:00",
     "forecast_prediction_deadline_at": "2026-10-26T19:55:00+00:00",
     "forecast_feature_snapshot_at": "2026-10-22T20:00:00+00:00",
     "forecast_feature_hash": "7219d917dd7638a33d211bd0bca413e31013bee5608de8f1db5b00624bde6630",
     "forecast_frozen_eligible": true
   },
-  "straddle_features": [],
+  "straddle_features": [
+    {
+      "expiration": "2026-11-20",
+      "dte": 25,
+      "atm_strike": 125.0,
+      "atm_iv": 0.5255,
+      "atm_call_iv": 0.5235,
+      "atm_put_iv": 0.5275,
+      "straddle_mid": 13.65,
+      "em_straddle": 13.65,
+      "em_straddle_pct": 0.1092,
+      "em_iv": 17.191204,
+      "em_iv_pct": 0.13753,
+      "call_delta": 0.5066,
+      "call_gamma": 0.023,
+      "call_vega": 0.1294,
+      "call_theta": -0.12
+    }
+  ],
   "earnings_history": [
     {
       "date": "2026-10-26",
@@ -92,7 +110,7 @@
       "fallback_reason": null,
       "forecast_frozen": true,
       "ml_publication_status": "eligible",
-      "forecast_published_at": "2026-10-26T10:17:56+00:00"
+      "forecast_published_at": "2026-10-27T08:54:57+00:00"
     },
     {
       "date": "2026-08-03",
@@ -428,13 +446,13 @@
   ],
   "next_earnings": "2026-10-26",
   "vol_regime": {
-    "iv_current": 0.4973,
-    "iv_rank": 0.945662,
+    "iv_current": 0.4921,
+    "iv_rank": 0.921918,
     "iv_year_high": 0.5092,
     "iv_year_low": 0.2902,
-    "hv_current": 0.2246,
-    "hv_rank": 0.170878,
-    "iv_mom_week": 0.013,
+    "hv_current": 0.2249,
+    "hv_rank": 0.17152,
+    "iv_mom_week": 0.0014,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

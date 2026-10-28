@@ -1,6 +1,6 @@
 {
   "symbol": "UAA",
-  "as_of_date": "2026-10-23",
+  "as_of_date": "2026-10-26",
   "spot_price": 5.0,
   "expected_move": {
     "earnings_date": "2026-11-06",
@@ -36,20 +36,20 @@
   "straddle_features": [
     {
       "expiration": "2026-12-18",
-      "dte": 56,
+      "dte": 53,
       "atm_strike": 5.0,
-      "atm_iv": 0.5321,
-      "atm_call_iv": 0.5321,
-      "atm_put_iv": 0.5321,
-      "straddle_mid": 0.825,
-      "em_straddle": 0.825,
-      "em_straddle_pct": 0.165,
-      "em_iv": 1.042103,
-      "em_iv_pct": 0.208421,
-      "call_delta": 0.4191,
-      "call_gamma": 0.4008,
-      "call_vega": 0.0071,
-      "call_theta": -0.0035
+      "atm_iv": 0.5683,
+      "atm_call_iv": 0.5683,
+      "atm_put_iv": 0.5683,
+      "straddle_mid": 0.875,
+      "em_straddle": 0.875,
+      "em_straddle_pct": 0.175,
+      "em_iv": 1.082777,
+      "em_iv_pct": 0.216555,
+      "call_delta": 0.4054,
+      "call_gamma": 0.3903,
+      "call_vega": 0.0068,
+      "call_theta": -0.0039
     }
   ],
   "earnings_history": [
@@ -84,6 +84,7 @@
       "forecast_id": "88977fced113104ae54011de36a5632b077e462e4bd91deed8db0413f925e32b",
       "forecast_model_bundle_id": "d14dc7f2aa6b175956922eb6266b8523742add962668b7d6b8833cc2c869dd1b",
       "forecast_scored_at": "2026-10-27T07:37:53.262760+00:00",
+      "forecast_published_at": "2026-10-27T08:54:26.847892+00:00",
       "forecast_feature_cutoff_at": "2026-11-05T21:00:00+00:00",
       "forecast_prediction_deadline_at": "2026-11-06T05:00:00+00:00",
       "forecast_feature_snapshot_at": "2026-10-26T20:00:00+00:00",
@@ -459,13 +460,13 @@
   ],
   "next_earnings": "2026-11-06",
   "vol_regime": {
-    "iv_current": 0.5889,
-    "iv_rank": 0.427086,
+    "iv_current": 0.7565,
+    "iv_rank": 0.782849,
     "iv_year_high": 0.8588,
     "iv_year_low": 0.3877,
-    "hv_current": 0.3999,
-    "hv_rank": 0.088109,
-    "iv_mom_week": -0.0634,
+    "hv_current": 0.3997,
+    "hv_rank": 0.087678,
+    "iv_mom_week": 0.1696,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"

@@ -1,6 +1,6 @@
 {
   "symbol": "KRC",
-  "as_of_date": "2026-10-23",
+  "as_of_date": "2026-10-26",
   "spot_price": 37.5,
   "expected_move": {
     "earnings_date": "2026-10-22",
@@ -36,20 +36,20 @@
   "straddle_features": [
     {
       "expiration": "2026-11-20",
-      "dte": 28,
+      "dte": 25,
       "atm_strike": 37.5,
-      "atm_iv": 0.3081,
-      "atm_call_iv": 0.3081,
-      "atm_put_iv": 0.3081,
-      "straddle_mid": 2.525,
-      "em_straddle": 2.525,
-      "em_straddle_pct": 0.067333,
-      "em_iv": 3.200041,
-      "em_iv_pct": 0.085334,
-      "call_delta": 0.5124,
-      "call_gamma": 0.1255,
-      "call_vega": 0.0412,
-      "call_theta": -0.0259
+      "atm_iv": 0.406079,
+      "atm_call_iv": 0.4115,
+      "atm_put_iv": 0.4007,
+      "straddle_mid": 2.35,
+      "em_straddle": 2.35,
+      "em_straddle_pct": 0.062667,
+      "em_iv": 3.985335,
+      "em_iv_pct": 0.106276,
+      "call_delta": 0.4336,
+      "call_gamma": 0.0988,
+      "call_vega": 0.0376,
+      "call_theta": -0.0289
     }
   ],
   "earnings_history": [
@@ -403,13 +403,13 @@
   ],
   "next_earnings": "2026-10-22",
   "vol_regime": {
-    "iv_current": 0.3067,
-    "iv_rank": 0.132012,
+    "iv_current": 0.3185,
+    "iv_rank": 0.171649,
     "iv_year_high": 0.5651,
     "iv_year_low": 0.2674,
-    "hv_current": 0.2963,
-    "hv_rank": 0.491279,
-    "iv_mom_week": -0.0441,
+    "hv_current": 0.3005,
+    "hv_rank": 0.506541,
+    "iv_mom_week": -0.0431,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

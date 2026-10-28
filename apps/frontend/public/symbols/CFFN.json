@@ -1,20 +1,21 @@
 {
   "symbol": "CFFN",
-  "as_of_date": "2026-10-23",
-  "spot_price": 8.4,
+  "as_of_date": "2026-10-26",
+  "spot_price": 8.44,
   "expected_move": {
-    "earnings_date": "2026-10-27",
+    "earnings_date": "2026-11-04",
+    "display_forecast_pct": 0.03278372269927876,
+    "display_forecast_method": "historical",
+    "display_forecast_as_of": "2026-10-26",
+    "ml_status": "unavailable_model",
+    "options_status": "unavailable",
+    "fallback_reason": "quote_quality",
+    "historical_event_count": 4,
     "hist_move_med_4q": 0.032784,
     "timing": "unknown",
-    "ml_status": "unavailable_model",
     "ml_publication_status": "held",
     "ml_publication_reason": "no_eligible_current_forecast",
-    "options_status": "unavailable",
-    "display_forecast_pct": null,
-    "display_forecast_method": "ml_unavailable",
-    "display_forecast_as_of": "2026-10-23",
-    "em_method": "ml_unavailable",
-    "fallback_reason": null
+    "em_method": "historical"
   },
   "straddle_features": [],
   "earnings_history": [
@@ -41,16 +42,7 @@
       "revenue_estimate": 62187360.0,
       "rev_surprise_pct": null,
       "realized_target_protocol": null,
-      "realized_label_source": null,
-      "ml_status": "unavailable_model",
-      "ml_publication_status": "held",
-      "ml_publication_reason": "no_eligible_current_forecast",
-      "options_status": "unavailable",
-      "display_forecast_pct": null,
-      "display_forecast_method": "ml_unavailable",
-      "display_forecast_as_of": "2026-10-23",
-      "em_method": "ml_unavailable",
-      "fallback_reason": null
+      "realized_label_source": null
     },
     {
       "date": "2026-07-29",
@@ -328,14 +320,14 @@
       "realized_label_source": "ohlcv_session_close"
     }
   ],
-  "next_earnings": "2026-10-27",
+  "next_earnings": "2026-11-04",
   "vol_regime": {
     "iv_current": null,
     "iv_rank": null,
     "iv_year_high": null,
     "iv_year_low": null,
-    "hv_current": 0.195,
-    "hv_rank": 0.33302,
+    "hv_current": 0.1928,
+    "hv_rank": 0.322672,
     "iv_mom_week": null,
     "iv_mom_month": null
   },
