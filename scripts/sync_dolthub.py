@@ -101,9 +101,11 @@ SYMBOLS_DIR = REPO_ROOT / "apps" / "frontend" / "public" / "symbols"
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from delisted import (  # noqa: E402
-    canonical_ticker,
+    canonical_action_ticker,
+    canonical_earnings_ticker,
     delisted_tickers,
     is_delisted,
+    preserves_earnings_history,
     ticker_renames,
 )
 METADATA_FILE = "sync_metadata.json"
@@ -764,7 +766,14 @@ def sync_earnings():
                 (set(df["act_symbol"].unique()) | forecast_tickers) - delisted_tickers()
             )
             kept_before = len(existing)
-            existing = existing[existing["act_symbol"].isin(dolthub_universe)]
+            # A continuing parent can disappear under its old symbol after a
+            # spin-off. Its valid pre-transition earnings are an archive, not
+            # stale forward coverage, even when the old forecast page is gone.
+            preserved = pd.Series([
+                preserves_earnings_history(symbol, event_date)
+                for symbol, event_date in existing[["act_symbol", "date"]].itertuples(index=False)
+            ], index=existing.index, dtype=bool)
+            existing = existing[existing["act_symbol"].isin(dolthub_universe) | preserved]
             print(
                 f"  Universe gate: forecast set {len(forecast_tickers):,} ∪ "
                 f"fresh DoltHub {df['act_symbol'].nunique():,} → "
@@ -812,19 +821,24 @@ def sync_earnings():
         except Exception as exc:
             print(f"  ⚠ Could not merge existing enriched columns: {exc}")
 
-    # Apply ticker renames (old -> new) so earnings history carries over under
-    # the company's current symbol. Only the renamed rows are rewritten; a
+    # Apply date-aware ticker transitions, preserving pre-spin earnings under
+    # the original economic identity. Only renamed rows are rewritten; a
     # collision with a fresh DoltHub row already under the new symbol is then
     # deduped on (symbol, date).
     renames = ticker_renames()
     if renames:
         mask = df["act_symbol"].astype(str).str.strip().str.upper().isin(renames)
         if mask.any():
-            df.loc[mask, "act_symbol"] = df.loc[mask, "act_symbol"].map(canonical_ticker)
+            original = df.loc[mask, "act_symbol"].copy()
+            df.loc[mask, "act_symbol"] = [
+                canonical_earnings_ticker(symbol, event_date)
+                for symbol, event_date in df.loc[mask, ["act_symbol", "date"]].itertuples(index=False)
+            ]
+            renamed_rows = int(df.loc[mask, "act_symbol"].ne(original).sum())
             before = len(df)
             df = df.drop_duplicates(subset=["act_symbol", "date"], keep="last").reset_index(drop=True)
             print(
-                f"  Renamed {int(mask.sum())} row(s) to current symbols "
+                f"  Renamed {renamed_rows} row(s) to current symbols "
                 f"{sorted(set(renames.values()))}; deduped {before - len(df)} collision(s)"
             )
 
@@ -926,7 +940,7 @@ def _latest_option_universe() -> tuple[date, list[str]]:
     frame = pq.read_table(partition, columns=["act_symbol"]).to_pandas()
     symbols = sorted(
         {
-            canonical_ticker(symbol)
+            canonical_action_ticker(symbol)
             for symbol in frame["act_symbol"].dropna().astype(str)
             if not is_delisted(symbol)
         }
@@ -1036,7 +1050,7 @@ def _fetch_action_table(
     frame = pd.DataFrame(all_rows, columns=columns)
     if frame.empty:
         return frame, evidence
-    frame["act_symbol"] = frame["act_symbol"].map(canonical_ticker)
+    frame["act_symbol"] = frame["act_symbol"].map(canonical_action_ticker)
     frame["ex_date"] = pd.to_datetime(frame["ex_date"], errors="raise").dt.date
     for column in value_columns:
         frame[column] = pd.to_numeric(frame[column], errors="coerce" if allow_invalid_values else "raise")

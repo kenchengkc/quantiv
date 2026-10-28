@@ -1,6 +1,18 @@
 {
-  "_comment": "Ticker renames: same company, new trading symbol (rebrand or exchange change). The daily refresh rewrites the OLD symbol to the NEW one (sync_dolthub.py) so earnings history carries over seamlessly, and the integrity gate treats the old symbol's disappearance as expected. Distinct from config/delisted_tickers.json, which removes companies that stopped trading entirely. Loaded via scripts/delisted.py. Format: OLD -> { new, reason, renamed_on, source }.",
+  "_comment": "Verified ticker transitions. Ordinary renames carry earnings history to the current symbol. A transition with history_policy=preserve_pre_transition and price_history_continuous=false retains pre-transition earnings and market observations under the original symbol; only earnings on/after renamed_on use the successor. Identity continuity does not establish price comparability across a spin-off. Distinct from delisted_tickers.json, which removes companies that stopped trading entirely. Loaded via scripts/delisted.py.",
   "renames": {
+    "MSGS": {
+      "new": "MSGK",
+      "reason": "Madison Square Garden Sports completed the Rangers spin-off at 11:59 p.m. ET on October 26, 2026. The continuing parent became MSG Knickerbockers Corp., trading as MSGK on October 27 with unchanged parent CUSIP 55825T103. Shareholders received one share of independent MSG Rangers Corp. (MSGR) per two parent shares. MSGE is the separate Madison Square Garden Entertainment Corp.; neither MSGR nor MSGE is a rename target. Retain pre-spin earnings as MSGS and do not splice raw prices across the distribution.",
+      "renamed_on": "2026-10-27",
+      "history_policy": "preserve_pre_transition",
+      "price_history_continuous": false,
+      "source": "https://www.nasdaq.com/press-release/msg-knicks-completes-spin-new-york-rangers-business-2026-10-27",
+      "supporting_sources": [
+        "https://www.sec.gov/Archives/edgar/data/1636519/000119312526409143/d126791dex991.htm",
+        "https://www.sec.gov/Archives/edgar/data/1952073/000162828026066898/msge-20261021.htm"
+      ]
+    },
     "BK": {
       "new": "BNY",
       "reason": "BNY Mellon corporate rebrand; NYSE ticker BK -> BNY.",

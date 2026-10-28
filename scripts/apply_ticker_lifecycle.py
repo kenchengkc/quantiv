@@ -19,7 +19,12 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT / "scripts") not in sys.path:
     sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
-from delisted import delisted_tickers, ticker_renames  # noqa: E402
+from delisted import (  # noqa: E402
+    canonical_earnings_ticker,
+    delisted_tickers,
+    ticker_history_cutovers,
+    ticker_renames,
+)
 
 
 def _normalize_symbol(value: object) -> str:
@@ -43,8 +48,14 @@ def apply_lifecycle(
     if blank:
         raise ValueError(f"earnings artifact contains {blank} blank ticker(s)")
 
-    rename_mask = symbols.isin(renames)
     out["act_symbol"] = symbols.map(lambda symbol: renames.get(symbol, symbol))
+    for old, (new, _) in ticker_history_cutovers().items():
+        if renames.get(old) == new:
+            mask = symbols.eq(old)
+            out.loc[mask, "act_symbol"] = out.loc[mask, "date"].map(
+                lambda event_date: canonical_earnings_ticker(old, event_date)
+            )
+    rename_mask = out["act_symbol"].ne(symbols)
     retired_mask = out["act_symbol"].isin(retired)
     retired_rows = int(retired_mask.sum())
     out = out.loc[~retired_mask].copy()
