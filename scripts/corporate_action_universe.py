@@ -238,6 +238,12 @@ def reconstruct_universe(data_dir: Path, universe: dict, source_date: date,
     def canonical(value) -> str:
         symbol = normalized(value)
         renamed = renames.get(symbol, {})
+        # Replay the captured policy: a spin-off's old price history needs
+        # action evidence under its own symbol, independently of the successor.
+        if (isinstance(renamed, dict)
+                and renamed.get("history_policy") == "preserve_pre_transition"
+                and renamed.get("price_history_continuous") is False):
+            return symbol
         return normalized(renamed.get("new", symbol)) if isinstance(renamed, dict) else symbol
 
     retired = {normalized(symbol): spec for symbol, spec in delistings.items()}

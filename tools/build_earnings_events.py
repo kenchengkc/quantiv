@@ -316,6 +316,9 @@ def create_duckdb_views(conn: duckdb.DuckDBPyConnection, data_dir: Path):
     if repo_root not in sys.path:
         sys.path.insert(0, repo_root)
     from scripts.setup_duckdb_from_parquet import setup_corporate_action_views
+    from scripts.ticker_lifecycle_sql import market_data_history_filter_sql, volatility_history_values_sql
+
+    history_filter = market_data_history_filter_sql()
 
     print("🦆 Creating DuckDB views...")
     setup_corporate_action_views(conn, data_dir)
@@ -394,6 +397,7 @@ def create_duckdb_views(conn: duckdb.DuckDBPyConnection, data_dir: Path):
                 END::VARCHAR AS quote_timestamp_precision,
                 '{market_data_mode}'::VARCHAR AS market_data_mode
             FROM {parquet_scan}
+            WHERE {history_filter}
         )
         SELECT *
         FROM normalized
@@ -446,6 +450,7 @@ def create_duckdb_views(conn: duckdb.DuckDBPyConnection, data_dir: Path):
                 CAST(close AS DOUBLE) AS close,
                 CAST(volume AS BIGINT) AS volume
             FROM read_parquet('{ohlcv_glob}')
+            WHERE {history_filter}
         """)
         print("✅ Created v_ohlcv view")
     else:
@@ -484,17 +489,9 @@ def create_duckdb_views(conn: duckdb.DuckDBPyConnection, data_dir: Path):
             SELECT
                 CAST(date AS DATE) AS date,
                 act_symbol,
-                CAST(hv_current   AS DOUBLE) AS hv_current,
-                CAST(hv_week_ago  AS DOUBLE) AS hv_week_ago,
-                CAST(hv_month_ago AS DOUBLE) AS hv_month_ago,
-                CAST(hv_year_high AS DOUBLE) AS hv_year_high,
-                CAST(hv_year_low  AS DOUBLE) AS hv_year_low,
-                CAST(iv_current   AS DOUBLE) AS iv_current,
-                CAST(iv_week_ago  AS DOUBLE) AS iv_week_ago,
-                CAST(iv_month_ago AS DOUBLE) AS iv_month_ago,
-                CAST(iv_year_high AS DOUBLE) AS iv_year_high,
-                CAST(iv_year_low  AS DOUBLE) AS iv_year_low
+                {volatility_history_values_sql()}
             FROM read_parquet('{vol_glob}')
+            WHERE {history_filter}
         """)
         print("✅ Created v_volhist view")
     else:
