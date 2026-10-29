@@ -1,7 +1,7 @@
 {
   "symbol": "CLS",
-  "as_of_date": "2026-10-26",
-  "spot_price": 246.65,
+  "as_of_date": "2026-10-27",
+  "spot_price": 276.54,
   "expected_move": {
     "earnings_date": "2026-10-26",
     "timing": "amc",
@@ -26,7 +26,7 @@
     "forecast_model_bundle_id": "d14dc7f2aa6b175956922eb6266b8523742add962668b7d6b8833cc2c869dd1b",
     "ml_publication_status": "eligible",
     "forecast_scored_at": "2026-10-26T09:08:21.424127+00:00",
-    "forecast_published_at": "2026-10-27T08:54:57+00:00",
+    "forecast_published_at": "2026-10-28T09:06:52+00:00",
     "forecast_feature_cutoff_at": "2026-10-26T19:55:00+00:00",
     "forecast_prediction_deadline_at": "2026-10-26T19:55:00+00:00",
     "forecast_feature_snapshot_at": "2026-10-22T20:00:00+00:00",
@@ -37,11 +37,11 @@
   "earnings_history": [
     {
       "date": "2026-10-26",
-      "timing": "after_market_close",
+      "timing": "amc",
       "q": "Q3 26",
       "fiscal_year": 2026,
       "fiscal_q": "Q3",
-      "actual": null,
+      "actual": 0.121184,
       "implied": null,
       "implied_as_of": null,
       "implied_expiration": null,
@@ -57,8 +57,8 @@
       "revenue_actual": null,
       "revenue_estimate": null,
       "rev_surprise_pct": null,
-      "realized_target_protocol": null,
-      "realized_label_source": null,
+      "realized_target_protocol": "quantiv.session-reaction.v2",
+      "realized_label_source": "ohlcv_session_close",
       "em_ml_pct": 0.097417,
       "em_ml_abs": 26.206081,
       "model_horizon": 4,
@@ -84,7 +84,7 @@
       "fallback_reason": null,
       "forecast_frozen": true,
       "ml_publication_status": "eligible",
-      "forecast_published_at": "2026-10-27T08:54:57+00:00"
+      "forecast_published_at": "2026-10-28T09:06:52+00:00"
     },
     {
       "date": "2026-07-27",

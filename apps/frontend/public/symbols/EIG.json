@@ -1,10 +1,10 @@
 {
   "symbol": "EIG",
-  "as_of_date": "2026-10-26",
-  "spot_price": 52.03,
+  "as_of_date": "2026-10-27",
+  "spot_price": 51.94,
   "expected_move": {
     "earnings_date": "2026-10-28",
-    "timing": "after_market_close",
+    "timing": "amc",
     "em_ml_pct": 0.040971,
     "em_ml_abs": 2.128051,
     "model_horizon": 1,
@@ -20,18 +20,18 @@
     "display_forecast_as_of": "2026-10-27",
     "ml_status": "available",
     "options_status": "unavailable",
+    "hist_move_med_4q": 0.050514,
     "forecast_frozen": true,
     "forecast_id": "0e544fa3a5f8c9df43cb070c5dcd1606fbbc65adbbeb1a1f66812df0e44a14a7",
     "forecast_model_bundle_id": "d14dc7f2aa6b175956922eb6266b8523742add962668b7d6b8833cc2c869dd1b",
+    "ml_publication_status": "eligible",
     "forecast_scored_at": "2026-10-28T07:59:08.475972+00:00",
+    "forecast_published_at": "2026-10-28T09:06:24.430925+00:00",
     "forecast_feature_cutoff_at": "2026-10-28T19:55:00+00:00",
     "forecast_prediction_deadline_at": "2026-10-28T19:55:00+00:00",
     "forecast_feature_snapshot_at": "2026-10-27T20:00:00+00:00",
     "forecast_feature_hash": "d99737d95a116334c3353d46a3318b224066bb13ed87859ee4fbb39845549629",
-    "forecast_frozen_eligible": true,
-    "ml_publication_status": "eligible",
-    "fallback_reason": null,
-    "hist_move_med_4q": 0.050514
+    "forecast_frozen_eligible": true
   },
   "straddle_features": [],
   "earnings_history": [
@@ -66,6 +66,7 @@
       "forecast_id": "0e544fa3a5f8c9df43cb070c5dcd1606fbbc65adbbeb1a1f66812df0e44a14a7",
       "forecast_model_bundle_id": "d14dc7f2aa6b175956922eb6266b8523742add962668b7d6b8833cc2c869dd1b",
       "forecast_scored_at": "2026-10-28T07:59:08.475972+00:00",
+      "forecast_published_at": "2026-10-28T09:06:24.430925+00:00",
       "forecast_feature_cutoff_at": "2026-10-28T19:55:00+00:00",
       "forecast_prediction_deadline_at": "2026-10-28T19:55:00+00:00",
       "forecast_feature_snapshot_at": "2026-10-27T20:00:00+00:00",
@@ -83,8 +84,7 @@
       "options_status": "unavailable",
       "fallback_reason": null,
       "forecast_frozen": true,
-      "ml_publication_status": "eligible",
-      "em_method": "ml_lightgbm"
+      "ml_publication_status": "eligible"
     },
     {
       "date": "2026-07-29",
@@ -375,8 +375,8 @@
     "iv_rank": null,
     "iv_year_high": null,
     "iv_year_low": null,
-    "hv_current": 0.1513,
-    "hv_rank": 0.120321,
+    "hv_current": 0.15,
+    "hv_rank": 0.114528,
     "iv_mom_week": null,
     "iv_mom_month": null
   },

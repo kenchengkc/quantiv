@@ -1,6 +1,11 @@
 {
   "_comment": "Single source of truth for tickers removed from the universe after delisting (M&A, bankruptcy, going-private). Honored by the daily-refresh integrity gates (check_earnings_calendar_integrity.py, check_ticker_identity.py) so deliberate removals don't trip silent-drop guards, and by sync_dolthub.py's universe gate so a stale forecast JSON can't resurrect them. Loaded via scripts/delisted.py. Add an entry (ticker -> reason/delisted_on/source) when a holding is confirmed delisted.",
   "tickers": {
+    "ACA": {
+      "reason": "Auto-detected: absent from NASDAQ/NYSE exchange directories for \u22653 consecutive days (likely M&A, bankruptcy, or going-private).",
+      "delisted_on": "2026-10-29",
+      "source": "auto: scripts/detect_delistings.py"
+    },
     "AMWD": {
       "reason": "Completed all-stock merger into MasterBrand, Inc. (NYSE: MBC); American Woodmark delisted.",
       "delisted_on": "2026-05-29",

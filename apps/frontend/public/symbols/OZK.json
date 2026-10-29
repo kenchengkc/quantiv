@@ -1,6 +1,6 @@
 {
   "symbol": "OZK",
-  "as_of_date": "2026-10-26",
+  "as_of_date": "2026-10-27",
   "spot_price": 50.0,
   "expected_move": {
     "earnings_date": "2026-10-20",
@@ -44,38 +44,21 @@
   },
   "straddle_features": [
     {
-      "expiration": "2026-11-20",
-      "dte": 25,
-      "atm_strike": 50.0,
-      "atm_iv": 0.267599,
-      "atm_call_iv": 0.2667,
-      "atm_put_iv": 0.2685,
-      "straddle_mid": 2.825,
-      "em_straddle": 2.825,
-      "em_straddle_pct": 0.0565,
-      "em_iv": 3.501695,
-      "em_iv_pct": 0.070034,
-      "call_delta": 0.5626,
-      "call_gamma": 0.1117,
-      "call_vega": 0.0518,
-      "call_theta": -0.0287
-    },
-    {
       "expiration": "2026-12-18",
-      "dte": 53,
+      "dte": 52,
       "atm_strike": 50.0,
-      "atm_iv": 0.26649,
-      "atm_call_iv": 0.2741,
-      "atm_put_iv": 0.2589,
-      "straddle_mid": 4.125,
-      "em_straddle": 4.125,
-      "em_straddle_pct": 0.0825,
-      "em_iv": 5.07741,
-      "em_iv_pct": 0.101548,
-      "call_delta": 0.5772,
-      "call_gamma": 0.0744,
-      "call_vega": 0.0752,
-      "call_theta": -0.023
+      "atm_iv": 0.265048,
+      "atm_call_iv": 0.2663,
+      "atm_put_iv": 0.2638,
+      "straddle_mid": 4.1,
+      "em_straddle": 4.1,
+      "em_straddle_pct": 0.082,
+      "em_iv": 5.002076,
+      "em_iv_pct": 0.100042,
+      "call_delta": 0.5971,
+      "call_gamma": 0.0757,
+      "call_vega": 0.074,
+      "call_theta": -0.0213
     }
   ],
   "earnings_history": [
@@ -478,13 +461,13 @@
   ],
   "next_earnings": "2026-10-20",
   "vol_regime": {
-    "iv_current": 0.2785,
-    "iv_rank": 0.254895,
+    "iv_current": 0.2893,
+    "iv_rank": 0.291357,
     "iv_year_high": 0.4992,
     "iv_year_low": 0.203,
-    "hv_current": 0.2941,
-    "hv_rank": 0.925311,
-    "iv_mom_week": -0.024,
+    "hv_current": 0.2948,
+    "hv_rank": 0.930152,
+    "iv_mom_week": -0.0343,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

@@ -1,20 +1,22 @@
 {
   "symbol": "PPC",
-  "as_of_date": "2026-10-26",
-  "spot_price": 27.33,
+  "as_of_date": "2026-10-27",
+  "spot_price": 27.09,
   "expected_move": {
     "earnings_date": "2026-10-28",
-    "hist_move_med_4q": 0.028012,
-    "timing": "unknown",
-    "ml_status": "unavailable_model",
-    "ml_publication_status": "held",
-    "ml_publication_reason": "no_eligible_current_forecast",
-    "options_status": "unavailable",
-    "display_forecast_pct": null,
-    "display_forecast_method": "ml_unavailable",
-    "display_forecast_as_of": "2026-10-26",
+    "timing": "amc",
     "em_method": "ml_unavailable",
-    "fallback_reason": null
+    "display_forecast_pct": 0.0280115,
+    "display_forecast_method": "historical",
+    "display_forecast_as_of": "2026-10-28",
+    "ml_status": "unavailable_event",
+    "options_status": "unavailable",
+    "fallback_reason": "no_event_expiry",
+    "historical_event_count": 4,
+    "hist_move_med_4q": 0.0280115,
+    "forecast_frozen": true,
+    "ml_publication_status": "held",
+    "ml_publication_reason": "no_eligible_current_forecast"
   },
   "straddle_features": [],
   "earnings_history": [
@@ -42,15 +44,12 @@
       "rev_surprise_pct": null,
       "realized_target_protocol": null,
       "realized_label_source": null,
-      "ml_status": "unavailable_model",
       "ml_publication_status": "held",
+      "display_forecast_as_of": "2026-10-28",
+      "display_forecast_method": "historical",
       "ml_publication_reason": "no_eligible_current_forecast",
-      "options_status": "unavailable",
-      "display_forecast_pct": null,
-      "display_forecast_method": "ml_unavailable",
-      "display_forecast_as_of": "2026-10-26",
-      "em_method": "ml_unavailable",
-      "fallback_reason": null
+      "display_forecast_pct": 0.0280115,
+      "forecast_frozen": true
     },
     {
       "date": "2026-07-29",
@@ -407,14 +406,14 @@
   ],
   "next_earnings": "2026-10-28",
   "vol_regime": {
-    "iv_current": 0.4546,
-    "iv_rank": 0.602136,
-    "iv_year_high": 0.5738,
-    "iv_year_low": 0.2742,
-    "hv_current": 0.4194,
-    "hv_rank": 0.746083,
-    "iv_mom_week": -0.1192,
+    "iv_current": null,
+    "iv_rank": null,
+    "iv_year_high": null,
+    "iv_year_low": null,
+    "hv_current": 0.4188,
+    "hv_rank": 0.743318,
+    "iv_mom_week": null,
     "iv_mom_month": null
   },
-  "next_earnings_timing": "unknown"
+  "next_earnings_timing": "amc"
 }
