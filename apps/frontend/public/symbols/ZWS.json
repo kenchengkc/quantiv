@@ -1,7 +1,7 @@
 {
   "symbol": "ZWS",
-  "as_of_date": "2026-10-27",
-  "spot_price": 49.15,
+  "as_of_date": "2026-10-28",
+  "spot_price": 43.5,
   "expected_move": {
     "earnings_date": "2026-10-27",
     "timing": "amc",
@@ -37,11 +37,11 @@
   "earnings_history": [
     {
       "date": "2026-10-27",
-      "timing": "after_market_close",
+      "timing": "amc",
       "q": "Q3 26",
       "fiscal_year": 2026,
       "fiscal_q": "Q3",
-      "actual": null,
+      "actual": -0.114954,
       "implied": null,
       "implied_as_of": null,
       "implied_expiration": null,
@@ -57,8 +57,8 @@
       "revenue_actual": null,
       "revenue_estimate": 498375410.0,
       "rev_surprise_pct": null,
-      "realized_target_protocol": null,
-      "realized_label_source": null,
+      "realized_target_protocol": "quantiv.session-reaction.v2",
+      "realized_label_source": "ohlcv_session_close",
       "em_ml_pct": 0.050758,
       "em_ml_abs": 2.503364,
       "model_horizon": 1,
@@ -378,13 +378,13 @@
   ],
   "next_earnings": "2026-10-27",
   "vol_regime": {
-    "iv_current": 0.3594,
-    "iv_rank": 0.368961,
+    "iv_current": 0.3291,
+    "iv_rank": 0.268696,
     "iv_year_high": 0.5501,
     "iv_year_low": 0.2479,
-    "hv_current": 0.1446,
-    "hv_rank": 0.022647,
-    "iv_mom_week": 0.0313,
+    "hv_current": 0.3879,
+    "hv_rank": 0.883581,
+    "iv_mom_week": 0.0278,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

@@ -1,6 +1,6 @@
 {
   "symbol": "KNSL",
-  "as_of_date": "2026-10-27",
+  "as_of_date": "2026-10-28",
   "spot_price": 360.0,
   "expected_move": {
     "earnings_date": "2026-10-22",
@@ -27,37 +27,37 @@
   "straddle_features": [
     {
       "expiration": "2026-11-20",
-      "dte": 24,
+      "dte": 23,
       "atm_strike": 360.0,
-      "atm_iv": 0.3305,
-      "atm_call_iv": 0.3306,
-      "atm_put_iv": 0.3304,
-      "straddle_mid": 24.3,
-      "em_straddle": 24.3,
-      "em_straddle_pct": 0.0675,
-      "em_iv": 30.509363,
-      "em_iv_pct": 0.084748,
-      "call_delta": 0.5161,
-      "call_gamma": 0.0129,
-      "call_vega": 0.3671,
-      "call_theta": -0.2394
+      "atm_iv": 0.3227,
+      "atm_call_iv": 0.3244,
+      "atm_put_iv": 0.321,
+      "straddle_mid": 23.3,
+      "em_straddle": 23.3,
+      "em_straddle_pct": 0.064722,
+      "em_iv": 29.162132,
+      "em_iv_pct": 0.081006,
+      "call_delta": 0.5108,
+      "call_gamma": 0.0136,
+      "call_vega": 0.3592,
+      "call_theta": -0.2774
     },
     {
       "expiration": "2026-12-18",
-      "dte": 52,
+      "dte": 51,
       "atm_strike": 360.0,
-      "atm_iv": 0.3175,
-      "atm_call_iv": 0.3192,
-      "atm_put_iv": 0.3158,
-      "straddle_mid": 34.45,
-      "em_straddle": 34.45,
-      "em_straddle_pct": 0.095694,
-      "em_iv": 43.142097,
-      "em_iv_pct": 0.119839,
-      "call_delta": 0.541,
-      "call_gamma": 0.0091,
-      "call_vega": 0.539,
-      "call_theta": -0.1771
+      "atm_iv": 0.30005,
+      "atm_call_iv": 0.3011,
+      "atm_put_iv": 0.299,
+      "straddle_mid": 32.15,
+      "em_straddle": 32.15,
+      "em_straddle_pct": 0.089306,
+      "em_iv": 40.377069,
+      "em_iv_pct": 0.112159,
+      "call_delta": 0.5203,
+      "call_gamma": 0.0098,
+      "call_vega": 0.5329,
+      "call_theta": -0.1702
     }
   ],
   "earnings_history": [
@@ -92,8 +92,8 @@
       "options_status": "decision_eligible",
       "fallback_reason": null,
       "forecast_frozen": true,
-      "ml_publication_status": "held",
-      "ml_publication_reason": "no_eligible_current_forecast"
+      "ml_publication_reason": "no_eligible_current_forecast",
+      "ml_publication_status": "held"
     },
     {
       "date": "2026-07-23",
@@ -443,13 +443,13 @@
   ],
   "next_earnings": "2026-10-22",
   "vol_regime": {
-    "iv_current": 0.3191,
-    "iv_rank": 0.121294,
+    "iv_current": 0.319,
+    "iv_rank": 0.120845,
     "iv_year_high": 0.5147,
     "iv_year_low": 0.2921,
-    "hv_current": 0.3675,
-    "hv_rank": 0.482597,
-    "iv_mom_week": -0.1041,
+    "hv_current": 0.3617,
+    "hv_rank": 0.459914,
+    "iv_mom_week": -0.1203,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

@@ -1,7 +1,7 @@
 {
   "symbol": "SCI",
-  "as_of_date": "2026-10-27",
-  "spot_price": 85.0,
+  "as_of_date": "2026-10-28",
+  "spot_price": 82.33,
   "expected_move": {
     "earnings_date": "2026-10-28",
     "timing": "amc",
@@ -24,25 +24,7 @@
     "ml_publication_status": "held",
     "ml_publication_reason": "no_eligible_current_forecast"
   },
-  "straddle_features": [
-    {
-      "expiration": "2026-12-18",
-      "dte": 52,
-      "atm_strike": 85.0,
-      "atm_iv": 0.253846,
-      "atm_call_iv": 0.2529,
-      "atm_put_iv": 0.2548,
-      "straddle_mid": 6.645,
-      "em_straddle": 6.645,
-      "em_straddle_pct": 0.078176,
-      "em_iv": 8.144115,
-      "em_iv_pct": 0.095813,
-      "call_delta": 0.4091,
-      "call_gamma": 0.0492,
-      "call_vega": 0.1208,
-      "call_theta": -0.0313
-    }
-  ],
+  "straddle_features": [],
   "earnings_history": [
     {
       "date": "2026-10-28",
@@ -68,10 +50,10 @@
       "rev_surprise_pct": null,
       "realized_target_protocol": null,
       "realized_label_source": null,
-      "ml_publication_status": "held",
       "display_forecast_as_of": "2026-10-27",
-      "display_forecast_method": "options_math",
       "ml_publication_reason": "no_eligible_current_forecast",
+      "display_forecast_method": "options_math",
+      "ml_publication_status": "held",
       "display_forecast_pct": 0.095813,
       "forecast_frozen": true
     },
@@ -430,13 +412,13 @@
   ],
   "next_earnings": "2026-10-28",
   "vol_regime": {
-    "iv_current": 0.2817,
-    "iv_rank": 0.52883,
+    "iv_current": 0.3525,
+    "iv_rank": 0.917628,
     "iv_year_high": 0.3675,
     "iv_year_low": 0.1854,
-    "hv_current": 0.1903,
-    "hv_rank": 0.075758,
-    "iv_mom_week": 0.0843,
+    "hv_current": 0.1894,
+    "hv_rank": 0.070076,
+    "iv_mom_week": 0.0635,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

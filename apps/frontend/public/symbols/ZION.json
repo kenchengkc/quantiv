@@ -1,6 +1,6 @@
 {
   "symbol": "ZION",
-  "as_of_date": "2026-10-27",
+  "as_of_date": "2026-10-28",
   "spot_price": 65.0,
   "expected_move": {
     "earnings_date": "2026-10-19",
@@ -45,38 +45,21 @@
   },
   "straddle_features": [
     {
-      "expiration": "2026-11-20",
-      "dte": 24,
-      "atm_strike": 65.0,
-      "atm_iv": 0.2697,
-      "atm_call_iv": 0.2696,
-      "atm_put_iv": 0.2698,
-      "straddle_mid": 3.625,
-      "em_straddle": 3.625,
-      "em_straddle_pct": 0.055769,
-      "em_iv": 4.495248,
-      "em_iv_pct": 0.069158,
-      "call_delta": 0.5623,
-      "call_gamma": 0.0863,
-      "call_vega": 0.066,
-      "call_theta": -0.0344
-    },
-    {
       "expiration": "2026-12-18",
-      "dte": 52,
+      "dte": 51,
       "atm_strike": 65.0,
-      "atm_iv": 0.251751,
-      "atm_call_iv": 0.2527,
-      "atm_put_iv": 0.2508,
-      "straddle_mid": 4.95,
-      "em_straddle": 4.95,
-      "em_straddle_pct": 0.076154,
-      "em_iv": 6.176474,
-      "em_iv_pct": 0.095023,
-      "call_delta": 0.556,
-      "call_gamma": 0.0625,
-      "call_vega": 0.0971,
-      "call_theta": -0.0228
+      "atm_iv": 0.253301,
+      "atm_call_iv": 0.2526,
+      "atm_put_iv": 0.254,
+      "straddle_mid": 4.9,
+      "em_straddle": 4.9,
+      "em_straddle_pct": 0.075385,
+      "em_iv": 6.154439,
+      "em_iv_pct": 0.094684,
+      "call_delta": 0.5319,
+      "call_gamma": 0.0638,
+      "call_vega": 0.0964,
+      "call_theta": -0.0221
     }
   ],
   "earnings_history": [
@@ -129,8 +112,8 @@
       "options_status": "decision_eligible",
       "fallback_reason": null,
       "forecast_frozen": true,
-      "ml_publication_status": "held",
-      "ml_publication_reason": "no_eligible_current_forecast"
+      "ml_publication_reason": "no_eligible_current_forecast",
+      "ml_publication_status": "held"
     },
     {
       "date": "2026-07-20",
@@ -487,13 +470,13 @@
   ],
   "next_earnings": "2026-10-19",
   "vol_regime": {
-    "iv_current": 0.2608,
-    "iv_rank": 0.108147,
+    "iv_current": 0.2601,
+    "iv_rank": 0.104753,
     "iv_year_high": 0.4447,
     "iv_year_low": 0.2385,
-    "hv_current": 0.2004,
-    "hv_rank": 0.073346,
-    "iv_mom_week": -0.0238,
+    "hv_current": 0.1681,
+    "hv_rank": 0.0,
+    "iv_mom_week": -0.0133,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

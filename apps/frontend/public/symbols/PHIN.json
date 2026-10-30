@@ -1,20 +1,22 @@
 {
   "symbol": "PHIN",
-  "as_of_date": "2026-10-27",
-  "spot_price": 57.83,
+  "as_of_date": "2026-10-28",
+  "spot_price": 57.68,
   "expected_move": {
     "earnings_date": "2026-10-29",
-    "hist_move_med_4q": 0.030323,
-    "timing": "unknown",
-    "ml_status": "unavailable_model",
-    "ml_publication_status": "held",
-    "ml_publication_reason": "no_eligible_current_forecast",
-    "options_status": "unavailable",
-    "display_forecast_pct": null,
-    "display_forecast_method": "ml_unavailable",
-    "display_forecast_as_of": "2026-10-27",
+    "timing": "bmo",
     "em_method": "ml_unavailable",
-    "fallback_reason": null
+    "display_forecast_pct": 0.030323,
+    "display_forecast_method": "historical",
+    "display_forecast_as_of": "2026-10-29",
+    "ml_status": "unavailable_event",
+    "options_status": "unavailable",
+    "fallback_reason": "no_event_expiry",
+    "historical_event_count": 4,
+    "hist_move_med_4q": 0.030323,
+    "forecast_frozen": true,
+    "ml_publication_status": "held",
+    "ml_publication_reason": "no_eligible_current_forecast"
   },
   "straddle_features": [],
   "earnings_history": [
@@ -42,15 +44,12 @@
       "rev_surprise_pct": null,
       "realized_target_protocol": null,
       "realized_label_source": null,
-      "ml_status": "unavailable_model",
-      "ml_publication_status": "held",
+      "display_forecast_as_of": "2026-10-29",
       "ml_publication_reason": "no_eligible_current_forecast",
-      "options_status": "unavailable",
-      "display_forecast_pct": null,
-      "display_forecast_method": "ml_unavailable",
-      "display_forecast_as_of": "2026-10-27",
-      "em_method": "ml_unavailable",
-      "fallback_reason": null
+      "display_forecast_method": "historical",
+      "ml_publication_status": "held",
+      "display_forecast_pct": 0.030323,
+      "forecast_frozen": true
     },
     {
       "date": "2026-07-30",
@@ -393,14 +392,14 @@
   ],
   "next_earnings": "2026-10-29",
   "vol_regime": {
-    "iv_current": 0.4399,
-    "iv_rank": 0.59733,
+    "iv_current": 0.3908,
+    "iv_rank": 0.415276,
     "iv_year_high": 0.5485,
     "iv_year_low": 0.2788,
-    "hv_current": 0.2579,
-    "hv_rank": 0.050161,
-    "iv_mom_week": 0.005,
+    "hv_current": 0.2576,
+    "hv_rank": 0.049196,
+    "iv_mom_week": -0.1233,
     "iv_mom_month": null
   },
-  "next_earnings_timing": "unknown"
+  "next_earnings_timing": "bmo"
 }

@@ -1,10 +1,10 @@
 {
   "symbol": "PFSI",
-  "as_of_date": "2026-10-27",
-  "spot_price": 64.17,
+  "as_of_date": "2026-10-28",
+  "spot_price": 63.42,
   "expected_move": {
     "earnings_date": "2026-10-29",
-    "timing": "after_market_close",
+    "timing": "amc",
     "em_ml_pct": 0.067167,
     "em_ml_abs": 4.259743,
     "model_horizon": 1,
@@ -20,18 +20,18 @@
     "display_forecast_as_of": "2026-10-28",
     "ml_status": "available",
     "options_status": "unavailable",
+    "hist_move_med_4q": 0.094912,
     "forecast_frozen": true,
     "forecast_id": "73bf50a62baec750be1d6f08eb10e85604386d3fe7b80d3570312577e08b9a69",
     "forecast_model_bundle_id": "d14dc7f2aa6b175956922eb6266b8523742add962668b7d6b8833cc2c869dd1b",
+    "ml_publication_status": "eligible",
     "forecast_scored_at": "2026-10-29T08:17:33.704862+00:00",
+    "forecast_published_at": "2026-10-29T09:27:14.921791+00:00",
     "forecast_feature_cutoff_at": "2026-10-29T19:55:00+00:00",
     "forecast_prediction_deadline_at": "2026-10-29T19:55:00+00:00",
     "forecast_feature_snapshot_at": "2026-10-28T20:00:00+00:00",
     "forecast_feature_hash": "14cfaa8849bdab26556c4e3769ac3b3c67f08381a266c968e34d14627697e93a",
-    "forecast_frozen_eligible": true,
-    "ml_publication_status": "eligible",
-    "fallback_reason": null,
-    "hist_move_med_4q": 0.061444
+    "forecast_frozen_eligible": true
   },
   "straddle_features": [],
   "earnings_history": [
@@ -66,6 +66,7 @@
       "forecast_id": "73bf50a62baec750be1d6f08eb10e85604386d3fe7b80d3570312577e08b9a69",
       "forecast_model_bundle_id": "d14dc7f2aa6b175956922eb6266b8523742add962668b7d6b8833cc2c869dd1b",
       "forecast_scored_at": "2026-10-29T08:17:33.704862+00:00",
+      "forecast_published_at": "2026-10-29T09:27:14.921791+00:00",
       "forecast_feature_cutoff_at": "2026-10-29T19:55:00+00:00",
       "forecast_prediction_deadline_at": "2026-10-29T19:55:00+00:00",
       "forecast_feature_snapshot_at": "2026-10-28T20:00:00+00:00",
@@ -83,8 +84,7 @@
       "options_status": "unavailable",
       "fallback_reason": null,
       "forecast_frozen": true,
-      "ml_publication_status": "eligible",
-      "em_method": "ml_lightgbm"
+      "ml_publication_status": "eligible"
     },
     {
       "date": "2026-07-29",

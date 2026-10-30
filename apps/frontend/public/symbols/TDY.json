@@ -1,7 +1,7 @@
 {
   "symbol": "TDY",
-  "as_of_date": "2026-10-27",
-  "spot_price": 660.0,
+  "as_of_date": "2026-10-28",
+  "spot_price": 670.0,
   "expected_move": {
     "earnings_date": "2026-10-21",
     "timing": "bmo",
@@ -45,20 +45,20 @@
   "straddle_features": [
     {
       "expiration": "2026-12-18",
-      "dte": 52,
-      "atm_strike": 660.0,
-      "atm_iv": 0.2538,
-      "atm_call_iv": 0.2549,
-      "atm_put_iv": 0.2527,
-      "straddle_mid": 50.4,
-      "em_straddle": 50.4,
-      "em_straddle_pct": 0.076364,
-      "em_iv": 63.225271,
-      "em_iv_pct": 0.095796,
-      "call_delta": 0.5086,
-      "call_gamma": 0.0063,
-      "call_vega": 0.9855,
-      "call_theta": -0.2718
+      "dte": 51,
+      "atm_strike": 670.0,
+      "atm_iv": 0.246951,
+      "atm_call_iv": 0.2486,
+      "atm_put_iv": 0.2453,
+      "straddle_mid": 49.395,
+      "em_straddle": 49.395,
+      "em_straddle_pct": 0.073724,
+      "em_iv": 61.847778,
+      "em_iv_pct": 0.09231,
+      "call_delta": 0.5156,
+      "call_gamma": 0.0064,
+      "call_vega": 0.9922,
+      "call_theta": -0.279
     }
   ],
   "earnings_history": [
@@ -111,8 +111,8 @@
       "options_status": "decision_eligible",
       "fallback_reason": null,
       "forecast_frozen": true,
-      "ml_publication_status": "held",
-      "ml_publication_reason": "no_eligible_current_forecast"
+      "ml_publication_reason": "no_eligible_current_forecast",
+      "ml_publication_status": "held"
     },
     {
       "date": "2026-07-22",
@@ -448,13 +448,13 @@
   ],
   "next_earnings": "2026-10-21",
   "vol_regime": {
-    "iv_current": 0.2585,
-    "iv_rank": 0.300994,
+    "iv_current": 0.2496,
+    "iv_rank": 0.258874,
     "iv_year_high": 0.4062,
     "iv_year_low": 0.1949,
-    "hv_current": 0.1848,
-    "hv_rank": 0.220859,
-    "iv_mom_week": -0.0577,
+    "hv_current": 0.1886,
+    "hv_rank": 0.237511,
+    "iv_mom_week": -0.014,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"

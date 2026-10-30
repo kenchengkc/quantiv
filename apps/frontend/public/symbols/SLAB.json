@@ -1,12 +1,12 @@
 {
   "symbol": "SLAB",
-  "as_of_date": "2026-10-27",
-  "spot_price": 220.0,
+  "as_of_date": "2026-10-28",
+  "spot_price": 221.76,
   "expected_move": {
     "earnings_date": "2026-11-02",
     "display_forecast_pct": 0.008612872219068257,
     "display_forecast_method": "historical",
-    "display_forecast_as_of": "2026-10-27",
+    "display_forecast_as_of": "2026-10-28",
     "ml_status": "unavailable_model",
     "options_status": "unavailable",
     "fallback_reason": "quote_quality",
@@ -17,25 +17,7 @@
     "ml_publication_reason": "no_eligible_current_forecast",
     "em_method": "historical"
   },
-  "straddle_features": [
-    {
-      "expiration": "2026-12-18",
-      "dte": 52,
-      "atm_strike": 220.0,
-      "atm_iv": 0.146606,
-      "atm_call_iv": 0.143,
-      "atm_put_iv": 0.1502,
-      "straddle_mid": 4.5,
-      "em_straddle": 4.5,
-      "em_straddle_pct": 0.020455,
-      "em_iv": 12.173906,
-      "em_iv_pct": 0.055336,
-      "call_delta": 0.5885,
-      "call_gamma": 0.0323,
-      "call_vega": 0.3244,
-      "call_theta": -0.0512
-    }
-  ],
+  "straddle_features": [],
   "earnings_history": [
     {
       "date": "2026-11-02",
@@ -66,7 +48,7 @@
       "ml_publication_reason": "no_eligible_current_forecast",
       "display_forecast_pct": 0.008612872219068257,
       "display_forecast_method": "historical",
-      "display_forecast_as_of": "2026-10-27",
+      "display_forecast_as_of": "2026-10-28",
       "options_status": "unavailable",
       "fallback_reason": "quote_quality",
       "historical_event_count": 4,
@@ -399,13 +381,13 @@
   ],
   "next_earnings": "2026-11-02",
   "vol_regime": {
-    "iv_current": 0.0447,
-    "iv_rank": 0.004952,
+    "iv_current": 0.0497,
+    "iv_rank": 0.014123,
     "iv_year_high": 0.5872,
     "iv_year_low": 0.042,
-    "hv_current": 0.0318,
-    "hv_rank": 0.000513,
-    "iv_mom_week": -0.0132,
+    "hv_current": 0.0315,
+    "hv_rank": 0.000256,
+    "iv_mom_week": 0.0067,
     "iv_mom_month": null
   },
   "next_earnings_timing": "unknown"

@@ -1,10 +1,18 @@
 {
   "symbol": "EXEL",
-  "as_of_date": "2026-10-27",
-  "spot_price": 65.35,
+  "as_of_date": "2026-10-28",
+  "spot_price": 66.28,
   "expected_move": {
     "earnings_date": "2026-10-29",
-    "timing": "after_market_close",
+    "timing": "amc",
+    "expiration": "2026-12-18",
+    "dte": 60,
+    "lead_time_days": 10,
+    "atm_strike": 65.0,
+    "atm_iv": 0.425012,
+    "straddle_abs": 9.0,
+    "straddle_pct": 0.138462,
+    "iv_pct": 0.172318,
     "em_ml_pct": 0.052659,
     "em_ml_abs": 3.490234,
     "model_horizon": 1,
@@ -19,18 +27,19 @@
     "display_forecast_method": "ml",
     "display_forecast_as_of": "2026-10-28",
     "ml_status": "available",
-    "options_status": "unavailable",
+    "options_status": "decision_eligible",
+    "hist_move_med_4q": 0.072268,
     "forecast_frozen": true,
     "forecast_id": "65ccc96a403d9ce0b1ca953f4ebf14ad4b116067d08f054954fbd898f02b213b",
     "forecast_model_bundle_id": "d14dc7f2aa6b175956922eb6266b8523742add962668b7d6b8833cc2c869dd1b",
+    "ml_publication_status": "eligible",
     "forecast_scored_at": "2026-10-29T08:17:33.704862+00:00",
+    "forecast_published_at": "2026-10-29T09:27:14.921791+00:00",
     "forecast_feature_cutoff_at": "2026-10-29T19:55:00+00:00",
     "forecast_prediction_deadline_at": "2026-10-29T19:55:00+00:00",
     "forecast_feature_snapshot_at": "2026-10-28T20:00:00+00:00",
     "forecast_feature_hash": "e9dc083aaee239edbb4a66c502d9551b5544d2c13b14cb9a042e27dc7a90a532",
-    "forecast_frozen_eligible": true,
-    "ml_publication_status": "eligible",
-    "fallback_reason": null
+    "forecast_frozen_eligible": true
   },
   "straddle_features": [],
   "earnings_history": [
@@ -65,6 +74,7 @@
       "forecast_id": "65ccc96a403d9ce0b1ca953f4ebf14ad4b116067d08f054954fbd898f02b213b",
       "forecast_model_bundle_id": "d14dc7f2aa6b175956922eb6266b8523742add962668b7d6b8833cc2c869dd1b",
       "forecast_scored_at": "2026-10-29T08:17:33.704862+00:00",
+      "forecast_published_at": "2026-10-29T09:27:14.921791+00:00",
       "forecast_feature_cutoff_at": "2026-10-29T19:55:00+00:00",
       "forecast_prediction_deadline_at": "2026-10-29T19:55:00+00:00",
       "forecast_feature_snapshot_at": "2026-10-28T20:00:00+00:00",
@@ -82,8 +92,7 @@
       "options_status": "unavailable",
       "fallback_reason": null,
       "forecast_frozen": true,
-      "ml_publication_status": "eligible",
-      "em_method": "ml_lightgbm"
+      "ml_publication_status": "eligible"
     },
     {
       "date": "2026-08-05",
@@ -440,13 +449,13 @@
   ],
   "next_earnings": "2026-10-29",
   "vol_regime": {
-    "iv_current": 0.4723,
-    "iv_rank": 0.470726,
+    "iv_current": 0.492,
+    "iv_rank": 0.521988,
     "iv_year_high": 0.6757,
     "iv_year_low": 0.2914,
-    "hv_current": 0.2156,
-    "hv_rank": 0.0,
-    "iv_mom_week": 0.0333,
+    "hv_current": 0.2164,
+    "hv_rank": 0.00318,
+    "iv_mom_week": 0.0432,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

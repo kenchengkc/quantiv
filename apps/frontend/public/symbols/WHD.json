@@ -1,6 +1,6 @@
 {
   "symbol": "WHD",
-  "as_of_date": "2026-10-27",
+  "as_of_date": "2026-10-28",
   "spot_price": 65.0,
   "expected_move": {
     "earnings_date": "2026-10-28",
@@ -43,38 +43,21 @@
   },
   "straddle_features": [
     {
-      "expiration": "2026-11-20",
-      "dte": 24,
-      "atm_strike": 65.0,
-      "atm_iv": 0.415698,
-      "atm_call_iv": 0.4171,
-      "atm_put_iv": 0.4143,
-      "straddle_mid": 5.6,
-      "em_straddle": 5.6,
-      "em_straddle_pct": 0.086154,
-      "em_iv": 6.928678,
-      "em_iv_pct": 0.106595,
-      "call_delta": 0.5671,
-      "call_gamma": 0.0561,
-      "call_vega": 0.0662,
-      "call_theta": -0.0627
-    },
-    {
       "expiration": "2026-12-18",
-      "dte": 52,
+      "dte": 51,
       "atm_strike": 65.0,
-      "atm_iv": 0.374549,
-      "atm_call_iv": 0.3753,
-      "atm_put_iv": 0.3738,
-      "straddle_mid": 7.4,
-      "em_straddle": 7.4,
-      "em_straddle_pct": 0.113846,
-      "em_iv": 9.189196,
-      "em_iv_pct": 0.141372,
-      "call_delta": 0.5672,
-      "call_gamma": 0.0423,
-      "call_vega": 0.0972,
-      "call_theta": -0.0385
+      "atm_iv": 0.425186,
+      "atm_call_iv": 0.4349,
+      "atm_put_iv": 0.4154,
+      "straddle_mid": 8.345,
+      "em_straddle": 8.345,
+      "em_straddle_pct": 0.128385,
+      "em_iv": 10.330718,
+      "em_iv_pct": 0.158934,
+      "call_delta": 0.5614,
+      "call_gamma": 0.0382,
+      "call_vega": 0.0963,
+      "call_theta": -0.054
     }
   ],
   "earnings_history": [
@@ -463,13 +446,13 @@
   ],
   "next_earnings": "2026-10-28",
   "vol_regime": {
-    "iv_current": 0.4076,
-    "iv_rank": 0.597881,
+    "iv_current": 0.4575,
+    "iv_rank": 0.849647,
     "iv_year_high": 0.4873,
     "iv_year_low": 0.2891,
-    "hv_current": 0.3337,
-    "hv_rank": 0.152574,
-    "iv_mom_week": 0.0024,
+    "hv_current": 0.3194,
+    "hv_rank": 0.115021,
+    "iv_mom_week": 0.0612,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

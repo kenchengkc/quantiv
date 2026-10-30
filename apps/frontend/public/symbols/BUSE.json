@@ -1,7 +1,7 @@
 {
   "symbol": "BUSE",
-  "as_of_date": "2026-10-27",
-  "spot_price": 30.18,
+  "as_of_date": "2026-10-28",
+  "spot_price": 29.24,
   "expected_move": {
     "earnings_date": "2026-10-27",
     "timing": "amc",
@@ -38,11 +38,11 @@
   "earnings_history": [
     {
       "date": "2026-10-27",
-      "timing": "after_market_close",
+      "timing": "amc",
       "q": "Q3 26",
       "fiscal_year": 2026,
       "fiscal_q": "Q3",
-      "actual": null,
+      "actual": -0.031146,
       "implied": null,
       "implied_as_of": null,
       "implied_expiration": null,
@@ -58,8 +58,8 @@
       "revenue_actual": null,
       "revenue_estimate": 199769244.0,
       "rev_surprise_pct": null,
-      "realized_target_protocol": null,
-      "realized_label_source": null,
+      "realized_target_protocol": "quantiv.session-reaction.v2",
+      "realized_label_source": "ohlcv_session_close",
       "em_ml_pct": 0.022586,
       "em_ml_abs": 0.653877,
       "model_horizon": 13,
@@ -85,8 +85,8 @@
       "options_status": "unavailable",
       "fallback_reason": null,
       "forecast_frozen": true,
-      "ml_publication_status": "held",
-      "ml_publication_reason": "no_eligible_current_forecast"
+      "ml_publication_reason": "no_eligible_current_forecast",
+      "ml_publication_status": "held"
     },
     {
       "date": "2026-07-28",

@@ -1,41 +1,23 @@
 {
   "symbol": "DCH",
-  "as_of_date": "2026-10-27",
-  "spot_price": 5.0,
+  "as_of_date": "2026-10-28",
+  "spot_price": 4.9,
   "expected_move": {
     "earnings_date": "2026-11-05",
-    "display_forecast_pct": 0.11992945326278659,
-    "display_forecast_method": "historical",
-    "display_forecast_as_of": "2026-10-27",
+    "display_forecast_pct": 0.16326530612244897,
+    "display_forecast_method": "straddle_implied",
+    "display_forecast_as_of": "2026-10-28",
     "ml_status": "unavailable_model",
-    "options_status": "unavailable",
+    "options_status": "indicative",
     "fallback_reason": "quote_quality",
-    "historical_event_count": 3,
+    "historical_event_count": null,
     "hist_move_med_4q": 0.119929,
     "timing": "unknown",
     "ml_publication_status": "held",
     "ml_publication_reason": "no_eligible_current_forecast",
-    "em_method": "historical"
+    "em_method": "straddle_implied"
   },
-  "straddle_features": [
-    {
-      "expiration": "2026-12-18",
-      "dte": 52,
-      "atm_strike": 5.0,
-      "atm_iv": 0.7101,
-      "atm_call_iv": 0.7101,
-      "atm_put_iv": 0.7101,
-      "straddle_mid": 1.05,
-      "em_straddle": 1.05,
-      "em_straddle_pct": 0.21,
-      "em_iv": 1.340123,
-      "em_iv_pct": 0.268025,
-      "call_delta": 0.4536,
-      "call_gamma": 0.3099,
-      "call_vega": 0.0069,
-      "call_theta": -0.0044
-    }
-  ],
+  "straddle_features": [],
   "earnings_history": [
     {
       "date": "2026-11-05",
@@ -64,13 +46,13 @@
       "ml_status": "unavailable_model",
       "ml_publication_status": "held",
       "ml_publication_reason": "no_eligible_current_forecast",
-      "display_forecast_pct": 0.11992945326278659,
-      "display_forecast_method": "historical",
-      "display_forecast_as_of": "2026-10-27",
-      "options_status": "unavailable",
+      "display_forecast_pct": 0.16326530612244897,
+      "display_forecast_method": "straddle_implied",
+      "display_forecast_as_of": "2026-10-28",
+      "options_status": "indicative",
       "fallback_reason": "quote_quality",
-      "historical_event_count": 3,
-      "em_method": "historical"
+      "historical_event_count": null,
+      "em_method": "straddle_implied"
     },
     {
       "date": "2026-08-07",
@@ -150,13 +132,13 @@
   ],
   "next_earnings": "2026-11-05",
   "vol_regime": {
-    "iv_current": 0.6739,
-    "iv_rank": 0.410732,
+    "iv_current": 0.6605,
+    "iv_rank": 0.3837,
     "iv_year_high": 0.966,
     "iv_year_low": 0.4703,
-    "hv_current": 0.4774,
-    "hv_rank": 0.030693,
-    "iv_mom_week": -0.041,
+    "hv_current": 0.4949,
+    "hv_rank": 0.088449,
+    "iv_mom_week": -0.0438,
     "iv_mom_month": null
   },
   "next_earnings_timing": "unknown"
