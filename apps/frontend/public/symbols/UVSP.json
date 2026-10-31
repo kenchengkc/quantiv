@@ -1,7 +1,7 @@
 {
   "symbol": "UVSP",
-  "as_of_date": "2026-10-28",
-  "spot_price": 42.08,
+  "as_of_date": "2026-10-29",
+  "spot_price": 39.33,
   "expected_move": {
     "earnings_date": "2026-10-28",
     "timing": "amc",
@@ -37,11 +37,11 @@
   "earnings_history": [
     {
       "date": "2026-10-28",
-      "timing": "after_market_close",
+      "timing": "amc",
       "q": "Q3 26",
       "fiscal_year": 2026,
       "fiscal_q": "Q3",
-      "actual": null,
+      "actual": -0.065352,
       "implied": null,
       "implied_as_of": null,
       "implied_expiration": null,
@@ -57,8 +57,8 @@
       "revenue_actual": null,
       "revenue_estimate": 92160396.0,
       "rev_surprise_pct": null,
-      "realized_target_protocol": null,
-      "realized_label_source": null,
+      "realized_target_protocol": "quantiv.session-reaction.v2",
+      "realized_label_source": "ohlcv_session_close",
       "em_ml_pct": 0.019066,
       "em_ml_abs": 0.808395,
       "model_horizon": 1,

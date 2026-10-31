@@ -1,12 +1,12 @@
 {
   "symbol": "ENSG",
-  "as_of_date": "2026-10-28",
-  "spot_price": 185.0,
+  "as_of_date": "2026-10-29",
+  "spot_price": 195.0,
   "expected_move": {
     "earnings_date": "2026-11-02",
-    "display_forecast_pct": 0.0580902721199283,
+    "display_forecast_pct": 0.05595212537569773,
     "display_forecast_method": "straddle_implied",
-    "display_forecast_as_of": "2026-10-28",
+    "display_forecast_as_of": "2026-10-29",
     "ml_status": "unavailable_model",
     "options_status": "indicative",
     "fallback_reason": "quote_quality",
@@ -20,20 +20,20 @@
   "straddle_features": [
     {
       "expiration": "2026-12-18",
-      "dte": 51,
-      "atm_strike": 185.0,
-      "atm_iv": 0.2625,
-      "atm_call_iv": 0.2633,
-      "atm_put_iv": 0.2617,
-      "straddle_mid": 14.45,
-      "em_straddle": 14.45,
-      "em_straddle_pct": 0.078108,
-      "em_iv": 18.152626,
-      "em_iv_pct": 0.098122,
-      "call_delta": 0.5134,
-      "call_gamma": 0.0219,
-      "call_vega": 0.2738,
-      "call_theta": -0.0764
+      "dte": 50,
+      "atm_strike": 195.0,
+      "atm_iv": 0.260556,
+      "atm_call_iv": 0.2725,
+      "atm_put_iv": 0.2484,
+      "straddle_mid": 16.05,
+      "em_straddle": 16.05,
+      "em_straddle_pct": 0.082308,
+      "em_iv": 18.805026,
+      "em_iv_pct": 0.096436,
+      "call_delta": 0.3622,
+      "call_gamma": 0.0199,
+      "call_vega": 0.2585,
+      "call_theta": -0.0766
     }
   ],
   "earnings_history": [
@@ -396,13 +396,13 @@
   ],
   "next_earnings": "2026-11-02",
   "vol_regime": {
-    "iv_current": 0.274,
-    "iv_rank": 0.218828,
+    "iv_current": 0.2743,
+    "iv_rank": 0.219763,
     "iv_year_high": 0.5246,
     "iv_year_low": 0.2038,
-    "hv_current": 0.3409,
-    "hv_rank": 0.614041,
-    "iv_mom_week": -0.0808,
+    "hv_current": 0.338,
+    "hv_rank": 0.60411,
+    "iv_mom_week": -0.0746,
     "iv_mom_month": null
   },
   "next_earnings_timing": "unknown"

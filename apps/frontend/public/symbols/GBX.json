@@ -1,7 +1,7 @@
 {
   "symbol": "GBX",
-  "as_of_date": "2026-10-28",
-  "spot_price": 37.48,
+  "as_of_date": "2026-10-29",
+  "spot_price": 37.5,
   "expected_move": {
     "earnings_date": "2026-10-26",
     "timing": "amc",
@@ -24,7 +24,25 @@
     "ml_publication_status": "held",
     "ml_publication_reason": "no_eligible_current_forecast"
   },
-  "straddle_features": [],
+  "straddle_features": [
+    {
+      "expiration": "2026-12-18",
+      "dte": 50,
+      "atm_strike": 37.5,
+      "atm_iv": 0.318814,
+      "atm_call_iv": 0.3239,
+      "atm_put_iv": 0.3137,
+      "straddle_mid": 3.575,
+      "em_straddle": 3.575,
+      "em_straddle_pct": 0.095333,
+      "em_iv": 4.424938,
+      "em_iv_pct": 0.117998,
+      "call_delta": 0.569,
+      "call_gamma": 0.0833,
+      "call_vega": 0.0549,
+      "call_theta": -0.0129
+    }
+  ],
   "earnings_history": [
     {
       "date": "2026-10-26",
@@ -57,8 +75,8 @@
       "options_status": "decision_eligible",
       "fallback_reason": null,
       "forecast_frozen": true,
-      "ml_publication_reason": "no_eligible_current_forecast",
-      "ml_publication_status": "held"
+      "ml_publication_status": "held",
+      "ml_publication_reason": "no_eligible_current_forecast"
     },
     {
       "date": "2026-07-01",
@@ -415,13 +433,13 @@
   ],
   "next_earnings": "2026-10-26",
   "vol_regime": {
-    "iv_current": 0.3518,
-    "iv_rank": 0.252101,
+    "iv_current": 0.3457,
+    "iv_rank": 0.236567,
     "iv_year_high": 0.6455,
     "iv_year_low": 0.2528,
-    "hv_current": 0.2319,
-    "hv_rank": 0.158265,
-    "iv_mom_week": -0.2066,
+    "hv_current": 0.2494,
+    "hv_rank": 0.223128,
+    "iv_mom_week": -0.1758,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

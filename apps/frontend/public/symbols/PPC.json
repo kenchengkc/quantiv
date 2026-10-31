@@ -1,7 +1,7 @@
 {
   "symbol": "PPC",
-  "as_of_date": "2026-10-28",
-  "spot_price": 26.38,
+  "as_of_date": "2026-10-29",
+  "spot_price": 27.61,
   "expected_move": {
     "earnings_date": "2026-10-28",
     "timing": "amc",
@@ -22,11 +22,11 @@
   "earnings_history": [
     {
       "date": "2026-10-28",
-      "timing": "after_market_close",
+      "timing": "amc",
       "q": "Q3 26",
       "fiscal_year": 2026,
       "fiscal_q": "Q3",
-      "actual": null,
+      "actual": 0.046626,
       "implied": null,
       "implied_as_of": null,
       "implied_expiration": null,
@@ -42,12 +42,12 @@
       "revenue_actual": null,
       "revenue_estimate": 4735213098.0,
       "rev_surprise_pct": null,
-      "realized_target_protocol": null,
-      "realized_label_source": null,
-      "display_forecast_as_of": "2026-10-28",
-      "ml_publication_reason": "no_eligible_current_forecast",
+      "realized_target_protocol": "quantiv.session-reaction.v2",
+      "realized_label_source": "ohlcv_session_close",
       "display_forecast_method": "historical",
+      "display_forecast_as_of": "2026-10-28",
       "ml_publication_status": "held",
+      "ml_publication_reason": "no_eligible_current_forecast",
       "display_forecast_pct": 0.0280115,
       "forecast_frozen": true
     },
@@ -410,8 +410,8 @@
     "iv_rank": null,
     "iv_year_high": null,
     "iv_year_low": null,
-    "hv_current": 0.4241,
-    "hv_rank": 0.767742,
+    "hv_current": 0.4477,
+    "hv_rank": 0.876498,
     "iv_mom_week": null,
     "iv_mom_month": null
   },

@@ -1,7 +1,7 @@
 {
   "symbol": "ESI",
-  "as_of_date": "2026-10-28",
-  "spot_price": 35.79,
+  "as_of_date": "2026-10-29",
+  "spot_price": 36.0,
   "expected_move": {
     "earnings_date": "2026-10-21",
     "timing": "amc",
@@ -41,7 +41,42 @@
     "forecast_feature_hash": "0392d15820dec859fbc0f3ab6a6e234f1e9daab1f2780805f14a5ea761dac1c5",
     "forecast_frozen_eligible": true
   },
-  "straddle_features": [],
+  "straddle_features": [
+    {
+      "expiration": "2026-11-20",
+      "dte": 22,
+      "atm_strike": 36.0,
+      "atm_iv": 0.39528,
+      "atm_call_iv": 0.4088,
+      "atm_put_iv": 0.3818,
+      "straddle_mid": 2.8,
+      "em_straddle": 2.8,
+      "em_straddle_pct": 0.077778,
+      "em_iv": 3.493597,
+      "em_iv_pct": 0.097044,
+      "call_delta": 0.4667,
+      "call_gamma": 0.1119,
+      "call_vega": 0.0345,
+      "call_theta": -0.0344
+    },
+    {
+      "expiration": "2026-12-18",
+      "dte": 50,
+      "atm_strike": 36.0,
+      "atm_iv": 0.385209,
+      "atm_call_iv": 0.3884,
+      "atm_put_iv": 0.382,
+      "straddle_mid": 4.07,
+      "em_straddle": 4.07,
+      "em_straddle_pct": 0.113056,
+      "em_iv": 5.132604,
+      "em_iv_pct": 0.142572,
+      "call_delta": 0.4935,
+      "call_gamma": 0.0782,
+      "call_vega": 0.0522,
+      "call_theta": -0.0215
+    }
+  ],
   "earnings_history": [
     {
       "date": "2026-10-21",
@@ -386,13 +421,13 @@
   ],
   "next_earnings": "2026-10-21",
   "vol_regime": {
-    "iv_current": 0.3858,
-    "iv_rank": 0.266215,
+    "iv_current": 0.3978,
+    "iv_rank": 0.301592,
     "iv_year_high": 0.6347,
     "iv_year_low": 0.2955,
-    "hv_current": 0.4497,
-    "hv_rank": 0.305904,
-    "iv_mom_week": -0.1168,
+    "hv_current": 0.4431,
+    "hv_rank": 0.28155,
+    "iv_mom_week": -0.0494,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

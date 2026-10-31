@@ -1,7 +1,7 @@
 {
   "symbol": "CSX",
-  "as_of_date": "2026-10-28",
-  "spot_price": 51.98,
+  "as_of_date": "2026-10-29",
+  "spot_price": 52.5,
   "expected_move": {
     "earnings_date": "2026-10-21",
     "timing": "amc",
@@ -41,7 +41,25 @@
     "forecast_feature_hash": "e5a1f32a38297d2de263d03a4edfa75a47d62d8a559714bbaa813b77d170fa63",
     "forecast_frozen_eligible": true
   },
-  "straddle_features": [],
+  "straddle_features": [
+    {
+      "expiration": "2026-12-18",
+      "dte": 50,
+      "atm_strike": 52.5,
+      "atm_iv": 0.213898,
+      "atm_call_iv": 0.2148,
+      "atm_put_iv": 0.213,
+      "straddle_mid": 3.295,
+      "em_straddle": 3.295,
+      "em_straddle_pct": 0.062762,
+      "em_iv": 4.156283,
+      "em_iv_pct": 0.079167,
+      "call_delta": 0.4879,
+      "call_gamma": 0.0954,
+      "call_vega": 0.0766,
+      "call_theta": -0.0162
+    }
+  ],
   "earnings_history": [
     {
       "date": "2026-10-21",
@@ -449,13 +467,13 @@
   ],
   "next_earnings": "2026-10-21",
   "vol_regime": {
-    "iv_current": 0.2313,
-    "iv_rank": 0.209043,
+    "iv_current": 0.217,
+    "iv_rank": 0.132979,
     "iv_year_high": 0.38,
     "iv_year_low": 0.192,
     "hv_current": 0.2549,
     "hv_rank": 0.740091,
-    "iv_mom_week": -0.0335,
+    "iv_mom_week": -0.029,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

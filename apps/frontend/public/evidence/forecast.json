@@ -1,17 +1,17 @@
 {
   "schema": "quantiv.dashboard-evidence.v1",
-  "receipt_id": "sha256:d7003e43b565372650f59a701d6b41c7eda6567539c998e6056cd297a33c1b08",
-  "receipt_file": "forecasts_2026-10-30.d7003e43b565.receipt.json",
-  "validated_at": "2026-10-30T08:11:10.926133+00:00",
+  "receipt_id": "sha256:e227a43413cbf06e90bd8eef5a42e869829b73e37b6cae9629645d4f1d736fec",
+  "receipt_file": "forecasts_2026-10-31.e227a43413cb.receipt.json",
+  "validated_at": "2026-10-31T07:45:17.042782+00:00",
   "quality": {
     "status": "passed",
     "issue_count": 0,
     "issue_codes": []
   },
   "coverage": {
-    "rows": 704,
-    "symbols": 704,
-    "events": 704,
+    "rows": 710,
+    "symbols": 710,
+    "events": 710,
     "horizons": [
       4,
       5,
@@ -24,16 +24,18 @@
       18,
       19,
       20,
-      22
+      21,
+      22,
+      25
     ]
   },
   "observation_window": {
-    "earnings_max": "2026-11-20",
+    "earnings_max": "2026-11-23",
     "earnings_min": "2026-11-02",
-    "scored_at_max": "2026-10-30T07:56:45.482315+00:00",
-    "scored_at_min": "2026-10-29T08:17:36.366521+00:00",
+    "scored_at_max": "2026-10-31T07:31:48.222390+00:00",
+    "scored_at_min": "2026-10-30T07:56:42.216005+00:00",
     "snapshot_max": "2026-10-29",
-    "snapshot_min": "2026-10-28"
+    "snapshot_min": "2026-10-29"
   },
   "controls": {
     "evaluated": 13,
@@ -49,25 +51,50 @@
       "ml_only_point_outside_band": 0,
       "ml_only_quantile_crossings": 0,
       "non_finite_ml_rows": 0,
-      "optionless_ml_rows": 704,
-      "strict_option_rows": 0,
-      "strict_reconciliation": null
+      "optionless_ml_rows": 628,
+      "strict_option_rows": 82,
+      "strict_reconciliation": {
+        "absolute_move_mismatches": 0,
+        "blank_symbols": 0,
+        "correction_factor_mismatches": 0,
+        "crossed_or_zero_quotes": 0,
+        "duplicate_serving_keys": 0,
+        "excessive_spreads": 0,
+        "feature_schema_mismatches": 0,
+        "invalid_feature_values": 0,
+        "invalid_feature_vectors": 0,
+        "invalid_horizons": 0,
+        "invalid_market_input_rows": 0,
+        "invalid_quote_evidence": 0,
+        "invalid_quote_quality_labels": 0,
+        "iv_formula_mismatches": 0,
+        "leg_mid_mismatches": 0,
+        "max_point_median_gap": 0.011998169328867478,
+        "non_finite_values": 0,
+        "out_of_range_move_rows": 0,
+        "point_outside_band": 0,
+        "quantile_crossings": 0,
+        "straddle_handoff_mismatches": 0,
+        "straddle_market_mismatches": 0,
+        "strike_mismatches": 0,
+        "timestamp_evidence_failures": 0
+      }
     }
   },
   "artifact_bundles": [
     {
       "name": "model_bundle",
       "producer": "apps/ml/model_trainer.py",
-      "member_count": 84,
-      "bytes": 34858406,
-      "sha256": "8d3fddc807330da118303bd68d072fd8defe8893a0a6a7f1b6e58faa40fb6db2"
+      "member_count": 98,
+      "bytes": 46764370,
+      "sha256": "4377730cee0c9824aa34aba57b6caad2cc71e2f870f98431cf87312461a1424a"
     },
     {
       "name": "forecast_snapshot",
       "producer": "scripts/daily_score.py",
       "member_count": 1,
-      "bytes": 550588,
-      "sha256": "d1fdab26629696e24abd94e5f985f17945c3e0c6266c3e97a2175cea39521cd7"
+      "bytes": 581608,
+      "sha256": "25ea7091337c1940b6fa9447c2bede8c165f006117668d5e5a6a9558d4a37b72"
     }
   ]
 }

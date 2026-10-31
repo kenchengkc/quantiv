@@ -1,7 +1,7 @@
 {
   "symbol": "CMCSA",
-  "as_of_date": "2026-10-28",
-  "spot_price": 21.0,
+  "as_of_date": "2026-10-29",
+  "spot_price": 22.5,
   "expected_move": {
     "earnings_date": "2026-10-22",
     "timing": "bmo",
@@ -27,20 +27,20 @@
   "straddle_features": [
     {
       "expiration": "2026-12-18",
-      "dte": 51,
-      "atm_strike": 21.0,
-      "atm_iv": 0.355574,
-      "atm_call_iv": 0.3742,
-      "atm_put_iv": 0.3367,
-      "straddle_mid": 2.36,
-      "em_straddle": 2.36,
-      "em_straddle_pct": 0.112381,
-      "em_iv": 2.791179,
-      "em_iv_pct": 0.132913,
-      "call_delta": 0.6372,
-      "call_gamma": 0.1254,
-      "call_vega": 0.0305,
-      "call_theta": -0.014
+      "dte": 50,
+      "atm_strike": 22.5,
+      "atm_iv": 0.339849,
+      "atm_call_iv": 0.3407,
+      "atm_put_iv": 0.339,
+      "straddle_mid": 2.25,
+      "em_straddle": 2.25,
+      "em_straddle_pct": 0.1,
+      "em_iv": 2.830132,
+      "em_iv_pct": 0.125784,
+      "call_delta": 0.5068,
+      "call_gamma": 0.1418,
+      "call_vega": 0.0328,
+      "call_theta": -0.0121
     }
   ],
   "earnings_history": [
@@ -75,8 +75,8 @@
       "options_status": "decision_eligible",
       "fallback_reason": null,
       "forecast_frozen": true,
-      "ml_publication_reason": "no_eligible_current_forecast",
-      "ml_publication_status": "held"
+      "ml_publication_status": "held",
+      "ml_publication_reason": "no_eligible_current_forecast"
     },
     {
       "date": "2026-07-23",
@@ -433,13 +433,13 @@
   ],
   "next_earnings": "2026-10-22",
   "vol_regime": {
-    "iv_current": 0.3453,
-    "iv_rank": 0.403186,
+    "iv_current": 0.318,
+    "iv_rank": 0.267297,
     "iv_year_high": 0.4652,
     "iv_year_low": 0.2643,
-    "hv_current": 0.2658,
-    "hv_rank": 0.153821,
-    "iv_mom_week": -0.0593,
+    "hv_current": 0.2668,
+    "hv_rank": 0.157033,
+    "iv_mom_week": -0.045,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"

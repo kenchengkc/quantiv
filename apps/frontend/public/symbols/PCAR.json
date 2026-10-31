@@ -1,6 +1,6 @@
 {
   "symbol": "PCAR",
-  "as_of_date": "2026-10-28",
+  "as_of_date": "2026-10-29",
   "spot_price": 105.0,
   "expected_move": {
     "earnings_date": "2026-10-27",
@@ -27,20 +27,20 @@
   "straddle_features": [
     {
       "expiration": "2026-12-18",
-      "dte": 51,
+      "dte": 50,
       "atm_strike": 105.0,
-      "atm_iv": 0.275047,
-      "atm_call_iv": 0.2731,
-      "atm_put_iv": 0.277,
-      "straddle_mid": 8.7,
-      "em_straddle": 8.7,
-      "em_straddle_pct": 0.082857,
-      "em_iv": 10.795319,
-      "em_iv_pct": 0.102813,
-      "call_delta": 0.432,
-      "call_gamma": 0.0375,
-      "call_vega": 0.1501,
-      "call_theta": -0.042
+      "atm_iv": 0.272136,
+      "atm_call_iv": 0.2562,
+      "atm_put_iv": 0.2882,
+      "straddle_mid": 8.55,
+      "em_straddle": 8.55,
+      "em_straddle_pct": 0.081429,
+      "em_iv": 10.575802,
+      "em_iv_pct": 0.100722,
+      "call_delta": 0.4442,
+      "call_gamma": 0.0408,
+      "call_vega": 0.1498,
+      "call_theta": -0.0454
     }
   ],
   "earnings_history": [
@@ -75,8 +75,8 @@
       "options_status": "decision_eligible",
       "fallback_reason": null,
       "forecast_frozen": true,
-      "ml_publication_reason": "no_eligible_current_forecast",
-      "ml_publication_status": "held"
+      "ml_publication_status": "held",
+      "ml_publication_reason": "no_eligible_current_forecast"
     },
     {
       "date": "2026-07-28",
@@ -426,13 +426,13 @@
   ],
   "next_earnings": "2026-10-27",
   "vol_regime": {
-    "iv_current": 0.2863,
-    "iv_rank": 0.538009,
+    "iv_current": 0.2946,
+    "iv_rank": 0.575566,
     "iv_year_high": 0.3884,
     "iv_year_low": 0.1674,
-    "hv_current": 0.1971,
-    "hv_rank": 0.190374,
-    "iv_mom_week": -0.0356,
+    "hv_current": 0.1972,
+    "hv_rank": 0.190909,
+    "iv_mom_week": -0.0488,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"

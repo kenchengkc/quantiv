@@ -1,7 +1,7 @@
 {
   "symbol": "SLGN",
-  "as_of_date": "2026-10-28",
-  "spot_price": 37.93,
+  "as_of_date": "2026-10-29",
+  "spot_price": 40.0,
   "expected_move": {
     "earnings_date": "2026-10-29",
     "timing": "bmo",
@@ -42,15 +42,33 @@
     "forecast_feature_hash": "5a69e981ab6dd84c4118bd66d13bf0d24f636e85a7581721431d019c8270a298",
     "forecast_frozen_eligible": true
   },
-  "straddle_features": [],
+  "straddle_features": [
+    {
+      "expiration": "2026-11-20",
+      "dte": 22,
+      "atm_strike": 40.0,
+      "atm_iv": 0.647575,
+      "atm_call_iv": 0.6667,
+      "atm_put_iv": 0.6285,
+      "straddle_mid": 2.65,
+      "em_straddle": 2.65,
+      "em_straddle_pct": 0.06625,
+      "em_iv": 6.359386,
+      "em_iv_pct": 0.158985,
+      "call_delta": 0.5031,
+      "call_gamma": 0.0616,
+      "call_vega": 0.0386,
+      "call_theta": -0.0591
+    }
+  ],
   "earnings_history": [
     {
       "date": "2026-10-29",
-      "timing": "before_market_open",
+      "timing": "bmo",
       "q": "Q3 26",
       "fiscal_year": 2026,
       "fiscal_q": "Q3",
-      "actual": null,
+      "actual": 0.041128,
       "implied": null,
       "implied_as_of": null,
       "implied_expiration": null,
@@ -66,8 +84,8 @@
       "revenue_actual": null,
       "revenue_estimate": 2152089503.0,
       "rev_surprise_pct": null,
-      "realized_target_protocol": null,
-      "realized_label_source": null,
+      "realized_target_protocol": "quantiv.session-reaction.v2",
+      "realized_label_source": "ohlcv_session_close",
       "em_ml_pct": 0.051637,
       "em_ml_abs": 1.98802,
       "model_horizon": 2,
@@ -93,8 +111,8 @@
       "options_status": "unavailable",
       "fallback_reason": null,
       "forecast_frozen": true,
-      "ml_publication_reason": "no_eligible_current_forecast",
-      "ml_publication_status": "held"
+      "ml_publication_status": "held",
+      "ml_publication_reason": "no_eligible_current_forecast"
     },
     {
       "date": "2026-07-29",
@@ -402,13 +420,13 @@
   ],
   "next_earnings": "2026-10-29",
   "vol_regime": {
-    "iv_current": 0.3515,
-    "iv_rank": 0.284373,
+    "iv_current": 0.3351,
+    "iv_rank": 0.229376,
     "iv_year_high": 0.5649,
     "iv_year_low": 0.2667,
-    "hv_current": 0.3198,
-    "hv_rank": 0.314666,
-    "iv_mom_week": -0.0577,
+    "hv_current": 0.3379,
+    "hv_rank": 0.387591,
+    "iv_mom_week": 0.016,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"

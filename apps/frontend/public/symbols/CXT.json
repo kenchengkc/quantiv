@@ -1,12 +1,12 @@
 {
   "symbol": "CXT",
-  "as_of_date": "2026-10-28",
-  "spot_price": 60.0,
+  "as_of_date": "2026-10-29",
+  "spot_price": 60.22,
   "expected_move": {
     "earnings_date": "2026-11-04",
     "display_forecast_pct": 0.0382905901035705,
     "display_forecast_method": "historical",
-    "display_forecast_as_of": "2026-10-28",
+    "display_forecast_as_of": "2026-10-29",
     "ml_status": "unavailable_model",
     "options_status": "unavailable",
     "fallback_reason": "quote_quality",
@@ -17,25 +17,7 @@
     "ml_publication_reason": "no_eligible_current_forecast",
     "em_method": "historical"
   },
-  "straddle_features": [
-    {
-      "expiration": "2026-12-18",
-      "dte": 51,
-      "atm_strike": 60.0,
-      "atm_iv": 0.370922,
-      "atm_call_iv": 0.3861,
-      "atm_put_iv": 0.3556,
-      "straddle_mid": 6.65,
-      "em_straddle": 6.65,
-      "em_straddle_pct": 0.110833,
-      "em_iv": 8.319015,
-      "em_iv_pct": 0.13865,
-      "call_delta": 0.4462,
-      "call_gamma": 0.0467,
-      "call_vega": 0.0857,
-      "call_theta": -0.0321
-    }
-  ],
+  "straddle_features": [],
   "earnings_history": [
     {
       "date": "2026-11-04",
@@ -66,7 +48,7 @@
       "ml_publication_reason": "no_eligible_current_forecast",
       "display_forecast_pct": 0.0382905901035705,
       "display_forecast_method": "historical",
-      "display_forecast_as_of": "2026-10-28",
+      "display_forecast_as_of": "2026-10-29",
       "options_status": "unavailable",
       "fallback_reason": "quote_quality",
       "historical_event_count": 4,
@@ -385,13 +367,13 @@
   ],
   "next_earnings": "2026-11-04",
   "vol_regime": {
-    "iv_current": 0.3653,
-    "iv_rank": 0.169608,
+    "iv_current": 0.3815,
+    "iv_rank": 0.214286,
     "iv_year_high": 0.6664,
     "iv_year_low": 0.3038,
-    "hv_current": 0.3551,
-    "hv_rank": 0.224112,
-    "iv_mom_week": -0.0799,
+    "hv_current": 0.3278,
+    "hv_rank": 0.120937,
+    "iv_mom_week": -0.0442,
     "iv_mom_month": null
   },
   "next_earnings_timing": "unknown"

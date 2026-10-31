@@ -1,7 +1,7 @@
 {
   "symbol": "BXP",
-  "as_of_date": "2026-10-28",
-  "spot_price": 60.0,
+  "as_of_date": "2026-10-29",
+  "spot_price": 65.0,
   "expected_move": {
     "earnings_date": "2026-10-27",
     "timing": "amc",
@@ -43,38 +43,21 @@
   },
   "straddle_features": [
     {
-      "expiration": "2026-11-20",
-      "dte": 23,
-      "atm_strike": 60.0,
-      "atm_iv": 0.347835,
-      "atm_call_iv": 0.3428,
-      "atm_put_iv": 0.3528,
-      "straddle_mid": 4.525,
-      "em_straddle": 4.525,
-      "em_straddle_pct": 0.075417,
-      "em_iv": 5.238922,
-      "em_iv_pct": 0.087315,
-      "call_delta": 0.6607,
-      "call_gamma": 0.0697,
-      "call_vega": 0.0569,
-      "call_theta": -0.0542
-    },
-    {
       "expiration": "2026-12-18",
-      "dte": 51,
+      "dte": 50,
       "atm_strike": 65.0,
-      "atm_iv": 0.278475,
-      "atm_call_iv": 0.2838,
-      "atm_put_iv": 0.2729,
-      "straddle_mid": 5.875,
-      "em_straddle": 5.875,
-      "em_straddle_pct": 0.090385,
-      "em_iv": 6.766095,
-      "em_iv_pct": 0.104094,
-      "call_delta": 0.3456,
-      "call_gamma": 0.0565,
-      "call_vega": 0.0848,
-      "call_theta": -0.0266
+      "atm_iv": 0.28312,
+      "atm_call_iv": 0.297,
+      "atm_put_iv": 0.269,
+      "straddle_mid": 5.62,
+      "em_straddle": 5.62,
+      "em_straddle_pct": 0.086462,
+      "em_iv": 6.811174,
+      "em_iv_pct": 0.104787,
+      "call_delta": 0.3863,
+      "call_gamma": 0.0547,
+      "call_vega": 0.0885,
+      "call_theta": -0.0233
     }
   ],
   "earnings_history": [
@@ -484,13 +467,13 @@
   ],
   "next_earnings": "2026-10-27",
   "vol_regime": {
-    "iv_current": 0.3357,
-    "iv_rank": 0.535771,
+    "iv_current": 0.2949,
+    "iv_rank": 0.319555,
     "iv_year_high": 0.4233,
     "iv_year_low": 0.2346,
-    "hv_current": 0.286,
-    "hv_rank": 0.402622,
-    "iv_mom_week": -0.0173,
+    "hv_current": 0.2958,
+    "hv_rank": 0.448502,
+    "iv_mom_week": -0.0294,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

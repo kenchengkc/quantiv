@@ -1,7 +1,7 @@
 {
   "symbol": "ACHC",
-  "as_of_date": "2026-10-28",
-  "spot_price": 29.51,
+  "as_of_date": "2026-10-29",
+  "spot_price": 30.0,
   "expected_move": {
     "earnings_date": "2026-11-04",
     "em_ml_pct": 0.105111,
@@ -33,7 +33,25 @@
     "timing": "amc",
     "ml_publication_status": "eligible"
   },
-  "straddle_features": [],
+  "straddle_features": [
+    {
+      "expiration": "2026-12-18",
+      "dte": 50,
+      "atm_strike": 30.0,
+      "atm_iv": 0.61725,
+      "atm_call_iv": 0.6174,
+      "atm_put_iv": 0.6171,
+      "straddle_mid": 5.4,
+      "em_straddle": 5.4,
+      "em_straddle_pct": 0.18,
+      "em_iv": 6.85363,
+      "em_iv_pct": 0.228454,
+      "call_delta": 0.5103,
+      "call_gamma": 0.0588,
+      "call_vega": 0.0432,
+      "call_theta": -0.0263
+    }
+  ],
   "earnings_history": [
     {
       "date": "2026-11-04",
@@ -59,16 +77,33 @@
       "rev_surprise_pct": null,
       "realized_target_protocol": null,
       "realized_label_source": null,
-      "ml_status": "unavailable_model",
-      "ml_publication_status": "held",
-      "ml_publication_reason": "no_eligible_current_forecast",
-      "display_forecast_pct": 0.123519948812506,
-      "display_forecast_method": "historical",
-      "display_forecast_as_of": "2026-10-28",
+      "em_ml_pct": 0.105111,
+      "em_ml_abs": 3.096577,
+      "model_horizon": 6,
+      "ml_snapshot_date": "2026-10-29",
+      "forecast_id": "c1db566d08ceeaa1451e9fb5403d8805cedd20a3ea47368fa03f5d81de9ef9ed",
+      "forecast_model_bundle_id": "d14dc7f2aa6b175956922eb6266b8523742add962668b7d6b8833cc2c869dd1b",
+      "forecast_scored_at": "2026-10-30T07:56:42.444157+00:00",
+      "forecast_published_at": "2026-10-30T08:51:02.394491+00:00",
+      "forecast_feature_cutoff_at": "2026-11-04T20:55:00+00:00",
+      "forecast_prediction_deadline_at": "2026-11-04T20:55:00+00:00",
+      "forecast_feature_snapshot_at": "2026-10-29T20:00:00+00:00",
+      "forecast_feature_hash": "7a46aa07813ef67f0b50246db54c88977f1e20cb626bf8b90964b549ae99d75f",
+      "forecast_frozen_eligible": true,
+      "p10": 0.016892,
+      "p25": 0.050101,
+      "p50": 0.111987,
+      "p75": 0.168778,
+      "p90": 0.247137,
+      "display_forecast_pct": 0.105111,
+      "display_forecast_method": "ml",
+      "display_forecast_as_of": "2026-10-29",
+      "ml_status": "available",
       "options_status": "unavailable",
-      "fallback_reason": "quote_quality",
-      "historical_event_count": 4,
-      "em_method": "historical"
+      "fallback_reason": null,
+      "forecast_frozen": true,
+      "ml_publication_status": "eligible",
+      "em_method": "ml_lightgbm"
     },
     {
       "date": "2026-07-28",
@@ -425,13 +460,13 @@
   ],
   "next_earnings": "2026-11-04",
   "vol_regime": {
-    "iv_current": 0.7093,
-    "iv_rank": 0.443286,
+    "iv_current": 0.6952,
+    "iv_rank": 0.41749,
     "iv_year_high": 1.0136,
     "iv_year_low": 0.467,
-    "hv_current": 0.3892,
-    "hv_rank": 0.072802,
-    "iv_mom_week": -0.0079,
+    "hv_current": 0.384,
+    "hv_rank": 0.06517,
+    "iv_mom_week": 0.0309,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

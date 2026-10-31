@@ -1,16 +1,16 @@
 {
   "symbol": "AROC",
-  "as_of_date": "2026-10-28",
-  "spot_price": 30.0,
+  "as_of_date": "2026-10-29",
+  "spot_price": 32.1,
   "expected_move": {
     "earnings_date": "2026-11-03",
     "em_ml_pct": 0.03792,
     "em_ml_abs": 1.217241,
     "model_horizon": 5,
     "ml_snapshot_date": "2026-10-29",
-    "forecast_id": "fbe4fa0ce601ea917dec1660fc175a155a1443d334e30979ddb54dbddb2e2c0c",
+    "forecast_id": "c4a6d14a8f36a8b5e158357ece0fd52c8cb43781b577e0bb65f6c9f6c8cf934c",
     "forecast_model_bundle_id": "d14dc7f2aa6b175956922eb6266b8523742add962668b7d6b8833cc2c869dd1b",
-    "forecast_scored_at": "2026-10-30T07:56:42.265333+00:00",
+    "forecast_scored_at": "2026-10-31T07:31:47.561620+00:00",
     "forecast_feature_cutoff_at": "2026-11-02T21:00:00+00:00",
     "forecast_prediction_deadline_at": "2026-11-03T05:00:00+00:00",
     "forecast_feature_snapshot_at": "2026-10-29T20:00:00+00:00",
@@ -33,25 +33,7 @@
     "timing": "bmo",
     "ml_publication_status": "eligible"
   },
-  "straddle_features": [
-    {
-      "expiration": "2026-12-18",
-      "dte": 51,
-      "atm_strike": 30.0,
-      "atm_iv": 0.4399,
-      "atm_call_iv": 0.4399,
-      "atm_put_iv": 0.4399,
-      "straddle_mid": 4.325,
-      "em_straddle": 4.325,
-      "em_straddle_pct": 0.144167,
-      "em_iv": 4.933031,
-      "em_iv_pct": 0.164434,
-      "call_delta": 0.6693,
-      "call_gamma": 0.0684,
-      "call_vega": 0.0427,
-      "call_theta": -0.0181
-    }
-  ],
+  "straddle_features": [],
   "earnings_history": [
     {
       "date": "2026-11-03",
@@ -80,9 +62,9 @@
       "ml_status": "unavailable_model",
       "ml_publication_status": "held",
       "ml_publication_reason": "no_eligible_current_forecast",
-      "display_forecast_pct": 0.1357501569365976,
+      "display_forecast_pct": 0.11059190031152648,
       "display_forecast_method": "straddle_implied",
-      "display_forecast_as_of": "2026-10-28",
+      "display_forecast_as_of": "2026-10-29",
       "options_status": "indicative",
       "fallback_reason": "quote_quality",
       "historical_event_count": null,
@@ -443,13 +425,13 @@
   ],
   "next_earnings": "2026-11-03",
   "vol_regime": {
-    "iv_current": 0.4779,
-    "iv_rank": 0.606542,
+    "iv_current": 0.4681,
+    "iv_rank": 0.575421,
     "iv_year_high": 0.6018,
     "iv_year_low": 0.2869,
-    "hv_current": 0.3186,
-    "hv_rank": 0.357809,
-    "iv_mom_week": 0.0223,
+    "hv_current": 0.3189,
+    "hv_rank": 0.359026,
+    "iv_mom_week": -0.0339,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"
