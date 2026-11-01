@@ -1,7 +1,7 @@
 {
   "symbol": "CINF",
-  "as_of_date": "2026-10-29",
-  "spot_price": 180.0,
+  "as_of_date": "2026-10-30",
+  "spot_price": 181.19,
   "expected_move": {
     "earnings_date": "2026-10-26",
     "timing": "amc",
@@ -35,49 +35,14 @@
     "forecast_model_bundle_id": "d14dc7f2aa6b175956922eb6266b8523742add962668b7d6b8833cc2c869dd1b",
     "ml_publication_status": "eligible",
     "forecast_scored_at": "2026-10-26T09:08:21.370812+00:00",
-    "forecast_published_at": "2026-10-30T08:51:29+00:00",
+    "forecast_published_at": "2026-10-31T08:43:10+00:00",
     "forecast_feature_cutoff_at": "2026-10-26T19:55:00+00:00",
     "forecast_prediction_deadline_at": "2026-10-26T19:55:00+00:00",
     "forecast_feature_snapshot_at": "2026-10-23T20:00:00+00:00",
     "forecast_feature_hash": "23f1e4ec828f87d62c62c5d370c2ee439ba65bf89cb46cd829bef57c6adae3c3",
     "forecast_frozen_eligible": true
   },
-  "straddle_features": [
-    {
-      "expiration": "2026-11-20",
-      "dte": 22,
-      "atm_strike": 180.0,
-      "atm_iv": 0.215957,
-      "atm_call_iv": 0.2146,
-      "atm_put_iv": 0.2173,
-      "straddle_mid": 7.825,
-      "em_straddle": 7.825,
-      "em_straddle_pct": 0.043472,
-      "em_iv": 9.543417,
-      "em_iv_pct": 0.053019,
-      "call_delta": 0.5939,
-      "call_gamma": 0.0403,
-      "call_vega": 0.1729,
-      "call_theta": -0.0882
-    },
-    {
-      "expiration": "2026-12-18",
-      "dte": 50,
-      "atm_strike": 185.0,
-      "atm_iv": 0.197167,
-      "atm_call_iv": 0.2,
-      "atm_put_iv": 0.1943,
-      "straddle_mid": 10.9,
-      "em_straddle": 10.9,
-      "em_straddle_pct": 0.058919,
-      "em_iv": 13.500314,
-      "em_iv_pct": 0.072975,
-      "call_delta": 0.4483,
-      "call_gamma": 0.0293,
-      "call_vega": 0.2661,
-      "call_theta": -0.0605
-    }
-  ],
+  "straddle_features": [],
   "earnings_history": [
     {
       "date": "2026-10-26",
@@ -128,8 +93,8 @@
       "options_status": "decision_eligible",
       "fallback_reason": null,
       "forecast_frozen": true,
-      "forecast_published_at": "2026-10-30T08:51:29+00:00",
-      "ml_publication_status": "eligible"
+      "ml_publication_status": "eligible",
+      "forecast_published_at": "2026-10-31T08:43:10+00:00"
     },
     {
       "date": "2026-07-27",
@@ -486,13 +451,13 @@
   ],
   "next_earnings": "2026-10-26",
   "vol_regime": {
-    "iv_current": 0.2077,
-    "iv_rank": 0.383191,
+    "iv_current": 0.2368,
+    "iv_rank": 0.590456,
     "iv_year_high": 0.2943,
     "iv_year_low": 0.1539,
-    "hv_current": 0.1969,
-    "hv_rank": 0.311265,
-    "iv_mom_week": -0.0592,
+    "hv_current": 0.1965,
+    "hv_rank": 0.30913,
+    "iv_mom_week": -0.034,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

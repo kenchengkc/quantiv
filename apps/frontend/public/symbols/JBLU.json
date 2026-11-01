@@ -1,6 +1,6 @@
 {
   "symbol": "JBLU",
-  "as_of_date": "2026-10-29",
+  "as_of_date": "2026-10-30",
   "spot_price": 3.0,
   "expected_move": {
     "earnings_date": "2026-10-27",
@@ -26,38 +26,21 @@
   },
   "straddle_features": [
     {
-      "expiration": "2026-11-13",
-      "dte": 15,
-      "atm_strike": 3.0,
-      "atm_iv": 1.00645,
-      "atm_call_iv": 1.0079,
-      "atm_put_iv": 1.005,
-      "straddle_mid": 0.49,
-      "em_straddle": 0.49,
-      "em_straddle_pct": 0.163333,
-      "em_iv": 0.612086,
-      "em_iv_pct": 0.204029,
-      "call_delta": 0.555,
-      "call_gamma": 0.6275,
-      "call_vega": 0.0024,
-      "call_theta": -0.0073
-    },
-    {
       "expiration": "2026-12-18",
-      "dte": 50,
-      "atm_strike": 3.5,
-      "atm_iv": 0.941876,
-      "atm_call_iv": 0.9308,
-      "atm_put_iv": 0.9527,
-      "straddle_mid": 0.97,
-      "em_straddle": 0.97,
-      "em_straddle_pct": 0.277143,
-      "em_iv": 1.220114,
-      "em_iv_pct": 0.348604,
-      "call_delta": 0.4123,
-      "call_gamma": 0.3697,
-      "call_vega": 0.0043,
-      "call_theta": -0.0041
+      "dte": 49,
+      "atm_strike": 3.0,
+      "atm_iv": 0.9537,
+      "atm_call_iv": 0.9533,
+      "atm_put_iv": 0.9541,
+      "straddle_mid": 0.82,
+      "em_straddle": 0.82,
+      "em_straddle_pct": 0.273333,
+      "em_iv": 1.048298,
+      "em_iv_pct": 0.349433,
+      "call_delta": 0.5273,
+      "call_gamma": 0.4024,
+      "call_vega": 0.0041,
+      "call_theta": -0.0043
     }
   ],
   "earnings_history": [
@@ -450,13 +433,13 @@
   ],
   "next_earnings": "2026-10-27",
   "vol_regime": {
-    "iv_current": 0.9818,
-    "iv_rank": 0.401097,
+    "iv_current": 0.9214,
+    "iv_rank": 0.350127,
     "iv_year_high": 1.6915,
     "iv_year_low": 0.5065,
-    "hv_current": 0.8684,
-    "hv_rank": 0.965713,
-    "iv_mom_week": -0.7097,
+    "hv_current": 0.883,
+    "hv_rank": 0.992483,
+    "iv_mom_week": -0.6021,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"

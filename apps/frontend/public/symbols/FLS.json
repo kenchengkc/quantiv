@@ -1,7 +1,7 @@
 {
   "symbol": "FLS",
-  "as_of_date": "2026-10-29",
-  "spot_price": 80.35,
+  "as_of_date": "2026-10-30",
+  "spot_price": 85.0,
   "expected_move": {
     "earnings_date": "2026-10-28",
     "timing": "amc",
@@ -41,7 +41,25 @@
     "forecast_feature_hash": "9114951f574a2d3bae1fbe50d08174978bf3eb333fcf7d02f29d393f46137828",
     "forecast_frozen_eligible": true
   },
-  "straddle_features": [],
+  "straddle_features": [
+    {
+      "expiration": "2026-12-18",
+      "dte": 49,
+      "atm_strike": 85.0,
+      "atm_iv": 0.372934,
+      "atm_call_iv": 0.3895,
+      "atm_put_iv": 0.3554,
+      "straddle_mid": 9.995,
+      "em_straddle": 9.995,
+      "em_straddle_pct": 0.117588,
+      "em_iv": 11.614565,
+      "em_iv_pct": 0.136642,
+      "call_delta": 0.3596,
+      "call_gamma": 0.0332,
+      "call_vega": 0.1086,
+      "call_theta": -0.0491
+    }
+  ],
   "earnings_history": [
     {
       "date": "2026-10-28",
@@ -449,13 +467,13 @@
   ],
   "next_earnings": "2026-10-28",
   "vol_regime": {
-    "iv_current": 0.4161,
-    "iv_rank": 0.431868,
+    "iv_current": 0.4277,
+    "iv_rank": 0.463736,
     "iv_year_high": 0.6229,
     "iv_year_low": 0.2589,
-    "hv_current": 0.4515,
-    "hv_rank": 0.46986,
-    "iv_mom_week": -0.1151,
+    "hv_current": 0.455,
+    "hv_rank": 0.479073,
+    "iv_mom_week": -0.1157,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

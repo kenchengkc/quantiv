@@ -1,7 +1,7 @@
 {
   "symbol": "TENB",
-  "as_of_date": "2026-10-29",
-  "spot_price": 50.0,
+  "as_of_date": "2026-10-30",
+  "spot_price": 55.0,
   "expected_move": {
     "earnings_date": "2026-10-28",
     "timing": "amc",
@@ -43,38 +43,21 @@
   },
   "straddle_features": [
     {
-      "expiration": "2026-11-20",
-      "dte": 22,
-      "atm_strike": 50.0,
-      "atm_iv": 0.6141,
-      "atm_call_iv": 0.6141,
-      "atm_put_iv": 0.6141,
-      "straddle_mid": 6.0,
-      "em_straddle": 6.0,
-      "em_straddle_pct": 0.12,
-      "em_iv": 7.53831,
-      "em_iv_pct": 0.150766,
-      "call_delta": 0.6172,
-      "call_gamma": 0.0486,
-      "call_vega": 0.0483,
-      "call_theta": -0.066
-    },
-    {
       "expiration": "2026-12-18",
-      "dte": 50,
+      "dte": 49,
       "atm_strike": 55.0,
-      "atm_iv": 0.6273,
-      "atm_call_iv": 0.594,
-      "atm_put_iv": 0.6606,
-      "straddle_mid": 10.15,
-      "em_straddle": 10.15,
-      "em_straddle_pct": 0.184545,
-      "em_iv": 12.769578,
-      "em_iv_pct": 0.232174,
-      "call_delta": 0.4499,
-      "call_gamma": 0.0348,
-      "call_vega": 0.076,
-      "call_theta": -0.0484
+      "atm_iv": 0.616313,
+      "atm_call_iv": 0.5896,
+      "atm_put_iv": 0.6431,
+      "straddle_mid": 10.025,
+      "em_straddle": 10.025,
+      "em_straddle_pct": 0.182273,
+      "em_iv": 12.419832,
+      "em_iv_pct": 0.225815,
+      "call_delta": 0.4157,
+      "call_gamma": 0.0357,
+      "call_vega": 0.0727,
+      "call_theta": -0.0477
     }
   ],
   "earnings_history": [
@@ -407,13 +390,13 @@
   ],
   "next_earnings": "2026-10-28",
   "vol_regime": {
-    "iv_current": 0.59,
-    "iv_rank": 0.50522,
+    "iv_current": 0.5852,
+    "iv_rank": 0.497266,
     "iv_year_high": 0.8886,
     "iv_year_low": 0.2851,
-    "hv_current": 0.5942,
-    "hv_rank": 0.319299,
-    "iv_mom_week": -0.2745,
+    "hv_current": 0.5953,
+    "hv_rank": 0.322407,
+    "iv_mom_week": -0.2291,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

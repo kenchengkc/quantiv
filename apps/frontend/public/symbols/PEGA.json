@@ -1,7 +1,7 @@
 {
   "symbol": "PEGA",
-  "as_of_date": "2026-10-29",
-  "spot_price": 35.0,
+  "as_of_date": "2026-10-30",
+  "spot_price": 33.93,
   "expected_move": {
     "earnings_date": "2026-10-20",
     "timing": "amc",
@@ -24,42 +24,7 @@
     "ml_publication_status": "held",
     "ml_publication_reason": "no_eligible_current_forecast"
   },
-  "straddle_features": [
-    {
-      "expiration": "2026-11-20",
-      "dte": 22,
-      "atm_strike": 35.0,
-      "atm_iv": 0.5006,
-      "atm_call_iv": 0.5006,
-      "atm_put_iv": 0.5006,
-      "straddle_mid": 3.45,
-      "em_straddle": 3.45,
-      "em_straddle_pct": 0.098571,
-      "em_iv": 4.301538,
-      "em_iv_pct": 0.122901,
-      "call_delta": 0.4395,
-      "call_gamma": 0.0938,
-      "call_vega": 0.0329,
-      "call_theta": -0.0372
-    },
-    {
-      "expiration": "2026-12-18",
-      "dte": 50,
-      "atm_strike": 35.0,
-      "atm_iv": 0.5178,
-      "atm_call_iv": 0.5205,
-      "atm_put_iv": 0.5151,
-      "straddle_mid": 5.3,
-      "em_straddle": 5.3,
-      "em_straddle_pct": 0.151429,
-      "em_iv": 6.707623,
-      "em_iv_pct": 0.191646,
-      "call_delta": 0.4796,
-      "call_gamma": 0.0602,
-      "call_vega": 0.0499,
-      "call_theta": -0.0254
-    }
-  ],
+  "straddle_features": [],
   "earnings_history": [
     {
       "date": "2026-10-19",
@@ -424,13 +389,13 @@
   ],
   "next_earnings": "2026-10-20",
   "vol_regime": {
-    "iv_current": 0.5099,
-    "iv_rank": 0.276909,
+    "iv_current": 0.5066,
+    "iv_rank": 0.270764,
     "iv_year_high": 0.8982,
     "iv_year_low": 0.3612,
-    "hv_current": 0.3969,
-    "hv_rank": 0.083787,
-    "iv_mom_week": 0.0207,
+    "hv_current": 0.3888,
+    "hv_rank": 0.064615,
+    "iv_mom_week": -0.0085,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

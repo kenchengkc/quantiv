@@ -1,6 +1,6 @@
 {
   "symbol": "JOE",
-  "as_of_date": "2026-10-29",
+  "as_of_date": "2026-10-30",
   "spot_price": 70.0,
   "expected_move": {
     "earnings_date": "2026-10-28",
@@ -26,38 +26,21 @@
   },
   "straddle_features": [
     {
-      "expiration": "2026-11-20",
-      "dte": 22,
-      "atm_strike": 70.0,
-      "atm_iv": 0.2837,
-      "atm_call_iv": 0.2837,
-      "atm_put_iv": 0.2837,
-      "straddle_mid": 4.2,
-      "em_straddle": 4.2,
-      "em_straddle_pct": 0.06,
-      "em_iv": 4.875535,
-      "em_iv_pct": 0.069651,
-      "call_delta": 0.648,
-      "call_gamma": 0.0737,
-      "call_vega": 0.065,
-      "call_theta": -0.0396
-    },
-    {
       "expiration": "2026-12-18",
-      "dte": 50,
+      "dte": 49,
       "atm_strike": 70.0,
-      "atm_iv": 0.280149,
-      "atm_call_iv": 0.2813,
-      "atm_put_iv": 0.279,
-      "straddle_mid": 6.075,
-      "em_straddle": 6.075,
-      "em_straddle_pct": 0.086786,
-      "em_iv": 7.258157,
-      "em_iv_pct": 0.103688,
-      "call_delta": 0.6264,
-      "call_gamma": 0.0504,
-      "call_vega": 0.1003,
-      "call_theta": -0.0305
+      "atm_iv": 0.27575,
+      "atm_call_iv": 0.2768,
+      "atm_put_iv": 0.2747,
+      "straddle_mid": 5.625,
+      "em_straddle": 5.625,
+      "em_straddle_pct": 0.080357,
+      "em_iv": 7.072373,
+      "em_iv_pct": 0.101034,
+      "call_delta": 0.5244,
+      "call_gamma": 0.0558,
+      "call_vega": 0.1017,
+      "call_theta": -0.0294
     }
   ],
   "earnings_history": [
@@ -436,13 +419,13 @@
   ],
   "next_earnings": "2026-10-28",
   "vol_regime": {
-    "iv_current": 0.28,
-    "iv_rank": 0.103837,
+    "iv_current": 0.2941,
+    "iv_rank": 0.156885,
     "iv_year_high": 0.5182,
     "iv_year_low": 0.2524,
-    "hv_current": 0.2474,
-    "hv_rank": 0.286522,
-    "iv_mom_week": -0.0403,
+    "hv_current": 0.261,
+    "hv_rank": 0.345652,
+    "iv_mom_week": -0.0346,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

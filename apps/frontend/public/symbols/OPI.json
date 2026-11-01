@@ -1,20 +1,20 @@
 {
   "symbol": "OPI",
-  "as_of_date": "2026-10-29",
-  "spot_price": 13.73,
+  "as_of_date": "2026-10-30",
+  "spot_price": 13.48,
   "expected_move": {
     "earnings_date": "2026-11-09",
     "em_ml_pct": 0.089142,
     "em_ml_abs": 1.223922,
     "model_horizon": 11,
     "ml_snapshot_date": "2026-10-29",
-    "forecast_id": "cfc617b57df606f154ae03785dbb50524702ffe56ebee3b14235da9b19c8f470",
+    "forecast_id": "3cfb8eeb18b845f92fac14fed74301e58575d08cfd07e0aacb3f43e099b9e60c",
     "forecast_model_bundle_id": "d14dc7f2aa6b175956922eb6266b8523742add962668b7d6b8833cc2c869dd1b",
-    "forecast_scored_at": "2026-10-31T07:31:47.707225+00:00",
+    "forecast_scored_at": "2026-11-01T09:09:15.989417+00:00",
     "forecast_feature_cutoff_at": "2026-11-09T20:55:00+00:00",
     "forecast_prediction_deadline_at": "2026-11-09T20:55:00+00:00",
     "forecast_feature_snapshot_at": "2026-10-29T20:00:00+00:00",
-    "forecast_feature_hash": "696515202c4723e80351268877954d4fd1b7f36a28c05e716d00256e15c58bca",
+    "forecast_feature_hash": "4c278c5c42d7a24c76940d6fd4882d1c78cf727227f1f398ffaeed9af4641543",
     "forecast_frozen_eligible": true,
     "p10": 0.012136,
     "p25": 0.034484,
@@ -30,7 +30,7 @@
     "fallback_reason": null,
     "historical_event_count": null,
     "hist_move_med_4q": 0.03774,
-    "timing": "after_market_close",
+    "timing": "amc",
     "ml_publication_status": "eligible"
   },
   "straddle_features": [],
@@ -64,7 +64,7 @@
       "ml_publication_reason": "no_eligible_current_forecast",
       "display_forecast_pct": 0.03774032977289221,
       "display_forecast_method": "historical",
-      "display_forecast_as_of": "2026-10-29",
+      "display_forecast_as_of": "2026-10-30",
       "options_status": "unavailable",
       "fallback_reason": "no_event_expiry",
       "historical_event_count": 4,
@@ -369,5 +369,5 @@
   ],
   "next_earnings": "2026-11-09",
   "vol_regime": null,
-  "next_earnings_timing": "after_market_close"
+  "next_earnings_timing": "amc"
 }

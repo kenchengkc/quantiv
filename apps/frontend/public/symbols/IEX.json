@@ -1,7 +1,7 @@
 {
   "symbol": "IEX",
-  "as_of_date": "2026-10-29",
-  "spot_price": 239.33,
+  "as_of_date": "2026-10-30",
+  "spot_price": 240.0,
   "expected_move": {
     "earnings_date": "2026-10-28",
     "timing": "bmo",
@@ -42,7 +42,25 @@
     "forecast_feature_hash": "fa1e1f3aca84b520c95ceb41b40bce81c284e6e82618ce9d0118e5222a2c42b7",
     "forecast_frozen_eligible": true
   },
-  "straddle_features": [],
+  "straddle_features": [
+    {
+      "expiration": "2026-12-18",
+      "dte": 49,
+      "atm_strike": 240.0,
+      "atm_iv": 0.227353,
+      "atm_call_iv": 0.2239,
+      "atm_put_iv": 0.2309,
+      "straddle_mid": 16.35,
+      "em_straddle": 16.35,
+      "em_straddle_pct": 0.068125,
+      "em_iv": 19.992374,
+      "em_iv_pct": 0.083302,
+      "call_delta": 0.4382,
+      "call_gamma": 0.0206,
+      "call_vega": 0.3389,
+      "call_theta": -0.0966
+    }
+  ],
   "earnings_history": [
     {
       "date": "2026-10-28",
@@ -437,13 +455,13 @@
   ],
   "next_earnings": "2026-10-28",
   "vol_regime": {
-    "iv_current": 0.235,
-    "iv_rank": 0.135453,
+    "iv_current": 0.2794,
+    "iv_rank": 0.396938,
     "iv_year_high": 0.3818,
     "iv_year_low": 0.212,
-    "hv_current": 0.183,
-    "hv_rank": 0.28562,
-    "iv_mom_week": -0.0936,
+    "hv_current": 0.1966,
+    "hv_rank": 0.374918,
+    "iv_mom_week": -0.0528,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"

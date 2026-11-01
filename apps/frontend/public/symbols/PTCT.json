@@ -1,7 +1,7 @@
 {
   "symbol": "PTCT",
-  "as_of_date": "2026-10-29",
-  "spot_price": 64.46,
+  "as_of_date": "2026-10-30",
+  "spot_price": 59.97,
   "expected_move": {
     "earnings_date": "2026-10-29",
     "timing": "amc",
@@ -22,11 +22,11 @@
   "earnings_history": [
     {
       "date": "2026-10-29",
-      "timing": "after_market_close",
+      "timing": "amc",
       "q": "Q3 26",
       "fiscal_year": 2026,
       "fiscal_q": "Q3",
-      "actual": null,
+      "actual": -0.069656,
       "implied": null,
       "implied_as_of": null,
       "implied_expiration": null,
@@ -42,13 +42,13 @@
       "revenue_actual": null,
       "revenue_estimate": 308327976.0,
       "rev_surprise_pct": null,
-      "realized_target_protocol": null,
-      "realized_label_source": null,
+      "realized_target_protocol": "quantiv.session-reaction.v2",
+      "realized_label_source": "ohlcv_session_close",
+      "ml_publication_status": "held",
+      "display_forecast_pct": 0.0796245,
+      "ml_publication_reason": "no_eligible_current_forecast",
       "display_forecast_method": "historical",
       "display_forecast_as_of": "2026-10-29",
-      "ml_publication_status": "held",
-      "ml_publication_reason": "no_eligible_current_forecast",
-      "display_forecast_pct": 0.0796245,
       "forecast_frozen": true
     },
     {
@@ -343,13 +343,13 @@
   ],
   "next_earnings": "2026-10-29",
   "vol_regime": {
-    "iv_current": 0.6197,
-    "iv_rank": 0.619767,
+    "iv_current": 0.4888,
+    "iv_rank": 0.320293,
     "iv_year_high": 0.7859,
     "iv_year_low": 0.3488,
-    "hv_current": 0.399,
-    "hv_rank": 0.454313,
-    "iv_mom_week": 0.0823,
+    "hv_current": 0.4355,
+    "hv_rank": 0.547735,
+    "iv_mom_week": -0.2207,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

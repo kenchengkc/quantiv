@@ -1,7 +1,7 @@
 {
   "symbol": "KEX",
-  "as_of_date": "2026-10-29",
-  "spot_price": 146.0,
+  "as_of_date": "2026-10-30",
+  "spot_price": 145.0,
   "expected_move": {
     "earnings_date": "2026-10-28",
     "timing": "bmo",
@@ -42,7 +42,25 @@
     "forecast_feature_hash": "3604d393baa2418eb8bcdfb59284498ba6e72e838f72529c9a61497fd84c4f15",
     "forecast_frozen_eligible": true
   },
-  "straddle_features": [],
+  "straddle_features": [
+    {
+      "expiration": "2026-12-18",
+      "dte": 49,
+      "atm_strike": 145.0,
+      "atm_iv": 0.266753,
+      "atm_call_iv": 0.2689,
+      "atm_put_iv": 0.2646,
+      "straddle_mid": 11.35,
+      "em_straddle": 11.35,
+      "em_straddle_pct": 0.078276,
+      "em_iv": 14.171904,
+      "em_iv_pct": 0.097737,
+      "call_delta": 0.5226,
+      "call_gamma": 0.0281,
+      "call_vega": 0.2106,
+      "call_theta": -0.0691
+    }
+  ],
   "earnings_history": [
     {
       "date": "2026-10-28",
@@ -444,13 +462,13 @@
   ],
   "next_earnings": "2026-10-28",
   "vol_regime": {
-    "iv_current": 0.2715,
-    "iv_rank": 0.188636,
+    "iv_current": 0.3092,
+    "iv_rank": 0.331439,
     "iv_year_high": 0.4857,
     "iv_year_low": 0.2217,
-    "hv_current": 0.3007,
-    "hv_rank": 0.521015,
-    "iv_mom_week": -0.161,
+    "hv_current": 0.3042,
+    "hv_rank": 0.535581,
+    "iv_mom_week": -0.1195,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"

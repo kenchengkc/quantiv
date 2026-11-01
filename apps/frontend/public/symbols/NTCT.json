@@ -1,20 +1,20 @@
 {
   "symbol": "NTCT",
-  "as_of_date": "2026-10-29",
-  "spot_price": 39.35,
+  "as_of_date": "2026-10-30",
+  "spot_price": 40.0,
   "expected_move": {
     "earnings_date": "2026-11-05",
     "em_ml_pct": 0.049901,
     "em_ml_abs": 1.963595,
     "model_horizon": 7,
     "ml_snapshot_date": "2026-10-29",
-    "forecast_id": "5f817cce708ab3271941b857cd00c3017ab00d2c5ad276421f5ef9af0d67a42f",
+    "forecast_id": "ccd0fc2a8983ba754938e70e0169e5aa5bfac7335e7e1548ad60df1740187172",
     "forecast_model_bundle_id": "d14dc7f2aa6b175956922eb6266b8523742add962668b7d6b8833cc2c869dd1b",
-    "forecast_scored_at": "2026-10-31T07:31:47.649115+00:00",
+    "forecast_scored_at": "2026-11-01T09:09:15.859685+00:00",
     "forecast_feature_cutoff_at": "2026-11-04T21:00:00+00:00",
     "forecast_prediction_deadline_at": "2026-11-05T05:00:00+00:00",
     "forecast_feature_snapshot_at": "2026-10-29T20:00:00+00:00",
-    "forecast_feature_hash": "dbba509e781ed289fc8eabc923e9b9898943eff0b0eec36d7e2c0a75b014380a",
+    "forecast_feature_hash": "f3c3aa874918a81c5182e116d4e39ecc284f413c548979a702e7e8bd8e6e0b4c",
     "forecast_frozen_eligible": true,
     "p10": 0.00942,
     "p25": 0.025079,
@@ -33,7 +33,25 @@
     "timing": "bmo",
     "ml_publication_status": "eligible"
   },
-  "straddle_features": [],
+  "straddle_features": [
+    {
+      "expiration": "2026-12-18",
+      "dte": 49,
+      "atm_strike": 40.0,
+      "atm_iv": 0.4762,
+      "atm_call_iv": 0.4762,
+      "atm_put_iv": 0.4762,
+      "straddle_mid": 5.37,
+      "em_straddle": 5.37,
+      "em_straddle_pct": 0.13425,
+      "em_iv": 6.979125,
+      "em_iv_pct": 0.174478,
+      "call_delta": 0.4313,
+      "call_gamma": 0.0583,
+      "call_vega": 0.0549,
+      "call_theta": -0.0256
+    }
+  ],
   "earnings_history": [
     {
       "date": "2026-11-05",
@@ -62,13 +80,13 @@
       "ml_status": "unavailable_model",
       "ml_publication_status": "held",
       "ml_publication_reason": "no_eligible_current_forecast",
-      "display_forecast_pct": 0.059269004891063626,
-      "display_forecast_method": "historical",
-      "display_forecast_as_of": "2026-10-29",
-      "options_status": "unavailable",
+      "display_forecast_pct": 0.10620276257492835,
+      "display_forecast_method": "straddle_implied",
+      "display_forecast_as_of": "2026-10-30",
+      "options_status": "indicative",
       "fallback_reason": "quote_quality",
-      "historical_event_count": 4,
-      "em_method": "historical"
+      "historical_event_count": null,
+      "em_method": "straddle_implied"
     },
     {
       "date": "2026-08-06",
@@ -397,13 +415,13 @@
   ],
   "next_earnings": "2026-11-05",
   "vol_regime": {
-    "iv_current": 0.4858,
-    "iv_rank": 0.510121,
+    "iv_current": 0.5067,
+    "iv_rank": 0.570561,
     "iv_year_high": 0.6552,
     "iv_year_low": 0.3094,
-    "hv_current": 0.2882,
-    "hv_rank": 0.305934,
-    "iv_mom_week": 0.0626,
+    "hv_current": 0.2865,
+    "hv_rank": 0.298462,
+    "iv_mom_week": 0.0372,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"

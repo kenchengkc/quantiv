@@ -1,7 +1,7 @@
 {
   "symbol": "FRT",
-  "as_of_date": "2026-10-29",
-  "spot_price": 110.0,
+  "as_of_date": "2026-10-30",
+  "spot_price": 110.19,
   "expected_move": {
     "earnings_date": "2026-10-30",
     "timing": "bmo",
@@ -42,33 +42,15 @@
     "forecast_feature_hash": "fd677024a063d2a0715e9fd88c5d45b498c6d4a1aca236939daa88453ebc1431",
     "forecast_frozen_eligible": true
   },
-  "straddle_features": [
-    {
-      "expiration": "2026-12-18",
-      "dte": 50,
-      "atm_strike": 110.0,
-      "atm_iv": 0.1902,
-      "atm_call_iv": 0.1902,
-      "atm_put_iv": 0.1902,
-      "straddle_mid": 6.4,
-      "em_straddle": 6.4,
-      "em_straddle_pct": 0.058182,
-      "em_iv": 7.74358,
-      "em_iv_pct": 0.070396,
-      "call_delta": 0.6319,
-      "call_gamma": 0.0482,
-      "call_vega": 0.156,
-      "call_theta": -0.0403
-    }
-  ],
+  "straddle_features": [],
   "earnings_history": [
     {
       "date": "2026-10-30",
-      "timing": "before_market_open",
+      "timing": "bmo",
       "q": "Q3 26",
       "fiscal_year": 2026,
       "fiscal_q": "Q3",
-      "actual": null,
+      "actual": -0.011217,
       "implied": null,
       "implied_as_of": null,
       "implied_expiration": null,
@@ -84,8 +66,8 @@
       "revenue_actual": null,
       "revenue_estimate": null,
       "rev_surprise_pct": null,
-      "realized_target_protocol": null,
-      "realized_label_source": null,
+      "realized_target_protocol": "quantiv.session-reaction.v2",
+      "realized_label_source": "ohlcv_session_close",
       "em_ml_pct": 0.01838,
       "em_ml_abs": 1.989459,
       "model_horizon": 2,
@@ -462,13 +444,13 @@
   ],
   "next_earnings": "2026-10-30",
   "vol_regime": {
-    "iv_current": 0.1937,
-    "iv_rank": 0.222963,
+    "iv_current": 0.183,
+    "iv_rank": 0.168119,
     "iv_year_high": 0.3453,
     "iv_year_low": 0.1502,
-    "hv_current": 0.1721,
-    "hv_rank": 0.742802,
-    "iv_mom_week": -0.0535,
+    "hv_current": 0.1738,
+    "hv_rank": 0.759117,
+    "iv_mom_week": 0.0075,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"

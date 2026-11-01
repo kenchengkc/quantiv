@@ -1,7 +1,7 @@
 {
   "symbol": "VFC",
-  "as_of_date": "2026-10-29",
-  "spot_price": 18.5,
+  "as_of_date": "2026-10-30",
+  "spot_price": 19.0,
   "expected_move": {
     "earnings_date": "2026-10-28",
     "timing": "bmo",
@@ -26,38 +26,21 @@
   },
   "straddle_features": [
     {
-      "expiration": "2026-11-13",
-      "dte": 15,
-      "atm_strike": 18.5,
-      "atm_iv": 0.52995,
-      "atm_call_iv": 0.5322,
-      "atm_put_iv": 0.5277,
-      "straddle_mid": 1.585,
-      "em_straddle": 1.585,
-      "em_straddle_pct": 0.085676,
-      "em_iv": 1.987494,
-      "em_iv_pct": 0.107432,
-      "call_delta": 0.4985,
-      "call_gamma": 0.2018,
-      "call_vega": 0.0148,
-      "call_theta": -0.0279
-    },
-    {
       "expiration": "2026-12-18",
-      "dte": 50,
+      "dte": 49,
       "atm_strike": 19.0,
-      "atm_iv": 0.432666,
-      "atm_call_iv": 0.4369,
-      "atm_put_iv": 0.4284,
-      "straddle_mid": 2.43,
-      "em_straddle": 2.43,
-      "em_straddle_pct": 0.127895,
-      "em_iv": 3.0426,
-      "em_iv_pct": 0.160137,
-      "call_delta": 0.4528,
-      "call_gamma": 0.1334,
-      "call_vega": 0.0268,
-      "call_theta": -0.0122
+      "atm_iv": 0.453145,
+      "atm_call_iv": 0.4504,
+      "atm_put_iv": 0.4559,
+      "straddle_mid": 2.52,
+      "em_straddle": 2.52,
+      "em_straddle_pct": 0.132632,
+      "em_iv": 3.154585,
+      "em_iv_pct": 0.166031,
+      "call_delta": 0.4406,
+      "call_gamma": 0.13,
+      "call_vega": 0.0263,
+      "call_theta": -0.012
     }
   ],
   "earnings_history": [
@@ -443,13 +426,13 @@
   ],
   "next_earnings": "2026-10-28",
   "vol_regime": {
-    "iv_current": 0.4479,
-    "iv_rank": 0.270812,
+    "iv_current": 0.4435,
+    "iv_rank": 0.259645,
     "iv_year_high": 0.7352,
     "iv_year_low": 0.3412,
-    "hv_current": 0.334,
-    "hv_rank": 0.091298,
-    "iv_mom_week": -0.1739,
+    "hv_current": 0.3297,
+    "hv_rank": 0.080483,
+    "iv_mom_week": -0.1624,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"

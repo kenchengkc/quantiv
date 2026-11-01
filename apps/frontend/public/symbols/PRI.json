@@ -1,12 +1,12 @@
 {
   "symbol": "PRI",
-  "as_of_date": "2026-10-29",
-  "spot_price": 283.55,
+  "as_of_date": "2026-10-30",
+  "spot_price": 290.0,
   "expected_move": {
     "earnings_date": "2026-11-04",
     "display_forecast_pct": 0.015804179376293137,
     "display_forecast_method": "historical",
-    "display_forecast_as_of": "2026-10-29",
+    "display_forecast_as_of": "2026-10-30",
     "ml_status": "unavailable_model",
     "options_status": "unavailable",
     "fallback_reason": "quote_quality",
@@ -17,7 +17,25 @@
     "ml_publication_reason": "no_eligible_current_forecast",
     "em_method": "historical"
   },
-  "straddle_features": [],
+  "straddle_features": [
+    {
+      "expiration": "2026-12-18",
+      "dte": 49,
+      "atm_strike": 290.0,
+      "atm_iv": 0.228347,
+      "atm_call_iv": 0.2489,
+      "atm_put_iv": 0.2073,
+      "straddle_mid": 20.25,
+      "em_straddle": 20.25,
+      "em_straddle_pct": 0.069828,
+      "em_iv": 24.263028,
+      "em_iv_pct": 0.083666,
+      "call_delta": 0.3835,
+      "call_gamma": 0.0148,
+      "call_vega": 0.3919,
+      "call_theta": -0.0998
+    }
+  ],
   "earnings_history": [
     {
       "date": "2026-11-04",
@@ -48,7 +66,7 @@
       "ml_publication_reason": "no_eligible_current_forecast",
       "display_forecast_pct": 0.015804179376293137,
       "display_forecast_method": "historical",
-      "display_forecast_as_of": "2026-10-29",
+      "display_forecast_as_of": "2026-10-30",
       "options_status": "unavailable",
       "fallback_reason": "quote_quality",
       "historical_event_count": 4,
@@ -367,13 +385,13 @@
   ],
   "next_earnings": "2026-11-04",
   "vol_regime": {
-    "iv_current": 0.2396,
-    "iv_rank": 0.387824,
+    "iv_current": 0.2495,
+    "iv_rank": 0.435283,
     "iv_year_high": 0.3673,
     "iv_year_low": 0.1587,
-    "hv_current": 0.204,
-    "hv_rank": 0.334786,
-    "iv_mom_week": -0.0102,
+    "hv_current": 0.2052,
+    "hv_rank": 0.345248,
+    "iv_mom_week": -0.0015,
     "iv_mom_month": null
   },
   "next_earnings_timing": "unknown"

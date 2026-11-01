@@ -1,7 +1,7 @@
 {
   "symbol": "ENVA",
-  "as_of_date": "2026-10-29",
-  "spot_price": 185.0,
+  "as_of_date": "2026-10-30",
+  "spot_price": 175.0,
   "expected_move": {
     "earnings_date": "2026-10-22",
     "timing": "amc",
@@ -43,21 +43,38 @@
   },
   "straddle_features": [
     {
+      "expiration": "2026-11-20",
+      "dte": 21,
+      "atm_strike": 175.0,
+      "atm_iv": 0.3961,
+      "atm_call_iv": 0.3965,
+      "atm_put_iv": 0.3957,
+      "straddle_mid": 13.25,
+      "em_straddle": 13.25,
+      "em_straddle_pct": 0.075714,
+      "em_iv": 16.626692,
+      "em_iv_pct": 0.09501,
+      "call_delta": 0.5032,
+      "call_gamma": 0.024,
+      "call_vega": 0.1665,
+      "call_theta": -0.1628
+    },
+    {
       "expiration": "2026-12-18",
-      "dte": 50,
-      "atm_strike": 185.0,
-      "atm_iv": 0.373154,
-      "atm_call_iv": 0.3785,
-      "atm_put_iv": 0.3678,
-      "straddle_mid": 20.35,
-      "em_straddle": 20.35,
-      "em_straddle_pct": 0.11,
-      "em_iv": 25.550441,
-      "em_iv_pct": 0.13811,
-      "call_delta": 0.4843,
-      "call_gamma": 0.0157,
-      "call_vega": 0.2673,
-      "call_theta": -0.111
+      "dte": 49,
+      "atm_strike": 175.0,
+      "atm_iv": 0.39015,
+      "atm_call_iv": 0.3911,
+      "atm_put_iv": 0.3892,
+      "straddle_mid": 19.9,
+      "em_straddle": 19.9,
+      "em_straddle_pct": 0.113714,
+      "em_iv": 25.016184,
+      "em_iv_pct": 0.14295,
+      "call_delta": 0.525,
+      "call_gamma": 0.0159,
+      "call_vega": 0.2536,
+      "call_theta": -0.1079
     }
   ],
   "earnings_history": [
@@ -453,13 +470,13 @@
   ],
   "next_earnings": "2026-10-22",
   "vol_regime": {
-    "iv_current": 0.3752,
-    "iv_rank": 0.280915,
+    "iv_current": 0.3928,
+    "iv_rank": 0.331885,
     "iv_year_high": 0.6235,
     "iv_year_low": 0.2782,
-    "hv_current": 0.3572,
-    "hv_rank": 0.082942,
-    "iv_mom_week": -0.1529,
+    "hv_current": 0.3684,
+    "hv_rank": 0.103959,
+    "iv_mom_week": -0.0128,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

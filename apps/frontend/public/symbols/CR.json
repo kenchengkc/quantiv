@@ -1,7 +1,7 @@
 {
   "symbol": "CR",
-  "as_of_date": "2026-10-29",
-  "spot_price": 210.0,
+  "as_of_date": "2026-10-30",
+  "spot_price": 200.0,
   "expected_move": {
     "earnings_date": "2026-10-28",
     "timing": "after_market_close",
@@ -26,21 +26,38 @@
   },
   "straddle_features": [
     {
+      "expiration": "2026-11-20",
+      "dte": 21,
+      "atm_strike": 200.0,
+      "atm_iv": 0.341506,
+      "atm_call_iv": 0.344,
+      "atm_put_iv": 0.339,
+      "straddle_mid": 13.095,
+      "em_straddle": 13.095,
+      "em_straddle_pct": 0.065475,
+      "em_iv": 16.382927,
+      "em_iv_pct": 0.081915,
+      "call_delta": 0.4814,
+      "call_gamma": 0.0243,
+      "call_vega": 0.1894,
+      "call_theta": -0.1665
+    },
+    {
       "expiration": "2026-12-18",
-      "dte": 50,
-      "atm_strike": 210.0,
-      "atm_iv": 0.310353,
-      "atm_call_iv": 0.3089,
-      "atm_put_iv": 0.3118,
-      "straddle_mid": 19.25,
-      "em_straddle": 19.25,
-      "em_straddle_pct": 0.091667,
-      "em_iv": 24.122018,
-      "em_iv_pct": 0.114867,
-      "call_delta": 0.4609,
+      "dte": 49,
+      "atm_strike": 200.0,
+      "atm_iv": 0.323897,
+      "atm_call_iv": 0.3261,
+      "atm_put_iv": 0.3217,
+      "straddle_mid": 18.85,
+      "em_straddle": 18.85,
+      "em_straddle_pct": 0.09425,
+      "em_iv": 23.73493,
+      "em_iv_pct": 0.118675,
+      "call_delta": 0.4985,
       "call_gamma": 0.0168,
-      "call_vega": 0.3017,
-      "call_theta": -0.0975
+      "call_vega": 0.2887,
+      "call_theta": -0.1006
     }
   ],
   "earnings_history": [
@@ -426,13 +443,13 @@
   ],
   "next_earnings": "2026-10-28",
   "vol_regime": {
-    "iv_current": 0.3112,
-    "iv_rank": 0.185417,
+    "iv_current": 0.3397,
+    "iv_rank": 0.297138,
     "iv_year_high": 0.519,
     "iv_year_low": 0.2639,
-    "hv_current": 0.3521,
-    "hv_rank": 0.603312,
-    "iv_mom_week": -0.1354,
+    "hv_current": 0.3706,
+    "hv_rank": 0.669906,
+    "iv_mom_week": -0.0969,
     "iv_mom_month": null
   },
   "next_earnings_timing": "unknown"

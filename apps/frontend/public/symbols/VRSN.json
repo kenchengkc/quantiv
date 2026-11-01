@@ -1,7 +1,7 @@
 {
   "symbol": "VRSN",
-  "as_of_date": "2026-10-29",
-  "spot_price": 310.0,
+  "as_of_date": "2026-10-30",
+  "spot_price": 300.0,
   "expected_move": {
     "earnings_date": "2026-10-22",
     "timing": "amc",
@@ -26,21 +26,38 @@
   },
   "straddle_features": [
     {
+      "expiration": "2026-11-20",
+      "dte": 21,
+      "atm_strike": 300.0,
+      "atm_iv": 0.322179,
+      "atm_call_iv": 0.3138,
+      "atm_put_iv": 0.3304,
+      "straddle_mid": 19.45,
+      "em_straddle": 19.45,
+      "em_straddle_pct": 0.064833,
+      "em_iv": 23.183621,
+      "em_iv_pct": 0.077279,
+      "call_delta": 0.6294,
+      "call_gamma": 0.0162,
+      "call_vega": 0.2769,
+      "call_theta": -0.1937
+    },
+    {
       "expiration": "2026-12-18",
-      "dte": 50,
+      "dte": 49,
       "atm_strike": 310.0,
-      "atm_iv": 0.306049,
-      "atm_call_iv": 0.3055,
-      "atm_put_iv": 0.3066,
-      "straddle_mid": 27.9,
-      "em_straddle": 27.9,
-      "em_straddle_pct": 0.09,
-      "em_iv": 35.114893,
-      "em_iv_pct": 0.113274,
-      "call_delta": 0.4806,
-      "call_gamma": 0.0114,
-      "call_vega": 0.4497,
-      "call_theta": -0.1412
+      "atm_iv": 0.313299,
+      "atm_call_iv": 0.3143,
+      "atm_put_iv": 0.3123,
+      "straddle_mid": 28.245,
+      "em_straddle": 28.245,
+      "em_straddle_pct": 0.091113,
+      "em_iv": 35.585386,
+      "em_iv_pct": 0.114792,
+      "call_delta": 0.4967,
+      "call_gamma": 0.0112,
+      "call_vega": 0.4476,
+      "call_theta": -0.1481
     }
   ],
   "earnings_history": [
@@ -433,13 +450,13 @@
   ],
   "next_earnings": "2026-10-22",
   "vol_regime": {
-    "iv_current": 0.3108,
-    "iv_rank": 0.443662,
+    "iv_current": 0.3144,
+    "iv_rank": 0.461771,
     "iv_year_high": 0.4214,
     "iv_year_low": 0.2226,
     "hv_current": 0.2093,
     "hv_rank": 0.082809,
-    "iv_mom_week": -0.0794,
+    "iv_mom_week": 0.0107,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

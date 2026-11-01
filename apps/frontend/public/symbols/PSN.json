@@ -1,7 +1,7 @@
 {
   "symbol": "PSN",
-  "as_of_date": "2026-10-29",
-  "spot_price": 49.33,
+  "as_of_date": "2026-10-30",
+  "spot_price": 50.0,
   "expected_move": {
     "earnings_date": "2026-10-28",
     "timing": "bmo",
@@ -42,7 +42,25 @@
     "forecast_feature_hash": "ce4ebef1c3f5ae00b96ea47200d70d13afa7851b81406efc93c622f237bebb60",
     "forecast_frozen_eligible": true
   },
-  "straddle_features": [],
+  "straddle_features": [
+    {
+      "expiration": "2026-12-18",
+      "dte": 49,
+      "atm_strike": 50.0,
+      "atm_iv": 0.427298,
+      "atm_call_iv": 0.4279,
+      "atm_put_iv": 0.4267,
+      "straddle_mid": 6.3,
+      "em_straddle": 6.3,
+      "em_straddle_pct": 0.126,
+      "em_iv": 7.828036,
+      "em_iv_pct": 0.156561,
+      "call_delta": 0.5697,
+      "call_gamma": 0.0492,
+      "call_vega": 0.0726,
+      "call_theta": -0.0326
+    }
+  ],
   "earnings_history": [
     {
       "date": "2026-10-28",
@@ -430,13 +448,13 @@
   ],
   "next_earnings": "2026-10-28",
   "vol_regime": {
-    "iv_current": 0.496,
-    "iv_rank": 0.491257,
+    "iv_current": 0.5064,
+    "iv_rank": 0.519672,
     "iv_year_high": 0.6822,
     "iv_year_low": 0.3162,
-    "hv_current": 0.3594,
-    "hv_rank": 0.048512,
-    "iv_mom_week": -0.1658,
+    "hv_current": 0.3533,
+    "hv_rank": 0.042876,
+    "iv_mom_week": -0.0746,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"

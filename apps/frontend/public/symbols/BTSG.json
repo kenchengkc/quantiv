@@ -1,7 +1,7 @@
 {
   "symbol": "BTSG",
-  "as_of_date": "2026-10-29",
-  "spot_price": 60.22,
+  "as_of_date": "2026-10-30",
+  "spot_price": 70.0,
   "expected_move": {
     "earnings_date": "2026-10-30",
     "timing": "bmo",
@@ -42,15 +42,33 @@
     "forecast_feature_hash": "f3b4a1906a2acb34309d238ac43e815fde060d6797e0b20158a98e68e0fa1a3c",
     "forecast_frozen_eligible": true
   },
-  "straddle_features": [],
+  "straddle_features": [
+    {
+      "expiration": "2026-12-18",
+      "dte": 49,
+      "atm_strike": 70.0,
+      "atm_iv": 0.422482,
+      "atm_call_iv": 0.4251,
+      "atm_put_iv": 0.4199,
+      "straddle_mid": 8.775,
+      "em_straddle": 8.775,
+      "em_straddle_pct": 0.125357,
+      "em_iv": 10.835729,
+      "em_iv_pct": 0.154796,
+      "call_delta": 0.4096,
+      "call_gamma": 0.0371,
+      "call_vega": 0.0947,
+      "call_theta": -0.0401
+    }
+  ],
   "earnings_history": [
     {
       "date": "2026-10-30",
-      "timing": "before_market_open",
+      "timing": "bmo",
       "q": "Q3 26",
       "fiscal_year": 2026,
       "fiscal_q": "Q3",
-      "actual": null,
+      "actual": 0.110761,
       "implied": null,
       "implied_as_of": null,
       "implied_expiration": null,
@@ -66,8 +84,8 @@
       "revenue_actual": null,
       "revenue_estimate": 3941461325.0,
       "rev_surprise_pct": null,
-      "realized_target_protocol": null,
-      "realized_label_source": null,
+      "realized_target_protocol": "quantiv.session-reaction.v2",
+      "realized_label_source": "ohlcv_session_close",
       "em_ml_pct": 0.064886,
       "em_ml_abs": 3.858093,
       "model_horizon": 2,
@@ -370,13 +388,13 @@
   ],
   "next_earnings": "2026-10-30",
   "vol_regime": {
-    "iv_current": 0.6275,
-    "iv_rank": 0.732174,
+    "iv_current": 0.4259,
+    "iv_rank": 0.147826,
     "iv_year_high": 0.7199,
     "iv_year_low": 0.3749,
-    "hv_current": 0.2755,
-    "hv_rank": 0.026613,
-    "iv_mom_week": 0.0917,
+    "hv_current": 0.4062,
+    "hv_rank": 0.290121,
+    "iv_mom_week": -0.1831,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"
