@@ -924,10 +924,25 @@ def test_legacy_selection_exposure_includes_conservative_label_availability():
     assert end == pd.Timestamp("2026-06-06")
 
 
-def test_monitoring_ledger_retains_cohort_and_asof_historical_baseline(
-    tmp_path, monkeypatch
-):
+@pytest.fixture
+def monitoring_clock(monkeypatch):
     from datetime import datetime, timezone
+    import ml.model_control as control
+
+    now = datetime(2026, 10, 28, 21, tzinfo=timezone.utc)
+
+    class FixedDateTime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return now.astimezone(tz) if tz else now.replace(tzinfo=None)
+
+    monkeypatch.setattr(control, "datetime", FixedDateTime)
+    return now
+
+
+def test_monitoring_ledger_retains_cohort_and_asof_historical_baseline(
+    tmp_path, monkeypatch, monitoring_clock
+):
     from market_sessions import latest_completed_us_market_session
     from ml.model_control import monitoring_rows
 
@@ -937,15 +952,15 @@ def test_monitoring_ledger_retains_cohort_and_asof_historical_baseline(
     forecast = pd.DataFrame(
         {
             "act_symbol": ["A"],
-            "earnings_date": [pd.Timestamp("2026-11-01")],
+            "earnings_date": [pd.Timestamp("2026-10-29")],
             "snapshot_date": [
-                latest_completed_us_market_session(datetime.now(timezone.utc))
+                latest_completed_us_market_session(monitoring_clock)
             ],
             "model_horizon": [1],
             "em_math_pct": [np.nan],
             "em_ml_pct": [0.05],
             "__cohort": ["optionless"],
-            "scored_at": [datetime.now(timezone.utc).isoformat()],
+            "scored_at": [monitoring_clock.isoformat()],
             "feature_vector": [
                 json.dumps(
                     {"feature": 0.5, "straddle_pct": None, "hist_move_med_4q": 0.08}
@@ -965,8 +980,9 @@ def test_monitoring_ledger_retains_cohort_and_asof_historical_baseline(
     assert rows.iloc[0]["hist_move_med_4q"] == 0.08
 
 
-def test_monitoring_does_not_invent_a_score_timestamp_for_unrecorded_vectors(tmp_path, monkeypatch):
-    from datetime import datetime, timezone
+def test_monitoring_does_not_invent_a_score_timestamp_for_unrecorded_vectors(
+    tmp_path, monkeypatch, monitoring_clock
+):
     from market_sessions import latest_completed_us_market_session
     from ml.model_control import monitoring_rows
 
@@ -974,13 +990,16 @@ def test_monitoring_does_not_invent_a_score_timestamp_for_unrecorded_vectors(tmp
     monkeypatch.setenv("MODEL_BUNDLE_PUBLIC_KEY", str(public))
     bundle = _bundle(tmp_path / "bundle", private, target_shift=0.)
     rows = pd.DataFrame({
-        "act_symbol": ["A"], "earnings_date": [pd.Timestamp("2026-11-01")],
-        "snapshot_date": [latest_completed_us_market_session(datetime.now(timezone.utc))],
+        "act_symbol": ["A"], "earnings_date": [pd.Timestamp("2026-10-29")],
+        "snapshot_date": [latest_completed_us_market_session(monitoring_clock)],
         "model_horizon": [1], "em_math_pct": [.08], "em_ml_pct": [.05],
         "feature_vector": [json.dumps({"feature": .5, "straddle_pct": .08})],
         **{f"p{q:02d}": [q / 1000] for q in (10, 25, 50, 75, 90)},
     })
     assert monitoring_rows(rows, bundle, bundle_id="candidate", role="challenger", use_served_predictions=True).empty
+    # Prove the missing timestamp alone caused rejection, not an expired event.
+    rows["scored_at"] = monitoring_clock.isoformat()
+    assert len(monitoring_rows(rows, bundle, bundle_id="candidate", role="challenger", use_served_predictions=True)) == 1
 
 
 def test_common_holdout_rejects_training_vectors_from_another_protocol(
