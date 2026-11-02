@@ -187,3 +187,20 @@ def test_issuer_correction_applies_to_retained_calendar_reference(tmp_path: Path
         {'ticker': 'HUBG', 'earnings_date': '2026-09-10', 'timing': 'unknown'},
     ]}))
     assert load_published_calendar_events(tmp_path) == [('HUBG', date(2026, 9, 14), 'bmo')]
+
+
+def test_alphabet_correction_discards_november_forecast_without_relabeling(tmp_path: Path):
+    (tmp_path / 'calendar-reference.json').write_text(json.dumps({'events': [
+        {'ticker': 'GOOG', 'earnings_date': '2026-11-04', 'timing': 'unknown'},
+        {'ticker': 'GOOGL', 'earnings_date': '2026-10-28', 'timing': 'amc'},
+    ]}))
+    events = load_published_calendar_events(tmp_path)
+    assert events == [('GOOG', date(2026, 10, 28), 'amc'), ('GOOGL', date(2026, 10, 28), 'amc')]
+    detail = {
+        'next_earnings': '2026-11-04',
+        'expected_move': {'earnings_date': '2026-11-04', 'iv_pct': 0.063866, 'display_forecast_as_of': '2026-10-30'},
+    }
+    canonical = published_symbol_dates(events, date(2026, 11, 1))['GOOG']
+    align_symbol_detail_to_published(detail, *canonical)
+    assert detail['next_earnings'] == '2026-10-28'
+    assert detail['expected_move'] is None

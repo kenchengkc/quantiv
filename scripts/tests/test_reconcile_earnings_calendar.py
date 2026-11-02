@@ -816,3 +816,187 @@ def test_expanded_news_recovery_keeps_press_release_requests_bounded(monkeypatch
                           "twelvedata": ["AAA", "BBB"], "alphavantage": ["AAA"]}
     assert {row["provider"] for row in evidence["CCC"]} == {"finnhub"}
     assert set(status["twelvedata_press_releases"]) == {"AAA", "BBB"}
+
+
+def _calendar_row(symbol, day, *, source="dolthub", quarter="Q4", actual=None):
+    return {"act_symbol": symbol, "date": day, "timing": "unknown",
+            "fiscal_year": 2026, "fiscal_q": quarter, "source": source,
+            "eps_actual": actual, "eps_estimate": 3.0,
+            "revenue_actual": None, "revenue_estimate": None}
+
+
+def _reconcile_november(rows, *, votes=None, announcements=None):
+    current = pd.DataFrame(rows)
+    return reconcile_calendar(
+        current, current.copy(), start=date(2026, 11, 1), end=date(2026, 12, 31),
+        structured_votes=votes or [], announcements_by_symbol=announcements or {},
+    )
+
+
+def test_recent_completed_announcement_repairs_nearby_projected_event():
+    row = _calendar_row("AAA", "2026-11-04")
+    evidence = {"AAA": [{**_announcement("issuer", "2026-10-28", "amc", official=True),
+                         "fiscal_year": 2026, "fiscal_q": "Q3"}]}
+    result, report = _reconcile_november([row], announcements=evidence)
+    assert result["date"].tolist() == [date(2026, 10, 28)]
+    assert result["timing"].tolist() == ["amc"]
+    assert result["fiscal_q"].tolist() == ["Q3"]
+    assert report["decisions"]["AAA"]["reason"] == "official_announcement"
+
+
+@pytest.mark.parametrize("source,event_date", [("override", "2026-11-04"),
+                                               ("finnhub", "2026-11-04"),
+                                               ("dolthub", "2026-12-10")])
+def test_completed_announcement_preserves_verified_or_distant_next_period(source, event_date):
+    row = _calendar_row("AAA", event_date, source=source, quarter="Q4")
+    evidence = {"AAA": [{**_announcement("issuer", "2026-10-28", "amc", official=True),
+                         "fiscal_year": 2026, "fiscal_q": "Q3"}]}
+    result, _ = _reconcile_november([row], announcements=evidence)
+    assert result["date"].tolist() == [date.fromisoformat(event_date)]
+
+
+def test_verified_share_classes_share_announcements_without_copying_financials():
+    rows = [_calendar_row("GOOG", "2026-11-04"),
+            _calendar_row("GOOGL", "2026-10-28", source="finnhub", quarter="Q3", actual=2.12),
+            _calendar_row("MSGE", "2026-11-04")]
+    evidence = {"GOOGL": [{**_announcement("issuer", "2026-10-28", "amc", official=True),
+                           "fiscal_year": 2026, "fiscal_q": "Q3"}]}
+    result, report = _reconcile_november(rows, announcements=evidence)
+    goog = result[result.act_symbol.eq("GOOG")].iloc[0]
+    googl = result[result.act_symbol.eq("GOOGL")].iloc[0]
+    assert goog["date"] == date(2026, 10, 28)
+    assert goog["timing"] == "amc"
+    assert pd.isna(goog["eps_actual"])
+    assert googl["eps_actual"] == 2.12
+    assert result[result.act_symbol.eq("MSGE")].iloc[0]["date"] == date(2026, 11, 4)
+    assert report["decisions"]["GOOG"]["announcement_evidence"][0]["evidence_symbol"] == "GOOGL"
+
+
+def test_reported_share_class_removes_phantom_future_event_without_news():
+    rows = [_calendar_row("GOOG", "2026-11-04"),
+            _calendar_row("GOOGL", "2026-10-28", source="finnhub", quarter="Q3", actual=2.12)]
+    result, report = _reconcile_november(rows)
+    goog = result[result.act_symbol.eq("GOOG")].iloc[0]
+    assert goog["date"] == date(2026, 10, 28)
+    assert goog["fiscal_q"] == "Q3"
+    assert goog["timing"] == "unknown"
+    assert pd.isna(goog["eps_actual"])
+    assert report["decisions"]["GOOG"]["reason"] == "reported_actuals"
+
+
+def test_same_symbol_completed_actual_row_survives_phantom_cleanup():
+    rows = [_calendar_row("AAA", "2026-11-04"),
+            _calendar_row("AAA", "2026-10-28", source="finnhub", quarter="Q3", actual=0.0)]
+    result, _ = _reconcile_november(rows)
+    assert len(result) == 1
+    assert result.iloc[0]["date"] == date(2026, 10, 28)
+    assert result.iloc[0]["eps_actual"] == 0.0
+    assert result.iloc[0]["fiscal_q"] == "Q3"
+
+
+def test_share_classes_share_independent_calendar_date_votes():
+    rows = [_calendar_row("GOOG", "2026-11-04"), _calendar_row("GOOGL", "2026-11-04")]
+    votes = [{**_vote(provider, "2026-11-05"), "symbol": "GOOGL"}
+             for provider in ("finnhub_calendar", "fmp_calendar")]
+    result, report = _reconcile_november(rows, votes=votes)
+    assert result["date"].tolist() == [date(2026, 11, 5)] * 2
+    assert report["decisions"]["GOOG"]["date_sources"] == ["finnhub_calendar", "fmp_calendar"]
+
+
+def test_share_class_votes_do_not_multiply_a_single_provider():
+    rows = [_calendar_row("GOOG", "2026-11-04"), _calendar_row("GOOGL", "2026-11-04")]
+    votes = [{**_vote("finnhub_calendar", "2026-11-05"), "symbol": symbol}
+             for symbol in ("GOOG", "GOOGL")]
+    result, _ = _reconcile_november(rows, votes=votes)
+    assert result["date"].tolist() == [date(2026, 11, 4)] * 2
+
+
+def test_conflicting_share_class_dates_from_one_provider_abstain():
+    rows = [_calendar_row("GOOG", "2026-11-04"), _calendar_row("GOOGL", "2026-11-04")]
+    votes = [{**_vote("finnhub_calendar", "2026-11-04"), "symbol": "GOOG"},
+             {**_vote("finnhub_calendar", "2026-11-05"), "symbol": "GOOGL"},
+             {**_vote("fmp_calendar", "2026-11-05"), "symbol": "GOOGL"}]
+    result, _ = _reconcile_november(rows, votes=votes)
+    assert result["date"].tolist() == [date(2026, 11, 4)] * 2
+
+
+def test_recent_calendar_consensus_cannot_create_an_unanchored_past_event():
+    rows = [_calendar_row("AAA", "2026-11-04")]
+    votes = [{**_vote(provider, "2026-10-28"), "symbol": "ZZZ"}
+             for provider in ("finnhub_calendar", "fmp_calendar")]
+    result, _ = _reconcile_november(rows, votes=votes)
+    assert result["act_symbol"].tolist() == ["AAA"]
+
+
+def test_reported_share_class_retains_reconciled_session_but_not_financials():
+    reported = _calendar_row("GOOGL", "2026-10-28", source="finnhub+reconciled", quarter="Q3", actual=2.12)
+    reported["timing"] = "amc"
+    result, _ = _reconcile_november([_calendar_row("GOOG", "2026-11-04"), reported])
+    goog = result[result.act_symbol.eq("GOOG")].iloc[0]
+    assert goog["date"] == date(2026, 10, 28)
+    assert goog["timing"] == "amc"
+    assert pd.isna(goog["eps_actual"])
+
+
+def test_reconcile_still_clears_unverified_projected_session():
+    row = _calendar_row("AAA", "2026-11-04")
+    row["timing"] = "amc"
+    result, _ = _reconcile_november([row])
+    assert result.iloc[0]["timing"] == "unknown"
+
+
+def test_duplicate_share_class_announcement_does_not_manufacture_date_majority():
+    early = _announcement("news", "2026-11-04", published_on="2026-10-20")
+    revised = _announcement("other_news", "2026-11-05", published_on="2026-10-30")
+    rows = [_calendar_row("GOOG", "2026-11-04"), _calendar_row("GOOGL", "2026-11-04")]
+    result, _ = _reconcile_november(rows, announcements={"GOOG": [early], "GOOGL": [early, revised]})
+    assert result["date"].tolist() == [date(2026, 11, 5)] * 2
+
+
+def test_contemporaneous_conflicting_share_class_announcements_do_not_move_date():
+    rows = [_calendar_row("GOOG", "2026-11-04"), _calendar_row("GOOGL", "2026-11-04")]
+    evidence = {symbol: [_announcement("issuer", day, official=True, published_on="2026-10-20")]
+                for symbol, day in [("GOOG", "2026-11-05"), ("GOOGL", "2026-11-06")]}
+    result, _ = _reconcile_november(rows, announcements=evidence)
+    assert result["date"].tolist() == [date(2026, 11, 4)] * 2
+
+
+def test_conflicting_reported_share_class_sessions_remain_unknown():
+    rows = [_calendar_row("GOOG", "2026-11-04")]
+    for symbol, timing in [("GOOG", "bmo"), ("GOOGL", "amc")]:
+        row = _calendar_row(symbol, "2026-10-28", source="finnhub+reconciled", quarter="Q3", actual=2.12)
+        row["timing"] = timing
+        rows.append(row)
+    result, report = _reconcile_november(rows)
+    assert report["decisions"]["GOOG"]["timing"] == "unknown"
+    # A conflicting sibling does not overwrite this security's recorded history.
+    assert result[result.act_symbol.eq("GOOG")].iloc[0]["timing"] == "bmo"
+
+
+@pytest.mark.parametrize("actual,expected", [(0, True), (2.12, True), (None, False),
+                                           ("", False), ("N/A", False),
+                                           (float("nan"), False), (float("inf"), False)])
+def test_fetched_actual_evidence_reaches_share_class_reconciliation(monkeypatch, actual, expected):
+    import reconcile_earnings_calendar as calendar
+    monkeypatch.setattr(calendar, "_request_json", lambda *a, **k: (200, {
+        "earningsCalendar": [{"symbol": "GOOGL", "date": "2026-10-28", "hour": "amc",
+                              "year": 2026, "quarter": 3, "epsActual": actual}]
+    }, None))
+    votes, _ = calendar.fetch_finnhub_calendar(date(2026, 10, 18), date(2026, 12, 31), "test")
+    rows = [_calendar_row("GOOG", "2026-11-04")]
+    result, report = _reconcile_november(rows, votes=votes)
+    goog = result[result.act_symbol.eq("GOOG")].iloc[0]
+    assert goog["date"] == (date(2026, 10, 28) if expected else date(2026, 11, 4))
+    assert goog["timing"] == "unknown"  # Actuals alone do not certify a release clock.
+    assert pd.isna(goog["eps_actual"])
+    if expected:
+        assert goog["fiscal_q"] == "Q3"
+        assert report["decisions"]["GOOG"]["reason"] == "reported_actuals"
+
+
+def test_conflicting_reported_provider_dates_cannot_rewrite_future_event():
+    rows = [_calendar_row("GOOG", "2026-11-04")]
+    votes = [{**_vote(provider, day), "symbol": "GOOGL", "has_actuals": True}
+             for provider, day in [("finnhub_calendar", "2026-10-28"), ("fmp_calendar", "2026-10-29")]]
+    result, _ = _reconcile_november(rows, votes=votes)
+    assert result[result.act_symbol.eq("GOOG")].iloc[0]["date"] == date(2026, 11, 4)
