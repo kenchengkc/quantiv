@@ -43,6 +43,26 @@ const research = (events: Event[]): ResearchWeek<Event> => ({
 });
 
 describe('calendar reference overlay', () => {
+  it('removes the phantom GOOG November report without moving its forecast into October', () => {
+    const calendar = {
+      ...reference([
+        { ticker: 'GOOG', earnings_date: '2026-11-04', timing: 'unknown' },
+        { ticker: 'GOOGL', earnings_date: '2026-10-28', timing: 'amc' },
+      ]),
+      window: { start: '2026-10-26', end: '2026-11-13' },
+    };
+    const stale = research([{
+      ticker: 'GOOG', earnings_date: '2026-11-04', timing: 'amc',
+      em_ml_pct: 0.07, em_iv_pct: 0.063866, em_straddle_pct: 0.051071, p25: 0.04, p75: 0.09,
+    }]);
+    expect(mergeCalendarReference(calendar, stale, '2026-11-02').events).toEqual([]);
+    const corrected = mergeCalendarReference(calendar, stale, '2026-10-26');
+    expect(corrected.events.find((event) => event.ticker === 'GOOG')).toEqual({
+      ticker: 'GOOG', earnings_date: '2026-10-28', timing: 'amc',
+    });
+    expect(stale.events[0].earnings_date).toBe('2026-11-04');
+  });
+
   it('preserves research for an exact ticker/date/known-session match', () => {
     const merged = mergeCalendarReference(
       reference([{ ticker: 'AAA', earnings_date: '2026-09-08', timing: 'bmo' }]),

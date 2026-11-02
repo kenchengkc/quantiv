@@ -137,7 +137,26 @@ def apply_overrides(rows: list[dict[str, str]], fieldnames: list[str],
             if k not in SETTABLE:
                 raise ValueError(f"unsupported set key '{k}' (allowed: {SETTABLE})")
         for r in matched:
+            if not any(row is r for row in out):
+                continue  # Already merged into another corrected row.
             before = f"{r.get('date')}/{r.get('timing')}"
+            # A corrected estimate may collide with an already reported row.
+            # Normalization keeps the last row per ticker/date, so preserve the
+            # target's actuals before moving the estimate onto that identity.
+            if sets.get("date") and _norm(sets["date"]) != _norm(r.get("date")):
+                for target in list(out):
+                    if target is r or not _matches(target, symbol, {"date": sets["date"]}):
+                        continue
+                    for key in ("eps_actual", "revenue_actual"):
+                        if _norm(target.get(key)) not in {"", "NAN", "NONE"}:
+                            r[key] = target[key]
+                    r["source"] = "+".join(dict.fromkeys(
+                        part for row in (r, target)
+                        for part in str(row.get("source") or "").split("+") if part
+                    ))
+                    # Keep the explicitly corrected row regardless of input
+                    # ordering, rather than letting keep='last' undo the fix.
+                    out = [row for row in out if row is not target]
             for k, v in sets.items():
                 r[k] = "" if v is None else str(v)
             _tag_source(r)
