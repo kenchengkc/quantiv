@@ -20,6 +20,38 @@
       "note": "Alphabet reported Q3 results for GOOG and GOOGL on October 28 after market close, with its call at 4:30 p.m. ET. November 4 was a stale projected GOOG date. Match that date explicitly because the provider incorrectly labeled it Q4. Forecasts for November 4 must be discarded, never relabeled as October 28 forecasts."
     },
     {
+      "symbol": "GOOG",
+      "match": {
+        "date": "2026-10-28"
+      },
+      "set": {
+        "date": "2026-10-28",
+        "timing": "amc",
+        "fiscal_year": 2026,
+        "fiscal_q": "Q3"
+      },
+      "source_url": "https://www.sec.gov/Archives/edgar/data/1652044/000165204426000080/googexhibit991q32026.htm",
+      "published_on": "2026-10-28",
+      "observed_on": "2026-11-01",
+      "note": "Alphabet reported Q3 results for both common share classes on October 28 after market close, with its call at 4:30 p.m. ET. Preserve the verified session even when providers or reconciliation have already corrected the date."
+    },
+    {
+      "symbol": "GOOGL",
+      "match": {
+        "date": "2026-10-28"
+      },
+      "set": {
+        "date": "2026-10-28",
+        "timing": "amc",
+        "fiscal_year": 2026,
+        "fiscal_q": "Q3"
+      },
+      "source_url": "https://www.sec.gov/Archives/edgar/data/1652044/000165204426000080/googexhibit991q32026.htm",
+      "published_on": "2026-10-28",
+      "observed_on": "2026-11-01",
+      "note": "Alphabet reported Q3 results for both common share classes on October 28 after market close, with its call at 4:30 p.m. ET. Preserve the verified session even when providers or reconciliation have already corrected the date."
+    },
+    {
       "symbol": "PVH",
       "match": {
         "fiscal_year": 2027,

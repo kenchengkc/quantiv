@@ -135,8 +135,22 @@ def test_alphabet_override_corrects_reasserted_estimate_without_touching_sibling
     assert corrected["fiscal_q"] == "Q3"
     assert "override" in corrected["source"]
     assert not any(row["date"] == "2026-11-04" for row in out)
-    assert googl in out and prior in out
+    assert next(row for row in out if row["act_symbol"] == "GOOGL")["eps_actual"] == googl["eps_actual"]
+    assert prior in out
     assert apply_overrides(out, FIELDS, overrides)[0] == out
+
+
+@pytest.mark.parametrize("symbol", ["GOOG", "GOOGL"])
+def test_alphabet_verified_session_survives_provider_date_correction(symbol):
+    overrides = json.loads((REPO_ROOT / "config/earnings_overrides.json").read_text())["overrides"]
+    row = {**_row(symbol, "2026-10-28", "unknown", "2026", "Q4", "finnhub+reconciled"),
+           "eps_actual": "2.12", "eps_estimate": "3.1057"}
+    out, _ = apply_overrides([row], [*FIELDS, "eps_actual", "eps_estimate"], overrides)
+    assert out[0]["date"] == "2026-10-28"
+    assert out[0]["timing"] == "amc"
+    assert out[0]["fiscal_q"] == "Q3"
+    assert out[0]["eps_actual"] == "2.12"
+    assert out[0]["eps_estimate"] == "3.1057"
 
 
 @pytest.mark.parametrize("reported_first", [True, False])
