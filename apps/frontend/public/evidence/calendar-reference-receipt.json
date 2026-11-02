@@ -1,30 +1,37 @@
 {
-  "deduplicated_event_count": 140,
-  "event_count": 2130,
+  "deduplicated_event_count": 47,
+  "event_count": 1900,
   "integrity": {
-    "baseline_sha256": "8f02cb884e620a66ec0119a2b1b0a07f4eb6c2943e6712d615266c7fac961518",
+    "baseline_sha256": "3233572c3f7bf9501a23674dea015fe246b74bea6bd52bd811ab54414b4f517f",
     "status": "passed",
-    "stdout_sha256": "abdca0ff0155f584d1cc2eba9a2975faacdc52f2bf14d61f6c491baa9ab11ab4"
+    "stdout_sha256": "f6fe48b9c5d2969b98314ea446d4969b96b0868eea99c1ce8a5f911621494425"
   },
-  "observed_at": "2026-11-02T03:29:30.202364Z",
-  "receipt_id": "0266fbc20071ce6c7530fef47d87288bcef7c171d3f54bcb84b01f42fa9d9b18",
-  "release_id": "82591ebd648911dab93c25fd84129989f76b060897f6bf9f9e24cb873d01d4bd",
+  "observed_at": "2026-11-02T07:28:45Z",
+  "receipt_id": "5c9475d9a9cefd33bc78f3fbf3a42edb9c4837f40fc599e10c13b217ac7a8229",
+  "release_id": "6e49ee76f1313e255b06f163a9377ccefe0d7b957024b9d56054bdee583a7569",
   "schema": "quantiv.calendar-reference-receipt.v1",
   "source_evidence": [
     {
       "date_max": "2028-10-10",
       "date_min": "2020-01-22",
-      "metadata_sha256": "72790e8f779832b02c6986a41504d3fcf4ee0593e9acf10d4c0708be27931a0e",
-      "observed_at": "2026-11-02T03:29:30.202364Z",
+      "metadata_sha256": "960eb461ab345879901ed83d4aca14aeae09b784fed67b11aa767e38248c81ca",
+      "observed_at": "2026-11-02T07:28:41.327385Z",
       "provider": "dolthub",
-      "rows": 129190,
+      "rows": 129078,
       "symbols": 7432
+    },
+    {
+      "from": "2026-10-03",
+      "metadata_sha256": "a021feb7fa6a3314954dc0994bd5dddc9a879b39a48a5b544fd062291f910752",
+      "observed_at": "2026-11-02T07:28:45Z",
+      "provider": "fmp",
+      "to": "2027-01-01"
     }
   ],
   "source_file": {
     "path": "data/earnings_calendar.csv",
-    "sha256": "3233572c3f7bf9501a23674dea015fe246b74bea6bd52bd811ab54414b4f517f"
+    "sha256": "cf8ff5e9396d1a0dbda9129a61c1979de32ca14bd17be0d12d5d529ac59854e5"
   },
-  "source_revision": "85aa11f9fd347b4c118418b94d1aa0954907029c",
+  "source_revision": "9ec2e0cbb6c29a6e3eee02818a193e0d3566befe",
   "universe_id": "12889b0b6fd2601995883038241c74281684497a813f6a108f623e67efe72610"
 }
