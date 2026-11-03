@@ -1,6 +1,6 @@
 {
   "symbol": "DAR",
-  "as_of_date": "2026-10-30",
+  "as_of_date": "2026-11-02",
   "spot_price": 55.0,
   "expected_move": {
     "earnings_date": "2026-10-29",
@@ -26,38 +26,21 @@
   },
   "straddle_features": [
     {
-      "expiration": "2026-11-20",
-      "dte": 21,
-      "atm_strike": 55.0,
-      "atm_iv": 0.43795,
-      "atm_call_iv": 0.4384,
-      "atm_put_iv": 0.4375,
-      "straddle_mid": 4.65,
-      "em_straddle": 4.65,
-      "em_straddle_pct": 0.084545,
-      "em_iv": 5.777645,
-      "em_iv_pct": 0.105048,
-      "call_delta": 0.5591,
-      "call_gamma": 0.0669,
-      "call_vega": 0.0524,
-      "call_theta": -0.0509
-    },
-    {
       "expiration": "2026-12-18",
-      "dte": 49,
-      "atm_strike": 57.5,
-      "atm_iv": 0.444553,
-      "atm_call_iv": 0.3974,
-      "atm_put_iv": 0.4913,
-      "straddle_mid": 7.445,
-      "em_straddle": 7.445,
-      "em_straddle_pct": 0.129478,
-      "em_iv": 9.365754,
-      "em_iv_pct": 0.162883,
-      "call_delta": 0.4522,
-      "call_gamma": 0.0487,
-      "call_vega": 0.0807,
-      "call_theta": -0.0342
+      "dte": 46,
+      "atm_strike": 55.0,
+      "atm_iv": 0.416637,
+      "atm_call_iv": 0.4126,
+      "atm_put_iv": 0.4207,
+      "straddle_mid": 6.475,
+      "em_straddle": 6.475,
+      "em_straddle_pct": 0.117727,
+      "em_iv": 8.13491,
+      "em_iv_pct": 0.147907,
+      "call_delta": 0.5048,
+      "call_gamma": 0.0506,
+      "call_vega": 0.0767,
+      "call_theta": -0.0391
     }
   ],
   "earnings_history": [
@@ -92,8 +75,8 @@
       "options_status": "decision_eligible",
       "fallback_reason": null,
       "forecast_frozen": true,
-      "ml_publication_reason": "no_eligible_current_forecast",
-      "ml_publication_status": "held"
+      "ml_publication_status": "held",
+      "ml_publication_reason": "no_eligible_current_forecast"
     },
     {
       "date": "2026-07-30",
@@ -443,13 +426,13 @@
   ],
   "next_earnings": "2026-10-29",
   "vol_regime": {
-    "iv_current": 0.4131,
-    "iv_rank": 0.172017,
+    "iv_current": 0.4347,
+    "iv_rank": 0.247383,
     "iv_year_high": 0.6504,
     "iv_year_low": 0.3638,
-    "hv_current": 0.3358,
-    "hv_rank": 0.507671,
-    "iv_mom_week": -0.0618,
+    "hv_current": 0.3347,
+    "hv_rank": 0.502708,
+    "iv_mom_week": -0.0524,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"

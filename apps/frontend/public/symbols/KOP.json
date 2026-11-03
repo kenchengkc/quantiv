@@ -1,6 +1,6 @@
 {
   "symbol": "KOP",
-  "as_of_date": "2026-10-30",
+  "as_of_date": "2026-11-02",
   "spot_price": 40.0,
   "expected_move": {
     "earnings_date": "2026-11-06",
@@ -9,9 +9,9 @@
     "correction_factor": 0.360551,
     "model_horizon": 7,
     "ml_snapshot_date": "2026-10-30",
-    "forecast_id": "3d28d24633596ce55efc47252395c66935f3102a0e5495f70540b4d99f6ac903",
+    "forecast_id": "2c37ba87533bde9c922e82fe367708293ab6364e9a44ed2bda8f42f76f5f9ed5",
     "forecast_model_bundle_id": "d14dc7f2aa6b175956922eb6266b8523742add962668b7d6b8833cc2c869dd1b",
-    "forecast_scored_at": "2026-11-02T08:58:48.352106+00:00",
+    "forecast_scored_at": "2026-11-03T08:33:04.436283+00:00",
     "forecast_feature_cutoff_at": "2026-11-05T21:00:00+00:00",
     "forecast_prediction_deadline_at": "2026-11-06T05:00:00+00:00",
     "forecast_feature_snapshot_at": "2026-10-30T20:00:00+00:00",
@@ -37,20 +37,20 @@
   "straddle_features": [
     {
       "expiration": "2026-12-18",
-      "dte": 49,
+      "dte": 46,
       "atm_strike": 40.0,
-      "atm_iv": 0.4659,
-      "atm_call_iv": 0.4659,
-      "atm_put_iv": 0.4659,
-      "straddle_mid": 5.975,
-      "em_straddle": 5.975,
-      "em_straddle_pct": 0.149375,
-      "em_iv": 6.82817,
-      "em_iv_pct": 0.170704,
-      "call_delta": 0.6403,
-      "call_gamma": 0.053,
-      "call_vega": 0.0572,
-      "call_theta": -0.0316
+      "atm_iv": 0.481252,
+      "atm_call_iv": 0.4804,
+      "atm_put_iv": 0.4821,
+      "straddle_mid": 5.825,
+      "em_straddle": 5.825,
+      "em_straddle_pct": 0.145625,
+      "em_iv": 6.833848,
+      "em_iv_pct": 0.170846,
+      "call_delta": 0.6515,
+      "call_gamma": 0.0519,
+      "call_vega": 0.055,
+      "call_theta": -0.0322
     }
   ],
   "earnings_history": [
@@ -83,7 +83,7 @@
       "ml_publication_reason": "no_eligible_current_forecast",
       "display_forecast_pct": 0.05485217486009186,
       "display_forecast_method": "historical",
-      "display_forecast_as_of": "2026-10-30",
+      "display_forecast_as_of": "2026-11-02",
       "options_status": "unavailable",
       "fallback_reason": "quote_quality",
       "historical_event_count": 4,
@@ -374,13 +374,13 @@
   ],
   "next_earnings": "2026-11-06",
   "vol_regime": {
-    "iv_current": 0.4908,
-    "iv_rank": 0.355436,
+    "iv_current": 0.4853,
+    "iv_rank": 0.340671,
     "iv_year_high": 0.7309,
     "iv_year_low": 0.3584,
-    "hv_current": 0.2769,
-    "hv_rank": 0.315609,
-    "iv_mom_week": 0.0557,
+    "hv_current": 0.2775,
+    "hv_rank": 0.317667,
+    "iv_mom_week": -0.0307,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"

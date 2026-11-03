@@ -1,7 +1,7 @@
 {
   "symbol": "OTIS",
-  "as_of_date": "2026-10-30",
-  "spot_price": 75.0,
+  "as_of_date": "2026-11-02",
+  "spot_price": 80.0,
   "expected_move": {
     "earnings_date": "2026-10-28",
     "timing": "bmo",
@@ -27,20 +27,20 @@
   "straddle_features": [
     {
       "expiration": "2026-12-18",
-      "dte": 49,
-      "atm_strike": 75.0,
-      "atm_iv": 0.235947,
-      "atm_call_iv": 0.2343,
-      "atm_put_iv": 0.2376,
-      "straddle_mid": 5.2,
-      "em_straddle": 5.2,
-      "em_straddle_pct": 0.069333,
-      "em_iv": 6.483765,
-      "em_iv_pct": 0.08645,
-      "call_delta": 0.556,
-      "call_gamma": 0.0602,
-      "call_vega": 0.1088,
-      "call_theta": -0.025
+      "dte": 46,
+      "atm_strike": 80.0,
+      "atm_iv": 0.246786,
+      "atm_call_iv": 0.2546,
+      "atm_put_iv": 0.2389,
+      "straddle_mid": 5.65,
+      "em_straddle": 5.65,
+      "em_straddle_pct": 0.070625,
+      "em_iv": 7.008787,
+      "em_iv_pct": 0.08761,
+      "call_delta": 0.4461,
+      "call_gamma": 0.0557,
+      "call_vega": 0.1098,
+      "call_theta": -0.0334
     }
   ],
   "earnings_history": [
@@ -75,8 +75,8 @@
       "options_status": "decision_eligible",
       "fallback_reason": null,
       "forecast_frozen": true,
-      "ml_publication_reason": "no_eligible_current_forecast",
-      "ml_publication_status": "held"
+      "ml_publication_status": "held",
+      "ml_publication_reason": "no_eligible_current_forecast"
     },
     {
       "date": "2026-07-22",
@@ -433,13 +433,13 @@
   ],
   "next_earnings": "2026-10-28",
   "vol_regime": {
-    "iv_current": 0.236,
-    "iv_rank": 0.431373,
+    "iv_current": 0.2654,
+    "iv_rank": 0.606061,
     "iv_year_high": 0.3317,
     "iv_year_low": 0.1634,
-    "hv_current": 0.2647,
-    "hv_rank": 0.579864,
-    "iv_mom_week": -0.0287,
+    "hv_current": 0.2621,
+    "hv_rank": 0.560182,
+    "iv_mom_week": -0.0071,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"

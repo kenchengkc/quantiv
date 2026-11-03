@@ -1,6 +1,6 @@
 {
   "symbol": "LFUS",
-  "as_of_date": "2026-10-30",
+  "as_of_date": "2026-11-02",
   "spot_price": 400.0,
   "expected_move": {
     "earnings_date": "2026-10-28",
@@ -45,37 +45,37 @@
   "straddle_features": [
     {
       "expiration": "2026-11-20",
-      "dte": 21,
+      "dte": 18,
       "atm_strike": 400.0,
-      "atm_iv": 0.487,
-      "atm_call_iv": 0.4869,
-      "atm_put_iv": 0.4871,
-      "straddle_mid": 37.295,
-      "em_straddle": 37.295,
-      "em_straddle_pct": 0.093238,
-      "em_iv": 46.725313,
-      "em_iv_pct": 0.116813,
-      "call_delta": 0.4652,
-      "call_gamma": 0.0086,
-      "call_vega": 0.3742,
-      "call_theta": -0.4377
+      "atm_iv": 0.514297,
+      "atm_call_iv": 0.5129,
+      "atm_put_iv": 0.5157,
+      "straddle_mid": 36.4,
+      "em_straddle": 36.4,
+      "em_straddle_pct": 0.091,
+      "em_iv": 45.684001,
+      "em_iv_pct": 0.11421,
+      "call_delta": 0.483,
+      "call_gamma": 0.0088,
+      "call_vega": 0.3491,
+      "call_theta": -0.5212
     },
     {
       "expiration": "2026-12-18",
-      "dte": 49,
+      "dte": 46,
       "atm_strike": 400.0,
-      "atm_iv": 0.46115,
-      "atm_call_iv": 0.4613,
-      "atm_put_iv": 0.461,
-      "straddle_mid": 53.5,
-      "em_straddle": 53.5,
-      "em_straddle_pct": 0.13375,
-      "em_iv": 67.585599,
-      "em_iv_pct": 0.168964,
-      "call_delta": 0.4992,
+      "atm_iv": 0.474048,
+      "atm_call_iv": 0.4764,
+      "atm_put_iv": 0.4717,
+      "straddle_mid": 53.4,
+      "em_straddle": 53.4,
+      "em_straddle_pct": 0.1335,
+      "em_iv": 67.315442,
+      "em_iv_pct": 0.168289,
+      "call_delta": 0.5144,
       "call_gamma": 0.0059,
-      "call_vega": 0.5734,
-      "call_theta": -0.2803
+      "call_vega": 0.5585,
+      "call_theta": -0.3108
     }
   ],
   "earnings_history": [
@@ -128,8 +128,8 @@
       "options_status": "decision_eligible",
       "fallback_reason": null,
       "forecast_frozen": true,
-      "ml_publication_reason": "no_eligible_current_forecast",
-      "ml_publication_status": "held"
+      "ml_publication_status": "held",
+      "ml_publication_reason": "no_eligible_current_forecast"
     },
     {
       "date": "2026-07-29",
@@ -486,13 +486,13 @@
   ],
   "next_earnings": "2026-10-28",
   "vol_regime": {
-    "iv_current": 0.4748,
-    "iv_rank": 0.344314,
+    "iv_current": 0.4864,
+    "iv_rank": 0.363516,
     "iv_year_high": 0.8709,
     "iv_year_low": 0.2668,
     "hv_current": 0.4955,
     "hv_rank": 0.699277,
-    "iv_mom_week": -0.0729,
+    "iv_mom_week": -0.0646,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"

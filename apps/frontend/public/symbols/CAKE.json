@@ -1,7 +1,7 @@
 {
   "symbol": "CAKE",
-  "as_of_date": "2026-10-30",
-  "spot_price": 110.0,
+  "as_of_date": "2026-11-02",
+  "spot_price": 115.0,
   "expected_move": {
     "earnings_date": "2026-10-27",
     "timing": "amc",
@@ -44,20 +44,37 @@
   "straddle_features": [
     {
       "expiration": "2026-11-20",
-      "dte": 21,
-      "atm_strike": 110.0,
-      "atm_iv": 0.447373,
-      "atm_call_iv": 0.4361,
-      "atm_put_iv": 0.4587,
-      "straddle_mid": 9.7,
-      "em_straddle": 9.7,
-      "em_straddle_pct": 0.088182,
-      "em_iv": 11.803896,
-      "em_iv_pct": 0.107308,
-      "call_delta": 0.6009,
-      "call_gamma": 0.0325,
-      "call_vega": 0.1037,
-      "call_theta": -0.1013
+      "dte": 18,
+      "atm_strike": 115.0,
+      "atm_iv": 0.469745,
+      "atm_call_iv": 0.4745,
+      "atm_put_iv": 0.465,
+      "straddle_mid": 9.6,
+      "em_straddle": 9.6,
+      "em_straddle_pct": 0.083478,
+      "em_iv": 11.996375,
+      "em_iv_pct": 0.104316,
+      "call_delta": 0.4665,
+      "call_gamma": 0.0334,
+      "call_vega": 0.0997,
+      "call_theta": -0.1412
+    },
+    {
+      "expiration": "2026-12-18",
+      "dte": 46,
+      "atm_strike": 115.0,
+      "atm_iv": 0.426776,
+      "atm_call_iv": 0.4322,
+      "atm_put_iv": 0.4213,
+      "straddle_mid": 13.9,
+      "em_straddle": 13.9,
+      "em_straddle_pct": 0.12087,
+      "em_iv": 17.423277,
+      "em_iv_pct": 0.151507,
+      "call_delta": 0.5165,
+      "call_gamma": 0.0231,
+      "call_vega": 0.1608,
+      "call_theta": -0.0892
     }
   ],
   "earnings_history": [
@@ -460,13 +477,13 @@
   ],
   "next_earnings": "2026-10-27",
   "vol_regime": {
-    "iv_current": 0.418,
-    "iv_rank": 0.463235,
+    "iv_current": 0.4567,
+    "iv_rank": 0.630623,
     "iv_year_high": 0.5421,
     "iv_year_low": 0.3109,
-    "hv_current": 0.3467,
-    "hv_rank": 0.251157,
-    "iv_mom_week": -0.0742,
+    "hv_current": 0.3385,
+    "hv_rank": 0.219522,
+    "iv_mom_week": -0.0556,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

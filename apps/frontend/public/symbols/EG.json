@@ -1,7 +1,7 @@
 {
   "symbol": "EG",
-  "as_of_date": "2026-10-30",
-  "spot_price": 410.0,
+  "as_of_date": "2026-11-02",
+  "spot_price": 420.0,
   "expected_move": {
     "earnings_date": "2026-10-29",
     "timing": "after_market_close",
@@ -27,37 +27,37 @@
   "straddle_features": [
     {
       "expiration": "2026-11-20",
-      "dte": 21,
-      "atm_strike": 410.0,
-      "atm_iv": 0.2383,
-      "atm_call_iv": 0.2407,
-      "atm_put_iv": 0.2359,
-      "straddle_mid": 18.9,
-      "em_straddle": 18.9,
-      "em_straddle_pct": 0.046098,
-      "em_iv": 23.435362,
-      "em_iv_pct": 0.057159,
-      "call_delta": 0.5508,
-      "call_gamma": 0.0166,
-      "call_vega": 0.3906,
-      "call_theta": -0.2577
+      "dte": 18,
+      "atm_strike": 420.0,
+      "atm_iv": 0.236105,
+      "atm_call_iv": 0.2372,
+      "atm_put_iv": 0.235,
+      "straddle_mid": 17.65,
+      "em_straddle": 17.65,
+      "em_straddle_pct": 0.042024,
+      "em_iv": 22.021361,
+      "em_iv_pct": 0.052432,
+      "call_delta": 0.4967,
+      "call_gamma": 0.0181,
+      "call_vega": 0.3704,
+      "call_theta": -0.2841
     },
     {
       "expiration": "2026-12-18",
-      "dte": 49,
-      "atm_strike": 410.0,
-      "atm_iv": 0.225899,
-      "atm_call_iv": 0.2273,
-      "atm_put_iv": 0.2245,
-      "straddle_mid": 27.1,
-      "em_straddle": 27.1,
-      "em_straddle_pct": 0.066098,
-      "em_iv": 33.935212,
-      "em_iv_pct": 0.082769,
-      "call_delta": 0.5359,
-      "call_gamma": 0.0115,
-      "call_vega": 0.5961,
-      "call_theta": -0.1458
+      "dte": 46,
+      "atm_strike": 420.0,
+      "atm_iv": 0.2257,
+      "atm_call_iv": 0.2257,
+      "atm_put_iv": 0.2257,
+      "straddle_mid": 26.75,
+      "em_straddle": 26.75,
+      "em_straddle_pct": 0.06369,
+      "em_iv": 33.65219,
+      "em_iv_pct": 0.080124,
+      "call_delta": 0.494,
+      "call_gamma": 0.0118,
+      "call_vega": 0.5893,
+      "call_theta": -0.1495
     }
   ],
   "earnings_history": [
@@ -92,8 +92,8 @@
       "options_status": "decision_eligible",
       "fallback_reason": null,
       "forecast_frozen": true,
-      "ml_publication_reason": "no_eligible_current_forecast",
-      "ml_publication_status": "held"
+      "ml_publication_status": "held",
+      "ml_publication_reason": "no_eligible_current_forecast"
     },
     {
       "date": "2026-07-29",
@@ -443,13 +443,13 @@
   ],
   "next_earnings": "2026-10-29",
   "vol_regime": {
-    "iv_current": 0.2282,
-    "iv_rank": 0.245528,
+    "iv_current": 0.2324,
+    "iv_rank": 0.279675,
     "iv_year_high": 0.321,
     "iv_year_low": 0.198,
-    "hv_current": 0.2291,
-    "hv_rank": 0.545837,
-    "iv_mom_week": -0.0618,
+    "hv_current": 0.2259,
+    "hv_rank": 0.518923,
+    "iv_mom_week": -0.0572,
     "iv_mom_month": null
   },
   "next_earnings_timing": "unknown"

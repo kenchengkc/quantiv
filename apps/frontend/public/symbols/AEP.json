@@ -1,7 +1,7 @@
 {
   "symbol": "AEP",
-  "as_of_date": "2026-10-30",
-  "spot_price": 130.21,
+  "as_of_date": "2026-11-02",
+  "spot_price": 130.0,
   "expected_move": {
     "earnings_date": "2026-10-28",
     "timing": "bmo",
@@ -24,7 +24,42 @@
     "ml_publication_status": "held",
     "ml_publication_reason": "no_eligible_current_forecast"
   },
-  "straddle_features": [],
+  "straddle_features": [
+    {
+      "expiration": "2026-11-20",
+      "dte": 18,
+      "atm_strike": 130.0,
+      "atm_iv": 0.21535,
+      "atm_call_iv": 0.2155,
+      "atm_put_iv": 0.2152,
+      "straddle_mid": 4.95,
+      "em_straddle": 4.95,
+      "em_straddle_pct": 0.038077,
+      "em_iv": 6.216956,
+      "em_iv_pct": 0.047823,
+      "call_delta": 0.4868,
+      "call_gamma": 0.0635,
+      "call_vega": 0.1145,
+      "call_theta": -0.0513
+    },
+    {
+      "expiration": "2026-12-18",
+      "dte": 46,
+      "atm_strike": 130.0,
+      "atm_iv": 0.20725,
+      "atm_call_iv": 0.2075,
+      "atm_put_iv": 0.207,
+      "straddle_mid": 7.6,
+      "em_straddle": 7.6,
+      "em_straddle_pct": 0.058462,
+      "em_iv": 9.564672,
+      "em_iv_pct": 0.073574,
+      "call_delta": 0.5197,
+      "call_gamma": 0.0412,
+      "call_vega": 0.183,
+      "call_theta": -0.0393
+    }
+  ],
   "earnings_history": [
     {
       "date": "2026-10-28",
@@ -57,8 +92,8 @@
       "options_status": "decision_eligible",
       "fallback_reason": null,
       "forecast_frozen": true,
-      "ml_publication_reason": "no_eligible_current_forecast",
-      "ml_publication_status": "held"
+      "ml_publication_status": "held",
+      "ml_publication_reason": "no_eligible_current_forecast"
     },
     {
       "date": "2026-07-30",
@@ -415,13 +450,13 @@
   ],
   "next_earnings": "2026-10-28",
   "vol_regime": {
-    "iv_current": 0.2063,
-    "iv_rank": 0.373026,
+    "iv_current": 0.2103,
+    "iv_rank": 0.421628,
     "iv_year_high": 0.2579,
     "iv_year_low": 0.1756,
-    "hv_current": 0.1756,
-    "hv_rank": 0.43573,
-    "iv_mom_week": -0.0243,
+    "hv_current": 0.1755,
+    "hv_rank": 0.435004,
+    "iv_mom_week": -0.0095,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"
