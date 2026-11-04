@@ -1,6 +1,6 @@
 {
   "symbol": "OSIS",
-  "as_of_date": "2026-11-02",
+  "as_of_date": "2026-11-03",
   "spot_price": 200.0,
   "expected_move": {
     "earnings_date": "2026-10-29",
@@ -27,37 +27,20 @@
   "straddle_features": [
     {
       "expiration": "2026-11-20",
-      "dte": 18,
+      "dte": 17,
       "atm_strike": 200.0,
-      "atm_iv": 0.352303,
-      "atm_call_iv": 0.3546,
-      "atm_put_iv": 0.35,
-      "straddle_mid": 12.55,
-      "em_straddle": 12.55,
-      "em_straddle_pct": 0.06275,
-      "em_iv": 15.647194,
-      "em_iv_pct": 0.078236,
-      "call_delta": 0.5194,
-      "call_gamma": 0.0255,
-      "call_vega": 0.1765,
-      "call_theta": -0.2072
-    },
-    {
-      "expiration": "2026-12-18",
-      "dte": 46,
-      "atm_strike": 200.0,
-      "atm_iv": 0.336004,
-      "atm_call_iv": 0.3382,
-      "atm_put_iv": 0.3338,
-      "straddle_mid": 19.15,
-      "em_straddle": 19.15,
-      "em_straddle_pct": 0.09575,
-      "em_iv": 23.856505,
-      "em_iv_pct": 0.119283,
-      "call_delta": 0.5415,
-      "call_gamma": 0.0167,
-      "call_vega": 0.2816,
-      "call_theta": -0.126
+      "atm_iv": 0.337201,
+      "atm_call_iv": 0.3361,
+      "atm_put_iv": 0.3383,
+      "straddle_mid": 11.7,
+      "em_straddle": 11.7,
+      "em_straddle_pct": 0.0585,
+      "em_iv": 14.554485,
+      "em_iv_pct": 0.072772,
+      "call_delta": 0.552,
+      "call_gamma": 0.0271,
+      "call_vega": 0.1714,
+      "call_theta": -0.1827
     }
   ],
   "earnings_history": [
@@ -450,13 +433,13 @@
   ],
   "next_earnings": "2026-10-29",
   "vol_regime": {
-    "iv_current": 0.3592,
-    "iv_rank": 0.144975,
+    "iv_current": 0.3273,
+    "iv_rank": 0.013591,
     "iv_year_high": 0.5668,
     "iv_year_low": 0.324,
-    "hv_current": 0.2391,
-    "hv_rank": 0.106152,
-    "iv_mom_week": -0.1468,
+    "hv_current": 0.2409,
+    "hv_rank": 0.109458,
+    "iv_mom_week": -0.1648,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

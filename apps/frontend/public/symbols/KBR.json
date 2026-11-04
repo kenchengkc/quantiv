@@ -1,6 +1,6 @@
 {
   "symbol": "KBR",
-  "as_of_date": "2026-11-02",
+  "as_of_date": "2026-11-03",
   "spot_price": 40.0,
   "expected_move": {
     "earnings_date": "2026-10-29",
@@ -26,21 +26,21 @@
   },
   "straddle_features": [
     {
-      "expiration": "2026-11-20",
-      "dte": 18,
+      "expiration": "2026-12-18",
+      "dte": 45,
       "atm_strike": 40.0,
-      "atm_iv": 0.326624,
-      "atm_call_iv": 0.3322,
-      "atm_put_iv": 0.321,
-      "straddle_mid": 2.325,
-      "em_straddle": 2.325,
-      "em_straddle_pct": 0.058125,
-      "em_iv": 2.901335,
-      "em_iv_pct": 0.072533,
-      "call_delta": 0.5034,
-      "call_gamma": 0.1368,
-      "call_vega": 0.0352,
-      "call_theta": -0.0384
+      "atm_iv": 0.346952,
+      "atm_call_iv": 0.3497,
+      "atm_put_iv": 0.3442,
+      "straddle_mid": 3.9,
+      "em_straddle": 3.9,
+      "em_straddle_pct": 0.0975,
+      "em_iv": 4.872926,
+      "em_iv_pct": 0.121823,
+      "call_delta": 0.5344,
+      "call_gamma": 0.0817,
+      "call_vega": 0.0556,
+      "call_theta": -0.0254
     }
   ],
   "earnings_history": [
@@ -405,13 +405,13 @@
   ],
   "next_earnings": "2026-10-29",
   "vol_regime": {
-    "iv_current": 0.3332,
-    "iv_rank": 0.191451,
+    "iv_current": 0.3633,
+    "iv_rank": 0.26943,
     "iv_year_high": 0.6453,
     "iv_year_low": 0.2593,
-    "hv_current": 0.3131,
-    "hv_rank": 0.404996,
-    "iv_mom_week": -0.0454,
+    "hv_current": 0.3048,
+    "hv_rank": 0.375792,
+    "iv_mom_week": 0.0028,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"

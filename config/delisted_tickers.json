@@ -71,6 +71,11 @@
       "delisted_on": "2026-07-16",
       "source": "manual (user-confirmed acquisition)"
     },
+    "KVUE": {
+      "reason": "Auto-detected: absent from NASDAQ/NYSE exchange directories for \u22653 consecutive days (likely M&A, bankruptcy, or going-private).",
+      "delisted_on": "2026-11-04",
+      "source": "auto: scripts/detect_delistings.py"
+    },
     "MASI": {
       "reason": "Acquired by Danaher Corporation (NYSE: DHR); Masimo delisted from Nasdaq.",
       "delisted_on": "2026-06-10",
@@ -90,6 +95,11 @@
       "reason": "Qorvo completed its merger with Skyworks Solutions on 2026-10-05; common shares converted into $32.50 cash plus 0.960 SWKS shares and Nasdaq trading halted. Retire QRVO; do not merge Qorvo earnings history into SWKS.",
       "delisted_on": "2026-10-05",
       "source": "https://www.sec.gov/Archives/edgar/data/1604778/000095010326015180/dp254466_8k.htm"
+    },
+    "RAMP": {
+      "reason": "Auto-detected: absent from NASDAQ/NYSE exchange directories for \u22653 consecutive days (likely M&A, bankruptcy, or going-private).",
+      "delisted_on": "2026-11-04",
+      "source": "auto: scripts/detect_delistings.py"
     },
     "SNCY": {
       "reason": "Acquired by Allegiant Travel Company (NASDAQ: ALGT); Sun Country Airlines delisted from Nasdaq.",

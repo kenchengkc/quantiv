@@ -1,81 +1,87 @@
 {
   "data": {
-    "contract_rejection_rate": 0.378173,
-    "contracts": 112356,
-    "corporate_action_rows": 62597,
+    "contract_rejection_rate": 0.394078,
+    "contracts": 97940,
+    "corporate_action_rows": 62586,
     "corporate_action_status": "enforced",
-    "covered_events": 402,
-    "decision_group_rejection_rate": 0.342062,
-    "decision_groups": 611,
+    "covered_events": 321,
+    "decision_group_rejection_rate": 0.364356,
+    "decision_groups": 505,
     "decision_scope": "end_of_day_research",
     "display_forecast_coverage_pct": 1.0,
-    "display_forecast_covered_events": 960,
-    "display_forecast_events": 960,
+    "display_forecast_covered_events": 638,
+    "display_forecast_events": 638,
     "display_forecast_method_mix": {
-      "historical": 223,
-      "historical_prior": 8,
-      "ml": 571,
+      "historical": 178,
+      "historical_prior": 12,
+      "ml": 336,
       "ml_unavailable": 0,
       "options_indicative": 0,
-      "options_math": 118,
-      "straddle_implied": 40
+      "options_math": 89,
+      "straddle_implied": 23
     },
     "duplicate_rows": 0,
-    "eligible_contracts": 69866,
-    "eligible_decision_groups": 402,
-    "event_coverage_pct": 0.657938,
-    "expected_events": 611,
-    "expected_source_date": "2026-11-02",
+    "eligible_contracts": 59344,
+    "eligible_decision_groups": 321,
+    "event_coverage_pct": 0.635644,
+    "expected_events": 505,
+    "expected_source_date": "2026-11-03",
     "live_trading_eligible": false,
-    "missing_events": 209,
-    "pair_rejection_rate": 0.825804,
-    "quarantine_records": 88882,
+    "missing_events": 184,
+    "pair_rejection_rate": 0.841679,
+    "quarantine_records": 79813,
     "quarantine_status": "enforced",
     "quote_quality_errors": [],
     "replay_status": "verified",
-    "source_date": "2026-11-02",
+    "source_date": "2026-11-03",
     "source_session_lag": 0,
-    "status": "passed"
+    "status": "advisory"
   },
   "exceptions": [
     {
       "code": "upcoming_events_outside_option_universe",
-      "count": 2606,
+      "count": 2438,
       "severity": "warning",
       "summary": "Calendar events fall outside the current options decision universe"
     },
     {
       "code": "upcoming_events_without_option_chain",
-      "count": 209,
+      "count": 184,
       "severity": "warning",
       "summary": "In-universe earnings events have no decision-eligible option chain"
     },
     {
+      "code": "event_quote_coverage_below_limit",
+      "count": 184,
+      "severity": "warning",
+      "summary": "Aggregate option coverage is below the model activation limit; individually eligible events may publish"
+    },
+    {
       "code": "forecast_horizon_coverage_below_limit",
-      "count": 209,
+      "count": 184,
       "severity": "warning",
       "summary": "One or more model horizons lack sufficient eligible option coverage"
     }
   ],
-  "generated_at": "2026-11-03T09:39:55.685791+00:00",
+  "generated_at": "2026-11-04T09:32:28.344522+00:00",
   "model": {
     "challenger_present": true,
     "champion_active": true,
-    "critical_features": 146,
+    "critical_features": 143,
     "drift_status": "warning",
     "fallback_bundle_available": true,
     "hard_missing_features": null,
-    "monitored_at": "2026-11-03T08:33:16.586102+00:00",
+    "monitored_at": "2026-11-04T08:33:06.163758+00:00",
     "outcome_common_rows": 328,
     "outcome_evaluated_at": "2026-11-01T18:28:58.512609+00:00",
     "outcome_evaluations": 8,
     "outcome_minimum_rows": 30,
     "outcome_status": "passed",
     "publication_coverage": {
-      "candidate_events": 619,
-      "candidate_rows": 619,
-      "eligible_events": 619,
-      "eligible_rows": 619,
+      "candidate_events": 491,
+      "candidate_rows": 491,
+      "eligible_events": 491,
+      "eligible_rows": 491,
       "held_events": 0,
       "held_rows": 0
     },
@@ -88,7 +94,7 @@
       "champion_evidence",
       "previous"
     ],
-    "snapshot_date": "2026-11-02",
+    "snapshot_date": "2026-11-03",
     "status": "passed",
     "warning_features": 0
   },
@@ -101,5 +107,5 @@
     "neon_import_status": "passed"
   },
   "schema": "quantiv.control-plane.v2",
-  "status": "passed"
+  "status": "advisory"
 }

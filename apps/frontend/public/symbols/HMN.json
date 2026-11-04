@@ -1,10 +1,10 @@
 {
   "symbol": "HMN",
-  "as_of_date": "2026-11-02",
-  "spot_price": 47.78,
+  "as_of_date": "2026-11-03",
+  "spot_price": 47.47,
   "expected_move": {
     "earnings_date": "2026-11-03",
-    "timing": "after_market_close",
+    "timing": "amc",
     "em_ml_pct": 0.027521,
     "em_ml_abs": 1.314958,
     "model_horizon": 1,
@@ -20,18 +20,18 @@
     "display_forecast_as_of": "2026-11-02",
     "ml_status": "available",
     "options_status": "unavailable",
+    "hist_move_med_4q": 0.0355,
     "forecast_frozen": true,
     "forecast_id": "9d3ad549baa61dc6452304e6cf4d8f5170b83f7b11ed88c7ef2d6bb8e4651b4e",
     "forecast_model_bundle_id": "d14dc7f2aa6b175956922eb6266b8523742add962668b7d6b8833cc2c869dd1b",
+    "ml_publication_status": "eligible",
     "forecast_scored_at": "2026-11-03T08:33:02.938169+00:00",
+    "forecast_published_at": "2026-11-03T09:39:31.705175+00:00",
     "forecast_feature_cutoff_at": "2026-11-03T20:55:00+00:00",
     "forecast_prediction_deadline_at": "2026-11-03T20:55:00+00:00",
     "forecast_feature_snapshot_at": "2026-11-02T21:00:00+00:00",
     "forecast_feature_hash": "69005e4bf8d21db269caa98f8098ac4e2dfa35121bb210505a39bc08f2d96ba0",
-    "forecast_frozen_eligible": true,
-    "ml_publication_status": "eligible",
-    "fallback_reason": null,
-    "hist_move_med_4q": 0.0355
+    "forecast_frozen_eligible": true
   },
   "straddle_features": [],
   "earnings_history": [
@@ -66,6 +66,7 @@
       "forecast_id": "9d3ad549baa61dc6452304e6cf4d8f5170b83f7b11ed88c7ef2d6bb8e4651b4e",
       "forecast_model_bundle_id": "d14dc7f2aa6b175956922eb6266b8523742add962668b7d6b8833cc2c869dd1b",
       "forecast_scored_at": "2026-11-03T08:33:02.938169+00:00",
+      "forecast_published_at": "2026-11-03T09:39:31.705175+00:00",
       "forecast_feature_cutoff_at": "2026-11-03T20:55:00+00:00",
       "forecast_prediction_deadline_at": "2026-11-03T20:55:00+00:00",
       "forecast_feature_snapshot_at": "2026-11-02T21:00:00+00:00",
@@ -83,8 +84,7 @@
       "options_status": "unavailable",
       "fallback_reason": null,
       "forecast_frozen": true,
-      "ml_publication_status": "eligible",
-      "em_method": "ml_lightgbm"
+      "ml_publication_status": "eligible"
     },
     {
       "date": "2026-08-05",
@@ -368,8 +368,8 @@
     "iv_rank": null,
     "iv_year_high": null,
     "iv_year_low": null,
-    "hv_current": 0.1938,
-    "hv_rank": 0.3625,
+    "hv_current": 0.1849,
+    "hv_rank": 0.276923,
     "iv_mom_week": null,
     "iv_mom_month": null
   },

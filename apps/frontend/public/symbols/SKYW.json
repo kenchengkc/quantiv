@@ -1,7 +1,7 @@
 {
   "symbol": "SKYW",
-  "as_of_date": "2026-11-02",
-  "spot_price": 81.68,
+  "as_of_date": "2026-11-03",
+  "spot_price": 80.0,
   "expected_move": {
     "earnings_date": "2026-10-29",
     "timing": "amc",
@@ -41,7 +41,25 @@
     "forecast_feature_hash": "c4c0c67840fa5220514a2763fa96551fbd145b94cd6b213e69329d2345446173",
     "forecast_frozen_eligible": true
   },
-  "straddle_features": [],
+  "straddle_features": [
+    {
+      "expiration": "2026-12-18",
+      "dte": 45,
+      "atm_strike": 80.0,
+      "atm_iv": 0.371944,
+      "atm_call_iv": 0.376,
+      "atm_put_iv": 0.3678,
+      "straddle_mid": 8.395,
+      "em_straddle": 8.395,
+      "em_straddle_pct": 0.104937,
+      "em_iv": 10.447847,
+      "em_iv_pct": 0.130598,
+      "call_delta": 0.4815,
+      "call_gamma": 0.0391,
+      "call_vega": 0.1095,
+      "call_theta": -0.0562
+    }
+  ],
   "earnings_history": [
     {
       "date": "2026-10-29",
@@ -449,13 +467,13 @@
   ],
   "next_earnings": "2026-10-29",
   "vol_regime": {
-    "iv_current": 0.3911,
-    "iv_rank": 0.454584,
+    "iv_current": 0.4112,
+    "iv_rank": 0.540299,
     "iv_year_high": 0.519,
     "iv_year_low": 0.2845,
-    "hv_current": 0.5143,
-    "hv_rank": 0.942288,
-    "iv_mom_week": -0.0649,
+    "hv_current": 0.5265,
+    "hv_rank": 0.984198,
+    "iv_mom_week": -0.0604,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

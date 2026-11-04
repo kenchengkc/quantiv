@@ -1,7 +1,7 @@
 {
   "symbol": "COHU",
-  "as_of_date": "2026-11-02",
-  "spot_price": 55.0,
+  "as_of_date": "2026-11-03",
+  "spot_price": 50.0,
   "expected_move": {
     "earnings_date": "2026-10-28",
     "timing": "amc",
@@ -43,21 +43,38 @@
   },
   "straddle_features": [
     {
+      "expiration": "2026-11-20",
+      "dte": 17,
+      "atm_strike": 50.0,
+      "atm_iv": 0.9551,
+      "atm_call_iv": 0.9549,
+      "atm_put_iv": 0.9553,
+      "straddle_mid": 8.2,
+      "em_straddle": 8.2,
+      "em_straddle_pct": 0.164,
+      "em_iv": 10.30616,
+      "em_iv_pct": 0.206123,
+      "call_delta": 0.5449,
+      "call_gamma": 0.0384,
+      "call_vega": 0.0427,
+      "call_theta": -0.1223
+    },
+    {
       "expiration": "2026-12-18",
-      "dte": 46,
-      "atm_strike": 55.0,
-      "atm_iv": 0.78054,
-      "atm_call_iv": 0.7563,
-      "atm_put_iv": 0.805,
-      "straddle_mid": 12.45,
-      "em_straddle": 12.45,
-      "em_straddle_pct": 0.226364,
-      "em_iv": 15.240182,
-      "em_iv_pct": 0.277094,
-      "call_delta": 0.3925,
-      "call_gamma": 0.0298,
-      "call_vega": 0.0665,
-      "call_theta": -0.061
+      "dte": 45,
+      "atm_strike": 50.0,
+      "atm_iv": 0.8124,
+      "atm_call_iv": 0.8136,
+      "atm_put_iv": 0.8112,
+      "straddle_mid": 11.3,
+      "em_straddle": 11.3,
+      "em_straddle_pct": 0.226,
+      "em_iv": 14.262634,
+      "em_iv_pct": 0.285253,
+      "call_delta": 0.5572,
+      "call_gamma": 0.0275,
+      "call_vega": 0.069,
+      "call_theta": -0.0625
     }
   ],
   "earnings_history": [
@@ -453,13 +470,13 @@
   ],
   "next_earnings": "2026-10-28",
   "vol_regime": {
-    "iv_current": 0.8511,
-    "iv_rank": 0.607644,
+    "iv_current": 0.8592,
+    "iv_rank": 0.619737,
     "iv_year_high": 1.1139,
     "iv_year_low": 0.4441,
-    "hv_current": 0.8233,
-    "hv_rank": 0.510043,
-    "iv_mom_week": -0.0187,
+    "hv_current": 0.8059,
+    "hv_rank": 0.485079,
+    "iv_mom_week": -0.0488,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

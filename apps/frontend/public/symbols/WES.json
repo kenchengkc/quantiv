@@ -1,37 +1,20 @@
 {
   "symbol": "WES",
-  "as_of_date": "2026-11-02",
-  "spot_price": 44.23,
+  "as_of_date": "2026-11-03",
+  "spot_price": 43.87,
   "expected_move": {
-    "earnings_date": "2026-11-02",
-    "timing": "after_market_close",
-    "em_ml_pct": 0.02509,
-    "em_ml_abs": 1.115522,
-    "model_horizon": 11,
-    "ml_snapshot_date": "2026-10-22",
-    "p10": 0.005039,
-    "p25": 0.014152,
-    "p50": 0.024576,
-    "p75": 0.052508,
-    "p90": 0.06208,
-    "em_method": "ml_lightgbm",
-    "display_forecast_pct": 0.02509,
-    "display_forecast_method": "ml",
-    "display_forecast_as_of": "2026-10-22",
-    "ml_status": "available",
-    "options_status": "unavailable",
-    "hist_move_med_4q": 0.037034,
-    "forecast_frozen": true,
-    "forecast_id": "bd3095dae5a673ff4ebf99479172986fc65ecefd15660d675331c3f946817efb",
-    "forecast_model_bundle_id": "d14dc7f2aa6b175956922eb6266b8523742add962668b7d6b8833cc2c869dd1b",
+    "earnings_date": "2026-11-04",
+    "hist_move_med_4q": 0.033624,
+    "timing": "unknown",
+    "ml_status": "unavailable_model",
     "ml_publication_status": "held",
     "ml_publication_reason": "no_eligible_current_forecast",
-    "forecast_scored_at": "2026-10-23T07:09:34.673908+00:00",
-    "forecast_feature_cutoff_at": "2026-11-02T20:55:00+00:00",
-    "forecast_prediction_deadline_at": "2026-11-02T20:55:00+00:00",
-    "forecast_feature_snapshot_at": "2026-10-22T20:00:00+00:00",
-    "forecast_feature_hash": "0c23ed77bd445363bce80da57c432ef9a8349e6747f3a4aa6e92b1108e50aae2",
-    "forecast_frozen_eligible": true
+    "options_status": "unavailable",
+    "display_forecast_pct": null,
+    "display_forecast_method": "ml_unavailable",
+    "display_forecast_as_of": "2026-11-03",
+    "em_method": "ml_unavailable",
+    "fallback_reason": null
   },
   "straddle_features": [],
   "earnings_history": [
@@ -82,9 +65,7 @@
       "ml_status": "available",
       "options_status": "unavailable",
       "fallback_reason": null,
-      "forecast_frozen": true,
-      "ml_publication_status": "held",
-      "ml_publication_reason": "no_eligible_current_forecast"
+      "forecast_frozen": true
     },
     {
       "date": "2026-08-05",
@@ -362,7 +343,7 @@
       "realized_label_source": "ohlcv_session_close"
     }
   ],
-  "next_earnings": "2026-11-02",
+  "next_earnings": "2026-11-04",
   "vol_regime": null,
   "next_earnings_timing": "unknown"
 }
