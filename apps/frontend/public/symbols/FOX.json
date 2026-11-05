@@ -1,7 +1,7 @@
 {
   "symbol": "FOX",
-  "as_of_date": "2026-11-03",
-  "spot_price": 60.0,
+  "as_of_date": "2026-11-04",
+  "spot_price": 61.62,
   "expected_move": {
     "earnings_date": "2026-11-02",
     "timing": "bmo",
@@ -18,25 +18,7 @@
     "ml_publication_status": "held",
     "ml_publication_reason": "no_eligible_current_forecast"
   },
-  "straddle_features": [
-    {
-      "expiration": "2026-11-20",
-      "dte": 17,
-      "atm_strike": 60.0,
-      "atm_iv": 0.3813,
-      "atm_call_iv": 0.3813,
-      "atm_put_iv": 0.3813,
-      "straddle_mid": 3.925,
-      "em_straddle": 3.925,
-      "em_straddle_pct": 0.065417,
-      "em_iv": 4.937375,
-      "em_iv_pct": 0.08229,
-      "call_delta": 0.4939,
-      "call_gamma": 0.0813,
-      "call_vega": 0.0512,
-      "call_theta": -0.0601
-    }
-  ],
+  "straddle_features": [],
   "earnings_history": [
     {
       "date": "2026-11-02",
@@ -62,11 +44,11 @@
       "rev_surprise_pct": null,
       "realized_target_protocol": "quantiv.session-reaction.v2",
       "realized_label_source": "ohlcv_session_close",
-      "ml_publication_status": "held",
-      "display_forecast_as_of": "2026-11-02",
-      "display_forecast_pct": 0.0708235,
       "display_forecast_method": "historical",
+      "ml_publication_status": "held",
       "ml_publication_reason": "no_eligible_current_forecast",
+      "display_forecast_pct": 0.0708235,
+      "display_forecast_as_of": "2026-11-02",
       "forecast_frozen": true
     },
     {
@@ -389,13 +371,13 @@
   ],
   "next_earnings": "2026-11-02",
   "vol_regime": {
-    "iv_current": 0.354,
-    "iv_rank": 0.392211,
+    "iv_current": 0.4492,
+    "iv_rank": 0.684146,
     "iv_year_high": 0.5522,
     "iv_year_low": 0.2261,
-    "hv_current": 0.3248,
-    "hv_rank": 0.332061,
-    "iv_mom_week": -0.0058,
+    "hv_current": 0.3365,
+    "hv_rank": 0.35833,
+    "iv_mom_week": 0.0801,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"

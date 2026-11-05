@@ -1,7 +1,7 @@
 {
   "symbol": "GEHC",
-  "as_of_date": "2026-11-03",
-  "spot_price": 80.0,
+  "as_of_date": "2026-11-04",
+  "spot_price": 84.0,
   "expected_move": {
     "earnings_date": "2026-10-28",
     "timing": "bmo",
@@ -44,21 +44,21 @@
   },
   "straddle_features": [
     {
-      "expiration": "2026-12-18",
-      "dte": 45,
-      "atm_strike": 80.0,
-      "atm_iv": 0.302363,
-      "atm_call_iv": 0.2953,
-      "atm_put_iv": 0.3094,
-      "straddle_mid": 6.87,
-      "em_straddle": 6.87,
-      "em_straddle_pct": 0.085875,
-      "em_iv": 8.49333,
-      "em_iv_pct": 0.106167,
-      "call_delta": 0.5741,
-      "call_gamma": 0.0469,
-      "call_vega": 0.111,
-      "call_theta": -0.0419
+      "expiration": "2026-12-04",
+      "dte": 30,
+      "atm_strike": 84.0,
+      "atm_iv": 0.285703,
+      "atm_call_iv": 0.271,
+      "atm_put_iv": 0.3002,
+      "straddle_mid": 5.875,
+      "em_straddle": 5.875,
+      "em_straddle_pct": 0.06994,
+      "em_iv": 6.880325,
+      "em_iv_pct": 0.081909,
+      "call_delta": 0.6538,
+      "call_gamma": 0.0556,
+      "call_vega": 0.0911,
+      "call_theta": -0.052
     }
   ],
   "earnings_history": [
@@ -462,13 +462,13 @@
   ],
   "next_earnings": "2026-10-28",
   "vol_regime": {
-    "iv_current": 0.3045,
-    "iv_rank": 0.287963,
+    "iv_current": 0.2849,
+    "iv_rank": 0.197222,
     "iv_year_high": 0.4583,
     "iv_year_low": 0.2423,
-    "hv_current": 0.3012,
-    "hv_rank": 0.351423,
-    "iv_mom_week": -0.1388,
+    "hv_current": 0.3397,
+    "hv_rank": 0.464359,
+    "iv_mom_week": -0.0572,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"

@@ -1,7 +1,7 @@
 {
   "symbol": "INVH",
-  "as_of_date": "2026-11-03",
-  "spot_price": 26.6,
+  "as_of_date": "2026-11-04",
+  "spot_price": 27.5,
   "expected_move": {
     "earnings_date": "2026-10-28",
     "timing": "amc",
@@ -41,7 +41,25 @@
     "forecast_feature_hash": "ca47e87718b57982a00b5a64233ca187bfc5f4b7e7d6d2ddb97a254e135ee94a",
     "forecast_frozen_eligible": true
   },
-  "straddle_features": [],
+  "straddle_features": [
+    {
+      "expiration": "2026-11-20",
+      "dte": 16,
+      "atm_strike": 27.5,
+      "atm_iv": 0.4472,
+      "atm_call_iv": 0.4472,
+      "atm_put_iv": 0.4472,
+      "straddle_mid": 1.075,
+      "em_straddle": 1.075,
+      "em_straddle_pct": 0.039091,
+      "em_iv": 2.574827,
+      "em_iv_pct": 0.09363,
+      "call_delta": 0.5275,
+      "call_gamma": 0.1539,
+      "call_vega": 0.0229,
+      "call_theta": -0.0317
+    }
+  ],
   "earnings_history": [
     {
       "date": "2026-10-28",
@@ -449,13 +467,13 @@
   ],
   "next_earnings": "2026-10-28",
   "vol_regime": {
-    "iv_current": 0.2034,
-    "iv_rank": 0.086494,
+    "iv_current": 0.2385,
+    "iv_rank": 0.20326,
     "iv_year_high": 0.478,
     "iv_year_low": 0.1774,
-    "hv_current": 0.1821,
-    "hv_rank": 0.419734,
-    "iv_mom_week": -0.0461,
+    "hv_current": 0.2092,
+    "hv_rank": 0.63195,
+    "iv_mom_week": 0.0175,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

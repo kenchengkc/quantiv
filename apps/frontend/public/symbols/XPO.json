@@ -1,7 +1,7 @@
 {
   "symbol": "XPO",
-  "as_of_date": "2026-11-03",
-  "spot_price": 191.15,
+  "as_of_date": "2026-11-04",
+  "spot_price": 190.0,
   "expected_move": {
     "earnings_date": "2026-10-29",
     "timing": "bmo",
@@ -24,7 +24,42 @@
     "ml_publication_status": "held",
     "ml_publication_reason": "no_eligible_current_forecast"
   },
-  "straddle_features": [],
+  "straddle_features": [
+    {
+      "expiration": "2026-11-20",
+      "dte": 16,
+      "atm_strike": 190.0,
+      "atm_iv": 0.413793,
+      "atm_call_iv": 0.4081,
+      "atm_put_iv": 0.4195,
+      "straddle_mid": 13.15,
+      "em_straddle": 13.15,
+      "em_straddle_pct": 0.069211,
+      "em_iv": 16.460762,
+      "em_iv_pct": 0.086636,
+      "call_delta": 0.4592,
+      "call_gamma": 0.0246,
+      "call_vega": 0.1556,
+      "call_theta": -0.1886
+    },
+    {
+      "expiration": "2026-12-18",
+      "dte": 44,
+      "atm_strike": 190.0,
+      "atm_iv": 0.398599,
+      "atm_call_iv": 0.3995,
+      "atm_put_iv": 0.3977,
+      "straddle_mid": 20.845,
+      "em_straddle": 20.845,
+      "em_straddle_pct": 0.109711,
+      "em_iv": 26.294765,
+      "em_iv_pct": 0.138393,
+      "call_delta": 0.5024,
+      "call_gamma": 0.0152,
+      "call_vega": 0.2596,
+      "call_theta": -0.1211
+    }
+  ],
   "earnings_history": [
     {
       "date": "2026-10-29",
@@ -415,13 +450,13 @@
   ],
   "next_earnings": "2026-10-29",
   "vol_regime": {
-    "iv_current": 0.4184,
-    "iv_rank": 0.281705,
+    "iv_current": 0.3999,
+    "iv_rank": 0.215986,
     "iv_year_high": 0.6206,
     "iv_year_low": 0.3391,
-    "hv_current": 0.2868,
-    "hv_rank": 0.121768,
-    "iv_mom_week": -0.0496,
+    "hv_current": 0.2901,
+    "hv_rank": 0.129525,
+    "iv_mom_week": -0.065,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"

@@ -1,7 +1,7 @@
 {
   "symbol": "OKE",
-  "as_of_date": "2026-11-03",
-  "spot_price": 92.5,
+  "as_of_date": "2026-11-04",
+  "spot_price": 87.5,
   "expected_move": {
     "earnings_date": "2026-10-27",
     "timing": "amc",
@@ -43,38 +43,21 @@
   },
   "straddle_features": [
     {
-      "expiration": "2026-11-20",
-      "dte": 17,
-      "atm_strike": 92.5,
-      "atm_iv": 0.32475,
-      "atm_call_iv": 0.3252,
-      "atm_put_iv": 0.3243,
-      "straddle_mid": 5.175,
-      "em_straddle": 5.175,
-      "em_straddle_pct": 0.055946,
-      "em_iv": 6.482888,
-      "em_iv_pct": 0.070085,
-      "call_delta": 0.4951,
-      "call_gamma": 0.0619,
-      "call_vega": 0.0791,
-      "call_theta": -0.0827
-    },
-    {
       "expiration": "2026-12-18",
-      "dte": 45,
-      "atm_strike": 90.0,
-      "atm_iv": 0.311594,
-      "atm_call_iv": 0.3271,
-      "atm_put_iv": 0.296,
-      "straddle_mid": 8.075,
-      "em_straddle": 8.075,
-      "em_straddle_pct": 0.089722,
-      "em_iv": 9.846716,
-      "em_iv_pct": 0.109408,
-      "call_delta": 0.5981,
-      "call_gamma": 0.0364,
-      "call_vega": 0.1241,
-      "call_theta": -0.0461
+      "dte": 44,
+      "atm_strike": 87.5,
+      "atm_iv": 0.282763,
+      "atm_call_iv": 0.2728,
+      "atm_put_iv": 0.2927,
+      "straddle_mid": 7.165,
+      "em_straddle": 7.165,
+      "em_straddle_pct": 0.081886,
+      "em_iv": 8.590333,
+      "em_iv_pct": 0.098175,
+      "call_delta": 0.6229,
+      "call_gamma": 0.0457,
+      "call_vega": 0.118,
+      "call_theta": -0.0507
     }
   ],
   "earnings_history": [
@@ -484,13 +467,13 @@
   ],
   "next_earnings": "2026-10-27",
   "vol_regime": {
-    "iv_current": 0.3027,
-    "iv_rank": 0.475502,
+    "iv_current": 0.3111,
+    "iv_rank": 0.542972,
     "iv_year_high": 0.368,
     "iv_year_low": 0.2435,
-    "hv_current": 0.2762,
-    "hv_rank": 0.412975,
-    "iv_mom_week": -0.0033,
+    "hv_current": 0.2966,
+    "hv_rank": 0.574367,
+    "iv_mom_week": 0.0197,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

@@ -1,6 +1,6 @@
 {
   "symbol": "HONA",
-  "as_of_date": "2026-11-03",
+  "as_of_date": "2026-11-04",
   "spot_price": 160.0,
   "expected_move": {
     "earnings_date": "2026-10-28",
@@ -26,38 +26,21 @@
   },
   "straddle_features": [
     {
-      "expiration": "2026-11-20",
-      "dte": 17,
-      "atm_strike": 160.0,
-      "atm_iv": 0.475905,
-      "atm_call_iv": 0.4689,
-      "atm_put_iv": 0.4829,
-      "straddle_mid": 13.15,
-      "em_straddle": 13.15,
-      "em_straddle_pct": 0.082187,
-      "em_iv": 16.433061,
-      "em_iv_pct": 0.102707,
-      "call_delta": 0.45,
-      "call_gamma": 0.0247,
-      "call_vega": 0.134,
-      "call_theta": -0.1777
-    },
-    {
       "expiration": "2026-12-18",
-      "dte": 45,
+      "dte": 44,
       "atm_strike": 160.0,
-      "atm_iv": 0.445299,
-      "atm_call_iv": 0.4471,
-      "atm_put_iv": 0.4435,
-      "straddle_mid": 19.8,
-      "em_straddle": 19.8,
-      "em_straddle_pct": 0.12375,
-      "em_iv": 25.016797,
-      "em_iv_pct": 0.156355,
-      "call_delta": 0.4933,
-      "call_gamma": 0.016,
-      "call_vega": 0.2197,
-      "call_theta": -0.1108
+      "atm_iv": 0.45404,
+      "atm_call_iv": 0.447,
+      "atm_put_iv": 0.4611,
+      "straddle_mid": 20.045,
+      "em_straddle": 20.045,
+      "em_straddle_pct": 0.125281,
+      "em_iv": 25.222854,
+      "em_iv_pct": 0.157643,
+      "call_delta": 0.4905,
+      "call_gamma": 0.0164,
+      "call_vega": 0.2168,
+      "call_theta": -0.121
     }
   ],
   "earnings_history": [
@@ -130,13 +113,13 @@
   ],
   "next_earnings": "2026-10-28",
   "vol_regime": {
-    "iv_current": 0.4525,
-    "iv_rank": 0.359292,
+    "iv_current": 0.4547,
+    "iv_rank": 0.372271,
     "iv_year_high": 0.5611,
     "iv_year_low": 0.3916,
-    "hv_current": 0.471,
-    "hv_rank": 0.200832,
-    "iv_mom_week": -0.059,
+    "hv_current": 0.4666,
+    "hv_rank": 0.193791,
+    "iv_mom_week": -0.051,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

@@ -1,7 +1,7 @@
 {
   "symbol": "TROW",
-  "as_of_date": "2026-11-03",
-  "spot_price": 105.0,
+  "as_of_date": "2026-11-04",
+  "spot_price": 112.57,
   "expected_move": {
     "earnings_date": "2026-10-29",
     "timing": "bmo",
@@ -24,42 +24,7 @@
     "ml_publication_status": "held",
     "ml_publication_reason": "no_eligible_current_forecast"
   },
-  "straddle_features": [
-    {
-      "expiration": "2026-11-20",
-      "dte": 17,
-      "atm_strike": 105.0,
-      "atm_iv": 0.346444,
-      "atm_call_iv": 0.3564,
-      "atm_put_iv": 0.3365,
-      "straddle_mid": 6.425,
-      "em_straddle": 6.425,
-      "em_straddle_pct": 0.06119,
-      "em_iv": 7.850565,
-      "em_iv_pct": 0.074767,
-      "call_delta": 0.5897,
-      "call_gamma": 0.0476,
-      "call_vega": 0.0891,
-      "call_theta": -0.1032
-    },
-    {
-      "expiration": "2026-12-18",
-      "dte": 45,
-      "atm_strike": 110.0,
-      "atm_iv": 0.290404,
-      "atm_call_iv": 0.259,
-      "atm_put_iv": 0.3215,
-      "straddle_mid": 9.22,
-      "em_straddle": 9.22,
-      "em_straddle_pct": 0.083818,
-      "em_iv": 11.216431,
-      "em_iv_pct": 0.101968,
-      "call_delta": 0.3792,
-      "call_gamma": 0.0393,
-      "call_vega": 0.1416,
-      "call_theta": -0.0431
-    }
-  ],
+  "straddle_features": [],
   "earnings_history": [
     {
       "date": "2026-10-29",
@@ -450,13 +415,13 @@
   ],
   "next_earnings": "2026-10-29",
   "vol_regime": {
-    "iv_current": 0.2941,
-    "iv_rank": 0.654349,
+    "iv_current": 0.2797,
+    "iv_rank": 0.543495,
     "iv_year_high": 0.339,
     "iv_year_low": 0.2091,
-    "hv_current": 0.2048,
-    "hv_rank": 0.292948,
-    "iv_mom_week": -0.0111,
+    "hv_current": 0.2637,
+    "hv_rank": 0.571699,
+    "iv_mom_week": -0.0247,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"

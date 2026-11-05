@@ -1,7 +1,7 @@
 {
   "symbol": "FSS",
-  "as_of_date": "2026-11-03",
-  "spot_price": 117.14,
+  "as_of_date": "2026-11-04",
+  "spot_price": 120.0,
   "expected_move": {
     "earnings_date": "2026-10-29",
     "timing": "bmo",
@@ -42,7 +42,25 @@
     "forecast_feature_hash": "a25b60410d7275f78df5bb4e62150ecf0dce12f93289e13244a8ec92204c227f",
     "forecast_frozen_eligible": true
   },
-  "straddle_features": [],
+  "straddle_features": [
+    {
+      "expiration": "2026-12-18",
+      "dte": 44,
+      "atm_strike": 120.0,
+      "atm_iv": 0.365046,
+      "atm_call_iv": 0.3608,
+      "atm_put_iv": 0.3693,
+      "straddle_mid": 12.095,
+      "em_straddle": 12.095,
+      "em_straddle_pct": 0.100792,
+      "em_iv": 15.209287,
+      "em_iv_pct": 0.126744,
+      "call_delta": 0.481,
+      "call_gamma": 0.0269,
+      "call_vega": 0.1629,
+      "call_theta": -0.0711
+    }
+  ],
   "earnings_history": [
     {
       "date": "2026-10-29",
@@ -430,13 +448,13 @@
   ],
   "next_earnings": "2026-10-29",
   "vol_regime": {
-    "iv_current": 0.3641,
-    "iv_rank": 0.346622,
+    "iv_current": 0.376,
+    "iv_rank": 0.379568,
     "iv_year_high": 0.6001,
     "iv_year_low": 0.2389,
-    "hv_current": 0.2814,
-    "hv_rank": 0.163916,
-    "iv_mom_week": -0.1232,
+    "hv_current": 0.2742,
+    "hv_rank": 0.137514,
+    "iv_mom_week": -0.077,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"

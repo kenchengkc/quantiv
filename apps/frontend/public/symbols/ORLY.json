@@ -1,7 +1,7 @@
 {
   "symbol": "ORLY",
-  "as_of_date": "2026-11-03",
-  "spot_price": 89.99,
+  "as_of_date": "2026-11-04",
+  "spot_price": 90.0,
   "expected_move": {
     "earnings_date": "2026-10-28",
     "timing": "amc",
@@ -24,7 +24,25 @@
     "ml_publication_status": "held",
     "ml_publication_reason": "no_eligible_current_forecast"
   },
-  "straddle_features": [],
+  "straddle_features": [
+    {
+      "expiration": "2026-12-18",
+      "dte": 44,
+      "atm_strike": 90.0,
+      "atm_iv": 0.247389,
+      "atm_call_iv": 0.2538,
+      "atm_put_iv": 0.241,
+      "straddle_mid": 6.625,
+      "em_straddle": 6.625,
+      "em_straddle_pct": 0.073611,
+      "em_iv": 7.730422,
+      "em_iv_pct": 0.085894,
+      "call_delta": 0.6501,
+      "call_gamma": 0.0455,
+      "call_vega": 0.1186,
+      "call_theta": -0.0398
+    }
+  ],
   "earnings_history": [
     {
       "date": "2026-10-28",
@@ -415,13 +433,13 @@
   ],
   "next_earnings": "2026-10-28",
   "vol_regime": {
-    "iv_current": 0.267,
-    "iv_rank": 0.23073,
+    "iv_current": 0.2584,
+    "iv_rank": 0.18683,
     "iv_year_high": 0.4177,
     "iv_year_low": 0.2218,
-    "hv_current": 0.2094,
-    "hv_rank": 0.107507,
-    "iv_mom_week": -0.051,
+    "hv_current": 0.2208,
+    "hv_rank": 0.160334,
+    "iv_mom_week": -0.0425,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

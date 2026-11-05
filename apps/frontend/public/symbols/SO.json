@@ -1,7 +1,7 @@
 {
   "symbol": "SO",
-  "as_of_date": "2026-11-03",
-  "spot_price": 95.0,
+  "as_of_date": "2026-11-04",
+  "spot_price": 92.5,
   "expected_move": {
     "earnings_date": "2026-10-28",
     "timing": "before_market_open",
@@ -24,38 +24,21 @@
   },
   "straddle_features": [
     {
-      "expiration": "2026-11-20",
-      "dte": 17,
-      "atm_strike": 95.0,
-      "atm_iv": 0.331546,
-      "atm_call_iv": 0.2991,
-      "atm_put_iv": 0.3635,
-      "straddle_mid": 5.525,
-      "em_straddle": 5.525,
-      "em_straddle_pct": 0.058158,
-      "em_iv": 6.797449,
-      "em_iv_pct": 0.071552,
-      "call_delta": 0.4015,
-      "call_gamma": 0.0636,
-      "call_vega": 0.0778,
-      "call_theta": -0.0584
-    },
-    {
       "expiration": "2026-12-18",
-      "dte": 45,
-      "atm_strike": 95.0,
-      "atm_iv": 0.223699,
-      "atm_call_iv": 0.2242,
-      "atm_put_iv": 0.2232,
-      "straddle_mid": 6.0,
-      "em_straddle": 6.0,
-      "em_straddle_pct": 0.063158,
-      "em_iv": 7.461861,
-      "em_iv_pct": 0.078546,
-      "call_delta": 0.431,
-      "call_gamma": 0.0529,
-      "call_vega": 0.1284,
-      "call_theta": -0.0292
+      "dte": 44,
+      "atm_strike": 92.5,
+      "atm_iv": 0.23635,
+      "atm_call_iv": 0.2363,
+      "atm_put_iv": 0.2364,
+      "straddle_mid": 6.025,
+      "em_straddle": 6.025,
+      "em_straddle_pct": 0.065135,
+      "em_iv": 7.590622,
+      "em_iv_pct": 0.082061,
+      "call_delta": 0.5092,
+      "call_gamma": 0.0515,
+      "call_vega": 0.1273,
+      "call_theta": -0.0264
     }
   ],
   "earnings_history": [
@@ -446,13 +429,13 @@
   ],
   "next_earnings": "2026-10-28",
   "vol_regime": {
-    "iv_current": 0.2364,
-    "iv_rank": 0.622542,
+    "iv_current": 0.2565,
+    "iv_rank": 0.774584,
     "iv_year_high": 0.2863,
     "iv_year_low": 0.1541,
-    "hv_current": 0.2024,
-    "hv_rank": 0.684075,
-    "iv_mom_week": 0.0047,
+    "hv_current": 0.1927,
+    "hv_rank": 0.601027,
+    "iv_mom_week": 0.0234,
     "iv_mom_month": null
   },
   "next_earnings_timing": "unknown"
