@@ -1,7 +1,7 @@
 {
   "symbol": "BXP",
-  "as_of_date": "2026-11-04",
-  "spot_price": 67.5,
+  "as_of_date": "2026-11-05",
+  "spot_price": 65.0,
   "expected_move": {
     "earnings_date": "2026-10-27",
     "timing": "amc",
@@ -43,38 +43,21 @@
   },
   "straddle_features": [
     {
-      "expiration": "2026-11-20",
-      "dte": 16,
-      "atm_strike": 67.5,
-      "atm_iv": 0.303779,
-      "atm_call_iv": 0.2978,
-      "atm_put_iv": 0.3097,
-      "straddle_mid": 3.6,
-      "em_straddle": 3.6,
-      "em_straddle_pct": 0.053333,
-      "em_iv": 4.293134,
-      "em_iv_pct": 0.063602,
-      "call_delta": 0.3667,
-      "call_gamma": 0.0914,
-      "call_vega": 0.0518,
-      "call_theta": -0.0482
-    },
-    {
       "expiration": "2026-12-18",
-      "dte": 44,
-      "atm_strike": 67.5,
-      "atm_iv": 0.283305,
-      "atm_call_iv": 0.2855,
-      "atm_put_iv": 0.2811,
-      "straddle_mid": 5.35,
-      "em_straddle": 5.35,
-      "em_straddle_pct": 0.079259,
-      "em_iv": 6.639537,
-      "em_iv_pct": 0.098364,
-      "call_delta": 0.4361,
-      "call_gamma": 0.0601,
-      "call_vega": 0.0899,
-      "call_theta": -0.0306
+      "dte": 43,
+      "atm_strike": 65.0,
+      "atm_iv": 0.3017,
+      "atm_call_iv": 0.3013,
+      "atm_put_iv": 0.3021,
+      "straddle_mid": 5.345,
+      "em_straddle": 5.345,
+      "em_straddle_pct": 0.082231,
+      "em_iv": 6.730952,
+      "em_iv_pct": 0.103553,
+      "call_delta": 0.5236,
+      "call_gamma": 0.0586,
+      "call_vega": 0.0885,
+      "call_theta": -0.0291
     }
   ],
   "earnings_history": [
@@ -484,13 +467,13 @@
   ],
   "next_earnings": "2026-10-27",
   "vol_regime": {
-    "iv_current": 0.281,
-    "iv_rank": 0.245893,
+    "iv_current": 0.3137,
+    "iv_rank": 0.419184,
     "iv_year_high": 0.4233,
     "iv_year_low": 0.2346,
-    "hv_current": 0.3179,
-    "hv_rank": 0.551966,
-    "iv_mom_week": -0.0547,
+    "hv_current": 0.32,
+    "hv_rank": 0.561798,
+    "iv_mom_week": 0.0188,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

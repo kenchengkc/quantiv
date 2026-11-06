@@ -1,7 +1,7 @@
 {
   "symbol": "CNMD",
-  "as_of_date": "2026-11-04",
-  "spot_price": 55.0,
+  "as_of_date": "2026-11-05",
+  "spot_price": 52.83,
   "expected_move": {
     "earnings_date": "2026-10-28",
     "timing": "amc",
@@ -33,25 +33,7 @@
     "forecast_feature_hash": "17669fea7ef4562712486a5fd1226ed7d54276b703074d214addeff00e813cb3",
     "forecast_frozen_eligible": true
   },
-  "straddle_features": [
-    {
-      "expiration": "2026-12-18",
-      "dte": 44,
-      "atm_strike": 55.0,
-      "atm_iv": 0.366113,
-      "atm_call_iv": 0.3634,
-      "atm_put_iv": 0.3688,
-      "straddle_mid": 5.625,
-      "em_straddle": 5.625,
-      "em_straddle_pct": 0.102273,
-      "em_iv": 6.991297,
-      "em_iv_pct": 0.127114,
-      "call_delta": 0.4218,
-      "call_gamma": 0.0572,
-      "call_vega": 0.0722,
-      "call_theta": -0.0262
-    }
-  ],
+  "straddle_features": [],
   "earnings_history": [
     {
       "date": "2026-10-28",
@@ -431,13 +413,13 @@
   ],
   "next_earnings": "2026-10-28",
   "vol_regime": {
-    "iv_current": 0.3677,
-    "iv_rank": 0.050955,
+    "iv_current": 0.453,
+    "iv_rank": 0.215595,
     "iv_year_high": 0.8594,
     "iv_year_low": 0.3413,
-    "hv_current": 0.5441,
-    "hv_rank": 0.64883,
-    "iv_mom_week": -0.0823,
+    "hv_current": 0.5447,
+    "hv_rank": 0.65013,
+    "iv_mom_week": 0.087,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

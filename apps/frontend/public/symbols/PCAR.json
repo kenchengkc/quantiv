@@ -1,6 +1,6 @@
 {
   "symbol": "PCAR",
-  "as_of_date": "2026-11-04",
+  "as_of_date": "2026-11-05",
   "spot_price": 105.0,
   "expected_move": {
     "earnings_date": "2026-10-27",
@@ -26,21 +26,38 @@
   },
   "straddle_features": [
     {
-      "expiration": "2026-12-18",
-      "dte": 44,
+      "expiration": "2026-11-20",
+      "dte": 15,
       "atm_strike": 105.0,
-      "atm_iv": 0.266249,
-      "atm_call_iv": 0.2653,
-      "atm_put_iv": 0.2672,
-      "straddle_mid": 7.85,
-      "em_straddle": 7.85,
-      "em_straddle_pct": 0.074762,
-      "em_iv": 9.70639,
-      "em_iv_pct": 0.092442,
-      "call_delta": 0.5738,
-      "call_gamma": 0.0399,
-      "call_vega": 0.1439,
-      "call_theta": -0.046
+      "atm_iv": 0.296603,
+      "atm_call_iv": 0.2949,
+      "atm_put_iv": 0.2983,
+      "straddle_mid": 5.05,
+      "em_straddle": 5.05,
+      "em_straddle_pct": 0.048095,
+      "em_iv": 6.313412,
+      "em_iv_pct": 0.060128,
+      "call_delta": 0.4574,
+      "call_gamma": 0.0632,
+      "call_vega": 0.0836,
+      "call_theta": -0.0723
+    },
+    {
+      "expiration": "2026-12-18",
+      "dte": 43,
+      "atm_strike": 105.0,
+      "atm_iv": 0.287702,
+      "atm_call_iv": 0.2834,
+      "atm_put_iv": 0.292,
+      "straddle_mid": 8.25,
+      "em_straddle": 8.25,
+      "em_straddle_pct": 0.078571,
+      "em_iv": 10.368579,
+      "em_iv_pct": 0.098748,
+      "call_delta": 0.5105,
+      "call_gamma": 0.0391,
+      "call_vega": 0.1427,
+      "call_theta": -0.0501
     }
   ],
   "earnings_history": [
@@ -426,13 +443,13 @@
   ],
   "next_earnings": "2026-10-27",
   "vol_regime": {
-    "iv_current": 0.2778,
-    "iv_rank": 0.499548,
+    "iv_current": 0.2896,
+    "iv_rank": 0.552941,
     "iv_year_high": 0.3884,
     "iv_year_low": 0.1674,
-    "hv_current": 0.2311,
-    "hv_rank": 0.372193,
-    "iv_mom_week": -0.0085,
+    "hv_current": 0.2325,
+    "hv_rank": 0.379679,
+    "iv_mom_week": -0.005,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"

@@ -1,7 +1,7 @@
 {
   "symbol": "BKH",
-  "as_of_date": "2026-11-04",
-  "spot_price": 84.19,
+  "as_of_date": "2026-11-05",
+  "spot_price": 84.63,
   "expected_move": {
     "earnings_date": "2026-11-04",
     "timing": "amc",
@@ -37,11 +37,11 @@
   "earnings_history": [
     {
       "date": "2026-11-04",
-      "timing": "after_market_close",
+      "timing": "amc",
       "q": "Q3 26",
       "fiscal_year": 2026,
       "fiscal_q": "Q3",
-      "actual": null,
+      "actual": 0.005226,
       "implied": null,
       "implied_as_of": null,
       "implied_expiration": null,
@@ -57,8 +57,8 @@
       "revenue_actual": null,
       "revenue_estimate": null,
       "rev_surprise_pct": null,
-      "realized_target_protocol": null,
-      "realized_label_source": null,
+      "realized_target_protocol": "quantiv.session-reaction.v2",
+      "realized_label_source": "ohlcv_session_close",
       "em_ml_pct": 0.020749,
       "em_ml_abs": 1.705529,
       "model_horizon": 1,
@@ -406,13 +406,13 @@
   ],
   "next_earnings": "2026-11-04",
   "vol_regime": {
-    "iv_current": 0.2645,
-    "iv_rank": 0.233878,
+    "iv_current": 0.2925,
+    "iv_rank": 0.354256,
     "iv_year_high": 0.4427,
     "iv_year_low": 0.2101,
-    "hv_current": 0.2405,
-    "hv_rank": 0.40256,
-    "iv_mom_week": -0.0275,
+    "hv_current": 0.2367,
+    "hv_rank": 0.380454,
+    "iv_mom_week": 0.0011,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

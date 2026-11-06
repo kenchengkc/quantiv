@@ -1,7 +1,7 @@
 {
   "symbol": "DT",
-  "as_of_date": "2026-11-04",
-  "spot_price": 47.5,
+  "as_of_date": "2026-11-05",
+  "spot_price": 45.0,
   "expected_move": {
     "earnings_date": "2026-11-03",
     "timing": "bmo",
@@ -45,37 +45,20 @@
   "straddle_features": [
     {
       "expiration": "2026-11-20",
-      "dte": 16,
-      "atm_strike": 47.5,
-      "atm_iv": 0.471696,
-      "atm_call_iv": 0.4747,
-      "atm_put_iv": 0.4687,
-      "straddle_mid": 3.75,
-      "em_straddle": 3.75,
-      "em_straddle_pct": 0.078947,
-      "em_iv": 4.691044,
-      "em_iv_pct": 0.098759,
-      "call_delta": 0.4575,
-      "call_gamma": 0.0852,
-      "call_vega": 0.0387,
-      "call_theta": -0.0573
-    },
-    {
-      "expiration": "2026-12-18",
-      "dte": 44,
-      "atm_strike": 47.5,
-      "atm_iv": 0.449994,
-      "atm_call_iv": 0.4528,
-      "atm_put_iv": 0.4472,
-      "straddle_mid": 5.875,
-      "em_straddle": 5.875,
-      "em_straddle_pct": 0.123684,
-      "em_iv": 7.421296,
-      "em_iv_pct": 0.156238,
-      "call_delta": 0.4942,
-      "call_gamma": 0.054,
-      "call_vega": 0.0645,
-      "call_theta": -0.0336
+      "dte": 15,
+      "atm_strike": 45.0,
+      "atm_iv": 0.5127,
+      "atm_call_iv": 0.5201,
+      "atm_put_iv": 0.5053,
+      "straddle_mid": 3.8,
+      "em_straddle": 3.8,
+      "em_straddle_pct": 0.084444,
+      "em_iv": 4.677082,
+      "em_iv_pct": 0.103935,
+      "call_delta": 0.4309,
+      "call_gamma": 0.0855,
+      "call_vega": 0.0348,
+      "call_theta": -0.0667
     }
   ],
   "earnings_history": [
@@ -486,13 +469,13 @@
   ],
   "next_earnings": "2026-11-03",
   "vol_regime": {
-    "iv_current": 0.4689,
-    "iv_rank": 0.43327,
+    "iv_current": 0.5072,
+    "iv_rank": 0.537374,
     "iv_year_high": 0.6774,
     "iv_year_low": 0.3095,
-    "hv_current": 0.5782,
-    "hv_rank": 0.822153,
-    "iv_mom_week": -0.0547,
+    "hv_current": 0.6033,
+    "hv_rank": 0.892897,
+    "iv_mom_week": -0.0337,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"

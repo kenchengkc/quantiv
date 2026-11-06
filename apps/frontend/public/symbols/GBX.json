@@ -1,6 +1,6 @@
 {
   "symbol": "GBX",
-  "as_of_date": "2026-11-04",
+  "as_of_date": "2026-11-05",
   "spot_price": 42.5,
   "expected_move": {
     "earnings_date": "2026-10-26",
@@ -26,38 +26,21 @@
   },
   "straddle_features": [
     {
-      "expiration": "2026-11-20",
-      "dte": 16,
-      "atm_strike": 42.5,
-      "atm_iv": 0.396367,
-      "atm_call_iv": 0.4117,
-      "atm_put_iv": 0.3809,
-      "straddle_mid": 2.95,
-      "em_straddle": 2.95,
-      "em_straddle_pct": 0.069412,
-      "em_iv": 3.526958,
-      "em_iv_pct": 0.082987,
-      "call_delta": 0.6136,
-      "call_gamma": 0.0987,
-      "call_vega": 0.0345,
-      "call_theta": -0.0228
-    },
-    {
       "expiration": "2026-12-18",
-      "dte": 44,
-      "atm_strike": 45.0,
-      "atm_iv": 0.330601,
-      "atm_call_iv": 0.3303,
-      "atm_put_iv": 0.3309,
+      "dte": 43,
+      "atm_strike": 42.5,
+      "atm_iv": 0.35885,
+      "atm_call_iv": 0.3592,
+      "atm_put_iv": 0.3585,
       "straddle_mid": 4.175,
       "em_straddle": 4.175,
-      "em_straddle_pct": 0.092778,
-      "em_iv": 5.165316,
-      "em_iv_pct": 0.114785,
-      "call_delta": 0.4137,
-      "call_gamma": 0.0763,
-      "call_vega": 0.0589,
-      "call_theta": -0.0184
+      "em_straddle_pct": 0.098235,
+      "em_iv": 5.23467,
+      "em_iv_pct": 0.123169,
+      "call_delta": 0.5414,
+      "call_gamma": 0.0744,
+      "call_vega": 0.0579,
+      "call_theta": -0.0226
     }
   ],
   "earnings_history": [
@@ -450,13 +433,13 @@
   ],
   "next_earnings": "2026-10-26",
   "vol_regime": {
-    "iv_current": 0.3509,
-    "iv_rank": 0.249809,
+    "iv_current": 0.3837,
+    "iv_rank": 0.333333,
     "iv_year_high": 0.6455,
     "iv_year_low": 0.2528,
-    "hv_current": 0.3784,
-    "hv_rank": 0.70126,
-    "iv_mom_week": -0.0009,
+    "hv_current": 0.386,
+    "hv_rank": 0.729429,
+    "iv_mom_week": 0.038,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

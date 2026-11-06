@@ -1,6 +1,6 @@
 {
   "symbol": "ITRI",
-  "as_of_date": "2026-11-04",
+  "as_of_date": "2026-11-05",
   "spot_price": 100.0,
   "expected_move": {
     "earnings_date": "2026-10-27",
@@ -35,7 +35,7 @@
     "ml_publication_status": "held",
     "ml_publication_reason": "no_eligible_current_forecast",
     "forecast_scored_at": "2026-10-25T08:59:56.778474+00:00",
-    "forecast_published_at": "2026-11-04T09:32:37+00:00",
+    "forecast_published_at": "2026-11-05T09:36:54+00:00",
     "forecast_feature_cutoff_at": "2026-10-26T20:00:00+00:00",
     "forecast_prediction_deadline_at": "2026-10-27T04:00:00+00:00",
     "forecast_feature_snapshot_at": "2026-10-23T20:00:00+00:00",
@@ -45,20 +45,20 @@
   "straddle_features": [
     {
       "expiration": "2026-12-18",
-      "dte": 44,
+      "dte": 43,
       "atm_strike": 100.0,
-      "atm_iv": 0.379499,
-      "atm_call_iv": 0.3779,
-      "atm_put_iv": 0.3811,
-      "straddle_mid": 10.8,
-      "em_straddle": 10.8,
-      "em_straddle_pct": 0.108,
-      "em_iv": 13.176205,
-      "em_iv_pct": 0.131762,
-      "call_delta": 0.5993,
-      "call_gamma": 0.0291,
-      "call_vega": 0.1368,
-      "call_theta": -0.069
+      "atm_iv": 0.377,
+      "atm_call_iv": 0.379,
+      "atm_put_iv": 0.375,
+      "straddle_mid": 10.3,
+      "em_straddle": 10.3,
+      "em_straddle_pct": 0.103,
+      "em_iv": 12.939847,
+      "em_iv_pct": 0.129398,
+      "call_delta": 0.522,
+      "call_gamma": 0.0307,
+      "call_vega": 0.1358,
+      "call_theta": -0.0644
     }
   ],
   "earnings_history": [
@@ -93,7 +93,7 @@
       "forecast_id": "3c41c06a7500339f5cbe5720cb96c759ac7a7f57c2d6b5a49d92fdef828f7a42",
       "forecast_model_bundle_id": "d14dc7f2aa6b175956922eb6266b8523742add962668b7d6b8833cc2c869dd1b",
       "forecast_scored_at": "2026-10-25T08:59:56.778474+00:00",
-      "forecast_published_at": "2026-11-04T09:32:37+00:00",
+      "forecast_published_at": "2026-11-05T09:36:54+00:00",
       "forecast_feature_cutoff_at": "2026-10-26T20:00:00+00:00",
       "forecast_prediction_deadline_at": "2026-10-27T04:00:00+00:00",
       "forecast_feature_snapshot_at": "2026-10-23T20:00:00+00:00",
@@ -469,13 +469,13 @@
   ],
   "next_earnings": "2026-10-27",
   "vol_regime": {
-    "iv_current": 0.4008,
-    "iv_rank": 0.170967,
+    "iv_current": 0.3952,
+    "iv_rank": 0.161335,
     "iv_year_high": 0.8828,
     "iv_year_low": 0.3014,
-    "hv_current": 0.3692,
-    "hv_rank": 0.322302,
-    "iv_mom_week": 0.0124,
+    "hv_current": 0.3762,
+    "hv_rank": 0.334624,
+    "iv_mom_week": 0.0396,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"

@@ -1,7 +1,7 @@
 {
   "symbol": "ZBRA",
-  "as_of_date": "2026-11-04",
-  "spot_price": 330.0,
+  "as_of_date": "2026-11-05",
+  "spot_price": 320.0,
   "expected_move": {
     "earnings_date": "2026-11-03",
     "timing": "bmo",
@@ -26,21 +26,38 @@
   },
   "straddle_features": [
     {
+      "expiration": "2026-11-20",
+      "dte": 15,
+      "atm_strike": 320.0,
+      "atm_iv": 0.438346,
+      "atm_call_iv": 0.4452,
+      "atm_put_iv": 0.4315,
+      "straddle_mid": 22.89,
+      "em_straddle": 22.89,
+      "em_straddle_pct": 0.071531,
+      "em_iv": 28.435852,
+      "em_iv_pct": 0.088862,
+      "call_delta": 0.5563,
+      "call_gamma": 0.0136,
+      "call_vega": 0.2577,
+      "call_theta": -0.4224
+    },
+    {
       "expiration": "2026-12-18",
-      "dte": 44,
+      "dte": 43,
       "atm_strike": 330.0,
-      "atm_iv": 0.380496,
-      "atm_call_iv": 0.3865,
-      "atm_put_iv": 0.3745,
-      "straddle_mid": 35.1,
-      "em_straddle": 35.1,
-      "em_straddle_pct": 0.106364,
-      "em_iv": 43.595734,
-      "em_iv_pct": 0.132108,
-      "call_delta": 0.5643,
-      "call_gamma": 0.0088,
-      "call_vega": 0.4545,
-      "call_theta": -0.2202
+      "atm_iv": 0.398952,
+      "atm_call_iv": 0.4009,
+      "atm_put_iv": 0.397,
+      "straddle_mid": 36.095,
+      "em_straddle": 36.095,
+      "em_straddle_pct": 0.109379,
+      "em_iv": 45.187897,
+      "em_iv_pct": 0.136933,
+      "call_delta": 0.4806,
+      "call_gamma": 0.009,
+      "call_vega": 0.4414,
+      "call_theta": -0.236
     }
   ],
   "earnings_history": [
@@ -433,13 +450,13 @@
   ],
   "next_earnings": "2026-11-03",
   "vol_regime": {
-    "iv_current": 0.3986,
-    "iv_rank": 0.223669,
+    "iv_current": 0.4111,
+    "iv_rank": 0.260651,
     "iv_year_high": 0.661,
     "iv_year_low": 0.323,
-    "hv_current": 0.3587,
-    "hv_rank": 0.242117,
-    "iv_mom_week": -0.1005,
+    "hv_current": 0.3671,
+    "hv_rank": 0.257883,
+    "iv_mom_week": -0.2086,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"

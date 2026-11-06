@@ -1,6 +1,6 @@
 {
   "symbol": "CHDN",
-  "as_of_date": "2026-11-04",
+  "as_of_date": "2026-11-05",
   "spot_price": 100.0,
   "expected_move": {
     "earnings_date": "2026-10-28",
@@ -27,20 +27,20 @@
   "straddle_features": [
     {
       "expiration": "2026-12-18",
-      "dte": 44,
+      "dte": 43,
       "atm_strike": 100.0,
-      "atm_iv": 0.364005,
-      "atm_call_iv": 0.3611,
-      "atm_put_iv": 0.3669,
-      "straddle_mid": 10.15,
-      "em_straddle": 10.15,
-      "em_straddle_pct": 0.1015,
-      "em_iv": 12.638276,
-      "em_iv_pct": 0.126383,
-      "call_delta": 0.4263,
-      "call_gamma": 0.0315,
-      "call_vega": 0.1318,
-      "call_theta": -0.0451
+      "atm_iv": 0.352398,
+      "atm_call_iv": 0.3544,
+      "atm_put_iv": 0.3504,
+      "straddle_mid": 9.65,
+      "em_straddle": 9.65,
+      "em_straddle_pct": 0.0965,
+      "em_iv": 12.095445,
+      "em_iv_pct": 0.120954,
+      "call_delta": 0.4511,
+      "call_gamma": 0.0329,
+      "call_vega": 0.1325,
+      "call_theta": -0.0512
     }
   ],
   "earnings_history": [
@@ -426,13 +426,13 @@
   ],
   "next_earnings": "2026-10-28",
   "vol_regime": {
-    "iv_current": 0.3124,
-    "iv_rank": 0.256163,
+    "iv_current": 0.3641,
+    "iv_rank": 0.455316,
     "iv_year_high": 0.5055,
     "iv_year_low": 0.2459,
-    "hv_current": 0.4797,
-    "hv_rank": 0.952005,
-    "iv_mom_week": -0.1518,
+    "hv_current": 0.4763,
+    "hv_rank": 0.932806,
+    "iv_mom_week": 0.0137,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

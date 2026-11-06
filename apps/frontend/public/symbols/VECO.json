@@ -1,7 +1,7 @@
 {
   "symbol": "VECO",
-  "as_of_date": "2026-11-04",
-  "spot_price": 36.0,
+  "as_of_date": "2026-11-05",
+  "spot_price": 33.25,
   "expected_move": {
     "earnings_date": "2026-11-04",
     "timing": "amc",
@@ -37,11 +37,11 @@
   "earnings_history": [
     {
       "date": "2026-11-04",
-      "timing": "after_market_close",
+      "timing": "amc",
       "q": "Q3 26",
       "fiscal_year": 2026,
       "fiscal_q": "Q3",
-      "actual": null,
+      "actual": -0.076389,
       "implied": null,
       "implied_as_of": null,
       "implied_expiration": null,
@@ -57,8 +57,8 @@
       "revenue_actual": null,
       "revenue_estimate": 217593203.0,
       "rev_surprise_pct": null,
-      "realized_target_protocol": null,
-      "realized_label_source": null,
+      "realized_target_protocol": "quantiv.session-reaction.v2",
+      "realized_label_source": "ohlcv_session_close",
       "em_ml_pct": 0.07271,
       "em_ml_abs": 2.718621,
       "model_horizon": 1,
@@ -427,13 +427,13 @@
   ],
   "next_earnings": "2026-11-04",
   "vol_regime": {
-    "iv_current": 0.9837,
-    "iv_rank": 0.794767,
+    "iv_current": 0.7778,
+    "iv_rank": 0.530657,
     "iv_year_high": 1.1437,
     "iv_year_low": 0.3641,
-    "hv_current": 0.7389,
-    "hv_rank": 0.377815,
-    "iv_mom_week": 0.2711,
+    "hv_current": 0.7673,
+    "hv_rank": 0.431119,
+    "iv_mom_week": 0.0269,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"
