@@ -1,7 +1,7 @@
 {
   "symbol": "CL",
-  "as_of_date": "2026-11-05",
-  "spot_price": 100.0,
+  "as_of_date": "2026-11-06",
+  "spot_price": 97.5,
   "expected_move": {
     "earnings_date": "2026-10-30",
     "timing": "bmo",
@@ -26,38 +26,21 @@
   },
   "straddle_features": [
     {
-      "expiration": "2026-11-20",
-      "dte": 15,
-      "atm_strike": 100.0,
-      "atm_iv": 0.250285,
-      "atm_call_iv": 0.2778,
-      "atm_put_iv": 0.2227,
-      "straddle_mid": 4.15,
-      "em_straddle": 4.15,
-      "em_straddle_pct": 0.0415,
-      "em_iv": 5.073817,
-      "em_iv_pct": 0.050738,
-      "call_delta": 0.4162,
-      "call_gamma": 0.0701,
-      "call_vega": 0.0778,
-      "call_theta": -0.0715
-    },
-    {
       "expiration": "2026-12-18",
-      "dte": 43,
-      "atm_strike": 100.0,
-      "atm_iv": 0.230197,
-      "atm_call_iv": 0.2296,
-      "atm_put_iv": 0.2308,
-      "straddle_mid": 6.35,
-      "em_straddle": 6.35,
-      "em_straddle_pct": 0.0635,
-      "em_iv": 7.901109,
-      "em_iv_pct": 0.079011,
-      "call_delta": 0.4889,
-      "call_gamma": 0.0514,
-      "call_vega": 0.1354,
-      "call_theta": -0.0444
+      "dte": 42,
+      "atm_strike": 97.5,
+      "atm_iv": 0.228757,
+      "atm_call_iv": 0.2308,
+      "atm_put_iv": 0.2267,
+      "straddle_mid": 6.05,
+      "em_straddle": 6.05,
+      "em_straddle_pct": 0.062051,
+      "em_iv": 7.565844,
+      "em_iv_pct": 0.077598,
+      "call_delta": 0.4917,
+      "call_gamma": 0.0527,
+      "call_vega": 0.1306,
+      "call_theta": -0.0412
     }
   ],
   "earnings_history": [
@@ -450,13 +433,13 @@
   ],
   "next_earnings": "2026-10-30",
   "vol_regime": {
-    "iv_current": 0.2402,
-    "iv_rank": 0.435509,
+    "iv_current": 0.2142,
+    "iv_rank": 0.299739,
     "iv_year_high": 0.3483,
     "iv_year_low": 0.1568,
-    "hv_current": 0.2673,
-    "hv_rank": 0.774402,
-    "iv_mom_week": 0.0063,
+    "hv_current": 0.2779,
+    "hv_rank": 0.842922,
+    "iv_mom_week": -0.017,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"

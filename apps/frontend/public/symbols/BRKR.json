@@ -1,7 +1,7 @@
 {
   "symbol": "BRKR",
-  "as_of_date": "2026-11-05",
-  "spot_price": 60.0,
+  "as_of_date": "2026-11-06",
+  "spot_price": 61.31,
   "expected_move": {
     "earnings_date": "2026-11-04",
     "timing": "bmo",
@@ -43,42 +43,7 @@
     "forecast_feature_hash": "59fa4cfac54304a4b81f7b0185c67b5c76da02937a7eaddf73629dee983597a8",
     "forecast_frozen_eligible": true
   },
-  "straddle_features": [
-    {
-      "expiration": "2026-11-20",
-      "dte": 15,
-      "atm_strike": 60.0,
-      "atm_iv": 0.690388,
-      "atm_call_iv": 0.7117,
-      "atm_put_iv": 0.6688,
-      "straddle_mid": 6.75,
-      "em_straddle": 6.75,
-      "em_straddle_pct": 0.1125,
-      "em_iv": 8.397375,
-      "em_iv_pct": 0.139956,
-      "call_delta": 0.4672,
-      "call_gamma": 0.0478,
-      "call_vega": 0.047,
-      "call_theta": -0.1285
-    },
-    {
-      "expiration": "2026-12-18",
-      "dte": 43,
-      "atm_strike": 60.0,
-      "atm_iv": 0.5947,
-      "atm_call_iv": 0.5734,
-      "atm_put_iv": 0.616,
-      "straddle_mid": 9.7,
-      "em_straddle": 9.7,
-      "em_straddle_pct": 0.161667,
-      "em_iv": 12.247205,
-      "em_iv_pct": 0.20412,
-      "call_delta": 0.4881,
-      "call_gamma": 0.0349,
-      "call_vega": 0.0796,
-      "call_theta": -0.0573
-    }
-  ],
+  "straddle_features": [],
   "earnings_history": [
     {
       "date": "2026-11-04",
@@ -488,13 +453,13 @@
   ],
   "next_earnings": "2026-11-04",
   "vol_regime": {
-    "iv_current": 0.6224,
-    "iv_rank": 0.4463,
+    "iv_current": 0.6285,
+    "iv_rank": 0.461973,
     "iv_year_high": 0.8379,
     "iv_year_low": 0.4487,
-    "hv_current": 0.6476,
-    "hv_rank": 0.498054,
-    "iv_mom_week": -0.0795,
+    "hv_current": 0.6687,
+    "hv_rank": 0.541266,
+    "iv_mom_week": -0.0789,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"

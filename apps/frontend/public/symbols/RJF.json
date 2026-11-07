@@ -1,7 +1,7 @@
 {
   "symbol": "RJF",
-  "as_of_date": "2026-11-05",
-  "spot_price": 165.0,
+  "as_of_date": "2026-11-06",
+  "spot_price": 160.0,
   "expected_move": {
     "earnings_date": "2026-10-28",
     "timing": "amc",
@@ -26,21 +26,38 @@
   },
   "straddle_features": [
     {
+      "expiration": "2026-11-20",
+      "dte": 14,
+      "atm_strike": 160.0,
+      "atm_iv": 0.298668,
+      "atm_call_iv": 0.3158,
+      "atm_put_iv": 0.2812,
+      "straddle_mid": 7.925,
+      "em_straddle": 7.925,
+      "em_straddle_pct": 0.049531,
+      "em_iv": 9.358917,
+      "em_iv_pct": 0.058493,
+      "call_delta": 0.6329,
+      "call_gamma": 0.0374,
+      "call_vega": 0.1199,
+      "call_theta": -0.1471
+    },
+    {
       "expiration": "2026-12-18",
-      "dte": 43,
+      "dte": 42,
       "atm_strike": 165.0,
-      "atm_iv": 0.284251,
-      "atm_call_iv": 0.2858,
-      "atm_put_iv": 0.2827,
-      "straddle_mid": 12.9,
-      "em_straddle": 12.9,
-      "em_straddle_pct": 0.078182,
-      "em_iv": 16.098089,
-      "em_iv_pct": 0.097564,
-      "call_delta": 0.5401,
-      "call_gamma": 0.0245,
-      "call_vega": 0.2248,
-      "call_theta": -0.0864
+      "atm_iv": 0.271594,
+      "atm_call_iv": 0.2687,
+      "atm_put_iv": 0.2745,
+      "straddle_mid": 12.15,
+      "em_straddle": 12.15,
+      "em_straddle_pct": 0.073636,
+      "em_iv": 15.201359,
+      "em_iv_pct": 0.092129,
+      "call_delta": 0.4826,
+      "call_gamma": 0.0268,
+      "call_vega": 0.2201,
+      "call_theta": -0.0796
     }
   ],
   "earnings_history": [
@@ -433,13 +450,13 @@
   ],
   "next_earnings": "2026-10-28",
   "vol_regime": {
-    "iv_current": 0.306,
-    "iv_rank": 0.673901,
+    "iv_current": 0.2838,
+    "iv_rank": 0.550362,
     "iv_year_high": 0.3646,
     "iv_year_low": 0.1849,
-    "hv_current": 0.2482,
-    "hv_rank": 0.371897,
-    "iv_mom_week": 0.0559,
+    "hv_current": 0.2506,
+    "hv_rank": 0.383813,
+    "iv_mom_week": 0.0174,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

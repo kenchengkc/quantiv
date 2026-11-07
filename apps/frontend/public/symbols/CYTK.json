@@ -1,7 +1,7 @@
 {
   "symbol": "CYTK",
-  "as_of_date": "2026-11-05",
-  "spot_price": 55.55,
+  "as_of_date": "2026-11-06",
+  "spot_price": 55.0,
   "expected_move": {
     "earnings_date": "2026-11-04",
     "timing": "amc",
@@ -41,7 +41,25 @@
     "forecast_feature_hash": "137f867e250e5187856eee1d4de9fa49ae93df404837c3d6117ab672e23a595a",
     "forecast_frozen_eligible": true
   },
-  "straddle_features": [],
+  "straddle_features": [
+    {
+      "expiration": "2026-12-18",
+      "dte": 42,
+      "atm_strike": 55.0,
+      "atm_iv": 0.471253,
+      "atm_call_iv": 0.4483,
+      "atm_put_iv": 0.4943,
+      "straddle_mid": 7.0,
+      "em_straddle": 7.0,
+      "em_straddle_pct": 0.127273,
+      "em_iv": 8.792141,
+      "em_iv_pct": 0.159857,
+      "call_delta": 0.493,
+      "call_gamma": 0.049,
+      "call_vega": 0.0729,
+      "call_theta": -0.0443
+    }
+  ],
   "earnings_history": [
     {
       "date": "2026-11-04",
@@ -442,13 +460,13 @@
   ],
   "next_earnings": "2026-11-04",
   "vol_regime": {
-    "iv_current": 0.5461,
-    "iv_rank": 0.098075,
+    "iv_current": 0.4722,
+    "iv_rank": 0.045593,
     "iv_year_high": 1.8161,
     "iv_year_low": 0.408,
-    "hv_current": 0.4814,
-    "hv_rank": 0.556257,
-    "iv_mom_week": 0.1004,
+    "hv_current": 0.4877,
+    "hv_rank": 0.572818,
+    "iv_mom_week": -0.0701,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

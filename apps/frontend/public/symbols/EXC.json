@@ -1,7 +1,7 @@
 {
   "symbol": "EXC",
-  "as_of_date": "2026-11-05",
-  "spot_price": 46.53,
+  "as_of_date": "2026-11-06",
+  "spot_price": 46.0,
   "expected_move": {
     "earnings_date": "2026-10-30",
     "timing": "bmo",
@@ -24,7 +24,25 @@
     "ml_publication_status": "held",
     "ml_publication_reason": "no_eligible_current_forecast"
   },
-  "straddle_features": [],
+  "straddle_features": [
+    {
+      "expiration": "2026-12-18",
+      "dte": 42,
+      "atm_strike": 46.0,
+      "atm_iv": 0.206545,
+      "atm_call_iv": 0.2035,
+      "atm_put_iv": 0.2096,
+      "straddle_mid": 2.575,
+      "em_straddle": 2.575,
+      "em_straddle_pct": 0.055978,
+      "em_iv": 3.222929,
+      "em_iv_pct": 0.070064,
+      "call_delta": 0.4489,
+      "call_gamma": 0.1249,
+      "call_vega": 0.0608,
+      "call_theta": -0.0134
+    }
+  ],
   "earnings_history": [
     {
       "date": "2026-10-30",
@@ -408,13 +426,13 @@
   ],
   "next_earnings": "2026-10-30",
   "vol_regime": {
-    "iv_current": 0.1956,
-    "iv_rank": 0.21627,
+    "iv_current": 0.2192,
+    "iv_rank": 0.450397,
     "iv_year_high": 0.2746,
     "iv_year_low": 0.1738,
-    "hv_current": 0.2026,
-    "hv_rank": 0.431835,
-    "iv_mom_week": -0.016,
+    "hv_current": 0.2148,
+    "hv_rank": 0.524752,
+    "iv_mom_week": -0.0035,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"

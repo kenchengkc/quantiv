@@ -1,6 +1,6 @@
 {
   "symbol": "ITRI",
-  "as_of_date": "2026-11-05",
+  "as_of_date": "2026-11-06",
   "spot_price": 100.0,
   "expected_move": {
     "earnings_date": "2026-10-27",
@@ -45,20 +45,20 @@
   "straddle_features": [
     {
       "expiration": "2026-12-18",
-      "dte": 43,
+      "dte": 42,
       "atm_strike": 100.0,
-      "atm_iv": 0.377,
-      "atm_call_iv": 0.379,
-      "atm_put_iv": 0.375,
-      "straddle_mid": 10.3,
-      "em_straddle": 10.3,
-      "em_straddle_pct": 0.103,
-      "em_iv": 12.939847,
-      "em_iv_pct": 0.129398,
-      "call_delta": 0.522,
-      "call_gamma": 0.0307,
-      "call_vega": 0.1358,
-      "call_theta": -0.0644
+      "atm_iv": 0.408447,
+      "atm_call_iv": 0.4197,
+      "atm_put_iv": 0.3971,
+      "straddle_mid": 11.05,
+      "em_straddle": 11.05,
+      "em_straddle_pct": 0.1105,
+      "em_iv": 13.855225,
+      "em_iv_pct": 0.138552,
+      "call_delta": 0.5116,
+      "call_gamma": 0.0285,
+      "call_vega": 0.1337,
+      "call_theta": -0.077
     }
   ],
   "earnings_history": [
@@ -469,13 +469,13 @@
   ],
   "next_earnings": "2026-10-27",
   "vol_regime": {
-    "iv_current": 0.3952,
-    "iv_rank": 0.161335,
+    "iv_current": 0.3768,
+    "iv_rank": 0.129687,
     "iv_year_high": 0.8828,
     "iv_year_low": 0.3014,
-    "hv_current": 0.3762,
-    "hv_rank": 0.334624,
-    "iv_mom_week": 0.0396,
+    "hv_current": 0.3723,
+    "hv_rank": 0.327759,
+    "iv_mom_week": -0.0074,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"

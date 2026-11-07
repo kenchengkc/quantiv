@@ -1,7 +1,7 @@
 {
   "symbol": "ODFL",
-  "as_of_date": "2026-11-05",
-  "spot_price": 170.0,
+  "as_of_date": "2026-11-06",
+  "spot_price": 165.0,
   "expected_move": {
     "earnings_date": "2026-10-28",
     "timing": "bmo",
@@ -26,38 +26,21 @@
   },
   "straddle_features": [
     {
-      "expiration": "2026-11-20",
-      "dte": 15,
-      "atm_strike": 170.0,
-      "atm_iv": 0.4003,
-      "atm_call_iv": 0.4056,
-      "atm_put_iv": 0.395,
-      "straddle_mid": 11.1,
-      "em_straddle": 11.1,
-      "em_straddle_pct": 0.065294,
-      "em_iv": 13.795381,
-      "em_iv_pct": 0.081149,
-      "call_delta": 0.5516,
-      "call_gamma": 0.0283,
-      "call_vega": 0.1369,
-      "call_theta": -0.2085
-    },
-    {
       "expiration": "2026-12-18",
-      "dte": 43,
-      "atm_strike": 175.0,
-      "atm_iv": 0.378297,
-      "atm_call_iv": 0.3803,
-      "atm_put_iv": 0.3763,
-      "straddle_mid": 18.15,
-      "em_straddle": 18.15,
-      "em_straddle_pct": 0.103714,
-      "em_iv": 22.722663,
-      "em_iv_pct": 0.129844,
-      "call_delta": 0.4631,
-      "call_gamma": 0.0178,
-      "call_vega": 0.2325,
-      "call_theta": -0.1114
+      "dte": 42,
+      "atm_strike": 165.0,
+      "atm_iv": 0.3683,
+      "atm_call_iv": 0.3697,
+      "atm_put_iv": 0.3669,
+      "straddle_mid": 16.45,
+      "em_straddle": 16.45,
+      "em_straddle_pct": 0.099697,
+      "em_iv": 20.614094,
+      "em_iv_pct": 0.124934,
+      "call_delta": 0.5371,
+      "call_gamma": 0.0191,
+      "call_vega": 0.222,
+      "call_theta": -0.1061
     }
   ],
   "earnings_history": [
@@ -450,13 +433,13 @@
   ],
   "next_earnings": "2026-10-28",
   "vol_regime": {
-    "iv_current": 0.3779,
-    "iv_rank": 0.26938,
+    "iv_current": 0.3824,
+    "iv_rank": 0.291182,
     "iv_year_high": 0.5287,
     "iv_year_low": 0.3223,
-    "hv_current": 0.3612,
-    "hv_rank": 0.349488,
-    "iv_mom_week": 0.0459,
+    "hv_current": 0.3729,
+    "hv_rank": 0.380991,
+    "iv_mom_week": 0.0032,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"

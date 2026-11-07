@@ -1,6 +1,6 @@
 {
   "symbol": "OSK",
-  "as_of_date": "2026-11-05",
+  "as_of_date": "2026-11-06",
   "spot_price": 135.0,
   "expected_move": {
     "earnings_date": "2026-10-29",
@@ -26,38 +26,21 @@
   },
   "straddle_features": [
     {
-      "expiration": "2026-11-20",
-      "dte": 15,
-      "atm_strike": 135.0,
-      "atm_iv": 0.45345,
-      "atm_call_iv": 0.4519,
-      "atm_put_iv": 0.455,
-      "straddle_mid": 10.05,
-      "em_straddle": 10.05,
-      "em_straddle_pct": 0.074444,
-      "em_iv": 12.409731,
-      "em_iv_pct": 0.091924,
-      "call_delta": 0.5746,
-      "call_gamma": 0.0312,
-      "call_vega": 0.1083,
-      "call_theta": -0.1646
-    },
-    {
       "expiration": "2026-12-18",
-      "dte": 43,
-      "atm_strike": 140.0,
-      "atm_iv": 0.396998,
-      "atm_call_iv": 0.3989,
-      "atm_put_iv": 0.3951,
-      "straddle_mid": 15.2,
-      "em_straddle": 15.2,
-      "em_straddle_pct": 0.108571,
-      "em_iv": 19.076762,
-      "em_iv_pct": 0.136263,
-      "call_delta": 0.4722,
-      "call_gamma": 0.0212,
-      "call_vega": 0.1867,
-      "call_theta": -0.0928
+      "dte": 42,
+      "atm_strike": 135.0,
+      "atm_iv": 0.376351,
+      "atm_call_iv": 0.3784,
+      "atm_put_iv": 0.3743,
+      "straddle_mid": 13.745,
+      "em_straddle": 13.745,
+      "em_straddle_pct": 0.101815,
+      "em_iv": 17.234759,
+      "em_iv_pct": 0.127665,
+      "call_delta": 0.5295,
+      "call_gamma": 0.0231,
+      "call_vega": 0.1815,
+      "call_theta": -0.0908
     }
   ],
   "earnings_history": [
@@ -450,13 +433,13 @@
   ],
   "next_earnings": "2026-10-29",
   "vol_regime": {
-    "iv_current": 0.4051,
-    "iv_rank": 0.516988,
+    "iv_current": 0.3864,
+    "iv_rank": 0.431129,
     "iv_year_high": 0.5103,
     "iv_year_low": 0.2925,
     "hv_current": 0.3294,
     "hv_rank": 0.205787,
-    "iv_mom_week": 0.0272,
+    "iv_mom_week": -0.0062,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"

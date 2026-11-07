@@ -1,7 +1,7 @@
 {
   "symbol": "NVT",
-  "as_of_date": "2026-11-05",
-  "spot_price": 100.0,
+  "as_of_date": "2026-11-06",
+  "spot_price": 110.0,
   "expected_move": {
     "earnings_date": "2026-10-30",
     "timing": "bmo",
@@ -26,38 +26,21 @@
   },
   "straddle_features": [
     {
-      "expiration": "2026-11-20",
-      "dte": 15,
-      "atm_strike": 100.0,
-      "atm_iv": 0.85855,
-      "atm_call_iv": 0.8677,
-      "atm_put_iv": 0.8494,
-      "straddle_mid": 13.85,
-      "em_straddle": 13.85,
-      "em_straddle_pct": 0.1385,
-      "em_iv": 17.40463,
-      "em_iv_pct": 0.174046,
-      "call_delta": 0.5191,
-      "call_gamma": 0.0232,
-      "call_vega": 0.0799,
-      "call_theta": -0.2578
-    },
-    {
       "expiration": "2026-12-18",
-      "dte": 43,
-      "atm_strike": 100.0,
-      "atm_iv": 0.72255,
-      "atm_call_iv": 0.7264,
-      "atm_put_iv": 0.7187,
-      "straddle_mid": 19.7,
-      "em_straddle": 19.7,
-      "em_straddle_pct": 0.197,
-      "em_iv": 24.80023,
-      "em_iv_pct": 0.248002,
-      "call_delta": 0.5472,
-      "call_gamma": 0.0162,
-      "call_vega": 0.1348,
-      "call_theta": -0.1283
+      "dte": 42,
+      "atm_strike": 110.0,
+      "atm_iv": 0.68965,
+      "atm_call_iv": 0.6895,
+      "atm_put_iv": 0.6898,
+      "straddle_mid": 20.295,
+      "em_straddle": 20.295,
+      "em_straddle_pct": 0.1845,
+      "em_iv": 25.733548,
+      "em_iv_pct": 0.233941,
+      "call_delta": 0.4933,
+      "call_gamma": 0.016,
+      "call_vega": 0.1435,
+      "call_theta": -0.1219
     }
   ],
   "earnings_history": [
@@ -443,13 +426,13 @@
   ],
   "next_earnings": "2026-10-30",
   "vol_regime": {
-    "iv_current": 0.7628,
-    "iv_rank": 1.0,
+    "iv_current": 0.7092,
+    "iv_rank": 0.865462,
     "iv_year_high": 0.7628,
     "iv_year_low": 0.3644,
-    "hv_current": 0.8215,
+    "hv_current": 0.8623,
     "hv_rank": 1.0,
-    "iv_mom_week": 0.1364,
+    "iv_mom_week": 0.1056,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"

@@ -1,6 +1,6 @@
 {
   "symbol": "FTI",
-  "as_of_date": "2026-11-05",
+  "as_of_date": "2026-11-06",
   "spot_price": 65.0,
   "expected_move": {
     "earnings_date": "2026-10-29",
@@ -44,21 +44,38 @@
   },
   "straddle_features": [
     {
-      "expiration": "2026-12-18",
-      "dte": 43,
+      "expiration": "2026-11-20",
+      "dte": 14,
       "atm_strike": 65.0,
-      "atm_iv": 0.399429,
-      "atm_call_iv": 0.4111,
-      "atm_put_iv": 0.3872,
-      "straddle_mid": 7.345,
-      "em_straddle": 7.345,
-      "em_straddle_pct": 0.113,
-      "em_iv": 8.9113,
-      "em_iv_pct": 0.137097,
-      "call_delta": 0.4207,
-      "call_gamma": 0.0453,
-      "call_vega": 0.0832,
-      "call_theta": -0.0481
+      "atm_iv": 0.441945,
+      "atm_call_iv": 0.4471,
+      "atm_put_iv": 0.4368,
+      "straddle_mid": 4.575,
+      "em_straddle": 4.575,
+      "em_straddle_pct": 0.070385,
+      "em_iv": 5.625989,
+      "em_iv_pct": 0.086554,
+      "call_delta": 0.4213,
+      "call_gamma": 0.0704,
+      "call_vega": 0.0486,
+      "call_theta": -0.081
+    },
+    {
+      "expiration": "2026-12-18",
+      "dte": 42,
+      "atm_strike": 65.0,
+      "atm_iv": 0.407048,
+      "atm_call_iv": 0.4097,
+      "atm_put_iv": 0.4044,
+      "straddle_mid": 7.15,
+      "em_straddle": 7.15,
+      "em_straddle_pct": 0.11,
+      "em_iv": 8.975067,
+      "em_iv_pct": 0.138078,
+      "call_delta": 0.4757,
+      "call_gamma": 0.0451,
+      "call_vega": 0.0857,
+      "call_theta": -0.045
     }
   ],
   "earnings_history": [
@@ -420,13 +437,13 @@
   ],
   "next_earnings": "2026-10-29",
   "vol_regime": {
-    "iv_current": 0.4297,
-    "iv_rank": 0.716511,
+    "iv_current": 0.4147,
+    "iv_rank": 0.649755,
     "iv_year_high": 0.4934,
     "iv_year_low": 0.2687,
-    "hv_current": 0.3807,
-    "hv_rank": 0.912876,
-    "iv_mom_week": 0.0592,
+    "hv_current": 0.3942,
+    "hv_rank": 0.999359,
+    "iv_mom_week": 0.0422,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"

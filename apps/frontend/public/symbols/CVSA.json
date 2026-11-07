@@ -1,6 +1,6 @@
 {
   "symbol": "CVSA",
-  "as_of_date": "2026-11-05",
+  "as_of_date": "2026-11-06",
   "spot_price": 110.0,
   "expected_move": {
     "earnings_date": "2026-10-29",
@@ -43,38 +43,21 @@
   },
   "straddle_features": [
     {
-      "expiration": "2026-11-20",
-      "dte": 15,
-      "atm_strike": 110.0,
-      "atm_iv": 0.50264,
-      "atm_call_iv": 0.5206,
-      "atm_put_iv": 0.4847,
-      "straddle_mid": 9.325,
-      "em_straddle": 9.325,
-      "em_straddle_pct": 0.084773,
-      "em_iv": 11.20853,
-      "em_iv_pct": 0.101896,
-      "call_delta": 0.6153,
-      "call_gamma": 0.0319,
-      "call_vega": 0.0871,
-      "call_theta": -0.1471
-    },
-    {
       "expiration": "2026-12-18",
-      "dte": 43,
-      "atm_strike": 115.0,
-      "atm_iv": 0.428252,
-      "atm_call_iv": 0.4304,
-      "atm_put_iv": 0.4261,
-      "straddle_mid": 13.4,
-      "em_straddle": 13.4,
-      "em_straddle_pct": 0.116522,
-      "em_iv": 16.903831,
-      "em_iv_pct": 0.14699,
-      "call_delta": 0.4811,
-      "call_gamma": 0.0238,
-      "call_vega": 0.1538,
-      "call_theta": -0.0773
+      "dte": 42,
+      "atm_strike": 110.0,
+      "atm_iv": 0.4064,
+      "atm_call_iv": 0.4072,
+      "atm_put_iv": 0.4056,
+      "straddle_mid": 12.05,
+      "em_straddle": 12.05,
+      "em_straddle_pct": 0.109545,
+      "em_iv": 15.164368,
+      "em_iv_pct": 0.137858,
+      "call_delta": 0.5307,
+      "call_gamma": 0.0259,
+      "call_vega": 0.1479,
+      "call_theta": -0.0699
     }
   ],
   "earnings_history": [
@@ -196,13 +179,13 @@
   ],
   "next_earnings": "2026-10-29",
   "vol_regime": {
-    "iv_current": 0.4423,
-    "iv_rank": 0.37553,
+    "iv_current": 0.4038,
+    "iv_rank": 0.249918,
     "iv_year_high": 0.6337,
     "iv_year_low": 0.3272,
-    "hv_current": 0.3823,
-    "hv_rank": 0.318304,
-    "iv_mom_week": -0.1191,
+    "hv_current": 0.3801,
+    "hv_rank": 0.314083,
+    "iv_mom_week": -0.0102,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

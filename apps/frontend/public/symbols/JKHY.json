@@ -1,7 +1,7 @@
 {
   "symbol": "JKHY",
-  "as_of_date": "2026-11-05",
-  "spot_price": 185.0,
+  "as_of_date": "2026-11-06",
+  "spot_price": 175.0,
   "expected_move": {
     "earnings_date": "2026-11-03",
     "timing": "amc",
@@ -26,38 +26,21 @@
   },
   "straddle_features": [
     {
-      "expiration": "2026-11-20",
-      "dte": 15,
-      "atm_strike": 185.0,
-      "atm_iv": 0.37928,
-      "atm_call_iv": 0.3753,
-      "atm_put_iv": 0.3833,
-      "straddle_mid": 11.75,
-      "em_straddle": 11.75,
-      "em_straddle_pct": 0.063514,
-      "em_iv": 14.2243,
-      "em_iv_pct": 0.076888,
-      "call_delta": 0.3971,
-      "call_gamma": 0.0281,
-      "call_vega": 0.1409,
-      "call_theta": -0.1911
-    },
-    {
       "expiration": "2026-12-18",
-      "dte": 43,
-      "atm_strike": 180.0,
-      "atm_iv": 0.3497,
-      "atm_call_iv": 0.3495,
-      "atm_put_iv": 0.3499,
-      "straddle_mid": 17.25,
-      "em_straddle": 17.25,
-      "em_straddle_pct": 0.095833,
-      "em_iv": 21.60508,
-      "em_iv_pct": 0.120028,
-      "call_delta": 0.54,
-      "call_gamma": 0.0183,
-      "call_vega": 0.2452,
-      "call_theta": -0.1069
+      "dte": 42,
+      "atm_strike": 175.0,
+      "atm_iv": 0.336559,
+      "atm_call_iv": 0.3322,
+      "atm_put_iv": 0.3409,
+      "straddle_mid": 15.85,
+      "em_straddle": 15.85,
+      "em_straddle_pct": 0.090571,
+      "em_iv": 19.97919,
+      "em_iv_pct": 0.114167,
+      "call_delta": 0.4849,
+      "call_gamma": 0.0203,
+      "call_vega": 0.2332,
+      "call_theta": -0.0918
     }
   ],
   "earnings_history": [
@@ -443,13 +426,13 @@
   ],
   "next_earnings": "2026-11-03",
   "vol_regime": {
-    "iv_current": 0.3536,
-    "iv_rank": 0.712595,
+    "iv_current": 0.3476,
+    "iv_rank": 0.684186,
     "iv_year_high": 0.4143,
     "iv_year_low": 0.2031,
-    "hv_current": 0.3768,
-    "hv_rank": 0.98103,
-    "iv_mom_week": 0.0034,
+    "hv_current": 0.3998,
+    "hv_rank": 1.0,
+    "iv_mom_week": -0.0116,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

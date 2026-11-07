@@ -1,7 +1,7 @@
 {
   "symbol": "BGC",
-  "as_of_date": "2026-11-05",
-  "spot_price": 10.46,
+  "as_of_date": "2026-11-06",
+  "spot_price": 10.0,
   "expected_move": {
     "earnings_date": "2026-11-05",
     "timing": "bmo",
@@ -34,7 +34,25 @@
     "forecast_feature_hash": "66091d4feba462cb8b1b9f5a418b51ab9cf66988e1df6462ee0c025f1163880f",
     "forecast_frozen_eligible": true
   },
-  "straddle_features": [],
+  "straddle_features": [
+    {
+      "expiration": "2026-12-18",
+      "dte": 42,
+      "atm_strike": 10.0,
+      "atm_iv": 0.3915,
+      "atm_call_iv": 0.3915,
+      "atm_put_iv": 0.3915,
+      "straddle_mid": 1.15,
+      "em_straddle": 1.15,
+      "em_straddle_pct": 0.115,
+      "em_iv": 1.328036,
+      "em_iv_pct": 0.132804,
+      "call_delta": 0.666,
+      "call_gamma": 0.2602,
+      "call_vega": 0.0128,
+      "call_theta": -0.0062
+    }
+  ],
   "earnings_history": [
     {
       "date": "2026-11-05",
@@ -422,13 +440,13 @@
   ],
   "next_earnings": "2026-11-05",
   "vol_regime": {
-    "iv_current": 0.4303,
-    "iv_rank": 0.358171,
+    "iv_current": 0.3884,
+    "iv_rank": 0.269475,
     "iv_year_high": 0.7335,
     "iv_year_low": 0.2611,
-    "hv_current": 0.3712,
-    "hv_rank": 0.544976,
-    "iv_mom_week": 0.0005,
+    "hv_current": 0.3655,
+    "hv_rank": 0.52188,
+    "iv_mom_week": -0.0602,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"

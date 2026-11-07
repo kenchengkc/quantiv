@@ -1,7 +1,7 @@
 {
   "symbol": "JBTM",
-  "as_of_date": "2026-11-05",
-  "spot_price": 130.0,
+  "as_of_date": "2026-11-06",
+  "spot_price": 128.35,
   "expected_move": {
     "earnings_date": "2026-11-03",
     "timing": "bmo",
@@ -35,32 +35,14 @@
     "ml_publication_status": "held",
     "ml_publication_reason": "no_eligible_current_forecast",
     "forecast_scored_at": "2026-11-02T08:58:48.228766+00:00",
-    "forecast_published_at": "2026-11-05T09:36:54+00:00",
+    "forecast_published_at": "2026-11-06T08:34:47+00:00",
     "forecast_feature_cutoff_at": "2026-11-02T21:00:00+00:00",
     "forecast_prediction_deadline_at": "2026-11-03T05:00:00+00:00",
     "forecast_feature_snapshot_at": "2026-10-30T20:00:00+00:00",
     "forecast_feature_hash": "64a711837c33975faf519192cc882dad4ee8f15934f05ae979027141bb51f7d0",
     "forecast_frozen_eligible": true
   },
-  "straddle_features": [
-    {
-      "expiration": "2026-12-18",
-      "dte": 43,
-      "atm_strike": 130.0,
-      "atm_iv": 0.300285,
-      "atm_call_iv": 0.3066,
-      "atm_put_iv": 0.2939,
-      "straddle_mid": 10.8,
-      "em_straddle": 10.8,
-      "em_straddle_pct": 0.083077,
-      "em_iv": 13.398771,
-      "em_iv_pct": 0.103067,
-      "call_delta": 0.4534,
-      "call_gamma": 0.0297,
-      "call_vega": 0.1727,
-      "call_theta": -0.07
-    }
-  ],
+  "straddle_features": [],
   "earnings_history": [
     {
       "date": "2026-11-03",
@@ -93,7 +75,7 @@
       "forecast_id": "fd532c6008d4ec71f1490b70dca302f900955240b59fe8cd4a6107a299f23b81",
       "forecast_model_bundle_id": "d14dc7f2aa6b175956922eb6266b8523742add962668b7d6b8833cc2c869dd1b",
       "forecast_scored_at": "2026-11-02T08:58:48.228766+00:00",
-      "forecast_published_at": "2026-11-05T09:36:54+00:00",
+      "forecast_published_at": "2026-11-06T08:34:47+00:00",
       "forecast_feature_cutoff_at": "2026-11-02T21:00:00+00:00",
       "forecast_prediction_deadline_at": "2026-11-03T05:00:00+00:00",
       "forecast_feature_snapshot_at": "2026-10-30T20:00:00+00:00",
@@ -341,13 +323,13 @@
   ],
   "next_earnings": "2026-11-03",
   "vol_regime": {
-    "iv_current": 0.315,
-    "iv_rank": 0.114701,
+    "iv_current": 0.3299,
+    "iv_rank": 0.162843,
     "iv_year_high": 0.589,
     "iv_year_low": 0.2795,
-    "hv_current": 0.356,
-    "hv_rank": 0.420006,
-    "iv_mom_week": -0.1269,
+    "hv_current": 0.3555,
+    "hv_rank": 0.418453,
+    "iv_mom_week": -0.1137,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"

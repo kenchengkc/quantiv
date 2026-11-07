@@ -1,7 +1,7 @@
 {
   "symbol": "BRO",
-  "as_of_date": "2026-11-05",
-  "spot_price": 75.0,
+  "as_of_date": "2026-11-06",
+  "spot_price": 72.12,
   "expected_move": {
     "earnings_date": "2026-10-26",
     "timing": "amc",
@@ -41,42 +41,7 @@
     "forecast_feature_hash": "b4d4f703763e857aaa26f634bc43a83dccab8ee32e1ff2d4ef302343863f5288",
     "forecast_frozen_eligible": true
   },
-  "straddle_features": [
-    {
-      "expiration": "2026-11-20",
-      "dte": 15,
-      "atm_strike": 75.0,
-      "atm_iv": 0.358327,
-      "atm_call_iv": 0.369,
-      "atm_put_iv": 0.3476,
-      "straddle_mid": 4.375,
-      "em_straddle": 4.375,
-      "em_straddle_pct": 0.058333,
-      "em_iv": 5.448039,
-      "em_iv_pct": 0.072641,
-      "call_delta": 0.4441,
-      "call_gamma": 0.0707,
-      "call_vega": 0.0592,
-      "call_theta": -0.0629
-    },
-    {
-      "expiration": "2026-12-18",
-      "dte": 43,
-      "atm_strike": 75.0,
-      "atm_iv": 0.340551,
-      "atm_call_iv": 0.3396,
-      "atm_put_iv": 0.3415,
-      "straddle_mid": 6.95,
-      "em_straddle": 6.95,
-      "em_straddle_pct": 0.092667,
-      "em_iv": 8.766611,
-      "em_iv_pct": 0.116888,
-      "call_delta": 0.492,
-      "call_gamma": 0.0458,
-      "call_vega": 0.1013,
-      "call_theta": -0.0395
-    }
-  ],
+  "straddle_features": [],
   "earnings_history": [
     {
       "date": "2026-10-26",
@@ -477,13 +442,13 @@
   ],
   "next_earnings": "2026-10-26",
   "vol_regime": {
-    "iv_current": 0.3472,
-    "iv_rank": 0.496514,
+    "iv_current": 0.3518,
+    "iv_rank": 0.51433,
     "iv_year_high": 0.4772,
     "iv_year_low": 0.219,
-    "hv_current": 0.3841,
-    "hv_rank": 0.75626,
-    "iv_mom_week": 0.0493,
+    "hv_current": 0.3994,
+    "hv_rank": 0.83444,
+    "iv_mom_week": -0.0047,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"
