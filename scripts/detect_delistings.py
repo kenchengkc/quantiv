@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Detect tickers that have dropped off the US exchange directories.
 
-A symbol in our active universe (earnings_calendar.csv US rows ∪ generated
-forecast pages) that disappears from the authoritative NASDAQ/NYSE listing
-files is a delisting — an acquisition, merger, bankruptcy, or going-private.
+A symbol in our active universe that disappears from the authoritative
+NASDAQ/NYSE listing files is a lifecycle candidate: it may be a delisting,
+rename, or part of a corporate reorganization.
 Those directories are the exchanges' own daily-updated source of truth, far
 cleaner than inferring delistings from gaps in DoltHub/Finnhub feeds.
 
@@ -12,11 +12,11 @@ must be absent for several consecutive days (--threshold) before it is promoted
 into config/delisted_tickers.json. Reappearing in the directories clears the
 watch. State persists in data/delisting_watch.json across nightly runs.
 
-Absence is not proof of delisting: the name matcher needs at least two shared
-tokens, and build_ticker_names.mjs replaces names with the current SEC listing
-map before this script runs. A simultaneous name/symbol change (PSKY -> SKYD)
-can therefore evade the heuristic. Verify corporate filings and record confirmed
-renames in config/ticker_renames.json; do not loosen matching to an acquirer.
+Absence and name similarity are not issuer-identity evidence. Only a unique,
+exact normalized company name produces an unconfirmed successor candidate;
+related or ambiguous names are held for manual review. A simultaneous
+name/symbol change can evade name matching entirely. Verify corporate filings
+and record confirmed renames in config/ticker_renames.json.
 
 Run in the daily refresh after scripts/build_ticker_names.mjs and before the
 integrity gate, so a newly promoted delisting is honored in the same commit:
@@ -28,6 +28,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -54,6 +55,15 @@ SYMBOL_DIR_HEADERS = {
 DEFAULT_THRESHOLD_DAYS = 3
 GITHUB_API = "https://api.github.com"
 LIFECYCLE_LABEL = "ticker-lifecycle"
+COMMON_SHARE_SUFFIX = re.compile(
+    r"\b(?:class\s+[a-z0-9.-]+\s+)?(?:common\s+(?:stock|shares?)|ordinary\s+shares?)\b.*$",
+    re.I,
+)
+NON_COMMON_SECURITY = re.compile(
+    r"\b(?:preferred\s+(?:stock|shares?)|preference\s+shares?|"
+    r"depositary\s+(?:shares?|receipts?)|warrants?|units)\b|[-,]\s*rights\b",
+    re.I,
+)
 
 
 def normalize(symbol: str) -> str:
@@ -84,8 +94,8 @@ def fetch_pipe_table(url: str) -> list[dict[str, str]]:
 
 def fetch_directory() -> tuple[set[str], list[tuple[str, str]]]:
     """Return (currently-listed US symbols, [(symbol, security_name), …]) from
-    both NASDAQ Trader directory files. The name corpus lets us tell a real
-    delisting apart from a ticker rename and name the likely new symbol."""
+    both NASDAQ Trader directory files. Names flag possible continuity for
+    review; they do not prove a ticker rename or a delisting."""
     listed: set[str] = set()
     entries: list[tuple[str, str]] = []
     for url, sym_col in ((NASDAQ_LISTED_URL, "Symbol"), (OTHER_LISTED_URL, "ACT Symbol")):
@@ -110,37 +120,56 @@ def load_names() -> dict[str, str]:
     return payload if isinstance(payload, dict) else {}
 
 
-def build_rename_finder(directory_entries: list[tuple[str, str]]):
-    """Return a fn mapping a company name → the symbol it currently trades under
-    (or None). A non-None result means the ticker was renamed, not delisted.
+def _issuer_tokens(name: str) -> set[str]:
+    # Strip listing boilerplate before legal suffixes. Keep business words such
+    # as Sports and Entertainment: shared branding does not identify an issuer.
+    issuer = COMMON_SHARE_SUFFIX.sub("", name).rstrip(" ,-")
+    return norm_tokens(issuer) - {"the"}
 
-    Matches on distinctive token overlap so 'Bank of New York Mellon' (BK)
-    resolves to the 'The Bank of New York Mellon Corporation' row now listed as
-    BNY. Requires ≥2 shared significant tokens and ≥60% overlap (and picks the
-    best overlap) to avoid matching on a single common word like 'American'.
-    """
-    # NYSE otherlisted encodes preferred/warrant classes with `$` (TWO$A =
-    # TWO PRA). Those are still-listed securities of a going-private or
-    # acquired company, not a successor common ticker.
-    corpus = [
-        (sym, toks)
+
+def _common_issuer_corpus(directory_entries: list[tuple[str, str]]):
+    return [
+        (sym, _issuer_tokens(name))
         for sym, name in directory_entries
-        if "$" not in sym and (toks := norm_tokens(name))
+        if "$" not in sym and not NON_COMMON_SECURITY.search(name)
     ]
 
+
+def build_rename_finder(directory_entries: list[tuple[str, str]]):
+    """Return a unique name-only candidate, never a verified ticker transition.
+
+    Exact issuer tokens preserve the BK/BNY case while refusing MSG Sports /
+    MSG Entertainment and share-class ties. Corporate filings and security
+    identifiers still have to establish continuity before any ledger update.
+    """
+    corpus = _common_issuer_corpus(directory_entries)
+
     def renamed_symbol(company_name: str) -> str | None:
-        a = norm_tokens(company_name)
+        a = _issuer_tokens(company_name)
         if len(a) < 2:
             return None  # too generic to disambiguate safely
-        best_sym, best_ratio = None, 0.0
-        for sym, b in corpus:
-            overlap = len(a & b)
-            ratio = overlap / min(len(a), len(b))
-            if overlap >= 2 and ratio >= 0.6 and ratio > best_ratio:
-                best_sym, best_ratio = sym, ratio
-        return best_sym
+        matches = {sym for sym, b in corpus if a == b}
+        return next(iter(matches)) if len(matches) == 1 else None
 
     return renamed_symbol
+
+
+def build_related_name_finder(directory_entries: list[tuple[str, str]]):
+    """Flag unresolved related issuers without naming one as the successor.
+
+    Tightening successor matching must not turn the same uncertain corporate
+    action into an automatic delisting. Overlap is only a manual-review hold.
+    """
+    corpus = _common_issuer_corpus(directory_entries)
+
+    def has_related_listing(company_name: str) -> bool:
+        a = _issuer_tokens(company_name)
+        return any(
+            len(a & b) >= 2 and len(a & b) / min(len(a), len(b)) >= 0.6
+            for _, b in corpus if a and b
+        )
+
+    return has_related_listing
 
 
 def load_active_universe() -> set[str]:
@@ -151,7 +180,7 @@ def load_active_universe() -> set[str]:
     absence from the directories is old news, not actionable. A forecast page
     exists only for a name with recent/upcoming earnings that the frontend
     renders a detail page for (CTRA had one), so a forecast-page ticker missing
-    from the exchange directories is a genuine, recent delisting.
+    from the exchange directories is a recent lifecycle candidate.
     """
     if not SYMBOLS_DIR.exists():
         return set()
@@ -209,11 +238,14 @@ def promote_to_delisted(tickers: list[str], threshold: int) -> None:
     DELISTED_PATH.write_text(json.dumps(payload, indent=2) + "\n")
 
 
-def notify_github(renames: dict[str, str], promoted: list[str], *, dry_run: bool) -> None:
+def notify_github(
+    renames: dict[str, str], promoted: list[str], *, dry_run: bool,
+    unresolved: list[str] | None = None,
+) -> None:
     """Open a tracking GitHub issue per actionable lifecycle event, idempotent
     by title (skips when an open issue with the same title already exists).
 
-    Suspected renames need a manual remap into config/ticker_renames.json;
+    Name-only candidates and ambiguous listings need primary-source review;
     auto-promoted delistings are informational. Uses GITHUB_TOKEN +
     GITHUB_REPOSITORY from the Actions environment. Fail-soft: a notify error
     never breaks the nightly build.
@@ -222,13 +254,25 @@ def notify_github(renames: dict[str, str], promoted: list[str], *, dry_run: bool
     for old, new in sorted(renames.items()):
         issues.append((
             f"Ticker rename suspected: {old} → {new}",
-            f"`{old}` is gone from the NASDAQ/NYSE listing directories, but the "
-            f"company still appears to trade as **`{new}`**.\n\n"
-            f"**Action — confirm and add to `config/ticker_renames.json`:**\n\n"
-            f"```json\n"
-            f'"{old}": {{ "new": "{new}", "reason": "…", '
-            f'"renamed_on": "YYYY-MM-DD", "source": "…" }}\n'
-            f"```\n\n"
+            f"`{old}` is absent from the NASDAQ/NYSE listing directories. "
+            f"**`{new}` is an unconfirmed name-only candidate**, not a verified successor.\n\n"
+            "**Review before changing `config/ticker_renames.json`:** verify the "
+            "issuer's announcement and SEC filings, CIK, CUSIP, share class, and "
+            "effective trading date. Related companies, acquisitions, and spin-offs "
+            "can share names without representing the same security. A spin-off "
+            "also requires a separate price-comparability assessment; do not merge "
+            "price histories solely because the parent retains its identity.\n\n"
+            f"_Detected {today_iso()} by `scripts/detect_delistings.py`._",
+        ))
+    for ticker in sorted(unresolved or []):
+        issues.append((
+            f"Ticker lifecycle needs review: {ticker}",
+            f"`{ticker}` is absent from the NASDAQ/NYSE listing directories, but "
+            "related or ambiguous common-share names remain listed. **No successor "
+            "has been identified, and automatic delisting is held.**\n\n"
+            "Verify issuer announcements, SEC filings, CIK/CUSIP, share class, and "
+            "effective dates before recording a rename, spin-off, or delisting. "
+            "Shared company-name tokens are not evidence that histories may be combined.\n\n"
             f"_Detected {today_iso()} by `scripts/detect_delistings.py`._",
         ))
     for tkr in promoted:
@@ -335,18 +379,20 @@ def main() -> int:
     rename_old = {normalize(t) for t in ticker_renames()}
     missing_now = universe - listed - already - rename_old
 
-    # Split missing tickers into ticker RENAMES (the company still trades under
-    # a new symbol — e.g. BK→BNY, EXPI→AGNT) and genuine disappearances. Only
-    # the latter are auto-promotable; renames need a symbol remap, not removal,
-    # and would otherwise be wrongly purged.
+    # Name matches only nominate review candidates. Related/ambiguous names
+    # must not become auto-delistings merely because no successor is proven.
     renamed_symbol = build_rename_finder(directory_entries)
+    related_listing = build_related_name_finder(directory_entries)
     renames: dict[str, str] = {}      # old ticker → suspected new symbol
+    unresolved: set[str] = set()
     genuine: set[str] = set()
     for ticker in missing_now:
         company = names.get(ticker) or names.get(ticker.replace("-", "."))
         new_sym = renamed_symbol(company) if company else None
         if new_sym and new_sym != ticker:
             renames[ticker] = new_sym
+        elif company and related_listing(company):
+            unresolved.add(ticker)
         else:
             genuine.add(ticker)
 
@@ -356,7 +402,7 @@ def main() -> int:
     cleared: list[str] = []
 
     # Clear any watched ticker that reappeared in the directories, fell out of
-    # our universe, or is now classified as a rename rather than a delisting.
+    # our universe, or now needs identity review rather than automatic removal.
     for ticker in list(watching):
         if ticker not in genuine:
             cleared.append(ticker)
@@ -388,9 +434,11 @@ def main() -> int:
         print(f"  ↷ documented renames (skipped): {sorted(skipped_renames)}")
     print(f"  missing from directories:     {len(missing_now):,}")
     if renames:
-        print("  ✋ likely ticker renames (review/remap — NOT auto-delisted):")
+        print("  ✋ unconfirmed name-only candidates (verify identity — NOT auto-delisted):")
         for t in sorted(renames):
-            print(f"       {t:<8} → {renames[t]} (company still listed under new symbol)")
+            print(f"       {t:<8} → {renames[t]} (name match only; continuity unverified)")
+    if unresolved:
+        print(f"  ✋ related/ambiguous listings (manual review; NOT auto-delisted): {sorted(unresolved)}")
     if cleared:
         print(f"  ↩ reappeared / cleared:       {sorted(cleared)}")
     pending = sorted(
@@ -405,11 +453,10 @@ def main() -> int:
     if promoted:
         print(f"  🚫 PROMOTING to delisted (≥{args.threshold}d): {sorted(promoted)}")
 
-    # Notify on actionable events: suspected renames (need a manual remap) and
-    # this run's auto-promotions (informational; revert if it was really a
-    # rename). Idempotent + fail-soft inside notify_github.
-    if args.notify_github and (renames or promoted):
-        notify_github(renames, sorted(promoted), dry_run=args.dry_run)
+    # Notify on identity-review candidates and this run's auto-promotions.
+    # Idempotent + fail-soft inside notify_github.
+    if args.notify_github and (renames or promoted or unresolved):
+        notify_github(renames, sorted(promoted), dry_run=args.dry_run, unresolved=sorted(unresolved))
 
     if args.dry_run:
         print("  (dry run — no files written)")

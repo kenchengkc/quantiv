@@ -1012,6 +1012,11 @@ def main():
                 WHERE 1=0
             """)
     if "v_volhist" not in views:
+        try:
+            from ticker_lifecycle_sql import market_data_history_filter_sql, volatility_history_values_sql
+        except ModuleNotFoundError:
+            from scripts.ticker_lifecycle_sql import market_data_history_filter_sql, volatility_history_values_sql
+
         volhist_glob = (
             data_dir
             / "parquet"
@@ -1021,9 +1026,12 @@ def main():
             / "*.parquet"
         )
         if "v_volhist_raw" in views:
-            conn.execute("""
+            conn.execute(f"""
                 CREATE OR REPLACE VIEW v_volhist AS
-                SELECT * EXCLUDE (month, year) FROM v_volhist_raw
+                SELECT CAST(date AS DATE) AS date, act_symbol,
+                       {volatility_history_values_sql()}
+                FROM v_volhist_raw
+                WHERE {market_data_history_filter_sql()}
             """)
         elif list(
             data_dir.glob("parquet/volatility_history/year=*/month=*/*.parquet")
@@ -1033,17 +1041,9 @@ def main():
                 SELECT
                     CAST(date AS DATE) AS date,
                     act_symbol,
-                    CAST(hv_current AS DOUBLE) AS hv_current,
-                    CAST(hv_week_ago AS DOUBLE) AS hv_week_ago,
-                    CAST(hv_month_ago AS DOUBLE) AS hv_month_ago,
-                    CAST(hv_year_high AS DOUBLE) AS hv_year_high,
-                    CAST(hv_year_low AS DOUBLE) AS hv_year_low,
-                    CAST(iv_current AS DOUBLE) AS iv_current,
-                    CAST(iv_week_ago AS DOUBLE) AS iv_week_ago,
-                    CAST(iv_month_ago AS DOUBLE) AS iv_month_ago,
-                    CAST(iv_year_high AS DOUBLE) AS iv_year_high,
-                    CAST(iv_year_low AS DOUBLE) AS iv_year_low
+                    {volatility_history_values_sql()}
                 FROM read_parquet('{volhist_glob}')
+                WHERE {market_data_history_filter_sql()}
             """)
         else:
             logger.warning(

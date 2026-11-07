@@ -21,6 +21,11 @@ import duckdb
 from .realized_moves import reaction_label_lookup
 from .shared import DATA_DIR
 
+try:
+    from ticker_lifecycle_sql import market_data_history_filter_sql
+except ModuleNotFoundError:
+    from scripts.ticker_lifecycle_sql import market_data_history_filter_sql
+
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_POLICY_PATH = REPO_ROOT / "config" / "option_display_quality.json"
@@ -132,15 +137,16 @@ def _relation_exists(conn: duckdb.DuckDBPyConnection, name: str) -> bool:
 def _raw_options_source(conn: duckdb.DuckDBPyConnection) -> str | None:
     """Return provider-level option rows suitable for display-only estimates."""
 
-    if _relation_exists(conn, "v_options"):
-        return "v_options"
-    if _relation_exists(conn, "v_options_raw"):
-        return "v_options_raw"
+    history_filter = market_data_history_filter_sql(symbol="UPPER(CAST(act_symbol AS VARCHAR))")
+    for source in ("v_options", "v_options_raw"):
+        if _relation_exists(conn, source):
+            return f"(SELECT * FROM {source} WHERE {history_filter})"
 
     root = DATA_DIR / "parquet" / "options_chain"
     if root.exists() and any(root.glob("year=*/month=*/*.parquet")):
         pattern = str(root / "year=*" / "month=*" / "*.parquet").replace("'", "''")
-        return f"read_parquet('{pattern}', hive_partitioning=true, union_by_name=true)"
+        return (f"(SELECT * FROM read_parquet('{pattern}', hive_partitioning=true, union_by_name=true) "
+                f"WHERE {history_filter})")
     return None
 
 
@@ -156,11 +162,12 @@ def _eod_spot(
         return None
     try:
         row = conn.execute(
-            """
+            f"""
             SELECT close
             FROM v_ohlcv
             WHERE UPPER(CAST(act_symbol AS VARCHAR)) = ?
               AND CAST(date AS DATE) <= ?
+              AND {market_data_history_filter_sql(symbol='UPPER(CAST(act_symbol AS VARCHAR))')}
               AND TRY_CAST(close AS DOUBLE) > 0
               AND isfinite(TRY_CAST(close AS DOUBLE))
             ORDER BY CAST(date AS DATE) DESC

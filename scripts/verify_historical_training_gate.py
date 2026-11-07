@@ -27,10 +27,10 @@ except ModuleNotFoundError:
 def verify_historical_corporate_actions(data_dir: Path, declared: set[str]) -> dict[str, Any]:
     """Verify the receipt's original universe, independently of today's options."""
     try:
-        from delisted import canonical_ticker, is_delisted
+        from delisted import canonical_action_ticker, is_delisted
         from sync_dolthub import _action_content_digest, _json_digest
     except ModuleNotFoundError:
-        from scripts.delisted import canonical_ticker, is_delisted
+        from scripts.delisted import canonical_action_ticker, is_delisted
         from scripts.sync_dolthub import _action_content_digest, _json_digest
 
     root = data_dir / "control/ingestion/corporate_actions"
@@ -97,7 +97,7 @@ def verify_historical_corporate_actions(data_dir: Path, declared: set[str]) -> d
             if "quarantine" in receipt or "coverage_universe" in receipt:
                 raise ValueError("legacy action receipt cannot declare unsupported quarantine")
             raw_symbols = pd.read_parquet(source, columns=["act_symbol"])["act_symbol"]
-            symbols = sorted({canonical_ticker(symbol) for symbol in raw_symbols.dropna()
+            symbols = sorted({canonical_action_ticker(symbol) for symbol in raw_symbols.dropna()
                               if not is_delisted(symbol)} - {""})
             symbol_window_ends = {symbol: query_end.isoformat() for symbol in symbols}
             if (not symbols or universe["symbols"] != len(symbols)

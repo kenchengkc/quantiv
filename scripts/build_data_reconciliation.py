@@ -24,7 +24,7 @@ from ml.data_reconciliation import (  # noqa: E402 - standalone script path setu
     build_reconciliation_manifest,
 )
 from export_quote_quarantine import export_quarantine  # noqa: E402
-from delisted import canonical_ticker, is_delisted  # noqa: E402
+from delisted import canonical_action_ticker, is_delisted  # noqa: E402
 from market_sessions import (  # noqa: E402
     latest_completed_us_market_session,
     market_session_lag,
@@ -763,7 +763,7 @@ def _corporate_actions(
     ]
     symbols = sorted(
         {
-            canonical_ticker(symbol)
+            canonical_action_ticker(symbol)
             for symbol in raw_symbols
             if not is_delisted(symbol)
         }
