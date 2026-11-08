@@ -3,25 +3,20 @@
   "as_of_date": "2026-11-06",
   "spot_price": 570.0,
   "expected_move": {
-    "earnings_date": "2026-11-06",
-    "timing": "before_market_open",
+    "earnings_date": "2026-11-07",
     "expiration": "2026-11-20",
-    "dte": 15,
+    "dte": 14,
     "lead_time_days": 1,
     "atm_strike": 570.0,
-    "atm_iv": 0.2439,
-    "straddle_abs": 22.645,
-    "straddle_pct": 0.039728,
-    "iv_pct": 0.049444,
+    "atm_iv": 0.2394,
+    "straddle_abs": 21.4,
+    "straddle_pct": 0.037544,
+    "iv_pct": 0.046886,
+    "skew_atm": -0.006263,
+    "term_slope": -0.02445,
+    "total_vega": 0.8875,
     "em_method": "options_math",
-    "display_forecast_pct": 0.049444,
-    "display_forecast_method": "options_math",
-    "display_forecast_as_of": "2026-11-05",
-    "ml_status": "unavailable_event",
-    "options_status": "decision_eligible",
-    "forecast_frozen": true,
-    "ml_publication_status": "held",
-    "ml_publication_reason": "no_eligible_current_forecast"
+    "timing": "bmo"
   },
   "straddle_features": [
     {
@@ -95,7 +90,7 @@
   ],
   "earnings_history": [
     {
-      "date": "2026-11-06",
+      "date": "2026-11-07",
       "timing": "before_market_open",
       "q": "Q3 26",
       "fiscal_year": 2026,
@@ -117,13 +112,7 @@
       "revenue_estimate": null,
       "rev_surprise_pct": null,
       "realized_target_protocol": null,
-      "realized_label_source": null,
-      "display_forecast_pct": 0.049444,
-      "display_forecast_as_of": "2026-11-05",
-      "ml_publication_status": "held",
-      "ml_publication_reason": "no_eligible_current_forecast",
-      "display_forecast_method": "options_math",
-      "forecast_frozen": true
+      "realized_label_source": null
     },
     {
       "date": "2026-08-08",
@@ -471,7 +460,7 @@
       "realized_label_source": null
     }
   ],
-  "next_earnings": "2026-11-06",
+  "next_earnings": "2026-11-07",
   "vol_regime": {
     "iv_current": 0.2026,
     "iv_rank": 0.862963,
@@ -482,5 +471,5 @@
     "iv_mom_week": 0.0307,
     "iv_mom_month": null
   },
-  "next_earnings_timing": "unknown"
+  "next_earnings_timing": "bmo"
 }
