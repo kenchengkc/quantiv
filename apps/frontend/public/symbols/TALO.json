@@ -1,6 +1,6 @@
 {
   "symbol": "TALO",
-  "as_of_date": "2026-11-06",
+  "as_of_date": "2026-11-09",
   "spot_price": 15.0,
   "expected_move": {
     "earnings_date": "2026-11-03",
@@ -27,20 +27,20 @@
   "straddle_features": [
     {
       "expiration": "2026-12-18",
-      "dte": 42,
+      "dte": 39,
       "atm_strike": 15.0,
-      "atm_iv": 0.5149,
-      "atm_call_iv": 0.5149,
-      "atm_put_iv": 0.5149,
-      "straddle_mid": 2.075,
-      "em_straddle": 2.075,
-      "em_straddle_pct": 0.138333,
-      "em_iv": 2.619946,
-      "em_iv_pct": 0.174663,
-      "call_delta": 0.5331,
-      "call_gamma": 0.1541,
-      "call_vega": 0.0201,
-      "call_theta": -0.0139
+      "atm_iv": 0.634346,
+      "atm_call_iv": 0.558,
+      "atm_put_iv": 0.7115,
+      "straddle_mid": 1.925,
+      "em_straddle": 1.925,
+      "em_straddle_pct": 0.128333,
+      "em_iv": 3.110308,
+      "em_iv_pct": 0.207354,
+      "call_delta": 0.4959,
+      "call_gamma": 0.15,
+      "call_vega": 0.0191,
+      "call_theta": -0.0148
     }
   ],
   "earnings_history": [
@@ -75,8 +75,8 @@
       "options_status": "decision_eligible",
       "fallback_reason": null,
       "forecast_frozen": true,
-      "ml_publication_reason": "no_eligible_current_forecast",
-      "ml_publication_status": "held"
+      "ml_publication_status": "held",
+      "ml_publication_reason": "no_eligible_current_forecast"
     },
     {
       "date": "2026-08-04",
@@ -426,13 +426,13 @@
   ],
   "next_earnings": "2026-11-03",
   "vol_regime": {
-    "iv_current": 0.5138,
-    "iv_rank": 0.26791,
+    "iv_current": 0.494,
+    "iv_rank": 0.23373,
     "iv_year_high": 0.9379,
     "iv_year_low": 0.3586,
-    "hv_current": 0.4663,
-    "hv_rank": 0.391762,
-    "iv_mom_week": -0.0243,
+    "hv_current": 0.4674,
+    "hv_rank": 0.394975,
+    "iv_mom_week": -0.1342,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

@@ -1,7 +1,7 @@
 {
   "symbol": "BCO",
-  "as_of_date": "2026-11-06",
-  "spot_price": 110.0,
+  "as_of_date": "2026-11-09",
+  "spot_price": 115.0,
   "expected_move": {
     "earnings_date": "2026-11-04",
     "timing": "bmo",
@@ -27,37 +27,37 @@
   "straddle_features": [
     {
       "expiration": "2026-11-20",
-      "dte": 14,
-      "atm_strike": 110.0,
-      "atm_iv": 0.3914,
-      "atm_call_iv": 0.3927,
-      "atm_put_iv": 0.3901,
-      "straddle_mid": 6.77,
-      "em_straddle": 6.77,
-      "em_straddle_pct": 0.061545,
-      "em_iv": 8.43201,
-      "em_iv_pct": 0.076655,
-      "call_delta": 0.5459,
-      "call_gamma": 0.0468,
-      "call_vega": 0.0856,
-      "call_theta": -0.1348
+      "dte": 11,
+      "atm_strike": 115.0,
+      "atm_iv": 0.39375,
+      "atm_call_iv": 0.3946,
+      "atm_put_iv": 0.3929,
+      "straddle_mid": 6.275,
+      "em_straddle": 6.275,
+      "em_straddle_pct": 0.054565,
+      "em_iv": 7.860828,
+      "em_iv_pct": 0.068355,
+      "call_delta": 0.5057,
+      "call_gamma": 0.0509,
+      "call_vega": 0.0793,
+      "call_theta": -0.1544
     },
     {
       "expiration": "2026-12-18",
-      "dte": 42,
-      "atm_strike": 110.0,
-      "atm_iv": 0.370452,
-      "atm_call_iv": 0.3728,
-      "atm_put_iv": 0.3681,
-      "straddle_mid": 11.1,
-      "em_straddle": 11.1,
-      "em_straddle_pct": 0.100909,
-      "em_iv": 13.823002,
-      "em_iv_pct": 0.125664,
-      "call_delta": 0.5544,
-      "call_gamma": 0.0284,
-      "call_vega": 0.1481,
-      "call_theta": -0.0748
+      "dte": 39,
+      "atm_strike": 115.0,
+      "atm_iv": 0.374101,
+      "atm_call_iv": 0.376,
+      "atm_put_iv": 0.3722,
+      "straddle_mid": 11.25,
+      "em_straddle": 11.25,
+      "em_straddle_pct": 0.097826,
+      "em_iv": 14.062836,
+      "em_iv_pct": 0.122286,
+      "call_delta": 0.536,
+      "call_gamma": 0.0283,
+      "call_vega": 0.1491,
+      "call_theta": -0.0821
     }
   ],
   "earnings_history": [
@@ -92,8 +92,8 @@
       "options_status": "decision_eligible",
       "fallback_reason": null,
       "forecast_frozen": true,
-      "ml_publication_reason": "no_eligible_current_forecast",
-      "ml_publication_status": "held"
+      "ml_publication_status": "held",
+      "ml_publication_reason": "no_eligible_current_forecast"
     },
     {
       "date": "2026-08-05",
@@ -450,13 +450,13 @@
   ],
   "next_earnings": "2026-11-04",
   "vol_regime": {
-    "iv_current": 0.3737,
-    "iv_rank": 0.608104,
+    "iv_current": 0.3833,
+    "iv_rank": 0.638493,
     "iv_year_high": 0.4975,
     "iv_year_low": 0.1816,
-    "hv_current": 0.3788,
-    "hv_rank": 0.405428,
-    "iv_mom_week": -0.0821,
+    "hv_current": 0.3886,
+    "hv_rank": 0.433135,
+    "iv_mom_week": -0.0889,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"

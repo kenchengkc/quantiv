@@ -1,21 +1,20 @@
 {
   "symbol": "AZTA",
-  "as_of_date": "2026-11-06",
-  "spot_price": 39.16,
+  "as_of_date": "2026-11-09",
+  "spot_price": 40.95,
   "expected_move": {
     "earnings_date": "2026-11-10",
-    "display_forecast_pct": 0.24063579320466189,
-    "display_forecast_method": "historical",
-    "display_forecast_as_of": "2026-11-06",
+    "display_forecast_pct": null,
+    "display_forecast_method": "ml_unavailable",
+    "display_forecast_as_of": "2026-11-09",
     "ml_status": "unavailable_model",
     "options_status": "unavailable",
-    "fallback_reason": "quote_quality",
-    "historical_event_count": 4,
+    "fallback_reason": null,
     "hist_move_med_4q": 0.240636,
     "timing": "unknown",
     "ml_publication_status": "held",
     "ml_publication_reason": "no_eligible_current_forecast",
-    "em_method": "historical"
+    "em_method": "ml_unavailable"
   },
   "straddle_features": [],
   "earnings_history": [
@@ -46,13 +45,12 @@
       "ml_status": "unavailable_model",
       "ml_publication_status": "held",
       "ml_publication_reason": "no_eligible_current_forecast",
-      "display_forecast_pct": 0.24063579320466189,
-      "display_forecast_method": "historical",
-      "display_forecast_as_of": "2026-11-06",
       "options_status": "unavailable",
-      "fallback_reason": "quote_quality",
-      "historical_event_count": 4,
-      "em_method": "historical"
+      "display_forecast_pct": null,
+      "display_forecast_method": "ml_unavailable",
+      "display_forecast_as_of": "2026-11-09",
+      "em_method": "ml_unavailable",
+      "fallback_reason": null
     },
     {
       "date": "2026-08-04",
@@ -367,13 +365,13 @@
   ],
   "next_earnings": "2026-11-10",
   "vol_regime": {
-    "iv_current": 0.8771,
-    "iv_rank": 0.685669,
+    "iv_current": 0.8314,
+    "iv_rank": 0.625363,
     "iv_year_high": 1.1153,
     "iv_year_low": 0.3575,
-    "hv_current": 0.8011,
-    "hv_rank": 0.609515,
-    "iv_mom_week": 0.1494,
+    "hv_current": 0.8094,
+    "hv_rank": 0.621933,
+    "iv_mom_week": -0.2839,
     "iv_mom_month": null
   },
   "next_earnings_timing": "unknown"

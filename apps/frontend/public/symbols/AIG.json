@@ -1,6 +1,6 @@
 {
   "symbol": "AIG",
-  "as_of_date": "2026-11-06",
+  "as_of_date": "2026-11-09",
   "spot_price": 78.0,
   "expected_move": {
     "earnings_date": "2026-11-03",
@@ -27,20 +27,20 @@
   "straddle_features": [
     {
       "expiration": "2026-12-24",
-      "dte": 48,
+      "dte": 45,
       "atm_strike": 78.0,
-      "atm_iv": 0.2397,
-      "atm_call_iv": 0.2406,
-      "atm_put_iv": 0.2388,
-      "straddle_mid": 5.4,
-      "em_straddle": 5.4,
-      "em_straddle_pct": 0.069231,
-      "em_iv": 6.780123,
-      "em_iv_pct": 0.086925,
-      "call_delta": 0.5164,
-      "call_gamma": 0.0586,
-      "call_vega": 0.1121,
-      "call_theta": -0.0305
+      "atm_iv": 0.228369,
+      "atm_call_iv": 0.2096,
+      "atm_put_iv": 0.2468,
+      "straddle_mid": 5.3,
+      "em_straddle": 5.3,
+      "em_straddle_pct": 0.067949,
+      "em_iv": 6.25449,
+      "em_iv_pct": 0.080186,
+      "call_delta": 0.6496,
+      "call_gamma": 0.0632,
+      "call_vega": 0.1035,
+      "call_theta": -0.0293
     }
   ],
   "earnings_history": [
@@ -75,8 +75,8 @@
       "options_status": "decision_eligible",
       "fallback_reason": null,
       "forecast_frozen": true,
-      "ml_publication_reason": "no_eligible_current_forecast",
-      "ml_publication_status": "held"
+      "ml_publication_status": "held",
+      "ml_publication_reason": "no_eligible_current_forecast"
     },
     {
       "date": "2026-08-06",
@@ -433,13 +433,13 @@
   ],
   "next_earnings": "2026-11-03",
   "vol_regime": {
-    "iv_current": 0.2636,
-    "iv_rank": 0.278423,
+    "iv_current": 0.2303,
+    "iv_rank": 0.161211,
     "iv_year_high": 0.4686,
     "iv_year_low": 0.1845,
-    "hv_current": 0.2523,
-    "hv_rank": 0.896915,
-    "iv_mom_week": -0.0082,
+    "hv_current": 0.2526,
+    "hv_rank": 0.899172,
+    "iv_mom_week": -0.0413,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

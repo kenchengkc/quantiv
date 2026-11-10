@@ -1,7 +1,7 @@
 {
   "symbol": "MCY",
-  "as_of_date": "2026-11-06",
-  "spot_price": 85.0,
+  "as_of_date": "2026-11-09",
+  "spot_price": 82.74,
   "expected_move": {
     "earnings_date": "2026-11-03",
     "timing": "amc",
@@ -42,25 +42,7 @@
     "forecast_feature_hash": "8f34dabb0782a39e754a924f7ebad6dd978b53309572c3f9d3ec5aa025d7ad09",
     "forecast_frozen_eligible": true
   },
-  "straddle_features": [
-    {
-      "expiration": "2026-12-18",
-      "dte": 42,
-      "atm_strike": 85.0,
-      "atm_iv": 0.3063,
-      "atm_call_iv": 0.3063,
-      "atm_put_iv": 0.3063,
-      "straddle_mid": 6.975,
-      "em_straddle": 6.975,
-      "em_straddle_pct": 0.082059,
-      "em_iv": 8.831696,
-      "em_iv_pct": 0.103902,
-      "call_delta": 0.4292,
-      "call_gamma": 0.0457,
-      "call_vega": 0.11,
-      "call_theta": -0.0437
-    }
-  ],
+  "straddle_features": [],
   "earnings_history": [
     {
       "date": "2026-11-03",
@@ -111,8 +93,8 @@
       "options_status": "decision_eligible",
       "fallback_reason": null,
       "forecast_frozen": true,
-      "ml_publication_reason": "no_eligible_current_forecast",
-      "ml_publication_status": "held"
+      "ml_publication_status": "held",
+      "ml_publication_reason": "no_eligible_current_forecast"
     },
     {
       "date": "2026-08-04",
@@ -441,13 +423,13 @@
   ],
   "next_earnings": "2026-11-03",
   "vol_regime": {
-    "iv_current": 0.35,
-    "iv_rank": 0.277027,
+    "iv_current": 0.3483,
+    "iv_rank": 0.271557,
     "iv_year_high": 0.5747,
     "iv_year_low": 0.2639,
-    "hv_current": 0.4901,
+    "hv_current": 0.4906,
     "hv_rank": 1.0,
-    "iv_mom_week": -0.0521,
+    "iv_mom_week": -0.0301,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"
