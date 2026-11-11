@@ -1,6 +1,6 @@
 {
   "symbol": "CENX",
-  "as_of_date": "2026-11-09",
+  "as_of_date": "2026-11-10",
   "spot_price": 37.5,
   "expected_move": {
     "earnings_date": "2026-11-05",
@@ -27,20 +27,20 @@
   "straddle_features": [
     {
       "expiration": "2026-12-18",
-      "dte": 39,
+      "dte": 38,
       "atm_strike": 37.5,
-      "atm_iv": 0.593047,
-      "atm_call_iv": 0.5899,
-      "atm_put_iv": 0.5962,
-      "straddle_mid": 5.75,
-      "em_straddle": 5.75,
-      "em_straddle_pct": 0.153333,
-      "em_iv": 7.269525,
-      "em_iv_pct": 0.193854,
-      "call_delta": 0.4955,
-      "call_gamma": 0.0564,
-      "call_vega": 0.0476,
-      "call_theta": -0.0373
+      "atm_iv": 0.585249,
+      "atm_call_iv": 0.5847,
+      "atm_put_iv": 0.5858,
+      "straddle_mid": 5.625,
+      "em_straddle": 5.625,
+      "em_straddle_pct": 0.15,
+      "em_iv": 7.081368,
+      "em_iv_pct": 0.188836,
+      "call_delta": 0.4979,
+      "call_gamma": 0.0583,
+      "call_vega": 0.0471,
+      "call_theta": -0.0404
     }
   ],
   "earnings_history": [
@@ -75,8 +75,8 @@
       "options_status": "decision_eligible",
       "fallback_reason": null,
       "forecast_frozen": true,
-      "ml_publication_status": "held",
-      "ml_publication_reason": "no_eligible_current_forecast"
+      "ml_publication_reason": "no_eligible_current_forecast",
+      "ml_publication_status": "held"
     },
     {
       "date": "2026-08-06",
@@ -433,13 +433,13 @@
   ],
   "next_earnings": "2026-11-05",
   "vol_regime": {
-    "iv_current": 0.6242,
-    "iv_rank": 0.220914,
+    "iv_current": 0.6292,
+    "iv_rank": 0.234931,
     "iv_year_high": 0.9021,
     "iv_year_low": 0.5454,
-    "hv_current": 0.6518,
-    "hv_rank": 0.673447,
-    "iv_mom_week": -0.0967,
+    "hv_current": 0.645,
+    "hv_rank": 0.655004,
+    "iv_mom_week": -0.0888,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

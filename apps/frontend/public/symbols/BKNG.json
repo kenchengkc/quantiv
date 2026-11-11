@@ -1,7 +1,7 @@
 {
   "symbol": "BKNG",
-  "as_of_date": "2026-11-09",
-  "spot_price": 168.0,
+  "as_of_date": "2026-11-10",
+  "spot_price": 159.26,
   "expected_move": {
     "earnings_date": "2026-11-03",
     "timing": "amc",
@@ -42,25 +42,7 @@
     "forecast_feature_hash": "ecaeeda7f4871e718be8cd86eee9be5e6c2a558c36f6a7616348b6cd80fda0e7",
     "forecast_frozen_eligible": true
   },
-  "straddle_features": [
-    {
-      "expiration": "2026-12-18",
-      "dte": 39,
-      "atm_strike": 168.0,
-      "atm_iv": 0.405951,
-      "atm_call_iv": 0.4061,
-      "atm_put_iv": 0.4058,
-      "straddle_mid": 17.85,
-      "em_straddle": 17.85,
-      "em_straddle_pct": 0.10625,
-      "em_iv": 22.292996,
-      "em_iv_pct": 0.132696,
-      "call_delta": 0.4374,
-      "call_gamma": 0.018,
-      "call_vega": 0.2094,
-      "call_theta": -0.1054
-    }
-  ],
+  "straddle_features": [],
   "earnings_history": [
     {
       "date": "2026-11-03",
@@ -111,8 +93,8 @@
       "options_status": "decision_eligible",
       "fallback_reason": null,
       "forecast_frozen": true,
-      "ml_publication_status": "held",
-      "ml_publication_reason": "no_eligible_current_forecast"
+      "ml_publication_reason": "no_eligible_current_forecast",
+      "ml_publication_status": "held"
     },
     {
       "date": "2026-08-04",
@@ -469,13 +451,13 @@
   ],
   "next_earnings": "2026-11-03",
   "vol_regime": {
-    "iv_current": 0.4254,
-    "iv_rank": 0.673488,
+    "iv_current": 0.4161,
+    "iv_rank": 0.645082,
     "iv_year_high": 0.5323,
     "iv_year_low": 0.2049,
-    "hv_current": 0.4204,
-    "hv_rank": 0.46928,
-    "iv_mom_week": -0.0809,
+    "hv_current": 0.4264,
+    "hv_rank": 0.491896,
+    "iv_mom_week": -0.1162,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

@@ -1,7 +1,7 @@
 {
   "symbol": "ZBRA",
-  "as_of_date": "2026-11-09",
-  "spot_price": 330.0,
+  "as_of_date": "2026-11-10",
+  "spot_price": 321.38,
   "expected_move": {
     "earnings_date": "2026-11-03",
     "timing": "bmo",
@@ -24,25 +24,7 @@
     "ml_publication_status": "held",
     "ml_publication_reason": "no_eligible_current_forecast"
   },
-  "straddle_features": [
-    {
-      "expiration": "2026-12-18",
-      "dte": 39,
-      "atm_strike": 330.0,
-      "atm_iv": 0.388149,
-      "atm_call_iv": 0.3892,
-      "atm_put_iv": 0.3871,
-      "straddle_mid": 33.295,
-      "em_straddle": 33.295,
-      "em_straddle_pct": 0.100894,
-      "em_iv": 41.869564,
-      "em_iv_pct": 0.126877,
-      "call_delta": 0.5075,
-      "call_gamma": 0.0095,
-      "call_vega": 0.4258,
-      "call_theta": -0.2293
-    }
-  ],
+  "straddle_features": [],
   "earnings_history": [
     {
       "date": "2026-11-03",
@@ -75,8 +57,8 @@
       "options_status": "decision_eligible",
       "fallback_reason": null,
       "forecast_frozen": true,
-      "ml_publication_status": "held",
-      "ml_publication_reason": "no_eligible_current_forecast"
+      "ml_publication_reason": "no_eligible_current_forecast",
+      "ml_publication_status": "held"
     },
     {
       "date": "2026-08-04",
@@ -433,13 +415,13 @@
   ],
   "next_earnings": "2026-11-03",
   "vol_regime": {
-    "iv_current": 0.4008,
-    "iv_rank": 0.230178,
+    "iv_current": 0.4105,
+    "iv_rank": 0.258876,
     "iv_year_high": 0.661,
     "iv_year_low": 0.323,
-    "hv_current": 0.3668,
-    "hv_rank": 0.25732,
-    "iv_mom_week": -0.1744,
+    "hv_current": 0.3655,
+    "hv_rank": 0.25488,
+    "iv_mom_week": -0.0122,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"

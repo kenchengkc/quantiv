@@ -1,20 +1,22 @@
 {
   "symbol": "GEVO",
-  "as_of_date": "2026-11-09",
-  "spot_price": 1.47,
+  "as_of_date": "2026-11-10",
+  "spot_price": 1.39,
   "expected_move": {
     "earnings_date": "2026-11-10",
-    "hist_move_med_4q": 0.0944,
-    "timing": "unknown",
-    "ml_status": "unavailable_model",
-    "ml_publication_status": "held",
-    "ml_publication_reason": "no_eligible_current_forecast",
-    "options_status": "unavailable",
-    "display_forecast_pct": null,
-    "display_forecast_method": "ml_unavailable",
-    "display_forecast_as_of": "2026-11-09",
+    "timing": "amc",
     "em_method": "ml_unavailable",
-    "fallback_reason": null
+    "display_forecast_pct": 0.0944,
+    "display_forecast_method": "historical",
+    "display_forecast_as_of": "2026-11-10",
+    "ml_status": "unavailable_event",
+    "options_status": "unavailable",
+    "fallback_reason": "no_event_expiry",
+    "historical_event_count": 4,
+    "hist_move_med_4q": 0.0944,
+    "forecast_frozen": true,
+    "ml_publication_status": "held",
+    "ml_publication_reason": "no_eligible_current_forecast"
   },
   "straddle_features": [],
   "earnings_history": [
@@ -42,15 +44,12 @@
       "rev_surprise_pct": null,
       "realized_target_protocol": null,
       "realized_label_source": null,
-      "ml_status": "unavailable_model",
-      "ml_publication_status": "held",
+      "display_forecast_as_of": "2026-11-10",
       "ml_publication_reason": "no_eligible_current_forecast",
-      "options_status": "unavailable",
-      "display_forecast_pct": null,
-      "display_forecast_method": "ml_unavailable",
-      "display_forecast_as_of": "2026-11-09",
-      "em_method": "ml_unavailable",
-      "fallback_reason": null
+      "ml_publication_status": "held",
+      "display_forecast_method": "historical",
+      "display_forecast_pct": 0.0944,
+      "forecast_frozen": true
     },
     {
       "date": "2026-08-06",
@@ -330,5 +329,5 @@
   ],
   "next_earnings": "2026-11-10",
   "vol_regime": null,
-  "next_earnings_timing": "unknown"
+  "next_earnings_timing": "amc"
 }

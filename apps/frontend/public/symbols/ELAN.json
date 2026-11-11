@@ -1,6 +1,6 @@
 {
   "symbol": "ELAN",
-  "as_of_date": "2026-11-09",
+  "as_of_date": "2026-11-10",
   "spot_price": 27.0,
   "expected_move": {
     "earnings_date": "2026-11-06",
@@ -27,20 +27,20 @@
   "straddle_features": [
     {
       "expiration": "2026-12-18",
-      "dte": 39,
+      "dte": 38,
       "atm_strike": 27.0,
-      "atm_iv": 0.399602,
-      "atm_call_iv": 0.4013,
-      "atm_put_iv": 0.3979,
-      "straddle_mid": 2.825,
-      "em_straddle": 2.825,
-      "em_straddle_pct": 0.10463,
-      "em_iv": 3.526775,
-      "em_iv_pct": 0.130621,
-      "call_delta": 0.5381,
-      "call_gamma": 0.1134,
-      "call_vega": 0.035,
-      "call_theta": -0.0212
+      "atm_iv": 0.390454,
+      "atm_call_iv": 0.3933,
+      "atm_put_iv": 0.3876,
+      "straddle_mid": 2.725,
+      "em_straddle": 2.725,
+      "em_straddle_pct": 0.100926,
+      "em_iv": 3.401568,
+      "em_iv_pct": 0.125984,
+      "call_delta": 0.5317,
+      "call_gamma": 0.1179,
+      "call_vega": 0.0345,
+      "call_theta": -0.0214
     }
   ],
   "earnings_history": [
@@ -75,8 +75,8 @@
       "options_status": "decision_eligible",
       "fallback_reason": null,
       "forecast_frozen": true,
-      "ml_publication_status": "held",
-      "ml_publication_reason": "no_eligible_current_forecast"
+      "ml_publication_reason": "no_eligible_current_forecast",
+      "ml_publication_status": "held"
     },
     {
       "date": "2026-08-05",
@@ -384,13 +384,13 @@
   ],
   "next_earnings": "2026-11-06",
   "vol_regime": {
-    "iv_current": 0.4181,
-    "iv_rank": 0.147863,
+    "iv_current": 0.4134,
+    "iv_rank": 0.131395,
     "iv_year_high": 0.6613,
     "iv_year_low": 0.3759,
-    "hv_current": 0.4364,
-    "hv_rank": 0.415388,
-    "iv_mom_week": -0.1342,
+    "hv_current": 0.4372,
+    "hv_rank": 0.417003,
+    "iv_mom_week": -0.1233,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"
