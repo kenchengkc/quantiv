@@ -1,6 +1,6 @@
 {
   "symbol": "USFD",
-  "as_of_date": "2026-11-10",
+  "as_of_date": "2026-11-11",
   "spot_price": 110.0,
   "expected_move": {
     "earnings_date": "2026-11-05",
@@ -27,20 +27,20 @@
   "straddle_features": [
     {
       "expiration": "2026-12-18",
-      "dte": 38,
+      "dte": 37,
       "atm_strike": 110.0,
-      "atm_iv": 0.2565,
-      "atm_call_iv": 0.2569,
-      "atm_put_iv": 0.2561,
-      "straddle_mid": 7.245,
-      "em_straddle": 7.245,
-      "em_straddle_pct": 0.065864,
-      "em_iv": 9.103857,
-      "em_iv_pct": 0.082762,
-      "call_delta": 0.5178,
-      "call_gamma": 0.0436,
-      "call_vega": 0.1408,
-      "call_theta": -0.05
+      "atm_iv": 0.2625,
+      "atm_call_iv": 0.2633,
+      "atm_put_iv": 0.2617,
+      "straddle_mid": 7.325,
+      "em_straddle": 7.325,
+      "em_straddle_pct": 0.066591,
+      "em_iv": 9.193406,
+      "em_iv_pct": 0.083576,
+      "call_delta": 0.517,
+      "call_gamma": 0.0432,
+      "call_vega": 0.139,
+      "call_theta": -0.0529
     }
   ],
   "earnings_history": [
@@ -75,8 +75,8 @@
       "options_status": "decision_eligible",
       "fallback_reason": null,
       "forecast_frozen": true,
-      "ml_publication_reason": "no_eligible_current_forecast",
-      "ml_publication_status": "held"
+      "ml_publication_status": "held",
+      "ml_publication_reason": "no_eligible_current_forecast"
     },
     {
       "date": "2026-08-06",
@@ -433,13 +433,13 @@
   ],
   "next_earnings": "2026-11-05",
   "vol_regime": {
-    "iv_current": 0.2656,
-    "iv_rank": 0.294218,
+    "iv_current": 0.2661,
+    "iv_rank": 0.297052,
     "iv_year_high": 0.3901,
     "iv_year_low": 0.2137,
-    "hv_current": 0.3731,
-    "hv_rank": 0.62856,
-    "iv_mom_week": -0.1245,
+    "hv_current": 0.3681,
+    "hv_rank": 0.607924,
+    "iv_mom_week": -0.1125,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"

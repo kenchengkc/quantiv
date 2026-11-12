@@ -1,6 +1,6 @@
 {
   "symbol": "PJT",
-  "as_of_date": "2026-11-10",
+  "as_of_date": "2026-11-11",
   "spot_price": 155.0,
   "expected_move": {
     "earnings_date": "2026-11-03",
@@ -27,20 +27,20 @@
   "straddle_features": [
     {
       "expiration": "2026-12-18",
-      "dte": 38,
+      "dte": 37,
       "atm_strike": 155.0,
-      "atm_iv": 0.37675,
-      "atm_call_iv": 0.3777,
-      "atm_put_iv": 0.3758,
-      "straddle_mid": 14.995,
-      "em_straddle": 14.995,
-      "em_straddle_pct": 0.096742,
-      "em_iv": 18.842144,
-      "em_iv_pct": 0.121562,
-      "call_delta": 0.5239,
-      "call_gamma": 0.0211,
-      "call_vega": 0.1982,
-      "call_theta": -0.1046
+      "atm_iv": 0.358774,
+      "atm_call_iv": 0.3671,
+      "atm_put_iv": 0.3504,
+      "straddle_mid": 14.1,
+      "em_straddle": 14.1,
+      "em_straddle_pct": 0.090968,
+      "em_iv": 17.705441,
+      "em_iv_pct": 0.114229,
+      "call_delta": 0.4933,
+      "call_gamma": 0.0223,
+      "call_vega": 0.1942,
+      "call_theta": -0.1049
     }
   ],
   "earnings_history": [
@@ -75,8 +75,8 @@
       "options_status": "decision_eligible",
       "fallback_reason": null,
       "forecast_frozen": true,
-      "ml_publication_reason": "no_eligible_current_forecast",
-      "ml_publication_status": "held"
+      "ml_publication_status": "held",
+      "ml_publication_reason": "no_eligible_current_forecast"
     },
     {
       "date": "2026-07-28",
@@ -426,13 +426,13 @@
   ],
   "next_earnings": "2026-11-03",
   "vol_regime": {
-    "iv_current": 0.3647,
-    "iv_rank": 0.522319,
+    "iv_current": 0.3696,
+    "iv_rank": 0.54746,
     "iv_year_high": 0.4578,
     "iv_year_low": 0.2629,
-    "hv_current": 0.4154,
-    "hv_rank": 0.804651,
-    "iv_mom_week": -0.0024,
+    "hv_current": 0.414,
+    "hv_rank": 0.799225,
+    "iv_mom_week": 0.0075,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"

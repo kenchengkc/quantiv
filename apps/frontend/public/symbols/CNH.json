@@ -1,6 +1,6 @@
 {
   "symbol": "CNH",
-  "as_of_date": "2026-11-10",
+  "as_of_date": "2026-11-11",
   "spot_price": 12.5,
   "expected_move": {
     "earnings_date": "2026-11-09",
@@ -27,20 +27,20 @@
   "straddle_features": [
     {
       "expiration": "2026-12-18",
-      "dte": 38,
+      "dte": 37,
       "atm_strike": 12.5,
-      "atm_iv": 0.9605,
-      "atm_call_iv": 0.9605,
-      "atm_put_iv": 0.9605,
-      "straddle_mid": 1.375,
-      "em_straddle": 1.375,
-      "em_straddle_pct": 0.11,
-      "em_iv": 3.873939,
-      "em_iv_pct": 0.309915,
-      "call_delta": 0.553,
-      "call_gamma": 0.1048,
-      "call_vega": 0.0157,
-      "call_theta": -0.0215
+      "atm_iv": 1.0317,
+      "atm_call_iv": 1.0317,
+      "atm_put_iv": 1.0317,
+      "straddle_mid": 1.325,
+      "em_straddle": 1.325,
+      "em_straddle_pct": 0.106,
+      "em_iv": 4.10599,
+      "em_iv_pct": 0.328479,
+      "call_delta": 0.5667,
+      "call_gamma": 0.0957,
+      "call_vega": 0.0156,
+      "call_theta": -0.0221
     }
   ],
   "earnings_history": [
@@ -75,8 +75,8 @@
       "options_status": "decision_eligible",
       "fallback_reason": null,
       "forecast_frozen": true,
-      "ml_publication_reason": "no_eligible_current_forecast",
-      "ml_publication_status": "held"
+      "ml_publication_status": "held",
+      "ml_publication_reason": "no_eligible_current_forecast"
     },
     {
       "date": "2026-08-03",
@@ -362,13 +362,13 @@
   ],
   "next_earnings": "2026-11-09",
   "vol_regime": {
-    "iv_current": 0.4386,
-    "iv_rank": 0.331625,
+    "iv_current": 0.4173,
+    "iv_rank": 0.286141,
     "iv_year_high": 0.7516,
     "iv_year_low": 0.2833,
-    "hv_current": 0.5504,
-    "hv_rank": 0.788866,
-    "iv_mom_week": -0.0869,
+    "hv_current": 0.5519,
+    "hv_rank": 0.794118,
+    "iv_mom_week": -0.0214,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"

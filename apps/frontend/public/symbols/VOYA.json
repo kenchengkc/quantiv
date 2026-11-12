@@ -1,6 +1,6 @@
 {
   "symbol": "VOYA",
-  "as_of_date": "2026-11-10",
+  "as_of_date": "2026-11-11",
   "spot_price": 105.0,
   "expected_move": {
     "earnings_date": "2026-11-02",
@@ -27,20 +27,20 @@
   "straddle_features": [
     {
       "expiration": "2026-12-18",
-      "dte": 38,
+      "dte": 37,
       "atm_strike": 105.0,
-      "atm_iv": 0.369953,
-      "atm_call_iv": 0.3677,
-      "atm_put_iv": 0.3722,
-      "straddle_mid": 9.95,
-      "em_straddle": 9.95,
-      "em_straddle_pct": 0.094762,
-      "em_iv": 12.533739,
-      "em_iv_pct": 0.119369,
-      "call_delta": 0.5038,
-      "call_gamma": 0.0321,
-      "call_vega": 0.1337,
-      "call_theta": -0.0663
+      "atm_iv": 0.378712,
+      "atm_call_iv": 0.384,
+      "atm_put_iv": 0.3734,
+      "straddle_mid": 10.05,
+      "em_straddle": 10.05,
+      "em_straddle_pct": 0.095714,
+      "em_iv": 12.660563,
+      "em_iv_pct": 0.120577,
+      "call_delta": 0.4748,
+      "call_gamma": 0.0312,
+      "call_vega": 0.1306,
+      "call_theta": -0.065
     }
   ],
   "earnings_history": [
@@ -75,8 +75,8 @@
       "options_status": "decision_eligible",
       "fallback_reason": null,
       "forecast_frozen": true,
-      "ml_publication_reason": "no_eligible_current_forecast",
-      "ml_publication_status": "held"
+      "ml_publication_status": "held",
+      "ml_publication_reason": "no_eligible_current_forecast"
     },
     {
       "date": "2026-08-04",
@@ -426,13 +426,13 @@
   ],
   "next_earnings": "2026-11-02",
   "vol_regime": {
-    "iv_current": 0.3861,
-    "iv_rank": 0.639495,
+    "iv_current": 0.389,
+    "iv_rank": 0.650593,
     "iv_year_high": 0.4803,
     "iv_year_low": 0.219,
-    "hv_current": 0.3204,
-    "hv_rank": 0.57357,
-    "iv_mom_week": 0.0279,
+    "hv_current": 0.3201,
+    "hv_rank": 0.572387,
+    "iv_mom_week": 0.0317,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"
