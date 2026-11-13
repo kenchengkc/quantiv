@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { resolveDisplayForecastCompat } from './displayForecast';
 import {
   mergeCalendarReference,
   type CalendarReference,
@@ -33,6 +34,20 @@ function research(events: LegacyEvent[]): ResearchWeek<LegacyEvent> {
 }
 
 describe('calendar legacy display forecast compatibility', () => {
+  it('preserves a reported event with held ML and no eligible fallback', () => {
+    const held = {
+      ticker: 'LASE', earnings_date: '2026-09-22', timing: 'bmo',
+      ml_publication_status: 'held', display_forecast_method: 'ml',
+      display_forecast_pct: 0.061995, hist_move_med_4q: null, hist_move_avg_4q: 0.11,
+    } as const;
+    const merged = mergeCalendarReference(
+      reference([held]), research([held, {
+        ticker: 'AAA', earnings_date: '2026-09-23', timing: 'amc', hist_move_med_4q: 0.08,
+      }]), '2026-09-21',
+    );
+    expect(resolveDisplayForecastCompat(merged.events[0]).pct).toBeNull();
+  });
+
   it('uses only same-ticker history after an earnings-date revision, never stale ML/options', () => {
     const merged = mergeCalendarReference(
       reference([{ ticker: 'TEST', earnings_date: '2026-09-22', timing: 'unknown' }]),

@@ -87,7 +87,7 @@ describe('display forecast helpers', () => {
     ).toEqual({ pct: 0.081, method: 'historical' });
   });
 
-  it('uses legacy calendar history instead of a dash when canonical display fields are absent', () => {
+  it('uses the legacy calendar median when canonical display fields are absent', () => {
     expect(
       resolveDisplayForecastCompat({
         em_ml_pct: null,
@@ -105,8 +105,19 @@ describe('display forecast helpers', () => {
         em_iv_pct: null,
         hist_move_med_4q: null,
         hist_move_avg_4q: 0.102694,
-      }),
-    ).toEqual({ pct: 0.102694, method: 'historical' });
+      }).pct,
+    ).toBeNull();
+  });
+
+  it('does not use the four-event mean as the historical median for a reported event', () => {
+    const event = {
+      earnings_date: '2026-11-12', eps_actual: 0, ml_publication_status: 'held',
+      display_forecast_method: 'ml', display_forecast_pct: 0.061995,
+      em_ml_pct: 0.061995, hist_move_med_4q: null, hist_move_avg_4q: 0.11,
+    } as const;
+    expect(resolveDisplayForecastCompat(event).pct).toBeNull();
+    expect(resolveDisplayForecastCompat({ ...event, hist_move_med_4q: 0.07 }))
+      .toEqual({ pct: 0.07, method: 'historical' });
   });
 
   it.each(['historical', 'historical_prior'] as const)(

@@ -244,8 +244,7 @@ def _resolved_forecast_signature(
     )
     source_historical = canonical_historical or _positive_optional(payload.get("hist_move_med_4q"))
     historical = (source_historical or (None if "hist_move_med_4q" in payload else explicit_historical)
-                  if upcoming else explicit_historical or source_historical
-                  or _positive_optional(payload.get("hist_move_avg_4q")))
+                  if upcoming else explicit_historical or source_historical)
     if historical is not None:
         method = (
             "historical"
