@@ -1,50 +1,50 @@
 {
   "symbol": "T",
-  "as_of_date": "2026-11-11",
+  "as_of_date": "2026-11-12",
   "spot_price": 22.0,
   "expected_move": {
     "expiration": "2026-11-27",
-    "dte": 16,
+    "dte": 15,
     "atm_strike": 22.0,
-    "atm_iv": 0.249886,
+    "atm_iv": 0.265287,
     "straddle_abs": 0.96,
     "straddle_pct": 0.043636,
-    "iv_pct": 0.052318
+    "iv_pct": 0.053779
   },
   "straddle_features": [
     {
       "expiration": "2026-11-27",
-      "dte": 16,
+      "dte": 15,
       "atm_strike": 22.0,
-      "atm_iv": 0.249886,
-      "atm_call_iv": 0.2372,
-      "atm_put_iv": 0.2625,
+      "atm_iv": 0.265287,
+      "atm_call_iv": 0.2522,
+      "atm_put_iv": 0.2783,
       "straddle_mid": 0.96,
       "em_straddle": 0.96,
       "em_straddle_pct": 0.043636,
-      "em_iv": 1.151007,
-      "em_iv_pct": 0.052318,
-      "call_delta": 0.6239,
-      "call_gamma": 0.344,
-      "call_vega": 0.0176,
-      "call_theta": -0.0153
+      "em_iv": 1.183145,
+      "em_iv_pct": 0.053779,
+      "call_delta": 0.579,
+      "call_gamma": 0.3448,
+      "call_vega": 0.0175,
+      "call_theta": -0.0154
     },
     {
       "expiration": "2026-12-11",
-      "dte": 30,
+      "dte": 29,
       "atm_strike": 22.0,
-      "atm_iv": 0.2718,
-      "atm_call_iv": 0.2891,
-      "atm_put_iv": 0.2545,
-      "straddle_mid": 1.41,
-      "em_straddle": 1.41,
-      "em_straddle_pct": 0.064091,
-      "em_iv": 1.714298,
-      "em_iv_pct": 0.077923,
-      "call_delta": 0.5949,
-      "call_gamma": 0.2105,
-      "call_vega": 0.0247,
-      "call_theta": -0.0138
+      "atm_iv": 0.271514,
+      "atm_call_iv": 0.2559,
+      "atm_put_iv": 0.287,
+      "straddle_mid": 1.39,
+      "em_straddle": 1.39,
+      "em_straddle_pct": 0.063182,
+      "em_iv": 1.683711,
+      "em_iv_pct": 0.076532,
+      "call_delta": 0.6054,
+      "call_gamma": 0.2423,
+      "call_vega": 0.0242,
+      "call_theta": -0.0143
     }
   ],
   "earnings_history": [
@@ -453,13 +453,13 @@
   ],
   "next_earnings": null,
   "vol_regime": {
-    "iv_current": 0.2663,
-    "iv_rank": 0.38897,
+    "iv_current": 0.2689,
+    "iv_rank": 0.401548,
     "iv_year_high": 0.3926,
     "iv_year_low": 0.1859,
     "hv_current": 0.4985,
     "hv_rank": 1.0,
-    "iv_mom_week": 0.0005,
+    "iv_mom_week": -0.0287,
     "iv_mom_month": null
   }
 }

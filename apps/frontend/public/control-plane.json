@@ -1,112 +1,101 @@
 {
   "data": {
-    "contract_rejection_rate": 0.572438,
-    "contracts": 130636,
-    "corporate_action_rows": 62725,
+    "contract_rejection_rate": 0.512536,
+    "contracts": 133376,
+    "corporate_action_rows": 62723,
     "corporate_action_status": "enforced",
-    "covered_events": 77,
-    "decision_group_rejection_rate": 0.3,
-    "decision_groups": 110,
+    "covered_events": 76,
+    "decision_group_rejection_rate": 0.232323,
+    "decision_groups": 99,
     "decision_scope": "end_of_day_research",
     "display_forecast_coverage_pct": 1.0,
-    "display_forecast_covered_events": 113,
-    "display_forecast_events": 113,
+    "display_forecast_covered_events": 117,
+    "display_forecast_events": 117,
     "display_forecast_method_mix": {
-      "historical": 14,
-      "historical_prior": 1,
-      "ml": 23,
+      "historical": 13,
+      "historical_prior": 0,
+      "ml": 37,
       "ml_unavailable": 0,
       "options_indicative": 0,
-      "options_math": 62,
-      "straddle_implied": 13
+      "options_math": 58,
+      "straddle_implied": 9
     },
     "duplicate_rows": 0,
-    "eligible_contracts": 55855,
-    "eligible_decision_groups": 77,
-    "event_coverage_pct": 0.7,
-    "expected_events": 110,
-    "expected_source_date": "2026-11-11",
+    "eligible_contracts": 65016,
+    "eligible_decision_groups": 76,
+    "event_coverage_pct": 0.767677,
+    "expected_events": 99,
+    "expected_source_date": "2026-11-12",
     "live_trading_eligible": false,
-    "missing_events": 33,
-    "pair_rejection_rate": 0.90361,
-    "quarantine_records": 133803,
+    "missing_events": 23,
+    "pair_rejection_rate": 0.877309,
+    "quarantine_records": 126866,
     "quarantine_status": "enforced",
     "quote_quality_errors": [],
     "replay_status": "verified",
-    "source_date": "2026-11-11",
+    "source_date": "2026-11-12",
     "source_session_lag": 0,
     "status": "passed"
   },
   "exceptions": [
     {
       "code": "upcoming_events_outside_option_universe",
-      "count": 1017,
+      "count": 598,
       "severity": "warning",
       "summary": "Calendar events fall outside the current options decision universe"
     },
     {
       "code": "upcoming_events_without_option_chain",
-      "count": 33,
+      "count": 23,
       "severity": "warning",
       "summary": "In-universe earnings events have no decision-eligible option chain"
     },
     {
       "code": "forecast_horizon_coverage_below_limit",
-      "count": 33,
+      "count": 24,
       "severity": "warning",
       "summary": "One or more model horizons lack sufficient eligible option coverage"
     },
     {
       "code": "option_chain_diagnostics_above_limit",
-      "count": 2803,
+      "count": 2489,
       "severity": "warning",
       "summary": "Chain-wide option diagnostics exceed their limits outside the scoped earnings decision surface"
-    },
-    {
-      "code": "ml_event_coverage_partial",
-      "count": 1,
-      "severity": "warning",
-      "summary": "39 of 40 scored earnings events have eligible ML forecasts; 1 of those events are held. Other upcoming calendar events remain held for ML and use independent estimates until a current eligible forecast is available."
-    },
-    {
-      "code": "ml_aggregate_drift_advisory",
-      "severity": "warning",
-      "summary": "The aggregate model assessment requires attention. Only eligible event forecasts are published."
     }
   ],
-  "generated_at": "2026-11-12T09:01:04.141396+00:00",
+  "generated_at": "2026-11-13T09:55:35.105402+00:00",
   "model": {
     "challenger_present": true,
     "champion_active": true,
-    "critical_features": 108,
-    "drift_status": "critical",
+    "critical_features": 61,
+    "drift_status": "warning",
     "fallback_bundle_available": true,
     "hard_missing_features": null,
-    "monitored_at": "2026-11-12T08:24:39.072809+00:00",
+    "monitored_at": "2026-11-13T09:22:12.754222+00:00",
     "outcome_common_rows": 1013,
     "outcome_evaluated_at": "2026-11-08T18:35:18.026720+00:00",
     "outcome_evaluations": 9,
     "outcome_minimum_rows": 30,
     "outcome_status": "passed",
     "publication_coverage": {
-      "candidate_events": 40,
-      "candidate_rows": 40,
+      "candidate_events": 39,
+      "candidate_rows": 39,
       "eligible_events": 39,
       "eligible_rows": 39,
-      "held_events": 1,
-      "held_rows": 1
+      "held_events": 0,
+      "held_rows": 0
     },
-    "publication_hold_reason": "event_forecast_eligibility",
+    "publication_hold_reason": null,
     "publication_policy": "quantiv.event-forecast-eligibility.v1",
-    "publication_status": "partial",
+    "publication_status": "eligible",
     "rollback_recorded": false,
     "shadow_roles": [
       "challenger",
       "champion_evidence",
       "previous"
     ],
-    "snapshot_date": "2026-11-11",
-    "status": "advisory",
+    "snapshot_date": "2026-11-12",
+    "status": "passed",
     "warning_features": 0
   },
   "publication_eligible": true,
@@ -118,5 +107,5 @@
     "neon_import_status": "passed"
   },
   "schema": "quantiv.control-plane.v2",
-  "status": "advisory"
+  "status": "passed"
 }

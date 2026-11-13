@@ -1,7 +1,7 @@
 {
   "symbol": "SBAC",
-  "as_of_date": "2026-11-11",
-  "spot_price": 190.03,
+  "as_of_date": "2026-11-12",
+  "spot_price": 185.0,
   "expected_move": {
     "earnings_date": "2026-11-02",
     "timing": "amc",
@@ -35,14 +35,32 @@
     "forecast_model_bundle_id": "d14dc7f2aa6b175956922eb6266b8523742add962668b7d6b8833cc2c869dd1b",
     "ml_publication_status": "eligible",
     "forecast_scored_at": "2026-11-02T08:58:48.205293+00:00",
-    "forecast_published_at": "2026-11-11T09:00:01+00:00",
+    "forecast_published_at": "2026-11-12T09:01:14+00:00",
     "forecast_feature_cutoff_at": "2026-11-02T20:55:00+00:00",
     "forecast_prediction_deadline_at": "2026-11-02T20:55:00+00:00",
     "forecast_feature_snapshot_at": "2026-10-30T20:00:00+00:00",
     "forecast_feature_hash": "28f077c2751c847ff3e03d53c0979f49dc21cb6500bf912e6ac1855f4ce188aa",
     "forecast_frozen_eligible": true
   },
-  "straddle_features": [],
+  "straddle_features": [
+    {
+      "expiration": "2026-11-20",
+      "dte": 8,
+      "atm_strike": 185.0,
+      "atm_iv": 0.376549,
+      "atm_call_iv": 0.3775,
+      "atm_put_iv": 0.3756,
+      "straddle_mid": 8.425,
+      "em_straddle": 8.425,
+      "em_straddle_pct": 0.045541,
+      "em_iv": 10.313164,
+      "em_iv_pct": 0.055747,
+      "call_delta": 0.5873,
+      "call_gamma": 0.0374,
+      "call_vega": 0.1075,
+      "call_theta": -0.2843
+    }
+  ],
   "earnings_history": [
     {
       "date": "2026-11-02",
@@ -76,7 +94,7 @@
       "forecast_id": "629de6f430940cda57a58957d314a138924fe7f7ddcc9799e0f3cd30d713f9a1",
       "forecast_model_bundle_id": "d14dc7f2aa6b175956922eb6266b8523742add962668b7d6b8833cc2c869dd1b",
       "forecast_scored_at": "2026-11-02T08:58:48.205293+00:00",
-      "forecast_published_at": "2026-11-11T09:00:01+00:00",
+      "forecast_published_at": "2026-11-12T09:01:14+00:00",
       "forecast_feature_cutoff_at": "2026-11-02T20:55:00+00:00",
       "forecast_prediction_deadline_at": "2026-11-02T20:55:00+00:00",
       "forecast_feature_snapshot_at": "2026-10-30T20:00:00+00:00",
@@ -451,13 +469,13 @@
   ],
   "next_earnings": "2026-11-02",
   "vol_regime": {
-    "iv_current": 0.3385,
-    "iv_rank": 0.548706,
+    "iv_current": 0.3371,
+    "iv_rank": 0.542118,
     "iv_year_high": 0.4344,
     "iv_year_low": 0.2219,
-    "hv_current": 0.3795,
-    "hv_rank": 0.398228,
-    "iv_mom_week": -0.0304,
+    "hv_current": 0.3821,
+    "hv_rank": 0.404454,
+    "iv_mom_week": -0.0547,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

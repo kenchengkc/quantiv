@@ -1,6 +1,6 @@
 {
   "symbol": "FIVN",
-  "as_of_date": "2026-11-11",
+  "as_of_date": "2026-11-12",
   "spot_price": 30.0,
   "expected_move": {
     "earnings_date": "2026-11-05",
@@ -27,20 +27,20 @@
   "straddle_features": [
     {
       "expiration": "2026-12-18",
-      "dte": 37,
+      "dte": 36,
       "atm_strike": 30.0,
-      "atm_iv": 0.628909,
-      "atm_call_iv": 0.6163,
-      "atm_put_iv": 0.6417,
-      "straddle_mid": 4.85,
-      "em_straddle": 4.85,
-      "em_straddle_pct": 0.161667,
-      "em_iv": 6.007083,
-      "em_iv_pct": 0.200236,
-      "call_delta": 0.4286,
-      "call_gamma": 0.0716,
-      "call_vega": 0.0352,
-      "call_theta": -0.0326
+      "atm_iv": 0.621246,
+      "atm_call_iv": 0.6121,
+      "atm_put_iv": 0.6305,
+      "straddle_mid": 4.725,
+      "em_straddle": 4.725,
+      "em_straddle_pct": 0.1575,
+      "em_iv": 5.853154,
+      "em_iv_pct": 0.195105,
+      "call_delta": 0.4173,
+      "call_gamma": 0.072,
+      "call_vega": 0.0345,
+      "call_theta": -0.0304
     }
   ],
   "earnings_history": [
@@ -356,13 +356,13 @@
   ],
   "next_earnings": "2026-11-05",
   "vol_regime": {
-    "iv_current": 0.607,
-    "iv_rank": 0.225663,
+    "iv_current": 0.6248,
+    "iv_rank": 0.250462,
     "iv_year_high": 0.9896,
-    "iv_year_low": 0.4955,
-    "hv_current": 0.8133,
-    "hv_rank": 0.668565,
-    "iv_mom_week": -0.2551,
+    "iv_year_low": 0.5029,
+    "hv_current": 0.7964,
+    "hv_rank": 0.636484,
+    "iv_mom_week": -0.3046,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

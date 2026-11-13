@@ -1,7 +1,7 @@
 {
   "symbol": "ZBH",
-  "as_of_date": "2026-11-11",
-  "spot_price": 107.47,
+  "as_of_date": "2026-11-12",
+  "spot_price": 105.0,
   "expected_move": {
     "earnings_date": "2026-11-04",
     "timing": "bmo",
@@ -43,7 +43,25 @@
     "forecast_feature_hash": "31b0e4ba1b319a9866d192866ce09f989322ecde18dd60c5c5ce1400abca8281",
     "forecast_frozen_eligible": true
   },
-  "straddle_features": [],
+  "straddle_features": [
+    {
+      "expiration": "2026-12-18",
+      "dte": 36,
+      "atm_strike": 105.0,
+      "atm_iv": 0.281924,
+      "atm_call_iv": 0.287,
+      "atm_put_iv": 0.2768,
+      "straddle_mid": 7.575,
+      "em_straddle": 7.575,
+      "em_straddle_pct": 0.072143,
+      "em_iv": 9.296627,
+      "em_iv_pct": 0.088539,
+      "call_delta": 0.5614,
+      "call_gamma": 0.0423,
+      "call_vega": 0.1308,
+      "call_theta": -0.0727
+    }
+  ],
   "earnings_history": [
     {
       "date": "2026-11-04",
@@ -453,13 +471,13 @@
   ],
   "next_earnings": "2026-11-04",
   "vol_regime": {
-    "iv_current": 0.2771,
-    "iv_rank": 0.208704,
+    "iv_current": 0.2893,
+    "iv_rank": 0.265793,
     "iv_year_high": 0.4462,
     "iv_year_low": 0.2325,
-    "hv_current": 0.4646,
-    "hv_rank": 0.963003,
-    "iv_mom_week": -0.022,
+    "hv_current": 0.473,
+    "hv_rank": 0.993175,
+    "iv_mom_week": -0.0314,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"

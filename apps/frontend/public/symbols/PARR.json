@@ -1,7 +1,7 @@
 {
   "symbol": "PARR",
-  "as_of_date": "2026-11-11",
-  "spot_price": 70.0,
+  "as_of_date": "2026-11-12",
+  "spot_price": 75.0,
   "expected_move": {
     "earnings_date": "2026-11-03",
     "timing": "amc",
@@ -44,38 +44,21 @@
   },
   "straddle_features": [
     {
-      "expiration": "2026-11-20",
-      "dte": 9,
-      "atm_strike": 70.0,
-      "atm_iv": 0.644891,
-      "atm_call_iv": 0.6525,
-      "atm_put_iv": 0.6373,
-      "straddle_mid": 5.72,
-      "em_straddle": 5.72,
-      "em_straddle_pct": 0.081714,
-      "em_iv": 7.088582,
-      "em_iv_pct": 0.101265,
-      "call_delta": 0.5678,
-      "call_gamma": 0.0536,
-      "call_vega": 0.0436,
-      "call_theta": -0.1412
-    },
-    {
       "expiration": "2026-12-18",
-      "dte": 37,
-      "atm_strike": 70.0,
-      "atm_iv": 0.588465,
-      "atm_call_iv": 0.5816,
-      "atm_put_iv": 0.5953,
-      "straddle_mid": 10.5,
-      "em_straddle": 10.5,
-      "em_straddle_pct": 0.15,
-      "em_iv": 13.115156,
-      "em_iv_pct": 0.187359,
-      "call_delta": 0.5607,
-      "call_gamma": 0.0296,
-      "call_vega": 0.0884,
-      "call_theta": -0.0651
+      "dte": 36,
+      "atm_strike": 75.0,
+      "atm_iv": 0.552619,
+      "atm_call_iv": 0.5435,
+      "atm_put_iv": 0.5618,
+      "straddle_mid": 10.4,
+      "em_straddle": 10.4,
+      "em_straddle_pct": 0.138667,
+      "em_iv": 13.016438,
+      "em_iv_pct": 0.173553,
+      "call_delta": 0.4562,
+      "call_gamma": 0.0323,
+      "call_vega": 0.0898,
+      "call_theta": -0.0734
     }
   ],
   "earnings_history": [
@@ -486,13 +469,13 @@
   ],
   "next_earnings": "2026-11-03",
   "vol_regime": {
-    "iv_current": 0.588,
-    "iv_rank": 0.383821,
+    "iv_current": 0.5779,
+    "iv_rank": 0.340361,
     "iv_year_high": 0.7312,
     "iv_year_low": 0.4988,
-    "hv_current": 0.674,
-    "hv_rank": 0.721574,
-    "iv_mom_week": -0.0503,
+    "hv_current": 0.6524,
+    "hv_rank": 0.672157,
+    "iv_mom_week": -0.067,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

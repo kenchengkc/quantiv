@@ -1,7 +1,7 @@
 {
   "symbol": "BDX",
-  "as_of_date": "2026-11-11",
-  "spot_price": 214.52,
+  "as_of_date": "2026-11-12",
+  "spot_price": 210.0,
   "expected_move": {
     "earnings_date": "2026-11-05",
     "timing": "bmo",
@@ -24,7 +24,25 @@
     "ml_publication_status": "held",
     "ml_publication_reason": "no_eligible_current_forecast"
   },
-  "straddle_features": [],
+  "straddle_features": [
+    {
+      "expiration": "2026-12-18",
+      "dte": 36,
+      "atm_strike": 210.0,
+      "atm_iv": 0.26646,
+      "atm_call_iv": 0.2686,
+      "atm_put_iv": 0.2643,
+      "straddle_mid": 14.745,
+      "em_straddle": 14.745,
+      "em_straddle_pct": 0.070214,
+      "em_iv": 17.573428,
+      "em_iv_pct": 0.083683,
+      "call_delta": 0.6277,
+      "call_gamma": 0.0206,
+      "call_vega": 0.2537,
+      "call_theta": -0.0859
+    }
+  ],
   "earnings_history": [
     {
       "date": "2026-11-05",
@@ -415,13 +433,13 @@
   ],
   "next_earnings": "2026-11-05",
   "vol_regime": {
-    "iv_current": 0.2633,
-    "iv_rank": 0.287028,
+    "iv_current": 0.2615,
+    "iv_rank": 0.278316,
     "iv_year_high": 0.4106,
     "iv_year_low": 0.204,
-    "hv_current": 0.2472,
-    "hv_rank": 0.445734,
-    "iv_mom_week": -0.0723,
+    "hv_current": 0.2449,
+    "hv_rank": 0.432385,
+    "iv_mom_week": -0.0376,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"

@@ -1,7 +1,7 @@
 {
   "symbol": "ZTS",
-  "as_of_date": "2026-11-11",
-  "spot_price": 80.0,
+  "as_of_date": "2026-11-12",
+  "spot_price": 85.0,
   "expected_move": {
     "earnings_date": "2026-11-05",
     "timing": "bmo",
@@ -26,21 +26,38 @@
   },
   "straddle_features": [
     {
+      "expiration": "2026-11-20",
+      "dte": 8,
+      "atm_strike": 85.0,
+      "atm_iv": 0.3601,
+      "atm_call_iv": 0.3601,
+      "atm_put_iv": 0.3601,
+      "straddle_mid": 3.825,
+      "em_straddle": 3.825,
+      "em_straddle_pct": 0.045,
+      "em_iv": 4.531486,
+      "em_iv_pct": 0.053312,
+      "call_delta": 0.3347,
+      "call_gamma": 0.0824,
+      "call_vega": 0.0446,
+      "call_theta": -0.1014
+    },
+    {
       "expiration": "2026-12-18",
-      "dte": 37,
-      "atm_strike": 80.0,
-      "atm_iv": 0.32785,
-      "atm_call_iv": 0.3318,
-      "atm_put_iv": 0.3239,
-      "straddle_mid": 7.05,
-      "em_straddle": 7.05,
-      "em_straddle_pct": 0.088125,
-      "em_iv": 8.350637,
-      "em_iv_pct": 0.104383,
-      "call_delta": 0.6358,
-      "call_gamma": 0.0428,
-      "call_vega": 0.098,
-      "call_theta": -0.0437
+      "dte": 36,
+      "atm_strike": 85.0,
+      "atm_iv": 0.332708,
+      "atm_call_iv": 0.3354,
+      "atm_put_iv": 0.33,
+      "straddle_mid": 7.145,
+      "em_straddle": 7.145,
+      "em_straddle_pct": 0.084059,
+      "em_iv": 8.881511,
+      "em_iv_pct": 0.104488,
+      "call_delta": 0.4405,
+      "call_gamma": 0.0451,
+      "call_vega": 0.1026,
+      "call_theta": -0.0507
     }
   ],
   "earnings_history": [
@@ -433,13 +450,13 @@
   ],
   "next_earnings": "2026-11-05",
   "vol_regime": {
-    "iv_current": 0.3255,
-    "iv_rank": 0.196332,
+    "iv_current": 0.3327,
+    "iv_rank": 0.220788,
     "iv_year_high": 0.5621,
     "iv_year_low": 0.2677,
-    "hv_current": 0.439,
-    "hv_rank": 0.385633,
-    "iv_mom_week": -0.1911,
+    "hv_current": 0.4364,
+    "hv_rank": 0.381165,
+    "iv_mom_week": -0.0331,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"

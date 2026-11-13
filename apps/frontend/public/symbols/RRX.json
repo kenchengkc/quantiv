@@ -1,7 +1,7 @@
 {
   "symbol": "RRX",
-  "as_of_date": "2026-11-11",
-  "spot_price": 185.0,
+  "as_of_date": "2026-11-12",
+  "spot_price": 180.0,
   "expected_move": {
     "earnings_date": "2026-11-03",
     "timing": "bmo",
@@ -44,21 +44,38 @@
   },
   "straddle_features": [
     {
+      "expiration": "2026-11-20",
+      "dte": 8,
+      "atm_strike": 180.0,
+      "atm_iv": 0.4971,
+      "atm_call_iv": 0.5003,
+      "atm_put_iv": 0.4939,
+      "straddle_mid": 10.65,
+      "em_straddle": 10.65,
+      "em_straddle_pct": 0.059167,
+      "em_iv": 13.246917,
+      "em_iv_pct": 0.073594,
+      "call_delta": 0.5495,
+      "call_gamma": 0.0297,
+      "call_vega": 0.1058,
+      "call_theta": -0.3728
+    },
+    {
       "expiration": "2026-12-18",
-      "dte": 37,
+      "dte": 36,
       "atm_strike": 185.0,
-      "atm_iv": 0.472098,
-      "atm_call_iv": 0.4755,
-      "atm_put_iv": 0.4687,
-      "straddle_mid": 22.095,
-      "em_straddle": 22.095,
-      "em_straddle_pct": 0.119432,
-      "em_iv": 27.807256,
-      "em_iv_pct": 0.150309,
-      "call_delta": 0.5126,
-      "call_gamma": 0.0144,
-      "call_vega": 0.2322,
-      "call_theta": -0.1622
+      "atm_iv": 0.467409,
+      "atm_call_iv": 0.4772,
+      "atm_put_iv": 0.4576,
+      "straddle_mid": 21.64,
+      "em_straddle": 21.64,
+      "em_straddle_pct": 0.116973,
+      "em_iv": 27.156469,
+      "em_iv_pct": 0.146792,
+      "call_delta": 0.4871,
+      "call_gamma": 0.0147,
+      "call_vega": 0.2267,
+      "call_theta": -0.1682
     }
   ],
   "earnings_history": [
@@ -462,13 +479,13 @@
   ],
   "next_earnings": "2026-11-03",
   "vol_regime": {
-    "iv_current": 0.4711,
-    "iv_rank": 0.418634,
+    "iv_current": 0.4858,
+    "iv_rank": 0.465539,
     "iv_year_high": 0.6533,
     "iv_year_low": 0.3399,
-    "hv_current": 0.6084,
-    "hv_rank": 0.661528,
-    "iv_mom_week": -0.0165,
+    "hv_current": 0.6104,
+    "hv_rank": 0.665871,
+    "iv_mom_week": -0.0622,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"

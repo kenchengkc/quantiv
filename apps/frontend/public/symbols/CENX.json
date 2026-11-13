@@ -1,6 +1,6 @@
 {
   "symbol": "CENX",
-  "as_of_date": "2026-11-11",
+  "as_of_date": "2026-11-12",
   "spot_price": 37.5,
   "expected_move": {
     "earnings_date": "2026-11-05",
@@ -27,20 +27,20 @@
   "straddle_features": [
     {
       "expiration": "2026-12-18",
-      "dte": 37,
+      "dte": 36,
       "atm_strike": 37.5,
-      "atm_iv": 0.614143,
-      "atm_call_iv": 0.6107,
-      "atm_put_iv": 0.6176,
-      "straddle_mid": 5.8,
-      "em_straddle": 5.8,
-      "em_straddle_pct": 0.154667,
-      "em_iv": 7.332548,
-      "em_iv_pct": 0.195535,
-      "call_delta": 0.5021,
-      "call_gamma": 0.0558,
-      "call_vega": 0.0465,
-      "call_theta": -0.0399
+      "atm_iv": 0.624872,
+      "atm_call_iv": 0.6166,
+      "atm_put_iv": 0.6332,
+      "straddle_mid": 5.9,
+      "em_straddle": 5.9,
+      "em_straddle_pct": 0.157333,
+      "em_iv": 7.359141,
+      "em_iv_pct": 0.196244,
+      "call_delta": 0.4609,
+      "call_gamma": 0.0582,
+      "call_vega": 0.0446,
+      "call_theta": -0.0446
     }
   ],
   "earnings_history": [
@@ -433,13 +433,13 @@
   ],
   "next_earnings": "2026-11-05",
   "vol_regime": {
-    "iv_current": 0.6213,
-    "iv_rank": 0.212784,
+    "iv_current": 0.6122,
+    "iv_rank": 0.187272,
     "iv_year_high": 0.9021,
     "iv_year_low": 0.5454,
-    "hv_current": 0.6451,
-    "hv_rank": 0.655275,
-    "iv_mom_week": -0.0937,
+    "hv_current": 0.6525,
+    "hv_rank": 0.675346,
+    "iv_mom_week": -0.1321,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

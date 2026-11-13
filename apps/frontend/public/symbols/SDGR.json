@@ -1,6 +1,6 @@
 {
   "symbol": "SDGR",
-  "as_of_date": "2026-11-11",
+  "as_of_date": "2026-11-12",
   "spot_price": 32.5,
   "expected_move": {
     "earnings_date": "2026-11-04",
@@ -26,38 +26,21 @@
   },
   "straddle_features": [
     {
-      "expiration": "2026-11-20",
-      "dte": 9,
-      "atm_strike": 32.5,
-      "atm_iv": 0.841265,
-      "atm_call_iv": 0.8345,
-      "atm_put_iv": 0.8481,
-      "straddle_mid": 3.45,
-      "em_straddle": 3.45,
-      "em_straddle_pct": 0.106154,
-      "em_iv": 4.293299,
-      "em_iv_pct": 0.132102,
-      "call_delta": 0.4577,
-      "call_gamma": 0.0967,
-      "call_vega": 0.0197,
-      "call_theta": -0.1032
-    },
-    {
       "expiration": "2026-12-18",
-      "dte": 37,
+      "dte": 36,
       "atm_strike": 32.5,
-      "atm_iv": 0.7266,
-      "atm_call_iv": 0.7292,
-      "atm_put_iv": 0.724,
-      "straddle_mid": 5.92,
-      "em_straddle": 5.92,
-      "em_straddle_pct": 0.182154,
-      "em_iv": 7.518534,
-      "em_iv_pct": 0.23134,
-      "call_delta": 0.4906,
-      "call_gamma": 0.0542,
-      "call_vega": 0.0398,
-      "call_theta": -0.0388
+      "atm_iv": 0.761539,
+      "atm_call_iv": 0.7764,
+      "atm_put_iv": 0.7466,
+      "straddle_mid": 6.145,
+      "em_straddle": 6.145,
+      "em_straddle_pct": 0.189077,
+      "em_iv": 7.772852,
+      "em_iv_pct": 0.239165,
+      "call_delta": 0.4604,
+      "call_gamma": 0.0525,
+      "call_vega": 0.0382,
+      "call_theta": -0.0408
     }
   ],
   "earnings_history": [
@@ -450,13 +433,13 @@
   ],
   "next_earnings": "2026-11-04",
   "vol_regime": {
-    "iv_current": 0.7746,
-    "iv_rank": 0.531274,
+    "iv_current": 0.7637,
+    "iv_rank": 0.514272,
     "iv_year_high": 1.0751,
     "iv_year_low": 0.434,
-    "hv_current": 0.9858,
-    "hv_rank": 0.838071,
-    "iv_mom_week": -0.2357,
+    "hv_current": 0.9862,
+    "hv_rank": 0.838603,
+    "iv_mom_week": -0.0469,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

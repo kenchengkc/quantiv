@@ -1,6 +1,6 @@
 {
   "symbol": "FOXA",
-  "as_of_date": "2026-11-11",
+  "as_of_date": "2026-11-12",
   "spot_price": 70.0,
   "expected_move": {
     "earnings_date": "2026-11-02",
@@ -27,20 +27,20 @@
   "straddle_features": [
     {
       "expiration": "2026-12-18",
-      "dte": 37,
+      "dte": 36,
       "atm_strike": 70.0,
-      "atm_iv": 0.405581,
-      "atm_call_iv": 0.3897,
-      "atm_put_iv": 0.4215,
-      "straddle_mid": 7.275,
-      "em_straddle": 7.275,
-      "em_straddle_pct": 0.103929,
-      "em_iv": 9.039204,
-      "em_iv_pct": 0.129131,
-      "call_delta": 0.4216,
-      "call_gamma": 0.0461,
-      "call_vega": 0.0842,
-      "call_theta": -0.0425
+      "atm_iv": 0.375299,
+      "atm_call_iv": 0.3559,
+      "atm_put_iv": 0.3953,
+      "straddle_mid": 7.125,
+      "em_straddle": 7.125,
+      "em_straddle_pct": 0.101786,
+      "em_iv": 8.250499,
+      "em_iv_pct": 0.117864,
+      "call_delta": 0.3463,
+      "call_gamma": 0.0505,
+      "call_vega": 0.0764,
+      "call_theta": -0.0452
     }
   ],
   "earnings_history": [
@@ -433,13 +433,13 @@
   ],
   "next_earnings": "2026-11-02",
   "vol_regime": {
-    "iv_current": 0.348,
-    "iv_rank": 0.462118,
+    "iv_current": 0.3797,
+    "iv_rank": 0.575943,
     "iv_year_high": 0.4978,
     "iv_year_low": 0.2193,
-    "hv_current": 0.358,
-    "hv_rank": 0.311846,
-    "iv_mom_week": 0.0046,
+    "hv_current": 0.3667,
+    "hv_rank": 0.330416,
+    "iv_mom_week": -0.0001,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"

@@ -1,7 +1,7 @@
 {
   "symbol": "FNV",
-  "as_of_date": "2026-11-11",
-  "spot_price": 248.76,
+  "as_of_date": "2026-11-12",
+  "spot_price": 247.72,
   "expected_move": {
     "earnings_date": "2026-11-11",
     "timing": "amc",
@@ -27,7 +27,7 @@
     "ml_publication_status": "held",
     "ml_publication_reason": "no_eligible_current_forecast",
     "forecast_scored_at": "2026-10-21T09:54:00.090573+00:00",
-    "forecast_published_at": "2026-10-21T11:01:14+00:00",
+    "forecast_published_at": "2026-11-12T09:01:14+00:00",
     "forecast_feature_cutoff_at": "2026-11-11T20:55:00+00:00",
     "forecast_prediction_deadline_at": "2026-11-11T20:55:00+00:00",
     "forecast_feature_snapshot_at": "2026-10-20T20:00:00+00:00",
@@ -38,11 +38,11 @@
   "earnings_history": [
     {
       "date": "2026-11-11",
-      "timing": "after_market_close",
+      "timing": "amc",
       "q": "Q3 26",
       "fiscal_year": 2026,
       "fiscal_q": "Q3",
-      "actual": null,
+      "actual": -0.004181,
       "implied": null,
       "implied_as_of": null,
       "implied_expiration": null,
@@ -58,8 +58,8 @@
       "revenue_actual": null,
       "revenue_estimate": null,
       "rev_surprise_pct": null,
-      "realized_target_protocol": null,
-      "realized_label_source": null,
+      "realized_target_protocol": "quantiv.session-reaction.v2",
+      "realized_label_source": "ohlcv_session_close",
       "em_ml_pct": 0.034572,
       "em_ml_abs": 8.336009,
       "model_horizon": 22,
@@ -85,7 +85,7 @@
       "fallback_reason": null,
       "forecast_frozen": true,
       "ml_publication_status": "held",
-      "forecast_published_at": "2026-10-21T11:01:14+00:00",
+      "forecast_published_at": "2026-11-12T09:01:14+00:00",
       "ml_publication_reason": "no_eligible_current_forecast"
     },
     {

@@ -1,7 +1,7 @@
 {
   "symbol": "PLNT",
-  "as_of_date": "2026-11-11",
-  "spot_price": 62.5,
+  "as_of_date": "2026-11-12",
+  "spot_price": 60.0,
   "expected_move": {
     "earnings_date": "2026-11-05",
     "timing": "bmo",
@@ -45,38 +45,21 @@
   },
   "straddle_features": [
     {
-      "expiration": "2026-11-20",
-      "dte": 9,
-      "atm_strike": 62.5,
-      "atm_iv": 0.410908,
-      "atm_call_iv": 0.4047,
-      "atm_put_iv": 0.4172,
-      "straddle_mid": 3.325,
-      "em_straddle": 3.325,
-      "em_straddle_pct": 0.0532,
-      "em_iv": 4.032729,
-      "em_iv_pct": 0.064524,
-      "call_delta": 0.4023,
-      "call_gamma": 0.0998,
-      "call_vega": 0.0371,
-      "call_theta": -0.0929
-    },
-    {
       "expiration": "2026-12-18",
-      "dte": 37,
-      "atm_strike": 62.5,
-      "atm_iv": 0.391799,
-      "atm_call_iv": 0.3907,
-      "atm_put_iv": 0.3929,
-      "straddle_mid": 6.225,
-      "em_straddle": 6.225,
-      "em_straddle_pct": 0.0996,
-      "em_iv": 7.796471,
-      "em_iv_pct": 0.124744,
-      "call_delta": 0.4781,
-      "call_gamma": 0.0524,
-      "call_vega": 0.0777,
-      "call_theta": -0.0457
+      "dte": 36,
+      "atm_strike": 60.0,
+      "atm_iv": 0.4034,
+      "atm_call_iv": 0.4029,
+      "atm_put_iv": 0.4039,
+      "straddle_mid": 6.075,
+      "em_straddle": 6.075,
+      "em_straddle_pct": 0.10125,
+      "em_iv": 7.601372,
+      "em_iv_pct": 0.12669,
+      "call_delta": 0.543,
+      "call_gamma": 0.052,
+      "call_vega": 0.0748,
+      "call_theta": -0.0445
     }
   ],
   "earnings_history": [
@@ -488,13 +471,13 @@
   ],
   "next_earnings": "2026-11-05",
   "vol_regime": {
-    "iv_current": 0.4016,
-    "iv_rank": 0.349404,
+    "iv_current": 0.406,
+    "iv_rank": 0.360568,
     "iv_year_high": 0.658,
     "iv_year_low": 0.2639,
-    "hv_current": 0.3838,
-    "hv_rank": 0.137912,
-    "iv_mom_week": -0.2235,
+    "hv_current": 0.3885,
+    "hv_rank": 0.143077,
+    "iv_mom_week": -0.0364,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"

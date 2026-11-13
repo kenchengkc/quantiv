@@ -1,7 +1,7 @@
 {
   "symbol": "VYLR",
-  "as_of_date": "2026-11-11",
-  "spot_price": 70.0,
+  "as_of_date": "2026-11-12",
+  "spot_price": 72.06,
   "expected_move": {
     "earnings_date": "2026-11-11",
     "timing": "amc",
@@ -32,33 +32,15 @@
     "forecast_feature_hash": "6af5997ebb8db3eb049ae117b62462bf48294b488d59c51e480fac731d1de322",
     "forecast_frozen_eligible": true
   },
-  "straddle_features": [
-    {
-      "expiration": "2026-11-20",
-      "dte": 9,
-      "atm_strike": 70.0,
-      "atm_iv": 0.612396,
-      "atm_call_iv": 0.6358,
-      "atm_put_iv": 0.5886,
-      "straddle_mid": 5.65,
-      "em_straddle": 5.65,
-      "em_straddle_pct": 0.080714,
-      "em_iv": 6.731392,
-      "em_iv_pct": 0.096163,
-      "call_delta": 0.6258,
-      "call_gamma": 0.0524,
-      "call_vega": 0.0426,
-      "call_theta": -0.1404
-    }
-  ],
+  "straddle_features": [],
   "earnings_history": [
     {
       "date": "2026-11-11",
-      "timing": "after_market_close",
+      "timing": "amc",
       "q": "Q3 26",
       "fiscal_year": 2026,
       "fiscal_q": "Q3",
-      "actual": null,
+      "actual": -0.000555,
       "implied": null,
       "implied_as_of": null,
       "implied_expiration": null,
@@ -74,8 +56,8 @@
       "revenue_actual": null,
       "revenue_estimate": null,
       "rev_surprise_pct": null,
-      "realized_target_protocol": null,
-      "realized_label_source": null,
+      "realized_target_protocol": "quantiv.session-reaction.v2",
+      "realized_label_source": "ohlcv_session_close",
       "em_ml_pct": 0.04311,
       "em_ml_abs": 3.126734,
       "model_horizon": 1,
