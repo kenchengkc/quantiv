@@ -143,8 +143,24 @@ def test_forecast_surface_parity_rejects_fdx_style_split_release(
     )
     monkeypatch.setattr(contracts, "PUBLIC", public)
 
-    with pytest.raises(contracts.ContractError, match="resolved headline mismatch"):
+    with pytest.raises(contracts.ContractError, match="calendar is missing resolved headline forecast"):
         contracts.validate_forecast_surface_parity()
+
+
+def test_reported_calendar_mean_cannot_replace_a_missing_median(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    held = {
+        "ml_publication_status": "held", "display_forecast_method": "ml",
+        "display_forecast_pct": 0.061995, "em_ml_pct": 0.061995,
+        "hist_move_med_4q": None,
+    }
+    _write_forecast_surface_fixture(
+        tmp_path, calendar_forecast={**held, "hist_move_avg_4q": 0.11},
+        symbol_forecast=held,
+    )
+    monkeypatch.setattr(contracts, "PUBLIC", tmp_path)
+    contracts.validate_forecast_surface_parity()
 
 
 def test_forecast_surface_parity_accepts_same_ml_headline(

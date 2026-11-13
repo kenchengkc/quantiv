@@ -192,7 +192,7 @@ export function resolveDisplayForecastCompat(
   const sourceHistorical = canonicalHistorical ?? finiteDisplayForecast(fields.hist_move_med_4q);
   const historical = upcoming
     ? sourceHistorical ?? ('hist_move_med_4q' in fields ? null : explicitHistorical)
-    : explicitHistorical ?? sourceHistorical ?? finiteDisplayForecast(fields.hist_move_avg_4q);
+    : explicitHistorical ?? sourceHistorical;
   if (historical != null) {
     return {
       pct: historical,
