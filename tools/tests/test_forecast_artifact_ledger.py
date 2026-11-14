@@ -230,3 +230,69 @@ def test_same_day_frozen_symbol_keeps_the_model_binding_fields():
     assert result['expected_move']['forecast_model_bundle_id'] == 'active-bundle'
     assert result['expected_move']['forecast_scored_at'] == '2026-10-13T10:00:00Z'
     assert result['expected_move']['ml_snapshot_date'] == '2026-10-12'
+
+
+@pytest.mark.parametrize("prior_symbol", ["STEM", "OTHER"])
+def test_symbol_rebuild_keeps_published_hold_only_on_matching_past_event(prior_symbol):
+    from frontend_data.payloads import preserve_reported_ml_holds
+
+    historical = {"date": "2026-11-05", "display_forecast_method": "ml",
+                  "em_ml_pct": 0.103453, "actual": 0.155963}
+    current = {"date": "2026-12-05", "ml_publication_status": "eligible"}
+    previous = {
+        "symbol": prior_symbol,
+        "earnings_history": [
+            {"date": historical["date"], "ml_publication_status": "held",
+             "ml_publication_reason": "no_eligible_current_forecast", "em_ml_pct": 0.99},
+            {"date": current["date"], "ml_publication_status": "held"},
+        ],
+    }
+    detail = {"symbol": "STEM", "earnings_history": [dict(historical), dict(current)],
+              "expected_move": {"earnings_date": current["date"], "ml_publication_status": "eligible"}}
+    preserve_reported_ml_holds(detail, previous, today=date(2026, 11, 14))
+    row = detail["earnings_history"][0]
+    expected_history = dict(historical)
+    if prior_symbol == "STEM":
+        expected_history.update(ml_publication_status="held", ml_publication_reason="no_eligible_current_forecast")
+    assert row == expected_history
+    assert detail["earnings_history"][1] == current
+    assert detail["expected_move"]["ml_publication_status"] == "eligible"
+
+
+def test_reported_hold_from_prior_hero_survives_rollover_only_for_its_date():
+    from frontend_data.payloads import preserve_reported_ml_holds
+
+    held = {"earnings_date": "2026-11-05", "ml_publication_status": "held",
+            "ml_publication_reason": "feature_drift"}
+    previous = {"symbol": "STEM", "expected_move": held, "earnings_history": []}
+    current = {"symbol": "STEM", "expected_move": {"earnings_date": "2026-12-05"},
+               "earnings_history": [{"date": "2026-11-05"}, {"date": "2026-08-12"}]}
+    preserve_reported_ml_holds(current, previous, today=date(2026, 11, 14))
+    assert current["earnings_history"] == [
+        {"date": "2026-11-05", "ml_publication_status": "held", "ml_publication_reason": "feature_drift"},
+        {"date": "2026-08-12"},
+    ]
+    assert current["expected_move"] == {"earnings_date": "2026-12-05"}
+
+
+@pytest.mark.parametrize(("reported_keys", "current_status", "expected_status"), [
+    ({"STEM|2026-11-16"}, None, "held"),
+    ({"OTHER|2026-11-16"}, None, None),
+    ({"STEM|2026-11-16"}, "eligible", "eligible"),
+])
+def test_same_day_hold_requires_reporting_and_respects_current_decision(
+    reported_keys, current_status, expected_status,
+):
+    from frontend_data.payloads import preserve_reported_ml_holds
+
+    day = date(2026, 11, 16)
+    held = {"date": day.isoformat(), "ml_publication_status": "held",
+            "ml_publication_reason": "feature_drift"}
+    previous = {"symbol": "STEM", "earnings_history": [held]}
+    history = {"date": day.isoformat(), "ml_publication_status": current_status}
+    hero = {"earnings_date": day.isoformat(), "ml_publication_status": current_status}
+    detail = {"symbol": "STEM", "earnings_history": [history], "expected_move": hero}
+    preserve_reported_ml_holds(detail, previous, today=day, reported_event_keys=reported_keys)
+    for node in (history, hero):
+        assert node["ml_publication_status"] == expected_status
+        assert node.get("ml_publication_reason") == ("feature_drift" if expected_status == "held" else None)

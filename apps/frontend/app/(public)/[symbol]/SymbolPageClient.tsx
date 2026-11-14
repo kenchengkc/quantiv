@@ -48,7 +48,7 @@ import type {
   PredictionMode,
   SymbolDetail,
 } from './symbolPageTypes';
-import { parseLocalDate } from './symbolPageUtils';
+import { historicalMlForecast, parseLocalDate } from './symbolPageUtils';
 
 const EMPTY_LIVE_PREDICTION: LivePredictionState = {
   status: 'idle',
@@ -163,16 +163,12 @@ function frozenHistoryForecastForEvent(
     : null;
 
   const mlSnapshot = row.ml_snapshot_date?.slice(0, 10) ?? null;
-  const mlPct =
-    mlSnapshot != null && mlSnapshot < eventIso
-      ? finiteDisplayForecast(row.em_ml_pct)
-      : null;
 
   return {
     row,
     ivPct,
     straddlePct,
-    mlPct,
+    mlPct: historicalMlForecast(row),
     mlSnapshot,
   };
 }
@@ -678,8 +674,9 @@ export default function SymbolPage({
     earningsDate,
     todayIso,
   );
-  const modelSnapshot = em ?? frozenHistoryForecast?.row ?? null;
-  const mlPublicationHeld = em?.ml_publication_status === 'held';
+  const modelSnapshot = em ?? (frozenHistoryForecast?.mlPct != null ? frozenHistoryForecast.row : null);
+  const mlPublicationStatus = em?.ml_publication_status ?? frozenHistoryForecast?.row.ml_publication_status;
+  const mlPublicationHeld = mlPublicationStatus === 'held';
   const snapshotQuantiles = normalizeForecastQuantiles(
     modelSnapshot && !mlPublicationHeld
       ? {
@@ -715,6 +712,7 @@ export default function SymbolPage({
   const reportedEvent = data.earnings_history?.find((row) => row.date.slice(0, 10) === earningsDate);
   const headlineForecastFields = {
     ...(em ?? {}),
+    ml_publication_status: mlPublicationStatus,
     actual: reportedEvent?.actual,
     eps_actual: reportedEvent?.eps_actual,
     revenue_actual: reportedEvent?.revenue_actual,
@@ -801,7 +799,7 @@ export default function SymbolPage({
 
       <ResearchAvailability
         hasModel={activePredictionPct != null}
-        mlPublicationStatus={em?.ml_publication_status}
+        mlPublicationStatus={mlPublicationStatus}
         hasOptions={termRows.length > 0}
         historyCount={historySeries.length}
         history={data.earnings_history}

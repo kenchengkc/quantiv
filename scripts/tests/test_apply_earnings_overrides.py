@@ -53,6 +53,26 @@ def test_remove_drops_phantom_row():
     assert out[0]["fiscal_q"] == "Q4"
 
 
+@pytest.mark.parametrize("correct_row_present", [True, False])
+def test_stem_reschedule_replaces_original_and_replay_dates(correct_row_present):
+    overrides = json.loads((REPO_ROOT / "config/earnings_overrides.json").read_text())["overrides"]
+    prior = _row("STEM", "2026-08-12", "amc", "2026", "Q2", "finnhub")
+    original = {**_row("STEM", "2026-11-05", "amc", "2026", "Q3", "finnhub"),
+                "eps_estimate": "-1.6269"}
+    replay = _row("STEM", "2026-12-05", "amc", "2026", "Q3", "reconciled")
+    rows = [original, replay, prior]
+    if correct_row_present:
+        rows.append({**_row("STEM", "2026-11-16", "amc", "2026", "Q3", "finnhub"),
+                     "eps_estimate": "-1.57"})
+    out, _ = apply_overrides(rows, [*FIELDS, "eps_estimate"], overrides)
+
+    assert [(row["date"], row["timing"], row.get("eps_estimate")) for row in out if row is not prior] == [
+        ("2026-11-16", "amc", "-1.57" if correct_row_present else "-1.6269"),
+    ]
+    assert prior in out
+    assert apply_overrides(out, FIELDS, overrides)[0] == out
+
+
 def test_add_appends_new_event():
     rows = [_row("AAA", "2026-01-01", "amc", "2026", "Q1", "finnhub")]
     out, _ = apply_overrides(rows, FIELDS, [{

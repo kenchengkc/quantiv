@@ -79,6 +79,20 @@ describe('buildHistorySeries', () => {
     expect(result[0]?.modelAsOf).toBe('2026-09-15');
   });
 
+  it.each([
+    { ml_publication_status: 'held' as const, ml_snapshot_date: '2026-10-16' },
+    { ml_publication_status: 'eligible' as const, ml_snapshot_date: '2026-11-05' },
+  ])('excludes a held or late archived forecast and its bands from history', (fields) => {
+    const [point] = buildHistorySeries([{
+      date: '2026-11-05', timing: 'amc', actual: 0.155963, implied: 0.08,
+      em_ml_pct: 0.103453, p50: 0.11, forecast_frozen_eligible: true, ...fields,
+    }]);
+    expect(point.model).toBeNull();
+    expect(point.modelP50).toBeNull();
+    expect(point.actual).toBe(0.155963);
+    expect(point.implied).toBe(0.08);
+  });
+
 });
 
 describe('priorHistoricalForecastWindow', () => {

@@ -87,6 +87,7 @@ DATE_RE = re.compile(
     rf"\b({MONTH_PATTERN})\.?\s+(\d{{1,2}})(?:st|nd|rd|th)?(?:,?\s+(20\d{{2}}))?\b",
     re.IGNORECASE,
 )
+WEEKDAY_PREFIX = r"(?:(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),?\s+)?"
 TIME_ZONE_PATTERN = (
     r"(?:Eastern|Central|Mountain|Pacific)(?:\s+(?:Standard|Daylight))?\s+Time|"
     r"EST|EDT|CST|CDT|MST|MDT|PST|PDT|ET|CT|MT|PT"
@@ -146,6 +147,7 @@ DIRECT_TITLE_ACTIONS = (
     " announces ",
     " schedules ",
     " scheduled ",
+    " reschedules ",
     " sets date ",
     " will announce ",
     " will report ",
@@ -586,7 +588,7 @@ def _candidate_date(match: re.Match[str], published_on: date) -> date | None:
 
 
 def _is_announcement_logistics_date(text: str, match: re.Match[str]) -> bool:
-    """Registration/question-submission dates are not earnings event dates."""
+    """Exclude call logistics from the candidates for an earnings release."""
     prefix = re.split(r"[.!?;]\s+(?=[A-Z])", text[:match.start()])[-1]
     suffix = re.split(r"[.!?;]\s+(?=[A-Z])", text[match.end():], maxsplit=1)[0]
     # Coordinated clauses can put registration and release dates in the same
@@ -594,6 +596,11 @@ def _is_announcement_logistics_date(text: str, match: re.Match[str]) -> bool:
     clause_boundary = r";\s*|,\s*(?:and|while|but)\s+"
     prefix = re.split(clause_boundary, prefix, flags=re.I)[-1]
     suffix = re.split(clause_boundary, suffix, maxsplit=1, flags=re.I)[0]
+    if re.search(r"\b(?:replay|recording|archive)\b[^.!?;]{0,120}"
+                 r"\b(?:until|through|expires?(?:\s+on)?)\s*"
+                 + WEEKDAY_PREFIX + "$",
+                 prefix, re.I):
+        return True
     sentence = prefix + match.group() + suffix
     if not re.search(r"\b(?:registration|register|submit|upvote)\b|\bq&a\s+platform\b", sentence, re.I):
         return False
@@ -797,9 +804,34 @@ def _announcement_decision(
     for row in valid:
         key = tuple(str(row.get(field) or "") for field in (
             "provider", "date", "published_on", "url", "title", "timing", "official", "direct",
+            "supersedes_date",
         ))
         unique[key] = row
     valid = list(unique.values())
+    # A wire may repeat the original announcement on multiple feeds. The
+    # issuer's subsequent revision supersedes all copies of that exact date.
+    superseded: dict[str, str] = {}
+    for row in valid:
+        old_date = row.get("supersedes_date")
+        if old_date and row.get("published_on"):
+            superseded[old_date] = max(superseded.get(old_date, ""), row["published_on"])
+    retained = []
+    for row in valid:
+        published = str(row.get("published_on") or "")
+        replaced = superseded.get(str(row["date"]), "")
+        if published and replaced and (
+            published < replaced or (published == replaced and not row.get("supersedes_date"))
+        ):
+            continue
+        retained.append(row)
+    valid = retained
+    revisions = [row for row in valid if row.get("supersedes_date") and row.get("published_on")]
+    if revisions:
+        newest_revision = max(row["published_on"] for row in revisions)
+        # Multiple copies cannot break a tie between competing explicit
+        # revisions. Publication dates lack the time needed to order them.
+        if len({row["date"] for row in revisions if row["published_on"] == newest_revision}) > 1:
+            return None, None
     official = [row for row in valid if row.get("official")]
     if official:
         newest = max(str(row.get("published_on") or "") for row in official)
@@ -1248,6 +1280,50 @@ def fetch_fmp_calendar(
     return votes, {"status": "ok", "http_status": status, "rows": len(votes)}
 
 
+def _rescheduled_release(text: str, published_on: date) -> dict[str, str] | None:
+    # The body must move publication itself. A company can move only its call.
+    directions: dict[str, set[date]] = {"from": set(), "to": set()}
+    direction_prefix = re.compile(r"\s*,?\s*(from|to|for)\s+" + WEEKDAY_PREFIX, re.I)
+    for statement in re.split(r"[.!?;]\s+(?=[A-Z])", text):
+        release = re.search(
+            r"\brescheduled?\s+(?:(?:the|its)\s+)?"
+            r"(?:release\s+of\s+(?:(?:the|its)\s+)?"
+            r"(?:(?:first|second|third|fourth)[\s-]+quarter\s+|quarterly\s+|"
+            r"fiscal\s+|20\d{2}\s+)*(?:financial\s+)?(?:results|earnings)\b|"
+            r"(?:earnings|(?:financial\s+)?results)\s+release\b)"
+            r"(?!\s+(?:conference|call|webcast|replay|transcript|recording)\b)"
+            r"(?:\s+and\s+(?:(?:its|the)\s+)?(?:conference\s+)?call\b)?", statement, re.I,
+        )
+        if release is None:
+            continue
+        # Consume only consecutive "from/to/for DATE" phrases immediately
+        # following this release. A later clause can schedule another event.
+        cursor = release.end()
+        clause_dates: dict[str, set[date]] = {"from": set(), "to": set()}
+        while direction := direction_prefix.match(statement, cursor):
+            match = DATE_RE.match(statement, direction.end())
+            if match is None:
+                break
+            day = _candidate_date(match, published_on)
+            if day is None:
+                return None
+            key = "from" if direction.group(1).lower() == "from" else "to"
+            clause_dates[key].add(day)
+            cursor = match.end()
+        if clause_dates["to"]:
+            for key in directions:
+                directions[key].update(clause_dates[key])
+    if len(directions["to"]) != 1 or len(directions["from"]) > 1:
+        return None
+    new_date = directions["to"].pop()
+    if new_date < published_on:
+        return None
+    parsed = {"date": new_date.isoformat(), "timing": _session_from_text(text, report_day=new_date)}
+    if directions["from"]:
+        parsed["supersedes_date"] = directions["from"].pop().isoformat()
+    return parsed
+
+
 def _announcement_from_article(
     *,
     provider: str,
@@ -1281,17 +1357,16 @@ def _announcement_from_article(
                 release_statement = True
         if not release_statement:
             return None
-    parsed = extract_earnings_announcement(
-        f"{title}. {body}",
-        published_on=published_on,
-    )
+    if " reschedules " in normalized_title:
+        parsed = _rescheduled_release(_clean_text(body), published_on)
+    else:
+        parsed = extract_earnings_announcement(f"{title}. {body}", published_on=published_on)
     if parsed is None:
         return None
     fiscal_identity = extract_fiscal_identity(f"{title}. {body}")
     return {
         "provider": provider,
-        "date": parsed["date"],
-        "timing": parsed["timing"],
+        **parsed,
         "published_on": published_on.isoformat(),
         "official": official,
         "direct": True,
@@ -1939,6 +2014,7 @@ def reconcile_calendar(
                     "date",
                     "timing",
                     "published_on",
+                    "supersedes_date",
                     "official",
                     "direct",
                     "title",

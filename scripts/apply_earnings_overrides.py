@@ -142,12 +142,12 @@ def apply_overrides(rows: list[dict[str, str]], fieldnames: list[str],
             before = f"{r.get('date')}/{r.get('timing')}"
             # A corrected estimate may collide with an already reported row.
             # Normalization keeps the last row per ticker/date, so preserve the
-            # target's actuals before moving the estimate onto that identity.
+            # target's own reported and estimated financials before merging.
             if sets.get("date") and _norm(sets["date"]) != _norm(r.get("date")):
                 for target in list(out):
                     if target is r or not _matches(target, symbol, {"date": sets["date"]}):
                         continue
-                    for key in ("eps_actual", "revenue_actual"):
+                    for key in ("eps_actual", "revenue_actual", "eps_estimate", "revenue_estimate"):
                         if _norm(target.get(key)) not in {"", "NAN", "NONE"}:
                             r[key] = target[key]
                     r["source"] = "+".join(dict.fromkeys(
