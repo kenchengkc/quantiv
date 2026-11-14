@@ -1459,10 +1459,14 @@ def preserve_reported_events(
         "display_forecast_as_of",
         "ml_status",
         "ml_publication_status",
+        "ml_publication_reason",
         "options_status",
         "options_publication_status",
+        "options_publication_source_date",
         "options_source_date",
         "fallback_reason",
+        "hist_move_avg_4q",
+        "hist_move_med_4q",
         "historical_event_count",
     }
 

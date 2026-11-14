@@ -892,7 +892,12 @@ def main() -> int:
         # reported forecast, including calendar rows whose values did not change.
         for event in retained:
             key = (event.get("ticker"), event.get("earnings_date"))
-            if key in membership and _can_restore_event(key, event, today, context) and _forecast_rank(event)[0] > 0:
+            # recover_week promotes independently supported forecasts on the
+            # calendar first. Raw components on an explicitly unavailable row
+            # must not be promoted only on the symbol page.
+            if (key in membership and _can_restore_event(key, event, today, context)
+                    and event.get("display_forecast_method") != "ml_unavailable"
+                    and _forecast_rank(event)[0] > 0):
                 resolved[key] = event
         if repaired:
             recovered.update(repaired)
