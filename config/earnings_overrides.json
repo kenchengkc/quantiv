@@ -2,6 +2,24 @@
   "_comment": "Manual earnings-calendar overrides re-applied after provider sync, before build. Schema + actions documented in scripts/apply_earnings_overrides.py. Prefer matching on fiscal_year + fiscal_q (stable identity) so an override still binds after a provider re-asserts a different date.",
   "overrides": [
     {
+      "symbol": "WHK",
+      "match": {"date": "2026-11-13"},
+      "set": {"date": "2026-11-12", "timing": "amc", "fiscal_year": 2026, "fiscal_q": "Q3"},
+      "source_url": "https://www.sec.gov/Archives/edgar/data/1921603/000119312526458596/whk-ex99_1.htm",
+      "published_on": "2026-11-12",
+      "observed_on": "2026-11-14",
+      "note": "WhiteHawk Minerals released Q3 results on November 12 after market close. Its November 13 conference call discussed those results."
+    },
+    {
+      "symbol": "WHK",
+      "match": {"date": "2026-11-12"},
+      "set": {"date": "2026-11-12", "timing": "amc", "fiscal_year": 2026, "fiscal_q": "Q3"},
+      "source_url": "https://www.sec.gov/Archives/edgar/data/1921603/000119312526458596/whk-ex99_1.htm",
+      "published_on": "2026-11-12",
+      "observed_on": "2026-11-14",
+      "note": "The November 12 release covers the quarter ended September 30, 2026. Preserve the fiscal period and session when the provider already has the release date."
+    },
+    {
       "symbol": "STEM",
       "match": {"date": "2026-12-05"},
       "set": {"date": "2026-11-16", "timing": "amc", "fiscal_year": 2026, "fiscal_q": "Q3"},

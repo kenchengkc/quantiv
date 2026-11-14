@@ -88,6 +88,23 @@ def test_sets_date_title_admits_an_explicit_earnings_release() -> None:
     assert (announcement["date"], announcement["timing"]) == ("2026-11-05", "amc")
 
 
+@pytest.mark.parametrize("summary,expected", [
+    ("Example scheduled its results call for November 13, 2026 at 9 a.m. ET.", None),
+    ("Example scheduled its results call for November 13, 2026 at 9 a.m. ET. "
+     "The company will release its quarterly results after the market closes on November 12, 2026.",
+     ("2026-11-12", "amc")),
+    ("The company will release its results after the conference call on November 13, 2026.", None),
+    ("The company will release its results and has scheduled a shareholder meeting for November 13, 2026.",
+     None),
+])
+def test_headline_that_dates_a_call_requires_a_separate_release_date(summary, expected) -> None:
+    article = _announcement_from_article(
+        provider="news", title="Example Announces Third Quarter 2026 Earnings Conference Call for November 13, 2026",
+        body=summary, published_on=date(2026, 10, 13), official=False, url=None,
+    )
+    assert (None if article is None else (article["date"], article["timing"])) == expected
+
+
 def test_hyphenated_quarter_title_admits_explicit_release() -> None:
     announcement = _announcement_from_article(
         provider="test",

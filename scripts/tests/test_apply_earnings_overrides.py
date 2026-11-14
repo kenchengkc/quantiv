@@ -86,6 +86,24 @@ def test_add_appends_new_event():
     assert "override" in added["source"]
 
 
+@pytest.mark.parametrize("include_call", [False, True])
+def test_whk_keeps_release_day_financials_and_drops_next_days_call(include_call):
+    overrides = json.loads((REPO_ROOT / "config/earnings_overrides.json").read_text())["overrides"]
+    prior = _row("WHK", "2026-08-12", "amc", "2026", "Q2", "finnhub")
+    release = {**_row("WHK", "2026-11-12", "unknown", "2026", "Q4", "dolthub"),
+               "eps_actual": "0.21", "revenue_estimate": "33000000"}
+    rows = [prior.copy(), release]
+    if include_call:
+        rows.append(_row("WHK", "2026-11-13", "unknown", "2026", "Q3", "finnhub"))
+    out, _ = apply_overrides(rows, [*FIELDS, "eps_actual", "revenue_estimate"], overrides)
+    assert [(r["date"], r["fiscal_q"], r["timing"]) for r in out] == [
+        ("2026-08-12", "Q2", "amc"), ("2026-11-12", "Q3", "amc"),
+    ]
+    assert out[0] == prior
+    assert (out[1]["eps_actual"], out[1]["revenue_estimate"]) == ("0.21", "33000000")
+    assert apply_overrides(out, FIELDS, overrides)[0] == out
+
+
 def test_unmatched_set_warns_and_is_skipped():
     rows = [_row("PVH", "2026-06-02", "unknown", "2027", "Q1", "finnhub")]
     out, log = apply_overrides(rows, FIELDS, [{
