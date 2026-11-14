@@ -335,7 +335,10 @@ def _symbol_page_components(
             history_straddle = _positive_optional(history_row.get("implied"))
 
         ml_snapshot = str(history_row.get("ml_snapshot_date") or "")[:10]
-        if ml_snapshot and ml_snapshot < event_date:
+        if (history_row.get("forecast_frozen_eligible") is True
+                and history_row.get("ml_publication_status") != "held"
+                and history_row.get("display_forecast_method") != "ml_unavailable"
+                and ml_snapshot and ml_snapshot < event_date):
             history_ml = _positive_optional(history_row.get("em_ml_pct"))
 
     historical, _count = _symbol_historical_median(payload, event_date)
@@ -361,8 +364,12 @@ def _symbol_page_signature(
     components = _symbol_page_components(payload, event_date)
     history_row = next((row for row in payload.get("earnings_history") or []
                         if isinstance(row, dict) and str(row.get("date") or "")[:10] == event_date), {})
+    publication_status = active_expected.get("ml_publication_status")
+    if publication_status is None and event_date < datetime.now(ZoneInfo("America/New_York")).date().isoformat():
+        publication_status = history_row.get("ml_publication_status")
     headline_fields = {
         **active_expected,
+        "ml_publication_status": publication_status,
         **{key: history_row[key] for key in ("actual", "eps_actual", "revenue_actual") if key in history_row},
         "em_ml_pct": components["ml"],
         "iv_pct": components["iv"],

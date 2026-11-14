@@ -146,6 +146,7 @@ export interface SymbolDetail {
     forecast_feature_snapshot_at?: string | null;
     forecast_feature_hash?: string | null;
     forecast_frozen_eligible?: boolean | null;
+    ml_publication_status?: DisplayForecastFields['ml_publication_status'];
     /** Realized close-to-close move, as a signed decimal fraction. */
     actual?: number | null;
     eps_actual?: number | null;

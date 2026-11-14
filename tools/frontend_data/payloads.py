@@ -406,6 +406,26 @@ def _history_rows(history, ticker: str, historical_options: dict[date, dict]) ->
     return rows[:12]
 
 
+def preserve_reported_ml_holds(detail: dict, previous: dict, *, today: date) -> None:
+    """Keep the published ML decision when archive data rebuilds a past event."""
+    if not detail.get("symbol") or previous.get("symbol") != detail["symbol"]:
+        return
+    prior_by_date = {row["date"]: row for row in previous.get("earnings_history") or []
+                     if row.get("date") and row.get("ml_publication_status")}
+    prior_hero = previous.get("expected_move") or {}
+    if prior_hero.get("earnings_date") and prior_hero.get("ml_publication_status"):
+        prior_by_date[prior_hero["earnings_date"]] = prior_hero
+
+    for row in [*(detail.get("earnings_history") or []), detail.get("expected_move") or {}]:
+        event_date = row.get("date") or row.get("earnings_date")
+        prior = prior_by_date.get(event_date)
+        if (prior and prior.get("ml_publication_status") == "held"
+                and event_date < today.isoformat() and row.get("ml_publication_status") is None):
+            row["ml_publication_status"] = "held"
+            if prior.get("ml_publication_reason") is not None:
+                row["ml_publication_reason"] = prior["ml_publication_reason"]
+
+
 def attach_frozen_event_forecasts(
     detail: dict | None,
     ticker: str,

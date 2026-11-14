@@ -161,6 +161,24 @@ def _load_reference_membership() -> tuple[set[EventKey], dict[str, str]]:
     return membership, payload["window"]
 
 
+def _superseded_dates(membership: set[EventKey], window: dict[str, str]) -> set[EventKey]:
+    """Only discard exact date corrections corroborated by the current reference."""
+    config = REPO_ROOT / "config" / "earnings_overrides.json"
+    discarded = set()
+    for rule in json.loads(config.read_text(encoding="utf-8"))["overrides"]:
+        match = rule.get("match") or {}
+        if set(match) != {"date"} or not window["start"] <= match["date"] <= window["end"]:
+            continue
+        key = (rule["symbol"].upper(), match["date"])
+        action = rule.get("action", "set")
+        replacement = (rule.get("set") or {}).get("date")
+        if key not in membership and (
+            action == "remove" or (action == "set" and (key[0], replacement) in membership)
+        ):
+            discarded.add(key)
+    return discarded
+
+
 def _history(path: Path) -> list[str]:
     rel = path.relative_to(REPO_ROOT).as_posix()
     return _git("log", "--format=%H", "--", rel).decode().split()
@@ -851,14 +869,28 @@ def main() -> int:
 
     recovered: dict[EventKey, dict] = {}
     resolved: dict[EventKey, dict] = {}
+    superseded = _superseded_dates(membership, window)
+    removed = 0
     context = _restoration_context(today)
     for path in sorted(WEEKS_DIR.glob("*.json")):
         if path.name == "manifest.json":
             continue
         repaired = recover_week(path, membership, today, args.apply)
+        bundle = json.loads(path.read_text(encoding="utf-8"))
+        events = bundle.get("events") or []
+        retained = [e for e in events if (e["ticker"], e["earnings_date"]) not in superseded]
+        if len(retained) < len(events):
+            count = len(events) - len(retained)
+            removed += count
+            print(f"  {path.name}: {count} superseded event(s)")
+            if args.apply:
+                bundle["events"] = retained
+                if "summary" in bundle:
+                    bundle["summary"].update(_summary(retained))
+                path.write_text(json.dumps(bundle, indent=2, default=str), encoding="utf-8")
         # Symbols are rebuilt independently every day. Synchronize every active
         # reported forecast, including calendar rows whose values did not change.
-        for event in json.loads(path.read_text(encoding="utf-8")).get("events") or []:
+        for event in retained:
             key = (event.get("ticker"), event.get("earnings_date"))
             if key in membership and _can_restore_event(key, event, today, context) and _forecast_rank(event)[0] > 0:
                 resolved[key] = event
@@ -873,23 +905,23 @@ def main() -> int:
 
     if not args.apply:
         print(
-            f"\ndry run — {len(recovered)} reported forecasts would be repaired; "
+            f"\ndry run — {len(recovered)} repairs and {removed} superseded events to remove; "
             "re-run with --apply"
         )
         return 0
 
     symbol_count = _repair_symbol_payloads(resolved, apply=True)
-    if recovered:
+    if recovered or removed:
         _republish_manifest_and_screener()
     # Fail in the producer, before committing/publishing an inconsistent corpus.
     from validate_public_contracts import validate_forecast_surface_parity
     validate_forecast_surface_parity()
-    if not recovered and not symbol_count:
+    if not recovered and not symbol_count and not removed:
         print("nothing to restore; forecast surface parity passed")
         return 0
     print(
         f"\nrepaired {len(recovered)} reported forecasts "
-        f"and {symbol_count} symbol payload(s)"
+        f"and {symbol_count} symbol payload(s), removed {removed} superseded event(s)"
     )
     return 0
 

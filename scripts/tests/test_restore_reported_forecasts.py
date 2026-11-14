@@ -619,3 +619,42 @@ def test_legacy_markerless_same_day_recovery_keeps_prior_behavior(tmp_path, monk
     monkeypatch.setattr(restore, '_commit_at', lambda *_args: None)
     result = restore.recover_week(path, {('LEGACY', '2026-10-13')}, date(2026, 10, 13), apply=True)
     assert result[('LEGACY', '2026-10-13')]['em_ml_pct'] == .04
+
+
+def test_retained_week_prunes_confirmed_reschedule_without_moving_forecast(tmp_path, monkeypatch):
+    import sys
+    import validate_public_contracts as contracts
+
+    weeks = tmp_path / "weeks"
+    weeks.mkdir()
+    old = _event("STEM", "2026-11-05", em_ml_pct=0.103453, actual=0.155963)
+    other = _event("OTHER", "2026-11-05")
+    week = weeks / "2026-11-02.json"
+    week.write_text(json.dumps({
+        "events": [old, other], "window": {"start": "2026-11-02", "end": "2026-11-08"},
+        "summary": {"total_events": 2},
+    }))
+    moved = _event("STEM", "2026-11-16", timing="amc")
+    next_week = weeks / "2026-11-16.json"
+    next_week.write_text(json.dumps({
+        "events": [moved], "window": {"start": "2026-11-16", "end": "2026-11-22"},
+    }))
+    monkeypatch.setattr(restore, "PUBLIC_DIR", tmp_path)
+    monkeypatch.setattr(restore, "WEEKS_DIR", weeks)
+    monkeypatch.setattr(restore, "_load_reference_membership", lambda: (
+        {("STEM", "2026-11-16")}, {"start": "2026-11-02", "end": "2026-12-05"},
+    ))
+    monkeypatch.setattr(restore, "_history", lambda _: [])
+    published = []
+    monkeypatch.setattr(restore, "_republish_manifest_and_screener", lambda: published.append(True))
+    monkeypatch.setattr(contracts, "validate_forecast_surface_parity", lambda: None)
+    monkeypatch.setattr(sys, "argv", ["restore", "--today", "2026-11-14"])
+    assert restore.main() == 0
+    assert json.loads(week.read_text())["events"] == [old, other]
+    monkeypatch.setattr(sys, "argv", [*sys.argv, "--apply"])
+    assert restore.main() == 0
+    assert json.loads(week.read_text())["events"] == [other]
+    assert json.loads(week.read_text())["summary"]["total_events"] == 1
+    assert json.loads(next_week.read_text())["events"] == [moved]
+    assert restore.main() == 0
+    assert published == [True]
