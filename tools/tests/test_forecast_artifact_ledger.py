@@ -273,3 +273,26 @@ def test_reported_hold_from_prior_hero_survives_rollover_only_for_its_date():
         {"date": "2026-08-12"},
     ]
     assert current["expected_move"] == {"earnings_date": "2026-12-05"}
+
+
+@pytest.mark.parametrize(("reported_keys", "current_status", "expected_status"), [
+    ({"STEM|2026-11-16"}, None, "held"),
+    ({"OTHER|2026-11-16"}, None, None),
+    ({"STEM|2026-11-16"}, "eligible", "eligible"),
+])
+def test_same_day_hold_requires_reporting_and_respects_current_decision(
+    reported_keys, current_status, expected_status,
+):
+    from frontend_data.payloads import preserve_reported_ml_holds
+
+    day = date(2026, 11, 16)
+    held = {"date": day.isoformat(), "ml_publication_status": "held",
+            "ml_publication_reason": "feature_drift"}
+    previous = {"symbol": "STEM", "earnings_history": [held]}
+    history = {"date": day.isoformat(), "ml_publication_status": current_status}
+    hero = {"earnings_date": day.isoformat(), "ml_publication_status": current_status}
+    detail = {"symbol": "STEM", "earnings_history": [history], "expected_move": hero}
+    preserve_reported_ml_holds(detail, previous, today=day, reported_event_keys=reported_keys)
+    for node in (history, hero):
+        assert node["ml_publication_status"] == expected_status
+        assert node.get("ml_publication_reason") == ("feature_drift" if expected_status == "held" else None)

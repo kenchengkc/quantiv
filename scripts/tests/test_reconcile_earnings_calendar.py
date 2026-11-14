@@ -194,6 +194,33 @@ def test_two_sources_must_agree_before_session_changes_with_new_date() -> None:
     assert decision["timing"] == "unknown"
 
 
+def test_same_day_copies_of_the_original_yield_to_an_explicit_reschedule() -> None:
+    original = _announcement("issuer", "2026-11-05", official=True, published_on="2026-11-04")
+    revision = {**_announcement("wire", "2026-11-16", "amc", published_on="2026-11-04"),
+                "supersedes_date": "2026-11-05"}
+    decision = choose_canonical_event(
+        current=None, baseline=None, structured_votes=[],
+        announcements=[original, {**original, "provider": "news"}, revision],
+    )
+    assert (decision["date"], decision["timing"]) == ("2026-11-16", "amc")
+
+
+@pytest.mark.parametrize("other_old,other_new", [
+    ("2026-11-05", "2026-11-17"),  # Two replacements for the original date.
+    ("2026-11-16", "2026-11-05"),  # Reversal, without intraday timestamps.
+])
+def test_same_day_conflicting_explicit_revisions_abstain_even_with_duplicates(other_old, other_new):
+    revision = {**_announcement("wire", "2026-11-16", published_on="2026-11-04"),
+                "supersedes_date": "2026-11-05"}
+    other = {**revision, "provider": "issuer", "date": other_new,
+             "supersedes_date": other_old, "official": True}
+    decision = choose_canonical_event(
+        current=None, baseline=None, structured_votes=[],
+        announcements=[revision, {**revision, "provider": "news"}, other],
+    )
+    assert decision["date"] is None
+
+
 def test_official_press_release_wins_over_direct_news_if_they_conflict() -> None:
     decision = choose_canonical_event(
         current=_vote("dolthub", "2026-09-29"),

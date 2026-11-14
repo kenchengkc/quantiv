@@ -27,6 +27,7 @@ def test_replay_deadline_cannot_outscore_the_earnings_date() -> None:
 @pytest.mark.parametrize("revision", [
     "to Monday, November 16, 2026, from November 5, 2026",
     "from November 5, 2026 to Monday, November 16, 2026",
+    "from November 5, 2026 to November 16, 2026 and set a shareholder meeting for December 1, 2026",
 ])
 def test_rescheduled_earnings_release_uses_replacement_date(revision: str) -> None:
     article = _announcement_from_article(
@@ -56,6 +57,19 @@ def test_rescheduled_call_alone_does_not_move_the_results_release(rescheduled: s
         provider="wire", title="Example Reschedules Third Quarter 2026 Earnings Call",
         body=f"Example rescheduled {rescheduled} to November 16, 2026. "
         "Example will release quarterly results as originally planned on November 5, 2026.",
+        published_on=date(2026, 11, 4), official=False, url=None,
+    ) is None
+
+
+@pytest.mark.parametrize("schedule", [
+    "from November 5, 2026 to a date to be determined and scheduled a shareholder meeting for November 16, 2026",
+    "and will hold a webcast for November 16, 2026",
+    "from November 5, 2026 pending review, with a press briefing moved to November 16, 2026",
+])
+def test_pending_earnings_release_cannot_borrow_another_events_date(schedule: str) -> None:
+    assert _announcement_from_article(
+        provider="wire", title="Example Reschedules Third Quarter 2026 Earnings Release",
+        body=f"Example rescheduled its earnings release {schedule}.",
         published_on=date(2026, 11, 4), official=False, url=None,
     ) is None
 

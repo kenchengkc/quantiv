@@ -541,7 +541,8 @@ def main():
             )
             previous_symbol = PUBLIC_DIR / "symbols" / f"{ticker}.json"
             if previous_symbol.is_file():
-                preserve_reported_ml_holds(detail, json.loads(previous_symbol.read_text()), today=today)
+                preserve_reported_ml_holds(detail, json.loads(previous_symbol.read_text()),
+                                           today=today, reported_event_keys=reported_event_keys)
             forecast_nodes = [detail.get("expected_move") or {}]
             forecast_nodes.extend(detail.get("earnings_history") or [])
             published_forecast_ids.update(

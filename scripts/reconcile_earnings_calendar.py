@@ -804,6 +804,7 @@ def _announcement_decision(
     for row in valid:
         key = tuple(str(row.get(field) or "") for field in (
             "provider", "date", "published_on", "url", "title", "timing", "official", "direct",
+            "supersedes_date",
         ))
         unique[key] = row
     valid = list(unique.values())
@@ -814,9 +815,23 @@ def _announcement_decision(
         old_date = row.get("supersedes_date")
         if old_date and row.get("published_on"):
             superseded[old_date] = max(superseded.get(old_date, ""), row["published_on"])
-    valid = [row for row in valid if not (
-        row.get("published_on") and str(row["published_on"]) < superseded.get(str(row["date"]), "")
-    )]
+    retained = []
+    for row in valid:
+        published = str(row.get("published_on") or "")
+        replaced = superseded.get(str(row["date"]), "")
+        if published and replaced and (
+            published < replaced or (published == replaced and not row.get("supersedes_date"))
+        ):
+            continue
+        retained.append(row)
+    valid = retained
+    revisions = [row for row in valid if row.get("supersedes_date") and row.get("published_on")]
+    if revisions:
+        newest_revision = max(row["published_on"] for row in revisions)
+        # Multiple copies cannot break a tie between competing explicit
+        # revisions. Publication dates lack the time needed to order them.
+        if len({row["date"] for row in revisions if row["published_on"] == newest_revision}) > 1:
+            return None, None
     official = [row for row in valid if row.get("official")]
     if official:
         newest = max(str(row.get("published_on") or "") for row in official)
@@ -1268,6 +1283,7 @@ def fetch_fmp_calendar(
 def _rescheduled_release(text: str, published_on: date) -> dict[str, str] | None:
     # The body must move publication itself. A company can move only its call.
     directions: dict[str, set[date]] = {"from": set(), "to": set()}
+    direction_prefix = re.compile(r"\s*,?\s*(from|to|for)\s+" + WEEKDAY_PREFIX, re.I)
     for statement in re.split(r"[.!?;]\s+(?=[A-Z])", text):
         release = re.search(
             r"\brescheduled?\s+(?:(?:the|its)\s+)?"
@@ -1275,18 +1291,28 @@ def _rescheduled_release(text: str, published_on: date) -> dict[str, str] | None
             r"(?:(?:first|second|third|fourth)[\s-]+quarter\s+|quarterly\s+|"
             r"fiscal\s+|20\d{2}\s+)*(?:financial\s+)?(?:results|earnings)\b|"
             r"(?:earnings|(?:financial\s+)?results)\s+release\b)"
-            r"(?!\s+(?:conference|call|webcast|replay|transcript|recording)\b)", statement, re.I,
+            r"(?!\s+(?:conference|call|webcast|replay|transcript|recording)\b)"
+            r"(?:\s+and\s+(?:(?:its|the)\s+)?(?:conference\s+)?call\b)?", statement, re.I,
         )
         if release is None:
             continue
-        schedule = statement[release.end():]
-        for match in DATE_RE.finditer(schedule):
-            direction = re.search(r"\b(from|to|for)\s+" + WEEKDAY_PREFIX + "$",
-                                  schedule[:match.start()], re.I)
+        # Consume only consecutive "from/to/for DATE" phrases immediately
+        # following this release. A later clause can schedule another event.
+        cursor = release.end()
+        clause_dates: dict[str, set[date]] = {"from": set(), "to": set()}
+        while direction := direction_prefix.match(statement, cursor):
+            match = DATE_RE.match(statement, direction.end())
+            if match is None:
+                break
             day = _candidate_date(match, published_on)
-            if direction and day:
-                key = "from" if direction.group(1).lower() == "from" else "to"
-                directions[key].add(day)
+            if day is None:
+                return None
+            key = "from" if direction.group(1).lower() == "from" else "to"
+            clause_dates[key].add(day)
+            cursor = match.end()
+        if clause_dates["to"]:
+            for key in directions:
+                directions[key].update(clause_dates[key])
     if len(directions["to"]) != 1 or len(directions["from"]) > 1:
         return None
     new_date = directions["to"].pop()
