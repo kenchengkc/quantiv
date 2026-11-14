@@ -1324,6 +1324,34 @@ def _rescheduled_release(text: str, published_on: date) -> dict[str, str] | None
     return parsed
 
 
+def _release_date_for_dated_call(body: str, published_on: date) -> dict[str, str] | None:
+    # Summaries of a dated earnings-call headline may omit the actual release
+    # schedule. Only a date attached to publication itself can supply it.
+    release_action = re.compile(
+        r"\b(?:will|to)\s+(?:release|issue|publish|post|report|announce)\s+"
+        r"(?:(?:the|its|first|second|third|fourth|quarter|quarterly|fiscal|20\d{2}|financial)[\s-]+)*"
+        r"(?:results|earnings)\b|"
+        r"\b(?:results|earnings)\s+will\s+be\s+(?:released|issued|published|posted|reported|announced)\b",
+        re.I,
+    )
+    date_binding = re.compile(
+        r"\s*,?\s*(?:(?:after|before)\s+(?:the\s+)?market\s+(?:close[sd]?|opens?)\s+)?"
+        r"(?:on\s+)?" + WEEKDAY_PREFIX, re.I,
+    )
+    days = set()
+    for action in release_action.finditer(body):
+        binding = date_binding.match(body, action.end())
+        match = DATE_RE.match(body, binding.end())
+        if match:
+            day = _candidate_date(match, published_on)
+            if day and day >= published_on:
+                days.add(day)
+    if len(days) != 1:
+        return None
+    report_day = days.pop()
+    return {"date": report_day.isoformat(), "timing": _session_from_text(body, report_day=report_day)}
+
+
 def _announcement_from_article(
     *,
     provider: str,
@@ -1359,6 +1387,10 @@ def _announcement_from_article(
             return None
     if " reschedules " in normalized_title:
         parsed = _rescheduled_release(_clean_text(body), published_on)
+    elif any(DATE_RE.match(normalized_title, call.end()) for call in re.finditer(
+        r"\b(?:call|webcast)\s+(?:for|on)\s+" + WEEKDAY_PREFIX, normalized_title, re.I,
+    )):
+        parsed = _release_date_for_dated_call(_clean_text(body), published_on)
     else:
         parsed = extract_earnings_announcement(f"{title}. {body}", published_on=published_on)
     if parsed is None:

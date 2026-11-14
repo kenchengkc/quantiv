@@ -13,6 +13,40 @@ def _event(ticker: str, earnings_date: str, **extra) -> dict:
     return {"ticker": ticker, "earnings_date": earnings_date, **extra}
 
 
+def test_reported_unavailable_row_cannot_publish_a_symbol_only_median(tmp_path, monkeypatch):
+    import sys
+    import validate_public_contracts as contracts
+
+    key = ("WHK", "2026-11-13")
+    symbols, weeks = tmp_path / "symbols", tmp_path / "weeks"
+    symbols.mkdir()
+    weeks.mkdir()
+    # Older builds combined the November 12 publication with a median
+    # computed after the release. The only genuine prior reaction is flat.
+    event = _event(*key, as_of_date="2026-11-12", hist_move_med_4q=0.007614,
+                   display_forecast_method="ml_unavailable", display_forecast_pct=None,
+                   ml_publication_status="held", ml_status="unavailable_model")
+    week = weeks / "2026-11-09.json"
+    week.write_text(json.dumps({"metadata": {"as_of_date": "2026-11-13"},
+                               "window": {"start": "2026-11-09", "end": key[1]}, "events": [event]}))
+    path = symbols / "WHK.json"
+    path.write_text(json.dumps({"symbol": key[0], "next_earnings": key[1], "expected_move": event,
+                                "earnings_history": [{"date": "2026-08-12", "actual": 0.0},
+                                                     {"date": key[1], "actual": None}]}))
+    original = path.read_bytes()
+    monkeypatch.setattr(restore, "PUBLIC_DIR", tmp_path)
+    monkeypatch.setattr(restore, "SYMBOLS_DIR", symbols)
+    monkeypatch.setattr(restore, "WEEKS_DIR", weeks)
+    monkeypatch.setattr(restore, "_history", lambda _: [])
+    monkeypatch.setattr(restore, "_load_reference_membership", lambda: (
+        {key}, {"start": "2026-11-02", "end": "2026-12-05"},
+    ))
+    monkeypatch.setattr(contracts, "PUBLIC", tmp_path)
+    monkeypatch.setattr(sys, "argv", ["restore", "--today", "2026-11-14", "--apply"])
+    assert restore.main() == 0
+    assert path.read_bytes() == original
+
+
 def test_forecast_rank_prefers_ml_over_iv_when_both_are_pre_event():
     ml = _event(
         "ADBE",
