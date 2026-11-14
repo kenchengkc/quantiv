@@ -1,7 +1,7 @@
 {
   "symbol": "SITM",
-  "as_of_date": "2026-11-12",
-  "spot_price": 480.0,
+  "as_of_date": "2026-11-13",
+  "spot_price": 460.0,
   "expected_move": {
     "earnings_date": "2026-11-04",
     "timing": "amc",
@@ -44,38 +44,21 @@
   },
   "straddle_features": [
     {
-      "expiration": "2026-11-20",
-      "dte": 8,
-      "atm_strike": 480.0,
-      "atm_iv": 0.884014,
-      "atm_call_iv": 0.9078,
-      "atm_put_iv": 0.8601,
-      "straddle_mid": 50.2,
-      "em_straddle": 50.2,
-      "em_straddle_pct": 0.104583,
-      "em_iv": 62.820161,
-      "em_iv_pct": 0.130875,
-      "call_delta": 0.4955,
-      "call_gamma": 0.0063,
-      "call_vega": 0.2793,
-      "call_theta": -1.8288
-    },
-    {
       "expiration": "2026-12-18",
-      "dte": 36,
-      "atm_strike": 490.0,
-      "atm_iv": 0.814538,
-      "atm_call_iv": 0.8005,
-      "atm_put_iv": 0.8286,
-      "straddle_mid": 98.945,
-      "em_straddle": 98.945,
-      "em_straddle_pct": 0.201929,
-      "em_iv": 125.346532,
-      "em_iv_pct": 0.255809,
-      "call_delta": 0.5053,
-      "call_gamma": 0.0033,
-      "call_vega": 0.5929,
-      "call_theta": -0.7233
+      "dte": 35,
+      "atm_strike": 460.0,
+      "atm_iv": 0.807103,
+      "atm_call_iv": 0.8113,
+      "atm_put_iv": 0.8029,
+      "straddle_mid": 90.595,
+      "em_straddle": 90.595,
+      "em_straddle_pct": 0.196946,
+      "em_iv": 114.967268,
+      "em_iv_pct": 0.249929,
+      "call_delta": 0.503,
+      "call_gamma": 0.0035,
+      "call_vega": 0.5491,
+      "call_theta": -0.6609
     }
   ],
   "earnings_history": [
@@ -486,13 +469,13 @@
   ],
   "next_earnings": "2026-11-04",
   "vol_regime": {
-    "iv_current": 0.816,
-    "iv_rank": 0.368373,
+    "iv_current": 0.8247,
+    "iv_rank": 0.384223,
     "iv_year_high": 1.1627,
     "iv_year_low": 0.6138,
-    "hv_current": 1.0374,
-    "hv_rank": 0.76089,
-    "iv_mom_week": -0.0855,
+    "hv_current": 1.031,
+    "hv_rank": 0.748716,
+    "iv_mom_week": -0.0625,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

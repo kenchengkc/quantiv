@@ -1,7 +1,7 @@
 {
   "symbol": "ARW",
-  "as_of_date": "2026-11-12",
-  "spot_price": 200.0,
+  "as_of_date": "2026-11-13",
+  "spot_price": 195.0,
   "expected_move": {
     "earnings_date": "2026-11-05",
     "timing": "bmo",
@@ -26,38 +26,21 @@
   },
   "straddle_features": [
     {
-      "expiration": "2026-11-20",
-      "dte": 8,
-      "atm_strike": 200.0,
-      "atm_iv": 0.511681,
-      "atm_call_iv": 0.5182,
-      "atm_put_iv": 0.5051,
-      "straddle_mid": 12.15,
-      "em_straddle": 12.15,
-      "em_straddle_pct": 0.06075,
-      "em_iv": 15.150526,
-      "em_iv_pct": 0.075753,
-      "call_delta": 0.4992,
-      "call_gamma": 0.0263,
-      "call_vega": 0.1174,
-      "call_theta": -0.449
-    },
-    {
       "expiration": "2026-12-18",
-      "dte": 36,
-      "atm_strike": 200.0,
-      "atm_iv": 0.432901,
-      "atm_call_iv": 0.4351,
-      "atm_put_iv": 0.4307,
-      "straddle_mid": 21.7,
-      "em_straddle": 21.7,
-      "em_straddle_pct": 0.1085,
-      "em_iv": 27.190909,
-      "em_iv_pct": 0.135955,
-      "call_delta": 0.525,
-      "call_gamma": 0.0147,
-      "call_vega": 0.2487,
-      "call_theta": -0.1712
+      "dte": 35,
+      "atm_strike": 195.0,
+      "atm_iv": 0.448751,
+      "atm_call_iv": 0.4479,
+      "atm_put_iv": 0.4496,
+      "straddle_mid": 21.5,
+      "em_straddle": 21.5,
+      "em_straddle_pct": 0.110256,
+      "em_iv": 27.097416,
+      "em_iv_pct": 0.138961,
+      "call_delta": 0.501,
+      "call_gamma": 0.0148,
+      "call_vega": 0.2377,
+      "call_theta": -0.1564
     }
   ],
   "earnings_history": [
@@ -436,13 +419,13 @@
   ],
   "next_earnings": "2026-11-05",
   "vol_regime": {
-    "iv_current": 0.4411,
-    "iv_rank": 0.578041,
+    "iv_current": 0.4486,
+    "iv_rank": 0.604952,
     "iv_year_high": 0.5587,
     "iv_year_low": 0.28,
-    "hv_current": 0.5744,
-    "hv_rank": 0.987017,
-    "iv_mom_week": -0.1073,
+    "hv_current": 0.5583,
+    "hv_rank": 0.940565,
+    "iv_mom_week": -0.0296,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"

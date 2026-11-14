@@ -1,7 +1,7 @@
 {
   "symbol": "BJRI",
-  "as_of_date": "2026-11-12",
-  "spot_price": 54.89,
+  "as_of_date": "2026-11-13",
+  "spot_price": 57.5,
   "expected_move": {
     "earnings_date": "2026-11-05",
     "timing": "amc",
@@ -41,7 +41,25 @@
     "forecast_feature_hash": "f56ccc0383783aa0625a7e5f4fb8e2682a4cce97414e75cabcc371bc68ee0ff1",
     "forecast_frozen_eligible": true
   },
-  "straddle_features": [],
+  "straddle_features": [
+    {
+      "expiration": "2026-12-18",
+      "dte": 35,
+      "atm_strike": 57.5,
+      "atm_iv": 0.592409,
+      "atm_call_iv": 0.5945,
+      "atm_put_iv": 0.5903,
+      "straddle_mid": 8.425,
+      "em_straddle": 8.425,
+      "em_straddle_pct": 0.146522,
+      "em_iv": 10.54817,
+      "em_iv_pct": 0.183446,
+      "call_delta": 0.5119,
+      "call_gamma": 0.0393,
+      "call_vega": 0.0697,
+      "call_theta": -0.072
+    }
+  ],
   "earnings_history": [
     {
       "date": "2026-11-05",
@@ -414,13 +432,13 @@
   ],
   "next_earnings": "2026-11-05",
   "vol_regime": {
-    "iv_current": 0.5101,
-    "iv_rank": 0.297537,
+    "iv_current": 0.6084,
+    "iv_rank": 0.547093,
     "iv_year_high": 0.7868,
     "iv_year_low": 0.3929,
-    "hv_current": 0.4849,
-    "hv_rank": 0.782046,
-    "iv_mom_week": -0.2767,
+    "hv_current": 0.4678,
+    "hv_rank": 0.708243,
+    "iv_mom_week": 0.0041,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

@@ -1,7 +1,7 @@
 {
   "symbol": "TTD",
-  "as_of_date": "2026-11-12",
-  "spot_price": 15.0,
+  "as_of_date": "2026-11-13",
+  "spot_price": 17.0,
   "expected_move": {
     "earnings_date": "2026-11-09",
     "timing": "amc",
@@ -26,38 +26,21 @@
   },
   "straddle_features": [
     {
-      "expiration": "2026-12-11",
-      "dte": 29,
-      "atm_strike": 15.0,
-      "atm_iv": 0.616,
-      "atm_call_iv": 0.616,
-      "atm_put_iv": 0.616,
-      "straddle_mid": 1.83,
-      "em_straddle": 1.83,
-      "em_straddle_pct": 0.122,
-      "em_iv": 2.604501,
-      "em_iv_pct": 0.173633,
-      "call_delta": 0.5455,
-      "call_gamma": 0.1435,
-      "call_vega": 0.0167,
-      "call_theta": -0.0118
-    },
-    {
       "expiration": "2026-12-24",
-      "dte": 42,
-      "atm_strike": 15.5,
-      "atm_iv": 0.53575,
-      "atm_call_iv": 0.5453,
-      "atm_put_iv": 0.5262,
-      "straddle_mid": 2.245,
-      "em_straddle": 2.245,
-      "em_straddle_pct": 0.144839,
-      "em_iv": 2.816904,
-      "em_iv_pct": 0.181736,
-      "call_delta": 0.5461,
-      "call_gamma": 0.1387,
-      "call_vega": 0.0208,
-      "call_theta": -0.0145
+      "dte": 41,
+      "atm_strike": 17.0,
+      "atm_iv": 0.5112,
+      "atm_call_iv": 0.5173,
+      "atm_put_iv": 0.5051,
+      "straddle_mid": 2.455,
+      "em_straddle": 2.455,
+      "em_straddle_pct": 0.144412,
+      "em_iv": 2.91263,
+      "em_iv_pct": 0.171331,
+      "call_delta": 0.359,
+      "call_gamma": 0.1374,
+      "call_vega": 0.0196,
+      "call_theta": -0.0127
     }
   ],
   "earnings_history": [
@@ -408,13 +391,13 @@
   ],
   "next_earnings": "2026-11-09",
   "vol_regime": {
-    "iv_current": 0.5679,
-    "iv_rank": 0.235867,
+    "iv_current": 0.5415,
+    "iv_rank": 0.185447,
     "iv_year_high": 0.968,
     "iv_year_low": 0.4444,
-    "hv_current": 0.6265,
-    "hv_rank": 0.452983,
-    "iv_mom_week": -0.3144,
+    "hv_current": 0.6236,
+    "hv_rank": 0.447254,
+    "iv_mom_week": -0.3025,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

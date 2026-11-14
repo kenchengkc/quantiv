@@ -1,6 +1,6 @@
 {
   "symbol": "KRMN",
-  "as_of_date": "2026-11-12",
+  "as_of_date": "2026-11-13",
   "spot_price": 40.0,
   "expected_move": {
     "earnings_date": "2026-11-05",
@@ -44,21 +44,38 @@
   },
   "straddle_features": [
     {
-      "expiration": "2026-12-18",
-      "dte": 36,
+      "expiration": "2026-11-20",
+      "dte": 7,
       "atm_strike": 40.0,
-      "atm_iv": 0.710201,
-      "atm_call_iv": 0.7095,
-      "atm_put_iv": 0.7109,
-      "straddle_mid": 7.2,
-      "em_straddle": 7.2,
-      "em_straddle_pct": 0.18,
-      "em_iv": 8.921665,
-      "em_iv_pct": 0.223042,
-      "call_delta": 0.5832,
-      "call_gamma": 0.0434,
-      "call_vega": 0.0498,
-      "call_theta": -0.0541
+      "atm_iv": 0.8061,
+      "atm_call_iv": 0.8061,
+      "atm_put_iv": 0.8061,
+      "straddle_mid": 3.5,
+      "em_straddle": 3.5,
+      "em_straddle_pct": 0.0875,
+      "em_iv": 4.465309,
+      "em_iv_pct": 0.111633,
+      "call_delta": 0.5642,
+      "call_gamma": 0.0864,
+      "call_vega": 0.0219,
+      "call_theta": -0.1143
+    },
+    {
+      "expiration": "2026-12-18",
+      "dte": 35,
+      "atm_strike": 40.0,
+      "atm_iv": 0.766197,
+      "atm_call_iv": 0.7693,
+      "atm_put_iv": 0.7631,
+      "straddle_mid": 7.55,
+      "em_straddle": 7.55,
+      "em_straddle_pct": 0.18875,
+      "em_iv": 9.490475,
+      "em_iv_pct": 0.237262,
+      "call_delta": 0.5486,
+      "call_gamma": 0.0401,
+      "call_vega": 0.0489,
+      "call_theta": -0.0465
     }
   ],
   "earnings_history": [
@@ -274,13 +291,13 @@
   ],
   "next_earnings": "2026-11-05",
   "vol_regime": {
-    "iv_current": 0.7264,
-    "iv_rank": 0.388527,
+    "iv_current": 0.7651,
+    "iv_rank": 0.469847,
     "iv_year_high": 1.0174,
     "iv_year_low": 0.5415,
-    "hv_current": 1.3307,
-    "hv_rank": 1.0,
-    "iv_mom_week": -0.2852,
+    "hv_current": 1.3184,
+    "hv_rank": 0.983884,
+    "iv_mom_week": -0.0899,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

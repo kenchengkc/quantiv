@@ -1,7 +1,7 @@
 {
   "symbol": "LPG",
-  "as_of_date": "2026-11-12",
-  "spot_price": 47.8,
+  "as_of_date": "2026-11-13",
+  "spot_price": 48.75,
   "expected_move": {
     "earnings_date": "2026-11-05",
     "timing": "before_market_open",
@@ -24,7 +24,25 @@
     "ml_publication_status": "held",
     "ml_publication_reason": "no_eligible_current_forecast"
   },
-  "straddle_features": [],
+  "straddle_features": [
+    {
+      "expiration": "2026-12-18",
+      "dte": 35,
+      "atm_strike": 48.75,
+      "atm_iv": 0.466041,
+      "atm_call_iv": 0.4698,
+      "atm_put_iv": 0.4623,
+      "straddle_mid": 5.575,
+      "em_straddle": 5.575,
+      "em_straddle_pct": 0.114359,
+      "em_iv": 7.035353,
+      "em_iv_pct": 0.144315,
+      "call_delta": 0.4951,
+      "call_gamma": 0.0567,
+      "call_vega": 0.0592,
+      "call_theta": -0.0397
+    }
+  ],
   "earnings_history": [
     {
       "date": "2026-11-05",
@@ -408,13 +426,13 @@
   ],
   "next_earnings": "2026-11-05",
   "vol_regime": {
-    "iv_current": 0.4446,
-    "iv_rank": 0.469448,
+    "iv_current": 0.4464,
+    "iv_rank": 0.473552,
     "iv_year_high": 0.6773,
     "iv_year_low": 0.2387,
-    "hv_current": 0.4301,
-    "hv_rank": 0.496361,
-    "iv_mom_week": -0.154,
+    "hv_current": 0.4292,
+    "hv_rank": 0.493633,
+    "iv_mom_week": -0.0176,
     "iv_mom_month": null
   },
   "next_earnings_timing": "unknown"

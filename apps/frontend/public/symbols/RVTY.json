@@ -1,6 +1,6 @@
 {
   "symbol": "RVTY",
-  "as_of_date": "2026-11-12",
+  "as_of_date": "2026-11-13",
   "spot_price": 155.0,
   "expected_move": {
     "earnings_date": "2026-11-03",
@@ -44,38 +44,21 @@
   },
   "straddle_features": [
     {
-      "expiration": "2026-11-20",
-      "dte": 8,
-      "atm_strike": 155.0,
-      "atm_iv": 0.686297,
-      "atm_call_iv": 0.6834,
-      "atm_put_iv": 0.6892,
-      "straddle_mid": 12.745,
-      "em_straddle": 12.745,
-      "em_straddle_pct": 0.082226,
-      "em_iv": 15.74861,
-      "em_iv_pct": 0.101604,
-      "call_delta": 0.576,
-      "call_gamma": 0.0247,
-      "call_vega": 0.0909,
-      "call_theta": -0.4034
-    },
-    {
       "expiration": "2026-12-18",
-      "dte": 36,
-      "atm_strike": 160.0,
-      "atm_iv": 0.466915,
-      "atm_call_iv": 0.4745,
-      "atm_put_iv": 0.4593,
-      "straddle_mid": 18.65,
-      "em_straddle": 18.65,
-      "em_straddle_pct": 0.116562,
-      "em_iv": 23.461894,
-      "em_iv_pct": 0.146637,
-      "call_delta": 0.4934,
-      "call_gamma": 0.017,
-      "call_vega": 0.1968,
-      "call_theta": -0.1398
+      "dte": 35,
+      "atm_strike": 155.0,
+      "atm_iv": 0.412759,
+      "atm_call_iv": 0.4184,
+      "atm_put_iv": 0.4071,
+      "straddle_mid": 15.9,
+      "em_straddle": 15.9,
+      "em_straddle_pct": 0.102581,
+      "em_iv": 19.811426,
+      "em_iv_pct": 0.127816,
+      "call_delta": 0.5445,
+      "call_gamma": 0.0199,
+      "call_vega": 0.1906,
+      "call_theta": -0.1349
     }
   ],
   "earnings_history": [
@@ -479,13 +462,13 @@
   ],
   "next_earnings": "2026-11-03",
   "vol_regime": {
-    "iv_current": 0.4877,
-    "iv_rank": 0.572754,
+    "iv_current": 0.4348,
+    "iv_rank": 0.397415,
     "iv_year_high": 0.6166,
     "iv_year_low": 0.3149,
-    "hv_current": 0.4301,
-    "hv_rank": 0.635229,
-    "iv_mom_week": -0.0138,
+    "hv_current": 0.431,
+    "hv_rank": 0.63939,
+    "iv_mom_week": -0.056,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"

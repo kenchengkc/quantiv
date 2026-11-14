@@ -1,6 +1,6 @@
 {
   "symbol": "AMG",
-  "as_of_date": "2026-11-12",
+  "as_of_date": "2026-11-13",
   "spot_price": 400.0,
   "expected_move": {
     "earnings_date": "2026-11-09",
@@ -26,38 +26,21 @@
   },
   "straddle_features": [
     {
-      "expiration": "2026-11-20",
-      "dte": 8,
-      "atm_strike": 400.0,
-      "atm_iv": 0.344018,
-      "atm_call_iv": 0.3517,
-      "atm_put_iv": 0.3361,
-      "straddle_mid": 16.8,
-      "em_straddle": 16.8,
-      "em_straddle_pct": 0.042,
-      "em_iv": 20.372282,
-      "em_iv_pct": 0.050931,
-      "call_delta": 0.4215,
-      "call_gamma": 0.0191,
-      "call_vega": 0.2282,
-      "call_theta": -0.5992
-    },
-    {
       "expiration": "2026-12-18",
-      "dte": 36,
+      "dte": 35,
       "atm_strike": 400.0,
-      "atm_iv": 0.31252,
-      "atm_call_iv": 0.3186,
-      "atm_put_iv": 0.3064,
-      "straddle_mid": 31.5,
-      "em_straddle": 31.5,
-      "em_straddle_pct": 0.07875,
-      "em_iv": 39.259281,
-      "em_iv_pct": 0.098148,
-      "call_delta": 0.4893,
-      "call_gamma": 0.0101,
-      "call_vega": 0.4946,
-      "call_theta": -0.2618
+      "atm_iv": 0.310455,
+      "atm_call_iv": 0.3129,
+      "atm_put_iv": 0.308,
+      "straddle_mid": 30.7,
+      "em_straddle": 30.7,
+      "em_straddle_pct": 0.07675,
+      "em_iv": 38.454391,
+      "em_iv_pct": 0.096136,
+      "call_delta": 0.4835,
+      "call_gamma": 0.0104,
+      "call_vega": 0.4873,
+      "call_theta": -0.2402
     }
   ],
   "earnings_history": [
@@ -436,13 +419,13 @@
   ],
   "next_earnings": "2026-11-09",
   "vol_regime": {
-    "iv_current": 0.3199,
-    "iv_rank": 0.359092,
+    "iv_current": 0.313,
+    "iv_rank": 0.337933,
     "iv_year_high": 0.5289,
     "iv_year_low": 0.2028,
-    "hv_current": 0.3711,
-    "hv_rank": 0.520143,
-    "iv_mom_week": -0.0947,
+    "hv_current": 0.371,
+    "hv_rank": 0.519786,
+    "iv_mom_week": -0.1022,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"

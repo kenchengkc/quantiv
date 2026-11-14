@@ -1,6 +1,6 @@
 {
   "symbol": "VSAT",
-  "as_of_date": "2026-11-12",
+  "as_of_date": "2026-11-13",
   "spot_price": 70.0,
   "expected_move": {
     "earnings_date": "2026-11-06",
@@ -24,38 +24,21 @@
   },
   "straddle_features": [
     {
-      "expiration": "2026-11-20",
-      "dte": 8,
-      "atm_strike": 70.0,
-      "atm_iv": 0.946293,
-      "atm_call_iv": 0.9405,
-      "atm_put_iv": 0.9521,
-      "straddle_mid": 8.0,
-      "em_straddle": 8.0,
-      "em_straddle_pct": 0.114286,
-      "em_iv": 9.806684,
-      "em_iv_pct": 0.140095,
-      "call_delta": 0.5927,
-      "call_gamma": 0.0394,
-      "call_vega": 0.041,
-      "call_theta": -0.2661
-    },
-    {
       "expiration": "2026-12-18",
-      "dte": 36,
-      "atm_strike": 75.0,
-      "atm_iv": 0.893987,
-      "atm_call_iv": 0.8988,
-      "atm_put_iv": 0.8892,
-      "straddle_mid": 16.55,
-      "em_straddle": 16.55,
-      "em_straddle_pct": 0.220667,
-      "em_iv": 21.057028,
-      "em_iv_pct": 0.28076,
-      "call_delta": 0.4908,
-      "call_gamma": 0.0198,
-      "call_vega": 0.0892,
-      "call_theta": -0.1155
+      "dte": 35,
+      "atm_strike": 70.0,
+      "atm_iv": 0.883384,
+      "atm_call_iv": 0.8701,
+      "atm_put_iv": 0.8967,
+      "straddle_mid": 15.05,
+      "em_straddle": 15.05,
+      "em_straddle_pct": 0.215,
+      "em_iv": 19.148518,
+      "em_iv_pct": 0.27355,
+      "call_delta": 0.5075,
+      "call_gamma": 0.0218,
+      "call_vega": 0.0834,
+      "call_theta": -0.1055
     }
   ],
   "earnings_history": [
@@ -425,13 +408,13 @@
   ],
   "next_earnings": "2026-11-06",
   "vol_regime": {
-    "iv_current": 0.8989,
-    "iv_rank": 0.526135,
+    "iv_current": 0.908,
+    "iv_rank": 0.545709,
     "iv_year_high": 1.1192,
     "iv_year_low": 0.6543,
-    "hv_current": 1.0053,
-    "hv_rank": 0.720389,
-    "iv_mom_week": -0.178,
+    "hv_current": 1.0136,
+    "hv_rank": 0.732092,
+    "iv_mom_week": -0.0638,
     "iv_mom_month": null
   },
   "next_earnings_timing": "unknown"

@@ -1,6 +1,6 @@
 {
   "symbol": "MSGK",
-  "as_of_date": "2026-11-12",
+  "as_of_date": "2026-11-13",
   "spot_price": 320.0,
   "expected_move": {
     "earnings_date": "2026-11-06",
@@ -44,21 +44,21 @@
   },
   "straddle_features": [
     {
-      "expiration": "2026-11-20",
-      "dte": 8,
+      "expiration": "2026-12-18",
+      "dte": 35,
       "atm_strike": 320.0,
-      "atm_iv": 0.299304,
-      "atm_call_iv": 0.2979,
-      "atm_put_iv": 0.3007,
-      "straddle_mid": 11.975,
-      "em_straddle": 11.975,
-      "em_straddle_pct": 0.037422,
-      "em_iv": 14.179505,
-      "em_iv_pct": 0.044311,
-      "call_delta": 0.3605,
-      "call_gamma": 0.0269,
-      "call_vega": 0.174,
-      "call_theta": -0.316
+      "atm_iv": 0.268361,
+      "atm_call_iv": 0.2709,
+      "atm_put_iv": 0.2658,
+      "straddle_mid": 21.4,
+      "em_straddle": 21.4,
+      "em_straddle_pct": 0.066875,
+      "em_iv": 26.592337,
+      "em_iv_pct": 0.083101,
+      "call_delta": 0.4364,
+      "call_gamma": 0.0148,
+      "call_vega": 0.3824,
+      "call_theta": -0.1504
     }
   ],
   "earnings_history": [
@@ -118,13 +118,13 @@
   ],
   "next_earnings": "2026-11-06",
   "vol_regime": {
-    "iv_current": 0.2806,
-    "iv_rank": 0.35769,
+    "iv_current": 0.2702,
+    "iv_rank": 0.285317,
     "iv_year_high": 0.3729,
     "iv_year_low": 0.2292,
-    "hv_current": 0.3483,
-    "hv_rank": 0.46527,
-    "iv_mom_week": -0.0446,
+    "hv_current": 0.3443,
+    "hv_rank": 0.454245,
+    "iv_mom_week": -0.0182,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"

@@ -1,7 +1,7 @@
 {
   "symbol": "PGNY",
-  "as_of_date": "2026-11-12",
-  "spot_price": 36.58,
+  "as_of_date": "2026-11-13",
+  "spot_price": 35.0,
   "expected_move": {
     "earnings_date": "2026-11-04",
     "timing": "amc",
@@ -41,7 +41,25 @@
     "forecast_feature_hash": "57fd7f930eb7c51723504b59ae08f4e878be9b34807644e2807aa54c40ce2ca6",
     "forecast_frozen_eligible": true
   },
-  "straddle_features": [],
+  "straddle_features": [
+    {
+      "expiration": "2026-12-18",
+      "dte": 35,
+      "atm_strike": 35.0,
+      "atm_iv": 0.6111,
+      "atm_call_iv": 0.6862,
+      "atm_put_iv": 0.536,
+      "straddle_mid": 3.175,
+      "em_straddle": 3.175,
+      "em_straddle_pct": 0.090714,
+      "em_iv": 6.623201,
+      "em_iv_pct": 0.189234,
+      "call_delta": 0.6186,
+      "call_gamma": 0.0498,
+      "call_vega": 0.0429,
+      "call_theta": -0.0463
+    }
+  ],
   "earnings_history": [
     {
       "date": "2026-11-04",
@@ -442,13 +460,13 @@
   ],
   "next_earnings": "2026-11-04",
   "vol_regime": {
-    "iv_current": 0.3195,
-    "iv_rank": 0.0,
+    "iv_current": 0.3405,
+    "iv_rank": 0.042245,
     "iv_year_high": 0.8166,
     "iv_year_low": 0.3195,
-    "hv_current": 0.4791,
-    "hv_rank": 0.459665,
-    "iv_mom_week": -0.0856,
+    "hv_current": 0.484,
+    "hv_rank": 0.469449,
+    "iv_mom_week": -0.0175,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

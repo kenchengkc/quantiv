@@ -1,7 +1,7 @@
 {
   "symbol": "MCK",
-  "as_of_date": "2026-11-12",
-  "spot_price": 1080.0,
+  "as_of_date": "2026-11-13",
+  "spot_price": 1110.0,
   "expected_move": {
     "earnings_date": "2026-11-04",
     "timing": "amc",
@@ -44,38 +44,21 @@
   },
   "straddle_features": [
     {
-      "expiration": "2026-11-20",
-      "dte": 8,
-      "atm_strike": 1080.0,
-      "atm_iv": 0.26685,
-      "atm_call_iv": 0.2695,
-      "atm_put_iv": 0.2642,
-      "straddle_mid": 34.095,
-      "em_straddle": 34.095,
-      "em_straddle_pct": 0.031569,
-      "em_iv": 42.666779,
-      "em_iv_pct": 0.039506,
-      "call_delta": 0.4993,
-      "call_gamma": 0.0093,
-      "call_vega": 0.6354,
-      "call_theta": -1.1964
-    },
-    {
       "expiration": "2026-12-18",
-      "dte": 36,
-      "atm_strike": 1080.0,
-      "atm_iv": 0.2546,
-      "atm_call_iv": 0.2551,
-      "atm_put_iv": 0.2541,
-      "straddle_mid": 68.8,
-      "em_straddle": 68.8,
-      "em_straddle_pct": 0.063704,
-      "em_iv": 86.354891,
-      "em_iv_pct": 0.079958,
-      "call_delta": 0.5132,
+      "dte": 35,
+      "atm_strike": 1110.0,
+      "atm_iv": 0.2509,
+      "atm_call_iv": 0.2511,
+      "atm_put_iv": 0.2507,
+      "straddle_mid": 68.645,
+      "em_straddle": 68.645,
+      "em_straddle_pct": 0.061842,
+      "em_iv": 86.240404,
+      "em_iv_pct": 0.077694,
+      "call_delta": 0.4912,
       "call_gamma": 0.0046,
-      "call_vega": 1.3458,
-      "call_theta": -0.5097
+      "call_vega": 1.3589,
+      "call_theta": -0.5147
     }
   ],
   "earnings_history": [
@@ -486,13 +469,13 @@
   ],
   "next_earnings": "2026-11-04",
   "vol_regime": {
-    "iv_current": 0.2506,
-    "iv_rank": 0.24649,
+    "iv_current": 0.2498,
+    "iv_rank": 0.24233,
     "iv_year_high": 0.3955,
     "iv_year_low": 0.2032,
-    "hv_current": 0.2697,
-    "hv_rank": 0.279547,
-    "iv_mom_week": -0.0367,
+    "hv_current": 0.2744,
+    "hv_rank": 0.292229,
+    "iv_mom_week": -0.0235,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

@@ -1,6 +1,6 @@
 {
   "symbol": "MKSI",
-  "as_of_date": "2026-11-12",
+  "as_of_date": "2026-11-13",
   "spot_price": 220.0,
   "expected_move": {
     "earnings_date": "2026-11-04",
@@ -44,38 +44,21 @@
   },
   "straddle_features": [
     {
-      "expiration": "2026-11-20",
-      "dte": 8,
-      "atm_strike": 220.0,
-      "atm_iv": 0.74385,
-      "atm_call_iv": 0.7436,
-      "atm_put_iv": 0.7441,
-      "straddle_mid": 19.345,
-      "em_straddle": 19.345,
-      "em_straddle_pct": 0.087932,
-      "em_iv": 24.227398,
-      "em_iv_pct": 0.110125,
-      "call_delta": 0.5398,
-      "call_gamma": 0.0162,
-      "call_vega": 0.1295,
-      "call_theta": -0.581
-    },
-    {
       "expiration": "2026-12-18",
-      "dte": 36,
-      "atm_strike": 230.0,
-      "atm_iv": 0.636613,
-      "atm_call_iv": 0.6335,
-      "atm_put_iv": 0.6397,
-      "straddle_mid": 36.45,
-      "em_straddle": 36.45,
-      "em_straddle_pct": 0.158478,
-      "em_iv": 45.984142,
-      "em_iv_pct": 0.199931,
-      "call_delta": 0.4636,
-      "call_gamma": 0.0089,
-      "call_vega": 0.2753,
-      "call_theta": -0.2425
+      "dte": 35,
+      "atm_strike": 220.0,
+      "atm_iv": 0.598303,
+      "atm_call_iv": 0.5996,
+      "atm_put_iv": 0.597,
+      "straddle_mid": 32.25,
+      "em_straddle": 32.25,
+      "em_straddle_pct": 0.146591,
+      "em_iv": 40.75974,
+      "em_iv_pct": 0.185272,
+      "call_delta": 0.4991,
+      "call_gamma": 0.0099,
+      "call_vega": 0.2659,
+      "call_theta": -0.2345
     }
   ],
   "earnings_history": [
@@ -479,13 +462,13 @@
   ],
   "next_earnings": "2026-11-04",
   "vol_regime": {
-    "iv_current": 0.6511,
-    "iv_rank": 0.381065,
+    "iv_current": 0.5964,
+    "iv_rank": 0.281284,
     "iv_year_high": 0.9904,
     "iv_year_low": 0.4422,
-    "hv_current": 0.7645,
-    "hv_rank": 0.629655,
-    "iv_mom_week": -0.0564,
+    "hv_current": 0.759,
+    "hv_rank": 0.620084,
+    "iv_mom_week": -0.0794,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

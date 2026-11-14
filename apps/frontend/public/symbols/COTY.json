@@ -1,6 +1,6 @@
 {
   "symbol": "COTY",
-  "as_of_date": "2026-11-12",
+  "as_of_date": "2026-11-13",
   "spot_price": 4.0,
   "expected_move": {
     "earnings_date": "2026-11-04",
@@ -21,18 +21,18 @@
   "straddle_features": [
     {
       "expiration": "2026-12-18",
-      "dte": 36,
+      "dte": 35,
       "atm_strike": 4.0,
-      "atm_iv": 0.916,
-      "atm_call_iv": 0.916,
-      "atm_put_iv": 0.916,
+      "atm_iv": 1.082769,
+      "atm_call_iv": 0.9118,
+      "atm_put_iv": 1.2573,
       "straddle_mid": 0.55,
       "em_straddle": 0.55,
       "em_straddle_pct": 0.1375,
-      "em_iv": 1.150695,
-      "em_iv_pct": 0.287674,
-      "call_delta": 0.5748,
-      "call_gamma": 0.3386,
+      "em_iv": 1.341169,
+      "em_iv_pct": 0.335292,
+      "call_delta": 0.5746,
+      "call_gamma": 0.3435,
       "call_vega": 0.0049,
       "call_theta": -0.0065
     }
@@ -63,10 +63,10 @@
       "realized_target_protocol": "quantiv.session-reaction.v2",
       "realized_label_source": "ohlcv_session_close",
       "ml_publication_status": "held",
+      "ml_publication_reason": "no_eligible_current_forecast",
       "display_forecast_pct": 0.0637825,
       "display_forecast_method": "historical",
       "display_forecast_as_of": "2026-11-04",
-      "ml_publication_reason": "no_eligible_current_forecast",
       "forecast_frozen": true
     },
     {
@@ -417,13 +417,13 @@
   ],
   "next_earnings": "2026-11-04",
   "vol_regime": {
-    "iv_current": 0.5459,
-    "iv_rank": 0.095908,
+    "iv_current": 0.5524,
+    "iv_rank": 0.106061,
     "iv_year_high": 1.1247,
     "iv_year_low": 0.4845,
-    "hv_current": 0.5773,
-    "hv_rank": 0.667955,
-    "iv_mom_week": -0.006,
+    "hv_current": 0.5775,
+    "hv_rank": 0.66847,
+    "iv_mom_week": 0.0044,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

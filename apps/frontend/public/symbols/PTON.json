@@ -1,7 +1,7 @@
 {
   "symbol": "PTON",
-  "as_of_date": "2026-11-12",
-  "spot_price": 5.5,
+  "as_of_date": "2026-11-13",
+  "spot_price": 5.7,
   "expected_move": {
     "earnings_date": "2026-11-05",
     "timing": "bmo",
@@ -43,25 +43,7 @@
     "forecast_feature_hash": "6b53a6c9a253bece1cfe17733081d53539db6810ddd15fa22f57890650c64c79",
     "forecast_frozen_eligible": true
   },
-  "straddle_features": [
-    {
-      "expiration": "2026-12-31",
-      "dte": 49,
-      "atm_strike": 5.5,
-      "atm_iv": 0.48275,
-      "atm_call_iv": 0.4784,
-      "atm_put_iv": 0.4871,
-      "straddle_mid": 0.79,
-      "em_straddle": 0.79,
-      "em_straddle_pct": 0.143636,
-      "em_iv": 0.972829,
-      "em_iv_pct": 0.176878,
-      "call_delta": 0.5865,
-      "call_gamma": 0.407,
-      "call_vega": 0.0079,
-      "call_theta": -0.0048
-    }
-  ],
+  "straddle_features": [],
   "earnings_history": [
     {
       "date": "2026-11-05",
@@ -401,13 +383,13 @@
   ],
   "next_earnings": "2026-11-05",
   "vol_regime": {
-    "iv_current": 0.6296,
-    "iv_rank": 0.32213,
+    "iv_current": 0.4913,
+    "iv_rank": 0.120908,
     "iv_year_high": 1.0955,
     "iv_year_low": 0.4082,
-    "hv_current": 0.443,
-    "hv_rank": 0.107572,
-    "iv_mom_week": 0.0424,
+    "hv_current": 0.4476,
+    "hv_rank": 0.115243,
+    "iv_mom_week": -0.0592,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"
