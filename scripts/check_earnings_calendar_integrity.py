@@ -25,7 +25,7 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from sync_finnhub_earnings import is_us_symbol  # noqa: E402
-from delisted import is_retired  # noqa: E402
+from delisted import is_retired, preserves_earnings_history  # noqa: E402
 
 CSV_PATH = Path("data/earnings_calendar.csv")
 DEFAULT_BASELINE_PATH = Path("data/validation/earnings_calendar_baseline.csv")
@@ -236,6 +236,18 @@ def main() -> int:
 
     print()
     tripped: list[str] = []
+
+    # A current-symbol transition does not authorize deleting the pre-spin
+    # archive. Check every preserved historical date, including old records
+    # outside the rolling event-count windows and partial anchor losses.
+    preserved_lost = {
+        key for key in removed if preserves_earnings_history(*key) and not _rescued(*key)
+    }
+    if preserved_lost:
+        tripped.append(
+            f"{len(preserved_lost):,} preserved pre-transition earnings vanished: "
+            f"{sorted(preserved_lost)[:10]}"
+        )
 
     old_us = old[old["act_symbol"].map(is_us_symbol)]
     new_us = new[new["act_symbol"].map(is_us_symbol)]

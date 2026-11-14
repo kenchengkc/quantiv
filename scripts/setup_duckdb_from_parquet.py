@@ -165,6 +165,12 @@ def setup_corporate_action_views(conn: duckdb.DuckDBPyConnection, data_dir: Path
 
 
 def setup_views(conn: duckdb.DuckDBPyConnection, data_dir: Path):
+    try:
+        from ticker_lifecycle_sql import market_data_history_filter_sql, volatility_history_values_sql
+    except ModuleNotFoundError:
+        from scripts.ticker_lifecycle_sql import market_data_history_filter_sql, volatility_history_values_sql
+
+    history_filter = market_data_history_filter_sql()
     policy = quote_quality_policy()
     min_bid = float(policy["min_bid"])
     min_ask = float(policy["min_ask"])
@@ -209,6 +215,7 @@ def setup_views(conn: duckdb.DuckDBPyConnection, data_dir: Path):
     conn.execute(f"""
         CREATE OR REPLACE VIEW v_options_raw AS
         SELECT {select_list} FROM {parquet_scan}
+        WHERE {history_filter}
     """)
     count = conn.execute("SELECT COUNT(*) FROM v_options_raw").fetchone()[0]
     print(f"[views] v_options_raw: {count:,} rows")
@@ -527,19 +534,33 @@ def setup_views(conn: duckdb.DuckDBPyConnection, data_dir: Path):
         volhist_glob = str(volhist_parquet_dir / "year=*" / "month=*" / "*.parquet")
         conn.execute(f"""
             CREATE OR REPLACE VIEW v_volhist_raw AS
-            SELECT * FROM read_parquet('{volhist_glob}', hive_partitioning=true)
+            SELECT * REPLACE ({volatility_history_values_sql()})
+            FROM read_parquet('{volhist_glob}', hive_partitioning=true)
+            WHERE {history_filter}
         """)
         vcount = conn.execute("SELECT COUNT(*) FROM v_volhist_raw").fetchone()[0]
         print(f"[views] v_volhist_raw: {vcount:,} rows (from Parquet)")
     elif volhist_csv.exists():
         conn.execute(f"""
             CREATE OR REPLACE VIEW v_volhist_raw AS
-            SELECT * FROM read_csv_auto('{volhist_csv}')
+            SELECT * REPLACE ({volatility_history_values_sql()})
+            FROM read_csv_auto('{volhist_csv}')
+            WHERE {history_filter}
         """)
         vcount = conn.execute("SELECT COUNT(*) FROM v_volhist_raw").fetchone()[0]
         print(f"[views] v_volhist_raw: {vcount:,} rows (from {volhist_csv.name}, fallback)")
     else:
         print("[views] ⚠ Volatility history not found (neither Parquet nor CSV)")
+
+    if conn.execute("SELECT COUNT(*) FROM information_schema.views WHERE table_name IN ('v_volhist_raw','v_volhist')").fetchone()[0] == 2:
+        # Replace a prior direct-Parquet view as well: downstream consumers may
+        # reuse this database and skip their view setup when v_volhist exists.
+        conn.execute(f"""
+            CREATE OR REPLACE VIEW v_volhist AS
+            SELECT CAST(date AS DATE) AS date, act_symbol,
+                   {volatility_history_values_sql()}
+            FROM v_volhist_raw WHERE {history_filter}
+        """)
 
     # ── VIX (CBOE Volatility Index, authoritative CBOE history) ─────
     vix_path = data_dir / "parquet" / "vix" / "vix.parquet"
@@ -561,6 +582,7 @@ def setup_views(conn: duckdb.DuckDBPyConnection, data_dir: Path):
         conn.execute(f"""
             CREATE OR REPLACE VIEW v_ohlcv AS
             SELECT * FROM read_parquet('{ohlcv_glob}', hive_partitioning=true)
+            WHERE {history_filter}
         """)
         ocount = conn.execute("SELECT COUNT(*) FROM v_ohlcv").fetchone()[0]
         print(f"[views] v_ohlcv: {ocount:,} rows")

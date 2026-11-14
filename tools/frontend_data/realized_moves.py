@@ -15,6 +15,11 @@ from twelvedata_basic import (
 
 import pandas as pd
 
+try:
+    from ticker_lifecycle_sql import market_data_window_is_comparable
+except ModuleNotFoundError:
+    from scripts.ticker_lifecycle_sql import market_data_window_is_comparable
+
 from ml.causal_features import extract_reaction_labels, reaction_sessions
 from .shared import DATA_DIR, ET, MARKET_SESSIONS_JSON, jsonable
 
@@ -191,12 +196,16 @@ def _compute_realized_from_closes(
     closes: list[tuple[date, float]],
     earnings_dt: date,
     timing: str | None,
+    *,
+    ticker: str | None = None,
 ) -> float | None:
     """Exact-session fallback on externally comparable closes, without label proof."""
     boundaries = reaction_sessions(earnings_dt, timing_bucket(timing))
     if boundaries is None:
         return None
     pre, post = boundaries
+    if ticker is not None and not market_data_window_is_comparable(ticker, pre, post):
+        return None
     observations = dict(closes)
     if len(observations) != len(closes):
         return None
@@ -299,6 +308,7 @@ def enrich_realized_moves_from_twelvedata(events: list[dict], *, dry_run: bool =
             closes_by_symbol.get(ticker, []),
             earnings_dt,
             ev.get("timing"),
+            ticker=ticker,
         )
         if move is None:
             continue
@@ -410,7 +420,7 @@ def enrich_hist_move_avg_from_twelvedata(
         vals = [
             abs(move)
             for d, timing in history
-            if (move := _compute_realized_from_closes(closes, d, timing)) is not None
+            if (move := _compute_realized_from_closes(closes, d, timing, ticker=ticker)) is not None
         ]
         if vals:
             hist_avg_by_symbol[ticker] = sum(vals) / len(vals)
@@ -552,6 +562,7 @@ def validate_twelvedata_against_ohlcv(
             fetch_result.closes.get(ticker, []),
             earnings_dt,
             timing,
+            ticker=ticker,
         )
         if td_move is None:
             continue
