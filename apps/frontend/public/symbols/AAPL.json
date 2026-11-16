@@ -3,26 +3,13 @@
   "as_of_date": "2026-11-13",
   "spot_price": 357.5,
   "expected_move": {
-    "earnings_date": "2026-11-02",
-    "timing": "amc",
-    "expiration": "2026-11-13",
+    "expiration": "2026-11-27",
     "dte": 14,
-    "lead_time_days": 3,
-    "atm_strike": 345.0,
-    "atm_iv": 0.34215,
-    "straddle_abs": 18.47,
-    "straddle_pct": 0.053536,
-    "iv_pct": 0.067009,
-    "em_method": "options_math",
-    "display_forecast_pct": 0.067009,
-    "display_forecast_method": "options_math",
-    "display_forecast_as_of": "2026-10-30",
-    "ml_status": "unavailable_event",
-    "options_status": "decision_eligible",
-    "hist_move_med_4q": 0.01852,
-    "forecast_frozen": true,
-    "ml_publication_status": "held",
-    "ml_publication_reason": "no_eligible_current_forecast"
+    "atm_strike": 357.5,
+    "atm_iv": 0.19515,
+    "straddle_abs": 10.925,
+    "straddle_pct": 0.030559,
+    "iv_pct": 0.03822
   },
   "straddle_features": [
     {
@@ -465,7 +452,7 @@
       "forecast_frozen": true
     }
   ],
-  "next_earnings": "2026-11-02",
+  "next_earnings": null,
   "vol_regime": {
     "iv_current": 0.2146,
     "iv_rank": null,
@@ -475,6 +462,5 @@
     "hv_rank": 0.418341,
     "iv_mom_week": -0.0438,
     "iv_mom_month": null
-  },
-  "next_earnings_timing": "amc"
+  }
 }
