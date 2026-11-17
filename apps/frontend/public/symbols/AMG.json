@@ -1,7 +1,7 @@
 {
   "symbol": "AMG",
-  "as_of_date": "2026-11-13",
-  "spot_price": 400.0,
+  "as_of_date": "2026-11-16",
+  "spot_price": 390.0,
   "expected_move": {
     "earnings_date": "2026-11-09",
     "timing": "bmo",
@@ -27,20 +27,37 @@
   "straddle_features": [
     {
       "expiration": "2026-12-18",
-      "dte": 35,
-      "atm_strike": 400.0,
-      "atm_iv": 0.310455,
-      "atm_call_iv": 0.3129,
-      "atm_put_iv": 0.308,
-      "straddle_mid": 30.7,
-      "em_straddle": 30.7,
-      "em_straddle_pct": 0.07675,
-      "em_iv": 38.454391,
-      "em_iv_pct": 0.096136,
-      "call_delta": 0.4835,
-      "call_gamma": 0.0104,
-      "call_vega": 0.4873,
-      "call_theta": -0.2402
+      "dte": 32,
+      "atm_strike": 390.0,
+      "atm_iv": 0.3297,
+      "atm_call_iv": 0.3311,
+      "atm_put_iv": 0.3283,
+      "straddle_mid": 30.345,
+      "em_straddle": 30.345,
+      "em_straddle_pct": 0.077808,
+      "em_iv": 38.072527,
+      "em_iv_pct": 0.097622,
+      "call_delta": 0.5096,
+      "call_gamma": 0.0105,
+      "call_vega": 0.4576,
+      "call_theta": -0.2582
+    },
+    {
+      "expiration": "2027-01-15",
+      "dte": 60,
+      "atm_strike": 390.0,
+      "atm_iv": 0.338001,
+      "atm_call_iv": 0.3397,
+      "atm_put_iv": 0.3363,
+      "straddle_mid": 42.6,
+      "em_straddle": 42.6,
+      "em_straddle_pct": 0.109231,
+      "em_iv": 53.445528,
+      "em_iv_pct": 0.13704,
+      "call_delta": 0.5309,
+      "call_gamma": 0.0074,
+      "call_vega": 0.6252,
+      "call_theta": -0.1997
     }
   ],
   "earnings_history": [
@@ -419,13 +436,13 @@
   ],
   "next_earnings": "2026-11-09",
   "vol_regime": {
-    "iv_current": 0.313,
-    "iv_rank": 0.337933,
+    "iv_current": 0.3338,
+    "iv_rank": 0.401717,
     "iv_year_high": 0.5289,
     "iv_year_low": 0.2028,
-    "hv_current": 0.371,
-    "hv_rank": 0.519786,
-    "iv_mom_week": -0.1022,
+    "hv_current": 0.3692,
+    "hv_rank": 0.513369,
+    "iv_mom_week": -0.0234,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"

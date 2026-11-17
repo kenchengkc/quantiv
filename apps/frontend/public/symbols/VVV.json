@@ -1,12 +1,12 @@
 {
   "symbol": "VVV",
-  "as_of_date": "2026-11-13",
-  "spot_price": 34.62,
+  "as_of_date": "2026-11-16",
+  "spot_price": 35.0,
   "expected_move": {
     "earnings_date": "2026-11-19",
     "display_forecast_pct": 0.05415260763392804,
     "display_forecast_method": "historical",
-    "display_forecast_as_of": "2026-11-13",
+    "display_forecast_as_of": "2026-11-16",
     "ml_status": "unavailable_model",
     "options_status": "unavailable",
     "fallback_reason": "quote_quality",
@@ -17,7 +17,25 @@
     "ml_publication_reason": "no_eligible_current_forecast",
     "em_method": "historical"
   },
-  "straddle_features": [],
+  "straddle_features": [
+    {
+      "expiration": "2027-01-15",
+      "dte": 60,
+      "atm_strike": 35.0,
+      "atm_iv": 0.420602,
+      "atm_call_iv": 0.4226,
+      "atm_put_iv": 0.4186,
+      "straddle_mid": 4.725,
+      "em_straddle": 4.725,
+      "em_straddle_pct": 0.135,
+      "em_iv": 5.968544,
+      "em_iv_pct": 0.17053,
+      "call_delta": 0.4941,
+      "call_gamma": 0.0678,
+      "call_vega": 0.0552,
+      "call_theta": -0.0206
+    }
+  ],
   "earnings_history": [
     {
       "date": "2026-11-19",
@@ -48,7 +66,7 @@
       "ml_publication_reason": "no_eligible_current_forecast",
       "display_forecast_pct": 0.05415260763392804,
       "display_forecast_method": "historical",
-      "display_forecast_as_of": "2026-11-13",
+      "display_forecast_as_of": "2026-11-16",
       "options_status": "unavailable",
       "fallback_reason": "quote_quality",
       "historical_event_count": 4,
@@ -395,13 +413,13 @@
   ],
   "next_earnings": "2026-11-19",
   "vol_regime": {
-    "iv_current": 0.4114,
-    "iv_rank": 0.272917,
+    "iv_current": 0.4201,
+    "iv_rank": 0.291084,
     "iv_year_high": 0.7596,
     "iv_year_low": 0.2807,
-    "hv_current": 0.3988,
-    "hv_rank": 0.80761,
-    "iv_mom_week": -0.0028,
+    "hv_current": 0.3996,
+    "hv_rank": 0.811897,
+    "iv_mom_week": -0.037,
     "iv_mom_month": null
   },
   "next_earnings_timing": "unknown"

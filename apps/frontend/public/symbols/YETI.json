@@ -1,7 +1,7 @@
 {
   "symbol": "YETI",
-  "as_of_date": "2026-11-13",
-  "spot_price": 40.0,
+  "as_of_date": "2026-11-16",
+  "spot_price": 37.5,
   "expected_move": {
     "earnings_date": "2026-11-12",
     "timing": "bmo",
@@ -46,20 +46,37 @@
   "straddle_features": [
     {
       "expiration": "2026-12-18",
-      "dte": 35,
+      "dte": 32,
+      "atm_strike": 37.5,
+      "atm_iv": 0.41854,
+      "atm_call_iv": 0.4144,
+      "atm_put_iv": 0.4227,
+      "straddle_mid": 3.85,
+      "em_straddle": 3.85,
+      "em_straddle_pct": 0.102667,
+      "em_iv": 4.647263,
+      "em_iv_pct": 0.123927,
+      "call_delta": 0.6151,
+      "call_gamma": 0.0806,
+      "call_vega": 0.0434,
+      "call_theta": -0.0291
+    },
+    {
+      "expiration": "2027-01-15",
+      "dte": 60,
       "atm_strike": 40.0,
-      "atm_iv": 0.398356,
-      "atm_call_iv": 0.4011,
-      "atm_put_iv": 0.3956,
-      "straddle_mid": 3.925,
-      "em_straddle": 3.925,
-      "em_straddle_pct": 0.098125,
-      "em_iv": 4.934221,
-      "em_iv_pct": 0.123356,
-      "call_delta": 0.4889,
-      "call_gamma": 0.0814,
-      "call_vega": 0.0486,
-      "call_theta": -0.0296
+      "atm_iv": 0.379506,
+      "atm_call_iv": 0.3815,
+      "atm_put_iv": 0.3775,
+      "straddle_mid": 4.925,
+      "em_straddle": 4.925,
+      "em_straddle_pct": 0.123125,
+      "em_iv": 6.154721,
+      "em_iv_pct": 0.153868,
+      "call_delta": 0.4546,
+      "call_gamma": 0.0665,
+      "call_vega": 0.0619,
+      "call_theta": -0.0217
     }
   ],
   "earnings_history": [
@@ -471,13 +488,13 @@
   ],
   "next_earnings": "2026-11-12",
   "vol_regime": {
-    "iv_current": 0.3914,
-    "iv_rank": 0.217025,
+    "iv_current": 0.4115,
+    "iv_rank": 0.301728,
     "iv_year_high": 0.5772,
     "iv_year_low": 0.3399,
-    "hv_current": 0.5487,
+    "hv_current": 0.5519,
     "hv_rank": 1.0,
-    "iv_mom_week": -0.1858,
+    "iv_mom_week": -0.1552,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"
