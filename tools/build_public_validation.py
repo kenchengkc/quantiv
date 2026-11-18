@@ -329,6 +329,7 @@ def _historical_rows(metadata: Mapping[str, Any], horizon: int, admission: Mappi
         rows.append({
             "horizon_days": horizon, "cohort": cohort,
             "metric_scope": "historical_out_of_sample",
+            "interval_status": cell.get("interval_status", "passed"),
             "n_train": _int(metadata.get("n_train")),
             "n_validation": cell["rows"], "n_matched_baseline": cell["baseline_rows"],
             "model_mae": cell["model_mae"], "baseline_mae": cell["baseline_mae"],
@@ -353,8 +354,10 @@ def _public_historical_admission(manifest: Mapping[str, Any]) -> dict[str, Any]:
         "source_bundle_id": receipt["bundle_id"], "serving_bundle_id": manifest["bundle_id"],
         "reservation_id": receipt["reservation_id"], "panel_id": receipt["panel_id"],
         "admitted_cohorts": manifest["serving_capabilities"],
+        "interval_capabilities": manifest.get("interval_capabilities", manifest["serving_capabilities"]),
         "protocol": receipt["protocol"], "policy": receipt["policy"],
         "global_temporal_boundary": receipt["global_temporal_boundary"],
+        **({"policy_reassessment": receipt["policy_reassessment"]} if receipt.get("policy_reassessment") else {}),
         "limitations": [
             "The exact candidate excludes reserved labels from fitting, selection, early stopping and quantile calibration.",
             "Complete point-in-time calendar revision history and historical provider delivery timestamps are not established.",

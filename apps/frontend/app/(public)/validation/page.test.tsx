@@ -120,7 +120,7 @@ it('renders admitted cohort results using matched benchmarks and distinct model 
       weighted_baseline_mae: 0.052,
       weighted_straddle_mae: null,
     },
-    horizons,
+    horizons: horizons.map((row, index) => ({ ...row, interval_status: index === 0 ? 'held' : 'passed' })),
     validation_protocol: {
       ...legacyValidation.validation_protocol,
       baseline: 'matched cohort benchmarks',
@@ -187,6 +187,9 @@ it('renders admitted cohort results using matched benchmarks and distinct model 
       hidden: true,
     }),
   ).toBeTruthy();
+  expect(within(table).getByRole('columnheader', { name: 'ML range', hidden: true })).toBeTruthy();
+  expect(rows[1].textContent).toContain('Withheld');
+  expect(rows[2].textContent).toContain('Available');
   expect(rows[1].textContent).toContain('Optionless');
   expect(rows[1].textContent).toContain('Historical move');
   expect(rows[1].textContent).toContain('5.00%');

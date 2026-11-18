@@ -404,6 +404,7 @@ def ml_fields(fc: dict | None) -> dict:
     out["em_ml_abs"] = jsonable(pick("em_ml_abs"))
     out["correction_factor"] = jsonable(pick("correction_factor"))
     out["model_horizon"] = pick("model_horizon")
+    out["intervals_calibrated"] = pick("intervals_calibrated")
     out["ml_snapshot_date"] = (
         fc["snapshot_date"].isoformat() if fc.get("snapshot_date") else None
     )
@@ -422,7 +423,10 @@ def ml_fields(fc: dict | None) -> dict:
     out["p50"] = jsonable(pick("p50", "em_ml_pct"))
     out["p75"] = jsonable(pick("p75", "band68_high_pct"))
     out["p90"] = jsonable(pick("p90", "band95_high_pct"))
-    return {k: v for k, v in out.items() if v is not None}
+    fields = {k: v for k, v in out.items() if v is not None}
+    if out["intervals_calibrated"] is False:
+        fields.update({key: None for key in ("p10", "p25", "p50", "p75", "p90")})
+    return fields
 
 
 def _read_enrichment_rows(filename: str) -> tuple[str | None, list[dict]]:

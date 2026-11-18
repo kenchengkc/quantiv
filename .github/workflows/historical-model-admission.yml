@@ -8,6 +8,11 @@ on:
         type: string
         required: false
         default: ''
+      reassess_source_bundle_id:
+        description: "Optional original frozen bundle to reassess under point/interval policy without fitting; mutually exclusive with candidate_bundle_id."
+        type: string
+        required: false
+        default: ''
       refresh_calendar:
         description: "Recover upcoming issuer dates and sessions before rescoring; existing model admission remains unchanged."
         type: boolean
@@ -40,6 +45,15 @@ jobs:
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Validate requested admission operation
+        env:
+          CANDIDATE: ${{ inputs.candidate_bundle_id }}
+          REASSESS_SOURCE: ${{ inputs.reassess_source_bundle_id }}
+        run: |
+          if [ -n "$CANDIDATE" ] && [ -n "$REASSESS_SOURCE" ]; then
+            echo "Choose candidate activation or source reassessment."
+            exit 1
+          fi
       - uses: ./.github/actions/setup-historical-ml
       - name: Pull verified source and runtime state
         run: bash scripts/r2_pull.sh
@@ -80,9 +94,10 @@ jobs:
       - uses: ./.github/actions/setup-historical-ml
       - name: Pull verified historical inputs and durable test reservations
         run: bash scripts/r2_pull.sh
-      - name: Fit once and evaluate sealed historical outcomes
+      - name: Evaluate frozen model admission
         id: fit
         env:
+          REASSESS_SOURCE: ${{ inputs.reassess_source_bundle_id }}
           MODEL_BUNDLE_SIGNING_KEY: ${{ secrets.MODEL_BUNDLE_SIGNING_KEY }}
           OMP_NUM_THREADS: '4'
           OMP_THREAD_LIMIT: '4'
@@ -93,7 +108,11 @@ jobs:
         run: |
           set -euo pipefail
           free -h
-          python scripts/historical_ml_pipeline.py fit --source-revision "$GITHUB_SHA"
+          if [ -n "$REASSESS_SOURCE" ]; then
+            python scripts/historical_ml_pipeline.py reassess --bundle-id "$REASSESS_SOURCE" --source-revision "$GITHUB_SHA"
+          else
+            python scripts/historical_ml_pipeline.py fit --source-revision "$GITHUB_SHA"
+          fi
           echo "bundle_id=$(jq -r '.bundle_id // empty' data/validation/historical_fit.json)" >> "$GITHUB_OUTPUT"
           cat data/validation/historical_fit.json >> "$GITHUB_STEP_SUMMARY"
       - name: Retain exact historical admission and development evidence
@@ -109,6 +128,7 @@ jobs:
             data/historical_admission/workspace/models/**
             data/models/historical_reservations/**
             data/models/historical_admissions/**
+            data/models/historical_policy_reassessments/**
           if-no-files-found: ignore
           retention-days: 365
 

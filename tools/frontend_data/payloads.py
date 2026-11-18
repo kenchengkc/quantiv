@@ -195,6 +195,7 @@ def _reported_forecast_fields(
         "em_ml_abs",
         "correction_factor",
         "model_horizon",
+        "intervals_calibrated",
         "ml_snapshot_date",
         "p10",
         "p25",
@@ -204,6 +205,8 @@ def _reported_forecast_fields(
     )
     if fallback_ml_is_audited:
         for key in fallback_keys:
+            if ml.get("intervals_calibrated") is False and key in {"p10", "p25", "p50", "p75", "p90"}:
+                continue
             if ml.get(key) is None and fallback_ml.get(key) is not None:
                 ml[key] = fallback_ml.get(key)
     for key in (
@@ -548,6 +551,7 @@ def attach_frozen_event_forecasts(
         "em_ml_abs": fields.get("em_ml_abs"),
         "correction_factor": fields.get("correction_factor"),
         "model_horizon": fields.get("model_horizon"),
+        "intervals_calibrated": fields.get("intervals_calibrated"),
         "ml_snapshot_date": fields.get("ml_snapshot_date"),
         "p10": fields.get("p10"),
         "p25": fields.get("p25"),
@@ -1448,6 +1452,7 @@ def preserve_reported_events(
         "em_ml_abs",
         "correction_factor",
         "model_horizon",
+        "intervals_calibrated",
         "ml_snapshot_date",
         "p10",
         "p25",

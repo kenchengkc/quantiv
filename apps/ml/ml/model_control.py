@@ -14,7 +14,7 @@ from sklearn.metrics import mean_absolute_error
 
 from ml.model_artifact import load_native_model, point_model_name, quantile_model_name
 from ml.model_bundle import DEFAULT_HORIZONS, DEFAULT_QUANTILES, verify_bundle_dir
-from ml.serving_capabilities import allowed_cohorts
+from ml.serving_capabilities import allowed_cohorts, intervals_admitted
 from ml.quantiles import rearrange_quantile_array
 from ml.model_protocol import feature_protocol, target_protocol, SESSION_TARGET_PROTOCOL, LEGACY_FEATURE_PROTOCOL, LEGACY_TARGET_PROTOCOL
 
@@ -1083,8 +1083,8 @@ def monitoring_rows(
 ) -> pd.DataFrame:
     vectors = _parse_feature_vectors(forecast_frame)
     rows: list[pd.DataFrame] = []
-    horizons = (verify_bundle_dir(bundle_dir)["horizons"]
-                if (bundle_dir / "manifest.json").exists() else DEFAULT_HORIZONS)
+    manifest = verify_bundle_dir(bundle_dir) if (bundle_dir / "manifest.json").exists() else None
+    horizons = manifest["horizons"] if manifest else DEFAULT_HORIZONS
     for horizon in horizons:
         mask = forecast_frame["model_horizon"].astype(int) == horizon
         if not mask.any():
@@ -1131,6 +1131,9 @@ def monitoring_rows(
                 index=selected.index,
             ),
         )
+        output["intervals_calibrated"] = [
+            intervals_admitted(manifest, horizon, cohort) for cohort in output["__cohort"]
+        ]
         output["hist_move_med_4q"] = vectors.loc[mask].get(
             "hist_move_med_4q", pd.Series(np.nan, index=selected.index)
         )
@@ -1423,7 +1426,15 @@ def evaluate_realized_outcomes(
     comparison_materially_better = (
         comparison_metrics["mae"] < champion_metrics["mae"] * 0.95
     )
-    severe_undercoverage = champion_metrics["coverage_80"] < 0.65
+    manifest = verify_bundle_dir(champion_dir) if (champion_dir / "manifest.json").exists() else None
+    interval_rows = champion_common.loc[[
+        intervals_admitted(manifest, int(row.model_horizon),
+                           "strict_options" if pd.notna(row.em_math_pct) and row.em_math_pct > 0 else "optionless")
+        for row in champion_common.itertuples()
+    ]]
+    interval_metrics = _outcome_metrics(interval_rows) if len(interval_rows) >= min_common_rows else None
+    report["published_interval_outcomes"] = interval_metrics or {"rows": len(interval_rows), "status": "insufficient_data"}
+    severe_undercoverage = bool(interval_metrics and interval_metrics["coverage_80"] < 0.65)
     report["rollback_recommended"] = bool(
         comparison_materially_better
         and (champion_worse_than_market or severe_undercoverage)

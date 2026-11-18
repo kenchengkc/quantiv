@@ -354,3 +354,51 @@ def test_saved_options_publication_revalidates_without_enabling_stale_quotes(tmp
     assert status["fallback_manifest_id"] == report["manifest_id"]
     assert manifest.read_bytes() == before
     assert source.read_bytes() == b"published immutable options"
+
+
+def test_reassessment_workflow_uses_frozen_evidence_then_normal_activation():
+    import yaml
+    workflow = yaml.safe_load((pipeline.ROOT / ".github/workflows/historical-model-admission.yml").read_text())
+    jobs = workflow["jobs"]
+    run = next(step for step in jobs["fit"]["steps"] if step.get("id") == "fit")["run"]
+    assert 'historical_ml_pipeline.py reassess --bundle-id "$REASSESS_SOURCE"' in run
+    assert "needs.fit.outputs.bundle_id" in jobs["activate"]["if"]
+    activate = next(step for step in jobs["activate"]["steps"] if "historical_ml_pipeline.py activate" in step.get("run", ""))
+    assert activate["env"]["CANDIDATE_BUNDLE_ID"] == "${{ inputs.candidate_bundle_id || needs.fit.outputs.bundle_id }}"
+
+
+def test_reassessment_keeps_original_receipt_and_signs_derived_bundle(tmp_path, monkeypatch):
+    import ml.historical_admission as historical
+    import ml.model_bundle as bundles
+    import archive_model_candidate
+
+    source_id = "a" * 64
+    source = tmp_path / "models/bundles" / source_id
+    source.mkdir(parents=True)
+    evidence = tmp_path / "models/historical_admissions" / source_id
+    evidence.mkdir(parents=True)
+    old = {"admission_id": "old"}
+    (evidence / "receipt.json").write_text(json.dumps(old))
+    calls = []
+    monkeypatch.setattr(pipeline, "_run", lambda *args, **kwargs: calls.append(args))
+    receipt = {"admission_id": "sha256:" + "b" * 64, "status": "passed",
+               "admitted_cohorts": {"7": ["strict_options"]}, "interval_capabilities": {"7": []},
+               "policy_reassessment": {"prior_admission_id": "old"}}
+
+    def reassess(previous, **kwargs):
+        assert previous == old and kwargs["bundle_dir"] == source and kwargs["evidence_root"] == evidence
+        out = kwargs["output_dir"]
+        out.mkdir(parents=True)
+        path = out / ("b" * 64 + ".json")
+        path.write_text(json.dumps(receipt))
+        return path, receipt
+
+    monkeypatch.setattr(historical, "reassess_historical_admission", reassess)
+    monkeypatch.setattr(bundles, "create_historically_admitted_bundle",
+                        lambda *args, **kwargs: (tmp_path / "derived", {"bundle_id": "c" * 64}))
+    monkeypatch.setattr(archive_model_candidate, "archive_candidate", lambda **kwargs: None)
+    pipeline.reassess(tmp_path, source_id, "test")
+    assert json.loads((evidence / "receipt.json").read_text()) == old
+    result = json.loads((tmp_path / "validation/historical_fit.json").read_text())
+    assert result["bundle_id"] == "c" * 64 and result["interval_capabilities"] == {"7": []}
+    assert any(call[1] == "copyto" and "--immutable" in call for call in calls)

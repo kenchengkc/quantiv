@@ -631,3 +631,26 @@ def test_default_model_validation_preserves_existing_signed_head_set(tmp_path, m
         validation_report_path=report_path, source_revision="test", horizons=[1], private_key=private)
     result = validate_model_artifacts(bundle, min_train_rows=10, min_validation_rows=4)
     assert set(result["horizons"]) == {"1"}
+
+
+@pytest.mark.parametrize('claim', [True, False, None])
+def test_optionless_interval_claim_is_bound_to_signed_capabilities(tmp_path, monkeypatch, claim):
+    from ml import live_forecast_validation, pipeline_validation
+    frame, path, models, now = _write_causal_optionless_forecast(tmp_path)
+    bundle_id = frame['model_bundle_id'].iloc[0]
+    (models / 'manifest.json').write_text('{}')
+    manifest = {'bundle_id': bundle_id, 'horizons': [1],
+                'serving_capabilities': {'1': ['strict_options', 'optionless']},
+                'interval_capabilities': {'1': []}}
+    monkeypatch.setattr(pipeline_validation, 'verify_bundle_dir', lambda _: manifest)
+    monkeypatch.setattr(live_forecast_validation, 'verify_bundle_dir', lambda _: manifest)
+    if claim is not None:
+        frame['intervals_calibrated'] = claim
+    frame.to_parquet(path, index=False)
+    for validator in (validate_forecast_artifact, live_forecast_validation.validate_live_forecast_artifact):
+        if claim is False:
+            assert validator(path, models_dir=models, now=now)['status'] == 'passed'
+        else:
+            with pytest.raises(PipelineValidationError) as exc:
+                validator(path, models_dir=models, now=now)
+            assert 'forecast_interval_capability' in _issue_codes(exc.value)

@@ -35,7 +35,7 @@ from ml.model_protocol import (
     bundle_feature_protocol, feature_protocol, target_protocol,
 )
 from ml.quantiles import rearrange_quantile_mapping
-from ml.serving_capabilities import allowed_cohorts
+from ml.serving_capabilities import allowed_cohorts, intervals_admitted
 
 logger = logging.getLogger(__name__)
 
@@ -86,6 +86,7 @@ class _ModelBundle:
     feature_protocol: str = LEGACY_FEATURE_PROTOCOL
     supported_cohorts: tuple[str, ...] = ()
     serving_capabilities_enforced: bool = False
+    interval_cohorts: tuple[str, ...] = ("strict_options", "optionless")
 
 
 _BUNDLE_CACHE: Dict[int, _ModelBundle] = {}
@@ -187,6 +188,8 @@ def _load_bundle_from_dir(models_dir: Path, horizon: int) -> Optional[_ModelBund
         feature_protocol=protocol,
         supported_cohorts=allowed_cohorts(manifest, horizon, metadata),
         serving_capabilities_enforced=bool(manifest is not None and "serving_capabilities" in manifest),
+        interval_cohorts=tuple(cohort for cohort in ("strict_options", "optionless")
+                               if intervals_admitted(manifest, horizon, cohort)),
     )
 
 
@@ -391,6 +394,7 @@ def predict(
         return None
     if bundle.bundle_id is not None and snapshot_bundle_id != bundle.bundle_id:
         return None
+    cohort = "strict_options"
     if bundle.serving_capabilities_enforced or bundle.feature_protocol == CAUSAL_FEATURE_PROTOCOL:
         try:
             straddle = float(feature_vector.get("straddle_pct") or 0.)
@@ -421,7 +425,7 @@ def predict(
             quantiles[q] = float(q_est.predict(X)[0])
         except Exception as exc:
             logger.warning("Quantile %s predict failed: %s", q, exc)
-    quantiles = rearrange_quantile_mapping(quantiles)
+    quantiles = rearrange_quantile_mapping(quantiles) if cohort in bundle.interval_cohorts else {}
 
     em_abs = em_pct * spot_used if spot_used else 0.0
     return PredictionResult(
