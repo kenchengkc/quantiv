@@ -1,8 +1,8 @@
 {
   "schema": "quantiv.dashboard-evidence.v1",
-  "receipt_id": "sha256:4a68182bb7d341f28d77832fdc7bd499d4b55de1f0cf3297923ca985566724c6",
-  "receipt_file": "forecasts_2026-11-18.4a68182bb7d3.receipt.json",
-  "validated_at": "2026-11-18T09:25:48.647251+00:00",
+  "receipt_id": "sha256:17b35fd544a149e1be89d9ddb54ef42116f878302636a7de7845d304bb07a201",
+  "receipt_file": "forecasts_2026-11-17.17b35fd544a1.receipt.json",
+  "validated_at": "2026-11-18T17:38:59.634958+00:00",
   "quality": {
     "status": "passed",
     "issue_count": 0,
@@ -16,7 +16,6 @@
       1,
       2,
       3,
-      4,
       6,
       7,
       13,
@@ -25,16 +24,16 @@
       16,
       20,
       21,
-      23
+      22
     ]
   },
   "observation_window": {
     "earnings_max": "2026-12-09",
     "earnings_min": "2026-11-18",
-    "scored_at_max": "2026-11-18T09:18:11.237408+00:00",
-    "scored_at_min": "2026-11-18T09:18:10.843871+00:00",
+    "scored_at_max": "2026-11-18T17:16:22.893786+00:00",
+    "scored_at_min": "2026-11-18T17:16:20.503556+00:00",
     "snapshot_max": "2026-11-17",
-    "snapshot_min": "2026-11-16"
+    "snapshot_min": "2026-11-17"
   },
   "controls": {
     "evaluated": 13,
@@ -84,16 +83,16 @@
     {
       "name": "model_bundle",
       "producer": "apps/ml/model_trainer.py",
-      "member_count": 91,
-      "bytes": 51163636,
-      "sha256": "8bb7479dd94de1c57f175f87ddf942a578cc5f6fb8f25d08e713c8f48db14903"
+      "member_count": 84,
+      "bytes": 47552085,
+      "sha256": "fdb74c1134530cb3a63b83b12a9bbfe075c60b26edd0817e652c5a4bb05227de"
     },
     {
       "name": "forecast_snapshot",
       "producer": "scripts/daily_score.py",
       "member_count": 1,
-      "bytes": 84519,
-      "sha256": "a952231a69b9ab553b795f91d6a9a97ed4ad74a4afc111993d1d3d1189f7a430"
+      "bytes": 84890,
+      "sha256": "dfd8f567d1d5465db4e4cada331e250a7283b498e0ff2ae9ea29ac4b5625053b"
     }
   ]
 }
