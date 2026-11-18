@@ -1,6 +1,6 @@
 {
   "symbol": "FERG",
-  "as_of_date": "2026-11-16",
+  "as_of_date": "2026-11-17",
   "spot_price": 250.0,
   "expected_move": {
     "earnings_date": "2026-11-09",
@@ -27,20 +27,20 @@
   "straddle_features": [
     {
       "expiration": "2026-12-18",
-      "dte": 32,
+      "dte": 31,
       "atm_strike": 250.0,
-      "atm_iv": 0.283301,
-      "atm_call_iv": 0.2821,
-      "atm_put_iv": 0.2845,
-      "straddle_mid": 17.05,
-      "em_straddle": 17.05,
-      "em_straddle_pct": 0.0682,
-      "em_iv": 20.970913,
-      "em_iv_pct": 0.083884,
-      "call_delta": 0.5823,
-      "call_gamma": 0.0184,
-      "call_vega": 0.2917,
-      "call_theta": -0.1341
+      "atm_iv": 0.29835,
+      "atm_call_iv": 0.2991,
+      "atm_put_iv": 0.2976,
+      "straddle_mid": 17.3,
+      "em_straddle": 17.3,
+      "em_straddle_pct": 0.0692,
+      "em_iv": 21.737024,
+      "em_iv_pct": 0.086948,
+      "call_delta": 0.5072,
+      "call_gamma": 0.0183,
+      "call_vega": 0.2888,
+      "call_theta": -0.1453
     }
   ],
   "earnings_history": [
@@ -356,13 +356,13 @@
   ],
   "next_earnings": "2026-11-09",
   "vol_regime": {
-    "iv_current": 0.2874,
-    "iv_rank": 0.301141,
+    "iv_current": 0.3023,
+    "iv_rank": 0.36655,
     "iv_year_high": 0.4466,
     "iv_year_low": 0.2188,
-    "hv_current": 0.434,
+    "hv_current": 0.4381,
     "hv_rank": 1.0,
-    "iv_mom_week": -0.0083,
+    "iv_mom_week": 0.0281,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"

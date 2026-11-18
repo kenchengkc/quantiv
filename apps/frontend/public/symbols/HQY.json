@@ -1,21 +1,21 @@
 {
   "symbol": "HQY",
-  "as_of_date": "2026-11-16",
-  "spot_price": 104.58,
+  "as_of_date": "2026-11-17",
+  "spot_price": 101.84,
   "expected_move": {
     "earnings_date": "2026-12-01",
-    "display_forecast_pct": 0.029029556721747174,
-    "display_forecast_method": "historical",
-    "display_forecast_as_of": "2026-11-16",
+    "display_forecast_pct": 0.09868421052631579,
+    "display_forecast_method": "straddle_implied",
+    "display_forecast_as_of": "2026-11-17",
     "ml_status": "unavailable_model",
-    "options_status": "unavailable",
+    "options_status": "indicative",
     "fallback_reason": "quote_quality",
-    "historical_event_count": 4,
+    "historical_event_count": null,
     "hist_move_med_4q": 0.02903,
     "timing": "unknown",
     "ml_publication_status": "held",
     "ml_publication_reason": "no_eligible_current_forecast",
-    "em_method": "historical"
+    "em_method": "straddle_implied"
   },
   "straddle_features": [],
   "earnings_history": [
@@ -46,13 +46,13 @@
       "ml_status": "unavailable_model",
       "ml_publication_status": "held",
       "ml_publication_reason": "no_eligible_current_forecast",
-      "display_forecast_pct": 0.029029556721747174,
-      "display_forecast_method": "historical",
-      "display_forecast_as_of": "2026-11-16",
-      "options_status": "unavailable",
+      "display_forecast_pct": 0.09868421052631579,
+      "display_forecast_method": "straddle_implied",
+      "display_forecast_as_of": "2026-11-17",
+      "options_status": "indicative",
       "fallback_reason": "quote_quality",
-      "historical_event_count": 4,
-      "em_method": "historical"
+      "historical_event_count": null,
+      "em_method": "straddle_implied"
     },
     {
       "date": "2026-08-27",
@@ -409,13 +409,13 @@
   ],
   "next_earnings": "2026-12-01",
   "vol_regime": {
-    "iv_current": 0.4428,
-    "iv_rank": 0.496417,
+    "iv_current": 0.4737,
+    "iv_rank": 0.597068,
     "iv_year_high": 0.5974,
     "iv_year_low": 0.2904,
-    "hv_current": 0.3383,
-    "hv_rank": 0.53578,
-    "iv_mom_week": 0.0162,
+    "hv_current": 0.349,
+    "hv_rank": 0.584862,
+    "iv_mom_week": 0.0337,
     "iv_mom_month": null
   },
   "next_earnings_timing": "unknown"

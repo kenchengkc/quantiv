@@ -1,6 +1,6 @@
 {
   "symbol": "YETI",
-  "as_of_date": "2026-11-16",
+  "as_of_date": "2026-11-17",
   "spot_price": 37.5,
   "expected_move": {
     "earnings_date": "2026-11-12",
@@ -46,37 +46,37 @@
   "straddle_features": [
     {
       "expiration": "2026-12-18",
-      "dte": 32,
+      "dte": 31,
       "atm_strike": 37.5,
-      "atm_iv": 0.41854,
-      "atm_call_iv": 0.4144,
-      "atm_put_iv": 0.4227,
+      "atm_iv": 0.431296,
+      "atm_call_iv": 0.4294,
+      "atm_put_iv": 0.4332,
       "straddle_mid": 3.85,
       "em_straddle": 3.85,
       "em_straddle_pct": 0.102667,
-      "em_iv": 4.647263,
-      "em_iv_pct": 0.123927,
-      "call_delta": 0.6151,
-      "call_gamma": 0.0806,
-      "call_vega": 0.0434,
-      "call_theta": -0.0291
+      "em_iv": 4.71347,
+      "em_iv_pct": 0.125693,
+      "call_delta": 0.5923,
+      "call_gamma": 0.082,
+      "call_vega": 0.0432,
+      "call_theta": -0.0347
     },
     {
       "expiration": "2027-01-15",
-      "dte": 60,
+      "dte": 59,
       "atm_strike": 40.0,
-      "atm_iv": 0.379506,
-      "atm_call_iv": 0.3815,
-      "atm_put_iv": 0.3775,
-      "straddle_mid": 4.925,
-      "em_straddle": 4.925,
-      "em_straddle_pct": 0.123125,
-      "em_iv": 6.154721,
-      "em_iv_pct": 0.153868,
-      "call_delta": 0.4546,
-      "call_gamma": 0.0665,
-      "call_vega": 0.0619,
-      "call_theta": -0.0217
+      "atm_iv": 0.408478,
+      "atm_call_iv": 0.4161,
+      "atm_put_iv": 0.4007,
+      "straddle_mid": 5.3,
+      "em_straddle": 5.3,
+      "em_straddle_pct": 0.1325,
+      "em_iv": 6.56913,
+      "em_iv_pct": 0.164228,
+      "call_delta": 0.433,
+      "call_gamma": 0.0619,
+      "call_vega": 0.0601,
+      "call_theta": -0.0233
     }
   ],
   "earnings_history": [
@@ -488,13 +488,13 @@
   ],
   "next_earnings": "2026-11-12",
   "vol_regime": {
-    "iv_current": 0.4115,
-    "iv_rank": 0.301728,
+    "iv_current": 0.4559,
+    "iv_rank": 0.488833,
     "iv_year_high": 0.5772,
     "iv_year_low": 0.3399,
-    "hv_current": 0.5519,
+    "hv_current": 0.5527,
     "hv_rank": 1.0,
-    "iv_mom_week": -0.1552,
+    "iv_mom_week": -0.1031,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"

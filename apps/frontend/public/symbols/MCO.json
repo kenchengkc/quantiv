@@ -1,50 +1,33 @@
 {
   "symbol": "MCO",
-  "as_of_date": "2026-11-16",
-  "spot_price": 510.0,
+  "as_of_date": "2026-11-17",
+  "spot_price": 490.0,
   "expected_move": {
-    "expiration": "2026-12-18",
-    "dte": 32,
-    "atm_strike": 510.0,
-    "atm_iv": 0.268502,
-    "straddle_abs": 32.3,
-    "straddle_pct": 0.063333,
-    "iv_pct": 0.079502
+    "expiration": "2027-01-15",
+    "dte": 59,
+    "atm_strike": 490.0,
+    "atm_iv": 0.274003,
+    "straddle_abs": 42.95,
+    "straddle_pct": 0.087653,
+    "iv_pct": 0.110163
   },
   "straddle_features": [
     {
-      "expiration": "2026-12-18",
-      "dte": 32,
-      "atm_strike": 510.0,
-      "atm_iv": 0.268502,
-      "atm_call_iv": 0.2669,
-      "atm_put_iv": 0.2701,
-      "straddle_mid": 32.3,
-      "em_straddle": 32.3,
-      "em_straddle_pct": 0.063333,
-      "em_iv": 40.545817,
-      "em_iv_pct": 0.079502,
-      "call_delta": 0.4914,
-      "call_gamma": 0.0099,
-      "call_vega": 0.597,
-      "call_theta": -0.2677
-    },
-    {
       "expiration": "2027-01-15",
-      "dte": 60,
-      "atm_strike": 510.0,
-      "atm_iv": 0.263253,
-      "atm_call_iv": 0.26,
-      "atm_put_iv": 0.2665,
-      "straddle_mid": 43.2,
-      "em_straddle": 43.2,
-      "em_straddle_pct": 0.084706,
-      "em_iv": 54.434345,
-      "em_iv_pct": 0.106734,
-      "call_delta": 0.5024,
+      "dte": 59,
+      "atm_strike": 490.0,
+      "atm_iv": 0.274003,
+      "atm_call_iv": 0.2747,
+      "atm_put_iv": 0.2733,
+      "straddle_mid": 42.95,
+      "em_straddle": 42.95,
+      "em_straddle_pct": 0.087653,
+      "em_iv": 53.979671,
+      "em_iv_pct": 0.110163,
+      "call_delta": 0.5006,
       "call_gamma": 0.0074,
-      "call_vega": 0.8154,
-      "call_theta": -0.1869
+      "call_vega": 0.776,
+      "call_theta": -0.2019
     }
   ],
   "earnings_history": [
@@ -446,13 +429,13 @@
   ],
   "next_earnings": null,
   "vol_regime": {
-    "iv_current": 0.2713,
-    "iv_rank": 0.318612,
+    "iv_current": 0.284,
+    "iv_rank": 0.363127,
     "iv_year_high": 0.4657,
     "iv_year_low": 0.1804,
-    "hv_current": 0.2809,
-    "hv_rank": 0.234411,
-    "iv_mom_week": -0.0141,
+    "hv_current": 0.3131,
+    "hv_rank": 0.358353,
+    "iv_mom_week": 0.0028,
     "iv_mom_month": null
   }
 }
