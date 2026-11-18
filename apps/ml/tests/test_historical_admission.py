@@ -493,3 +493,75 @@ def test_changed_native_candidate_cannot_claim_previously_seen_event_panel(tmp_p
     (second / "manifest.json").write_text(json.dumps(_sign(core, private)))
     with pytest.raises(ValueError, match="already claimed|different candidate"):
         engine.claim_historical_candidate(second, reservation, tmp_path / "registry", private_key=private, public_key=public)
+
+
+def test_point_policy_keeps_baseline_superiority_and_holds_miscalibrated_intervals():
+    engine = _engine()
+    frame = _predictions()
+    frame["q90"] = frame["raw_q90"] = .20
+    assert engine.assess_historical_cell(frame)["status"] == "failed"
+    report = engine.assess_historical_cell(frame, policy=engine.POINT_POLICY)
+    assert report["status"] == "passed"
+    assert report["interval_status"] == "held"
+    assert report["interval_issues"] == ["interval or quantile calibration exceeds tolerance"]
+    frame["point"] = frame["baseline"]
+    assert engine.assess_historical_cell(frame, policy=engine.POINT_POLICY)["status"] == "failed"
+
+
+def test_point_policy_does_not_admit_corrupt_quantiles():
+    engine = _engine()
+    frame = _predictions()
+    frame.loc[:100, "raw_q10"] = -.01
+    assert engine.assess_historical_cell(frame, policy=engine.POINT_POLICY)["status"] == "failed"
+
+
+def test_reassessment_preserves_original_evidence_and_legacy_verification(tmp_path, monkeypatch):
+    from ml.model_bundle import create_historically_admitted_bundle, verify_bundle_dir
+    from ml.serving_capabilities import intervals_admitted
+
+    engine = _engine()
+    source, reservation, model_receipt, private, public = _candidate(tmp_path, monkeypatch)
+    evidence = tmp_path / "evidence"
+    _, original = engine.evaluate_historical_admission(source, reservation, model_receipt,
+        tmp_path / "dev", evidence, private_key=private, public_key=public,
+        reservation_registry=tmp_path / "registry")
+    old_bytes = (evidence / "receipt.json").read_bytes()
+    path, reviewed = engine.reassess_historical_admission(
+        original, bundle_dir=source, evidence_root=evidence, output_dir=tmp_path / "reassessment",
+        private_key=private, public_key=public)
+    assert path.is_file() and (evidence / "receipt.json").read_bytes() == old_bytes
+    assert reviewed["policy"] == engine.POINT_POLICY
+    assert reviewed["policy_reassessment"]["prior_admission_id"] == original["admission_id"]
+    assert reviewed["policy_reassessment"]["policy_selected_after_evaluation"] is True
+    assert reviewed["evidence_files"] == original["evidence_files"]
+    for receipt in (original, reviewed):
+        engine.verify_historical_admission_receipt(receipt, bundle_dir=source,
+            evidence_root=evidence, public_key=public)
+    derived, _ = create_historically_admitted_bundle(source, tmp_path / "bundles",
+        admission_receipt=reviewed, source_revision="new-policy", private_key=private)
+    manifest = verify_bundle_dir(derived, public_key=public)
+    assert manifest["interval_capabilities"] == reviewed["interval_capabilities"]
+    assert intervals_admitted(manifest, 7, "strict_options")
+    assert intervals_admitted({"horizons": [7]}, 7, "strict_options")
+
+
+@pytest.mark.parametrize("mutation", ["claimed_calibration", "capability_map"])
+def test_signed_point_receipt_cannot_publish_unqualified_intervals(tmp_path, monkeypatch, mutation):
+    from copy import deepcopy
+    from ml.model_bundle import ModelBundleError, _sign
+
+    engine = _engine()
+    source, reservation, model_receipt, private, public = _candidate(tmp_path, monkeypatch)
+    _, receipt = engine.evaluate_historical_admission(source, reservation, model_receipt,
+        tmp_path / "dev", tmp_path / "evidence", private_key=private, public_key=public,
+        reservation_registry=tmp_path / "registry", policy=engine.POINT_POLICY)
+    core = deepcopy({key: value for key, value in receipt.items() if key not in {"signature", "admission_id"}})
+    if mutation == "claimed_calibration":
+        # A valid signature cannot turn visibly failed coverage into a passed band.
+        core["horizons"]["7"]["cohorts"]["strict_options"]["coverage"]["coverage_80"] = .1
+    else:
+        # The public band capability must agree with the signed cell decisions.
+        core["interval_capabilities"]["7"] = []
+    forged = _sign({**core, "admission_id": engine._identity(core)}, private)
+    with pytest.raises(ModelBundleError, match="qualifying metrics|interval capabilities"):
+        engine.verify_historical_admission_receipt(forged, bundle_dir=source, public_key=public)

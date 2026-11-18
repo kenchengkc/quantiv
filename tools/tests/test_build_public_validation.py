@@ -582,3 +582,16 @@ def test_historical_contract_rejects_changed_metric_cell_scope(historical_champi
     monkeypatch.setattr(contracts, 'PUBLIC', public)
     with pytest.raises(contracts.ContractError, match='admitted'):
         contracts.validate_model_validation()
+
+
+def test_point_only_historical_cell_keeps_accuracy_and_interval_diagnostics(historical_champion):
+    from tools.build_public_validation import _historical_rows
+
+    repo, _manifest, receipt, _models = historical_champion()
+    receipt['horizons']['7']['cohorts']['optionless']['interval_status'] = 'held'
+    metadata = {'horizon': 7, 'feature_cols': ['price']}
+    rows = {row['cohort']: row for row in _historical_rows(metadata, 7, receipt)}
+    assert rows['optionless']['interval_status'] == 'held'
+    assert rows['strict_options']['interval_status'] == 'passed'
+    assert rows['optionless']['model_mae'] == receipt['horizons']['7']['cohorts']['optionless']['model_mae']
+    assert rows['optionless']['coverage']['interval_80'] == receipt['horizons']['7']['cohorts']['optionless']['coverage']['coverage_80']

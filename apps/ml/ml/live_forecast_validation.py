@@ -38,7 +38,7 @@ from ml.pipeline_validation import (
 )
 from ml.model_bundle import verify_bundle_dir
 from ml.model_protocol import CAUSAL_FEATURE_PROTOCOL, feature_protocol, target_protocol
-from ml.serving_capabilities import assert_forecast_capability
+from ml.serving_capabilities import assert_forecast_capability, intervals_admitted
 
 
 STRICT_OPTION_EVIDENCE_COLUMNS = (
@@ -308,6 +308,12 @@ def _validate_ml_only_rows(
                     assert_forecast_capability(manifest, horizon, metadata, "optionless")
                 except ValueError as exc:
                     _issue(issues, artifact, "forecast_serving_capability", str(exc))
+            rows = frame.loc[horizon_values.eq(horizon)]
+            if manifest is not None and "interval_capabilities" in manifest:
+                expected = intervals_admitted(manifest, horizon, "optionless")
+                if "intervals_calibrated" not in rows or not rows["intervals_calibrated"].eq(expected).all():
+                    _issue(issues, artifact, "forecast_interval_capability",
+                           "ML-only interval status differs from the authenticated model capability")
             if feature_protocol(metadata) == CAUSAL_FEATURE_PROTOCOL:
                 rows = frame.loc[horizon_values.eq(horizon)]
                 if (not {"feature_protocol", "target_protocol"}.issubset(rows.columns)

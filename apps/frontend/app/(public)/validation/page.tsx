@@ -23,6 +23,7 @@ type HorizonValidation = {
   horizon_days: number;
   cohort?: 'strict_options' | 'optionless';
   metric_scope?: string;
+  interval_status?: 'passed' | 'held';
   n_train: number | null;
   n_validation: number;
   n_matched_baseline?: number;
@@ -507,6 +508,7 @@ export default function ValidationPage() {
                     'Improvement',
                     '50% interval',
                     '80% interval',
+                    ...(historical ? ['ML range'] : []),
                   ].map((label) => (
                     <th key={label}>{label}</th>
                   ))}
@@ -550,6 +552,7 @@ export default function ValidationPage() {
                     <td className="mono tnum">
                       {pct(row.coverage.interval_80, 1)}
                     </td>
+                    {historical ? <td>{row.interval_status === 'held' ? 'Withheld' : 'Available'}</td> : null}
                   </tr>
                 ))}
               </tbody>
@@ -559,7 +562,7 @@ export default function ValidationPage() {
             MAE is absolute stock-move error. This is predictive validation, not
             a trading-P&amp;L claim.
             {historical
-              ? ' Historical moves are a benchmark only; future forecasts have no historical-median fallback.'
+              ? ' Each point forecast must pass accuracy tests. ML ranges are published only for models whose observed coverage passes the calibration check.'
               : ''}
           </p>
         </details>
@@ -568,7 +571,7 @@ export default function ValidationPage() {
       <section className={styles.section} aria-labelledby="calibration">
         <SectionTitle
           kicker="Uncertainty"
-          description="Observed quantiles should land close to their nominal targets. The marker shows observed frequency; the thin line is the target."
+          description="Observed quantiles should land close to their nominal targets. The marker shows observed frequency; the thin line is the target. These results include models whose ranges are withheld; each row in the performance table shows range availability."
         >
           <span id="calibration">Calibration</span>
         </SectionTitle>
@@ -777,7 +780,7 @@ export default function ValidationPage() {
             </h3>
             <p>
               {historical
-                ? 'Strict-options results use the market straddle; optionless results use a historical-move benchmark. Each admitted pair passes point-error, calibration and statistical controls on reserved observations.'
+                ? 'Strict-options results use the market straddle; optionless results use a historical-move benchmark. Each admitted pair passes point-error and statistical controls on reserved observations. Uncertainty ranges pass a separate calibration check.'
                 : 'Every candidate is compared on the same observations against the straddle baseline, while point error and interval calibration are checked together.'}
             </p>
           </article>

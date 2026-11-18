@@ -453,3 +453,19 @@ def test_signed_preflight_rejects_missing_admitted_head(tmp_path, monkeypatch):
     (service._models_dir() / "lgbm_T25_q90.txt").unlink()
     with pytest.raises(ModelBundleError, match="missing"):
         service.validate_models_dir(service._models_dir())
+
+
+def test_live_point_only_model_does_not_expose_uncalibrated_quantiles(monkeypatch):
+    ps = _import()
+    bundle = ps._ModelBundle(
+        estimator=_ConstantEstimator(.08), feature_names=["log_spot"],
+        quantile_estimators={q: _ConstantEstimator(q / 1000) for q in (10, 25, 50, 75, 90)},
+        loaded_at=ps.datetime.now(ps.timezone.utc), model_version="test",
+        model_trained_at=None, feature_schema_hash="test-schema", val_mae=None,
+        interval_cohorts=(),
+    )
+    monkeypatch.setattr(ps, "get_bundle", lambda _horizon: bundle)
+    result = ps.predict(feature_vector={"log_spot": math.log(100)},
+                        snapshot_date=date(2026, 11, 16), horizon=7, spot_override=100.)
+    assert result.em_ml_pct == .08
+    assert result.quantiles == {}

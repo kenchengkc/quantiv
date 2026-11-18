@@ -296,3 +296,23 @@ def test_same_day_hold_requires_reporting_and_respects_current_decision(
     for node in (history, hero):
         assert node["ml_publication_status"] == expected_status
         assert node.get("ml_publication_reason") == ("feature_drift" if expected_status == "held" else None)
+
+
+def test_point_only_ml_clears_native_and_legacy_bands_through_frozen_projection():
+    from frontend_data.payloads import attach_frozen_event_forecasts
+    row = {'forecast_id': 'point-only', 'em_ml_pct': .08, 'model_horizon': 1,
+           'snapshot_date': date(2026, 10, 12), 'scored_at': '2026-10-13T10:00:00Z',
+           'freeze_eligible': True, 'intervals_calibrated': False,
+           'p10': .01, 'p25': .03, 'p50': .07, 'p75': .1, 'p90': .2,
+           'band95_low_pct': .02, 'band95_high_pct': .3}
+    projected = artifacts.ml_fields(row)
+    assert projected['em_ml_pct'] == .08
+    assert projected['intervals_calibrated'] is False
+    assert all(projected.get(key) is None for key in ('p10', 'p25', 'p50', 'p75', 'p90'))
+    detail = {'earnings_history': [{'date': '2026-10-13', 'timing': 'amc',
+               'forecast_frozen_eligible': True, 'p10': .02, 'p90': .3}]}
+    result = attach_frozen_event_forecasts(detail, 'GOOD', {('GOOD', '2026-10-13'): row},
+        current_event_date=date(2026, 10, 13), today=date(2026, 10, 14))
+    assert result['expected_move']['em_ml_pct'] == .08
+    assert result['expected_move']['intervals_calibrated'] is False
+    assert all(result['expected_move'].get(key) is None for key in ('p10', 'p25', 'p50', 'p75', 'p90'))

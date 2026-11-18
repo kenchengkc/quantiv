@@ -1212,3 +1212,30 @@ def test_monitoring_ledger_keeps_every_exact_signed_daily_head(tmp_path, monkeyp
     result = control.monitoring_rows(frame, bundle, bundle_id=manifest["bundle_id"],
         role="champion", use_served_predictions=True)
     assert result["model_horizon"].tolist() == [4, 25]
+
+
+@pytest.mark.parametrize('intervals', [False, True])
+def test_outcome_rollback_uses_calibration_only_for_published_intervals(tmp_path, monkeypatch, intervals):
+    import ml.model_control as control
+    bundle, training = tmp_path / 'bundle', tmp_path / 'training'
+    bundle.mkdir()
+    training.mkdir()
+    (bundle / 'metadata_T1.json').write_text('{}')
+    (bundle / 'manifest.json').write_text('{}')
+    monkeypatch.setattr(control, 'verify_bundle_dir', lambda _: {
+        'horizons': [1], 'serving_capabilities': {'1': ['strict_options']},
+        'interval_capabilities': {'1': ['strict_options'] if intervals else []},
+    })
+    events = pd.date_range('2026-10-01', periods=30)
+    base = pd.DataFrame({'act_symbol': [f'S{i}' for i in range(30)], 'earnings_date': events,
+                         'snapshot_date': events - pd.Timedelta(days=1), 'model_horizon': 1,
+                         'em_math_pct': .05, 'p10': .02, 'p25': .03, 'p50': .05, 'p75': .07, 'p90': .09})
+    ledger = pd.concat([base.assign(bundle_id='champion', prediction=.14),
+                        base.assign(bundle_id='previous', prediction=.121)], ignore_index=True)
+    pd.DataFrame({'__symbol': base.act_symbol, '__earnings_date': events, 'target': .12}).to_parquet(
+        training / 'training_T1.parquet', index=False)
+    result = control.evaluate_realized_outcomes(ledger, training, bundle, bundle,
+        champion_id='champion', comparison_id='previous', min_common_rows=30, horizons=[1])
+    assert result['rollback_reasons']['champion_worse_than_market'] is False
+    assert result['rollback_reasons']['severe_80pct_undercoverage'] is intervals
+    assert result['rollback_recommended'] is intervals

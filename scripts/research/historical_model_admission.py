@@ -17,6 +17,7 @@ from ml.historical_admission import (  # noqa: E402
     claim_historical_candidate,
     evaluate_historical_admission,
     prepare_historical_admission,
+    reassess_historical_admission,
     verify_historical_admission_receipt,
 )
 from ml.model_bundle import DAILY_HORIZONS  # noqa: E402
@@ -47,6 +48,11 @@ def _parser() -> argparse.ArgumentParser:
     claim.add_argument("--bundle-dir", type=Path, required=True)
     claim.add_argument("--reservation", type=Path, required=True)
     claim.add_argument("--reservation-registry", type=Path, required=True)
+    reassess = commands.add_parser("reassess", help="reassess unchanged frozen predictions under point/interval policy")
+    reassess.add_argument("--receipt", type=Path, required=True)
+    reassess.add_argument("--bundle-dir", type=Path, required=True)
+    reassess.add_argument("--evidence-root", type=Path, required=True)
+    reassess.add_argument("--output-dir", type=Path, required=True)
     verify = commands.add_parser("verify", help="verify retained admission evidence and replay native predictions")
     verify.add_argument("--receipt", type=Path, required=True)
     verify.add_argument("--bundle-dir", type=Path, required=True)
@@ -79,6 +85,13 @@ def main() -> int:
             reservation_registry=args.reservation_registry.resolve())
         result = {"receipt": str(path), "admission_id": receipt["admission_id"],
                   "status": receipt["status"], "admitted_cohorts": receipt["admitted_cohorts"]}
+    elif args.command == "reassess":
+        path, receipt = reassess_historical_admission(
+            json.loads(args.receipt.read_text()), bundle_dir=args.bundle_dir.resolve(),
+            evidence_root=args.evidence_root.resolve(), output_dir=args.output_dir.resolve())
+        result = {"receipt": str(path), "admission_id": receipt["admission_id"],
+                  "status": receipt["status"], "admitted_cohorts": receipt["admitted_cohorts"],
+                  "interval_capabilities": receipt["interval_capabilities"]}
     else:
         receipt = verify_historical_admission_receipt(json.loads(args.receipt.read_text()),
             bundle_dir=args.bundle_dir.resolve(),
