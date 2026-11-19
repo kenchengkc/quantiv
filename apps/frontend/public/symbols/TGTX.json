@@ -1,6 +1,6 @@
 {
   "symbol": "TGTX",
-  "as_of_date": "2026-11-17",
+  "as_of_date": "2026-11-18",
   "spot_price": 70.0,
   "expected_move": {
     "earnings_date": "2026-11-09",
@@ -27,21 +27,21 @@
   },
   "straddle_features": [
     {
-      "expiration": "2027-01-15",
-      "dte": 59,
+      "expiration": "2026-12-18",
+      "dte": 30,
       "atm_strike": 70.0,
-      "atm_iv": 0.529476,
-      "atm_call_iv": 0.5462,
-      "atm_put_iv": 0.5122,
-      "straddle_mid": 12.575,
-      "em_straddle": 12.575,
-      "em_straddle_pct": 0.179643,
-      "em_iv": 14.901282,
-      "em_iv_pct": 0.212875,
-      "call_delta": 0.3575,
-      "call_gamma": 0.027,
-      "call_vega": 0.094,
-      "call_theta": -0.0454
+      "atm_iv": 0.537661,
+      "atm_call_iv": 0.5145,
+      "atm_put_iv": 0.5606,
+      "straddle_mid": 8.875,
+      "em_straddle": 8.875,
+      "em_straddle_pct": 0.126786,
+      "em_iv": 10.789981,
+      "em_iv_pct": 0.154143,
+      "call_delta": 0.3851,
+      "call_gamma": 0.0392,
+      "call_vega": 0.0724,
+      "call_theta": -0.0645
     }
   ],
   "earnings_history": [
@@ -404,13 +404,13 @@
   ],
   "next_earnings": "2026-11-09",
   "vol_regime": {
-    "iv_current": 0.508,
-    "iv_rank": 0.303023,
+    "iv_current": 0.54,
+    "iv_rank": 0.382309,
     "iv_year_high": 0.7893,
     "iv_year_low": 0.3857,
-    "hv_current": 0.4116,
-    "hv_rank": 0.267053,
-    "iv_mom_week": -0.0254,
+    "hv_current": 0.4329,
+    "hv_rank": 0.335586,
+    "iv_mom_week": 0.007,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"

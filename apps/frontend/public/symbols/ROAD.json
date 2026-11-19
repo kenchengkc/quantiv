@@ -1,23 +1,40 @@
 {
   "symbol": "ROAD",
-  "as_of_date": "2026-11-17",
-  "spot_price": 78.74,
+  "as_of_date": "2026-11-18",
+  "spot_price": 80.0,
   "expected_move": {
     "earnings_date": "2026-11-19",
-    "display_forecast_pct": 0.11353822707645418,
-    "display_forecast_method": "straddle_implied",
-    "display_forecast_as_of": "2026-11-17",
+    "display_forecast_pct": 0.265187,
+    "display_forecast_method": "options_math",
+    "display_forecast_as_of": "2026-11-18",
     "ml_status": "unavailable_model",
-    "options_status": "indicative",
-    "fallback_reason": "quote_quality",
-    "historical_event_count": null,
+    "options_status": "decision_eligible",
+    "fallback_reason": null,
     "hist_move_med_4q": 0.090826,
     "timing": "unknown",
     "ml_publication_status": "held",
     "ml_publication_reason": "no_eligible_current_forecast",
-    "em_method": "straddle_implied"
+    "em_method": "options_math"
   },
-  "straddle_features": [],
+  "straddle_features": [
+    {
+      "expiration": "2027-01-15",
+      "dte": 58,
+      "atm_strike": 80.0,
+      "atm_iv": 0.66525,
+      "atm_call_iv": 0.683,
+      "atm_put_iv": 0.6476,
+      "straddle_mid": 16.645,
+      "em_straddle": 16.645,
+      "em_straddle_pct": 0.208062,
+      "em_iv": 21.214966,
+      "em_iv_pct": 0.265187,
+      "call_delta": 0.5164,
+      "call_gamma": 0.0186,
+      "call_vega": 0.1232,
+      "call_theta": -0.0723
+    }
+  ],
   "earnings_history": [
     {
       "date": "2026-11-19",
@@ -46,13 +63,12 @@
       "ml_status": "unavailable_model",
       "ml_publication_status": "held",
       "ml_publication_reason": "no_eligible_current_forecast",
-      "display_forecast_pct": 0.11353822707645418,
-      "display_forecast_method": "straddle_implied",
-      "display_forecast_as_of": "2026-11-17",
-      "options_status": "indicative",
-      "fallback_reason": "quote_quality",
-      "historical_event_count": null,
-      "em_method": "straddle_implied"
+      "options_status": "unavailable",
+      "display_forecast_pct": null,
+      "display_forecast_method": "ml_unavailable",
+      "display_forecast_as_of": "2026-11-18",
+      "em_method": "ml_unavailable",
+      "fallback_reason": null
     },
     {
       "date": "2026-08-07",
@@ -339,13 +355,13 @@
   ],
   "next_earnings": "2026-11-19",
   "vol_regime": {
-    "iv_current": 0.6568,
-    "iv_rank": 0.805362,
+    "iv_current": 0.686,
+    "iv_rank": 0.883646,
     "iv_year_high": 0.7294,
     "iv_year_low": 0.3564,
-    "hv_current": 0.9225,
-    "hv_rank": 0.985145,
-    "iv_mom_week": 0.0793,
+    "hv_current": 0.9098,
+    "hv_rank": 0.962138,
+    "iv_mom_week": 0.1193,
     "iv_mom_month": null
   },
   "next_earnings_timing": "unknown"

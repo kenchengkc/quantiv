@@ -1,6 +1,6 @@
 {
   "symbol": "RDNT",
-  "as_of_date": "2026-11-17",
+  "as_of_date": "2026-11-18",
   "spot_price": 75.0,
   "expected_move": {
     "earnings_date": "2026-11-09",
@@ -29,21 +29,21 @@
   },
   "straddle_features": [
     {
-      "expiration": "2026-11-20",
-      "dte": 3,
+      "expiration": "2026-12-18",
+      "dte": 30,
       "atm_strike": 75.0,
-      "atm_iv": 1.2574,
-      "atm_call_iv": 1.2574,
-      "atm_put_iv": 1.2574,
-      "straddle_mid": 2.75,
-      "em_straddle": 2.75,
-      "em_straddle_pct": 0.036667,
-      "em_iv": 8.549661,
-      "em_iv_pct": 0.113995,
-      "call_delta": 0.523,
-      "call_gamma": 0.0468,
-      "call_vega": 0.0269,
-      "call_theta": -0.5836
+      "atm_iv": 0.447002,
+      "atm_call_iv": 0.4475,
+      "atm_put_iv": 0.4465,
+      "straddle_mid": 7.875,
+      "em_straddle": 7.875,
+      "em_straddle_pct": 0.105,
+      "em_iv": 9.611359,
+      "em_iv_pct": 0.128151,
+      "call_delta": 0.4037,
+      "call_gamma": 0.042,
+      "call_vega": 0.0797,
+      "call_theta": -0.0629
     }
   ],
   "earnings_history": [
@@ -436,13 +436,13 @@
   ],
   "next_earnings": "2026-11-09",
   "vol_regime": {
-    "iv_current": 0.5434,
-    "iv_rank": 0.520397,
+    "iv_current": 0.4775,
+    "iv_rank": 0.343532,
     "iv_year_high": 0.7221,
     "iv_year_low": 0.3495,
-    "hv_current": 0.4168,
-    "hv_rank": 0.349776,
-    "iv_mom_week": 0.0304,
+    "hv_current": 0.4299,
+    "hv_rank": 0.388939,
+    "iv_mom_week": 0.0489,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"
