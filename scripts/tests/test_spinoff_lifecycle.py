@@ -119,3 +119,20 @@ def test_action_sync_cannot_collapse_parent_and_successor_rows(monkeypatch):
         'dividend', ['amount'], ['MSGK', 'MSGS'], date(2019, 1, 1), date(2026, 10, 28),
     )
     assert result.act_symbol.tolist() == ['MSGK', 'MSGS']
+
+
+def test_november_symbol_changes_and_cash_buyout():
+    from datetime import date
+    from scripts.ticker_lifecycle_sql import market_data_window_is_comparable
+
+    assert not (delisted.delisted_tickers() & delisted.ticker_renames().keys())
+    assert delisted.canonical_earnings_ticker("TCBI", "2026-10-15") == "TXCP"
+    assert delisted.canonical_ticker("TCBS") == "TCBS"
+    assert delisted.is_delisted("LXP") and not delisted.is_renamed_from("LXP")
+
+    # Both predecessor stocks existed independently and used different CUSIPs.
+    assert delisted.canonical_earnings_ticker("INDV", "2026-10-29") == "INDV"
+    assert delisted.canonical_earnings_ticker("SUPN", "2026-10-29") == "SUPN"
+    assert delisted.canonical_earnings_ticker("INDV", "2026-11-03") == "SUPN"
+    assert not market_data_window_is_comparable("SUPN", date(2026, 10, 30), date(2026, 11, 3))
+    assert market_data_window_is_comparable("SUPN", date(2026, 11, 3), date(2026, 11, 4))

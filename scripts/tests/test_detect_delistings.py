@@ -99,3 +99,33 @@ def test_candidate_notice_requires_primary_identity_evidence(monkeypatch):
     assert "CIK" in body and "CUSIP" in body
     assert "spin-off" in body.lower()
     assert '"new": "BNY"' not in body
+
+
+@pytest.mark.parametrize("bad_feed", [
+    "<html>Temporarily unavailable</html>",
+    "ACT Symbol|Security Name|Test Issue|ETF\nKO|Coca-Cola|N|N",
+    "ACT Symbol|Security Name|Test Issue|ETF\nKO|Coca-Cola|N|N\nFile Creation Time: test",
+    "ACT Symbol|Security Name\nKO|Coca-Cola\nFile Creation Time: test",
+])
+def test_incomplete_otherlisted_cannot_create_rename_or_delisting(monkeypatch, bad_feed):
+    # A valid Nasdaq file alone masked the missing NYSE listings on November 2.
+    nasdaq = "Symbol|Security Name|Test Issue|ETF\n" + "".join(
+        f"TEST{i}|Test Company {i}|N|N\n" for i in range(1200)
+    ) + "File Creation Time: test"
+    def fetch(url, **kwargs):
+        return SimpleNamespace(text=nasdaq if url == detector.NASDAQ_LISTED_URL else bad_feed,
+                               raise_for_status=lambda: None)
+
+    monkeypatch.setattr(detector.requests, "get", fetch)
+    monkeypatch.setattr(sys, "argv", ["detect_delistings.py", "--notify-github", "--allow-fetch-failure"])
+    monkeypatch.setattr(detector, "load_active_universe", lambda: pytest.fail("partial files reached classification"))
+    assert detector.main() == 0
+
+
+def test_etf_is_listed_but_cannot_be_a_common_stock_successor(monkeypatch):
+    rows = [{"Symbol": "ETF", "ACT Symbol": "ETF", "Test Issue": "N", "ETF": "Y",
+             "Security Name": "North Star Corporation"}]
+    monkeypatch.setattr(detector, "fetch_pipe_table", lambda *args: rows)
+    listed, candidates = detector.fetch_directory()
+    assert listed == {"ETF"}
+    assert detector.build_rename_finder(candidates)("North Star Corporation") is None

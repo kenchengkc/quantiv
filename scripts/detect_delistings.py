@@ -75,20 +75,25 @@ def today_iso() -> str:
     return date.today().isoformat()
 
 
-def fetch_pipe_table(url: str) -> list[dict[str, str]]:
+def fetch_pipe_table(url: str, symbol_column: str) -> list[dict[str, str]]:
     resp = requests.get(url, headers=SYMBOL_DIR_HEADERS, timeout=30)
     resp.raise_for_status()
-    lines = [
-        ln for ln in resp.text.splitlines()
-        if ln and not ln.startswith("File Creation Time")
-    ]
-    if not lines:
-        return []
+    lines = resp.text.strip().splitlines()
+    if len(lines) < 3 or not lines[-1].startswith("File Creation Time:"):
+        raise ValueError(f"Incomplete symbol directory at {url}")
     header = lines[0].split("|")
+    if not {symbol_column, "Security Name", "Test Issue", "ETF"}.issubset(header):
+        raise ValueError(f"Unexpected symbol directory header at {url}")
     rows = []
-    for ln in lines[1:]:
-        cells = ln.split("|")
-        rows.append({h: (cells[i] if i < len(cells) else "") for i, h in enumerate(header)})
+    for line in lines[1:-1]:
+        cells = line.split("|")
+        if len(cells) != len(header):
+            raise ValueError(f"Incomplete symbol directory row at {url}")
+        rows.append(dict(zip(header, cells)))
+    # Either file alone can pass the combined floor while the other is missing.
+    symbols = {row[symbol_column].strip() for row in rows if row["Test Issue"] == "N"}
+    if len(symbols - {""}) < 1000:
+        raise ValueError(f"Too few non-test listings at {url}")
     return rows
 
 
@@ -99,7 +104,7 @@ def fetch_directory() -> tuple[set[str], list[tuple[str, str]]]:
     listed: set[str] = set()
     entries: list[tuple[str, str]] = []
     for url, sym_col in ((NASDAQ_LISTED_URL, "Symbol"), (OTHER_LISTED_URL, "ACT Symbol")):
-        for row in fetch_pipe_table(url):
+        for row in fetch_pipe_table(url, sym_col):
             if row.get("Test Issue") == "Y":
                 continue
             sym = normalize(row.get(sym_col, ""))
@@ -107,7 +112,7 @@ def fetch_directory() -> tuple[set[str], list[tuple[str, str]]]:
                 continue
             listed.add(sym)
             name = (row.get("Security Name") or "").strip()
-            if name:
+            if name and row["ETF"] != "Y":
                 entries.append((sym, name))
     return listed, entries
 
@@ -364,7 +369,7 @@ def main() -> int:
 
     try:
         listed, directory_entries = fetch_directory()
-    except requests.RequestException as exc:
+    except (requests.RequestException, ValueError) as exc:
         print(f"⚠ Could not fetch exchange directories: {exc}")
         return 0 if args.allow_fetch_failure else 1
     if len(listed) < 1000:

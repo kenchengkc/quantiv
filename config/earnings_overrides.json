@@ -2,6 +2,15 @@
   "_comment": "Manual earnings-calendar overrides re-applied after provider sync, before build. Schema + actions documented in scripts/apply_earnings_overrides.py. Prefer matching on fiscal_year + fiscal_q (stable identity) so an override still binds after a provider re-asserts a different date.",
   "overrides": [
     {
+      "symbol": "MSGK",
+      "match": {"date": "2026-10-30"},
+      "set": {"date": "2026-11-06", "timing": "bmo", "fiscal_year": 2027, "fiscal_q": "Q1"},
+      "source_url": "https://www.sec.gov/Archives/edgar/data/1636519/000162828026071321/msgknickerbockerscorpex991.htm",
+      "published_on": "2026-11-06",
+      "observed_on": "2026-11-18",
+      "note": "The old MSGS calendar row uses the October 30 scheduling announcement. MSG Knickerbockers reported on November 6 before the open."
+    },
+    {
       "symbol": "WHK",
       "match": {"date": "2026-11-13"},
       "set": {"date": "2026-11-12", "timing": "amc", "fiscal_year": 2026, "fiscal_q": "Q3"},
