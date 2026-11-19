@@ -209,3 +209,21 @@ def test_event_forecast_archive_never_uses_post_event_snapshot(tmp_path):
 
     assert len(archived) == 1
     assert archived.iloc[0]["em_ml_pct"] == pytest.approx(0.05)
+
+
+def test_batch_scoring_keeps_point_and_audit_quantiles_for_uncalibrated_intervals():
+    frame = pd.DataFrame({
+        "act_symbol": ["STRICT", "OPTIONLESS"], "earnings_date": ["2026-11-23"] * 2,
+        "lead_days": [7, 7], "spot_price": [100.] * 2, "timing": ["amc"] * 2,
+        "straddle_pct": [.06, np.nan],
+    })
+    model = {
+        "feature_cols": ["straddle_pct"], "model": _ConstantModel(.05), "residual_std": .03,
+        "metadata": {"supported_cohorts": ["strict_options", "optionless"]},
+        "manifest": {"horizons": [7], "serving_capabilities": {"7": ["strict_options", "optionless"]},
+                     "interval_capabilities": {"7": ["optionless"]}},
+    }
+    result = score(frame, {7: model})
+    assert result['em_ml_pct'].tolist() == [.05, .05]
+    assert result['intervals_calibrated'].tolist() == [False, True]
+    assert result[['p10', 'p25', 'p50', 'p75', 'p90']].notna().all().all()

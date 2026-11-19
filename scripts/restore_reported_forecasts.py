@@ -37,6 +37,7 @@ for package_root in (REPO_ROOT / "tools", REPO_ROOT / "apps" / "ml"):
 from frontend_data.payloads import build_screener_payload  # noqa: E402
 from frontend_data.forecast_artifacts import has_reported_actuals, load_reported_event_keys  # noqa: E402
 from event_forecast_ledger import EASTERN, event_cutoffs  # noqa: E402
+from ml.source_coverage import forecast_snapshot_sessions  # noqa: E402
 
 EventKey = tuple[str, str]
 
@@ -59,6 +60,7 @@ FORECAST_FIELDS = {
     "em_ml_abs",
     "correction_factor",
     "model_horizon",
+    "intervals_calibrated",
     "ml_snapshot_date",
     "p10",
     "p25",
@@ -100,6 +102,7 @@ ML_HISTORY_FIELDS = {
     "em_ml_abs",
     "correction_factor",
     "model_horizon",
+    "intervals_calibrated",
     "ml_snapshot_date",
     "p10",
     "p25",
@@ -148,6 +151,11 @@ def _can_restore_event(key: EventKey, event: dict, today: date,
     return not policy_active and event.get('ml_publication_status') is None
 
 
+def _missing_current_ml(event: dict) -> bool:
+    return (event.get("ml_publication_status") == "held"
+            and event.get("ml_publication_reason") == "no_eligible_current_forecast")
+
+
 def _git(*args: str) -> bytes:
     return subprocess.run(
         ["git", *args], cwd=REPO_ROOT, capture_output=True, check=True
@@ -159,6 +167,24 @@ def _load_reference_membership() -> tuple[set[EventKey], dict[str, str]]:
     events = payload.get("events") or []
     membership = {(e["ticker"], e["earnings_date"]) for e in events}
     return membership, payload["window"]
+
+
+def _superseded_dates(membership: set[EventKey], window: dict[str, str]) -> set[EventKey]:
+    """Only discard exact date corrections corroborated by the current reference."""
+    config = REPO_ROOT / "config" / "earnings_overrides.json"
+    discarded = set()
+    for rule in json.loads(config.read_text(encoding="utf-8"))["overrides"]:
+        match = rule.get("match") or {}
+        if set(match) != {"date"} or not window["start"] <= match["date"] <= window["end"]:
+            continue
+        key = (rule["symbol"].upper(), match["date"])
+        action = rule.get("action", "set")
+        replacement = (rule.get("set") or {}).get("date")
+        if key not in membership and (
+            action == "remove" or (action == "set" and (key[0], replacement) in membership)
+        ):
+            discarded.add(key)
+    return discarded
 
 
 def _history(path: Path) -> list[str]:
@@ -264,6 +290,8 @@ def _forecast_rank(event: dict) -> tuple[int, str]:
 
 def _normalize_forecast(event: dict) -> dict:
     row = dict(event)
+    if row.get("intervals_calibrated") is False:
+        row.update({key: None for key in ("p10", "p25", "p50", "p75", "p90")})
     ml = _positive(row.get("em_ml_pct"))
     strict = _positive(row.get("em_straddle_pct"))
     iv = _positive(row.get("em_iv_pct"))
@@ -448,7 +476,10 @@ def _symbol_expected_move_candidate(key: EventKey) -> dict | None:
         "ticker": ticker,
         "earnings_date": event_date,
         "timing": expected.get("timing"),
-        "as_of_date": payload.get("as_of_date"),
+        "as_of_date": expected.get("as_of_date") or payload.get("as_of_date"),
+        "spot_price": expected.get("spot_price"),
+        "skew_atm": expected.get("skew_atm"),
+        "term_slope": expected.get("term_slope"),
         "expiry_date": expected.get("expiration"),
         "days_to_expiry": expected.get("dte"),
         "lead_time_days": expected.get("lead_time_days"),
@@ -542,6 +573,8 @@ def _merge_forecast(current: dict, historical: dict) -> dict:
             continue
         if value is not None:
             merged[field] = value
+    if source.get("intervals_calibrated") is False:
+        merged.update({key: None for key in ("p10", "p25", "p50", "p75", "p90")})
     return merged
 
 
@@ -568,22 +601,27 @@ def recover_week(
     membership: set[EventKey],
     today: date,
     apply: bool,
+    *,
+    now: datetime | None = None,
 ) -> dict[EventKey, dict]:
     bundle = json.loads(path.read_text(encoding="utf-8"))
     events = bundle.get("events") or []
     by_key = {(e["ticker"], e["earnings_date"]): e for e in events}
     context = _restoration_context(today)
+    now = now or datetime.now(timezone.utc)
 
     targets = {
         key
         for key in membership
-        if _can_restore_event(key, by_key.get(key) or {}, today, context)
+        if (_can_restore_event(key, by_key.get(key) or {}, today, context)
+            or key[1] == today.isoformat() and _missing_current_ml(by_key.get(key) or {}))
         and bundle["window"]["start"] <= key[1] <= bundle["window"]["end"]
     }
     if not targets:
         return {}
 
     best: dict[EventKey, dict] = {}
+    published_ml: dict[EventKey, dict[str, dict]] = {}
     options: dict[EventKey, dict] = {}
 
     def consider_options(key: EventKey, candidate: dict) -> None:
@@ -612,6 +650,17 @@ def recover_week(
             key = (event.get("ticker"), event.get("earnings_date"))
             if key not in targets or _forecast_rank(event)[0] == 0:
                 continue
+            # A prior eligible publication proves this exact forecast was usable
+            # before the deadline. An archive row alone cannot clear a hold.
+            # Use the commit time, never a backdated embedded publication field.
+            if (event.get("forecast_id") and event.get("ml_publication_status") == "eligible"
+                    and event.get("display_forecast_method") == "ml"
+                    and _forecast_rank(event)[0] == 4 and published_at is not None
+                    and _published_before_deadline(event)):
+                by_id = published_ml.setdefault(key, {})
+                prior = by_id.get(event["forecast_id"])
+                if prior is None or event["forecast_published_at"] < prior["forecast_published_at"]:
+                    by_id[event["forecast_id"]] = event
             consider_options(key, event)
             previous = best.get(key)
             if previous is None or _forecast_rank(event) > _forecast_rank(previous):
@@ -644,10 +693,30 @@ def recover_week(
     changed: dict[EventKey, dict] = {}
     for key in sorted(targets):
         candidate = best.get(key)
+        current = by_key.get(key)
+        # A corrected session can move the cutoff earlier on the same date.
+        # Publication must precede both the original and current deadlines.
+        verified = {identity: row for identity, row in (published_ml.get(key) or {}).items()
+                    if _published_before_deadline({**row, "timing": (current or {}).get("timing")})}
+        if key[1] == today.isoformat() and now < event_cutoffs(today, (current or {}).get("timing"))[1]:
+            # Until the event cutoff, retained estimates obey the same input
+            # freshness window as current scoring. Afterwards they are frozen.
+            fresh_sessions = {day.isoformat() for day in forecast_snapshot_sessions(now)}
+            verified = {identity: row for identity, row in verified.items()
+                        if str(row.get("ml_snapshot_date") or "")[:10] in fresh_sessions}
+        recover_published = bool(current and _missing_current_ml(current) and verified)
+        if not _can_restore_event(key, current or {}, today, context) and not recover_published:
+            continue
+        if recover_published:
+            candidate = max(verified.values(), key=_forecast_rank)
         if candidate is None:
             continue
-        current = by_key.get(key)
-        if current is None:
+        if recover_published:
+            repaired = _merge_forecast(current, candidate)
+            repaired["ml_publication_status"] = "eligible"
+            repaired.pop("ml_publication_reason", None)
+            repaired = _normalize_forecast(repaired)
+        elif current is None:
             repaired = _normalize_forecast(candidate)
         elif _forecast_rank(candidate) > _forecast_rank(current):
             repaired = _merge_forecast(current, candidate)
@@ -719,6 +788,10 @@ def _symbol_expected_move(event: dict) -> dict:
     mapped = {
         "earnings_date": event.get("earnings_date"),
         "timing": event.get("timing"),
+        "as_of_date": event.get("as_of_date"),
+        "spot_price": event.get("spot_price"),
+        "skew_atm": event.get("skew_atm"),
+        "term_slope": event.get("term_slope"),
         "expiration": event.get("expiry_date"),
         "dte": event.get("days_to_expiry"),
         "lead_time_days": event.get("lead_time_days"),
@@ -731,6 +804,7 @@ def _symbol_expected_move(event: dict) -> dict:
         "em_ml_abs": event.get("em_ml_abs"),
         "correction_factor": event.get("correction_factor"),
         "model_horizon": event.get("model_horizon"),
+        "intervals_calibrated": event.get("intervals_calibrated"),
         "ml_snapshot_date": event.get("ml_snapshot_date"),
         "p10": event.get("p10"),
         "p25": event.get("p25"),
@@ -780,11 +854,19 @@ def _repair_symbol_payloads(recovered: dict[EventKey, dict], apply: bool) -> int
             if str(row.get("date") or "")[:10] != event_date:
                 continue
             normalized = _normalize_forecast(event)
+            if normalized.get("ml_publication_status") == "eligible" and "ml_publication_reason" in row:
+                row.pop("ml_publication_reason")
+                changed = True
             for field in FROZEN_HISTORY_FIELDS:
                 value = normalized.get(field)
                 if value is not None and row.get(field) != value:
                     row[field] = value
                     changed = True
+            if normalized.get("intervals_calibrated") is False:
+                for field in ("p10", "p25", "p50", "p75", "p90"):
+                    if row.get(field) is not None:
+                        row[field] = None
+                        changed = True
             if normalized.get("display_forecast_pct") is not None:
                 if row.get("forecast_frozen") is not True:
                     row["forecast_frozen"] = True
@@ -851,16 +933,35 @@ def main() -> int:
 
     recovered: dict[EventKey, dict] = {}
     resolved: dict[EventKey, dict] = {}
+    superseded = _superseded_dates(membership, window)
+    removed = 0
     context = _restoration_context(today)
     for path in sorted(WEEKS_DIR.glob("*.json")):
         if path.name == "manifest.json":
             continue
         repaired = recover_week(path, membership, today, args.apply)
+        bundle = json.loads(path.read_text(encoding="utf-8"))
+        events = bundle.get("events") or []
+        retained = [e for e in events if (e["ticker"], e["earnings_date"]) not in superseded]
+        if len(retained) < len(events):
+            count = len(events) - len(retained)
+            removed += count
+            print(f"  {path.name}: {count} superseded event(s)")
+            if args.apply:
+                bundle["events"] = retained
+                if "summary" in bundle:
+                    bundle["summary"].update(_summary(retained))
+                path.write_text(json.dumps(bundle, indent=2, default=str), encoding="utf-8")
         # Symbols are rebuilt independently every day. Synchronize every active
         # reported forecast, including calendar rows whose values did not change.
-        for event in json.loads(path.read_text(encoding="utf-8")).get("events") or []:
+        for event in retained:
             key = (event.get("ticker"), event.get("earnings_date"))
-            if key in membership and _can_restore_event(key, event, today, context) and _forecast_rank(event)[0] > 0:
+            # recover_week promotes independently supported forecasts on the
+            # calendar first. Raw components on an explicitly unavailable row
+            # must not be promoted only on the symbol page.
+            if (key in membership and (_can_restore_event(key, event, today, context) or key in repaired)
+                    and event.get("display_forecast_method") != "ml_unavailable"
+                    and _forecast_rank(event)[0] > 0):
                 resolved[key] = event
         if repaired:
             recovered.update(repaired)
@@ -873,23 +974,23 @@ def main() -> int:
 
     if not args.apply:
         print(
-            f"\ndry run — {len(recovered)} reported forecasts would be repaired; "
+            f"\ndry run — {len(recovered)} repairs and {removed} superseded events to remove; "
             "re-run with --apply"
         )
         return 0
 
     symbol_count = _repair_symbol_payloads(resolved, apply=True)
-    if recovered:
+    if recovered or removed:
         _republish_manifest_and_screener()
     # Fail in the producer, before committing/publishing an inconsistent corpus.
     from validate_public_contracts import validate_forecast_surface_parity
     validate_forecast_surface_parity()
-    if not recovered and not symbol_count:
+    if not recovered and not symbol_count and not removed:
         print("nothing to restore; forecast surface parity passed")
         return 0
     print(
         f"\nrepaired {len(recovered)} reported forecasts "
-        f"and {symbol_count} symbol payload(s)"
+        f"and {symbol_count} symbol payload(s), removed {removed} superseded event(s)"
     )
     return 0
 

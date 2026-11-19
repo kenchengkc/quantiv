@@ -6,7 +6,7 @@ import { Download } from 'lucide-react';
 import { MetricHelp } from '@/components/MetricExplainer';
 import type { SymbolDetail } from './symbolPageTypes';
 import type { TermRow } from './ForecastPanels';
-import { axisDate } from './symbolPageUtils';
+import { axisDate, historicalMlForecast } from './symbolPageUtils';
 
 export type HistoryPoint = {
   q: string;
@@ -86,6 +86,7 @@ export function buildHistorySeries(
         h.implied != null && Number.isFinite(h.implied)
           ? Math.abs(h.implied)
           : null;
+      const model = historicalMlForecast(h);
       return {
         q,
         date: h.date,
@@ -98,19 +99,14 @@ export function buildHistorySeries(
         impliedAtmStrike: pickNum(h.implied_atm_strike),
         impliedStraddleAbs: pickNum(h.implied_straddle_abs),
         impliedAtmIv: pickNum(h.implied_atm_iv),
-        model:
-          h.forecast_frozen_eligible === true &&
-          h.em_ml_pct != null &&
-          Number.isFinite(h.em_ml_pct)
-            ? Math.abs(h.em_ml_pct)
-            : null,
+        model,
         modelAsOf: h.ml_snapshot_date ?? null,
         modelHorizon: pickNum(h.model_horizon),
-        modelP10: pickNum(h.p10),
-        modelP25: pickNum(h.p25),
-        modelP50: pickNum(h.p50),
-        modelP75: pickNum(h.p75),
-        modelP90: pickNum(h.p90),
+        modelP10: model == null ? null : pickNum(h.p10),
+        modelP25: model == null ? null : pickNum(h.p25),
+        modelP50: model == null ? null : pickNum(h.p50),
+        modelP75: model == null ? null : pickNum(h.p75),
+        modelP90: model == null ? null : pickNum(h.p90),
         actual: h.actual,
         epsActual: pickNum(h.eps_actual),
         epsEstimate: pickNum(h.eps_estimate),

@@ -87,7 +87,7 @@ def fit(data: Path, revision: str):
     from ml.model_bundle import DAILY_HORIZONS, create_historically_admitted_bundle
     from ml.pipeline_validation import PipelineValidationError, validate_model_artifacts
     from ml.historical_admission import (
-        claim_historical_candidate, prepare_historical_admission, evaluate_historical_admission,
+        POINT_POLICY, claim_historical_candidate, prepare_historical_admission, evaluate_historical_admission,
     )
     from archive_model_candidate import prepare_candidate_evidence, archive_candidate
 
@@ -155,7 +155,7 @@ def fit(data: Path, revision: str):
         bundle_dir=source, reservation_path=reservation,
         model_receipt=json.loads((models / "receipts/latest_models.json").read_text()),
         training_dir=workspace / "ml_training", output_dir=admission_dir,
-        reservation_registry=registry)
+        reservation_registry=registry, policy=POINT_POLICY)
     _run("rclone", "copy", str(admission_dir), f"{remote}/models/historical_admissions/{source.name}", "--immutable")
     _run("rclone", "check", str(admission_dir), f"{remote}/models/historical_admissions/{source.name}", "--one-way", "--download")
     result = {"status": receipt["status"], "source_bundle_id": source.name,
@@ -164,6 +164,39 @@ def fit(data: Path, revision: str):
     if receipt["status"] == "passed":
         served, manifest = create_historically_admitted_bundle(source, data / "models/bundles",
             admission_receipt=receipt, source_revision=revision)
+        archive_candidate(bundle_dir=served, remote=remote)
+        result["bundle_id"] = manifest["bundle_id"]
+    _write(data / "validation/historical_fit.json", result)
+def reassess(data: Path, source_id: str, revision: str):
+    """Reapply publication policy to authenticated frozen predictions and models."""
+    from ml.historical_admission import reassess_historical_admission
+    from ml.model_bundle import create_historically_admitted_bundle
+    from archive_model_candidate import archive_candidate
+
+    source_id = _bundle_id(source_id)
+    remote = f"r2:{os.environ.get('R2_BUCKET') or 'quantiv-data'}"
+    models = data / "models"
+    for relative in (f"bundles/{source_id}", f"historical_admissions/{source_id}"):
+        _run("rclone", "copy", f"{remote}/models/{relative}", str(models / relative))
+    source = models / "bundles" / source_id
+    evidence = models / "historical_admissions" / source_id
+    output = models / "historical_policy_reassessments" / source_id
+    receipt_path, receipt = reassess_historical_admission(
+        json.loads((evidence / "receipt.json").read_text()), bundle_dir=source,
+        evidence_root=evidence, output_dir=output)
+    # Keep each policy decision separately, preserving the original admission.
+    destination = f"{remote}/models/historical_policy_reassessments/{source_id}/{receipt_path.name}"
+    _run("rclone", "copyto", str(receipt_path), destination, "--immutable")
+    result = {
+        "status": receipt["status"], "source_bundle_id": source_id,
+        "admission_id": receipt["admission_id"], "receipt": str(receipt_path),
+        "policy_reassessment": receipt["policy_reassessment"],
+        "admitted_cohorts": receipt["admitted_cohorts"],
+        "interval_capabilities": receipt["interval_capabilities"],
+    }
+    if receipt["status"] == "passed":
+        served, manifest = create_historically_admitted_bundle(
+            source, models / "bundles", admission_receipt=receipt, source_revision=revision)
         archive_candidate(bundle_dir=served, remote=remote)
         result["bundle_id"] = manifest["bundle_id"]
     _write(data / "validation/historical_fit.json", result)
@@ -271,7 +304,7 @@ def activate(data: Path, bundle_id: str):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("phase", choices=("prepare-data", "fit", "activate"))
+    parser.add_argument("phase", choices=("prepare-data", "fit", "reassess", "activate"))
     parser.add_argument("--source-revision", default=os.environ.get("GITHUB_SHA", "local"))
     parser.add_argument("--bundle-id")
     parser.add_argument("--refresh-calendar", action="store_true")
@@ -281,6 +314,8 @@ def main():
         prepare_data(data, refresh_calendar=args.refresh_calendar)
     elif args.phase == "fit":
         fit(data, args.source_revision)
+    elif args.phase == "reassess":
+        reassess(data, _bundle_id(args.bundle_id or ""), args.source_revision)
     else:
         activate(data, _bundle_id(args.bundle_id or ""))
 

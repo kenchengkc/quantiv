@@ -45,6 +45,21 @@ POLICY = {
     "requires_conservative_clustered_ci_upper_below_zero": True,
     "aggregate_significance_claim": False,
 }
+POINT_POLICY = {
+    **POLICY,
+    "version": "quantiv.historical-point-forecast-policy.v2",
+    "interval_calibration_required_for_point": False,
+}
+CALIBRATION_ISSUE = "interval or quantile calibration exceeds tolerance"
+
+
+def _admission_policy(value: Mapping[str, Any]) -> dict[str, Any]:
+    for known in (POLICY, POINT_POLICY):
+        if value == known:
+            return known
+    raise ValueError("unsupported historical admission policy")
+
+
 DISCLOSURES = {
     "historical_model_family_exposure_status": "not_established",
     "calendar_vintage_status": "complete_point_in_time_revision_history_not_established",
@@ -285,8 +300,10 @@ def _cluster_intervals(difference: np.ndarray, clusters: pd.Series, *, multiplic
     return np.quantile(boot, [.025, .975]).tolist(), adjusted, len(names)
 
 
-def assess_historical_cell(frame: pd.DataFrame, *, multiplicity: int = 1) -> dict[str, Any]:
+def assess_historical_cell(frame: pd.DataFrame, *, multiplicity: int = 1,
+                           policy: Mapping[str, Any] = POLICY) -> dict[str, Any]:
     """Grade one predeclared horizon/cohort using its frozen six-head output."""
+    policy = _admission_policy(policy)
     if multiplicity < 1:
         raise ValueError("multiplicity must be positive")
     if frame["event_id"].duplicated().any():
@@ -296,7 +313,7 @@ def assess_historical_cell(frame: pd.DataFrame, *, multiplicity: int = 1) -> dic
     baseline = pd.to_numeric(frame["baseline"], errors="coerce").to_numpy(dtype=float)
     matched = np.isfinite(baseline) & (baseline >= 0)
     report["baseline_rows"] = int(matched.sum())
-    if report["events"] < POLICY["minimum_events"] or matched.sum() < POLICY["minimum_matched_baseline_rows"]:
+    if report["events"] < policy["minimum_events"] or matched.sum() < policy["minimum_matched_baseline_rows"]:
         report["issues"] = ["require 200 distinct events and 200 matched baseline rows"]
         return report
     actual = frame["actual"].to_numpy(dtype=float)
@@ -310,9 +327,9 @@ def assess_historical_cell(frame: pd.DataFrame, *, multiplicity: int = 1) -> dic
         issues.append("served quantiles are not monotone")
     report["quantile_crossing_rate_raw"] = float((np.diff(raw, axis=1) < 0).any(axis=1).mean())
     report["quantile_negative_rate_raw"] = float((raw < 0).any(axis=1).mean())
-    if report["quantile_crossing_rate_raw"] > POLICY["maximum_raw_crossing_rate"]:
+    if report["quantile_crossing_rate_raw"] > policy["maximum_raw_crossing_rate"]:
         issues.append("raw quantile crossing exceeds limit")
-    if report["quantile_negative_rate_raw"] > POLICY["maximum_raw_negative_rate"]:
+    if report["quantile_negative_rate_raw"] > policy["maximum_raw_negative_rate"]:
         issues.append("raw negative quantile rate exceeds limit")
     coverage = {f"q{q:02d}_coverage": float((actual <= quantiles[:, i]).mean()) for i, q in enumerate(QUANTILES)}
     coverage.update({"coverage_80": float(((actual >= quantiles[:, 0]) & (actual <= quantiles[:, 4])).mean()),
@@ -322,8 +339,13 @@ def assess_historical_cell(frame: pd.DataFrame, *, multiplicity: int = 1) -> dic
     report["pinball"] = {f"q{q:02d}": float(np.maximum((q / 100) * (actual - quantiles[:, i]),
                                              (q / 100 - 1) * (actual - quantiles[:, i])).mean())
                          for i, q in enumerate(QUANTILES)}
-    if any(abs(coverage[key] - target) > POLICY["coverage_tolerance"] + 1e-12 for key, target in targets.items()):
-        issues.append("interval or quantile calibration exceeds tolerance")
+    calibrated = all(abs(coverage[key] - target) <= policy["coverage_tolerance"] + 1e-12
+                     for key, target in targets.items())
+    if policy == POINT_POLICY:
+        report["interval_status"] = "passed" if calibrated else "held"
+        report["interval_issues"] = [] if calibrated else [CALIBRATION_ISSUE]
+    elif not calibrated:
+        issues.append(CALIBRATION_ISSUE)
     error = np.abs(actual[matched] - point[matched])
     baseline_error = np.abs(actual[matched] - baseline[matched])
     report.update({"model_mae": float(error.mean()), "baseline_mae": float(baseline_error.mean()),
@@ -336,7 +358,7 @@ def assess_historical_cell(frame: pd.DataFrame, *, multiplicity: int = 1) -> dic
                          ("earnings_week_clustered", pd.to_datetime(paired["earnings_date"]).dt.to_period("W-SUN").astype(str))):
         try:
             ordinary[name], family[name], clusters[name] = _cluster_intervals(error - baseline_error, labels,
-                multiplicity=multiplicity, seed=int(POLICY["bootstrap_seed"]) + len(ordinary))
+                multiplicity=multiplicity, seed=int(policy["bootstrap_seed"]) + len(ordinary))
         except ValueError as exc:
             issues.append(str(exc))
     if len(ordinary) == 2:
@@ -370,16 +392,16 @@ def assess_historical_cell(frame: pd.DataFrame, *, multiplicity: int = 1) -> dic
                               for i, q in enumerate(QUANTILES)}
             row["quantile_crossing_rate_raw"] = float((np.diff(raw_bands, axis=1) < 0).any(axis=1).mean())
             row["quantile_negative_rate_raw"] = float((raw_bands < 0).any(axis=1).mean())
-        if valid.sum() >= POLICY["minimum_block_rows"]:
+        if valid.sum() >= policy["minimum_block_rows"]:
             y = block["actual"].to_numpy(dtype=float)[valid]
             model_mae = float(np.abs(y - block["point"].to_numpy(dtype=float)[valid]).mean())
             baseline_mae = float(np.abs(y - b[valid]).mean())
             ratio = model_mae / baseline_mae if baseline_mae else (0. if model_mae == 0 else None)
             row.update({"model_mae": model_mae, "baseline_mae": baseline_mae, "mae_ratio": ratio, "status": "reported"})
-            if ratio is None or ratio > POLICY["maximum_block_mae_ratio"]:
+            if ratio is None or ratio > policy["maximum_block_mae_ratio"]:
                 issues.append(f"chronological block {index + 1} MAE ratio exceeds limit")
         else:
-            issues.append(f"chronological block {index + 1} has only {int(valid.sum())} matched baseline rows; require {POLICY['minimum_block_rows']}")
+            issues.append(f"chronological block {index + 1} has only {int(valid.sum())} matched baseline rows; require {policy['minimum_block_rows']}")
         blocks.append(row)
     report["blocks"] = blocks
     report["status"] = "failed" if issues else "passed"
@@ -615,7 +637,7 @@ def claim_historical_candidate(bundle_dir: Path, reservation_path: Path, reserva
     return destination, result
 
 
-def _check_passed_metrics(cell: Mapping[str, Any]) -> None:
+def _check_passed_metrics(cell: Mapping[str, Any], policy: Mapping[str, Any]) -> None:
     from ml.model_bundle import ModelBundleError
 
     def finite(value: Any) -> bool:
@@ -626,8 +648,8 @@ def _check_passed_metrics(cell: Mapping[str, Any]) -> None:
             raise ModelBundleError("historical admission passed cell lacks qualifying metrics")
 
     require(cell.get("issues") == [])
-    require(type(cell.get("events")) is int and cell["events"] >= POLICY["minimum_events"])
-    require(type(cell.get("baseline_rows")) is int and cell["baseline_rows"] >= POLICY["minimum_matched_baseline_rows"])
+    require(type(cell.get("events")) is int and cell["events"] >= policy["minimum_events"])
+    require(type(cell.get("baseline_rows")) is int and cell["baseline_rows"] >= policy["minimum_matched_baseline_rows"])
     require(finite(cell.get("model_mae")) and finite(cell.get("baseline_mae")))
     require(0 <= cell["model_mae"] < cell["baseline_mae"])
     for name in ("mae_difference_95_ci", "familywise_mae_difference_ci"):
@@ -641,21 +663,26 @@ def _check_passed_metrics(cell: Mapping[str, Any]) -> None:
     targets = {"coverage_80": .8, "coverage_50": .5, **{f"q{q:02d}_coverage": q / 100 for q in QUANTILES}}
     coverage = cell.get("coverage") or {}
     require(set(coverage) == set(targets))
-    require(all(finite(coverage[key]) and 0 <= coverage[key] <= 1
-                and abs(coverage[key] - target) <= POLICY["coverage_tolerance"] + 1e-12
-                for key, target in targets.items()))
+    require(all(finite(coverage[key]) and 0 <= coverage[key] <= 1 for key in targets))
+    calibrated = all(abs(coverage[key] - target) <= policy["coverage_tolerance"] + 1e-12
+                     for key, target in targets.items())
+    if policy == POINT_POLICY:
+        require(cell.get("interval_status") == ("passed" if calibrated else "held"))
+        require(cell.get("interval_issues") == ([] if calibrated else [CALIBRATION_ISSUE]))
+    else:
+        require(calibrated)
     for key, limit in (("quantile_crossing_rate_raw", "maximum_raw_crossing_rate"),
                        ("quantile_negative_rate_raw", "maximum_raw_negative_rate")):
-        require(finite(cell.get(key)) and 0 <= cell[key] <= POLICY[limit])
+        require(finite(cell.get(key)) and 0 <= cell[key] <= policy[limit])
     require(set(cell.get("pinball") or {}) == {f"q{q:02d}" for q in QUANTILES})
     require(all(finite(value) and value >= 0 for value in cell["pinball"].values()))
     blocks = cell.get("blocks")
-    require(isinstance(blocks, list) and len(blocks) == POLICY["diagnostic_blocks"])
+    require(isinstance(blocks, list) and len(blocks) == policy["diagnostic_blocks"])
     for block in blocks:
         count = block.get("baseline_rows")
-        require(type(count) is int and count >= POLICY["minimum_block_rows"])
+        require(type(count) is int and count >= policy["minimum_block_rows"])
         require(block.get("status") == "reported" and finite(block.get("mae_ratio")))
-        require(0 <= block["mae_ratio"] <= POLICY["maximum_block_mae_ratio"])
+        require(0 <= block["mae_ratio"] <= policy["maximum_block_mae_ratio"])
 
 
 def evaluate_historical_admission(
@@ -663,10 +690,12 @@ def evaluate_historical_admission(
     training_dir: Path, output_dir: Path, *, private_key: str | bytes | None = None,
     public_key: str | bytes | None = None,
     reservation_registry: Path | None = None,
+    policy: Mapping[str, Any] = POLICY,
 ) -> tuple[Path, dict[str, Any]]:
     """Score an exact native candidate before promotion and sign its capabilities."""
     from ml.model_bundle import _sign, verify_bundle_dir
 
+    policy = _admission_policy(policy)
     manifest = verify_bundle_dir(bundle_dir, public_key=public_key)
     verified_receipt = _verify_model_receipt(model_receipt, manifest)
     reservation = _read(reservation_path)
@@ -733,7 +762,7 @@ def evaluate_historical_admission(
         if (test_labels > _timestamp(reservation["as_of"])).any():
             raise ValueError("historical test contains labels unavailable at reservation cutoff")
         predictions = _native_predictions(bundle_dir, horizon, test, metadata[horizon])
-        cohort_reports = {cohort: assess_historical_cell(predictions.loc[predictions["cohort"].eq(cohort)], multiplicity=multiplicity)
+        cohort_reports = {cohort: assess_historical_cell(predictions.loc[predictions["cohort"].eq(cohort)], multiplicity=multiplicity, policy=policy)
                           if cohort in declared[str(horizon)] else {"status": "not_declared", "rows": int(predictions["cohort"].eq(cohort).sum()), "issues": []}
                           for cohort in COHORTS}
         staged.append((horizon, dev_path, test_path, predictions, cohort_reports))
@@ -768,7 +797,7 @@ def evaluate_historical_admission(
             "reservation_registry_record": reservation,
             "global_temporal_boundary": reservation["global_temporal_boundary"],
             "reservation": reservation, "model_validation_receipt": verified_receipt,
-            "policy": POLICY, "multiplicity_cells": multiplicity,
+            "policy": policy, "multiplicity_cells": multiplicity,
             "pretest_head_selection": {
                 "requested_horizons": sorted(int(h) for h in reservation["horizons"]),
                 "selected_horizons": sorted(manifest["horizons"]),
@@ -782,11 +811,60 @@ def evaluate_historical_admission(
             "splits": reservation["horizons"], "horizons": reports,
             "admitted_cohorts": admitted, "status": "passed" if admitted else "failed",
             "evidence_files": evidence_files, "evaluated_at": datetime.now(timezone.utc).isoformat()}
+    if policy == POINT_POLICY:
+        core["interval_capabilities"] = _interval_capabilities(reports, admitted)
     signed = _sign({**core, "admission_id": _identity(core)}, private_key)
     receipt_path = output_dir / "receipt.json"
     _write(receipt_path, signed)
     verify_historical_admission_receipt(signed, bundle_dir=bundle_dir, public_key=public_key, evidence_root=output_dir)
     return receipt_path, signed
+def _interval_capabilities(reports: Mapping[str, Any], admitted: Mapping[str, Any]) -> dict[str, list[str]]:
+    return {horizon: [cohort for cohort in cohorts
+                      if reports[horizon]["cohorts"][cohort].get("interval_status") == "passed"]
+            for horizon, cohorts in admitted.items()}
+
+
+def reassess_historical_admission(
+    receipt: Mapping[str, Any], *, bundle_dir: Path, evidence_root: Path, output_dir: Path,
+    private_key: str | bytes | None = None, public_key: str | bytes | None = None,
+) -> tuple[Path, dict[str, Any]]:
+    """Apply the point policy to the identical previously tested native models."""
+    from ml.model_bundle import _sign
+
+    previous = verify_historical_admission_receipt(
+        receipt, bundle_dir=bundle_dir, evidence_root=evidence_root, public_key=public_key)
+    if previous["policy"] != POLICY:
+        raise ValueError("policy reassessment requires the original strict admission")
+    reports, admitted = {}, {}
+    for horizon, original in previous["horizons"].items():
+        predictions = pd.read_parquet(evidence_root / f"predictions_T{horizon}.parquet")
+        cells = {cohort: assess_historical_cell(
+            predictions.loc[predictions["cohort"].eq(cohort)],
+            multiplicity=previous["multiplicity_cells"], policy=POINT_POLICY)
+            if cohort in original["declared_cohorts"] else original["cohorts"][cohort]
+            for cohort in COHORTS}
+        reports[horizon] = {**original, "cohorts": cells}
+        passing = [cohort for cohort in original["declared_cohorts"] if cells[cohort]["status"] == "passed"]
+        if passing:
+            admitted[horizon] = passing
+    core = {key: value for key, value in previous.items() if key not in {"signature", "admission_id"}}
+    core.update({
+        "policy": POINT_POLICY, "horizons": reports, "admitted_cohorts": admitted,
+        "interval_capabilities": _interval_capabilities(reports, admitted),
+        "status": "passed" if admitted else "failed",
+        "evaluated_at": datetime.now(timezone.utc).isoformat(),
+        "policy_reassessment": {
+            "prior_admission_id": previous["admission_id"],
+            "policy_selected_after_evaluation": True,
+            "model_refit": False, "predictions_changed": False,
+        },
+    })
+    signed = _sign({**core, "admission_id": _identity(core)}, private_key)
+    verify_historical_admission_receipt(signed, bundle_dir=bundle_dir, public_key=public_key)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    path = output_dir / (signed["admission_id"].removeprefix("sha256:") + ".json")
+    _immutable_signed_file(path, signed, public_key=public_key)
+    return path, signed
 
 
 def verify_historical_admission_receipt(
@@ -798,8 +876,12 @@ def verify_historical_admission_receipt(
     from ml.model_bundle import ModelBundleError, verify_bundle_dir, verify_bundle_manifest, verify_signed_payload
 
     payload = verify_signed_payload(receipt, public_key=public_key)
-    if payload.get("schema") != SCHEMA or payload.get("policy") != POLICY:
-        raise ModelBundleError("unsupported historical admission schema or policy")
+    if payload.get("schema") != SCHEMA:
+        raise ModelBundleError("unsupported historical admission schema")
+    try:
+        policy = _admission_policy(payload.get("policy") or {})
+    except ValueError as exc:
+        raise ModelBundleError(str(exc)) from exc
     core = {key: value for key, value in payload.items() if key != "admission_id"}
     if payload.get("admission_id") != _identity(core):
         raise ModelBundleError("historical admission identity mismatch")
@@ -861,9 +943,22 @@ def verify_historical_admission_receipt(
         passing = [cohort for cohort in declared if cohorts[cohort].get("status") == "passed"]
         for cohort in passing:
             cell = cohorts[cohort]
-            _check_passed_metrics(cell)
+            _check_passed_metrics(cell, policy)
         if passing:
             expected[key] = passing
+    if policy == POINT_POLICY:
+        if payload.get("interval_capabilities") != _interval_capabilities(payload["horizons"], expected):
+            raise ModelBundleError("historical interval capabilities disagree with calibration")
+    elif "interval_capabilities" in payload:
+        raise ModelBundleError("legacy historical admission cannot change interval capabilities")
+    reassessment = payload.get("policy_reassessment")
+    if reassessment is not None:
+        if (policy != POINT_POLICY or not isinstance(reassessment, Mapping)
+                or reassessment.get("policy_selected_after_evaluation") is not True
+                or reassessment.get("model_refit") is not False
+                or reassessment.get("predictions_changed") is not False
+                or not re.fullmatch(r"sha256:[0-9a-f]{64}", str(reassessment.get("prior_admission_id", "")))):
+            raise ModelBundleError("invalid historical policy reassessment disclosure")
     if payload.get("multiplicity_cells") != max(1, declared_count):
         raise ModelBundleError("historical admission multiplicity family mismatch")
     if payload.get("admitted_cohorts") != expected or payload.get("status") != ("passed" if expected else "failed"):
@@ -916,7 +1011,7 @@ def verify_historical_admission_receipt(
                 if training_row_digest(replay) != training_row_digest(predictions):
                     raise ModelBundleError("historical evidence predictions do not replay exact native candidate")
             for cohort in payload["horizons"][key]["declared_cohorts"]:
-                assessment = assess_historical_cell(predictions.loc[predictions["cohort"].eq(cohort)], multiplicity=payload["multiplicity_cells"])
+                assessment = assess_historical_cell(predictions.loc[predictions["cohort"].eq(cohort)], multiplicity=payload["multiplicity_cells"], policy=policy)
                 if _canonical(assessment) != _canonical(payload["horizons"][key]["cohorts"][cohort]):
                     raise ModelBundleError("historical evidence metrics do not replay retained predictions")
     return dict(payload)

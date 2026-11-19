@@ -1,21 +1,19 @@
 {
   "symbol": "USLM",
-  "as_of_date": "2026-10-26",
-  "spot_price": 109.65,
+  "as_of_date": "2026-11-06",
+  "spot_price": 118.1,
   "expected_move": {
-    "earnings_date": "2026-11-04",
-    "display_forecast_pct": 0.0488449304792527,
-    "display_forecast_method": "historical_prior",
-    "display_forecast_as_of": "2026-10-26",
-    "ml_status": "unavailable_model",
-    "options_status": "unavailable",
-    "fallback_reason": "insufficient_ticker_history",
-    "historical_event_count": 1,
-    "hist_move_med_4q": 0.000619,
+    "earnings_date": "2026-10-30",
     "timing": "unknown",
-    "ml_publication_status": "held",
-    "ml_publication_reason": "no_eligible_current_forecast",
-    "em_method": "historical_prior"
+    "display_forecast_pct": 0.000619,
+    "display_forecast_method": "historical",
+    "display_forecast_as_of": "2026-10-30",
+    "ml_status": "unavailable_event",
+    "options_status": "unavailable",
+    "fallback_reason": "no_event_expiry",
+    "historical_event_count": 4,
+    "hist_move_med_4q": 0.000619,
+    "forecast_frozen": true
   },
   "straddle_features": [],
   "earnings_history": [
@@ -327,15 +325,15 @@
       "realized_label_source": null
     }
   ],
-  "next_earnings": "2026-11-04",
+  "next_earnings": "2026-10-30",
   "vol_regime": {
-    "iv_current": 0.4508,
-    "iv_rank": 0.797461,
+    "iv_current": 0.4223,
+    "iv_rank": 0.640177,
     "iv_year_high": 0.4875,
     "iv_year_low": 0.3063,
-    "hv_current": 0.259,
-    "hv_rank": 0.14734,
-    "iv_mom_week": 0.0153,
+    "hv_current": 0.3312,
+    "hv_rank": 0.311505,
+    "iv_mom_week": -0.0322,
     "iv_mom_month": null
   },
   "next_earnings_timing": "unknown"

@@ -1,21 +1,22 @@
 {
   "symbol": "GPMT",
-  "as_of_date": "2026-10-26",
-  "spot_price": 4.9,
+  "as_of_date": "2026-11-13",
+  "spot_price": 2.44,
   "expected_move": {
     "earnings_date": "2026-11-05",
-    "display_forecast_pct": 0.08191660979090415,
+    "timing": "after_market_close",
+    "em_method": "ml_unavailable",
+    "display_forecast_pct": 0.0819165,
     "display_forecast_method": "historical",
-    "display_forecast_as_of": "2026-10-26",
-    "ml_status": "unavailable_model",
+    "display_forecast_as_of": "2026-11-05",
+    "ml_status": "unavailable_event",
     "options_status": "unavailable",
     "fallback_reason": "no_event_expiry",
     "historical_event_count": 4,
-    "hist_move_med_4q": 0.081917,
-    "timing": "unknown",
+    "hist_move_med_4q": 0.0819165,
+    "forecast_frozen": true,
     "ml_publication_status": "held",
-    "ml_publication_reason": "no_eligible_current_forecast",
-    "em_method": "historical"
+    "ml_publication_reason": "no_eligible_current_forecast"
   },
   "straddle_features": [],
   "earnings_history": [
@@ -43,16 +44,12 @@
       "rev_surprise_pct": null,
       "realized_target_protocol": null,
       "realized_label_source": null,
-      "ml_status": "unavailable_model",
       "ml_publication_status": "held",
       "ml_publication_reason": "no_eligible_current_forecast",
-      "display_forecast_pct": 0.08191660979090415,
+      "display_forecast_pct": 0.0819165,
+      "display_forecast_as_of": "2026-11-05",
       "display_forecast_method": "historical",
-      "display_forecast_as_of": "2026-10-26",
-      "options_status": "unavailable",
-      "fallback_reason": "no_event_expiry",
-      "historical_event_count": 4,
-      "em_method": "historical"
+      "forecast_frozen": true
     },
     {
       "date": "2026-08-05",

@@ -13,6 +13,40 @@ def _event(ticker: str, earnings_date: str, **extra) -> dict:
     return {"ticker": ticker, "earnings_date": earnings_date, **extra}
 
 
+def test_reported_unavailable_row_cannot_publish_a_symbol_only_median(tmp_path, monkeypatch):
+    import sys
+    import validate_public_contracts as contracts
+
+    key = ("WHK", "2026-11-13")
+    symbols, weeks = tmp_path / "symbols", tmp_path / "weeks"
+    symbols.mkdir()
+    weeks.mkdir()
+    # Older builds combined the November 12 publication with a median
+    # computed after the release. The only genuine prior reaction is flat.
+    event = _event(*key, as_of_date="2026-11-12", hist_move_med_4q=0.007614,
+                   display_forecast_method="ml_unavailable", display_forecast_pct=None,
+                   ml_publication_status="held", ml_status="unavailable_model")
+    week = weeks / "2026-11-09.json"
+    week.write_text(json.dumps({"metadata": {"as_of_date": "2026-11-13"},
+                               "window": {"start": "2026-11-09", "end": key[1]}, "events": [event]}))
+    path = symbols / "WHK.json"
+    path.write_text(json.dumps({"symbol": key[0], "next_earnings": key[1], "expected_move": event,
+                                "earnings_history": [{"date": "2026-08-12", "actual": 0.0},
+                                                     {"date": key[1], "actual": None}]}))
+    original = path.read_bytes()
+    monkeypatch.setattr(restore, "PUBLIC_DIR", tmp_path)
+    monkeypatch.setattr(restore, "SYMBOLS_DIR", symbols)
+    monkeypatch.setattr(restore, "WEEKS_DIR", weeks)
+    monkeypatch.setattr(restore, "_history", lambda _: [])
+    monkeypatch.setattr(restore, "_load_reference_membership", lambda: (
+        {key}, {"start": "2026-11-02", "end": "2026-12-05"},
+    ))
+    monkeypatch.setattr(contracts, "PUBLIC", tmp_path)
+    monkeypatch.setattr(sys, "argv", ["restore", "--today", "2026-11-14", "--apply"])
+    assert restore.main() == 0
+    assert path.read_bytes() == original
+
+
 def test_forecast_rank_prefers_ml_over_iv_when_both_are_pre_event():
     ml = _event(
         "ADBE",
@@ -411,6 +445,29 @@ def test_restoration_reconciles_option_snapshot_independently_of_ml_rank(
     assert restore.recover_week(path, {key}, date(2026, 9, 26), apply=True) == {}
 
 
+def test_point_only_restoration_clears_existing_symbol_and_history_bands(tmp_path, monkeypatch):
+    monkeypatch.setattr(restore, "SYMBOLS_DIR", tmp_path)
+    event = _event(
+        "FDX", "2026-09-16", em_ml_pct=0.04,
+        ml_snapshot_date="2026-09-15", forecast_frozen_eligible=True,
+        intervals_calibrated=False,
+        **{key: 0.05 for key in ("p10", "p25", "p50", "p75", "p90")},
+    )
+    path = tmp_path / "FDX.json"
+    path.write_text(json.dumps({
+        "expected_move": {"earnings_date": "2026-09-16", "p10": 0.02, "p90": 0.08},
+        "earnings_history": [{"date": "2026-09-16", "p10": 0.02, "p90": 0.08}],
+    }))
+
+    assert restore._repair_symbol_payloads({("FDX", "2026-09-16"): event}, apply=True) == 1
+    payload = json.loads(path.read_text())
+    for row in (payload["expected_move"], payload["earnings_history"][0]):
+        assert row["em_ml_pct"] == 0.04
+        assert row["intervals_calibrated"] is False
+        assert all(row.get(key) is None for key in ("p10", "p25", "p50", "p75", "p90"))
+    assert restore._repair_symbol_payloads({("FDX", "2026-09-16"): event}, apply=True) == 0
+
+
 def test_daily_rebuild_resynchronizes_symbols_when_calendar_is_unchanged(tmp_path, monkeypatch):
     import sys
     import validate_public_contracts as contracts
@@ -619,3 +676,216 @@ def test_legacy_markerless_same_day_recovery_keeps_prior_behavior(tmp_path, monk
     monkeypatch.setattr(restore, '_commit_at', lambda *_args: None)
     result = restore.recover_week(path, {('LEGACY', '2026-10-13')}, date(2026, 10, 13), apply=True)
     assert result[('LEGACY', '2026-10-13')]['em_ml_pct'] == .04
+
+
+def test_retained_week_prunes_confirmed_reschedule_without_moving_forecast(tmp_path, monkeypatch):
+    import sys
+    import validate_public_contracts as contracts
+
+    weeks = tmp_path / "weeks"
+    weeks.mkdir()
+    old = _event("STEM", "2026-11-05", em_ml_pct=0.103453, actual=0.155963)
+    other = _event("OTHER", "2026-11-05")
+    week = weeks / "2026-11-02.json"
+    week.write_text(json.dumps({
+        "events": [old, other], "window": {"start": "2026-11-02", "end": "2026-11-08"},
+        "summary": {"total_events": 2},
+    }))
+    moved = _event("STEM", "2026-11-16", timing="amc")
+    next_week = weeks / "2026-11-16.json"
+    next_week.write_text(json.dumps({
+        "events": [moved], "window": {"start": "2026-11-16", "end": "2026-11-22"},
+    }))
+    monkeypatch.setattr(restore, "PUBLIC_DIR", tmp_path)
+    monkeypatch.setattr(restore, "WEEKS_DIR", weeks)
+    monkeypatch.setattr(restore, "_load_reference_membership", lambda: (
+        {("STEM", "2026-11-16")}, {"start": "2026-11-02", "end": "2026-12-05"},
+    ))
+    monkeypatch.setattr(restore, "_history", lambda _: [])
+    published = []
+    monkeypatch.setattr(restore, "_republish_manifest_and_screener", lambda: published.append(True))
+    monkeypatch.setattr(contracts, "validate_forecast_surface_parity", lambda: None)
+    monkeypatch.setattr(sys, "argv", ["restore", "--today", "2026-11-14"])
+    assert restore.main() == 0
+    assert json.loads(week.read_text())["events"] == [old, other]
+    monkeypatch.setattr(sys, "argv", [*sys.argv, "--apply"])
+    assert restore.main() == 0
+    assert json.loads(week.read_text())["events"] == [other]
+    assert json.loads(week.read_text())["summary"]["total_events"] == 1
+    assert json.loads(next_week.read_text())["events"] == [moved]
+    assert restore.main() == 0
+    assert published == [True]
+
+
+@pytest.mark.parametrize("today", [date(2026, 11, 16), date(2026, 11, 18)])
+def test_previously_published_ml_recovers_missing_current_hold(tmp_path, monkeypatch, today):
+    from datetime import datetime
+
+    key = ('TSN', '2026-11-16')
+    historical = _event(*key, timing='bmo', em_ml_pct=.04027,
+        ml_snapshot_date='2026-11-13', forecast_id='published-id',
+        forecast_scored_at='2026-11-15T08:03:23+00:00', forecast_frozen_eligible=True,
+        ml_publication_status='eligible', ml_status='available',
+        display_forecast_method='ml', display_forecast_pct=.04027)
+    current = {**historical, 'ml_publication_status': 'held',
+               'ml_publication_reason': 'no_eligible_current_forecast',
+               'forecast_published_at': '2026-11-17T08:00:00+00:00'}
+    path = tmp_path / '2026-11-16.json'
+    path.write_text(json.dumps({'window': {'start': key[1], 'end': '2026-11-20'}, 'events': [current]}))
+    monkeypatch.setattr(restore, 'PUBLIC_DIR', tmp_path)
+    monkeypatch.setattr(restore, 'SYMBOLS_DIR', tmp_path / 'symbols')
+    monkeypatch.setattr(restore, '_history', lambda _: ['later', 'original'])
+    monkeypatch.setattr(restore, '_bundle_at', lambda c, _: {'events': [current if c == 'later' else historical]})
+    monkeypatch.setattr(restore, '_commit_at', lambda c: datetime.fromisoformat(
+        '2026-11-17T08:00:00+00:00' if c == 'later' else '2026-11-15T08:32:29+00:00'))
+    restored = restore.recover_week(path, {key}, today, apply=True)[key]
+    assert restored['ml_publication_status'] == 'eligible'
+    assert 'ml_publication_reason' not in restored
+    assert restored['forecast_id'] == 'published-id'
+    assert restored['em_ml_pct'] == .04027
+    assert restored['forecast_published_at'] == '2026-11-15T08:32:29+00:00'
+    assert restore.recover_week(path, {key}, today, apply=True) == {}
+
+
+@pytest.mark.parametrize(('reason', 'original_date', 'commit_date', 'today'), [
+    ('feature_drift', '2026-11-16', '2026-11-15', date(2026, 11, 18)),
+    ('no_eligible_current_forecast', '2026-11-17', '2026-11-15', date(2026, 11, 18)),
+    ('no_eligible_current_forecast', '2026-11-16', '2026-11-17', date(2026, 11, 18)),
+    ('no_eligible_current_forecast', '2026-11-16', '2026-11-15', date(2026, 11, 15)),
+])
+def test_restoration_needs_exact_event_and_predeadline_publication(
+    tmp_path, monkeypatch, reason, original_date, commit_date, today,
+):
+    from datetime import datetime
+
+    key = ('TSN', '2026-11-16')
+    current = _event(*key, em_ml_pct=.04, ml_snapshot_date='2026-11-13',
+        forecast_id='published-id', forecast_frozen_eligible=True,
+        ml_publication_status='held', ml_publication_reason=reason,
+        forecast_scored_at='2026-11-15T08:00:00+00:00')
+    original = {**current, 'earnings_date': original_date, 'ml_publication_status': 'eligible',
+                'display_forecast_method': 'ml', 'display_forecast_pct': .04,
+                'forecast_published_at': '2026-11-15T08:00:00+00:00'}
+    path = tmp_path / 'week.json'
+    path.write_text(json.dumps({'window': {'start': key[1], 'end': '2026-11-20'}, 'events': [current]}))
+    monkeypatch.setattr(restore, 'PUBLIC_DIR', tmp_path)
+    monkeypatch.setattr(restore, 'SYMBOLS_DIR', tmp_path / 'symbols')
+    monkeypatch.setattr(restore, '_history', lambda _: ['original'])
+    monkeypatch.setattr(restore, '_bundle_at', lambda *_: {'events': [original]})
+    monkeypatch.setattr(restore, '_commit_at', lambda _: datetime.fromisoformat(commit_date+'T08:32:29+00:00'))
+    restore.recover_week(path, {key}, today, apply=True)
+    actual = json.loads(path.read_text())['events'][0]
+    assert actual['ml_publication_status'] == 'held'
+    assert actual['ml_publication_reason'] == reason
+
+
+def test_event_morning_recovery_updates_both_calendar_and_symbol(tmp_path, monkeypatch):
+    import sys
+    from datetime import datetime
+    import validate_public_contracts as contracts
+
+    key = ('TSN', '2026-11-16')
+    symbols, weeks = tmp_path / 'symbols', tmp_path / 'weeks'
+    symbols.mkdir()
+    weeks.mkdir()
+    published = _event(*key, timing='bmo', as_of_date='2026-11-13',
+        em_ml_pct=.04027, ml_snapshot_date='2026-11-13', forecast_id='published-id',
+        forecast_scored_at='2026-11-15T08:03:23+00:00', forecast_frozen_eligible=True,
+        ml_publication_status='eligible', ml_status='available',
+        display_forecast_method='ml', display_forecast_pct=.04027)
+    held = _event(*key, timing='bmo', ml_publication_status='held',
+        ml_publication_reason='no_eligible_current_forecast', ml_status='unavailable_model',
+        display_forecast_method='ml_unavailable', display_forecast_pct=None,
+        as_of_date='2026-11-13')
+    week = weeks / '2026-11-16.json'
+    week.write_text(json.dumps({'metadata': {'as_of_date': '2026-11-13'},
+        'window': {'start': key[1], 'end': '2026-11-20'}, 'events': [held]}))
+    symbol = symbols / 'TSN.json'
+    symbol.write_text(json.dumps({'symbol': 'TSN', 'as_of_date': '2026-11-13',
+        'next_earnings': key[1], 'expected_move': held,
+        'earnings_history': [{'date': key[1], 'ml_publication_status': 'held',
+                             'ml_publication_reason': 'no_eligible_current_forecast'}]}))
+    (tmp_path / 'control-plane.json').write_text(json.dumps({'model': {
+        'publication_policy': 'quantiv.event-forecast-eligibility.v1'}}))
+    monkeypatch.setattr(restore, 'PUBLIC_DIR', tmp_path)
+    monkeypatch.setattr(restore, 'WEEKS_DIR', weeks)
+    monkeypatch.setattr(restore, 'SYMBOLS_DIR', symbols)
+    monkeypatch.setattr(restore, '_load_reference_membership', lambda: (
+        {key}, {'start': key[1], 'end': '2026-11-20'}))
+    monkeypatch.setattr(restore, '_history', lambda _: ['original'])
+    monkeypatch.setattr(restore, '_bundle_at', lambda *_: {'events': [published]})
+    monkeypatch.setattr(restore, '_commit_at', lambda _: datetime.fromisoformat('2026-11-15T08:32:29+00:00'))
+    monkeypatch.setattr(restore, '_republish_manifest_and_screener', lambda: None)
+    monkeypatch.setattr(contracts, 'PUBLIC', tmp_path)
+    monkeypatch.setattr(sys, 'argv', ['restore', '--apply', '--today', '2026-11-16'])
+    assert restore.main() == 0
+    restored = json.loads(symbol.read_text())
+    assert restored['expected_move']['ml_publication_status'] == 'eligible'
+    assert restored['expected_move']['forecast_id'] == 'published-id'
+    assert 'ml_publication_reason' not in restored['earnings_history'][0]
+    assert contracts._symbol_page_signature(restored, key[1])[0] == ('ml', .04027)
+    contracts.validate_forecast_surface_parity()
+    originals = week.read_bytes(), symbol.read_bytes()
+    assert restore.main() == 0
+    assert originals == (week.read_bytes(), symbol.read_bytes())
+
+
+@pytest.mark.parametrize(('snapshot', 'hour', 'expected'), [
+    ('2026-11-12', 12, 'eligible'), ('2026-11-11', 12, 'held'),
+    ('2026-11-11', 22, 'eligible'),
+])
+def test_same_day_retention_uses_grace_until_event_cutoff(tmp_path, monkeypatch, snapshot, hour, expected):
+    from datetime import datetime, timezone
+    key = ('TEST', '2026-11-16')
+    current = _event(*key, timing='amc', ml_publication_status='held',
+                     ml_publication_reason='no_eligible_current_forecast')
+    prior = {**current, 'ml_publication_status': 'eligible', 'forecast_id': 'prior',
+             'em_ml_pct': .05, 'ml_snapshot_date': snapshot, 'forecast_frozen_eligible': True,
+             'display_forecast_method': 'ml', 'display_forecast_pct': .05}
+    path = tmp_path / 'week.json'
+    path.write_text(json.dumps({'window': {'start': key[1], 'end': key[1]}, 'events': [current]}))
+    monkeypatch.setattr(restore, 'PUBLIC_DIR', tmp_path)
+    monkeypatch.setattr(restore, 'SYMBOLS_DIR', tmp_path / 'symbols')
+    monkeypatch.setattr(restore, '_history', lambda _: ['prior'])
+    monkeypatch.setattr(restore, '_bundle_at', lambda *_: {'events': [prior]})
+    monkeypatch.setattr(restore, '_commit_at', lambda _: datetime(2026, 11, 12, 23, tzinfo=timezone.utc))
+    restore.recover_week(path, {key}, date(2026, 11, 16), apply=True,
+                         now=datetime(2026, 11, 16, hour, tzinfo=timezone.utc))
+    assert json.loads(path.read_text())['events'][0]['ml_publication_status'] == expected
+
+
+def test_restored_symbol_option_observation_keeps_its_own_as_of(tmp_path, monkeypatch):
+    event = _event('ENR', '2026-11-17', as_of_date='2026-11-12',
+        em_iv_pct=.11, em_straddle_pct=.10, expiry_date='2026-11-20',
+        days_to_expiry=8, spot_price=25., atm_strike=25., atm_iv=.7,
+        skew_atm=.0436, term_slope=.1)
+    symbol = {'symbol': 'ENR', 'as_of_date': '2026-11-16',
+              'expected_move': restore._symbol_expected_move(event)}
+    (tmp_path / 'ENR.json').write_text(json.dumps(symbol))
+    monkeypatch.setattr(restore, 'SYMBOLS_DIR', tmp_path)
+    candidate = restore._symbol_expected_move_candidate(('ENR', '2026-11-17'))
+    for field in ('as_of_date', 'spot_price', 'atm_strike', 'atm_iv', 'skew_atm', 'term_slope'):
+        assert candidate[field] == event[field]
+
+
+def test_timing_correction_cannot_reuse_ml_published_after_current_deadline(tmp_path, monkeypatch):
+    from datetime import datetime
+
+    key = ('TEST', '2026-11-16')
+    current = _event(*key, timing='bmo', ml_publication_status='held',
+                     ml_publication_reason='no_eligible_current_forecast')
+    historical = _event(*key, timing='amc', em_ml_pct=.05, ml_snapshot_date='2026-11-13',
+        forecast_id='midday-forecast', forecast_scored_at='2026-11-16T14:00:00+00:00',
+        forecast_frozen_eligible=True, ml_publication_status='eligible',
+        display_forecast_method='ml', display_forecast_pct=.05)
+    path = tmp_path / 'week.json'
+    path.write_text(json.dumps({'window': {'start': key[1], 'end': key[1]}, 'events': [current]}))
+    monkeypatch.setattr(restore, 'PUBLIC_DIR', tmp_path)
+    monkeypatch.setattr(restore, 'SYMBOLS_DIR', tmp_path / 'symbols')
+    monkeypatch.setattr(restore, '_history', lambda _: ['midday'])
+    monkeypatch.setattr(restore, '_bundle_at', lambda *_: {'events': [historical]})
+    monkeypatch.setattr(restore, '_commit_at', lambda _: datetime.fromisoformat('2026-11-16T15:00:00+00:00'))
+    restore.recover_week(path, {key}, date(2026, 11, 18), apply=True)
+    event = json.loads(path.read_text())['events'][0]
+    assert event['ml_publication_status'] == 'held'
+    assert event['timing'] == 'bmo'

@@ -59,7 +59,7 @@ def test_explicit_session_conflict_cannot_be_refilled_from_confirmed_baseline():
 
 @pytest.mark.parametrize("old_date, old_publication", [
     ("2026-11-09", "2026-10-18"),
-    ("2026-11-04", "2026-10-19"),
+    ("2026-11-04", "2026-10-18"),
 ])
 def test_unknown_revision_does_not_borrow_an_older_or_different_event_session(
     old_date, old_publication,
@@ -69,6 +69,16 @@ def test_unknown_revision_does_not_borrow_an_older_or_different_event_session(
         announcement(old_date, "amc", published=old_publication),
     ], as_of=date(2026, 10, 21))
     assert (chosen["date"], chosen["timing"]) == ("2026-11-09", "unknown")
+
+
+@pytest.mark.parametrize("official", [False, True])
+def test_contemporaneous_conflicting_dates_abstain_instead_of_borrowing_session(official):
+    chosen, reason = calendar._announcement_decision([
+        announcement("2026-11-09", official=official),
+        announcement("2026-11-04", "amc", official=official),
+    ], as_of=date(2026, 10, 21))
+    assert chosen is None
+    assert reason is None
 
 
 @pytest.mark.parametrize("candidate_dates, expected_press, expected_alpha", [

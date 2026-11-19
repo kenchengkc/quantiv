@@ -15,7 +15,7 @@ import pandas as pd
 from ml.model_artifact import load_native_model, point_model_name, quantile_model_name
 from ml.model_bundle import DAILY_HORIZONS, verify_bundle_dir
 from ml.model_protocol import CAUSAL_FEATURE_PROTOCOL, feature_protocol, target_protocol
-from ml.serving_capabilities import allowed_cohorts
+from ml.serving_capabilities import allowed_cohorts, intervals_admitted
 from ml.provider_signal_policy import (
     DEFAULT_POLICY_PATH,
     ProviderSignalPolicyError,
@@ -927,6 +927,11 @@ def validate_forecast_artifact(
                         raise ValueError("forecast contains head/cohort combinations not admitted for serving")
                 except ValueError as exc:
                     _issue(issues, "forecasts", forecast_path, "forecast_serving_capability", str(exc))
+            if manifest is not None and "interval_capabilities" in manifest:
+                expected = [intervals_admitted(manifest, int(horizon), cohort) for cohort in cohorts]
+                if "intervals_calibrated" not in rows or not rows["intervals_calibrated"].eq(expected).all():
+                    _issue(issues, "forecasts", forecast_path, "forecast_interval_capability",
+                           "forecast interval status differs from the authenticated model capability")
             if protocol == CAUSAL_FEATURE_PROTOCOL:
                 if not {"feature_protocol", "target_protocol"} <= set(rows) or not rows["feature_protocol"].eq(protocol).all() or not rows["target_protocol"].eq(expected_target).all():
                     raise ValueError("forecast vectors are not bound to the model protocol")

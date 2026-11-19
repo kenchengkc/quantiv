@@ -7,8 +7,71 @@ import pytest
 from reconcile_earnings_calendar import (
     _announcement_from_article,
     _session_from_text,
+    choose_canonical_event,
     extract_earnings_announcement,
 )
+
+
+def test_replay_deadline_cannot_outscore_the_earnings_date() -> None:
+    parsed = extract_earnings_announcement(
+        "Example will hold its earnings call on November 5, 2026 to discuss results "
+        "for the quarter ended September 30, 2026. The release will be distributed "
+        "before the call. " + "Listeners may dial in or use the investor website. " * 6
+        + "The earnings conference call replay will be available until December 5, 2026.",
+        published_on=date(2026, 10, 14),
+    )
+
+    assert parsed == {"date": "2026-11-05", "timing": "unknown"}
+
+
+@pytest.mark.parametrize("revision", [
+    "to Monday, November 16, 2026, from November 5, 2026",
+    "from November 5, 2026 to Monday, November 16, 2026",
+    "from November 5, 2026 to November 16, 2026 and set a shareholder meeting for December 1, 2026",
+])
+def test_rescheduled_earnings_release_uses_replacement_date(revision: str) -> None:
+    article = _announcement_from_article(
+        provider="wire", title="Example Reschedules Third Quarter 2026 Earnings Call",
+        body=f"Example rescheduled the release of its quarterly results and call {revision}. "
+        "The results will be issued at 4:05 p.m. ET. The replay is available until December 16, 2026.",
+        published_on=date(2026, 11, 4), official=False, url=None,
+    )
+
+    assert article is not None
+    assert (article["date"], article["timing"]) == ("2026-11-16", "amc")
+    previous = {"direct": True, "date": "2026-11-05", "published_on": "2026-10-14",
+                "timing": "unknown"}
+    decision = choose_canonical_event(
+        current=None, baseline=None, as_of=date(2026, 11, 4), structured_votes=[],
+        announcements=[{**previous, "provider": "wire"}, {**previous, "provider": "news"}, article],
+    )
+    assert (decision["date"], decision["timing"]) == ("2026-11-16", "amc")
+
+
+@pytest.mark.parametrize("rescheduled", [
+    "its conference call", "the release of the webcast discussing its results",
+    "its earnings release webcast",
+])
+def test_rescheduled_call_alone_does_not_move_the_results_release(rescheduled: str) -> None:
+    assert _announcement_from_article(
+        provider="wire", title="Example Reschedules Third Quarter 2026 Earnings Call",
+        body=f"Example rescheduled {rescheduled} to November 16, 2026. "
+        "Example will release quarterly results as originally planned on November 5, 2026.",
+        published_on=date(2026, 11, 4), official=False, url=None,
+    ) is None
+
+
+@pytest.mark.parametrize("schedule", [
+    "from November 5, 2026 to a date to be determined and scheduled a shareholder meeting for November 16, 2026",
+    "and will hold a webcast for November 16, 2026",
+    "from November 5, 2026 pending review, with a press briefing moved to November 16, 2026",
+])
+def test_pending_earnings_release_cannot_borrow_another_events_date(schedule: str) -> None:
+    assert _announcement_from_article(
+        provider="wire", title="Example Reschedules Third Quarter 2026 Earnings Release",
+        body=f"Example rescheduled its earnings release {schedule}.",
+        published_on=date(2026, 11, 4), official=False, url=None,
+    ) is None
 
 
 def test_sets_date_title_admits_an_explicit_earnings_release() -> None:
@@ -23,6 +86,23 @@ def test_sets_date_title_admits_an_explicit_earnings_release() -> None:
 
     assert announcement is not None
     assert (announcement["date"], announcement["timing"]) == ("2026-11-05", "amc")
+
+
+@pytest.mark.parametrize("summary,expected", [
+    ("Example scheduled its results call for November 13, 2026 at 9 a.m. ET.", None),
+    ("Example scheduled its results call for November 13, 2026 at 9 a.m. ET. "
+     "The company will release its quarterly results after the market closes on November 12, 2026.",
+     ("2026-11-12", "amc")),
+    ("The company will release its results after the conference call on November 13, 2026.", None),
+    ("The company will release its results and has scheduled a shareholder meeting for November 13, 2026.",
+     None),
+])
+def test_headline_that_dates_a_call_requires_a_separate_release_date(summary, expected) -> None:
+    article = _announcement_from_article(
+        provider="news", title="Example Announces Third Quarter 2026 Earnings Conference Call for November 13, 2026",
+        body=summary, published_on=date(2026, 10, 13), official=False, url=None,
+    )
+    assert (None if article is None else (article["date"], article["timing"])) == expected
 
 
 def test_hyphenated_quarter_title_admits_explicit_release() -> None:

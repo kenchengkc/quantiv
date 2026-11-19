@@ -1,6 +1,11 @@
 {
   "_comment": "Single source of truth for tickers removed from the universe after delisting (M&A, bankruptcy, going-private). Honored by the daily-refresh integrity gates (check_earnings_calendar_integrity.py, check_ticker_identity.py) so deliberate removals don't trip silent-drop guards, and by sync_dolthub.py's universe gate so a stale forecast JSON can't resurrect them. Loaded via scripts/delisted.py. Add an entry (ticker -> reason/delisted_on/source) when a holding is confirmed delisted.",
   "tickers": {
+    "ACA": {
+      "reason": "Auto-detected: absent from NASDAQ/NYSE exchange directories for \u22653 consecutive days (likely M&A, bankruptcy, or going-private).",
+      "delisted_on": "2026-10-29",
+      "source": "auto: scripts/detect_delistings.py"
+    },
     "AMWD": {
       "reason": "Completed all-stock merger into MasterBrand, Inc. (NYSE: MBC); American Woodmark delisted.",
       "delisted_on": "2026-05-29",
@@ -66,10 +71,30 @@
       "delisted_on": "2026-07-16",
       "source": "manual (user-confirmed acquisition)"
     },
+    "INDV": {
+      "reason": "Auto-detected: absent from NASDAQ/NYSE exchange directories for \u22653 consecutive days (likely M&A, bankruptcy, or going-private).",
+      "delisted_on": "2026-11-05",
+      "source": "auto: scripts/detect_delistings.py"
+    },
+    "KVUE": {
+      "reason": "Auto-detected: absent from NASDAQ/NYSE exchange directories for \u22653 consecutive days (likely M&A, bankruptcy, or going-private).",
+      "delisted_on": "2026-11-04",
+      "source": "auto: scripts/detect_delistings.py"
+    },
+    "LXP": {
+      "reason": "Auto-detected: absent from NASDAQ/NYSE exchange directories for \u22653 consecutive days (likely M&A, bankruptcy, or going-private).",
+      "delisted_on": "2026-11-18",
+      "source": "auto: scripts/detect_delistings.py"
+    },
     "MASI": {
       "reason": "Acquired by Danaher Corporation (NYSE: DHR); Masimo delisted from Nasdaq.",
       "delisted_on": "2026-06-10",
       "source": "manual (SEC 8-K / Danaher acquisition completed 2026-06-10)"
+    },
+    "MSGS": {
+      "reason": "Auto-detected: absent from NASDAQ/NYSE exchange directories for \u22653 consecutive days (likely M&A, bankruptcy, or going-private).",
+      "delisted_on": "2026-11-16",
+      "source": "auto: scripts/detect_delistings.py"
     },
     "NSA": {
       "reason": "Acquired by Public Storage; National Storage Affiliates delisted from NYSE.",
@@ -85,6 +110,16 @@
       "reason": "Qorvo completed its merger with Skyworks Solutions on 2026-10-05; common shares converted into $32.50 cash plus 0.960 SWKS shares and Nasdaq trading halted. Retire QRVO; do not merge Qorvo earnings history into SWKS.",
       "delisted_on": "2026-10-05",
       "source": "https://www.sec.gov/Archives/edgar/data/1604778/000095010326015180/dp254466_8k.htm"
+    },
+    "RAMP": {
+      "reason": "Auto-detected: absent from NASDAQ/NYSE exchange directories for \u22653 consecutive days (likely M&A, bankruptcy, or going-private).",
+      "delisted_on": "2026-11-04",
+      "source": "auto: scripts/detect_delistings.py"
+    },
+    "ROKU": {
+      "reason": "Auto-detected: absent from NASDAQ/NYSE exchange directories for \u22653 consecutive days (likely M&A, bankruptcy, or going-private).",
+      "delisted_on": "2026-11-12",
+      "source": "auto: scripts/detect_delistings.py"
     },
     "SNCY": {
       "reason": "Acquired by Allegiant Travel Company (NASDAQ: ALGT); Sun Country Airlines delisted from Nasdaq.",

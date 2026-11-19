@@ -143,8 +143,24 @@ def test_forecast_surface_parity_rejects_fdx_style_split_release(
     )
     monkeypatch.setattr(contracts, "PUBLIC", public)
 
-    with pytest.raises(contracts.ContractError, match="resolved headline mismatch"):
+    with pytest.raises(contracts.ContractError, match="calendar is missing resolved headline forecast"):
         contracts.validate_forecast_surface_parity()
+
+
+def test_reported_calendar_mean_cannot_replace_a_missing_median(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    held = {
+        "ml_publication_status": "held", "display_forecast_method": "ml",
+        "display_forecast_pct": 0.061995, "em_ml_pct": 0.061995,
+        "hist_move_med_4q": None,
+    }
+    _write_forecast_surface_fixture(
+        tmp_path, calendar_forecast={**held, "hist_move_avg_4q": 0.11},
+        symbol_forecast=held,
+    )
+    monkeypatch.setattr(contracts, "PUBLIC", tmp_path)
+    contracts.validate_forecast_surface_parity()
 
 
 def test_forecast_surface_parity_accepts_same_ml_headline(
@@ -626,6 +642,27 @@ def test_upcoming_symbol_signature_uses_prior_historical_median():
         {"date": "2026-04-16", "actual": -0.07},
     ]}
     assert contracts._symbol_page_signature(symbol, "2099-10-21")[0] == ("historical", 0.08)
+
+
+@pytest.mark.parametrize(("overrides", "headline"), [
+    ({}, ("ml", 0.103453)),
+    ({"ml_publication_status": "held"}, ("historical", 0.20)),
+    ({"forecast_frozen_eligible": False}, ("historical", 0.20)),
+    ({"ml_snapshot_date": "2026-11-05"}, ("historical", 0.20)),
+    ({"ml_publication_status": "held", "implied_as_of": "2026-11-04", "implied": 0.08},
+     ("straddle_implied", 0.08)),
+])
+def test_rolled_symbol_headline_respects_historical_ml_publication(overrides, headline):
+    row = {
+        "date": "2026-11-05", "em_ml_pct": 0.103453, "ml_snapshot_date": "2026-10-16",
+        "display_forecast_method": "ml", "display_forecast_pct": 0.103453,
+        "forecast_frozen_eligible": True, **overrides,
+    }
+    symbol = {
+        "expected_move": {"earnings_date": "2026-11-16", "em_ml_pct": 0.40, "ml_publication_status": "eligible"},
+        "earnings_history": [row, {"date": "2026-08-05", "actual": 0.20}, {"date": "2026-05-05", "actual": -0.20}],
+    }
+    assert contracts._symbol_page_signature(symbol, row["date"])[0] == headline
 
 
 @pytest.mark.parametrize("mutation", [

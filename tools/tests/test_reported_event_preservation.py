@@ -136,6 +136,24 @@ def test_reported_legacy_forecast_does_not_inherit_fresh_admission_identity():
     assert "forecast_frozen_eligible" not in event
 
 
+@pytest.mark.parametrize("previous_median", [0.0, None, 0.031])
+def test_reported_refresh_freezes_historical_context_with_its_as_of(previous_median):
+    key = ("WHK", "2026-11-13")
+    prior = _event(*key, as_of_date="2026-11-12", display_forecast_method="ml_unavailable",
+                   ml_publication_status="held", ml_publication_reason="no_eligible_current_forecast")
+    if previous_median is not None:
+        prior.update(hist_move_avg_4q=previous_median, hist_move_med_4q=previous_median)
+    fresh = _event(*key, as_of_date="2026-11-13", hist_move_avg_4q=0.007614,
+                   hist_move_med_4q=0.007614, ml_publication_reason="feature_drift",
+                   options_publication_source_date="2026-11-13", eps_actual=0.15)
+    merged, = preserve_reported_events([fresh], [prior], date(2026, 11, 14))
+    assert merged["as_of_date"] == "2026-11-12"
+    assert merged.get("hist_move_med_4q") == merged.get("hist_move_avg_4q") == previous_median
+    assert merged["ml_publication_reason"] == prior["ml_publication_reason"]
+    assert "options_publication_source_date" not in merged
+    assert merged["eps_actual"] == fresh["eps_actual"]
+
+
 def test_fresh_rows_win_over_retained_rows():
     """A late EPS actual or corrected realized move landing in the fresh build
     replaces the retained copy instead of duplicating the event."""

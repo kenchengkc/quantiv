@@ -1,25 +1,134 @@
 {
   "current_evidence": {
     "control_plane_status": "advisory",
-    "data_status": "advisory",
-    "drift_status": "warning",
+    "data_status": "passed",
+    "drift_status": "critical",
     "forecast_control_exceptions": 0,
-    "forecast_events": 549,
+    "forecast_events": 40,
     "forecast_model_matches_evaluation": true,
     "forecast_quality": "passed",
-    "forecast_receipt_id": "sha256:24730a8d26af3b25cc5d945fab5fd7cf7e5b63536a94dd6f3ceb1347cd6ff48e",
-    "forecast_rows": 549,
-    "forecast_validated_at": "2026-10-28T08:16:11.729476+00:00",
-    "model_status": "passed",
+    "forecast_receipt_id": "sha256:17b35fd544a149e1be89d9ddb54ef42116f878302636a7de7845d304bb07a201",
+    "forecast_rows": 40,
+    "forecast_validated_at": "2026-11-18T17:38:59.634958+00:00",
+    "model_status": "advisory",
     "publication_eligible": true
   },
   "evaluation_evidence": {
     "receipt": {
-      "bundle_id": "d14dc7f2aa6b175956922eb6266b8523742add962668b7d6b8833cc2c869dd1b",
+      "bundle_id": "b593506618728c14a8bc13660fa7c6a373ba595566ee5bee01e59eed93083881",
       "evaluation_scope": "historical_out_of_sample",
       "historical_admission": {
-        "admission_id": "sha256:36751a510678c1c256832b5530ebc662a53d8f0907dde3a594851fc86c15e7fe",
+        "admission_id": "sha256:65d616adfb7ba14cc04d404f1092466616ca39e6e20cc20a2635811ad0cf837f",
         "admitted_cohorts": {
+          "1": [
+            "optionless",
+            "strict_options"
+          ],
+          "10": [
+            "optionless",
+            "strict_options"
+          ],
+          "11": [
+            "optionless",
+            "strict_options"
+          ],
+          "12": [
+            "optionless",
+            "strict_options"
+          ],
+          "13": [
+            "optionless",
+            "strict_options"
+          ],
+          "14": [
+            "optionless",
+            "strict_options"
+          ],
+          "15": [
+            "optionless",
+            "strict_options"
+          ],
+          "16": [
+            "optionless",
+            "strict_options"
+          ],
+          "17": [
+            "optionless",
+            "strict_options"
+          ],
+          "18": [
+            "optionless",
+            "strict_options"
+          ],
+          "19": [
+            "optionless",
+            "strict_options"
+          ],
+          "2": [
+            "optionless",
+            "strict_options"
+          ],
+          "20": [
+            "optionless",
+            "strict_options"
+          ],
+          "21": [
+            "optionless",
+            "strict_options"
+          ],
+          "22": [
+            "optionless",
+            "strict_options"
+          ],
+          "23": [
+            "optionless",
+            "strict_options"
+          ],
+          "24": [
+            "optionless",
+            "strict_options"
+          ],
+          "25": [
+            "optionless",
+            "strict_options"
+          ],
+          "3": [
+            "optionless",
+            "strict_options"
+          ],
+          "4": [
+            "optionless",
+            "strict_options"
+          ],
+          "5": [
+            "optionless",
+            "strict_options"
+          ],
+          "6": [
+            "optionless",
+            "strict_options"
+          ],
+          "7": [
+            "optionless",
+            "strict_options"
+          ],
+          "8": [
+            "optionless",
+            "strict_options"
+          ],
+          "9": [
+            "optionless",
+            "strict_options"
+          ]
+        },
+        "global_temporal_boundary": {
+          "calendar_end": "2026-10-14T00:00:00",
+          "calendar_start": "2026-04-18T00:00:00",
+          "first_test_snapshot": "2026-03-26T00:00:00",
+          "rule": "all_requested_heads_development_labels_strictly_before_earliest_reserved_snapshot",
+          "selection_label_cutoff": "2026-03-26T00:00:00"
+        },
+        "interval_capabilities": {
           "1": [
             "optionless"
           ],
@@ -36,12 +145,12 @@
             "optionless"
           ],
           "14": [
-            "optionless",
-            "strict_options"
+            "strict_options",
+            "optionless"
           ],
           "15": [
-            "optionless",
-            "strict_options"
+            "strict_options",
+            "optionless"
           ],
           "16": [
             "strict_options"
@@ -50,19 +159,19 @@
             "strict_options"
           ],
           "18": [
-            "optionless",
-            "strict_options"
+            "strict_options",
+            "optionless"
           ],
           "19": [
             "optionless"
           ],
           "2": [
-            "optionless",
-            "strict_options"
+            "strict_options",
+            "optionless"
           ],
           "20": [
-            "optionless",
-            "strict_options"
+            "strict_options",
+            "optionless"
           ],
           "21": [
             "strict_options"
@@ -71,8 +180,8 @@
             "optionless"
           ],
           "23": [
-            "optionless",
-            "strict_options"
+            "strict_options",
+            "optionless"
           ],
           "24": [
             "strict_options"
@@ -93,16 +202,11 @@
             "optionless"
           ],
           "7": [
-            "optionless",
-            "strict_options"
-          ]
-        },
-        "global_temporal_boundary": {
-          "calendar_end": "2026-10-14T00:00:00",
-          "calendar_start": "2026-04-18T00:00:00",
-          "first_test_snapshot": "2026-03-26T00:00:00",
-          "rule": "all_requested_heads_development_labels_strictly_before_earliest_reserved_snapshot",
-          "selection_label_cutoff": "2026-03-26T00:00:00"
+            "strict_options",
+            "optionless"
+          ],
+          "8": [],
+          "9": []
         },
         "limitations": [
           "The exact candidate excludes reserved labels from fitting, selection, early stopping and quantile calibration.",
@@ -118,6 +222,7 @@
           "coverage_tolerance": 0.08,
           "diagnostic_blocks": 3,
           "familywise_alpha": 0.05,
+          "interval_calibration_required_for_point": false,
           "maximum_block_mae_ratio": 1.5,
           "maximum_raw_crossing_rate": 0.2,
           "maximum_raw_negative_rate": 0.05,
@@ -127,7 +232,13 @@
           "minimum_matched_baseline_rows": 200,
           "multiplicity": "bonferroni_over_all_development_declared_horizon_cohort_cells",
           "requires_conservative_clustered_ci_upper_below_zero": true,
-          "version": "quantiv.historical-exact-artifact-policy.v1"
+          "version": "quantiv.historical-point-forecast-policy.v2"
+        },
+        "policy_reassessment": {
+          "model_refit": false,
+          "policy_selected_after_evaluation": true,
+          "predictions_changed": false,
+          "prior_admission_id": "sha256:36751a510678c1c256832b5530ebc662a53d8f0907dde3a594851fc86c15e7fe"
         },
         "protocol": {
           "calendar_vintage_status": "complete_point_in_time_revision_history_not_established",
@@ -144,10 +255,10 @@
           "test_labels_used_for_quantile_calibration": false
         },
         "reservation_id": "sha256:fd05c255ceb02f9f11ed352e6c62404c0cb7919bf137171ba82de4959d09669a",
-        "serving_bundle_id": "d14dc7f2aa6b175956922eb6266b8523742add962668b7d6b8833cc2c869dd1b",
+        "serving_bundle_id": "b593506618728c14a8bc13660fa7c6a373ba595566ee5bee01e59eed93083881",
         "source_bundle_id": "629386dcbf2736b8868df166bd54c5a656c197a34c55d1d7be44b5b9bc12c2ff"
       },
-      "historical_admission_id": "sha256:36751a510678c1c256832b5530ebc662a53d8f0907dde3a594851fc86c15e7fe",
+      "historical_admission_id": "sha256:65d616adfb7ba14cc04d404f1092466616ca39e6e20cc20a2635811ad0cf837f",
       "holdout_splits": [
         {
           "evaluation_scope": "development",
@@ -239,6 +350,32 @@
           "train_start": "2023-04-20",
           "validation_end": "2026-03-25",
           "validation_start": "2025-05-22"
+        },
+        {
+          "evaluation_scope": "development",
+          "horizon_days": 8,
+          "purge_days": 5,
+          "rows_purged": 116,
+          "rows_total": 34326,
+          "rows_train": 25617,
+          "rows_validation": 8593,
+          "train_end": "2025-05-16",
+          "train_start": "2023-04-21",
+          "validation_end": "2026-03-25",
+          "validation_start": "2025-05-28"
+        },
+        {
+          "evaluation_scope": "development",
+          "horizon_days": 9,
+          "purge_days": 5,
+          "rows_purged": 23,
+          "rows_total": 24699,
+          "rows_train": 18495,
+          "rows_validation": 6181,
+          "train_end": "2025-06-13",
+          "train_start": "2023-04-26",
+          "validation_end": "2026-03-25",
+          "validation_start": "2025-06-26"
         },
         {
           "evaluation_scope": "development",
@@ -472,7 +609,9 @@
         "4": "911df5d0416f340642788a8d2908dbc57a9e8155780498989465699bb5746c66",
         "5": "94f22ff72a8b8ca7c85a8134f0447be13537833dabe0564a5f6e9b0c88e5713f",
         "6": "ae2a353d2a3b6659eecddac3c46c038dc6e51ae5635a198036bdc94906516d4e",
-        "7": "9600ed98b8154b0a3da8d9362ec362175d349a916ea4a90e3bf5876d32a8cb90"
+        "7": "9600ed98b8154b0a3da8d9362ec362175d349a916ea4a90e3bf5876d32a8cb90",
+        "8": "89221e00627b5e42f9623bfd1357402c84edf166aa45dcbb34ff377890414a4c",
+        "9": "8bbe8727f5920a9422dfce510910343794bc577d2f902e915c4f7846a93838ab"
       },
       "metrics": [
         {
@@ -490,6 +629,7 @@
           },
           "feature_count": 45,
           "horizon_days": 1,
+          "interval_status": "passed",
           "interval_width": {
             "interval_50_mean": null,
             "interval_80_mean": null
@@ -514,6 +654,45 @@
           "trained_at": "2026-10-16T02:54:23.768245+00:00"
         },
         {
+          "baseline_label": "Market straddle",
+          "baseline_mae": 0.06260350096839344,
+          "cohort": "strict_options",
+          "coverage": {
+            "interval_50": 0.44819819819819817,
+            "interval_80": 0.7331081081081081,
+            "p10": 0.1751126126126126,
+            "p25": 0.34346846846846846,
+            "p50": 0.5838963963963963,
+            "p75": 0.7916666666666666,
+            "p90": 0.9082207207207207
+          },
+          "feature_count": 45,
+          "horizon_days": 1,
+          "interval_status": "held",
+          "interval_width": {
+            "interval_50_mean": null,
+            "interval_80_mean": null
+          },
+          "metric_scope": "historical_out_of_sample",
+          "model_mae": 0.0433643680970811,
+          "model_r2": null,
+          "model_rmse": null,
+          "model_version": "v3",
+          "n_matched_baseline": 1776,
+          "n_train": 26023,
+          "n_validation": 1776,
+          "quantiles": [
+            0.1,
+            0.25,
+            0.5,
+            0.75,
+            0.9
+          ],
+          "relative_mae_improvement": 0.30731720388969264,
+          "straddle_baseline_mae": 0.06260350096839344,
+          "trained_at": "2026-10-16T02:54:23.768245+00:00"
+        },
+        {
           "baseline_label": "Historical move",
           "baseline_mae": 0.05760336144855015,
           "cohort": "optionless",
@@ -528,6 +707,7 @@
           },
           "feature_count": 45,
           "horizon_days": 2,
+          "interval_status": "passed",
           "interval_width": {
             "interval_50_mean": null,
             "interval_80_mean": null
@@ -566,6 +746,7 @@
           },
           "feature_count": 45,
           "horizon_days": 2,
+          "interval_status": "passed",
           "interval_width": {
             "interval_50_mean": null,
             "interval_80_mean": null
@@ -590,6 +771,45 @@
           "trained_at": "2026-10-16T02:55:50.035024+00:00"
         },
         {
+          "baseline_label": "Historical move",
+          "baseline_mae": 0.06065949172896817,
+          "cohort": "optionless",
+          "coverage": {
+            "interval_50": 0.5003121098626716,
+            "interval_80": 0.7777777777777778,
+            "p10": 0.13607990012484394,
+            "p25": 0.30867665418227214,
+            "p50": 0.58270911360799,
+            "p75": 0.8089887640449438,
+            "p90": 0.9138576779026217
+          },
+          "feature_count": 45,
+          "horizon_days": 3,
+          "interval_status": "held",
+          "interval_width": {
+            "interval_50_mean": null,
+            "interval_80_mean": null
+          },
+          "metric_scope": "historical_out_of_sample",
+          "model_mae": 0.054434298600280234,
+          "model_r2": null,
+          "model_rmse": null,
+          "model_version": "v3",
+          "n_matched_baseline": 2842,
+          "n_train": 13577,
+          "n_validation": 3204,
+          "quantiles": [
+            0.1,
+            0.25,
+            0.5,
+            0.75,
+            0.9
+          ],
+          "relative_mae_improvement": 0.1026252108491551,
+          "straddle_baseline_mae": 0.06065949172896817,
+          "trained_at": "2026-10-16T02:56:29.240545+00:00"
+        },
+        {
           "baseline_label": "Market straddle",
           "baseline_mae": 0.06259107719725943,
           "cohort": "strict_options",
@@ -604,6 +824,7 @@
           },
           "feature_count": 45,
           "horizon_days": 3,
+          "interval_status": "passed",
           "interval_width": {
             "interval_50_mean": null,
             "interval_80_mean": null
@@ -642,6 +863,7 @@
           },
           "feature_count": 45,
           "horizon_days": 4,
+          "interval_status": "passed",
           "interval_width": {
             "interval_50_mean": null,
             "interval_80_mean": null
@@ -666,6 +888,45 @@
           "trained_at": "2026-10-16T02:57:05.145112+00:00"
         },
         {
+          "baseline_label": "Market straddle",
+          "baseline_mae": 0.06330943926344797,
+          "cohort": "strict_options",
+          "coverage": {
+            "interval_50": 0.5007898894154819,
+            "interval_80": 0.8135860979462876,
+            "p10": 0.13112164296998421,
+            "p25": 0.315955766192733,
+            "p50": 0.6018957345971564,
+            "p75": 0.8167456556082149,
+            "p90": 0.9447077409162717
+          },
+          "feature_count": 45,
+          "horizon_days": 4,
+          "interval_status": "held",
+          "interval_width": {
+            "interval_50_mean": null,
+            "interval_80_mean": null
+          },
+          "metric_scope": "historical_out_of_sample",
+          "model_mae": 0.03815613770667187,
+          "model_r2": null,
+          "model_rmse": null,
+          "model_version": "v3",
+          "n_matched_baseline": 633,
+          "n_train": 11631,
+          "n_validation": 633,
+          "quantiles": [
+            0.1,
+            0.25,
+            0.5,
+            0.75,
+            0.9
+          ],
+          "relative_mae_improvement": 0.39730728702407714,
+          "straddle_baseline_mae": 0.06330943926344797,
+          "trained_at": "2026-10-16T02:57:05.145112+00:00"
+        },
+        {
           "baseline_label": "Historical move",
           "baseline_mae": 0.058095022055892974,
           "cohort": "optionless",
@@ -680,6 +941,7 @@
           },
           "feature_count": 45,
           "horizon_days": 5,
+          "interval_status": "passed",
           "interval_width": {
             "interval_50_mean": null,
             "interval_80_mean": null
@@ -704,6 +966,45 @@
           "trained_at": "2026-10-16T02:58:20.126502+00:00"
         },
         {
+          "baseline_label": "Market straddle",
+          "baseline_mae": 0.06635827273117982,
+          "cohort": "strict_options",
+          "coverage": {
+            "interval_50": 0.48282097649186256,
+            "interval_80": 0.7721518987341772,
+            "p10": 0.15009041591320071,
+            "p25": 0.32368896925858953,
+            "p50": 0.6030741410488246,
+            "p75": 0.8065099457504521,
+            "p90": 0.9222423146473779
+          },
+          "feature_count": 45,
+          "horizon_days": 5,
+          "interval_status": "held",
+          "interval_width": {
+            "interval_50_mean": null,
+            "interval_80_mean": null
+          },
+          "metric_scope": "historical_out_of_sample",
+          "model_mae": 0.043644427313058724,
+          "model_r2": null,
+          "model_rmse": null,
+          "model_version": "v3",
+          "n_matched_baseline": 1106,
+          "n_train": 18989,
+          "n_validation": 1106,
+          "quantiles": [
+            0.1,
+            0.25,
+            0.5,
+            0.75,
+            0.9
+          ],
+          "relative_mae_improvement": 0.3422910887107603,
+          "straddle_baseline_mae": 0.06635827273117982,
+          "trained_at": "2026-10-16T02:58:20.126502+00:00"
+        },
+        {
           "baseline_label": "Historical move",
           "baseline_mae": 0.058947366705283076,
           "cohort": "optionless",
@@ -718,6 +1019,7 @@
           },
           "feature_count": 45,
           "horizon_days": 6,
+          "interval_status": "passed",
           "interval_width": {
             "interval_50_mean": null,
             "interval_80_mean": null
@@ -742,6 +1044,45 @@
           "trained_at": "2026-10-16T03:00:02.851451+00:00"
         },
         {
+          "baseline_label": "Market straddle",
+          "baseline_mae": 0.06543250541336262,
+          "cohort": "strict_options",
+          "coverage": {
+            "interval_50": 0.47891392258809934,
+            "interval_80": 0.7596764875794338,
+            "p10": 0.1611785095320624,
+            "p25": 0.3292894280762565,
+            "p50": 0.5811669555170422,
+            "p75": 0.8082033506643559,
+            "p90": 0.9208549971114962
+          },
+          "feature_count": 45,
+          "horizon_days": 6,
+          "interval_status": "held",
+          "interval_width": {
+            "interval_50_mean": null,
+            "interval_80_mean": null
+          },
+          "metric_scope": "historical_out_of_sample",
+          "model_mae": 0.04263821997995207,
+          "model_r2": null,
+          "model_rmse": null,
+          "model_version": "v3",
+          "n_matched_baseline": 1731,
+          "n_train": 28433,
+          "n_validation": 1731,
+          "quantiles": [
+            0.1,
+            0.25,
+            0.5,
+            0.75,
+            0.9
+          ],
+          "relative_mae_improvement": 0.34836332934846637,
+          "straddle_baseline_mae": 0.06543250541336262,
+          "trained_at": "2026-10-16T03:00:02.851451+00:00"
+        },
+        {
           "baseline_label": "Historical move",
           "baseline_mae": 0.05873420664806907,
           "cohort": "optionless",
@@ -756,6 +1097,7 @@
           },
           "feature_count": 45,
           "horizon_days": 7,
+          "interval_status": "passed",
           "interval_width": {
             "interval_50_mean": null,
             "interval_80_mean": null
@@ -794,6 +1136,7 @@
           },
           "feature_count": 45,
           "horizon_days": 7,
+          "interval_status": "passed",
           "interval_width": {
             "interval_50_mean": null,
             "interval_80_mean": null
@@ -818,6 +1161,201 @@
           "trained_at": "2026-10-16T03:02:13.282895+00:00"
         },
         {
+          "baseline_label": "Historical move",
+          "baseline_mae": 0.057987909108194124,
+          "cohort": "optionless",
+          "coverage": {
+            "interval_50": 0.48934987960733467,
+            "interval_80": 0.7842192998703463,
+            "p10": 0.1348397851453973,
+            "p25": 0.3196888312650491,
+            "p50": 0.5808483052417114,
+            "p75": 0.8088534913872939,
+            "p90": 0.9188738655306539
+          },
+          "feature_count": 45,
+          "horizon_days": 8,
+          "interval_status": "held",
+          "interval_width": {
+            "interval_50_mean": null,
+            "interval_80_mean": null
+          },
+          "metric_scope": "historical_out_of_sample",
+          "model_mae": 0.05206461902523327,
+          "model_r2": null,
+          "model_rmse": null,
+          "model_version": "v3",
+          "n_matched_baseline": 4848,
+          "n_train": 25617,
+          "n_validation": 5399,
+          "quantiles": [
+            0.1,
+            0.25,
+            0.5,
+            0.75,
+            0.9
+          ],
+          "relative_mae_improvement": 0.10214698501905195,
+          "straddle_baseline_mae": 0.057987909108194124,
+          "trained_at": "2026-10-16T03:03:50.606099+00:00"
+        },
+        {
+          "baseline_label": "Market straddle",
+          "baseline_mae": 0.06564700257568616,
+          "cohort": "strict_options",
+          "coverage": {
+            "interval_50": 0.4511602806260119,
+            "interval_80": 0.7366432811656772,
+            "p10": 0.17485159201295197,
+            "p25": 0.34646519158121963,
+            "p50": 0.5790609821910415,
+            "p75": 0.7976254722072316,
+            "p90": 0.9114948731786292
+          },
+          "feature_count": 45,
+          "horizon_days": 8,
+          "interval_status": "held",
+          "interval_width": {
+            "interval_50_mean": null,
+            "interval_80_mean": null
+          },
+          "metric_scope": "historical_out_of_sample",
+          "model_mae": 0.04356027390480073,
+          "model_r2": null,
+          "model_rmse": null,
+          "model_version": "v3",
+          "n_matched_baseline": 1853,
+          "n_train": 25617,
+          "n_validation": 1853,
+          "quantiles": [
+            0.1,
+            0.25,
+            0.5,
+            0.75,
+            0.9
+          ],
+          "relative_mae_improvement": 0.33644687197136014,
+          "straddle_baseline_mae": 0.06564700257568616,
+          "trained_at": "2026-10-16T03:03:50.606099+00:00"
+        },
+        {
+          "baseline_label": "Historical move",
+          "baseline_mae": 0.0574518638548339,
+          "cohort": "optionless",
+          "coverage": {
+            "interval_50": 0.48820981713185757,
+            "interval_80": 0.7872954764196343,
+            "p10": 0.13041385948026948,
+            "p25": 0.3221847930702599,
+            "p50": 0.5803657362848893,
+            "p75": 0.8101539942252165,
+            "p90": 0.917228103946102
+          },
+          "feature_count": 45,
+          "horizon_days": 9,
+          "interval_status": "held",
+          "interval_width": {
+            "interval_50_mean": null,
+            "interval_80_mean": null
+          },
+          "metric_scope": "historical_out_of_sample",
+          "model_mae": 0.05136326656303559,
+          "model_r2": null,
+          "model_rmse": null,
+          "model_version": "v3",
+          "n_matched_baseline": 3725,
+          "n_train": 18495,
+          "n_validation": 4156,
+          "quantiles": [
+            0.1,
+            0.25,
+            0.5,
+            0.75,
+            0.9
+          ],
+          "relative_mae_improvement": 0.10597736754342091,
+          "straddle_baseline_mae": 0.0574518638548339,
+          "trained_at": "2026-10-16T03:04:38.877069+00:00"
+        },
+        {
+          "baseline_label": "Market straddle",
+          "baseline_mae": 0.06585901670263941,
+          "cohort": "strict_options",
+          "coverage": {
+            "interval_50": 0.4351648351648352,
+            "interval_80": 0.756043956043956,
+            "p10": 0.14652014652014653,
+            "p25": 0.3487179487179487,
+            "p50": 0.5655677655677656,
+            "p75": 0.7838827838827839,
+            "p90": 0.9025641025641026
+          },
+          "feature_count": 45,
+          "horizon_days": 9,
+          "interval_status": "held",
+          "interval_width": {
+            "interval_50_mean": null,
+            "interval_80_mean": null
+          },
+          "metric_scope": "historical_out_of_sample",
+          "model_mae": 0.04385981793445553,
+          "model_r2": null,
+          "model_rmse": null,
+          "model_version": "v3",
+          "n_matched_baseline": 1365,
+          "n_train": 18495,
+          "n_validation": 1365,
+          "quantiles": [
+            0.1,
+            0.25,
+            0.5,
+            0.75,
+            0.9
+          ],
+          "relative_mae_improvement": 0.3340347285704651,
+          "straddle_baseline_mae": 0.06585901670263941,
+          "trained_at": "2026-10-16T03:04:38.877069+00:00"
+        },
+        {
+          "baseline_label": "Historical move",
+          "baseline_mae": 0.060650792742897454,
+          "cohort": "optionless",
+          "coverage": {
+            "interval_50": 0.4919454770755886,
+            "interval_80": 0.7881040892193308,
+            "p10": 0.129182156133829,
+            "p25": 0.313816604708798,
+            "p50": 0.5895291201982652,
+            "p75": 0.8057620817843866,
+            "p90": 0.9169764560099133
+          },
+          "feature_count": 45,
+          "horizon_days": 10,
+          "interval_status": "held",
+          "interval_width": {
+            "interval_50_mean": null,
+            "interval_80_mean": null
+          },
+          "metric_scope": "historical_out_of_sample",
+          "model_mae": 0.0545507066435583,
+          "model_r2": null,
+          "model_rmse": null,
+          "model_version": "v3",
+          "n_matched_baseline": 2866,
+          "n_train": 13251,
+          "n_validation": 3228,
+          "quantiles": [
+            0.1,
+            0.25,
+            0.5,
+            0.75,
+            0.9
+          ],
+          "relative_mae_improvement": 0.1005771866032783,
+          "straddle_baseline_mae": 0.060650792742897454,
+          "trained_at": "2026-10-16T03:05:43.134753+00:00"
+        },
+        {
           "baseline_label": "Market straddle",
           "baseline_mae": 0.06714521867325736,
           "cohort": "strict_options",
@@ -832,6 +1370,7 @@
           },
           "feature_count": 45,
           "horizon_days": 10,
+          "interval_status": "passed",
           "interval_width": {
             "interval_50_mean": null,
             "interval_80_mean": null
@@ -870,6 +1409,7 @@
           },
           "feature_count": 45,
           "horizon_days": 11,
+          "interval_status": "passed",
           "interval_width": {
             "interval_50_mean": null,
             "interval_80_mean": null
@@ -894,6 +1434,45 @@
           "trained_at": "2026-10-16T03:06:22.516991+00:00"
         },
         {
+          "baseline_label": "Market straddle",
+          "baseline_mae": 0.06627664177006455,
+          "cohort": "strict_options",
+          "coverage": {
+            "interval_50": 0.4767277856135402,
+            "interval_80": 0.7870239774330042,
+            "p10": 0.14386459802538787,
+            "p25": 0.3385049365303244,
+            "p50": 0.61212976022567,
+            "p75": 0.8152327221438646,
+            "p90": 0.9308885754583921
+          },
+          "feature_count": 45,
+          "horizon_days": 11,
+          "interval_status": "held",
+          "interval_width": {
+            "interval_50_mean": null,
+            "interval_80_mean": null
+          },
+          "metric_scope": "historical_out_of_sample",
+          "model_mae": 0.039836562635080563,
+          "model_r2": null,
+          "model_rmse": null,
+          "model_version": "v3",
+          "n_matched_baseline": 709,
+          "n_train": 11012,
+          "n_validation": 709,
+          "quantiles": [
+            0.1,
+            0.25,
+            0.5,
+            0.75,
+            0.9
+          ],
+          "relative_mae_improvement": 0.3989351063790062,
+          "straddle_baseline_mae": 0.06627664177006455,
+          "trained_at": "2026-10-16T03:06:22.516991+00:00"
+        },
+        {
           "baseline_label": "Historical move",
           "baseline_mae": 0.058428484272312765,
           "cohort": "optionless",
@@ -908,6 +1487,7 @@
           },
           "feature_count": 45,
           "horizon_days": 12,
+          "interval_status": "passed",
           "interval_width": {
             "interval_50_mean": null,
             "interval_80_mean": null
@@ -932,6 +1512,45 @@
           "trained_at": "2026-10-16T03:07:37.178658+00:00"
         },
         {
+          "baseline_label": "Market straddle",
+          "baseline_mae": 0.06716008667941431,
+          "cohort": "strict_options",
+          "coverage": {
+            "interval_50": 0.4925619834710744,
+            "interval_80": 0.7793388429752066,
+            "p10": 0.1371900826446281,
+            "p25": 0.31322314049586775,
+            "p50": 0.5818181818181818,
+            "p75": 0.8057851239669421,
+            "p90": 0.9165289256198347
+          },
+          "feature_count": 45,
+          "horizon_days": 12,
+          "interval_status": "held",
+          "interval_width": {
+            "interval_50_mean": null,
+            "interval_80_mean": null
+          },
+          "metric_scope": "historical_out_of_sample",
+          "model_mae": 0.043043025449777214,
+          "model_r2": null,
+          "model_rmse": null,
+          "model_version": "v3",
+          "n_matched_baseline": 1210,
+          "n_train": 17956,
+          "n_validation": 1210,
+          "quantiles": [
+            0.1,
+            0.25,
+            0.5,
+            0.75,
+            0.9
+          ],
+          "relative_mae_improvement": 0.3590981254202189,
+          "straddle_baseline_mae": 0.06716008667941431,
+          "trained_at": "2026-10-16T03:07:37.178658+00:00"
+        },
+        {
           "baseline_label": "Historical move",
           "baseline_mae": 0.05913779194212162,
           "cohort": "optionless",
@@ -946,6 +1565,7 @@
           },
           "feature_count": 45,
           "horizon_days": 13,
+          "interval_status": "passed",
           "interval_width": {
             "interval_50_mean": null,
             "interval_80_mean": null
@@ -970,6 +1590,45 @@
           "trained_at": "2026-10-16T03:08:57.211695+00:00"
         },
         {
+          "baseline_label": "Market straddle",
+          "baseline_mae": 0.06799384241947093,
+          "cohort": "strict_options",
+          "coverage": {
+            "interval_50": 0.47639717851329355,
+            "interval_80": 0.7552902875746066,
+            "p10": 0.149755832881172,
+            "p25": 0.33423765599565924,
+            "p50": 0.5919696147585458,
+            "p75": 0.8106348345089528,
+            "p90": 0.9050461204557786
+          },
+          "feature_count": 45,
+          "horizon_days": 13,
+          "interval_status": "held",
+          "interval_width": {
+            "interval_50_mean": null,
+            "interval_80_mean": null
+          },
+          "metric_scope": "historical_out_of_sample",
+          "model_mae": 0.04401396400699891,
+          "model_r2": null,
+          "model_rmse": null,
+          "model_version": "v3",
+          "n_matched_baseline": 1843,
+          "n_train": 28013,
+          "n_validation": 1843,
+          "quantiles": [
+            0.1,
+            0.25,
+            0.5,
+            0.75,
+            0.9
+          ],
+          "relative_mae_improvement": 0.3526772066290089,
+          "straddle_baseline_mae": 0.06799384241947093,
+          "trained_at": "2026-10-16T03:08:57.211695+00:00"
+        },
+        {
           "baseline_label": "Historical move",
           "baseline_mae": 0.05870801316103943,
           "cohort": "optionless",
@@ -984,6 +1643,7 @@
           },
           "feature_count": 45,
           "horizon_days": 14,
+          "interval_status": "passed",
           "interval_width": {
             "interval_50_mean": null,
             "interval_80_mean": null
@@ -1022,6 +1682,7 @@
           },
           "feature_count": 45,
           "horizon_days": 14,
+          "interval_status": "passed",
           "interval_width": {
             "interval_50_mean": null,
             "interval_80_mean": null
@@ -1060,6 +1721,7 @@
           },
           "feature_count": 45,
           "horizon_days": 15,
+          "interval_status": "passed",
           "interval_width": {
             "interval_50_mean": null,
             "interval_80_mean": null
@@ -1098,6 +1760,7 @@
           },
           "feature_count": 45,
           "horizon_days": 15,
+          "interval_status": "passed",
           "interval_width": {
             "interval_50_mean": null,
             "interval_80_mean": null
@@ -1122,6 +1785,45 @@
           "trained_at": "2026-10-16T03:11:31.719826+00:00"
         },
         {
+          "baseline_label": "Historical move",
+          "baseline_mae": 0.057283562443330195,
+          "cohort": "optionless",
+          "coverage": {
+            "interval_50": 0.49616858237547895,
+            "interval_80": 0.7861590038314177,
+            "p10": 0.1300287356321839,
+            "p25": 0.31082375478927204,
+            "p50": 0.5821360153256705,
+            "p75": 0.8069923371647509,
+            "p90": 0.9161877394636015
+          },
+          "feature_count": 45,
+          "horizon_days": 16,
+          "interval_status": "held",
+          "interval_width": {
+            "interval_50_mean": null,
+            "interval_80_mean": null
+          },
+          "metric_scope": "historical_out_of_sample",
+          "model_mae": 0.0513253007551154,
+          "model_r2": null,
+          "model_rmse": null,
+          "model_version": "v3",
+          "n_matched_baseline": 3739,
+          "n_train": 18254,
+          "n_validation": 4176,
+          "quantiles": [
+            0.1,
+            0.25,
+            0.5,
+            0.75,
+            0.9
+          ],
+          "relative_mae_improvement": 0.10401346274700041,
+          "straddle_baseline_mae": 0.057283562443330195,
+          "trained_at": "2026-10-16T03:12:37.755286+00:00"
+        },
+        {
           "baseline_label": "Market straddle",
           "baseline_mae": 0.07090885737570927,
           "cohort": "strict_options",
@@ -1136,6 +1838,7 @@
           },
           "feature_count": 45,
           "horizon_days": 16,
+          "interval_status": "passed",
           "interval_width": {
             "interval_50_mean": null,
             "interval_80_mean": null
@@ -1160,6 +1863,45 @@
           "trained_at": "2026-10-16T03:12:37.755286+00:00"
         },
         {
+          "baseline_label": "Historical move",
+          "baseline_mae": 0.06109948760349399,
+          "cohort": "optionless",
+          "coverage": {
+            "interval_50": 0.49111872857588035,
+            "interval_80": 0.7790588968526021,
+            "p10": 0.1327516360236834,
+            "p25": 0.3138049236522281,
+            "p50": 0.5811779370520411,
+            "p75": 0.8049236522281085,
+            "p90": 0.9118105328762854
+          },
+          "feature_count": 45,
+          "horizon_days": 17,
+          "interval_status": "held",
+          "interval_width": {
+            "interval_50_mean": null,
+            "interval_80_mean": null
+          },
+          "metric_scope": "historical_out_of_sample",
+          "model_mae": 0.0547690104288505,
+          "model_r2": null,
+          "model_rmse": null,
+          "model_version": "v3",
+          "n_matched_baseline": 2845,
+          "n_train": 13134,
+          "n_validation": 3209,
+          "quantiles": [
+            0.1,
+            0.25,
+            0.5,
+            0.75,
+            0.9
+          ],
+          "relative_mae_improvement": 0.10360933328484223,
+          "straddle_baseline_mae": 0.06109948760349399,
+          "trained_at": "2026-10-16T03:13:25.467755+00:00"
+        },
+        {
           "baseline_label": "Market straddle",
           "baseline_mae": 0.07314911149101572,
           "cohort": "strict_options",
@@ -1174,6 +1916,7 @@
           },
           "feature_count": 45,
           "horizon_days": 17,
+          "interval_status": "passed",
           "interval_width": {
             "interval_50_mean": null,
             "interval_80_mean": null
@@ -1212,6 +1955,7 @@
           },
           "feature_count": 45,
           "horizon_days": 18,
+          "interval_status": "passed",
           "interval_width": {
             "interval_50_mean": null,
             "interval_80_mean": null
@@ -1250,6 +1994,7 @@
           },
           "feature_count": 45,
           "horizon_days": 18,
+          "interval_status": "passed",
           "interval_width": {
             "interval_50_mean": null,
             "interval_80_mean": null
@@ -1288,6 +2033,7 @@
           },
           "feature_count": 45,
           "horizon_days": 19,
+          "interval_status": "passed",
           "interval_width": {
             "interval_50_mean": null,
             "interval_80_mean": null
@@ -1312,6 +2058,45 @@
           "trained_at": "2026-10-16T03:14:38.327907+00:00"
         },
         {
+          "baseline_label": "Market straddle",
+          "baseline_mae": 0.07504356624132649,
+          "cohort": "strict_options",
+          "coverage": {
+            "interval_50": 0.4620141342756184,
+            "interval_80": 0.7791519434628975,
+            "p10": 0.14575971731448764,
+            "p25": 0.3339222614840989,
+            "p50": 0.5830388692579506,
+            "p75": 0.7959363957597173,
+            "p90": 0.9249116607773852
+          },
+          "feature_count": 45,
+          "horizon_days": 19,
+          "interval_status": "held",
+          "interval_width": {
+            "interval_50_mean": null,
+            "interval_80_mean": null
+          },
+          "metric_scope": "historical_out_of_sample",
+          "model_mae": 0.0442477403448586,
+          "model_r2": null,
+          "model_rmse": null,
+          "model_version": "v3",
+          "n_matched_baseline": 1132,
+          "n_train": 17691,
+          "n_validation": 1132,
+          "quantiles": [
+            0.1,
+            0.25,
+            0.5,
+            0.75,
+            0.9
+          ],
+          "relative_mae_improvement": 0.41037263337717855,
+          "straddle_baseline_mae": 0.07504356624132649,
+          "trained_at": "2026-10-16T03:14:38.327907+00:00"
+        },
+        {
           "baseline_label": "Historical move",
           "baseline_mae": 0.059600711315566234,
           "cohort": "optionless",
@@ -1326,6 +2111,7 @@
           },
           "feature_count": 45,
           "horizon_days": 20,
+          "interval_status": "passed",
           "interval_width": {
             "interval_50_mean": null,
             "interval_80_mean": null
@@ -1364,6 +2150,7 @@
           },
           "feature_count": 45,
           "horizon_days": 20,
+          "interval_status": "passed",
           "interval_width": {
             "interval_50_mean": null,
             "interval_80_mean": null
@@ -1388,6 +2175,45 @@
           "trained_at": "2026-10-16T03:15:49.074018+00:00"
         },
         {
+          "baseline_label": "Historical move",
+          "baseline_mae": 0.05830633497919946,
+          "cohort": "optionless",
+          "coverage": {
+            "interval_50": 0.49960057517175266,
+            "interval_80": 0.7899025403419077,
+            "p10": 0.13053203387122544,
+            "p25": 0.30739734781914047,
+            "p50": 0.5823613995845982,
+            "p75": 0.8069979229908931,
+            "p90": 0.9204345742131331
+          },
+          "feature_count": 45,
+          "horizon_days": 21,
+          "interval_status": "held",
+          "interval_width": {
+            "interval_50_mean": null,
+            "interval_80_mean": null
+          },
+          "metric_scope": "historical_out_of_sample",
+          "model_mae": 0.052625152869549316,
+          "model_r2": null,
+          "model_rmse": null,
+          "model_version": "v3",
+          "n_matched_baseline": 5634,
+          "n_train": 28132,
+          "n_validation": 6259,
+          "quantiles": [
+            0.1,
+            0.25,
+            0.5,
+            0.75,
+            0.9
+          ],
+          "relative_mae_improvement": 0.09743678987329385,
+          "straddle_baseline_mae": 0.05830633497919946,
+          "trained_at": "2026-10-16T03:17:12.766332+00:00"
+        },
+        {
           "baseline_label": "Market straddle",
           "baseline_mae": 0.07603738610844493,
           "cohort": "strict_options",
@@ -1402,6 +2228,7 @@
           },
           "feature_count": 45,
           "horizon_days": 21,
+          "interval_status": "passed",
           "interval_width": {
             "interval_50_mean": null,
             "interval_80_mean": null
@@ -1440,6 +2267,7 @@
           },
           "feature_count": 45,
           "horizon_days": 22,
+          "interval_status": "passed",
           "interval_width": {
             "interval_50_mean": null,
             "interval_80_mean": null
@@ -1464,6 +2292,45 @@
           "trained_at": "2026-10-16T03:18:23.932867+00:00"
         },
         {
+          "baseline_label": "Market straddle",
+          "baseline_mae": 0.07521539613644923,
+          "cohort": "strict_options",
+          "coverage": {
+            "interval_50": 0.45621064682312534,
+            "interval_80": 0.7515741270749857,
+            "p10": 0.15855752718946767,
+            "p25": 0.3314253005151689,
+            "p50": 0.5609616485403549,
+            "p75": 0.7876359473382942,
+            "p90": 0.9101316542644533
+          },
+          "feature_count": 45,
+          "horizon_days": 22,
+          "interval_status": "held",
+          "interval_width": {
+            "interval_50_mean": null,
+            "interval_80_mean": null
+          },
+          "metric_scope": "historical_out_of_sample",
+          "model_mae": 0.043345245657690906,
+          "model_r2": null,
+          "model_rmse": null,
+          "model_version": "v3",
+          "n_matched_baseline": 1747,
+          "n_train": 24210,
+          "n_validation": 1747,
+          "quantiles": [
+            0.1,
+            0.25,
+            0.5,
+            0.75,
+            0.9
+          ],
+          "relative_mae_improvement": 0.4237184421782778,
+          "straddle_baseline_mae": 0.07521539613644923,
+          "trained_at": "2026-10-16T03:18:23.932867+00:00"
+        },
+        {
           "baseline_label": "Historical move",
           "baseline_mae": 0.05749964165098366,
           "cohort": "optionless",
@@ -1478,6 +2345,7 @@
           },
           "feature_count": 45,
           "horizon_days": 23,
+          "interval_status": "passed",
           "interval_width": {
             "interval_50_mean": null,
             "interval_80_mean": null
@@ -1516,6 +2384,7 @@
           },
           "feature_count": 45,
           "horizon_days": 23,
+          "interval_status": "passed",
           "interval_width": {
             "interval_50_mean": null,
             "interval_80_mean": null
@@ -1540,6 +2409,45 @@
           "trained_at": "2026-10-16T03:19:39.238319+00:00"
         },
         {
+          "baseline_label": "Historical move",
+          "baseline_mae": 0.061018186189194946,
+          "cohort": "optionless",
+          "coverage": {
+            "interval_50": 0.4900559353635799,
+            "interval_80": 0.7830950901180858,
+            "p10": 0.12771908017402114,
+            "p25": 0.31821006836544435,
+            "p50": 0.5826600372902424,
+            "p75": 0.8082660037290242,
+            "p90": 0.9108141702921069
+          },
+          "feature_count": 45,
+          "horizon_days": 24,
+          "interval_status": "held",
+          "interval_width": {
+            "interval_50_mean": null,
+            "interval_80_mean": null
+          },
+          "metric_scope": "historical_out_of_sample",
+          "model_mae": 0.05495041245770062,
+          "model_r2": null,
+          "model_rmse": null,
+          "model_version": "v3",
+          "n_matched_baseline": 2868,
+          "n_train": 12423,
+          "n_validation": 3218,
+          "quantiles": [
+            0.1,
+            0.25,
+            0.5,
+            0.75,
+            0.9
+          ],
+          "relative_mae_improvement": 0.09944205343437107,
+          "straddle_baseline_mae": 0.061018186189194946,
+          "trained_at": "2026-10-16T03:20:23.946764+00:00"
+        },
+        {
           "baseline_label": "Market straddle",
           "baseline_mae": 0.07884483834498014,
           "cohort": "strict_options",
@@ -1554,6 +2462,7 @@
           },
           "feature_count": 45,
           "horizon_days": 24,
+          "interval_status": "passed",
           "interval_width": {
             "interval_50_mean": null,
             "interval_80_mean": null
@@ -1578,6 +2487,45 @@
           "trained_at": "2026-10-16T03:20:23.946764+00:00"
         },
         {
+          "baseline_label": "Historical move",
+          "baseline_mae": 0.06148715434328218,
+          "cohort": "optionless",
+          "coverage": {
+            "interval_50": 0.47824175824175824,
+            "interval_80": 0.7753846153846153,
+            "p10": 0.13274725274725274,
+            "p25": 0.3314285714285714,
+            "p50": 0.5986813186813187,
+            "p75": 0.8096703296703297,
+            "p90": 0.9081318681318681
+          },
+          "feature_count": 45,
+          "horizon_days": 25,
+          "interval_status": "held",
+          "interval_width": {
+            "interval_50_mean": null,
+            "interval_80_mean": null
+          },
+          "metric_scope": "historical_out_of_sample",
+          "model_mae": 0.055839980396537064,
+          "model_r2": null,
+          "model_rmse": null,
+          "model_version": "v3",
+          "n_matched_baseline": 2002,
+          "n_train": 10086,
+          "n_validation": 2275,
+          "quantiles": [
+            0.1,
+            0.25,
+            0.5,
+            0.75,
+            0.9
+          ],
+          "relative_mae_improvement": 0.09184315011908017,
+          "straddle_baseline_mae": 0.06148715434328218,
+          "trained_at": "2026-10-16T03:20:55.480751+00:00"
+        },
+        {
           "baseline_label": "Market straddle",
           "baseline_mae": 0.07892083298552172,
           "cohort": "strict_options",
@@ -1592,6 +2540,7 @@
           },
           "feature_count": 45,
           "horizon_days": 25,
+          "interval_status": "passed",
           "interval_width": {
             "interval_50_mean": null,
             "interval_80_mean": null
@@ -1618,23 +2567,28 @@
       ],
       "model_bundle_sha256": "b8ac16d8b000b8492ee7b34f13818de979608c06099bb3bdf63e72bedd94a9d2",
       "model_validation_receipt_id": "sha256:2c0e4e60974ba29b9ee340f465612d79a4e450844ec7f66c84df6279074cc7ca",
-      "receipt_id": "sha256:04c180e00c6d829fb18e4d554f406c8e645e19d1c3cc35c7d050857271071a8b",
+      "receipt_id": "sha256:b75a3b464e0a256f53d925ce405f9ee8034eaeb47f45c2239e8083b38affccb1",
       "schema": "quantiv.model-evaluation-receipt.v1",
       "serving_capabilities": {
         "1": [
-          "optionless"
+          "optionless",
+          "strict_options"
         ],
         "10": [
+          "optionless",
           "strict_options"
         ],
         "11": [
-          "optionless"
+          "optionless",
+          "strict_options"
         ],
         "12": [
-          "optionless"
+          "optionless",
+          "strict_options"
         ],
         "13": [
-          "optionless"
+          "optionless",
+          "strict_options"
         ],
         "14": [
           "optionless",
@@ -1645,9 +2599,11 @@
           "strict_options"
         ],
         "16": [
+          "optionless",
           "strict_options"
         ],
         "17": [
+          "optionless",
           "strict_options"
         ],
         "18": [
@@ -1655,7 +2611,8 @@
           "strict_options"
         ],
         "19": [
-          "optionless"
+          "optionless",
+          "strict_options"
         ],
         "2": [
           "optionless",
@@ -1666,40 +2623,56 @@
           "strict_options"
         ],
         "21": [
+          "optionless",
           "strict_options"
         ],
         "22": [
-          "optionless"
+          "optionless",
+          "strict_options"
         ],
         "23": [
           "optionless",
           "strict_options"
         ],
         "24": [
+          "optionless",
           "strict_options"
         ],
         "25": [
+          "optionless",
           "strict_options"
         ],
         "3": [
+          "optionless",
           "strict_options"
         ],
         "4": [
-          "optionless"
+          "optionless",
+          "strict_options"
         ],
         "5": [
-          "optionless"
+          "optionless",
+          "strict_options"
         ],
         "6": [
-          "optionless"
+          "optionless",
+          "strict_options"
         ],
         "7": [
+          "optionless",
+          "strict_options"
+        ],
+        "8": [
+          "optionless",
+          "strict_options"
+        ],
+        "9": [
           "optionless",
           "strict_options"
         ]
       },
       "source_bundle_id": "629386dcbf2736b8868df166bd54c5a656c197a34c55d1d7be44b5b9bc12c2ff",
-      "source_revision": "77784f190092be6df333ee75eb5c643d7e9d8150",
+      "source_revision": "dbbf526592b904ce182dba2e397e53e27305880a",
       "training_bundle_sha256": "1388e136fe4838fcd467d3c3a6eda4bb4a989c83b8ef451d6960cb04fe5e3820",
       "walk_forward": [
         {
@@ -1813,6 +2786,38 @@
           "test_days": 60,
           "validation_rows": 8858,
           "worst_fold_ratio": 0.8847815303489239
+        },
+        {
+          "baseline_straddle_mae": 0.05684595595197212,
+          "evaluation_scope": "development",
+          "fold_count": 4,
+          "folds_beating_baseline": 4,
+          "horizon_days": 8,
+          "improvement_vs_straddle": 0.14815154179707846,
+          "method": "expanding_purged_walk_forward",
+          "model_mae": 0.048424139932758646,
+          "purge_days": 5,
+          "requested_folds": 4,
+          "status": "passed",
+          "test_days": 60,
+          "validation_rows": 7778,
+          "worst_fold_ratio": 0.8804622032284352
+        },
+        {
+          "baseline_straddle_mae": 0.05623661520345812,
+          "evaluation_scope": "development",
+          "fold_count": 4,
+          "folds_beating_baseline": 4,
+          "horizon_days": 9,
+          "improvement_vs_straddle": 0.14156250857778607,
+          "method": "expanding_purged_walk_forward",
+          "model_mae": 0.04827561888133293,
+          "purge_days": 5,
+          "requested_folds": 4,
+          "status": "passed",
+          "test_days": 60,
+          "validation_rows": 5685,
+          "worst_fold_ratio": 0.9178349347875149
         },
         {
           "baseline_straddle_mae": 0.0582213954777943,
@@ -2074,7 +3079,7 @@
     },
     "status": "verified"
   },
-  "generated_at": "2026-10-28T09:06:43.787865+00:00",
+  "generated_at": "2026-11-18T17:47:46.792557+00:00",
   "horizons": [
     {
       "baseline_label": "Historical move",
@@ -2091,6 +3096,7 @@
       },
       "feature_count": 45,
       "horizon_days": 1,
+      "interval_status": "passed",
       "interval_width": {
         "interval_50_mean": null,
         "interval_80_mean": null
@@ -2115,6 +3121,45 @@
       "trained_at": "2026-10-16T02:54:23.768245+00:00"
     },
     {
+      "baseline_label": "Market straddle",
+      "baseline_mae": 0.06260350096839344,
+      "cohort": "strict_options",
+      "coverage": {
+        "interval_50": 0.44819819819819817,
+        "interval_80": 0.7331081081081081,
+        "p10": 0.1751126126126126,
+        "p25": 0.34346846846846846,
+        "p50": 0.5838963963963963,
+        "p75": 0.7916666666666666,
+        "p90": 0.9082207207207207
+      },
+      "feature_count": 45,
+      "horizon_days": 1,
+      "interval_status": "held",
+      "interval_width": {
+        "interval_50_mean": null,
+        "interval_80_mean": null
+      },
+      "metric_scope": "historical_out_of_sample",
+      "model_mae": 0.0433643680970811,
+      "model_r2": null,
+      "model_rmse": null,
+      "model_version": "v3",
+      "n_matched_baseline": 1776,
+      "n_train": 26023,
+      "n_validation": 1776,
+      "quantiles": [
+        0.1,
+        0.25,
+        0.5,
+        0.75,
+        0.9
+      ],
+      "relative_mae_improvement": 0.30731720388969264,
+      "straddle_baseline_mae": 0.06260350096839344,
+      "trained_at": "2026-10-16T02:54:23.768245+00:00"
+    },
+    {
       "baseline_label": "Historical move",
       "baseline_mae": 0.05760336144855015,
       "cohort": "optionless",
@@ -2129,6 +3174,7 @@
       },
       "feature_count": 45,
       "horizon_days": 2,
+      "interval_status": "passed",
       "interval_width": {
         "interval_50_mean": null,
         "interval_80_mean": null
@@ -2167,6 +3213,7 @@
       },
       "feature_count": 45,
       "horizon_days": 2,
+      "interval_status": "passed",
       "interval_width": {
         "interval_50_mean": null,
         "interval_80_mean": null
@@ -2191,6 +3238,45 @@
       "trained_at": "2026-10-16T02:55:50.035024+00:00"
     },
     {
+      "baseline_label": "Historical move",
+      "baseline_mae": 0.06065949172896817,
+      "cohort": "optionless",
+      "coverage": {
+        "interval_50": 0.5003121098626716,
+        "interval_80": 0.7777777777777778,
+        "p10": 0.13607990012484394,
+        "p25": 0.30867665418227214,
+        "p50": 0.58270911360799,
+        "p75": 0.8089887640449438,
+        "p90": 0.9138576779026217
+      },
+      "feature_count": 45,
+      "horizon_days": 3,
+      "interval_status": "held",
+      "interval_width": {
+        "interval_50_mean": null,
+        "interval_80_mean": null
+      },
+      "metric_scope": "historical_out_of_sample",
+      "model_mae": 0.054434298600280234,
+      "model_r2": null,
+      "model_rmse": null,
+      "model_version": "v3",
+      "n_matched_baseline": 2842,
+      "n_train": 13577,
+      "n_validation": 3204,
+      "quantiles": [
+        0.1,
+        0.25,
+        0.5,
+        0.75,
+        0.9
+      ],
+      "relative_mae_improvement": 0.1026252108491551,
+      "straddle_baseline_mae": 0.06065949172896817,
+      "trained_at": "2026-10-16T02:56:29.240545+00:00"
+    },
+    {
       "baseline_label": "Market straddle",
       "baseline_mae": 0.06259107719725943,
       "cohort": "strict_options",
@@ -2205,6 +3291,7 @@
       },
       "feature_count": 45,
       "horizon_days": 3,
+      "interval_status": "passed",
       "interval_width": {
         "interval_50_mean": null,
         "interval_80_mean": null
@@ -2243,6 +3330,7 @@
       },
       "feature_count": 45,
       "horizon_days": 4,
+      "interval_status": "passed",
       "interval_width": {
         "interval_50_mean": null,
         "interval_80_mean": null
@@ -2267,6 +3355,45 @@
       "trained_at": "2026-10-16T02:57:05.145112+00:00"
     },
     {
+      "baseline_label": "Market straddle",
+      "baseline_mae": 0.06330943926344797,
+      "cohort": "strict_options",
+      "coverage": {
+        "interval_50": 0.5007898894154819,
+        "interval_80": 0.8135860979462876,
+        "p10": 0.13112164296998421,
+        "p25": 0.315955766192733,
+        "p50": 0.6018957345971564,
+        "p75": 0.8167456556082149,
+        "p90": 0.9447077409162717
+      },
+      "feature_count": 45,
+      "horizon_days": 4,
+      "interval_status": "held",
+      "interval_width": {
+        "interval_50_mean": null,
+        "interval_80_mean": null
+      },
+      "metric_scope": "historical_out_of_sample",
+      "model_mae": 0.03815613770667187,
+      "model_r2": null,
+      "model_rmse": null,
+      "model_version": "v3",
+      "n_matched_baseline": 633,
+      "n_train": 11631,
+      "n_validation": 633,
+      "quantiles": [
+        0.1,
+        0.25,
+        0.5,
+        0.75,
+        0.9
+      ],
+      "relative_mae_improvement": 0.39730728702407714,
+      "straddle_baseline_mae": 0.06330943926344797,
+      "trained_at": "2026-10-16T02:57:05.145112+00:00"
+    },
+    {
       "baseline_label": "Historical move",
       "baseline_mae": 0.058095022055892974,
       "cohort": "optionless",
@@ -2281,6 +3408,7 @@
       },
       "feature_count": 45,
       "horizon_days": 5,
+      "interval_status": "passed",
       "interval_width": {
         "interval_50_mean": null,
         "interval_80_mean": null
@@ -2305,6 +3433,45 @@
       "trained_at": "2026-10-16T02:58:20.126502+00:00"
     },
     {
+      "baseline_label": "Market straddle",
+      "baseline_mae": 0.06635827273117982,
+      "cohort": "strict_options",
+      "coverage": {
+        "interval_50": 0.48282097649186256,
+        "interval_80": 0.7721518987341772,
+        "p10": 0.15009041591320071,
+        "p25": 0.32368896925858953,
+        "p50": 0.6030741410488246,
+        "p75": 0.8065099457504521,
+        "p90": 0.9222423146473779
+      },
+      "feature_count": 45,
+      "horizon_days": 5,
+      "interval_status": "held",
+      "interval_width": {
+        "interval_50_mean": null,
+        "interval_80_mean": null
+      },
+      "metric_scope": "historical_out_of_sample",
+      "model_mae": 0.043644427313058724,
+      "model_r2": null,
+      "model_rmse": null,
+      "model_version": "v3",
+      "n_matched_baseline": 1106,
+      "n_train": 18989,
+      "n_validation": 1106,
+      "quantiles": [
+        0.1,
+        0.25,
+        0.5,
+        0.75,
+        0.9
+      ],
+      "relative_mae_improvement": 0.3422910887107603,
+      "straddle_baseline_mae": 0.06635827273117982,
+      "trained_at": "2026-10-16T02:58:20.126502+00:00"
+    },
+    {
       "baseline_label": "Historical move",
       "baseline_mae": 0.058947366705283076,
       "cohort": "optionless",
@@ -2319,6 +3486,7 @@
       },
       "feature_count": 45,
       "horizon_days": 6,
+      "interval_status": "passed",
       "interval_width": {
         "interval_50_mean": null,
         "interval_80_mean": null
@@ -2343,6 +3511,45 @@
       "trained_at": "2026-10-16T03:00:02.851451+00:00"
     },
     {
+      "baseline_label": "Market straddle",
+      "baseline_mae": 0.06543250541336262,
+      "cohort": "strict_options",
+      "coverage": {
+        "interval_50": 0.47891392258809934,
+        "interval_80": 0.7596764875794338,
+        "p10": 0.1611785095320624,
+        "p25": 0.3292894280762565,
+        "p50": 0.5811669555170422,
+        "p75": 0.8082033506643559,
+        "p90": 0.9208549971114962
+      },
+      "feature_count": 45,
+      "horizon_days": 6,
+      "interval_status": "held",
+      "interval_width": {
+        "interval_50_mean": null,
+        "interval_80_mean": null
+      },
+      "metric_scope": "historical_out_of_sample",
+      "model_mae": 0.04263821997995207,
+      "model_r2": null,
+      "model_rmse": null,
+      "model_version": "v3",
+      "n_matched_baseline": 1731,
+      "n_train": 28433,
+      "n_validation": 1731,
+      "quantiles": [
+        0.1,
+        0.25,
+        0.5,
+        0.75,
+        0.9
+      ],
+      "relative_mae_improvement": 0.34836332934846637,
+      "straddle_baseline_mae": 0.06543250541336262,
+      "trained_at": "2026-10-16T03:00:02.851451+00:00"
+    },
+    {
       "baseline_label": "Historical move",
       "baseline_mae": 0.05873420664806907,
       "cohort": "optionless",
@@ -2357,6 +3564,7 @@
       },
       "feature_count": 45,
       "horizon_days": 7,
+      "interval_status": "passed",
       "interval_width": {
         "interval_50_mean": null,
         "interval_80_mean": null
@@ -2395,6 +3603,7 @@
       },
       "feature_count": 45,
       "horizon_days": 7,
+      "interval_status": "passed",
       "interval_width": {
         "interval_50_mean": null,
         "interval_80_mean": null
@@ -2419,6 +3628,201 @@
       "trained_at": "2026-10-16T03:02:13.282895+00:00"
     },
     {
+      "baseline_label": "Historical move",
+      "baseline_mae": 0.057987909108194124,
+      "cohort": "optionless",
+      "coverage": {
+        "interval_50": 0.48934987960733467,
+        "interval_80": 0.7842192998703463,
+        "p10": 0.1348397851453973,
+        "p25": 0.3196888312650491,
+        "p50": 0.5808483052417114,
+        "p75": 0.8088534913872939,
+        "p90": 0.9188738655306539
+      },
+      "feature_count": 45,
+      "horizon_days": 8,
+      "interval_status": "held",
+      "interval_width": {
+        "interval_50_mean": null,
+        "interval_80_mean": null
+      },
+      "metric_scope": "historical_out_of_sample",
+      "model_mae": 0.05206461902523327,
+      "model_r2": null,
+      "model_rmse": null,
+      "model_version": "v3",
+      "n_matched_baseline": 4848,
+      "n_train": 25617,
+      "n_validation": 5399,
+      "quantiles": [
+        0.1,
+        0.25,
+        0.5,
+        0.75,
+        0.9
+      ],
+      "relative_mae_improvement": 0.10214698501905195,
+      "straddle_baseline_mae": 0.057987909108194124,
+      "trained_at": "2026-10-16T03:03:50.606099+00:00"
+    },
+    {
+      "baseline_label": "Market straddle",
+      "baseline_mae": 0.06564700257568616,
+      "cohort": "strict_options",
+      "coverage": {
+        "interval_50": 0.4511602806260119,
+        "interval_80": 0.7366432811656772,
+        "p10": 0.17485159201295197,
+        "p25": 0.34646519158121963,
+        "p50": 0.5790609821910415,
+        "p75": 0.7976254722072316,
+        "p90": 0.9114948731786292
+      },
+      "feature_count": 45,
+      "horizon_days": 8,
+      "interval_status": "held",
+      "interval_width": {
+        "interval_50_mean": null,
+        "interval_80_mean": null
+      },
+      "metric_scope": "historical_out_of_sample",
+      "model_mae": 0.04356027390480073,
+      "model_r2": null,
+      "model_rmse": null,
+      "model_version": "v3",
+      "n_matched_baseline": 1853,
+      "n_train": 25617,
+      "n_validation": 1853,
+      "quantiles": [
+        0.1,
+        0.25,
+        0.5,
+        0.75,
+        0.9
+      ],
+      "relative_mae_improvement": 0.33644687197136014,
+      "straddle_baseline_mae": 0.06564700257568616,
+      "trained_at": "2026-10-16T03:03:50.606099+00:00"
+    },
+    {
+      "baseline_label": "Historical move",
+      "baseline_mae": 0.0574518638548339,
+      "cohort": "optionless",
+      "coverage": {
+        "interval_50": 0.48820981713185757,
+        "interval_80": 0.7872954764196343,
+        "p10": 0.13041385948026948,
+        "p25": 0.3221847930702599,
+        "p50": 0.5803657362848893,
+        "p75": 0.8101539942252165,
+        "p90": 0.917228103946102
+      },
+      "feature_count": 45,
+      "horizon_days": 9,
+      "interval_status": "held",
+      "interval_width": {
+        "interval_50_mean": null,
+        "interval_80_mean": null
+      },
+      "metric_scope": "historical_out_of_sample",
+      "model_mae": 0.05136326656303559,
+      "model_r2": null,
+      "model_rmse": null,
+      "model_version": "v3",
+      "n_matched_baseline": 3725,
+      "n_train": 18495,
+      "n_validation": 4156,
+      "quantiles": [
+        0.1,
+        0.25,
+        0.5,
+        0.75,
+        0.9
+      ],
+      "relative_mae_improvement": 0.10597736754342091,
+      "straddle_baseline_mae": 0.0574518638548339,
+      "trained_at": "2026-10-16T03:04:38.877069+00:00"
+    },
+    {
+      "baseline_label": "Market straddle",
+      "baseline_mae": 0.06585901670263941,
+      "cohort": "strict_options",
+      "coverage": {
+        "interval_50": 0.4351648351648352,
+        "interval_80": 0.756043956043956,
+        "p10": 0.14652014652014653,
+        "p25": 0.3487179487179487,
+        "p50": 0.5655677655677656,
+        "p75": 0.7838827838827839,
+        "p90": 0.9025641025641026
+      },
+      "feature_count": 45,
+      "horizon_days": 9,
+      "interval_status": "held",
+      "interval_width": {
+        "interval_50_mean": null,
+        "interval_80_mean": null
+      },
+      "metric_scope": "historical_out_of_sample",
+      "model_mae": 0.04385981793445553,
+      "model_r2": null,
+      "model_rmse": null,
+      "model_version": "v3",
+      "n_matched_baseline": 1365,
+      "n_train": 18495,
+      "n_validation": 1365,
+      "quantiles": [
+        0.1,
+        0.25,
+        0.5,
+        0.75,
+        0.9
+      ],
+      "relative_mae_improvement": 0.3340347285704651,
+      "straddle_baseline_mae": 0.06585901670263941,
+      "trained_at": "2026-10-16T03:04:38.877069+00:00"
+    },
+    {
+      "baseline_label": "Historical move",
+      "baseline_mae": 0.060650792742897454,
+      "cohort": "optionless",
+      "coverage": {
+        "interval_50": 0.4919454770755886,
+        "interval_80": 0.7881040892193308,
+        "p10": 0.129182156133829,
+        "p25": 0.313816604708798,
+        "p50": 0.5895291201982652,
+        "p75": 0.8057620817843866,
+        "p90": 0.9169764560099133
+      },
+      "feature_count": 45,
+      "horizon_days": 10,
+      "interval_status": "held",
+      "interval_width": {
+        "interval_50_mean": null,
+        "interval_80_mean": null
+      },
+      "metric_scope": "historical_out_of_sample",
+      "model_mae": 0.0545507066435583,
+      "model_r2": null,
+      "model_rmse": null,
+      "model_version": "v3",
+      "n_matched_baseline": 2866,
+      "n_train": 13251,
+      "n_validation": 3228,
+      "quantiles": [
+        0.1,
+        0.25,
+        0.5,
+        0.75,
+        0.9
+      ],
+      "relative_mae_improvement": 0.1005771866032783,
+      "straddle_baseline_mae": 0.060650792742897454,
+      "trained_at": "2026-10-16T03:05:43.134753+00:00"
+    },
+    {
       "baseline_label": "Market straddle",
       "baseline_mae": 0.06714521867325736,
       "cohort": "strict_options",
@@ -2433,6 +3837,7 @@
       },
       "feature_count": 45,
       "horizon_days": 10,
+      "interval_status": "passed",
       "interval_width": {
         "interval_50_mean": null,
         "interval_80_mean": null
@@ -2471,6 +3876,7 @@
       },
       "feature_count": 45,
       "horizon_days": 11,
+      "interval_status": "passed",
       "interval_width": {
         "interval_50_mean": null,
         "interval_80_mean": null
@@ -2495,6 +3901,45 @@
       "trained_at": "2026-10-16T03:06:22.516991+00:00"
     },
     {
+      "baseline_label": "Market straddle",
+      "baseline_mae": 0.06627664177006455,
+      "cohort": "strict_options",
+      "coverage": {
+        "interval_50": 0.4767277856135402,
+        "interval_80": 0.7870239774330042,
+        "p10": 0.14386459802538787,
+        "p25": 0.3385049365303244,
+        "p50": 0.61212976022567,
+        "p75": 0.8152327221438646,
+        "p90": 0.9308885754583921
+      },
+      "feature_count": 45,
+      "horizon_days": 11,
+      "interval_status": "held",
+      "interval_width": {
+        "interval_50_mean": null,
+        "interval_80_mean": null
+      },
+      "metric_scope": "historical_out_of_sample",
+      "model_mae": 0.039836562635080563,
+      "model_r2": null,
+      "model_rmse": null,
+      "model_version": "v3",
+      "n_matched_baseline": 709,
+      "n_train": 11012,
+      "n_validation": 709,
+      "quantiles": [
+        0.1,
+        0.25,
+        0.5,
+        0.75,
+        0.9
+      ],
+      "relative_mae_improvement": 0.3989351063790062,
+      "straddle_baseline_mae": 0.06627664177006455,
+      "trained_at": "2026-10-16T03:06:22.516991+00:00"
+    },
+    {
       "baseline_label": "Historical move",
       "baseline_mae": 0.058428484272312765,
       "cohort": "optionless",
@@ -2509,6 +3954,7 @@
       },
       "feature_count": 45,
       "horizon_days": 12,
+      "interval_status": "passed",
       "interval_width": {
         "interval_50_mean": null,
         "interval_80_mean": null
@@ -2533,6 +3979,45 @@
       "trained_at": "2026-10-16T03:07:37.178658+00:00"
     },
     {
+      "baseline_label": "Market straddle",
+      "baseline_mae": 0.06716008667941431,
+      "cohort": "strict_options",
+      "coverage": {
+        "interval_50": 0.4925619834710744,
+        "interval_80": 0.7793388429752066,
+        "p10": 0.1371900826446281,
+        "p25": 0.31322314049586775,
+        "p50": 0.5818181818181818,
+        "p75": 0.8057851239669421,
+        "p90": 0.9165289256198347
+      },
+      "feature_count": 45,
+      "horizon_days": 12,
+      "interval_status": "held",
+      "interval_width": {
+        "interval_50_mean": null,
+        "interval_80_mean": null
+      },
+      "metric_scope": "historical_out_of_sample",
+      "model_mae": 0.043043025449777214,
+      "model_r2": null,
+      "model_rmse": null,
+      "model_version": "v3",
+      "n_matched_baseline": 1210,
+      "n_train": 17956,
+      "n_validation": 1210,
+      "quantiles": [
+        0.1,
+        0.25,
+        0.5,
+        0.75,
+        0.9
+      ],
+      "relative_mae_improvement": 0.3590981254202189,
+      "straddle_baseline_mae": 0.06716008667941431,
+      "trained_at": "2026-10-16T03:07:37.178658+00:00"
+    },
+    {
       "baseline_label": "Historical move",
       "baseline_mae": 0.05913779194212162,
       "cohort": "optionless",
@@ -2547,6 +4032,7 @@
       },
       "feature_count": 45,
       "horizon_days": 13,
+      "interval_status": "passed",
       "interval_width": {
         "interval_50_mean": null,
         "interval_80_mean": null
@@ -2571,6 +4057,45 @@
       "trained_at": "2026-10-16T03:08:57.211695+00:00"
     },
     {
+      "baseline_label": "Market straddle",
+      "baseline_mae": 0.06799384241947093,
+      "cohort": "strict_options",
+      "coverage": {
+        "interval_50": 0.47639717851329355,
+        "interval_80": 0.7552902875746066,
+        "p10": 0.149755832881172,
+        "p25": 0.33423765599565924,
+        "p50": 0.5919696147585458,
+        "p75": 0.8106348345089528,
+        "p90": 0.9050461204557786
+      },
+      "feature_count": 45,
+      "horizon_days": 13,
+      "interval_status": "held",
+      "interval_width": {
+        "interval_50_mean": null,
+        "interval_80_mean": null
+      },
+      "metric_scope": "historical_out_of_sample",
+      "model_mae": 0.04401396400699891,
+      "model_r2": null,
+      "model_rmse": null,
+      "model_version": "v3",
+      "n_matched_baseline": 1843,
+      "n_train": 28013,
+      "n_validation": 1843,
+      "quantiles": [
+        0.1,
+        0.25,
+        0.5,
+        0.75,
+        0.9
+      ],
+      "relative_mae_improvement": 0.3526772066290089,
+      "straddle_baseline_mae": 0.06799384241947093,
+      "trained_at": "2026-10-16T03:08:57.211695+00:00"
+    },
+    {
       "baseline_label": "Historical move",
       "baseline_mae": 0.05870801316103943,
       "cohort": "optionless",
@@ -2585,6 +4110,7 @@
       },
       "feature_count": 45,
       "horizon_days": 14,
+      "interval_status": "passed",
       "interval_width": {
         "interval_50_mean": null,
         "interval_80_mean": null
@@ -2623,6 +4149,7 @@
       },
       "feature_count": 45,
       "horizon_days": 14,
+      "interval_status": "passed",
       "interval_width": {
         "interval_50_mean": null,
         "interval_80_mean": null
@@ -2661,6 +4188,7 @@
       },
       "feature_count": 45,
       "horizon_days": 15,
+      "interval_status": "passed",
       "interval_width": {
         "interval_50_mean": null,
         "interval_80_mean": null
@@ -2699,6 +4227,7 @@
       },
       "feature_count": 45,
       "horizon_days": 15,
+      "interval_status": "passed",
       "interval_width": {
         "interval_50_mean": null,
         "interval_80_mean": null
@@ -2723,6 +4252,45 @@
       "trained_at": "2026-10-16T03:11:31.719826+00:00"
     },
     {
+      "baseline_label": "Historical move",
+      "baseline_mae": 0.057283562443330195,
+      "cohort": "optionless",
+      "coverage": {
+        "interval_50": 0.49616858237547895,
+        "interval_80": 0.7861590038314177,
+        "p10": 0.1300287356321839,
+        "p25": 0.31082375478927204,
+        "p50": 0.5821360153256705,
+        "p75": 0.8069923371647509,
+        "p90": 0.9161877394636015
+      },
+      "feature_count": 45,
+      "horizon_days": 16,
+      "interval_status": "held",
+      "interval_width": {
+        "interval_50_mean": null,
+        "interval_80_mean": null
+      },
+      "metric_scope": "historical_out_of_sample",
+      "model_mae": 0.0513253007551154,
+      "model_r2": null,
+      "model_rmse": null,
+      "model_version": "v3",
+      "n_matched_baseline": 3739,
+      "n_train": 18254,
+      "n_validation": 4176,
+      "quantiles": [
+        0.1,
+        0.25,
+        0.5,
+        0.75,
+        0.9
+      ],
+      "relative_mae_improvement": 0.10401346274700041,
+      "straddle_baseline_mae": 0.057283562443330195,
+      "trained_at": "2026-10-16T03:12:37.755286+00:00"
+    },
+    {
       "baseline_label": "Market straddle",
       "baseline_mae": 0.07090885737570927,
       "cohort": "strict_options",
@@ -2737,6 +4305,7 @@
       },
       "feature_count": 45,
       "horizon_days": 16,
+      "interval_status": "passed",
       "interval_width": {
         "interval_50_mean": null,
         "interval_80_mean": null
@@ -2761,6 +4330,45 @@
       "trained_at": "2026-10-16T03:12:37.755286+00:00"
     },
     {
+      "baseline_label": "Historical move",
+      "baseline_mae": 0.06109948760349399,
+      "cohort": "optionless",
+      "coverage": {
+        "interval_50": 0.49111872857588035,
+        "interval_80": 0.7790588968526021,
+        "p10": 0.1327516360236834,
+        "p25": 0.3138049236522281,
+        "p50": 0.5811779370520411,
+        "p75": 0.8049236522281085,
+        "p90": 0.9118105328762854
+      },
+      "feature_count": 45,
+      "horizon_days": 17,
+      "interval_status": "held",
+      "interval_width": {
+        "interval_50_mean": null,
+        "interval_80_mean": null
+      },
+      "metric_scope": "historical_out_of_sample",
+      "model_mae": 0.0547690104288505,
+      "model_r2": null,
+      "model_rmse": null,
+      "model_version": "v3",
+      "n_matched_baseline": 2845,
+      "n_train": 13134,
+      "n_validation": 3209,
+      "quantiles": [
+        0.1,
+        0.25,
+        0.5,
+        0.75,
+        0.9
+      ],
+      "relative_mae_improvement": 0.10360933328484223,
+      "straddle_baseline_mae": 0.06109948760349399,
+      "trained_at": "2026-10-16T03:13:25.467755+00:00"
+    },
+    {
       "baseline_label": "Market straddle",
       "baseline_mae": 0.07314911149101572,
       "cohort": "strict_options",
@@ -2775,6 +4383,7 @@
       },
       "feature_count": 45,
       "horizon_days": 17,
+      "interval_status": "passed",
       "interval_width": {
         "interval_50_mean": null,
         "interval_80_mean": null
@@ -2813,6 +4422,7 @@
       },
       "feature_count": 45,
       "horizon_days": 18,
+      "interval_status": "passed",
       "interval_width": {
         "interval_50_mean": null,
         "interval_80_mean": null
@@ -2851,6 +4461,7 @@
       },
       "feature_count": 45,
       "horizon_days": 18,
+      "interval_status": "passed",
       "interval_width": {
         "interval_50_mean": null,
         "interval_80_mean": null
@@ -2889,6 +4500,7 @@
       },
       "feature_count": 45,
       "horizon_days": 19,
+      "interval_status": "passed",
       "interval_width": {
         "interval_50_mean": null,
         "interval_80_mean": null
@@ -2913,6 +4525,45 @@
       "trained_at": "2026-10-16T03:14:38.327907+00:00"
     },
     {
+      "baseline_label": "Market straddle",
+      "baseline_mae": 0.07504356624132649,
+      "cohort": "strict_options",
+      "coverage": {
+        "interval_50": 0.4620141342756184,
+        "interval_80": 0.7791519434628975,
+        "p10": 0.14575971731448764,
+        "p25": 0.3339222614840989,
+        "p50": 0.5830388692579506,
+        "p75": 0.7959363957597173,
+        "p90": 0.9249116607773852
+      },
+      "feature_count": 45,
+      "horizon_days": 19,
+      "interval_status": "held",
+      "interval_width": {
+        "interval_50_mean": null,
+        "interval_80_mean": null
+      },
+      "metric_scope": "historical_out_of_sample",
+      "model_mae": 0.0442477403448586,
+      "model_r2": null,
+      "model_rmse": null,
+      "model_version": "v3",
+      "n_matched_baseline": 1132,
+      "n_train": 17691,
+      "n_validation": 1132,
+      "quantiles": [
+        0.1,
+        0.25,
+        0.5,
+        0.75,
+        0.9
+      ],
+      "relative_mae_improvement": 0.41037263337717855,
+      "straddle_baseline_mae": 0.07504356624132649,
+      "trained_at": "2026-10-16T03:14:38.327907+00:00"
+    },
+    {
       "baseline_label": "Historical move",
       "baseline_mae": 0.059600711315566234,
       "cohort": "optionless",
@@ -2927,6 +4578,7 @@
       },
       "feature_count": 45,
       "horizon_days": 20,
+      "interval_status": "passed",
       "interval_width": {
         "interval_50_mean": null,
         "interval_80_mean": null
@@ -2965,6 +4617,7 @@
       },
       "feature_count": 45,
       "horizon_days": 20,
+      "interval_status": "passed",
       "interval_width": {
         "interval_50_mean": null,
         "interval_80_mean": null
@@ -2989,6 +4642,45 @@
       "trained_at": "2026-10-16T03:15:49.074018+00:00"
     },
     {
+      "baseline_label": "Historical move",
+      "baseline_mae": 0.05830633497919946,
+      "cohort": "optionless",
+      "coverage": {
+        "interval_50": 0.49960057517175266,
+        "interval_80": 0.7899025403419077,
+        "p10": 0.13053203387122544,
+        "p25": 0.30739734781914047,
+        "p50": 0.5823613995845982,
+        "p75": 0.8069979229908931,
+        "p90": 0.9204345742131331
+      },
+      "feature_count": 45,
+      "horizon_days": 21,
+      "interval_status": "held",
+      "interval_width": {
+        "interval_50_mean": null,
+        "interval_80_mean": null
+      },
+      "metric_scope": "historical_out_of_sample",
+      "model_mae": 0.052625152869549316,
+      "model_r2": null,
+      "model_rmse": null,
+      "model_version": "v3",
+      "n_matched_baseline": 5634,
+      "n_train": 28132,
+      "n_validation": 6259,
+      "quantiles": [
+        0.1,
+        0.25,
+        0.5,
+        0.75,
+        0.9
+      ],
+      "relative_mae_improvement": 0.09743678987329385,
+      "straddle_baseline_mae": 0.05830633497919946,
+      "trained_at": "2026-10-16T03:17:12.766332+00:00"
+    },
+    {
       "baseline_label": "Market straddle",
       "baseline_mae": 0.07603738610844493,
       "cohort": "strict_options",
@@ -3003,6 +4695,7 @@
       },
       "feature_count": 45,
       "horizon_days": 21,
+      "interval_status": "passed",
       "interval_width": {
         "interval_50_mean": null,
         "interval_80_mean": null
@@ -3041,6 +4734,7 @@
       },
       "feature_count": 45,
       "horizon_days": 22,
+      "interval_status": "passed",
       "interval_width": {
         "interval_50_mean": null,
         "interval_80_mean": null
@@ -3065,6 +4759,45 @@
       "trained_at": "2026-10-16T03:18:23.932867+00:00"
     },
     {
+      "baseline_label": "Market straddle",
+      "baseline_mae": 0.07521539613644923,
+      "cohort": "strict_options",
+      "coverage": {
+        "interval_50": 0.45621064682312534,
+        "interval_80": 0.7515741270749857,
+        "p10": 0.15855752718946767,
+        "p25": 0.3314253005151689,
+        "p50": 0.5609616485403549,
+        "p75": 0.7876359473382942,
+        "p90": 0.9101316542644533
+      },
+      "feature_count": 45,
+      "horizon_days": 22,
+      "interval_status": "held",
+      "interval_width": {
+        "interval_50_mean": null,
+        "interval_80_mean": null
+      },
+      "metric_scope": "historical_out_of_sample",
+      "model_mae": 0.043345245657690906,
+      "model_r2": null,
+      "model_rmse": null,
+      "model_version": "v3",
+      "n_matched_baseline": 1747,
+      "n_train": 24210,
+      "n_validation": 1747,
+      "quantiles": [
+        0.1,
+        0.25,
+        0.5,
+        0.75,
+        0.9
+      ],
+      "relative_mae_improvement": 0.4237184421782778,
+      "straddle_baseline_mae": 0.07521539613644923,
+      "trained_at": "2026-10-16T03:18:23.932867+00:00"
+    },
+    {
       "baseline_label": "Historical move",
       "baseline_mae": 0.05749964165098366,
       "cohort": "optionless",
@@ -3079,6 +4812,7 @@
       },
       "feature_count": 45,
       "horizon_days": 23,
+      "interval_status": "passed",
       "interval_width": {
         "interval_50_mean": null,
         "interval_80_mean": null
@@ -3117,6 +4851,7 @@
       },
       "feature_count": 45,
       "horizon_days": 23,
+      "interval_status": "passed",
       "interval_width": {
         "interval_50_mean": null,
         "interval_80_mean": null
@@ -3141,6 +4876,45 @@
       "trained_at": "2026-10-16T03:19:39.238319+00:00"
     },
     {
+      "baseline_label": "Historical move",
+      "baseline_mae": 0.061018186189194946,
+      "cohort": "optionless",
+      "coverage": {
+        "interval_50": 0.4900559353635799,
+        "interval_80": 0.7830950901180858,
+        "p10": 0.12771908017402114,
+        "p25": 0.31821006836544435,
+        "p50": 0.5826600372902424,
+        "p75": 0.8082660037290242,
+        "p90": 0.9108141702921069
+      },
+      "feature_count": 45,
+      "horizon_days": 24,
+      "interval_status": "held",
+      "interval_width": {
+        "interval_50_mean": null,
+        "interval_80_mean": null
+      },
+      "metric_scope": "historical_out_of_sample",
+      "model_mae": 0.05495041245770062,
+      "model_r2": null,
+      "model_rmse": null,
+      "model_version": "v3",
+      "n_matched_baseline": 2868,
+      "n_train": 12423,
+      "n_validation": 3218,
+      "quantiles": [
+        0.1,
+        0.25,
+        0.5,
+        0.75,
+        0.9
+      ],
+      "relative_mae_improvement": 0.09944205343437107,
+      "straddle_baseline_mae": 0.061018186189194946,
+      "trained_at": "2026-10-16T03:20:23.946764+00:00"
+    },
+    {
       "baseline_label": "Market straddle",
       "baseline_mae": 0.07884483834498014,
       "cohort": "strict_options",
@@ -3155,6 +4929,7 @@
       },
       "feature_count": 45,
       "horizon_days": 24,
+      "interval_status": "passed",
       "interval_width": {
         "interval_50_mean": null,
         "interval_80_mean": null
@@ -3179,6 +4954,45 @@
       "trained_at": "2026-10-16T03:20:23.946764+00:00"
     },
     {
+      "baseline_label": "Historical move",
+      "baseline_mae": 0.06148715434328218,
+      "cohort": "optionless",
+      "coverage": {
+        "interval_50": 0.47824175824175824,
+        "interval_80": 0.7753846153846153,
+        "p10": 0.13274725274725274,
+        "p25": 0.3314285714285714,
+        "p50": 0.5986813186813187,
+        "p75": 0.8096703296703297,
+        "p90": 0.9081318681318681
+      },
+      "feature_count": 45,
+      "horizon_days": 25,
+      "interval_status": "held",
+      "interval_width": {
+        "interval_50_mean": null,
+        "interval_80_mean": null
+      },
+      "metric_scope": "historical_out_of_sample",
+      "model_mae": 0.055839980396537064,
+      "model_r2": null,
+      "model_rmse": null,
+      "model_version": "v3",
+      "n_matched_baseline": 2002,
+      "n_train": 10086,
+      "n_validation": 2275,
+      "quantiles": [
+        0.1,
+        0.25,
+        0.5,
+        0.75,
+        0.9
+      ],
+      "relative_mae_improvement": 0.09184315011908017,
+      "straddle_baseline_mae": 0.06148715434328218,
+      "trained_at": "2026-10-16T03:20:55.480751+00:00"
+    },
+    {
       "baseline_label": "Market straddle",
       "baseline_mae": 0.07892083298552172,
       "cohort": "strict_options",
@@ -3193,6 +5007,7 @@
       },
       "feature_count": 45,
       "horizon_days": 25,
+      "interval_status": "passed",
       "interval_width": {
         "interval_50_mean": null,
         "interval_80_mean": null
@@ -3218,18 +5033,18 @@
     }
   ],
   "model_source": {
-    "artifact_sha256": "3370619ce27fdd1806adfedef31ab955553291eda043b9a5227df6f28e9aa8ce",
-    "bundle_id": "d14dc7f2aa6b175956922eb6266b8523742add962668b7d6b8833cc2c869dd1b",
+    "artifact_sha256": "3066b45b7af880c3e4135d73ffe759233e8c6a92edf60f0d35ff920f91dae848",
+    "bundle_id": "b593506618728c14a8bc13660fa7c6a373ba595566ee5bee01e59eed93083881",
     "kind": "signed_champion",
     "model_validation_receipt_id": "sha256:2c0e4e60974ba29b9ee340f465612d79a4e450844ec7f66c84df6279074cc7ca",
-    "source_revision": "77784f190092be6df333ee75eb5c643d7e9d8150",
+    "source_revision": "dbbf526592b904ce182dba2e397e53e27305880a",
     "verification_status": "verified"
   },
   "schema": "quantiv.public-model-validation.v1",
   "summary": {
-    "matched_baseline_row_observations": 83762,
+    "matched_baseline_row_observations": 130236,
     "max_relative_mae_improvement": 0.46925088653412295,
-    "metric_rows": 30,
+    "metric_rows": 50,
     "min_relative_mae_improvement": 0.08596947294557111,
     "supported_horizons": [
       1,
@@ -3239,6 +5054,8 @@
       5,
       6,
       7,
+      8,
+      9,
       10,
       11,
       12,
@@ -3256,20 +5073,20 @@
       24,
       25
     ],
-    "validation_row_observations": 91009,
-    "weighted_baseline_mae": 0.06123402556436438,
+    "validation_row_observations": 141238,
+    "weighted_baseline_mae": 0.06146086535111313,
     "weighted_coverage": {
-      "interval_50": 0.4901822896636596,
-      "interval_80": 0.7812963553055192,
-      "p10": 0.13306376292454591,
-      "p25": 0.31088134140579504,
-      "p50": 0.5717456515289696,
-      "p75": 0.8010196793723697,
-      "p90": 0.9143051786087091
+      "interval_50": 0.4881901471275436,
+      "interval_80": 0.7797405797306673,
+      "p10": 0.13509820303317804,
+      "p25": 0.31446919384301675,
+      "p50": 0.5758719324827596,
+      "p75": 0.8026168594854076,
+      "p90": 0.9147750605361163
     },
-    "weighted_model_mae": 0.050952783728568415,
-    "weighted_relative_mae_improvement": 0.16790079928665036,
-    "weighted_straddle_mae": 0.06123402556436438
+    "weighted_model_mae": 0.050580327832470635,
+    "weighted_relative_mae_improvement": 0.17703196101265817,
+    "weighted_straddle_mae": 0.06146086535111313
   },
   "validation_protocol": {
     "baseline": "matched cohort benchmarks",
@@ -3277,8 +5094,117 @@
     "decision_scope": "end_of_day_research",
     "evaluation_scope": "historical_out_of_sample",
     "historical_admission": {
-      "admission_id": "sha256:36751a510678c1c256832b5530ebc662a53d8f0907dde3a594851fc86c15e7fe",
+      "admission_id": "sha256:65d616adfb7ba14cc04d404f1092466616ca39e6e20cc20a2635811ad0cf837f",
       "admitted_cohorts": {
+        "1": [
+          "optionless",
+          "strict_options"
+        ],
+        "10": [
+          "optionless",
+          "strict_options"
+        ],
+        "11": [
+          "optionless",
+          "strict_options"
+        ],
+        "12": [
+          "optionless",
+          "strict_options"
+        ],
+        "13": [
+          "optionless",
+          "strict_options"
+        ],
+        "14": [
+          "optionless",
+          "strict_options"
+        ],
+        "15": [
+          "optionless",
+          "strict_options"
+        ],
+        "16": [
+          "optionless",
+          "strict_options"
+        ],
+        "17": [
+          "optionless",
+          "strict_options"
+        ],
+        "18": [
+          "optionless",
+          "strict_options"
+        ],
+        "19": [
+          "optionless",
+          "strict_options"
+        ],
+        "2": [
+          "optionless",
+          "strict_options"
+        ],
+        "20": [
+          "optionless",
+          "strict_options"
+        ],
+        "21": [
+          "optionless",
+          "strict_options"
+        ],
+        "22": [
+          "optionless",
+          "strict_options"
+        ],
+        "23": [
+          "optionless",
+          "strict_options"
+        ],
+        "24": [
+          "optionless",
+          "strict_options"
+        ],
+        "25": [
+          "optionless",
+          "strict_options"
+        ],
+        "3": [
+          "optionless",
+          "strict_options"
+        ],
+        "4": [
+          "optionless",
+          "strict_options"
+        ],
+        "5": [
+          "optionless",
+          "strict_options"
+        ],
+        "6": [
+          "optionless",
+          "strict_options"
+        ],
+        "7": [
+          "optionless",
+          "strict_options"
+        ],
+        "8": [
+          "optionless",
+          "strict_options"
+        ],
+        "9": [
+          "optionless",
+          "strict_options"
+        ]
+      },
+      "global_temporal_boundary": {
+        "calendar_end": "2026-10-14T00:00:00",
+        "calendar_start": "2026-04-18T00:00:00",
+        "first_test_snapshot": "2026-03-26T00:00:00",
+        "rule": "all_requested_heads_development_labels_strictly_before_earliest_reserved_snapshot",
+        "selection_label_cutoff": "2026-03-26T00:00:00"
+      },
+      "interval_capabilities": {
         "1": [
           "optionless"
         ],
@@ -3295,12 +5221,12 @@
           "optionless"
         ],
         "14": [
-          "optionless",
-          "strict_options"
+          "strict_options",
+          "optionless"
         ],
         "15": [
-          "optionless",
-          "strict_options"
+          "strict_options",
+          "optionless"
         ],
         "16": [
           "strict_options"
@@ -3309,19 +5235,19 @@
           "strict_options"
         ],
         "18": [
-          "optionless",
-          "strict_options"
+          "strict_options",
+          "optionless"
         ],
         "19": [
           "optionless"
         ],
         "2": [
-          "optionless",
-          "strict_options"
+          "strict_options",
+          "optionless"
         ],
         "20": [
-          "optionless",
-          "strict_options"
+          "strict_options",
+          "optionless"
         ],
         "21": [
           "strict_options"
@@ -3330,8 +5256,8 @@
           "optionless"
         ],
         "23": [
-          "optionless",
-          "strict_options"
+          "strict_options",
+          "optionless"
         ],
         "24": [
           "strict_options"
@@ -3352,16 +5278,11 @@
           "optionless"
         ],
         "7": [
-          "optionless",
-          "strict_options"
-        ]
-      },
-      "global_temporal_boundary": {
-        "calendar_end": "2026-10-14T00:00:00",
-        "calendar_start": "2026-04-18T00:00:00",
-        "first_test_snapshot": "2026-03-26T00:00:00",
-        "rule": "all_requested_heads_development_labels_strictly_before_earliest_reserved_snapshot",
-        "selection_label_cutoff": "2026-03-26T00:00:00"
+          "strict_options",
+          "optionless"
+        ],
+        "8": [],
+        "9": []
       },
       "limitations": [
         "The exact candidate excludes reserved labels from fitting, selection, early stopping and quantile calibration.",
@@ -3377,6 +5298,7 @@
         "coverage_tolerance": 0.08,
         "diagnostic_blocks": 3,
         "familywise_alpha": 0.05,
+        "interval_calibration_required_for_point": false,
         "maximum_block_mae_ratio": 1.5,
         "maximum_raw_crossing_rate": 0.2,
         "maximum_raw_negative_rate": 0.05,
@@ -3386,7 +5308,13 @@
         "minimum_matched_baseline_rows": 200,
         "multiplicity": "bonferroni_over_all_development_declared_horizon_cohort_cells",
         "requires_conservative_clustered_ci_upper_below_zero": true,
-        "version": "quantiv.historical-exact-artifact-policy.v1"
+        "version": "quantiv.historical-point-forecast-policy.v2"
+      },
+      "policy_reassessment": {
+        "model_refit": false,
+        "policy_selected_after_evaluation": true,
+        "predictions_changed": false,
+        "prior_admission_id": "sha256:36751a510678c1c256832b5530ebc662a53d8f0907dde3a594851fc86c15e7fe"
       },
       "protocol": {
         "calendar_vintage_status": "complete_point_in_time_revision_history_not_established",
@@ -3403,7 +5331,7 @@
         "test_labels_used_for_quantile_calibration": false
       },
       "reservation_id": "sha256:fd05c255ceb02f9f11ed352e6c62404c0cb7919bf137171ba82de4959d09669a",
-      "serving_bundle_id": "d14dc7f2aa6b175956922eb6266b8523742add962668b7d6b8833cc2c869dd1b",
+      "serving_bundle_id": "b593506618728c14a8bc13660fa7c6a373ba595566ee5bee01e59eed93083881",
       "source_bundle_id": "629386dcbf2736b8868df166bd54c5a656c197a34c55d1d7be44b5b9bc12c2ff"
     },
     "holdout_splits": [
@@ -3497,6 +5425,32 @@
         "train_start": "2023-04-20",
         "validation_end": "2026-03-25",
         "validation_start": "2025-05-22"
+      },
+      {
+        "evaluation_scope": "development",
+        "horizon_days": 8,
+        "purge_days": 5,
+        "rows_purged": 116,
+        "rows_total": 34326,
+        "rows_train": 25617,
+        "rows_validation": 8593,
+        "train_end": "2025-05-16",
+        "train_start": "2023-04-21",
+        "validation_end": "2026-03-25",
+        "validation_start": "2025-05-28"
+      },
+      {
+        "evaluation_scope": "development",
+        "horizon_days": 9,
+        "purge_days": 5,
+        "rows_purged": 23,
+        "rows_total": 24699,
+        "rows_train": 18495,
+        "rows_validation": 6181,
+        "train_end": "2025-06-13",
+        "train_start": "2023-04-26",
+        "validation_end": "2026-03-25",
+        "validation_start": "2025-06-26"
       },
       {
         "evaluation_scope": "development",
@@ -3831,6 +5785,38 @@
           "test_days": 60,
           "validation_rows": 8858,
           "worst_fold_ratio": 0.8847815303489239
+        },
+        {
+          "baseline_straddle_mae": 0.05684595595197212,
+          "evaluation_scope": "development",
+          "fold_count": 4,
+          "folds_beating_baseline": 4,
+          "horizon_days": 8,
+          "improvement_vs_straddle": 0.14815154179707846,
+          "method": "expanding_purged_walk_forward",
+          "model_mae": 0.048424139932758646,
+          "purge_days": 5,
+          "requested_folds": 4,
+          "status": "passed",
+          "test_days": 60,
+          "validation_rows": 7778,
+          "worst_fold_ratio": 0.8804622032284352
+        },
+        {
+          "baseline_straddle_mae": 0.05623661520345812,
+          "evaluation_scope": "development",
+          "fold_count": 4,
+          "folds_beating_baseline": 4,
+          "horizon_days": 9,
+          "improvement_vs_straddle": 0.14156250857778607,
+          "method": "expanding_purged_walk_forward",
+          "model_mae": 0.04827561888133293,
+          "purge_days": 5,
+          "requested_folds": 4,
+          "status": "passed",
+          "test_days": 60,
+          "validation_rows": 5685,
+          "worst_fold_ratio": 0.9178349347875149
         },
         {
           "baseline_straddle_mae": 0.0582213954777943,

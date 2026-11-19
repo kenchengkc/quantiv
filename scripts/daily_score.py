@@ -55,7 +55,7 @@ from ml.model_protocol import (  # noqa: E402
     target_protocol,
 )
 from ml.causal_features import build_causal_features  # noqa: E402
-from ml.serving_capabilities import allowed_cohorts  # noqa: E402
+from ml.serving_capabilities import allowed_cohorts, intervals_admitted  # noqa: E402
 from ml.source_coverage import filter_source_covered_snapshots, forecast_snapshot_sessions  # noqa: E402
 try:  # noqa: E402 - standalone script path setup
     from market_sessions import EASTERN
@@ -675,6 +675,9 @@ def score(df: pd.DataFrame, models: Dict[int, dict]) -> pd.DataFrame:
         hdf["em_math_pct"] = hdf["straddle_pct"]
         hdf["em_event_vol_pct"] = hdf.get("event_move_implied", np.nan)
         hdf["correction_factor"] = pred / hdf["straddle_pct"].clip(lower=0.001)
+        hdf["intervals_calibrated"] = [
+            intervals_admitted(m.get("manifest"), horizon, cohort) for cohort in hdf["__cohort"]
+        ]
         hdf["model_horizon"] = horizon
         hdf["model_bundle_id"] = (
             m.get("bundle_id")
@@ -845,7 +848,7 @@ def save_forecasts(
         "market_data_mode", "quote_quality_status", "liquidity_tier",
         "liquidity_tier_method", "quote_rejection_reason",
         "em_math_pct", "em_event_vol_pct", "em_ml_pct", "em_ml_abs",
-        "correction_factor", "p10", "p25", "p50", "p75", "p90",
+        "correction_factor", "p10", "p25", "p50", "p75", "p90", "intervals_calibrated",
         "iv_crush_pct", "event_vol_fraction",
         "hist_move_avg_4q", "hist_straddle_accuracy",
         "iv_rv_ratio_20d", "parkinson_rv_20d", "vol_of_vol_20d",

@@ -46,6 +46,7 @@ push_models() {
     --exclude "/bundles/**" \
     --exclude "/candidates/**" \
     --exclude "/historical_reservations/**" \
+    --exclude "/historical_policy_reassessments/**" \
     --exclude "/historical_admissions/**" \
     --exclude "/evaluations/**" \
     --exclude "/monitoring/**" \

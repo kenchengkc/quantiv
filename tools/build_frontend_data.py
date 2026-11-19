@@ -54,6 +54,7 @@ from frontend_data.payloads import (
     collapse_duplicate_earnings,
     enrich_reported_event_forecasts,
     load_published_calendar_events,
+    preserve_reported_ml_holds,
     preserve_reported_events,
     published_symbol_dates,
     week_em_averages,
@@ -538,6 +539,10 @@ def main():
                 current_event_date=published[0] if published else earn_dt,
                 today=today,
             )
+            previous_symbol = PUBLIC_DIR / "symbols" / f"{ticker}.json"
+            if previous_symbol.is_file():
+                preserve_reported_ml_holds(detail, json.loads(previous_symbol.read_text()),
+                                           today=today, reported_event_keys=reported_event_keys)
             forecast_nodes = [detail.get("expected_move") or {}]
             forecast_nodes.extend(detail.get("earnings_history") or [])
             published_forecast_ids.update(

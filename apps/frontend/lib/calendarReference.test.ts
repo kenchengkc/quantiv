@@ -43,6 +43,26 @@ const research = (events: Event[]): ResearchWeek<Event> => ({
 });
 
 describe('calendar reference overlay', () => {
+  it('removes the phantom GOOG November report without moving its forecast into October', () => {
+    const calendar = {
+      ...reference([
+        { ticker: 'GOOG', earnings_date: '2026-11-04', timing: 'unknown' },
+        { ticker: 'GOOGL', earnings_date: '2026-10-28', timing: 'amc' },
+      ]),
+      window: { start: '2026-10-26', end: '2026-11-13' },
+    };
+    const stale = research([{
+      ticker: 'GOOG', earnings_date: '2026-11-04', timing: 'amc',
+      em_ml_pct: 0.07, em_iv_pct: 0.063866, em_straddle_pct: 0.051071, p25: 0.04, p75: 0.09,
+    }]);
+    expect(mergeCalendarReference(calendar, stale, '2026-11-02').events).toEqual([]);
+    const corrected = mergeCalendarReference(calendar, stale, '2026-10-26');
+    expect(corrected.events.find((event) => event.ticker === 'GOOG')).toEqual({
+      ticker: 'GOOG', earnings_date: '2026-10-28', timing: 'amc',
+    });
+    expect(stale.events[0].earnings_date).toBe('2026-11-04');
+  });
+
   it('preserves research for an exact ticker/date/known-session match', () => {
     const merged = mergeCalendarReference(
       reference([{ ticker: 'AAA', earnings_date: '2026-09-08', timing: 'bmo' }]),
@@ -61,7 +81,7 @@ describe('calendar reference overlay', () => {
     expect(merged.metadata.research_as_of_date).toBe('2026-09-04');
   });
 
-  it('hydrates a matched legacy history-only row so the calendar does not render a dash', () => {
+  it('hydrates a matched legacy row from its historical median', () => {
     const merged = mergeCalendarReference(
       reference([{ ticker: 'APOG', earnings_date: '2026-09-22', timing: 'bmo' }]),
       research([{
@@ -72,6 +92,7 @@ describe('calendar reference overlay', () => {
         em_straddle_pct: null,
         em_iv_pct: null,
         hist_move_avg_4q: 0.102694,
+        hist_move_med_4q: 0.091,
       }]),
       '2026-09-21',
     );
@@ -80,7 +101,7 @@ describe('calendar reference overlay', () => {
       ticker: 'APOG',
       earnings_date: '2026-09-22',
       timing: 'bmo',
-      display_forecast_pct: 0.102694,
+      display_forecast_pct: 0.091,
       display_forecast_method: 'historical',
     });
   });

@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 import sys
+
+import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
@@ -50,6 +53,26 @@ def test_remove_drops_phantom_row():
     assert out[0]["fiscal_q"] == "Q4"
 
 
+@pytest.mark.parametrize("correct_row_present", [True, False])
+def test_stem_reschedule_replaces_original_and_replay_dates(correct_row_present):
+    overrides = json.loads((REPO_ROOT / "config/earnings_overrides.json").read_text())["overrides"]
+    prior = _row("STEM", "2026-08-12", "amc", "2026", "Q2", "finnhub")
+    original = {**_row("STEM", "2026-11-05", "amc", "2026", "Q3", "finnhub"),
+                "eps_estimate": "-1.6269"}
+    replay = _row("STEM", "2026-12-05", "amc", "2026", "Q3", "reconciled")
+    rows = [original, replay, prior]
+    if correct_row_present:
+        rows.append({**_row("STEM", "2026-11-16", "amc", "2026", "Q3", "finnhub"),
+                     "eps_estimate": "-1.57"})
+    out, _ = apply_overrides(rows, [*FIELDS, "eps_estimate"], overrides)
+
+    assert [(row["date"], row["timing"], row.get("eps_estimate")) for row in out if row is not prior] == [
+        ("2026-11-16", "amc", "-1.57" if correct_row_present else "-1.6269"),
+    ]
+    assert prior in out
+    assert apply_overrides(out, FIELDS, overrides)[0] == out
+
+
 def test_add_appends_new_event():
     rows = [_row("AAA", "2026-01-01", "amc", "2026", "Q1", "finnhub")]
     out, _ = apply_overrides(rows, FIELDS, [{
@@ -61,6 +84,24 @@ def test_add_appends_new_event():
     added = out[-1]
     assert added["act_symbol"] == "BBB" and added["date"] == "2026-07-01"
     assert "override" in added["source"]
+
+
+@pytest.mark.parametrize("include_call", [False, True])
+def test_whk_keeps_release_day_financials_and_drops_next_days_call(include_call):
+    overrides = json.loads((REPO_ROOT / "config/earnings_overrides.json").read_text())["overrides"]
+    prior = _row("WHK", "2026-08-12", "amc", "2026", "Q2", "finnhub")
+    release = {**_row("WHK", "2026-11-12", "unknown", "2026", "Q4", "dolthub"),
+               "eps_actual": "0.21", "revenue_estimate": "33000000"}
+    rows = [prior.copy(), release]
+    if include_call:
+        rows.append(_row("WHK", "2026-11-13", "unknown", "2026", "Q3", "finnhub"))
+    out, _ = apply_overrides(rows, [*FIELDS, "eps_actual", "revenue_estimate"], overrides)
+    assert [(r["date"], r["fiscal_q"], r["timing"]) for r in out] == [
+        ("2026-08-12", "Q2", "amc"), ("2026-11-12", "Q3", "amc"),
+    ]
+    assert out[0] == prior
+    assert (out[1]["eps_actual"], out[1]["revenue_estimate"]) == ("0.21", "33000000")
+    assert apply_overrides(out, FIELDS, overrides)[0] == out
 
 
 def test_unmatched_set_warns_and_is_skipped():
@@ -119,3 +160,55 @@ def test_artifact_override_keeps_csv_and_parquet_event_keys_aligned(tmp_path) ->
     assert csv_frame["timing"].tolist() == ["amc"]
     assert parquet_frame["timing"].tolist() == ["amc"]
     assert any("AIR" in line for line in logs)
+
+
+def test_alphabet_override_corrects_reasserted_estimate_without_touching_sibling():
+    overrides = json.loads((REPO_ROOT / "config/earnings_overrides.json").read_text())["overrides"]
+    goog = _row("GOOG", "2026-11-04", "unknown", "2026", "Q4", "dolthub")
+    googl = {**_row("GOOGL", "2026-10-28", "amc", "2026", "Q3", "finnhub"), "eps_actual": "2.12"}
+    prior = _row("GOOG", "2026-07-22", "amc", "2026", "Q2", "dolthub")
+    out, _ = apply_overrides([goog, googl.copy(), prior.copy()], FIELDS, overrides)
+    corrected = next(row for row in out if row["act_symbol"] == "GOOG" and row["date"] == "2026-10-28")
+    assert corrected["timing"] == "amc"
+    assert corrected["fiscal_q"] == "Q3"
+    assert "override" in corrected["source"]
+    assert not any(row["date"] == "2026-11-04" for row in out)
+    assert next(row for row in out if row["act_symbol"] == "GOOGL")["eps_actual"] == googl["eps_actual"]
+    assert prior in out
+    assert apply_overrides(out, FIELDS, overrides)[0] == out
+
+
+@pytest.mark.parametrize("symbol", ["GOOG", "GOOGL"])
+def test_alphabet_verified_session_survives_provider_date_correction(symbol):
+    overrides = json.loads((REPO_ROOT / "config/earnings_overrides.json").read_text())["overrides"]
+    row = {**_row(symbol, "2026-10-28", "unknown", "2026", "Q4", "finnhub+reconciled"),
+           "eps_actual": "2.12", "eps_estimate": "3.1057"}
+    out, _ = apply_overrides([row], [*FIELDS, "eps_actual", "eps_estimate"], overrides)
+    assert out[0]["date"] == "2026-10-28"
+    assert out[0]["timing"] == "amc"
+    assert out[0]["fiscal_q"] == "Q3"
+    assert out[0]["eps_actual"] == "2.12"
+    assert out[0]["eps_estimate"] == "3.1057"
+
+
+@pytest.mark.parametrize("reported_first", [True, False])
+def test_date_correction_preserves_already_reported_target_actuals(tmp_path, reported_first):
+    import pandas as pd
+
+    actual = {**_row("GOOG", "2026-10-28", "unknown", "2026", "Q4", "fmp"),
+              "eps_actual": 2.12, "revenue_actual": 127577000000.0}
+    estimate = _row("GOOG", "2026-11-04", "unknown", "2026", "Q4", "dolthub")
+    frame = pd.DataFrame([actual, estimate] if reported_first else [estimate, actual])
+    csv_path, parquet_path = tmp_path / "calendar.csv", tmp_path / "calendar.parquet"
+    frame.to_csv(csv_path, index=False)
+    frame.to_parquet(parquet_path, index=False)
+    overrides = json.loads((REPO_ROOT / "config/earnings_overrides.json").read_text())["overrides"]
+    apply_override_artifacts(csv_path, parquet_path, overrides)
+    corrected = pd.read_parquet(parquet_path)
+    assert len(corrected) == 1
+    assert str(corrected.iloc[0]["date"]) == "2026-10-28"
+    assert corrected.iloc[0]["eps_actual"] == 2.12
+    assert corrected.iloc[0]["revenue_actual"] == 127577000000.0
+    assert corrected.iloc[0]["timing"] == "amc"
+    assert corrected.iloc[0]["fiscal_q"] == "Q3"
+    assert "override" in corrected.iloc[0]["source"]

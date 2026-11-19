@@ -53,3 +53,26 @@ def assert_forecast_capability(
 ) -> None:
     if cohort not in allowed_cohorts(manifest, horizon, metadata):
         raise ValueError(f"T-{horizon} cohort {cohort!r} is not admitted for serving")
+
+def validate_interval_capabilities(
+    capabilities: Any, serving: Mapping[str, Sequence[str]],
+) -> dict[str, list[str]]:
+    if not isinstance(capabilities, Mapping) or set(capabilities) != set(serving):
+        raise ValueError("interval capabilities must declare every admitted horizon")
+    result = {}
+    for horizon, cohorts in capabilities.items():
+        if (not isinstance(cohorts, list) or any(not isinstance(cohort, str) for cohort in cohorts)
+                or len(set(cohorts)) != len(cohorts)
+                or not set(cohorts).issubset(serving[horizon])):
+            raise ValueError("interval capability exceeds admitted point cohorts")
+        result[horizon] = sorted(cohorts)
+    return result
+
+
+def intervals_admitted(manifest: Mapping[str, Any] | None, horizon: int, cohort: str) -> bool:
+    """Return the signed interval decision, retaining legacy bundle behavior."""
+    if manifest is None or "interval_capabilities" not in manifest:
+        return True
+    serving = validate_serving_capabilities(manifest.get("serving_capabilities"), manifest.get("horizons") or [])
+    intervals = validate_interval_capabilities(manifest["interval_capabilities"], serving)
+    return cohort in intervals.get(str(horizon), [])

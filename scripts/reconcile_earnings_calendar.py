@@ -6,7 +6,9 @@ Production contract:
 - Prior published calendar is sticky when providers disagree.
 - A single structured vendor cannot move an existing event.
 - Two independent structured sources may corroborate a new date.
-- Official/direct forward-looking company announcements may override estimates.
+- Official/direct company announcements may override estimates.
+- Recent completed reports can repair nearby unconfirmed future projections.
+- Verified share classes share event evidence, never financials or forecasts.
 - Session changes are stricter than date changes.
 - Raw announcement bodies are never persisted.
 
@@ -21,6 +23,7 @@ import csv
 import html
 import io
 import json
+import math
 import os
 import re
 import sys
@@ -53,6 +56,9 @@ DEFAULT_BASELINE = REPO_ROOT / "data" / "validation" / "earnings_calendar_baseli
 DEFAULT_REPORT = REPO_ROOT / "data" / "validation" / "earnings_calendar_reconciliation.json"
 TICKER_NAMES_PATH = REPO_ROOT / "apps" / "frontend" / "public" / "ticker-names.json"
 MAX_NEW_ANNOUNCEMENT_SYMBOLS = 100
+SHARE_CLASSES_PATH = REPO_ROOT / "config" / "earnings_share_classes.json"
+COMPLETED_LOOKBACK_DAYS = 14
+EVENT_CORRECTION_DAYS = 35
 
 MONTHS = {
     name.lower(): index
@@ -81,6 +87,7 @@ DATE_RE = re.compile(
     rf"\b({MONTH_PATTERN})\.?\s+(\d{{1,2}})(?:st|nd|rd|th)?(?:,?\s+(20\d{{2}}))?\b",
     re.IGNORECASE,
 )
+WEEKDAY_PREFIX = r"(?:(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),?\s+)?"
 TIME_ZONE_PATTERN = (
     r"(?:Eastern|Central|Mountain|Pacific)(?:\s+(?:Standard|Daylight))?\s+Time|"
     r"EST|EDT|CST|CDT|MST|MDT|PST|PDT|ET|CT|MT|PT"
@@ -140,6 +147,7 @@ DIRECT_TITLE_ACTIONS = (
     " announces ",
     " schedules ",
     " scheduled ",
+    " reschedules ",
     " sets date ",
     " will announce ",
     " will report ",
@@ -580,7 +588,7 @@ def _candidate_date(match: re.Match[str], published_on: date) -> date | None:
 
 
 def _is_announcement_logistics_date(text: str, match: re.Match[str]) -> bool:
-    """Registration/question-submission dates are not earnings event dates."""
+    """Exclude call logistics from the candidates for an earnings release."""
     prefix = re.split(r"[.!?;]\s+(?=[A-Z])", text[:match.start()])[-1]
     suffix = re.split(r"[.!?;]\s+(?=[A-Z])", text[match.end():], maxsplit=1)[0]
     # Coordinated clauses can put registration and release dates in the same
@@ -588,6 +596,11 @@ def _is_announcement_logistics_date(text: str, match: re.Match[str]) -> bool:
     clause_boundary = r";\s*|,\s*(?:and|while|but)\s+"
     prefix = re.split(clause_boundary, prefix, flags=re.I)[-1]
     suffix = re.split(clause_boundary, suffix, maxsplit=1, flags=re.I)[0]
+    if re.search(r"\b(?:replay|recording|archive)\b[^.!?;]{0,120}"
+                 r"\b(?:until|through|expires?(?:\s+on)?)\s*"
+                 + WEEKDAY_PREFIX + "$",
+                 prefix, re.I):
+        return True
     sentence = prefix + match.group() + suffix
     if not re.search(r"\b(?:registration|register|submit|upvote)\b|\bq&a\s+platform\b", sentence, re.I):
         return False
@@ -741,10 +754,36 @@ def alpha_article_mentions_symbol(
     return False
 
 
+def _completed_matches_anchor(
+    evidence: Vote, anchor: Vote | None, *, as_of: date,
+) -> bool:
+    """Permit recent corrections, never replace a verified next-period event.
+
+    DoltHub's projected fiscal quarter can be a calendar ordinal (GOOG Q4 for
+    October's Q3 release), so it is not authoritative period evidence.
+    """
+    if not anchor or not anchor.get("date") or anchor.get("has_actuals"):
+        return False
+    event_day = date.fromisoformat(str(evidence["date"])[:10])
+    anchor_day = date.fromisoformat(str(anchor["date"])[:10])
+    if not 0 < (as_of - event_day).days <= COMPLETED_LOOKBACK_DAYS:
+        return False
+    if not as_of <= anchor_day or abs((anchor_day - event_day).days) > EVENT_CORRECTION_DAYS:
+        return False
+    if str(anchor.get("confidence") or "").lower() in {"confirmed", "manual"}:
+        return False
+    if anchor.get("fiscal_identity_trusted"):
+        return bool(evidence.get("fiscal_year") and evidence.get("fiscal_q")
+                    and str(evidence["fiscal_year"]) == str(anchor.get("fiscal_year"))
+                    and evidence["fiscal_q"] == anchor.get("fiscal_q"))
+    return True
+
+
 def _announcement_decision(
     announcements: list[Announcement],
     *,
     as_of: date | None = None,
+    anchor: Vote | None = None,
 ) -> tuple[Announcement | None, str | None]:
     valid = [
         {
@@ -757,10 +796,48 @@ def _announcement_decision(
         and (
             as_of is None
             or date.fromisoformat(str(row.get("date"))[:10]) >= as_of
+            or _completed_matches_anchor(row, anchor, as_of=as_of)
         )
     ]
+    # A story returned under both share classes is still one item of evidence.
+    unique = {}
+    for row in valid:
+        key = tuple(str(row.get(field) or "") for field in (
+            "provider", "date", "published_on", "url", "title", "timing", "official", "direct",
+            "supersedes_date",
+        ))
+        unique[key] = row
+    valid = list(unique.values())
+    # A wire may repeat the original announcement on multiple feeds. The
+    # issuer's subsequent revision supersedes all copies of that exact date.
+    superseded: dict[str, str] = {}
+    for row in valid:
+        old_date = row.get("supersedes_date")
+        if old_date and row.get("published_on"):
+            superseded[old_date] = max(superseded.get(old_date, ""), row["published_on"])
+    retained = []
+    for row in valid:
+        published = str(row.get("published_on") or "")
+        replaced = superseded.get(str(row["date"]), "")
+        if published and replaced and (
+            published < replaced or (published == replaced and not row.get("supersedes_date"))
+        ):
+            continue
+        retained.append(row)
+    valid = retained
+    revisions = [row for row in valid if row.get("supersedes_date") and row.get("published_on")]
+    if revisions:
+        newest_revision = max(row["published_on"] for row in revisions)
+        # Multiple copies cannot break a tie between competing explicit
+        # revisions. Publication dates lack the time needed to order them.
+        if len({row["date"] for row in revisions if row["published_on"] == newest_revision}) > 1:
+            return None, None
     official = [row for row in valid if row.get("official")]
     if official:
+        newest = max(str(row.get("published_on") or "") for row in official)
+        if len({row["date"] for row in official
+                if str(row.get("published_on") or "") == newest}) > 1:
+            return None, None
         return _latest_announcement(official), "official_announcement"
     direct = [row for row in valid if row.get("direct")]
     if direct:
@@ -768,6 +845,10 @@ def _announcement_decision(
         max_count = max(counts.values())
         top_dates = {d for d, count in counts.items() if count == max_count}
         top_rows = [row for row in direct if str(row["date"]) in top_dates]
+        newest = max(str(row.get("published_on") or "") for row in top_rows)
+        if len({row["date"] for row in top_rows
+                if str(row.get("published_on") or "") == newest}) > 1:
+            return None, None
         return _latest_announcement(top_rows), "direct_announcement"
     return None, None
 
@@ -811,6 +892,7 @@ def choose_canonical_event(
     structured_votes: list[Vote],
     announcements: list[Announcement],
     as_of: date | None = None,
+    reported_events: list[Vote] | None = None,
 ) -> dict[str, Any]:
     current = (
         {
@@ -830,12 +912,23 @@ def choose_canonical_event(
         if baseline
         else None
     )
-    votes = _distinct_votes(structured_votes)
-
+    anchor = baseline or current
+    votes = _distinct_votes([
+        vote for vote in structured_votes
+        if as_of is None or str(vote.get("date") or "")[:10] >= as_of.isoformat()
+        or _completed_matches_anchor(vote, anchor, as_of=as_of)
+    ])
     announcement, announcement_reason = _announcement_decision(
-        announcements,
-        as_of=as_of,
+        announcements, as_of=as_of, anchor=anchor,
     )
+    completed = [row for row in reported_events or []
+                 if as_of is not None and _completed_matches_anchor(row, anchor, as_of=as_of)]
+    # Conflicting reported dates are not a basis for rewriting another security.
+    reported = completed[0] if len({row["date"] for row in completed}) == 1 else None
+    if reported is not None:
+        sessions = {normalize_timing(row.get("timing")) for row in completed
+                    if normalize_timing(row.get("timing")) != "unknown"}
+        reported = {**reported, "timing": sessions.pop() if len(sessions) == 1 else "unknown"}
     baseline_confirmed = bool(
         baseline
         and baseline.get("date")
@@ -847,6 +940,11 @@ def choose_canonical_event(
         reason = announcement_reason
         confidence = "confirmed"
         date_sources = [str(announcement.get("provider") or "announcement")]
+    elif reported is not None:
+        chosen_date = str(reported["date"])
+        reason = "reported_actuals"
+        confidence = "reported"
+        date_sources = ["reported_actuals"]
     elif baseline_confirmed:
         chosen_date = baseline["date"]
         reason = "baseline_confirmed"
@@ -891,6 +989,10 @@ def choose_canonical_event(
 
     timing = "unknown"
     timing_sources: list[str] = []
+    if announcement is None and reported is not None:
+        timing = reported["timing"]
+        if timing != "unknown":
+            timing_sources = ["reported_actuals"]
 
     if announcement is not None and str(announcement["date"])[:10] == chosen_date:
         announcement_timing = normalize_timing(announcement.get("timing"))
@@ -916,16 +1018,8 @@ def choose_canonical_event(
         "confidence": confidence,
         "date_sources": date_sources,
         "timing_sources": timing_sources,
-        "fiscal_year": (
-            announcement.get("fiscal_year")
-            if announcement is not None
-            else None
-        ),
-        "fiscal_q": (
-            announcement.get("fiscal_q")
-            if announcement is not None
-            else None
-        ),
+        "fiscal_year": (announcement or reported or {}).get("fiscal_year"),
+        "fiscal_q": (announcement or reported or {}).get("fiscal_q"),
     }
 
 
@@ -1025,6 +1119,19 @@ def _vote(provider: str, symbol: str, event_date: Any, timing: Any = None) -> Vo
     }
 
 
+def _reported_vote_metadata(row: dict[str, Any]) -> dict[str, Any]:
+    """Retain evidence that results exist, never another class's EPS/revenue."""
+    actuals = {"eps_actual": row.get("epsActual"), "revenue_actual": row.get("revenueActual")}
+    if not _has_actuals(actuals):
+        return {}
+    metadata: dict[str, Any] = {"has_actuals": True}
+    year = str(row.get("fiscalYear") or row.get("year") or "")
+    quarter = str(row.get("fiscalQuarter") or row.get("quarter") or "").upper().removeprefix("Q")
+    if re.fullmatch(r"20\d{2}", year) and quarter in {"1", "2", "3", "4"}:
+        metadata.update(fiscal_year=int(year), fiscal_q=f"Q{quarter}")
+    return metadata
+
+
 def fetch_finnhub_calendar(
     start: date,
     end: date,
@@ -1069,7 +1176,9 @@ def fetch_finnhub_calendar(
                 continue
             vote = _vote("finnhub_calendar", row.get("symbol"), row.get("date"), row.get("hour"))
             if vote and vote["symbol"] and window_start <= date.fromisoformat(vote["date"]) <= window_end:
-                votes_by_key[(vote["symbol"], vote["date"], vote["timing"])] = vote
+                votes_by_key[(vote["symbol"], vote["date"], vote["timing"])] = {
+                    **vote, **_reported_vote_metadata(row),
+                }
         if len(rows) >= 1500:
             if window_start == window_end:
                 incomplete.append({**window, "reason": "single_day_row_cap"})
@@ -1167,8 +1276,80 @@ def fetch_fmp_calendar(
         )
         vote = _vote("fmp_calendar", row.get("symbol"), row.get("date"), timing)
         if vote is not None and start <= date.fromisoformat(vote["date"]) <= end:
-            votes.append(vote)
+            votes.append({**vote, **_reported_vote_metadata(row)})
     return votes, {"status": "ok", "http_status": status, "rows": len(votes)}
+
+
+def _rescheduled_release(text: str, published_on: date) -> dict[str, str] | None:
+    # The body must move publication itself. A company can move only its call.
+    directions: dict[str, set[date]] = {"from": set(), "to": set()}
+    direction_prefix = re.compile(r"\s*,?\s*(from|to|for)\s+" + WEEKDAY_PREFIX, re.I)
+    for statement in re.split(r"[.!?;]\s+(?=[A-Z])", text):
+        release = re.search(
+            r"\brescheduled?\s+(?:(?:the|its)\s+)?"
+            r"(?:release\s+of\s+(?:(?:the|its)\s+)?"
+            r"(?:(?:first|second|third|fourth)[\s-]+quarter\s+|quarterly\s+|"
+            r"fiscal\s+|20\d{2}\s+)*(?:financial\s+)?(?:results|earnings)\b|"
+            r"(?:earnings|(?:financial\s+)?results)\s+release\b)"
+            r"(?!\s+(?:conference|call|webcast|replay|transcript|recording)\b)"
+            r"(?:\s+and\s+(?:(?:its|the)\s+)?(?:conference\s+)?call\b)?", statement, re.I,
+        )
+        if release is None:
+            continue
+        # Consume only consecutive "from/to/for DATE" phrases immediately
+        # following this release. A later clause can schedule another event.
+        cursor = release.end()
+        clause_dates: dict[str, set[date]] = {"from": set(), "to": set()}
+        while direction := direction_prefix.match(statement, cursor):
+            match = DATE_RE.match(statement, direction.end())
+            if match is None:
+                break
+            day = _candidate_date(match, published_on)
+            if day is None:
+                return None
+            key = "from" if direction.group(1).lower() == "from" else "to"
+            clause_dates[key].add(day)
+            cursor = match.end()
+        if clause_dates["to"]:
+            for key in directions:
+                directions[key].update(clause_dates[key])
+    if len(directions["to"]) != 1 or len(directions["from"]) > 1:
+        return None
+    new_date = directions["to"].pop()
+    if new_date < published_on:
+        return None
+    parsed = {"date": new_date.isoformat(), "timing": _session_from_text(text, report_day=new_date)}
+    if directions["from"]:
+        parsed["supersedes_date"] = directions["from"].pop().isoformat()
+    return parsed
+
+
+def _release_date_for_dated_call(body: str, published_on: date) -> dict[str, str] | None:
+    # Summaries of a dated earnings-call headline may omit the actual release
+    # schedule. Only a date attached to publication itself can supply it.
+    release_action = re.compile(
+        r"\b(?:will|to)\s+(?:release|issue|publish|post|report|announce)\s+"
+        r"(?:(?:the|its|first|second|third|fourth|quarter|quarterly|fiscal|20\d{2}|financial)[\s-]+)*"
+        r"(?:results|earnings)\b|"
+        r"\b(?:results|earnings)\s+will\s+be\s+(?:released|issued|published|posted|reported|announced)\b",
+        re.I,
+    )
+    date_binding = re.compile(
+        r"\s*,?\s*(?:(?:after|before)\s+(?:the\s+)?market\s+(?:close[sd]?|opens?)\s+)?"
+        r"(?:on\s+)?" + WEEKDAY_PREFIX, re.I,
+    )
+    days = set()
+    for action in release_action.finditer(body):
+        binding = date_binding.match(body, action.end())
+        match = DATE_RE.match(body, binding.end())
+        if match:
+            day = _candidate_date(match, published_on)
+            if day and day >= published_on:
+                days.add(day)
+    if len(days) != 1:
+        return None
+    report_day = days.pop()
+    return {"date": report_day.isoformat(), "timing": _session_from_text(body, report_day=report_day)}
 
 
 def _announcement_from_article(
@@ -1204,17 +1385,20 @@ def _announcement_from_article(
                 release_statement = True
         if not release_statement:
             return None
-    parsed = extract_earnings_announcement(
-        f"{title}. {body}",
-        published_on=published_on,
-    )
+    if " reschedules " in normalized_title:
+        parsed = _rescheduled_release(_clean_text(body), published_on)
+    elif any(DATE_RE.match(normalized_title, call.end()) for call in re.finditer(
+        r"\b(?:call|webcast)\s+(?:for|on)\s+" + WEEKDAY_PREFIX, normalized_title, re.I,
+    )):
+        parsed = _release_date_for_dated_call(_clean_text(body), published_on)
+    else:
+        parsed = extract_earnings_announcement(f"{title}. {body}", published_on=published_on)
     if parsed is None:
         return None
     fiscal_identity = extract_fiscal_identity(f"{title}. {body}")
     return {
         "provider": provider,
-        "date": parsed["date"],
-        "timing": parsed["timing"],
+        **parsed,
         "published_on": published_on.isoformat(),
         "official": official,
         "direct": True,
@@ -1577,6 +1761,32 @@ def _load_calendar(path: Path) -> pd.DataFrame:
     return normalize_existing(pd.read_csv(path, keep_default_na=False))
 
 
+def _has_actuals(row: pd.Series | dict[str, Any]) -> bool:
+    for key in ("eps_actual", "revenue_actual"):
+        try:
+            value = row.get(key)
+            if not isinstance(value, bool) and math.isfinite(float(value)):
+                return True
+        except (TypeError, ValueError):
+            continue
+    return False
+
+
+def load_share_class_groups(path: Path = SHARE_CLASSES_PATH) -> dict[str, tuple[str, ...]]:
+    """Only reviewed issuer identity may connect share-class calendars."""
+    groups: dict[str, tuple[str, ...]] = {}
+    for issuer in json.loads(path.read_text())["issuers"]:
+        symbols = tuple(issuer["symbols"])
+        if (len(set(symbols)) < 2 or len(set(symbols)) != len(symbols)
+                or not issuer.get("cik") or not issuer.get("source_url")):
+            raise ValueError("share-class issuer needs distinct symbols and primary-source evidence")
+        for symbol in symbols:
+            if symbol in groups or not re.fullmatch(r"[A-Z][A-Z0-9.-]{0,9}", symbol):
+                raise ValueError(f"invalid or overlapping share-class symbol: {symbol}")
+            groups[symbol] = symbols
+    return groups
+
+
 def _row_vote(row: pd.Series | dict[str, Any], provider: str) -> Vote:
     source_parts = {
         part.strip()
@@ -1602,6 +1812,14 @@ def _row_vote(row: pd.Series | dict[str, Any], provider: str) -> Vote:
         "date": str(row["date"])[:10],
         "timing": normalize_timing(row.get("timing")),
         "confidence": confidence,
+        "has_actuals": _has_actuals(row),
+        "fiscal_year": row.get("fiscal_year"),
+        "fiscal_q": row.get("fiscal_q"),
+        "fiscal_identity_trusted": bool(source_parts.intersection({
+            "finnhub", "fmp", "alphavantage", "override",
+            "twelvedata_press_release", "finnhub_company_news",
+            "financialcontent_press_release", "prnewswire_press_release", "alphavantage_news",
+        })),
     }
 
 
@@ -1706,6 +1924,7 @@ def reconcile_calendar(
     announcements_by_symbol: dict[str, list[Announcement]],
     allowed_symbols: set[str] | None = None,
 ) -> tuple[pd.DataFrame, dict[str, Any]]:
+    share_classes = load_share_class_groups()
     current_df = normalize_existing(current_df)
     baseline_df = normalize_existing(baseline_df)
 
@@ -1724,6 +1943,8 @@ def reconcile_calendar(
     )
     symbols.update(provider_map)
     symbols.update(announcements_by_symbol)
+    for symbol in tuple(symbols):
+        symbols.update(share_classes.get(symbol, ()))
     if allowed_symbols is not None:
         symbols.intersection_update(allowed_symbols)
 
@@ -1731,7 +1952,31 @@ def reconcile_calendar(
     replacement_rows: list[dict[str, Any]] = []
     decisions: dict[str, Any] = {}
 
+    recent_rows = current_df.loc[current_df["date"].map(
+        lambda value: start - timedelta(days=COMPLETED_LOOKBACK_DAYS) <= value < start
+    )]
+    reported_by_symbol: dict[str, list[Vote]] = defaultdict(list)
+    for _, row in recent_rows.iterrows():
+        if _has_actuals(row):
+            reported_by_symbol[row["act_symbol"]].append({
+                "date": row["date"].isoformat(), "fiscal_year": row["fiscal_year"],
+                "fiscal_q": row["fiscal_q"], "evidence_symbol": row["act_symbol"],
+                # Actuals prove a report occurred, not the release session.
+                # Reuse sessions only from already reconciled/verified history.
+                "timing": (normalize_timing(row["timing"])
+                           if "reconciled" in str(row["source"]).split("+")
+                           or _row_vote(row, "history")["confidence"] == "confirmed"
+                           else "unknown"),
+            })
+
     for symbol in sorted(symbols):
+        peers = share_classes.get(symbol, (symbol,))
+        announcements = [{**row, "evidence_symbol": peer}
+                         for peer in peers for row in announcements_by_symbol.get(peer, [])]
+        reported_events = [row for peer in peers for row in reported_by_symbol.get(peer, [])]
+        reported_events.extend({**vote, "timing": "unknown", "evidence_symbol": peer}
+                               for peer in peers for vote in provider_map.get(peer, [])
+                               if vote.get("has_actuals"))
         current_rows = _rows_in_window(current_df, symbol, start, end)
         baseline_rows = _rows_in_window(baseline_df, symbol, start, end)
 
@@ -1761,19 +2006,29 @@ def reconcile_calendar(
         if current_vote is not None:
             votes.append(current_vote)
         by_provider: dict[str, list[Vote]] = defaultdict(list)
-        for vote in provider_map.get(symbol, []):
-            by_provider[str(vote["provider"])].append(vote)
+        for peer in peers:
+            for vote in provider_map.get(peer, []):
+                by_provider[str(vote["provider"])].append({**vote, "evidence_symbol": peer})
         for provider_votes in by_provider.values():
-            selected = _closest_vote(provider_votes, anchor=anchor)
-            if selected:
-                votes.append(selected)
+            # Select one event per share class, then require that this provider
+            # agrees across classes. Two share classes are never two providers.
+            selected_by_peer = [_closest_vote(
+                [vote for vote in provider_votes if vote["evidence_symbol"] == peer], anchor=anchor,
+            ) for peer in peers]
+            selected_by_peer = [vote for vote in selected_by_peer if vote is not None]
+            if len({vote["date"] for vote in selected_by_peer}) == 1:
+                sessions = {normalize_timing(vote.get("timing")) for vote in selected_by_peer
+                            if normalize_timing(vote.get("timing")) != "unknown"}
+                votes.append({**selected_by_peer[0],
+                              "timing": sessions.pop() if len(sessions) == 1 else "unknown"})
 
         decision = choose_canonical_event(
             current=current_vote,
             baseline=baseline_vote,
             structured_votes=votes,
-            announcements=announcements_by_symbol.get(symbol, []),
+            announcements=announcements,
             as_of=start,
+            reported_events=reported_events,
         )
         decision["structured_votes"] = [
             {
@@ -1791,16 +2046,19 @@ def reconcile_calendar(
                     "date",
                     "timing",
                     "published_on",
+                    "supersedes_date",
                     "official",
                     "direct",
                     "title",
                     "url",
                     "fiscal_year",
                     "fiscal_q",
+                    "evidence_symbol",
                 )
             }
-            for row in announcements_by_symbol.get(symbol, [])
+            for row in announcements
         ]
+        decision["reported_evidence"] = reported_events
         decisions[symbol] = decision
 
         chosen_date_text = decision.get("date")
@@ -1808,7 +2066,15 @@ def reconcile_calendar(
             continue
         chosen_date = date.fromisoformat(str(chosen_date_text))
 
-        if current_row is not None:
+        # When a phantom future row collapses into a recorded event, retain
+        # that ticker's own actuals. Never copy another class's financial data.
+        recorded_rows = current_df.loc[
+            current_df["act_symbol"].eq(symbol) & current_df["date"].eq(chosen_date)
+        ]
+        recorded_row = _pick_anchor_row(recorded_rows)
+        if recorded_row is not None:
+            replacement = recorded_row.to_dict()
+        elif current_row is not None:
             replacement = current_row.to_dict()
         elif baseline_row is not None:
             replacement = baseline_row.to_dict()
@@ -1827,7 +2093,9 @@ def reconcile_calendar(
         if decision.get("fiscal_q"):
             replacement["fiscal_q"] = decision["fiscal_q"]
         replacement["date"] = chosen_date
-        replacement["timing"] = decision["timing"]
+        if (recorded_row is None or not _has_actuals(recorded_row)
+                or decision["timing"] != "unknown"):
+            replacement["timing"] = decision["timing"]
         replacement["source"] = _append_source(
             replacement.get("source"),
             "reconciled",
@@ -1840,7 +2108,7 @@ def reconcile_calendar(
         if current_row is not None:
             drop_indices.add(int(current_row.name))
         for index, row in current_rows.iterrows():
-            if abs((row["date"] - chosen_date).days) <= 35:
+            if not _has_actuals(row) and abs((row["date"] - chosen_date).days) <= EVENT_CORRECTION_DAYS:
                 drop_indices.add(int(index))
         replacement_rows.append(replacement)
 
@@ -2013,8 +2281,11 @@ def _collect_announcements(
     def unresolved_symbols() -> list[str]:
         pending = []
         for index, symbol in enumerate(symbols):
-            chosen, _ = _announcement_decision(evidence[symbol], as_of=today)
             expected_date = (candidate_dates or {}).get(symbol)
+            chosen, _ = _announcement_decision(
+                evidence[symbol], as_of=today,
+                anchor={"date": expected_date} if expected_date else None,
+            )
             same_event = not expected_date or chosen and chosen["date"] == expected_date
             if chosen and same_event and normalize_timing(chosen.get("timing")) in {"bmo", "amc"}:
                 continue
@@ -2140,23 +2411,26 @@ def main() -> int:
 
     provider_votes: list[Vote] = []
     provider_status: dict[str, Any] = {}
+    # A source that has already advanced must still be able to correct a
+    # nearby stale future projection. Past-only votes never create new rows.
+    evidence_start = today - timedelta(days=COMPLETED_LOOKBACK_DAYS)
 
     finnhub_votes, provider_status["finnhub_calendar"] = fetch_finnhub_calendar(
-        today,
+        evidence_start,
         end,
         finnhub_key,
     )
     provider_votes.extend(finnhub_votes)
 
     alpha_votes, provider_status["alphavantage_calendar"] = fetch_alphavantage_calendar(
-        today,
+        evidence_start,
         end,
         alphavantage_key,
     )
     provider_votes.extend(alpha_votes)
 
     fmp_votes, provider_status["fmp_calendar"] = fetch_fmp_calendar(
-        today,
+        evidence_start,
         end,
         fmp_key,
     )
@@ -2205,6 +2479,11 @@ def main() -> int:
             candidate_dates=candidate_dates,
         )
         symbols = published + newcomers[:MAX_NEW_ANNOUNCEMENT_SYMBOLS]
+    share_classes = load_share_class_groups()
+    for symbol in tuple(symbols):
+        for peer in share_classes.get(symbol, ()):
+            if peer in allowed_symbols and peer not in symbols:
+                symbols.append(peer)
     symbols = symbols[:args.announcement_max_symbols]
     company_names = load_company_names()
     announcements, announcement_status = _collect_announcements(
@@ -2239,6 +2518,7 @@ def main() -> int:
         "schema": "quantiv.earnings-calendar-reconciliation.v1",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "window": {
+            "evidence_start": evidence_start.isoformat(),
             "start": today.isoformat(),
             "end": end.isoformat(),
             "announcement_end": announcement_end.isoformat(),

@@ -169,13 +169,14 @@ export function mergeCalendarReference<
         (researchSessionKnown || !referenceSessionKnown);
 
       if (researchMatch && sessionsCompatible) {
-        const compatForecast = resolveDisplayForecastCompat(
-          researchMatch as TEvent & LegacyForecastOverlay,
-        );
+        const forecast = researchMatch as TEvent & LegacyForecastOverlay;
+        const compatForecast = resolveDisplayForecastCompat(forecast);
+        const useLegacyPrior = forecast.display_forecast_method == null
+          && event.earnings_date < localTodayIso() && legacyHistoricalPrior != null;
         const displayCompat = compatForecast.pct != null
           ? compatForecast.method === 'ml' ? {}
             : { display_forecast_pct: compatForecast.pct, display_forecast_method: compatForecast.method }
-          : event.earnings_date < localTodayIso() && legacyHistoricalPrior != null
+          : useLegacyPrior
             ? { display_forecast_pct: legacyHistoricalPrior, display_forecast_method: 'historical_prior' as const }
             : {};
         return {

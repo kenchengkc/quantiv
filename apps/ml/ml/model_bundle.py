@@ -140,6 +140,7 @@ def _bundle_core(
     created_at: str,
     serving_capabilities: Mapping[str, Any] | None = None,
     historical_admission: Mapping[str, Any] | None = None,
+    interval_capabilities: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     identity = {
         "artifacts": artifacts,
@@ -151,6 +152,8 @@ def _bundle_core(
         identity["serving_capabilities"] = dict(serving_capabilities)
     if historical_admission is not None:
         identity["historical_admission"] = dict(historical_admission)
+    if interval_capabilities is not None:
+        identity["interval_capabilities"] = dict(interval_capabilities)
     bundle_id = hashlib.sha256(_canonical(identity)).hexdigest()
     return {
         "schema": BUNDLE_SCHEMA,
@@ -272,6 +275,8 @@ def verify_bundle_manifest(
         or len(set(horizons)) != len(horizons)
     ):
         raise ModelBundleError("signed model bundle has invalid or unsupported horizons")
+    if "interval_capabilities" in payload and "historical_admission" not in payload:
+        raise ModelBundleError("interval capabilities require bound historical admission")
     if ("serving_capabilities" in payload) != ("historical_admission" in payload):
         raise ModelBundleError("serving capabilities require bound historical admission")
     if "historical_admission" in payload and (
@@ -290,6 +295,7 @@ def verify_bundle_manifest(
         created_at=str(payload.get("created_at", "")),
         serving_capabilities=payload.get("serving_capabilities"),
         historical_admission=payload.get("historical_admission"),
+        interval_capabilities=payload.get("interval_capabilities"),
     )["bundle_id"]
     if bundle_id != expected:
         raise ModelBundleError("model bundle id does not match its signed contents")
@@ -319,7 +325,7 @@ def _verify_historical_bundle(
     payload: Mapping[str, Any], *, public_key: str | bytes | None,
 ) -> None:
     from ml.historical_admission import verify_historical_admission_receipt
-    from ml.serving_capabilities import validate_serving_capabilities
+    from ml.serving_capabilities import validate_interval_capabilities, validate_serving_capabilities
 
     admission = payload["historical_admission"]
     try:
@@ -336,6 +342,10 @@ def _verify_historical_bundle(
         admitted = validate_serving_capabilities(receipt["admitted_cohorts"], payload["horizons"])
         if capabilities != admitted or payload["receipt_id"] != parent["receipt_id"]:
             raise ValueError("historical admission differs from serving capabilities or model receipt")
+        if payload.get("interval_capabilities") != receipt.get("interval_capabilities"):
+            raise ValueError("historical interval admission differs from serving capabilities")
+        if "interval_capabilities" in receipt:
+            validate_interval_capabilities(payload["interval_capabilities"], capabilities)
         parent_artifacts = _artifact_map(parent)
         if not set(payload["horizons"]).issubset(parent["horizons"]):
             raise ValueError("admitted model heads exceed the historical source bundle")
@@ -382,6 +392,7 @@ def create_historically_admitted_bundle(
         source_revision=source_revision, created_at=_utc_now(),
         serving_capabilities=capabilities,
         historical_admission={"source_manifest": source_manifest, "receipt": dict(admission_receipt)},
+        interval_capabilities=receipt.get("interval_capabilities"),
     )
     manifest = _sign(core, private_key)
     verify_bundle_manifest(manifest, public_key=public_key)
