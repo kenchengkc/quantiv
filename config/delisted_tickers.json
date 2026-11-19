@@ -2,9 +2,9 @@
   "_comment": "Single source of truth for tickers removed from the universe after delisting (M&A, bankruptcy, going-private). Honored by the daily-refresh integrity gates (check_earnings_calendar_integrity.py, check_ticker_identity.py) so deliberate removals don't trip silent-drop guards, and by sync_dolthub.py's universe gate so a stale forecast JSON can't resurrect them. Loaded via scripts/delisted.py. Add an entry (ticker -> reason/delisted_on/source) when a holding is confirmed delisted.",
   "tickers": {
     "ACA": {
-      "reason": "Auto-detected: absent from NASDAQ/NYSE exchange directories for \u22653 consecutive days (likely M&A, bankruptcy, or going-private).",
-      "delisted_on": "2026-10-29",
-      "source": "auto: scripts/detect_delistings.py"
+      "reason": "CRH Americas acquired Arcosa for cash. Trading in Arcosa common stock halted before the October 23 open on NYSE and NYSE Texas.",
+      "delisted_on": "2026-10-23",
+      "source": "https://www.sec.gov/Archives/edgar/data/1739445/000114036126040596/ef20084131_8k.htm"
     },
     "AMWD": {
       "reason": "Completed all-stock merger into MasterBrand, Inc. (NYSE: MBC); American Woodmark delisted.",
@@ -72,9 +72,9 @@
       "source": "manual (user-confirmed acquisition)"
     },
     "KVUE": {
-      "reason": "Auto-detected: absent from NASDAQ/NYSE exchange directories for \u22653 consecutive days (likely M&A, bankruptcy, or going-private).",
-      "delisted_on": "2026-11-04",
-      "source": "auto: scripts/detect_delistings.py"
+      "reason": "Kimberly-Clark acquired Kenvue for cash and stock. Kenvue common stock ceased trading at the November 2 NYSE open.",
+      "delisted_on": "2026-11-02",
+      "source": "https://www.sec.gov/Archives/edgar/data/55785/000110465926120990/tm2628636d1_ex99-1.htm"
     },
     "LXP": {
       "reason": "Brookfield and CPP Investments acquired LXP Industrial Trust for cash. The former NYSE common shares ceased trading.",
@@ -102,14 +102,14 @@
       "source": "https://www.sec.gov/Archives/edgar/data/1604778/000095010326015180/dp254466_8k.htm"
     },
     "RAMP": {
-      "reason": "Auto-detected: absent from NASDAQ/NYSE exchange directories for \u22653 consecutive days (likely M&A, bankruptcy, or going-private).",
-      "delisted_on": "2026-11-04",
-      "source": "auto: scripts/detect_delistings.py"
+      "reason": "Publicis Groupe acquired LiveRamp through its subsidiary MMS USA Holdings. NYSE suspended trading in LiveRamp common stock on November 2.",
+      "delisted_on": "2026-11-02",
+      "source": "https://www.sec.gov/Archives/edgar/data/733269/000087666126000877/ruleprovisionnotice.htm"
     },
     "ROKU": {
-      "reason": "Auto-detected: absent from NASDAQ/NYSE exchange directories for \u22653 consecutive days (likely M&A, bankruptcy, or going-private).",
-      "delisted_on": "2026-11-12",
-      "source": "auto: scripts/detect_delistings.py"
+      "reason": "Fox Corporation acquired Roku for cash and Fox Class A shares. ROKU last traded on November 6 when the merger closed. Nasdaq suspended trading effective November 9.",
+      "delisted_on": "2026-11-09",
+      "source": "https://www.nasdaqtrader.com/TraderNews.aspx?id=eca2026-806"
     },
     "SNCY": {
       "reason": "Acquired by Allegiant Travel Company (NASDAQ: ALGT); Sun Country Airlines delisted from Nasdaq.",
