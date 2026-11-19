@@ -101,11 +101,13 @@ SYMBOLS_DIR = REPO_ROOT / "apps" / "frontend" / "public" / "symbols"
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from delisted import (  # noqa: E402
-    canonical_ticker,
+    canonical_action_ticker,
     delisted_tickers,
     is_delisted,
+    preserves_earnings_history,
     ticker_renames,
 )
+from apply_ticker_lifecycle import apply_lifecycle  # noqa: E402
 METADATA_FILE = "sync_metadata.json"
 API_DELAY = 0.3  # seconds between API calls
 
@@ -715,6 +717,12 @@ def sync_earnings():
     }
     df["timing"] = df["timing"].map(timing_map).fillna("unknown")
 
+    # Join on the same event identity even while DoltHub still supplies the old
+    # symbol. Otherwise the next refresh can drop previously enriched rows.
+    renames = ticker_renames()
+    retired = delisted_tickers()
+    df, _ = apply_lifecycle(df, renames=renames, retired=retired)
+
     # Merge with existing CSV so we don't clobber Finnhub-overlaid columns
     # (eps_actual, eps_estimate, revenue_*, fiscal_year, fiscal_q, source).
     # DoltHub is the timing + universe baseline; Finnhub overlay adds the
@@ -741,6 +749,7 @@ def sync_earnings():
             existing = pd.read_csv(csv_path, keep_default_na=False)
             existing["date"] = pd.to_datetime(existing["date"], errors="coerce").dt.date
             existing = existing.dropna(subset=["date", "act_symbol"])
+            existing, _ = apply_lifecycle(existing, renames=renames, retired=retired)
 
             # Universe gate: keep existing rows whose ticker is EITHER in
             # tonight's fresh DoltHub snapshot OR has a current symbol JSON
@@ -764,7 +773,14 @@ def sync_earnings():
                 (set(df["act_symbol"].unique()) | forecast_tickers) - delisted_tickers()
             )
             kept_before = len(existing)
-            existing = existing[existing["act_symbol"].isin(dolthub_universe)]
+            # A continuing parent can disappear under its old symbol after a
+            # spin-off. Its valid pre-transition earnings are an archive, not
+            # stale forward coverage, even when the old forecast page is gone.
+            preserved = pd.Series([
+                preserves_earnings_history(symbol, event_date)
+                for symbol, event_date in existing[["act_symbol", "date"]].itertuples(index=False)
+            ], index=existing.index, dtype=bool)
+            existing = existing[existing["act_symbol"].isin(dolthub_universe) | preserved]
             print(
                 f"  Universe gate: forecast set {len(forecast_tickers):,} ∪ "
                 f"fresh DoltHub {df['act_symbol'].nunique():,} → "
@@ -811,35 +827,6 @@ def sync_earnings():
             print(f"  Merge: {len(df):,} total rows (DoltHub fresh + Finnhub-only carried forward)")
         except Exception as exc:
             print(f"  ⚠ Could not merge existing enriched columns: {exc}")
-
-    # Apply ticker renames (old -> new) so earnings history carries over under
-    # the company's current symbol. Only the renamed rows are rewritten; a
-    # collision with a fresh DoltHub row already under the new symbol is then
-    # deduped on (symbol, date).
-    renames = ticker_renames()
-    if renames:
-        mask = df["act_symbol"].astype(str).str.strip().str.upper().isin(renames)
-        if mask.any():
-            df.loc[mask, "act_symbol"] = df.loc[mask, "act_symbol"].map(canonical_ticker)
-            before = len(df)
-            df = df.drop_duplicates(subset=["act_symbol", "date"], keep="last").reset_index(drop=True)
-            print(
-                f"  Renamed {int(mask.sum())} row(s) to current symbols "
-                f"{sorted(set(renames.values()))}; deduped {before - len(df)} collision(s)"
-            )
-
-    # Final universe filter: drop delisted tickers that survived the merge.
-    # The universe gate above only screens carried-forward rows; fresh DoltHub
-    # rows reach here unfiltered, so a just-delisted name still in DoltHub's
-    # snapshot would otherwise slip through.
-    if delisted_tickers():
-        before = len(df)
-        df = df[~df["act_symbol"].map(is_delisted)].reset_index(drop=True)
-        if len(df) != before:
-            print(
-                f"  Dropped {before - len(df):,} delisted-ticker row(s): "
-                f"{sorted(delisted_tickers())}"
-            )
 
     # Write Parquet
     out_path = data_dir() / "earnings_calendar.parquet"
@@ -926,7 +913,7 @@ def _latest_option_universe() -> tuple[date, list[str]]:
     frame = pq.read_table(partition, columns=["act_symbol"]).to_pandas()
     symbols = sorted(
         {
-            canonical_ticker(symbol)
+            canonical_action_ticker(symbol)
             for symbol in frame["act_symbol"].dropna().astype(str)
             if not is_delisted(symbol)
         }
@@ -1036,7 +1023,7 @@ def _fetch_action_table(
     frame = pd.DataFrame(all_rows, columns=columns)
     if frame.empty:
         return frame, evidence
-    frame["act_symbol"] = frame["act_symbol"].map(canonical_ticker)
+    frame["act_symbol"] = frame["act_symbol"].map(canonical_action_ticker)
     frame["ex_date"] = pd.to_datetime(frame["ex_date"], errors="raise").dt.date
     for column in value_columns:
         frame[column] = pd.to_numeric(frame[column], errors="coerce" if allow_invalid_values else "raise")

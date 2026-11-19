@@ -24,7 +24,7 @@ import pyarrow.parquet as pq
 import requests
 
 from provider_market_hours import block_finnhub_reserved_window
-from delisted import canonical_ticker, is_delisted
+from delisted import canonical_earnings_ticker, canonical_ticker, is_delisted
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -247,9 +247,13 @@ def normalize_existing(df: pd.DataFrame) -> pd.DataFrame:
     if "act_symbol" not in out.columns or "date" not in out.columns:
         raise ValueError("Existing earnings file must contain act_symbol and date columns")
 
-    out["act_symbol"] = out["act_symbol"].map(canonical_ticker)
     out["date"] = pd.to_datetime(out["date"], errors="coerce").dt.date
-    out = out[out["act_symbol"].ne("") & out["date"].notna()].copy()
+    out = out[out["date"].notna()].copy()
+    out["act_symbol"] = [
+        canonical_earnings_ticker(symbol, event_date)
+        for symbol, event_date in out[["act_symbol", "date"]].itertuples(index=False)
+    ]
+    out = out[out["act_symbol"].ne("")].copy()
     # Drop foreign-exchange tickers at the boundary so they never
     # accumulate in the CSV (no forecast pipeline, no Finnhub free-tier
     # coverage). See is_us_symbol() for the convention.

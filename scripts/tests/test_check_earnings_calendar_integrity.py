@@ -110,3 +110,20 @@ def test_verified_rename_does_not_exempt_an_unrelated_ticker_drop(tmp_path):
     assert result.returncode == 1
     assert "1 US tickers vanished" in result.stdout
     assert "KEEP" in result.stdout
+
+
+def test_spinoff_does_not_exempt_loss_of_preserved_earnings(tmp_path):
+    history = [_row('MSGS', date(2025, 8, 12), 'dolthub'),
+               _row('MSGS', date(2026, 8, 12), 'dolthub')]
+    future = _row('MSGS', date(2026, 10, 30), 'dolthub')
+    successor = {**future, 'act_symbol': 'MSGK'}
+    _write_baseline(tmp_path, [*history, future])
+    args = ('--require-baseline', '--max-row-drop-pct', '100')
+    _write_calendar(tmp_path, [*history, successor])
+    result = _run_gate(tmp_path, *args)
+    assert result.returncode == 0, result.stdout + result.stderr
+
+    _write_calendar(tmp_path, [history[0], successor])
+    result = _run_gate(tmp_path, *args)
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert 'preserved pre-transition earnings' in result.stdout

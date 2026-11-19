@@ -159,6 +159,8 @@ def connect_duckdb() -> duckdb.DuckDBPyConnection:
 
     # Historical and implied vol snapshots. Empty stand-in if the files are missing.
     if "v_volhist" not in views:
+        from scripts.ticker_lifecycle_sql import market_data_history_filter_sql, volatility_history_values_sql
+
         data_root = get_data_dir()
         volhist_glob = str(data_root / "parquet" / "volatility_history" / "year=*" / "month=*" / "*.parquet")
         import glob as _glob
@@ -168,17 +170,9 @@ def connect_duckdb() -> duckdb.DuckDBPyConnection:
                 SELECT
                     CAST(date AS DATE) AS date,
                     act_symbol,
-                    CAST(hv_current     AS DOUBLE) AS hv_current,
-                    CAST(hv_week_ago    AS DOUBLE) AS hv_week_ago,
-                    CAST(hv_month_ago   AS DOUBLE) AS hv_month_ago,
-                    CAST(hv_year_high   AS DOUBLE) AS hv_year_high,
-                    CAST(hv_year_low    AS DOUBLE) AS hv_year_low,
-                    CAST(iv_current     AS DOUBLE) AS iv_current,
-                    CAST(iv_week_ago    AS DOUBLE) AS iv_week_ago,
-                    CAST(iv_month_ago   AS DOUBLE) AS iv_month_ago,
-                    CAST(iv_year_high   AS DOUBLE) AS iv_year_high,
-                    CAST(iv_year_low    AS DOUBLE) AS iv_year_low
+                    {volatility_history_values_sql()}
                 FROM read_parquet('{volhist_glob}')
+                WHERE {market_data_history_filter_sql()}
             """)
         else:
             logger.warning("v_volhist parquet not found — vol-history features will be NULL")
