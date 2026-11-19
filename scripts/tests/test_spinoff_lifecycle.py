@@ -27,14 +27,14 @@ def test_spinoff_earnings_history_survives_in_csv_and_parquet(tmp_path):
         {'act_symbol': 'MSGS', 'date': '2026-08-12', 'eps_actual': 0.42},
         {'act_symbol': 'MSGE', 'date': '2026-08-12', 'eps_actual': 9.9},
         {'act_symbol': 'MSGR', 'date': '2026-10-28', 'eps_actual': 0.1},
-        {'act_symbol': 'MSGS', 'date': '2026-10-30', 'eps_actual': 0.2},
         {'act_symbol': 'MSGK', 'date': '2026-10-30', 'eps_actual': 0.3},
+        {'act_symbol': 'MSGS', 'date': '2026-10-30', 'eps_actual': 0.2},
     ]
     frame = pd.DataFrame(rows)
     frame.to_csv(tmp_path / 'earnings_calendar.csv', index=False)
     frame.to_parquet(tmp_path / 'earnings_calendar.parquet', index=False)
     lifecycle.apply_artifacts(tmp_path)
-    expected = pd.DataFrame([rows[1], rows[0], rows[2], rows[4]])
+    expected = pd.DataFrame([rows[1], rows[0], rows[2], rows[3]])
     pd.testing.assert_frame_equal(pd.read_csv(tmp_path / 'earnings_calendar.csv'), expected)
     pd.testing.assert_frame_equal(pd.read_parquet(tmp_path / 'earnings_calendar.parquet'), expected)
 
@@ -136,3 +136,25 @@ def test_november_symbol_changes_and_cash_buyout():
     assert delisted.canonical_earnings_ticker("INDV", "2026-11-03") == "SUPN"
     assert not market_data_window_is_comparable("SUPN", date(2026, 10, 30), date(2026, 11, 3))
     assert market_data_window_is_comparable("SUPN", date(2026, 11, 3), date(2026, 11, 4))
+
+
+def test_old_provider_symbol_preserves_canonical_fundamentals_on_repeat(tmp_path, monkeypatch):
+    from scripts import sync_dolthub
+
+    enriched = pd.DataFrame([
+        {"act_symbol": "TCBI", "date": "2026-10-21", "timing": "bmo", "eps_actual": 2.3},
+        {"act_symbol": "TCBI", "date": "2025-01-23", "timing": "bmo", "eps_actual": 1.4},
+    ])
+    path = tmp_path / "earnings_calendar.csv"
+    enriched.to_csv(path, index=False)
+    monkeypatch.setattr(sync_dolthub, "query", lambda *args: [
+        {"act_symbol": "TCBI", "date": "2026-10-21", "when": None},
+    ])
+    monkeypatch.setattr(sync_dolthub, "data_dir", lambda: tmp_path)
+    monkeypatch.setattr(sync_dolthub, "SYMBOLS_DIR", tmp_path / "no_pages")
+    for _ in range(2):
+        sync_dolthub.sync_earnings()
+        result = pd.read_csv(path).set_index("date")
+        assert set(result.act_symbol) == {"TXCP"}
+        assert result.eps_actual.to_dict() == {"2025-01-23": 1.4, "2026-10-21": 2.3}
+        assert set(result.timing) == {"bmo"}

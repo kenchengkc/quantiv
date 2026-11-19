@@ -58,8 +58,9 @@ def apply_lifecycle(
     rename_mask = out["act_symbol"].ne(symbols)
     retired_mask = out["act_symbol"].isin(retired)
     retired_rows = int(retired_mask.sum())
-    out = out.loc[~retired_mask].copy()
-
+    # Prefer the row already filed under the current symbol if both feeds
+    # provide the same event. Provider row order has no identity significance.
+    out = pd.concat([out.loc[rename_mask & ~retired_mask], out.loc[~rename_mask & ~retired_mask]])
     before_dedup = len(out)
     out = out.drop_duplicates(subset=["act_symbol", "date"], keep="last")
     out = out.sort_values(["date", "act_symbol"], kind="stable").reset_index(drop=True)
