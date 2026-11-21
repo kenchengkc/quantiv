@@ -1,7 +1,7 @@
 {
   "symbol": "AZTA",
-  "as_of_date": "2026-11-19",
-  "spot_price": 50.0,
+  "as_of_date": "2026-11-20",
+  "spot_price": 45.0,
   "expected_move": {
     "earnings_date": "2026-11-10",
     "timing": "amc",
@@ -27,21 +27,38 @@
   },
   "straddle_features": [
     {
+      "expiration": "2026-12-18",
+      "dte": 28,
+      "atm_strike": 45.0,
+      "atm_iv": 0.67695,
+      "atm_call_iv": 0.6792,
+      "atm_put_iv": 0.6747,
+      "straddle_mid": 6.7,
+      "em_straddle": 6.7,
+      "em_straddle_pct": 0.148889,
+      "em_iv": 8.437265,
+      "em_iv_pct": 0.187495,
+      "call_delta": 0.5314,
+      "call_gamma": 0.0471,
+      "call_vega": 0.0492,
+      "call_theta": -0.061
+    },
+    {
       "expiration": "2027-01-15",
-      "dte": 57,
-      "atm_strike": 50.0,
-      "atm_iv": 0.636756,
-      "atm_call_iv": 0.6681,
-      "atm_put_iv": 0.6052,
-      "straddle_mid": 9.95,
-      "em_straddle": 9.95,
-      "em_straddle_pct": 0.199,
-      "em_iv": 12.581548,
-      "em_iv_pct": 0.251631,
-      "call_delta": 0.4815,
-      "call_gamma": 0.0322,
-      "call_vega": 0.0744,
-      "call_theta": -0.0477
+      "dte": 56,
+      "atm_strike": 45.0,
+      "atm_iv": 0.7008,
+      "atm_call_iv": 0.6998,
+      "atm_put_iv": 0.7018,
+      "straddle_mid": 9.695,
+      "em_straddle": 9.695,
+      "em_straddle_pct": 0.215444,
+      "em_iv": 12.352481,
+      "em_iv_pct": 0.2745,
+      "call_delta": 0.5186,
+      "call_gamma": 0.0317,
+      "call_vega": 0.0684,
+      "call_theta": -0.0367
     }
   ],
   "earnings_history": [
@@ -385,13 +402,13 @@
   ],
   "next_earnings": "2026-11-10",
   "vol_regime": {
-    "iv_current": 0.6015,
-    "iv_rank": 0.321985,
+    "iv_current": 0.6814,
+    "iv_rank": 0.427421,
     "iv_year_high": 1.1153,
     "iv_year_low": 0.3575,
-    "hv_current": 0.8908,
-    "hv_rank": 0.743716,
-    "iv_mom_week": -0.023,
+    "hv_current": 0.8992,
+    "hv_rank": 0.756284,
+    "iv_mom_week": 0.1016,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

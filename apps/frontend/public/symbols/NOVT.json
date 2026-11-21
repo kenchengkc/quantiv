@@ -1,7 +1,7 @@
 {
   "symbol": "NOVT",
-  "as_of_date": "2026-11-19",
-  "spot_price": 120.0,
+  "as_of_date": "2026-11-20",
+  "spot_price": 105.0,
   "expected_move": {
     "earnings_date": "2026-11-09",
     "timing": "amc",
@@ -47,21 +47,38 @@
   },
   "straddle_features": [
     {
+      "expiration": "2026-12-18",
+      "dte": 28,
+      "atm_strike": 105.0,
+      "atm_iv": 0.627872,
+      "atm_call_iv": 0.6153,
+      "atm_put_iv": 0.6404,
+      "straddle_mid": 14.5,
+      "em_straddle": 14.5,
+      "em_straddle_pct": 0.138095,
+      "em_iv": 18.259684,
+      "em_iv_pct": 0.173902,
+      "call_delta": 0.4672,
+      "call_gamma": 0.0228,
+      "call_vega": 0.112,
+      "call_theta": -0.1243
+    },
+    {
       "expiration": "2027-01-15",
-      "dte": 57,
-      "atm_strike": 120.0,
-      "atm_iv": 0.532541,
-      "atm_call_iv": 0.5399,
-      "atm_put_iv": 0.5251,
-      "straddle_mid": 20.0,
-      "em_straddle": 20.0,
-      "em_straddle_pct": 0.166667,
-      "em_iv": 25.253724,
-      "em_iv_pct": 0.210448,
-      "call_delta": 0.4744,
-      "call_gamma": 0.0162,
-      "call_vega": 0.1807,
-      "call_theta": -0.0915
+      "dte": 56,
+      "atm_strike": 105.0,
+      "atm_iv": 0.59945,
+      "atm_call_iv": 0.5991,
+      "atm_put_iv": 0.5998,
+      "straddle_mid": 19.4,
+      "em_straddle": 19.4,
+      "em_straddle_pct": 0.184762,
+      "em_iv": 24.654126,
+      "em_iv_pct": 0.234801,
+      "call_delta": 0.4993,
+      "call_gamma": 0.0166,
+      "call_vega": 0.1586,
+      "call_theta": -0.0861
     }
   ],
   "earnings_history": [
@@ -444,13 +461,13 @@
   ],
   "next_earnings": "2026-11-09",
   "vol_regime": {
-    "iv_current": 0.5572,
-    "iv_rank": 0.621903,
+    "iv_current": 0.6282,
+    "iv_rank": 0.87684,
     "iv_year_high": 0.6625,
     "iv_year_low": 0.384,
-    "hv_current": 0.7341,
-    "hv_rank": 0.961597,
-    "iv_mom_week": 0.0163,
+    "hv_current": 0.7929,
+    "hv_rank": 1.0,
+    "iv_mom_week": 0.0859,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

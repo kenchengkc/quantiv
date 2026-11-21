@@ -1,7 +1,7 @@
 {
   "symbol": "TGTX",
-  "as_of_date": "2026-11-19",
-  "spot_price": 70.0,
+  "as_of_date": "2026-11-20",
+  "spot_price": 65.0,
   "expected_move": {
     "earnings_date": "2026-11-09",
     "timing": "bmo",
@@ -27,21 +27,38 @@
   },
   "straddle_features": [
     {
+      "expiration": "2026-12-18",
+      "dte": 28,
+      "atm_strike": 65.0,
+      "atm_iv": 0.545121,
+      "atm_call_iv": 0.5526,
+      "atm_put_iv": 0.5376,
+      "straddle_mid": 7.85,
+      "em_straddle": 7.85,
+      "em_straddle_pct": 0.120769,
+      "em_iv": 9.813843,
+      "em_iv_pct": 0.150982,
+      "call_delta": 0.4994,
+      "call_gamma": 0.0415,
+      "call_vega": 0.0705,
+      "call_theta": -0.0831
+    },
+    {
       "expiration": "2027-01-15",
-      "dte": 57,
+      "dte": 56,
       "atm_strike": 70.0,
-      "atm_iv": 0.538715,
-      "atm_call_iv": 0.5294,
-      "atm_put_iv": 0.5483,
-      "straddle_mid": 12.05,
-      "em_straddle": 12.05,
-      "em_straddle_pct": 0.172143,
-      "em_iv": 14.90212,
-      "em_iv_pct": 0.212887,
-      "call_delta": 0.45,
-      "call_gamma": 0.0296,
-      "call_vega": 0.1029,
-      "call_theta": -0.0595
+      "atm_iv": 0.551935,
+      "atm_call_iv": 0.5491,
+      "atm_put_iv": 0.5548,
+      "straddle_mid": 12.525,
+      "em_straddle": 12.525,
+      "em_straddle_pct": 0.178929,
+      "em_iv": 15.133294,
+      "em_iv_pct": 0.21619,
+      "call_delta": 0.3819,
+      "call_gamma": 0.028,
+      "call_vega": 0.0949,
+      "call_theta": -0.051
     }
   ],
   "earnings_history": [
@@ -404,13 +421,13 @@
   ],
   "next_earnings": "2026-11-09",
   "vol_regime": {
-    "iv_current": 0.555,
-    "iv_rank": 0.419475,
+    "iv_current": 0.5728,
+    "iv_rank": 0.463578,
     "iv_year_high": 0.7893,
     "iv_year_low": 0.3857,
-    "hv_current": 0.4396,
-    "hv_rank": 0.357143,
-    "iv_mom_week": 0.0378,
+    "hv_current": 0.4382,
+    "hv_rank": 0.352638,
+    "iv_mom_week": 0.0729,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"

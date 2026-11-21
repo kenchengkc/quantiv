@@ -1,7 +1,7 @@
 {
   "symbol": "TDW",
-  "as_of_date": "2026-11-19",
-  "spot_price": 75.0,
+  "as_of_date": "2026-11-20",
+  "spot_price": 70.0,
   "expected_move": {
     "earnings_date": "2026-11-09",
     "timing": "amc",
@@ -45,21 +45,38 @@
   },
   "straddle_features": [
     {
+      "expiration": "2026-12-18",
+      "dte": 28,
+      "atm_strike": 70.0,
+      "atm_iv": 0.5567,
+      "atm_call_iv": 0.5612,
+      "atm_put_iv": 0.5522,
+      "straddle_mid": 8.6,
+      "em_straddle": 8.6,
+      "em_straddle_pct": 0.122857,
+      "em_iv": 10.79324,
+      "em_iv_pct": 0.154189,
+      "call_delta": 0.518,
+      "call_gamma": 0.0373,
+      "call_vega": 0.0765,
+      "call_theta": -0.0869
+    },
+    {
       "expiration": "2027-01-15",
-      "dte": 57,
-      "atm_strike": 75.0,
-      "atm_iv": 0.464819,
-      "atm_call_iv": 0.4509,
-      "atm_put_iv": 0.4788,
-      "straddle_mid": 11.045,
-      "em_straddle": 11.045,
-      "em_straddle_pct": 0.147267,
-      "em_iv": 13.776406,
-      "em_iv_pct": 0.183685,
-      "call_delta": 0.4525,
-      "call_gamma": 0.0314,
-      "call_vega": 0.112,
-      "call_theta": -0.0516
+      "dte": 56,
+      "atm_strike": 70.0,
+      "atm_iv": 0.553602,
+      "atm_call_iv": 0.5573,
+      "atm_put_iv": 0.5499,
+      "straddle_mid": 12.05,
+      "em_straddle": 12.05,
+      "em_straddle_pct": 0.172143,
+      "em_iv": 15.178996,
+      "em_iv_pct": 0.216843,
+      "call_delta": 0.5387,
+      "call_gamma": 0.0264,
+      "call_vega": 0.1078,
+      "call_theta": -0.0599
     }
   ],
   "earnings_history": [
@@ -449,13 +466,13 @@
   ],
   "next_earnings": "2026-11-09",
   "vol_regime": {
-    "iv_current": 0.4906,
-    "iv_rank": 0.305744,
+    "iv_current": 0.5454,
+    "iv_rank": 0.474985,
     "iv_year_high": 0.7154,
     "iv_year_low": 0.3916,
-    "hv_current": 0.6002,
-    "hv_rank": 0.689679,
-    "iv_mom_week": 0.0283,
+    "hv_current": 0.603,
+    "hv_rank": 0.696188,
+    "iv_mom_week": 0.0697,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"
