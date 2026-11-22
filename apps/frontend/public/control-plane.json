@@ -5,16 +5,16 @@
     "corporate_action_rows": 62920,
     "corporate_action_status": "enforced",
     "covered_events": 72,
-    "decision_group_rejection_rate": 0.142857,
-    "decision_groups": 84,
+    "decision_group_rejection_rate": 0.152941,
+    "decision_groups": 85,
     "decision_scope": "end_of_day_research",
     "display_forecast_coverage_pct": 1.0,
-    "display_forecast_covered_events": 91,
-    "display_forecast_events": 91,
+    "display_forecast_covered_events": 99,
+    "display_forecast_events": 99,
     "display_forecast_method_mix": {
-      "historical": 8,
+      "historical": 9,
       "historical_prior": 0,
-      "ml": 30,
+      "ml": 37,
       "ml_unavailable": 0,
       "options_indicative": 0,
       "options_math": 47,
@@ -23,11 +23,11 @@
     "duplicate_rows": 0,
     "eligible_contracts": 62730,
     "eligible_decision_groups": 72,
-    "event_coverage_pct": 0.857143,
-    "expected_events": 84,
+    "event_coverage_pct": 0.847059,
+    "expected_events": 85,
     "expected_source_date": "2026-11-20",
     "live_trading_eligible": false,
-    "missing_events": 12,
+    "missing_events": 13,
     "pair_rejection_rate": 0.856547,
     "quarantine_records": 106549,
     "quarantine_status": "enforced",
@@ -40,19 +40,19 @@
   "exceptions": [
     {
       "code": "upcoming_events_outside_option_universe",
-      "count": 215,
+      "count": 278,
       "severity": "warning",
       "summary": "Calendar events fall outside the current options decision universe"
     },
     {
       "code": "upcoming_events_without_option_chain",
-      "count": 12,
+      "count": 13,
       "severity": "warning",
       "summary": "In-universe earnings events have no decision-eligible option chain"
     },
     {
       "code": "forecast_horizon_coverage_below_limit",
-      "count": 12,
+      "count": 13,
       "severity": "warning",
       "summary": "One or more model horizons lack sufficient eligible option coverage"
     },
@@ -60,7 +60,7 @@
       "code": "ml_event_coverage_partial",
       "count": 1,
       "severity": "warning",
-      "summary": "38 of 39 scored earnings events have eligible ML forecasts; 1 of those events are held. Other upcoming calendar events remain held for ML and use independent estimates until a current eligible forecast is available."
+      "summary": "50 of 51 scored earnings events have eligible ML forecasts; 1 of those events are held. Other upcoming calendar events remain held for ML and use independent estimates until a current eligible forecast is available."
     },
     {
       "code": "ml_aggregate_drift_advisory",
@@ -68,7 +68,7 @@
       "summary": "The aggregate model assessment requires attention. Only eligible event forecasts are published."
     }
   ],
-  "generated_at": "2026-11-21T08:26:15.795710+00:00",
+  "generated_at": "2026-11-22T08:08:01.365210+00:00",
   "model": {
     "challenger_present": false,
     "champion_active": true,
@@ -76,17 +76,17 @@
     "drift_status": "critical",
     "fallback_bundle_available": true,
     "hard_missing_features": null,
-    "monitored_at": "2026-11-21T08:14:39.934131+00:00",
+    "monitored_at": "2026-11-22T07:58:03.885187+00:00",
     "outcome_common_rows": 1068,
     "outcome_evaluated_at": "2026-11-15T19:23:03.997197+00:00",
     "outcome_evaluations": 10,
     "outcome_minimum_rows": 30,
     "outcome_status": "passed",
     "publication_coverage": {
-      "candidate_events": 39,
-      "candidate_rows": 39,
-      "eligible_events": 38,
-      "eligible_rows": 38,
+      "candidate_events": 51,
+      "candidate_rows": 51,
+      "eligible_events": 50,
+      "eligible_rows": 50,
       "held_events": 1,
       "held_rows": 1
     },
