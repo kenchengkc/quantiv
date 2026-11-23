@@ -2,23 +2,23 @@
   "data": {
     "contract_rejection_rate": 0.470722,
     "contracts": 118520,
-    "corporate_action_rows": 62920,
+    "corporate_action_rows": 63182,
     "corporate_action_status": "enforced",
     "covered_events": 72,
     "decision_group_rejection_rate": 0.152941,
     "decision_groups": 85,
     "decision_scope": "end_of_day_research",
     "display_forecast_coverage_pct": 1.0,
-    "display_forecast_covered_events": 99,
-    "display_forecast_events": 99,
+    "display_forecast_covered_events": 120,
+    "display_forecast_events": 120,
     "display_forecast_method_mix": {
       "historical": 9,
       "historical_prior": 0,
-      "ml": 37,
+      "ml": 38,
       "ml_unavailable": 0,
       "options_indicative": 0,
-      "options_math": 47,
-      "straddle_implied": 6
+      "options_math": 65,
+      "straddle_implied": 8
     },
     "duplicate_rows": 0,
     "eligible_contracts": 62730,
@@ -40,7 +40,7 @@
   "exceptions": [
     {
       "code": "upcoming_events_outside_option_universe",
-      "count": 278,
+      "count": 283,
       "severity": "warning",
       "summary": "Calendar events fall outside the current options decision universe"
     },
@@ -60,7 +60,7 @@
       "code": "ml_event_coverage_partial",
       "count": 1,
       "severity": "warning",
-      "summary": "50 of 51 scored earnings events have eligible ML forecasts; 1 of those events are held. Other upcoming calendar events remain held for ML and use independent estimates until a current eligible forecast is available."
+      "summary": "55 of 56 scored earnings events have eligible ML forecasts; 1 of those events are held. Other upcoming calendar events remain held for ML and use independent estimates until a current eligible forecast is available."
     },
     {
       "code": "ml_aggregate_drift_advisory",
@@ -68,25 +68,25 @@
       "summary": "The aggregate model assessment requires attention. Only eligible event forecasts are published."
     }
   ],
-  "generated_at": "2026-11-22T08:08:01.365210+00:00",
+  "generated_at": "2026-11-23T09:07:12.077295+00:00",
   "model": {
-    "challenger_present": false,
+    "challenger_present": true,
     "champion_active": true,
     "critical_features": 0,
     "drift_status": "critical",
     "fallback_bundle_available": true,
     "hard_missing_features": null,
-    "monitored_at": "2026-11-22T07:58:03.885187+00:00",
-    "outcome_common_rows": 1068,
-    "outcome_evaluated_at": "2026-11-15T19:23:03.997197+00:00",
-    "outcome_evaluations": 10,
+    "monitored_at": "2026-11-23T08:54:43.784913+00:00",
+    "outcome_common_rows": 18,
+    "outcome_evaluated_at": "2026-11-22T20:29:32.699213+00:00",
+    "outcome_evaluations": 11,
     "outcome_minimum_rows": 30,
-    "outcome_status": "passed",
+    "outcome_status": "insufficient_data",
     "publication_coverage": {
-      "candidate_events": 51,
-      "candidate_rows": 51,
-      "eligible_events": 50,
-      "eligible_rows": 50,
+      "candidate_events": 56,
+      "candidate_rows": 56,
+      "eligible_events": 55,
+      "eligible_rows": 55,
       "held_events": 1,
       "held_rows": 1
     },
@@ -95,6 +95,7 @@
     "publication_status": "partial",
     "rollback_recorded": false,
     "shadow_roles": [
+      "challenger",
       "champion_evidence",
       "previous"
     ],
