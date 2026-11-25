@@ -17,6 +17,14 @@ The label beside each forecast tells you where the number came from. The calenda
 
 Stock quotes can update during the day. The options estimates use end-of-day prices.
 
+## How the calendar gets its numbers
+
+Each day, Quantiv checks upcoming earnings dates and reporting times against several data sources. It compares the new calendar with the last published one to catch missing reports. The website reads the saved results when you open a week or a ticker.
+
+Quantiv chooses a model based on how many calendar days separate the stock price from the earnings date. For a Wednesday report, Monday's closing price goes into the model trained to forecast two days ahead. If the latest closing price hasn't arrived, Quantiv can use the previous trading day's close. The forecast shows the date of the price it used.
+
+To test a model on past earnings, Quantiv trains it on older reports and sets aside later ones. For each test report, the model gets only the information available on the forecast date. Quantiv then compares its estimate with the actual move and checks how it did against a simpler estimate, such as the stock's historical median. [Forecast testing details](docs/ML_FORECAST_COVERAGE.md)
+
 ## Elsewhere on the site
 
 - Filter upcoming reports and compare companies in the [screener](https://usequantiv.com/screener).
@@ -47,7 +55,7 @@ npm run test --workspace=apps/frontend -- --run
 
 ### Data and forecasts
 
-The daily refresh checks earnings dates and prices, calculates forecasts and writes the files the site reads. If you're working on the refresh or the models, install Python 3.11. On macOS or Linux, start in the repository root.
+If you're working on the daily refresh or the models, install Python 3.11. On macOS or Linux, start in the repository root.
 
 ```bash
 python3.11 -m venv .venv
