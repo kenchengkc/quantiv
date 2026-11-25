@@ -10,20 +10,32 @@ The label beside each forecast tells you where the number came from. The calenda
 
 | Label | How it works |
 | --- | --- |
-| ML forecast | A model learns from past earnings reports. Quantiv uses its forecast when the model has passed testing and its data is recent enough. |
-| IV forecast | Quantiv uses implied volatility (IV) to estimate the move. IV measures how much prices might swing, based on what traders pay for options. |
-| Straddle implied | Add the prices of a call and a put with the same strike price and expiration. Divide by the stock price to get the move as a percentage. |
-| Historical median | Take the size of each past earnings move, whether the stock rose or fell. The median is the middle of those values. |
+| ML forecast | A model estimates the size of the move from past earnings reactions, recent stock prices and, when available, options quotes. |
+| IV forecast | Multiply annual implied volatility (IV) from option prices by the square root of the time to expiration in years. At 40% IV with 7 calendar days to expiration, the estimate is `40% × √(7 / 365) ≈ 5.5%`. |
+| Straddle implied | Add the midpoint prices of a call and a put with the same strike and expiration. Divide by that strike, chosen near the stock price. A $3 call and a $2 put at a $100 strike imply a 5% move. |
+| Historical median | Take the middle value of the stock's recent earnings moves after counting gains and losses by size. |
 
 Stock quotes can update during the day. The options estimates use end-of-day prices.
 
-## How the calendar gets its numbers
+## How the model works
 
-Each day, Quantiv checks upcoming earnings dates and reporting times against several data sources. It compares the new calendar with the last published one to catch missing reports. The website reads the saved results when you open a week or a ticker.
+**What counts as an earnings move?** Quantiv measures the change between the closing prices on either side of the announcement. For a report before the market opens, it uses the previous trading day's close and the report day's close. For an after-close report, it uses the report day's close and the next trading day's close. The calculation accounts for splits and cash dividends. The move as a percentage is `100 × abs(adjusted close after / close before − 1)`. A drop from $100 to $94 gives the model a 6% move to learn from. [Price calculation](apps/ml/ml/causal_features.py)
 
-Quantiv chooses a model based on how many calendar days separate the stock price from the earnings date. For a Wednesday report, Monday's closing price goes into the model trained to forecast two days ahead. If the latest closing price hasn't arrived, Quantiv can use the previous trading day's close. The forecast shows the date of the price it used.
+**How is it predicted?** Quantiv uses LightGBM, which builds a series of decision trees. Each new tree corrects errors in the estimate so far. It trains a separate model for each lead time using the median move over the last four reports, recent daily price swings and the price of an options straddle when quotes pass the quality checks. Monday's close for a Wednesday report uses the two-day model. If the latest close is missing, Quantiv can use one trading session earlier and keeps the actual price date. [Model inputs](apps/ml/ml/causal_features.py) · [Forecast timing](docs/ML_FORECAST_COVERAGE.md)
 
-To test a model on past earnings, Quantiv trains it on older reports and sets aside later ones. For each test report, the model gets only the information available on the forecast date. Quantiv then compares its estimate with the actual move and checks how it did against a simpler estimate, such as the stock's historical median. [Forecast testing details](docs/ML_FORECAST_COVERAGE.md)
+**How is it tested?** The main model minimizes absolute error. A 5% forecast against a 6% move misses by one percentage point. Quantiv tests on later reports set aside from training and model selection. It compares average absolute error with the straddle estimate for stocks with usable options, or with the stock's historical median otherwise.
+
+Five more models per lead time estimate the 10th, 25th, 50th, 75th and 90th percentiles. Quantiv checks how many actual moves land between each pair of bounds. About half should fall between the 25th and 75th percentiles, and about 80% between the 10th and 90th. [Training code](apps/ml/model_trainer.py) · [Historical tests](apps/ml/ml/historical_admission.py)
+
+## How the backend serves the site
+
+| Request | What happens |
+| --- | --- |
+| Open the calendar or a ticker | GitHub Actions runs the daily Python refresh. It checks earnings dates across providers, reads price and option data from Parquet files with DuckDB, runs the models and writes JSON by week and ticker. Next.js on Vercel serves those files. Cloudflare R2 stores the datasets and model releases. |
+| Get current stock prices | A quote worker writes prices to Upstash Redis. The calendar requests several tickers at once from `/api/stocks/batch-price`, which reads the saved quotes. |
+| Recalculate a forecast with a new stock price | Vercel signs a request to `POST /api/ml/predict` on the Railway FastAPI service. The service reads the original model inputs from Neon Postgres, updates the fields that depend on the stock price and runs the verified model again. The options inputs keep their original date. |
+
+[System architecture](docs/ARCHITECTURE.md) · [Prediction service](apps/backend/services/predict_service.py)
 
 ## Elsewhere on the site
 
