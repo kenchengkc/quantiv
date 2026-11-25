@@ -31,11 +31,18 @@ Five more models per lead time estimate the 10th, 25th, 50th, 75th and 90th perc
 
 | Request | What happens |
 | --- | --- |
-| Open the calendar or a ticker | GitHub Actions runs the daily Python refresh. It checks earnings dates across providers, reads price and option data from Parquet files with DuckDB, runs the models and writes JSON by week and ticker. Next.js on Vercel serves those files. Cloudflare R2 stores the datasets and model releases. |
+| Open the calendar or a ticker | Next.js on Vercel reads the JSON for that week or ticker. A daily GitHub Actions job builds those files ahead of time. It checks earnings dates, reads price and option data from Parquet files with DuckDB, and runs the models. Cloudflare R2 stores the datasets and model releases. |
 | Get current stock prices | A quote worker writes prices to Upstash Redis. The calendar requests several tickers at once from `/api/stocks/batch-price`, which reads the saved quotes. |
 | Recalculate a forecast with a new stock price | Vercel signs a request to `POST /api/ml/predict` on the Railway FastAPI service. The service reads the original model inputs from Neon Postgres, updates the fields that depend on the stock price and runs the verified model again. The options inputs keep their original date. |
 
 [System architecture](docs/ARCHITECTURE.md) · [Prediction service](apps/backend/services/predict_service.py)
+
+### System design decisions
+
+- **Calculate forecasts before readers open the page.** Everyone looking at the same report starts with the same published estimate. If the prediction service goes down, the calendar can still show that estimate. The tradeoff is that a new closing price reaches the published forecast on the next successful refresh.
+- **Let one worker collect live quotes.** Readers share prices from Redis, so opening the calendar in ten browsers doesn't trigger ten requests to the market data provider. During regular trading hours, a backup can take over after the active worker's lock expires. If it can't confirm who holds the lock, it skips the update. Quotes can age during an outage. [Quote update rules](apps/frontend/app/api/cron/refresh-prices/route.ts)
+- **Keep the forecast made before the announcement.** Quantiv records when it made each prediction and how recent its inputs were. When a company reports, the actual move can be compared with the estimate a reader could have seen beforehand. A model run after the report can't rewrite that record. [Forecast history](scripts/event_forecast_ledger.py)
+- **Publish the calendar and ticker pages together.** The release job checks that both pages show the same forecast for a given report. It uploads the files to R2 before updating the release ID used for deployment. If a check or upload fails, that ID still points to the previous release. Keeping earlier versions also makes a rollback possible. [Release script](scripts/r2_push_frontend.sh)
 
 ## Elsewhere on the site
 
