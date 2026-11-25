@@ -1,7 +1,7 @@
 {
   "symbol": "CENTA",
-  "as_of_date": "2026-11-20",
-  "spot_price": 39.6,
+  "as_of_date": "2026-11-24",
+  "spot_price": 35.41,
   "expected_move": {
     "earnings_date": "2026-11-23",
     "timing": "amc",
@@ -23,11 +23,11 @@
   "earnings_history": [
     {
       "date": "2026-11-23",
-      "timing": "after_market_close",
+      "timing": "amc",
       "q": "Q3 26",
       "fiscal_year": 2026,
       "fiscal_q": "Q3",
-      "actual": null,
+      "actual": -0.078584,
       "implied": null,
       "implied_as_of": null,
       "implied_expiration": null,
@@ -43,13 +43,13 @@
       "revenue_actual": null,
       "revenue_estimate": null,
       "rev_surprise_pct": null,
-      "realized_target_protocol": null,
-      "realized_label_source": null,
+      "realized_target_protocol": "quantiv.session-reaction.v2",
+      "realized_label_source": "ohlcv_session_close",
       "ml_publication_status": "held",
       "ml_publication_reason": "no_eligible_current_forecast",
       "display_forecast_method": "historical",
-      "display_forecast_pct": 0.047966,
       "display_forecast_as_of": "2026-11-23",
+      "display_forecast_pct": 0.047966,
       "forecast_frozen": true
     },
     {
@@ -330,13 +330,13 @@
   ],
   "next_earnings": "2026-11-23",
   "vol_regime": {
-    "iv_current": 0.3754,
-    "iv_rank": 0.244419,
-    "iv_year_high": 0.7748,
-    "iv_year_low": 0.2462,
-    "hv_current": 0.2855,
-    "hv_rank": 0.942435,
-    "iv_mom_week": 0.0156,
+    "iv_current": null,
+    "iv_rank": null,
+    "iv_year_high": null,
+    "iv_year_low": null,
+    "hv_current": 0.3885,
+    "hv_rank": 1.0,
+    "iv_mom_week": null,
     "iv_mom_month": null
   },
   "next_earnings_timing": "amc"

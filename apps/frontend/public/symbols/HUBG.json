@@ -1,21 +1,21 @@
 {
   "symbol": "HUBG",
-  "as_of_date": "2026-11-20",
-  "spot_price": 22.66,
+  "as_of_date": "2026-11-24",
+  "spot_price": 23.05,
   "expected_move": {
     "earnings_date": "2026-11-26",
-    "display_forecast_pct": 0.03959166996024832,
-    "display_forecast_method": "historical",
-    "display_forecast_as_of": "2026-11-20",
+    "display_forecast_pct": 0.20932754880694143,
+    "display_forecast_method": "straddle_implied",
+    "display_forecast_as_of": "2026-11-24",
     "ml_status": "unavailable_model",
-    "options_status": "unavailable",
+    "options_status": "indicative",
     "fallback_reason": "quote_quality",
-    "historical_event_count": 4,
+    "historical_event_count": null,
     "hist_move_med_4q": 0.039592,
     "timing": "unknown",
     "ml_publication_status": "held",
     "ml_publication_reason": "no_eligible_current_forecast",
-    "em_method": "historical"
+    "em_method": "straddle_implied"
   },
   "straddle_features": [],
   "earnings_history": [
@@ -336,13 +336,13 @@
   ],
   "next_earnings": "2026-11-26",
   "vol_regime": {
-    "iv_current": 0.8405,
-    "iv_rank": 0.916707,
+    "iv_current": 0.7272,
+    "iv_rank": 0.735918,
     "iv_year_high": 0.8927,
     "iv_year_low": 0.266,
-    "hv_current": 0.4481,
-    "hv_rank": 0.358362,
-    "iv_mom_week": 0.2293,
+    "hv_current": 0.4411,
+    "hv_rank": 0.344781,
+    "iv_mom_week": 0.0296,
     "iv_mom_month": null
   },
   "next_earnings_timing": "unknown"
