@@ -1,241 +1,75 @@
 # Quantiv
 
-> Decision-ready earnings research: market pricing, historical outcomes, and calibrated ML in one fast, auditable dashboard.
+Quantiv is an earnings calendar for U.S. stocks. It shows when a company reports, how far its stock might move, and how the price changed after past reports. Pick a ticker on the calendar to see its earnings history and the estimate for its next report. [Open the earnings calendar](https://usequantiv.com)
 
-![License](https://img.shields.io/badge/license-GPL--3.0-blue.svg)
-![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?logo=typescript&logoColor=white)
-![Next.js](https://img.shields.io/badge/Next.js-000000?logo=nextdotjs&logoColor=white)
-![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
-![DuckDB](https://img.shields.io/badge/DuckDB-FFF000?logo=duckdb&logoColor=black)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-316192?logo=postgresql&logoColor=white)
+## Reading a forecast
 
-Quantiv turns fragmented earnings, options, volatility, price, and company data into three clear answers for every ticker: **What move is the market pricing? What happened after similar earnings? What does the model estimate?** Each answer includes the uncertainty, freshness, and quote-quality context needed to judge it.
+A 5% forecast means an estimated move of about 5% in either direction. The stock could rise or fall, and the actual move can be larger or smaller.
 
-Under the hood, a Python pipeline reconciles provider data, validates every publishable snapshot, and generates static JSON. Public research pages therefore stay fast and available without waiting on a database or model server. Optional services add cached live stock quotes, authenticated watchlists, and controlled model re-scoring with an updated stock price.
+The calendar uses the first available method in the table. The label tells you which one you're seeing.
 
-> **Research and educational use only. Quantiv does not provide financial advice or execution-ready signals.**
+| Calendar label | Where the estimate comes from |
+| --- | --- |
+| ML forecast | A machine learning model trained on past earnings reports. Quantiv checks the model and the age of its inputs before showing a forecast. |
+| IV forecast | Implied volatility (IV), a measure of how much stock price movement is reflected in option prices. |
+| Straddle implied | The combined price of a call and a put with the same strike price and expiration, expressed as a percentage of the stock price. |
+| Historical median | The middle value of the stock's past earnings moves, measured by size in either direction. |
 
-## At a glance
+Stock quotes can update during the trading day. The option prices used in a published forecast come from an end-of-day snapshot. For a look at how past forecasts compared with actual moves, see the [validation page](https://usequantiv.com/validation).
 
-- 120,000+ historical earnings records
-- 10,000+ searchable ticker identities
-- 150+ monthly active users
-- Market pricing, model estimates, and event history in one research view
-- Validated nightly snapshots with cached live stock quotes
-- Bad data and weak models blocked before publication—without another always-on service
+## Exploring earnings
 
-| Surface             | Route        | Purpose                                                                                 |
-| ------------------- | ------------ | --------------------------------------------------------------------------------------- |
-| Earnings calendar   | `/`          | Browse previous and upcoming earnings weeks                                             |
-| Screener            | `/screener`  | Search and compare earnings events in a virtualized table                               |
-| Symbol research     | `/[symbol]`  | Compare market pricing, model estimates, history, term structure, Greeks, and scenarios |
-| Watchlist           | `/watchlist` | Save, reorder, price, and score tracked symbols                                         |
-| Methodology         | `/about`     | Review formulas, data sources, and interpretation                                       |
-| Production controls | `/ml-status` | Inspect data, model, serving, and release exceptions                                    |
+- Filter earnings events and compare tickers side by side in the [screener](https://usequantiv.com/screener).
+- Compare the move implied by options with the actual move across a group of past reports in the [research lab](https://usequantiv.com/research).
+- Keep a watchlist of companies you follow. [Sign in to your watchlist](https://usequantiv.com/sign-in?redirect_url=%2Fwatchlist)
+- Find the formulas and data sources in the [methodology guide](https://usequantiv.com/about).
 
-## Built to be reliable
-
-Institutional research software is credible only when every displayed number is timely, reproducible, and safe to interpret. Quantiv makes those requirements part of the publication path:
-
-- **Data integrity:** reconciliation checks freshness, expected-versus-received rows, duplicates, symbol mappings, corporate actions, quarantines, and deterministic replay.
-- **Usable market inputs:** option controls reject crossed, stale, excessively wide, invalid-IV, and otherwise commercially unusable quotes.
-- **Model risk:** challengers must pass purged chronological, walk-forward, straddle-baseline, calibration, drift, shadow-scoring, and forecast-handoff gates.
-- **Artifact security:** native LightGBM bundles are content-addressed, signed, digest-verified, and atomically activated.
-- **Fail-closed releases:** a critical failure stops scoring or publication while the last validated release remains available.
-- **Session correctness:** one versioned NYSE session contract supplies full holidays and early closes to frontend, workers, and Python controls.
-
-### Measured evidence
-
-Latest `main` CI evidence as of September 1, 2026:
-
-- **366 passing checks:** 121 frontend, 19 quote-worker, 127 backend/ML, 81 pipeline/tool, 16 Playwright, and 2 performance tests.
-- **724 ms lab FCP p90 and worst-sample proxy** across seven production-build loads, against a 1.8 s budget. Production Speed Insights remains the source of truth for real-user p90/p99.
-- Railway image health, public production smoke tests, and Python/JavaScript CodeQL checks pass independently.
-
-The decision boundary is explicit: a current stock price may refresh spot-derived inputs, but it does not make the frozen options snapshot intraday or live-trading eligible. See [Decision scope](docs/DECISION_SCOPE.md).
-
-## A small, production-focused architecture
-
-Most user traffic reads immutable, prebuilt research artifacts. Stateful infrastructure is reserved for the few features that need it: watchlists, cached quotes, and optional spot-updated inference.
-
-```mermaid
-flowchart LR
-  subgraph publication["Validated publication"]
-    SOURCES["Market and company data"] --> RECON["Reconcile and validate"]
-    RECON --> DATA["Parquet and DuckDB"]
-    DATA --> SCORE["LightGBM scoring"]
-    SCORE --> JSON["Static frontend JSON"]
-  end
-
-  DATA <-->|Versioned artifacts| R2[(Cloudflare R2)]
-  JSON --> WEB["Next.js on Vercel"]
-
-  subgraph runtime["Optional runtime services"]
-    WRITER["Single quote-writer owner"] --> REDIS[(Upstash Redis)]
-    REDIS --> QUOTES["Batch quote API"] --> WEB
-    WEB <-->|Watchlists| NEON[(Neon Postgres)]
-    WEB -->|HMAC-signed spot update| API["Railway FastAPI"]
-    NEON -->|Saved feature snapshot| API
-    R2 -->|Verified model bundle| API
-  end
-```
-
-The production system has three deliberately narrow paths:
-
-1. **Static publication** keeps the primary research experience fast and resilient.
-2. **Spot-updated inference** substitutes only the latest stock price into a saved end-of-day feature vector, then scores the signed champion model.
-3. **Live quotes** use one lease-elected regular-hours writer; explicit fallbacks take over only when the owner is absent.
-
-This design keeps operating cost and failure surface small while preserving a reproducible data and model trail.
-
-See [System architecture](docs/ARCHITECTURE.md) for providers, routes, schedules, and service responsibilities.
-
-## Technology
-
-| Layer          | Technologies                                     |
-| -------------- | ------------------------------------------------ |
-| Web            | Next.js 15, React 18, TypeScript, Tailwind CSS   |
-| API            | Vercel API routes; optional FastAPI on Railway   |
-| Data           | Python 3.11, DuckDB, Parquet, Cloudflare R2      |
-| ML             | LightGBM native model format                     |
-| Persistence    | Neon Postgres, Upstash Redis                     |
-| Authentication | Clerk                                            |
-| Automation     | GitHub Actions and a Cloudflare fallback trigger |
-
-## Repository structure
-
-```text
-quantiv/
-├── apps/
-│   ├── frontend/           # Next.js UI/API routes; generated public artifacts are transitional
-│   ├── backend/            # FastAPI prediction service and quote worker
-│   └── ml/                 # Features, training, published ML package, and tests
-├── config/                 # Versioned policies, security/session contracts + gitignored local env
-├── data/                   # Gitignored runtime/artifact workspace; selected small evidence may be tracked
-├── docs/                   # Active architecture, controls, and runbooks
-├── lib/                    # Shared ticker and index metadata
-├── scripts/                # Stable operational commands + maintenance/research/probes/tests
-├── tools/                  # Artifact builders/helpers + frontend_data package + tests
-├── workers/refresh-prices/ # Cloudflare quote-writer failover worker
-├── railway.toml
-├── railway.worker.toml
-├── requirements.in         # Direct scheduled-pipeline Python dependencies
-├── requirements.txt        # Hash-pinned scheduled-pipeline lock
-└── package.json
-```
-
-The layout follows ownership rather than language: stable runtime/automation entrypoints keep their existing paths, while tests, maintenance utilities, E2E-only configuration, and research artifacts live with the subsystem that owns them. Runtime datasets are materialized from artifact storage rather than treated as source code; manual research data is isolated under [`data/research/`](data/README.md). Retired live code remains recoverable through Git history.
+As of October 2026, Quantiv had 120,000+ historical earnings records, 10,000+ searchable tickers and 150+ monthly active users.
 
 ## Local development
 
-Requirements:
-
-- Node.js 20+
-- npm
-- Python 3.11
-- Local data artifacts or access to the configured R2 bucket
-- Neon `DATABASE_URL` only when working on watchlists or imported forecasts
-
-Install dependencies and create the local environment:
+To start the website, use Node.js 24 and run these commands from the repository root.
 
 ```bash
 npm ci
-python -m venv .venv
-source .venv/bin/activate
-pip install --require-hashes -r requirements.txt
-cp .env.example config/.env.local
-```
-
-On Windows, activate Python with `.venv\Scripts\Activate.ps1`. Add only the credentials required for the services you are running; the complete inventory is documented in [.env.example](.env.example).
-
-After local data and DuckDB views are available:
-
-```bash
-npm run data:frontend
 npm run dev
 ```
 
-The frontend runs at `http://localhost:3000`. Start the optional FastAPI service with `npm run dev:backend`; its API documentation is at `http://localhost:8000/docs`.
+Open [localhost:3000](http://localhost:3000). The calendar can use the data included in the repository. To set up sign-in, copy `.env.example` to `config/.env.local` and fill in your Clerk development keys. Saved watchlists also need a Postgres connection. [Environment settings](.env.example)
 
-For Neon-backed features, apply migrations with:
-
-```bash
-node scripts/maintenance/migrate.mjs
-```
-
-## Data and ML workflows
-
-Run the manual data path in dependency order:
-
-```bash
-npm run data:sync
-npm run data:earnings:finnhub
-npm run data:earnings:fmp
-python scripts/check_earnings_calendar_integrity.py
-npm run data:views
-npm run ml:score
-npm run data:frontend
-```
-
-Use `npm run data:sync-full` for the expanded synchronization workflow. Generated application data is currently written to `apps/frontend/public/` for Vercel compatibility. The repository also supports a content-addressed frontend release in R2 (`scripts/frontend_release.py` and `scripts/r2_push_frontend.sh`); that path is staging-verified but source-control eviction remains a separate deployment cutover.
-
-Common model-development commands:
-
-```bash
-npm run ml:features
-npm run ml:train
-npm run ml:score
-npm run ml:validate
-npm run ml:walk-forward
-```
-
-The manual `ml:walk-forward` command is a research diagnostic. Scheduled retraining uses mandatory production walk-forward and promotion gates documented in [Model control plane](docs/MODEL_CONTROL_PLANE.md).
-
-## Verification and automation
-
-Run the main local checks with:
+Run the frontend checks from the same directory.
 
 ```bash
 npm run lint
 npm run type-check
-npm test -- --run
-npm run test:e2e --workspace=apps/frontend
-python -m pytest apps/backend/tests apps/ml/tests scripts tools -q
+npm run test --workspace=apps/frontend -- --run
 ```
 
-| Workflow                   | Purpose                                                                                   |
-| -------------------------- | ----------------------------------------------------------------------------------------- |
-| `ci.yml`                   | Lint, type-check, build, pytest, Vitest, Playwright, performance, and Railway image smoke |
-| `security.yml`             | Python and JavaScript/TypeScript CodeQL analysis                                          |
-| `production-smoke.yml`     | Public frontend and API checks                                                            |
-| `data-refresh.yml`         | Provider refresh, reconciliation, scoring, and current frontend generation                |
-| `frontend-publication.yml` | Build and publish immutable content-addressed frontend releases to R2                     |
-| `model-retrain.yml`        | Weekly/manual gated challenger training, promotion, activation, and exact forecast import |
-| `model-rollback.yml`       | Isolated signed provenance recovery to an exact previously approved champion              |
-| `refresh-broad.yml`        | Off-hours Polygon quote-cache warming                                                     |
-| `refresh-ticker-names.yml` | Quarterly SEC ticker and exchange refresh                                                 |
-| `av-enrichment.yml`        | Manual, isolated provider-signal research; never publishes to `main`                      |
+### Working on data or models
 
-## Documentation
+The daily refresh checks earnings dates and prices, calculates forecasts and writes the JSON files the website reads. To work on the refresh or the models, set up Python 3.11. On macOS or Linux, run the following from the repository root.
 
-| Document                                                             | Topic                                                          |
-| -------------------------------------------------------------------- | -------------------------------------------------------------- |
-| [Architecture](docs/ARCHITECTURE.md)                                 | Production paths, providers, services, routes, and schedules   |
-| [Decision scope](docs/DECISION_SCOPE.md)                             | End-of-day versus spot-updated input boundary                  |
-| [Reconciliation control plane](docs/RECONCILIATION_CONTROL_PLANE.md) | Data quality, quote eligibility, replay, and publication gates |
-| [Model control plane](docs/MODEL_CONTROL_PLANE.md)                   | Signed bundles, promotion, monitoring, and rollback            |
-| [Evidence receipts](docs/EVIDENCE_RECEIPTS.md)                       | Reproducible run and artifact evidence                         |
-| [Performance](docs/PERFORMANCE.md)                                   | FCP budget, verification, and production monitoring            |
-| [Railway setup](docs/RAILWAY_SETUP.md)                               | API and quote-worker deployment                                |
-| [R2 setup](docs/R2_SETUP.md)                                         | Artifact storage and synchronization                           |
-| [Pipeline runbook](scripts/README.md)                                | Data-provider and scheduled-pipeline commands                  |
-| [Data layout](data/README.md)                                        | Runtime versus research artifact ownership                     |
-| [Tooling layout](tools/README.md)                                    | Frontend builders, helpers, fixtures, and tool tests           |
-| [Contributing](CONTRIBUTING.md)                                      | Development, review, reproducibility, and control expectations |
-| [Security policy](SECURITY.md)                                       | Private vulnerability reporting and credential response        |
+```bash
+python3.11 -m venv .venv
+source .venv/bin/activate
+python -m pip install --require-hashes -r requirements.txt
+python -m pip install --no-deps -e apps/ml
+```
 
-Additional documentation is indexed in [docs/README.md](docs/README.md).
+On Windows, create the environment with `py -3.11 -m venv .venv` and activate it in PowerShell with `.\.venv\Scripts\Activate.ps1`.
 
-## License
+To rebuild the site's JSON from local data, run `npm run data:views` and then `npm run data:frontend`. You'll need the input datasets in `data/`. [Data setup](docs/R2_SETUP.md) · [Daily refresh steps](.github/workflows/data-refresh.yml)
 
-Quantiv is licensed under the GNU General Public License v3.0. See [LICENSE](LICENSE).
+## Finding the code
+
+| Directory | What's there |
+| --- | --- |
+| [apps/frontend](apps/frontend/) | The Next.js website, API routes and published calendar data. |
+| [apps/ml](apps/ml/) | Python code for training and testing forecast models. |
+| [apps/backend](apps/backend/) | The FastAPI service for updating forecasts with a newer stock price. |
+| [scripts](scripts/README.md) | Commands that fetch data, check it and run forecasts. |
+| [tools](tools/README.md) | Code that builds the files served by the website. |
+
+For deployment, model monitoring and rollback, see the [documentation index](docs/README.md). For development and reporting security issues, see the [contributing guide](CONTRIBUTING.md) and [security policy](SECURITY.md).
+
+Quantiv is for research and education. [GNU General Public License v3.0](LICENSE)
