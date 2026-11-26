@@ -3,32 +3,18 @@
   "as_of_date": "2026-11-24",
   "spot_price": 0.7406,
   "expected_move": {
-    "earnings_date": "2026-11-23",
-    "timing": "amc",
-    "as_of_date": "2026-11-20",
-    "em_ml_pct": 0.072154,
-    "em_ml_abs": 0.048141,
-    "model_horizon": 3,
-    "intervals_calibrated": false,
-    "ml_snapshot_date": "2026-11-20",
-    "em_method": "ml_lightgbm",
-    "display_forecast_pct": 0.072154,
-    "display_forecast_method": "ml",
-    "display_forecast_as_of": "2026-11-20",
-    "ml_status": "available",
+    "earnings_date": "2026-11-25",
+    "timing": "before_market_open",
+    "as_of_date": "2026-11-24",
+    "display_forecast_pct": 0.0532505,
+    "display_forecast_method": "historical",
+    "display_forecast_as_of": "2026-11-25",
+    "ml_status": "unavailable_event",
     "options_status": "unavailable",
-    "hist_move_med_4q": 0.053251,
-    "forecast_frozen": true,
-    "forecast_id": "e08583e91951bea8c8bf5af1bece7c1397d18d144446c47d855b144c79535550",
-    "forecast_model_bundle_id": "b593506618728c14a8bc13660fa7c6a373ba595566ee5bee01e59eed93083881",
-    "ml_publication_status": "eligible",
-    "forecast_scored_at": "2026-11-23T08:54:37.548138+00:00",
-    "forecast_published_at": "2026-11-24T08:51:10+00:00",
-    "forecast_feature_cutoff_at": "2026-11-23T20:55:00+00:00",
-    "forecast_prediction_deadline_at": "2026-11-23T20:55:00+00:00",
-    "forecast_feature_snapshot_at": "2026-11-20T21:00:00+00:00",
-    "forecast_feature_hash": "3cf503fa1fe40102fce9cbd6c32abb855e157f5570ecd1bb48828cde84650acc",
-    "forecast_frozen_eligible": true
+    "fallback_reason": "no_event_expiry",
+    "historical_event_count": 4,
+    "hist_move_med_4q": 0.0532505,
+    "forecast_frozen": true
   },
   "straddle_features": [],
   "earnings_history": [
@@ -61,10 +47,10 @@
       "model_horizon": 3,
       "intervals_calibrated": false,
       "ml_snapshot_date": "2026-11-20",
-      "forecast_id": "e08583e91951bea8c8bf5af1bece7c1397d18d144446c47d855b144c79535550",
+      "forecast_id": "9e4fd9ce8c34b333edf04567e4cbab14409ebd4501de43a18e76041773bc7821",
       "forecast_model_bundle_id": "b593506618728c14a8bc13660fa7c6a373ba595566ee5bee01e59eed93083881",
-      "forecast_scored_at": "2026-11-23T08:54:37.548138+00:00",
-      "forecast_published_at": "2026-11-24T08:51:10+00:00",
+      "forecast_scored_at": "2026-11-21T08:14:33.525359+00:00",
+      "forecast_published_at": "2026-11-21T08:25:57.228673+00:00",
       "forecast_feature_cutoff_at": "2026-11-23T20:55:00+00:00",
       "forecast_prediction_deadline_at": "2026-11-23T20:55:00+00:00",
       "forecast_feature_snapshot_at": "2026-11-20T21:00:00+00:00",
@@ -81,8 +67,7 @@
       "ml_status": "available",
       "options_status": "unavailable",
       "fallback_reason": null,
-      "forecast_frozen": true,
-      "ml_publication_status": "eligible"
+      "forecast_frozen": true
     },
     {
       "date": "2026-08-12",
@@ -360,7 +345,7 @@
       "realized_label_source": "ohlcv_session_close"
     }
   ],
-  "next_earnings": "2026-11-23",
+  "next_earnings": "2026-11-25",
   "vol_regime": null,
-  "next_earnings_timing": "amc"
+  "next_earnings_timing": "unknown"
 }
