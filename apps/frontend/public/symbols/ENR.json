@@ -1,6 +1,6 @@
 {
   "symbol": "ENR",
-  "as_of_date": "2026-11-24",
+  "as_of_date": "2026-11-27",
   "spot_price": 30.0,
   "expected_move": {
     "earnings_date": "2026-11-17",
@@ -45,20 +45,20 @@
   "straddle_features": [
     {
       "expiration": "2027-01-15",
-      "dte": 52,
+      "dte": 49,
       "atm_strike": 30.0,
-      "atm_iv": 0.369,
-      "atm_call_iv": 0.369,
-      "atm_put_iv": 0.369,
-      "straddle_mid": 3.675,
-      "em_straddle": 3.675,
-      "em_straddle_pct": 0.1225,
-      "em_iv": 4.178331,
-      "em_iv_pct": 0.139278,
-      "call_delta": 0.3647,
-      "call_gamma": 0.0967,
-      "call_vega": 0.0398,
-      "call_theta": -0.0162
+      "atm_iv": 0.691421,
+      "atm_call_iv": 0.6742,
+      "atm_put_iv": 0.7086,
+      "straddle_mid": 3.55,
+      "em_straddle": 3.55,
+      "em_straddle_pct": 0.118333,
+      "em_iv": 7.600027,
+      "em_iv_pct": 0.253334,
+      "call_delta": 0.483,
+      "call_gamma": 0.0553,
+      "call_vega": 0.0419,
+      "call_theta": -0.028
     }
   ],
   "earnings_history": [
@@ -110,8 +110,8 @@
       "options_status": "decision_eligible",
       "fallback_reason": null,
       "forecast_frozen": true,
-      "forecast_published_at": "2026-11-26T08:31:57+00:00",
-      "ml_publication_status": "eligible"
+      "ml_publication_status": "eligible",
+      "forecast_published_at": "2026-11-26T08:31:57+00:00"
     },
     {
       "date": "2026-08-04",
@@ -461,13 +461,13 @@
   ],
   "next_earnings": "2026-11-17",
   "vol_regime": {
-    "iv_current": 0.427,
-    "iv_rank": 0.246668,
+    "iv_current": 0.4337,
+    "iv_rank": 0.261307,
     "iv_year_high": 0.7718,
     "iv_year_low": 0.3141,
-    "hv_current": 0.5027,
-    "hv_rank": 0.763136,
-    "iv_mom_week": -0.0527,
+    "hv_current": 0.5091,
+    "hv_rank": 0.789825,
+    "iv_mom_week": -0.0043,
     "iv_mom_month": null
   },
   "next_earnings_timing": "bmo"

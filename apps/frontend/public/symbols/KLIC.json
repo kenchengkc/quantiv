@@ -1,7 +1,7 @@
 {
   "symbol": "KLIC",
-  "as_of_date": "2026-11-24",
-  "spot_price": 60.0,
+  "as_of_date": "2026-11-27",
+  "spot_price": 59.58,
   "expected_move": {
     "earnings_date": "2026-11-18",
     "timing": "amc",
@@ -39,25 +39,7 @@
     "forecast_feature_hash": "aad131c1c51ed7ce7930aef153c27abab5eb6484f14a00c9022c297b2b65b23b",
     "forecast_frozen_eligible": true
   },
-  "straddle_features": [
-    {
-      "expiration": "2027-01-15",
-      "dte": 52,
-      "atm_strike": 60.0,
-      "atm_iv": 0.684806,
-      "atm_call_iv": 0.674,
-      "atm_put_iv": 0.6956,
-      "straddle_mid": 12.2,
-      "em_straddle": 12.2,
-      "em_straddle_pct": 0.203333,
-      "em_iv": 15.508657,
-      "em_iv_pct": 0.258478,
-      "call_delta": 0.495,
-      "call_gamma": 0.0272,
-      "call_vega": 0.0866,
-      "call_theta": -0.0586
-    }
-  ],
+  "straddle_features": [],
   "earnings_history": [
     {
       "date": "2026-11-18",
@@ -109,8 +91,8 @@
       "options_status": "decision_eligible",
       "fallback_reason": null,
       "forecast_frozen": true,
-      "forecast_published_at": "2026-11-18T17:47:48+00:00",
-      "ml_publication_status": "eligible"
+      "ml_publication_status": "eligible",
+      "forecast_published_at": "2026-11-18T17:47:48+00:00"
     },
     {
       "date": "2026-08-05",
@@ -466,15 +448,6 @@
     }
   ],
   "next_earnings": "2026-11-18",
-  "vol_regime": {
-    "iv_current": 0.7249,
-    "iv_rank": 0.590343,
-    "iv_year_high": 0.965,
-    "iv_year_low": 0.3789,
-    "hv_current": 0.9293,
-    "hv_rank": 1.0,
-    "iv_mom_week": -0.0505,
-    "iv_mom_month": null
-  },
+  "vol_regime": null,
   "next_earnings_timing": "amc"
 }

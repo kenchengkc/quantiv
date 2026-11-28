@@ -1,78 +1,9 @@
 {
   "symbol": "NFLX",
-  "as_of_date": "2026-11-24",
-  "spot_price": 59.0,
+  "as_of_date": "2026-11-27",
+  "spot_price": 60.93,
   "expected_move": null,
-  "straddle_features": [
-    {
-      "expiration": "2026-12-11",
-      "dte": 17,
-      "atm_strike": 59.0,
-      "atm_iv": 0.380201,
-      "atm_call_iv": 0.381,
-      "atm_put_iv": 0.3794,
-      "straddle_mid": 3.855,
-      "em_straddle": 3.855,
-      "em_straddle_pct": 0.065339,
-      "em_iv": 4.841089,
-      "em_iv_pct": 0.082052,
-      "call_delta": 0.5157,
-      "call_gamma": 0.0824,
-      "call_vega": 0.0506,
-      "call_theta": -0.0603
-    },
-    {
-      "expiration": "2026-12-24",
-      "dte": 30,
-      "atm_strike": 59.0,
-      "atm_iv": 0.36505,
-      "atm_call_iv": 0.3661,
-      "atm_put_iv": 0.364,
-      "straddle_mid": 4.92,
-      "em_straddle": 4.92,
-      "em_straddle_pct": 0.08339,
-      "em_iv": 6.174738,
-      "em_iv_pct": 0.104657,
-      "call_delta": 0.5225,
-      "call_gamma": 0.0644,
-      "call_vega": 0.0671,
-      "call_theta": -0.0435
-    },
-    {
-      "expiration": "2026-12-31",
-      "dte": 37,
-      "atm_strike": 59.0,
-      "atm_iv": 0.36845,
-      "atm_call_iv": 0.3692,
-      "atm_put_iv": 0.3677,
-      "straddle_mid": 5.51,
-      "em_straddle": 5.51,
-      "em_straddle_pct": 0.09339,
-      "em_iv": 6.921257,
-      "em_iv_pct": 0.117309,
-      "call_delta": 0.5252,
-      "call_gamma": 0.0574,
-      "call_vega": 0.0744,
-      "call_theta": -0.0393
-    },
-    {
-      "expiration": "2027-01-15",
-      "dte": 52,
-      "atm_strike": 60.0,
-      "atm_iv": 0.372295,
-      "atm_call_iv": 0.3701,
-      "atm_put_iv": 0.3745,
-      "straddle_mid": 6.71,
-      "em_straddle": 6.71,
-      "em_straddle_pct": 0.111833,
-      "em_iv": 8.431284,
-      "em_iv_pct": 0.140521,
-      "call_delta": 0.4973,
-      "call_gamma": 0.0486,
-      "call_vega": 0.0887,
-      "call_theta": -0.0357
-    }
-  ],
+  "straddle_features": [],
   "earnings_history": [
     {
       "date": "2027-01-19",
@@ -103,13 +34,11 @@
       "ml_publication_reason": "no_eligible_current_forecast",
       "display_forecast_pct": 0.06288336936322869,
       "display_forecast_method": "historical",
-      "display_forecast_as_of": "2026-11-24",
+      "display_forecast_as_of": "2026-11-27",
       "options_status": "unavailable",
-      "fallback_reason": "options_held",
+      "fallback_reason": "no_event_expiry",
       "historical_event_count": 4,
-      "em_method": "historical",
-      "options_publication_status": "held",
-      "options_publication_source_date": "2026-11-24"
+      "em_method": "historical"
     },
     {
       "date": "2026-10-20",
@@ -483,15 +412,6 @@
     }
   ],
   "next_earnings": "2027-01-19",
-  "vol_regime": {
-    "iv_current": 0.3703,
-    "iv_rank": 0.342811,
-    "iv_year_high": 0.5321,
-    "iv_year_low": 0.2859,
-    "hv_current": 0.3592,
-    "hv_rank": 0.46209,
-    "iv_mom_week": 0.0106,
-    "iv_mom_month": null
-  },
+  "vol_regime": null,
   "next_earnings_timing": "after_market_close"
 }

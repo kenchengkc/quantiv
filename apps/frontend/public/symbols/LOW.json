@@ -1,7 +1,7 @@
 {
   "symbol": "LOW",
-  "as_of_date": "2026-11-24",
-  "spot_price": 232.5,
+  "as_of_date": "2026-11-27",
+  "spot_price": 236.46,
   "expected_move": {
     "earnings_date": "2026-11-18",
     "timing": "bmo",
@@ -28,76 +28,7 @@
     "ml_publication_status": "held",
     "ml_publication_reason": "no_eligible_current_forecast"
   },
-  "straddle_features": [
-    {
-      "expiration": "2026-12-11",
-      "dte": 17,
-      "atm_strike": 232.5,
-      "atm_iv": 0.345382,
-      "atm_call_iv": 0.3554,
-      "atm_put_iv": 0.3354,
-      "straddle_mid": 13.8,
-      "em_straddle": 13.8,
-      "em_straddle_pct": 0.059355,
-      "em_iv": 17.330103,
-      "em_iv_pct": 0.074538,
-      "call_delta": 0.4833,
-      "call_gamma": 0.0224,
-      "call_vega": 0.1982,
-      "call_theta": -0.2089
-    },
-    {
-      "expiration": "2026-12-24",
-      "dte": 30,
-      "atm_strike": 230.0,
-      "atm_iv": 0.302101,
-      "atm_call_iv": 0.3014,
-      "atm_put_iv": 0.3028,
-      "straddle_mid": 15.95,
-      "em_straddle": 15.95,
-      "em_straddle_pct": 0.069348,
-      "em_iv": 19.920192,
-      "em_iv_pct": 0.08661,
-      "call_delta": 0.5447,
-      "call_gamma": 0.0198,
-      "call_vega": 0.2619,
-      "call_theta": -0.1377
-    },
-    {
-      "expiration": "2026-12-31",
-      "dte": 37,
-      "atm_strike": 235.0,
-      "atm_iv": 0.290449,
-      "atm_call_iv": 0.2911,
-      "atm_put_iv": 0.2898,
-      "straddle_mid": 17.4,
-      "em_straddle": 17.4,
-      "em_straddle_pct": 0.074043,
-      "em_iv": 21.73159,
-      "em_iv_pct": 0.092475,
-      "call_delta": 0.4551,
-      "call_gamma": 0.0184,
-      "call_vega": 0.291,
-      "call_theta": -0.1207
-    },
-    {
-      "expiration": "2027-01-15",
-      "dte": 52,
-      "atm_strike": 230.0,
-      "atm_iv": 0.29215,
-      "atm_call_iv": 0.2929,
-      "atm_put_iv": 0.2914,
-      "straddle_mid": 20.29,
-      "em_straddle": 20.29,
-      "em_straddle_pct": 0.088217,
-      "em_iv": 25.362282,
-      "em_iv_pct": 0.110271,
-      "call_delta": 0.549,
-      "call_gamma": 0.0154,
-      "call_vega": 0.3441,
-      "call_theta": -0.104
-    }
-  ],
+  "straddle_features": [],
   "earnings_history": [
     {
       "date": "2026-11-18",
@@ -487,15 +418,6 @@
     }
   ],
   "next_earnings": "2026-11-18",
-  "vol_regime": {
-    "iv_current": 0.2985,
-    "iv_rank": 0.518789,
-    "iv_year_high": 0.3843,
-    "iv_year_low": 0.206,
-    "hv_current": 0.3734,
-    "hv_rank": 0.942327,
-    "iv_mom_week": -0.0592,
-    "iv_mom_month": null
-  },
+  "vol_regime": null,
   "next_earnings_timing": "bmo"
 }
